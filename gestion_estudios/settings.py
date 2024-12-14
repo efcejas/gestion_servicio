@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Construya rutas dentro del proyecto de esta manera: BASE_DIR /'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Ver https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # ADVERTENCIA DE SEGURIDAD: ¡mantenga en secreto la clave secreta utilizada en la producción!
-SECRET_KEY = 'django-insecure-_7ueihg$ei+zwln)*ot)bz9nek@d@cv64z-3z)z1vd3t&rn-dx'
+# Configuración sensible desde el archivo .env
+SECRET_KEY = config('SECRET_KEY')
 
 # ADVERTENCIA DE SEGURIDAD: ¡no ejecute con la depuración activada en producción!
-DEBUG = True
+DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
 
 # Application definition

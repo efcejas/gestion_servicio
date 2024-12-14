@@ -1,0 +1,23 @@
+# Entorno virtual
+venv/
+gestion_env/
+
+# Archivos generados por el sistema operativo
+*.DS_Store
+Thumbs.db
+
+# Archivos temporales de Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/
+
+# Archivos estáticos generados
+staticfiles/
+media/
+
+# Claves y configuraciones sensibles
+.env
