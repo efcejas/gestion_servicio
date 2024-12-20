@@ -56,7 +56,7 @@ ROOT_URLCONF = 'gestion_estudios.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -101,6 +101,10 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+LOGIN_REDIRECT_URL = 'home'  # Redirigir al home después de iniciar sesión
+LOGOUT_REDIRECT_URL = 'login'  # Redirigir al login después de cerrar sesión
+LOGIN_URL = 'login'  # Página de login predeterminada
+
 
 # Internacionalización
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
@@ -118,6 +122,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+
+STATICFILES_DIRS = [
+    BASE_DIR / 'static',
+]
 
 # Tipo de campo de clave principal predeterminado
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
