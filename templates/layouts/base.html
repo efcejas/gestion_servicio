@@ -51,7 +51,7 @@
 <body>
     {% if not hide_navbar %}
     <header class="container-fluid py-3">
-        <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center">
+        <div class="container-fluid d-flex flex-column flex-md-row justify-content-between align-items-center">
             <div class="logo mb-2 mb-md-0">
                 <img src="{% static 'images/drcejaslogo.png' %}" alt="Logo" class="img-fluid" style="max-height: 80px;">
             </div>
@@ -117,7 +117,6 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
                             <li><a class="dropdown-item" href="#">Informes</a></li>
-                            <li><a class="dropdown-item" href="{% url 'home' %}">Residencia DM</a></li>
                             <li><a class="dropdown-item" href="#">Ajustes</a></li>
                         </ul>
                     </li>

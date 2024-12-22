@@ -20,6 +20,15 @@
                         <input type="password" name="password" id="password" class="form-control"
                             placeholder="Contraseña" required>
                     </div>
+                    {% if form.errors %}
+                    <div class="alert alert-danger text-center" role="alert">
+                        {% if form.non_field_errors %}
+                        <strong>¡Error!</strong> Nombre de usuario o contraseña incorrectos.
+                        {% else %}
+                        <strong>¡Error!</strong> Por favor, ingrese su nombre de usuario y contraseña.
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     <button type="submit" class="btn w-100" style="background-color: #164569; color: white;">Iniciar
                         sesión</button>
                 </form>
