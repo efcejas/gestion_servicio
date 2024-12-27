@@ -1,0 +1,82 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Crear una cuenta{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-start py-3">
+    <div class="card shadow border-0 w-100">
+        <!-- Ajuste de color personalizado -->
+        <div class="card-header text-white text-center cabecera-tarjeta">
+            <h4 class="mb-0">Registro de usuario</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row mb-3">
+                    <div class="col-md-12 titulo-h6">
+                        <p class="h6 col-12">Información de cuenta</p>
+                    </div>
+                    <div class="col-lg-5 mb-2 mb-lg-0">
+                        {{ form.username }}
+                    </div>
+                    <div class="col-lg-7 d-lg-flex align-items-center">
+                        <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">{{ form.username.help_text }}</p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-12 titulo-h6">
+                        <p class="h6 col-12">Datos personales</p>
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.first_name }}
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.last_name }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12 titulo-h6">
+                        <p class="h6 col-12">Datos de contacto</p>
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.email }}
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.telefono }}
+                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Debe ingresar el número de la siguiente manera: 1112345678</p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-12 titulo-h6">
+                        <p class="h6 col-12">Tipo de cargo</p>
+                    </div>
+                    <div class="col-lg-5 mb-2 mb-lg-0">
+                        {{ form.cargo }}
+                    </div>
+                    <div class="col-lg-7 d-lg-flex align-items-center">
+                        <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">Debe seleccionar el tipo de cargo que desempeña en el servicio.</p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-12 titulo-h6">
+                        <p class="h6 col-12">Contraseña</p>
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.password1 }}
+                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Su contraseña no puede ser similar a otros datos personales y debe contener al menos 8 caracteres.</p>
+                    </div>
+                    <div class="col-md-6 mb-2 mb-lg-0">
+                        {{ form.password2 }}
+                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">{{ form.password2.help_text }}</p>
+                    </div>
+                </div>
+                <button type="submit" class="btn text-white w-100" style="background-color: #164569;">Crear
+                    cuenta</button>
+            </form>
+            <p class="text-center mt-3">
+                ¿Ya tienes una cuenta? <a href="{% url 'login' %}" style="color: #164569;">Inicia sesión aquí</a>.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

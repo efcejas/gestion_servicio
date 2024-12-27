@@ -5,11 +5,18 @@
 {% block content %}
 <div class="d-flex align-items-center justify-content-center" style="height: 80vh;">
     <div class="col-md-6 col-lg-5">
-        <div class="card shadow-sm">
-            <div class="card-header text-center" style="background-color: #164569; color: white;">
+        <div class="card shadow border-0">
+            <div class="card-header text-center cabecera-tarjeta">
                 <h4 class="mb-0">Bienvenido</h4>
             </div>
             <div class="card-body">
+                {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} text-center" role="alert">
+                    {{ message }}
+                </div>
+                {% endfor %}
+                {% endif %}
                 <form method="post" class="needs-validation" novalidate>
                     {% csrf_token %}
                     <div class="mb-3">
@@ -29,12 +36,16 @@
                         {% endif %}
                     </div>
                     {% endif %}
-                    <button type="submit" class="btn w-100" style="background-color: #164569; color: white;">Iniciar
+                    <button type="submit" class="btn btn-custom">Iniciar
                         sesión</button>
                 </form>
                 <p class="text-center mt-3">
                     ¿Olvidaste tu contraseña?
                     <a href="{% url 'password_reset' %}" style="color: #164569;">Recupérala aquí</a>
+                </p>
+                <p class="text-center mt-3">
+                    ¿No tienes una cuenta?
+                    <a href="{% url 'register' %}" style="color: #164569;">Regístrate aquí</a>
                 </p>
             </div>
         </div>

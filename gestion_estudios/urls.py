@@ -22,5 +22,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', HomeView.as_view(), name='home'),  # Vista de inicio de la aplicación
     path('accounts/login/', CustomLoginView.as_view(), name='login'),  # Vista personalizada para login
+    path('accounts/', include('accounts.urls')),  # Incluye las rutas de la aplicación accounts
     path('accounts/', include('django.contrib.auth.urls')),  # Incluye todas las rutas predeterminadas de autenticación
 ]

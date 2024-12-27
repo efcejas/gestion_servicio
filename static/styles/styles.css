@@ -1,0 +1,58 @@
+/*Estilos globales */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Área de contenido principal */
+.content {
+    flex: 1;
+}
+
+/* Estilo de la cabecera */
+.user-info {
+    color: #164569;
+}
+
+/* Estilos de botones */
+.btn.btn-logout {
+    background-color: #164569;
+    color: white;
+    border: none;
+}
+
+.btn.btn-custom {
+    background-color: #164569;
+    color: white;
+    width: 100%;
+    border: none;
+}
+
+/* Estilo de texto principal */
+
+.titulo-h6 {
+    color: #164569;
+}
+
+/* Estilos de botón de login */
+.btn.btn-login {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+}
+
+/* Estilos cabeceras de tarjetas */
+.card-header.cabecera-tarjeta {
+    background-color: #164569; 
+    color: white;
+}
+
+/* Estilos de pie de página */
+footer {
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+}
