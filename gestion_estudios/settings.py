@@ -125,13 +125,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
+# Archivos estáticos
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Directorio donde se recopilan los archivos estáticos
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Opcional: Configura almacenamiento de archivos estáticos para producción
+# Directorios adicionales de archivos estáticos
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # Directorio con tus archivos estáticos
+    os.path.join(BASE_DIR, 'static'),
 ]
+
+# Almacenamiento para Heroku
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Tipo de campo de clave principal predeterminado
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
