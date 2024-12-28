@@ -11,6 +11,11 @@ __pycache__/
 *.py[cod]
 *.sqlite3
 
+# Archivos de compilación
+__pycache__/
+*.pyc
+*.pyo
+
 # Archivos de configuración de IDE
 .vscode/
 .idea/
