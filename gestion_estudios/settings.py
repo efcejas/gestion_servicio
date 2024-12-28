@@ -126,10 +126,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Lugar donde Django colocará los archivos estáticos recopilados
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Directorio donde se recopilan los archivos estáticos
 
+# Opcional: Configura almacenamiento de archivos estáticos para producción
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    os.path.join(BASE_DIR, 'static'),  # Directorio con tus archivos estáticos
 ]
 
 # Tipo de campo de clave principal predeterminado
