@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'accounts.apps.AccountsConfig',
     'recepcion.apps.RecepcionConfig',
+    'tasks.apps.TasksConfig',
+    'facturacion_regiones.apps.FacturacionRegionesConfig',
+    'control_guardias.apps.ControlGuardiasConfig',
 ]
 
 MIDDLEWARE = [

@@ -1,0 +1,36 @@
+{% extends "layouts/base_dos.html" %}
+{% block title %}Guardias - Médicos de imágenes{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h3 class="header-title text-center mb-4 titulo-h6">Guardias - Servicio de imágenes</h3>
+    <div class="row">
+        {% for guardia in guardias %}
+        <div class="col-md-6 col-lg-4 d-flex mb-4">
+            <div class="card w-100 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="guardia-fecha">{{ guardia.fecha|date:"l, d/m/Y"|capfirst }}</span>
+                    <span class="badge {% if guardia.cubierta %}badge-success{% else %}badge-danger{% endif %}">
+                        {% if guardia.cubierta %}
+                        <span style="color: rgb(5, 244, 5);">Cubierta</span>
+                        {% else %}
+                        <span style="color: red;">No Cubierta</span>
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="card-title">{{ guardia.get_franja_horaria_display }}</h5>
+                        {% if guardia.medico %}
+                        <p class="card-text"><strong>Dr/a. {{ guardia.medico }}</strong></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <p class="text-center text-muted">No hay guardias disponibles.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

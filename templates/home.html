@@ -1,35 +1,57 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}home{% endblock %}
+{% block title %}Bienvenido al sistema de gestión{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <h1>Bienvenido al sistema de gestión</h1>
-    <p>Esta es la página de inicio utilizando la vista genérica TemplateView.</p>
-    <p>Explore nuestras funcionalidades y descubra cómo podemos ayudarle a gestionar sus servicios de manera eficiente.</p>
-    <div class="row mt-4">
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Funcionalidad 1</h5>
-                    <p class="card-text">Descripción breve de la funcionalidad 1.</p>
-                </div>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Contenido principal -->
+        <div class="col-md-8">
+            <div class="text-center">
+                <h1 class="my-4">Bienvenido al sistema de gestión</h1>
+                <p>Este sistema te permite gestionar tus tareas de forma eficiente.</p>
+                <p>Puedes ver tus tareas pendientes y tareas importantes en la página de inicio.</p>
+                <p>Para comenzar, selecciona una opción del menú de navegación.</p>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Funcionalidad 2</h5>
-                    <p class="card-text">Descripción breve de la funcionalidad 2.</p>
+
+        <!-- Panel de tareas importantes -->
+        <div class="col-md-4 p-3">
+            <div class="bg-light p-3 rounded shadow-sm">
+                <h3 class="text-center titulo-h6">Tareas importantes</h3>
+                {% if tareas_importantes %}
+                {% for tarea in tareas_importantes %}
+                <div class="card shadow-sm mb-3 border-{{ tarea.prioridad_color }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <!-- Título con ícono -->
+                            <h6 class="card-title titulo-h6 m-0">
+                                <i class="bi bi-clipboard-check me-2"></i>{{ tarea.titulo }}
+                            </h6>
+                            <!-- Prioridad con color -->
+                            <span class="badge bg-{{ tarea.prioridad_color }}">
+                                Prioridad {{ tarea.get_prioridad_display }}
+                            </span>       
+                        </div>
+                        <!-- Descripción con ícono -->
+                        <p class="card-text text-muted small mb-2">
+                            <i class="bi bi-info-circle me-2"></i>{{ tarea.descripcion }}
+                        </p>
+                        <!-- Estado y Fecha Límite -->
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small">
+                                <i class="bi bi-flag me-1"></i>{{ tarea.get_estado_display }}
+                            </span>
+                            <span class="small">
+                                <i class="bi bi-calendar2-event me-1"></i>{{ tarea.fecha_limite }}
+                            </span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Funcionalidad 3</h5>
-                    <p class="card-text">Descripción breve de la funcionalidad 3.</p>
-                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-center text-muted">No hay tareas importantes en este momento.</p>
+                {% endif %}
             </div>
         </div>
     </div>

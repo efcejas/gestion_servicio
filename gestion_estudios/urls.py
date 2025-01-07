@@ -17,11 +17,15 @@ Incluyendo otra URLconf
 from django.contrib import admin
 from django.urls import path, include
 from .views import CustomLoginView, HomeView
+from tasks.views import TareasImportantesView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', HomeView.as_view(), name='home'),  # Vista de inicio de la aplicación
+    path('', TareasImportantesView.as_view(), name='home'),  # Configura la vista para la página principal
     path('accounts/login/', CustomLoginView.as_view(), name='login'),  # Vista personalizada para login
     path('accounts/', include('accounts.urls')),  # Incluye las rutas de la aplicación accounts
     path('accounts/', include('django.contrib.auth.urls')),  # Incluye todas las rutas predeterminadas de autenticación
+    path('tareas/', include('tasks.urls')),  # Incluye las rutas de la aplicación tasks
+    path('facturacion/', include('facturacion_regiones.urls')),  # Incluye las rutas de la aplicación facturacion_regiones
+    path('control_guardias/', include('control_guardias.urls')),  # Incluye las rutas de la aplicación control_guardias
 ]
