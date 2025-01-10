@@ -9,7 +9,7 @@
         <div class="col-md-6 col-lg-4 d-flex mb-4">
             <div class="card w-100 shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span class="guardia-fecha">{{ guardia.fecha|date:"l, d/m/Y"|capfirst }}</span>
+                    <span class="guardia-fecha">{{ guardia.fecha|date:"l d/m/Y"|capfirst }}</span>
                     <span class="badge {% if guardia.cubierta %}badge-success{% else %}badge-danger{% endif %}">
                         {% if guardia.cubierta %}
                         <span style="color: rgb(5, 244, 5);">Cubierta</span>
