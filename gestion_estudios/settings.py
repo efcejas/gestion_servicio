@@ -41,10 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'accounts.apps.AccountsConfig',
-    'recepcion.apps.RecepcionConfig',
     'tasks.apps.TasksConfig',
     'control_guardias.apps.ControlGuardiasConfig',
-    'liquidacion_honorarios.apps.LiquidacionHonorariosConfig',
 ]
 
 MIDDLEWARE = [
