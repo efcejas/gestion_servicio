@@ -43,8 +43,8 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'recepcion.apps.RecepcionConfig',
     'tasks.apps.TasksConfig',
-    'facturacion_regiones.apps.FacturacionRegionesConfig',
     'control_guardias.apps.ControlGuardiasConfig',
+    'liquidacion_honorarios.apps.LiquidacionHonorariosConfig',
 ]
 
 MIDDLEWARE = [
