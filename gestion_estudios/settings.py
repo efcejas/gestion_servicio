@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     'tasks.apps.TasksConfig',
     'facturacion_regiones.apps.FacturacionRegionesConfig',
     'control_guardias.apps.ControlGuardiasConfig',
-    'personal_del_servicio.apps.PersonalDelServicioConfig',
 ]
 
 MIDDLEWARE = [
