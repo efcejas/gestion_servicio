@@ -28,5 +28,4 @@ urlpatterns = [
     path('tareas/', include('tasks.urls')),  # Incluye las rutas de la aplicación tasks
     path('facturacion/', include('facturacion_regiones.urls')),  # Incluye las rutas de la aplicación facturacion_regiones
     path('control_guardias/', include('control_guardias.urls')),  # Incluye las rutas de la aplicación control_guardias
-    path('personal_del_servicio/', include('personal_del_servicio.urls')),  # Incluye las rutas de la aplicación personal_del_servicio
 ]
