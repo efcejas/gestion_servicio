@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'accounts.apps.AccountsConfig',
     'tasks.apps.TasksConfig',
     'control_guardias.apps.ControlGuardiasConfig',
+    'liquidacion.apps.LiquidacionConfig',
 ]
 
 MIDDLEWARE = [
