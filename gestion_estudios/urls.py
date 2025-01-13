@@ -27,4 +27,5 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),  # Incluye todas las rutas predeterminadas de autenticación
     path('tareas/', include('tasks.urls')),  # Incluye las rutas de la aplicación tasks
     path('control_guardias/', include('control_guardias.urls')),  # Incluye las rutas de la aplicación control_guardias
+    path('liquidacion/', include('liquidacion.urls')),  # Incluye las rutas de la aplicación liquidacion
 ]
