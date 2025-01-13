@@ -18,8 +18,8 @@ class Guardia(models.Model):
         ('NOCHE', '20:00 - 08:00'),
         ('DIA_COMPLETO', '24 horas'),
         ('DIA', '08:00 - 20:00'),
-        ('NOCHE_FIN_SEMANA', '20:00 - 08:00'),
-        ('DIA_FIN_SEMANA', '08:00 - 20:00'),
+        ('NOCHE_FIN_SEMANA', '20:00 - 08:00 (SA-DO-FE)'),
+        ('DIA_FIN_SEMANA', '08:00 - 20:00 (SA-DO-FE)'),
     ]
 
     franja_horaria = models.CharField(max_length=25, choices=FRANJA_HORARIA_CHOICES)
