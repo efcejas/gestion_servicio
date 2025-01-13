@@ -18,13 +18,19 @@ class Guardia(models.Model):
         ('NOCHE', '20:00 - 08:00'),
         ('DIA_COMPLETO', '24 horas'),
         ('DIA', '08:00 - 20:00'),
-        ('NOCHE_FIN_SEMANA', '20:00 - 08:00 (Fin de semana)'),
-        ('DIA_FIN_SEMANA', '08:00 - 20:00 (Fin de semana)'),
+        ('NOCHE_FIN_SEMANA', '20:00 - 08:00'),
+        ('DIA_FIN_SEMANA', '08:00 - 20:00'),
     ]
 
     franja_horaria = models.CharField(max_length=25, choices=FRANJA_HORARIA_CHOICES)
     cubierta = models.BooleanField(default=False)
-    medico = models.ForeignKey('MedicoGuardia', on_delete=models.CASCADE, verbose_name="Médico", blank=True, null=True)
+    medico = models.ForeignKey(
+        'MedicoGuardia',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        verbose_name="Médico"
+    )
     fecha = models.DateField()
 
     def __str__(self):
