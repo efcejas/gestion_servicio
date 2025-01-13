@@ -19,11 +19,11 @@
                     </span>
                 </div>
                 <div class="card-body d-flex flex-column justify-content-between">
-                    <div class="d-flex justify-content-between">
-                        <h5 class="card-title">{{ guardia.get_franja_horaria_display }}</h5>
+                    <div class="d-flex flex-column">
                         {% if guardia.medico %}
-                        <p class="card-text"><strong>Dr/a. {{ guardia.medico }}</strong></p>
+                        <p class="card-text text-center"><strong>Dr/a. {{ guardia.medico }}</strong></p>
                         {% endif %}
+                        <h6 class="card-title text-center">{{ guardia.get_franja_horaria_display }}</h6>
                     </div>
                 </div>
             </div>

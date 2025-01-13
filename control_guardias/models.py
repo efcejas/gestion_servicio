@@ -16,7 +16,7 @@ class MedicoGuardia(models.Model):
 class Guardia(models.Model):
     FRANJA_HORARIA_CHOICES = [
         ('NOCHE', '20:00 - 08:00'),
-        ('DIA_COMPLETO', '24 horas'),
+        ('DIA_COMPLETO', '24 horas (SA-DO-FE)'),
         ('DIA', '08:00 - 20:00'),
         ('NOCHE_FIN_SEMANA', '20:00 - 08:00 (SA-DO-FE)'),
         ('DIA_FIN_SEMANA', '08:00 - 20:00 (SA-DO-FE)'),
