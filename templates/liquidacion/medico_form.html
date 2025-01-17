@@ -1,0 +1,12 @@
+{% extends "layouts/base.html" %}
+{% block title %}Nuevo Médico{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <h1>Nuevo Médico</h1>
+    <form method="post">
+        {% csrf_token %}
+        <p>{{ form.as_p }}</p>
+        <button type="submit">Guardar</button>
+    </form>
+</div>
+{% endblock %}

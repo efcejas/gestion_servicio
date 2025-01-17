@@ -60,12 +60,21 @@
                         </div>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="#">Inicio</a>
+                        <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
                     </li>
-                    <li class="nav-item">
+                    <!-- <li class="nav-item">
                         <a class="nav-link" href="#">Una opción</a>
-                    </li>
+                    </li> -->
                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Liquidaciones
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                            <li><a class="dropdown-item" href="{% url 'estudios_list' %}">Gestión de estudios</a></li>
+                            <li><a class="dropdown-item" href="#">Submenú 2</a></li>
+                        </ul>
+                    <!-- <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
                             data-bs-toggle="dropdown" aria-expanded="false">
                             Más opciones
@@ -74,7 +83,7 @@
                             <li><a class="dropdown-item" href="#">Informes</a></li>
                             <li><a class="dropdown-item" href="#">Ajustes</a></li>
                         </ul>
-                    </li>
+                    </li> -->
                 </ul>
             </div>
         </div>
