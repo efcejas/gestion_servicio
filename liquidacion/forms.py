@@ -27,6 +27,7 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
             }),
             'dni_paciente': forms.TextInput(attrs={
                 'class': 'form-control',
+                'maxlength': 8,
             }),
             'estudio': forms.SelectMultiple(attrs={  # Cambiado a SelectMultiple
                 'class': 'form-control',
@@ -37,14 +38,3 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
                 'class': 'form-control',
             }),
         }
-
-    def clean_dni_paciente(self):
-        """
-        Valida el campo DNI para asegurarse de que contenga solo números y tenga 8 dígitos.
-        """
-        dni = self.cleaned_data.get('dni_paciente')
-        if not dni.isdigit():
-            raise forms.ValidationError('El DNI debe contener solo números.')
-        if len(dni) != 8:
-            raise forms.ValidationError('El DNI debe tener 8 dígitos.')
-        return dni

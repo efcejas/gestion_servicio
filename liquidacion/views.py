@@ -36,4 +36,4 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     form_class = RegistroEstudiosPorMedicoCreateViewForm
     template_name = 'liquidacion/registroestudios_form.html'
     success_url = reverse_lazy('registroestudios_nuevo')  # Redirigir a la misma vista por defecto
-    success_message = "El registro de estudio por médico fue registrado exitosamente"
+    success_message = "Registro realizado exitosamente"  # Mensaje de éxito
