@@ -71,8 +71,9 @@
                             Liquidaciones
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                            <li><a class="dropdown-item" href="{% url 'registroestudios_nuevo' %}">Registrar estudios por médico</a></li>
+                            <li><a class="dropdown-item" href="{% url 'medico_list' %}">Gestión de médicos</a></li>
                             <li><a class="dropdown-item" href="{% url 'estudios_list' %}">Gestión de estudios</a></li>
-                            <li><a class="dropdown-item" href="#">Submenú 2</a></li>
                         </ul>
                     <!-- <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"

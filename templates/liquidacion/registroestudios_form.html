@@ -1,0 +1,20 @@
+{% extends "layouts/base.html" %}
+{% block title %}Nuevo Registro Diario{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <!-- Título -->
+    <h2 class="mb-4 text-center">Registrar Estudios por Médico</h2>
+    <!-- Formulario -->
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <!-- Acciones -->
+        <div class="d-flex justify-content-between mt-4">
+            <!-- Botón para guardar y continuar -->
+            <button type="submit" class="btn btn-primary" name="continuar">Guardar y continuar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

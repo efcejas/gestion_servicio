@@ -30,3 +30,25 @@ class Estudios(models.Model):
 
     def __str__(self):
         return f'{self.nombre}'
+
+class RegistroEstudiosPorMedico(models.Model):
+    medico = models.ForeignKey(Medico, on_delete=models.CASCADE, verbose_name='Médico')
+    nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
+    apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
+    dni_paciente = models.CharField(max_length=8, verbose_name='DNI del paciente')
+    fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
+    fecha_del_informe = models.DateField(verbose_name='Fecha del informe', blank=True, null=True)
+    estudio = models.ManyToManyField(Estudios, verbose_name='Estudios')
+
+    class Meta:
+        verbose_name = 'Registro de estudio por médico'
+        verbose_name_plural = 'Registros de estudios por médico'
+
+    def __str__(self):
+        return f'{self.medico} - {self.fecha_registro}'
+
+    def total_regiones(self):
+        """
+        Calcula el total de regiones para los estudios asociados a este registro.
+        """
+        return sum(estudio.conteo_regiones for estudio in self.estudio.all())
