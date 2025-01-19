@@ -27,7 +27,6 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
             }),
             'dni_paciente': forms.TextInput(attrs={
                 'class': 'form-control',
-                'maxlength': 8,
             }),
             'estudio': forms.SelectMultiple(attrs={  # Cambiado a SelectMultiple
                 'class': 'form-control',
