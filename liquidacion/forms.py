@@ -17,24 +17,24 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
         fields = ['medico', 'nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_informe', 'estudio']
         widgets = {
             'medico': forms.Select(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
             }),
             'nombre_paciente': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
             }),
             'apellido_paciente': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
             }),
             'dni_paciente': forms.TextInput(attrs={
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'maxlength': 8,
             }),
             'estudio': forms.SelectMultiple(attrs={  # Cambiado a SelectMultiple
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
                 'size': 5,  # Tamaño del selector para facilitar la selección de múltiples estudios
             }),
             'fecha_del_informe': forms.DateInput(attrs={
                 'type': 'date',
-                'class': 'form-control',
+                'class': 'form-control form-control-sm',
             }),
         }
