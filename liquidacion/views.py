@@ -1,10 +1,10 @@
 from django.shortcuts import render
 from django.urls import reverse_lazy
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
-from django.contrib import messages
+from django.views.generic import ListView, CreateView, TemplateView
 from django.contrib.messages.views import SuccessMessageMixin
-from .models import Medico, Estudios, RegistroEstudiosPorMedico
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum
+from .models import Medico, Estudios, RegistroEstudiosPorMedico
 from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
@@ -37,3 +37,33 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     template_name = 'liquidacion/registroestudios_form.html'
     success_url = reverse_lazy('registroestudios_nuevo')  # Redirigir a la misma vista por defecto
     success_message = "Registro realizado exitosamente"  # Mensaje de éxito
+
+class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
+    template_name = 'liquidacion/registroestudios_list.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Obtener todos los médicos
+        medicos = Medico.objects.all()
+
+        # Calcular datos por médico
+        medico_data = []
+        for medico in medicos:
+            registros = RegistroEstudiosPorMedico.objects.filter(medico=medico).prefetch_related('estudio')
+
+            # Calcular el total de regiones para el médico
+            total_regiones = registros.aggregate(
+                total=Sum('estudio__conteo_regiones')
+            )['total'] or 0
+
+            # Reunir información en un diccionario por médico
+            medico_data.append({
+                'medico': medico,
+                'registros': registros,
+                'total_regiones': total_regiones,
+            })
+
+        # Agregar información al contexto
+        context['medico_data'] = medico_data
+        return context

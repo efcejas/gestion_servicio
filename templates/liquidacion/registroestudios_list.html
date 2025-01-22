@@ -1,0 +1,62 @@
+{% extends "layouts/base.html" %}
+{% load custom_filters %}
+{% block title %}Lista de Registros de Estudios por Médico{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="text-center mb-3">Lista de Registros de Estudios por Médico</h1>
+
+    {% for data in medico_data %}
+        <div class="mb-3">
+            <!-- Datos del Médico -->
+            <h2 class="text-primary">{{ data.medico.nombre }} {{ data.medico.apellido }}</h2>
+            <p class="text-muted">Matrícula: {{ data.medico.matricula|default:"No disponible" }}</p>
+
+            <!-- Tabla de Registros -->
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr class="text-center">
+                            <th>Paciente</th>
+                            <th>DNI</th>
+                            <th>Fecha del Informe</th>
+                            <th>Estudios</th>
+                            <th>Tipo de Estudios</th>
+                            <th>Regiones por Examen</th> <!-- Nueva columna -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in data.registros %}
+                            <tr>
+                                <td>{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                                <td class="text-center">{{ registro.dni_paciente }}</td>
+                                <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                                <td>
+                                    {{ registro.estudio.all|join:", " }}
+                                </td>
+                                <td class="text-center">
+                                    {% with registro.estudio.all|unique as tipos_unicos %}
+                                        {{ tipos_unicos|join:", " }}
+                                    {% endwith %}
+                                </td>
+                                <td class="text-center">
+                                    {{ registro.total_regiones }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="text-center fw-bold">
+                            <td colspan="5">Total de Regiones</td>
+                            <td>{{ data.total_regiones }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+
+
