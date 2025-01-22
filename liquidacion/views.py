@@ -50,7 +50,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         # Calcular datos por médico
         medico_data = []
         for medico in medicos:
-            registros = RegistroEstudiosPorMedico.objects.filter(medico=medico).prefetch_related('estudio')
+            registros = RegistroEstudiosPorMedico.objects.filter(medico=medico).prefetch_related('estudio').order_by('-fecha_registro')
 
             # Calcular el total de regiones para el médico
             total_regiones = registros.aggregate(
