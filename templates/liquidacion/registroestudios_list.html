@@ -4,7 +4,12 @@
 
 {% block content %}
 <div class="container py-4">
-    <h1 class="text-center mb-3">Lista de Registros de Estudios por Médico</h1>
+    <h1 class="mb-3">Lista de Registros de Estudios por Médico</h1>
+    <div class="text-end mt-4">
+        <a href="{% url 'generar_pdf_liquidacion' %}" class="btn btn-danger">
+            <i class="fas fa-file-pdf"></i> Descargar PDF
+        </a>
+    </div>
 
     {% for data in medico_data %}
         <div class="mb-3">
