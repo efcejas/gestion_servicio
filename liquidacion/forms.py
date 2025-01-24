@@ -29,9 +29,10 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
                 'class': 'form-control form-control-sm',
                 'maxlength': 8,
             }),
-            'estudio': forms.SelectMultiple(attrs={  # Cambiado a SelectMultiple
+            'estudio': forms.SelectMultiple(attrs={  # SelectMultiple con tooltips
                 'class': 'form-control form-control-sm',
-                'size': 3,  # Tamaño del selector para facilitar la selección de múltiples estudios
+                'size': 3,
+                'data-bs-toggle': 'tooltip',
             }),
             'fecha_del_informe': forms.DateInput(attrs={
                 'type': 'date',
