@@ -94,7 +94,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['medico_data'] = medico_data
         return context
 
-""" def generar_pdf_liquidacion(request):
+def generar_pdf_liquidacion(request):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     Story = []
@@ -178,4 +178,4 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
     # Construir PDF
     doc.build(Story)
     buffer.seek(0)
-    return FileResponse(buffer, as_attachment=True, filename="liquidacion_estudios.pdf") """
+    return FileResponse(buffer, as_attachment=True, filename="liquidacion_estudios.pdf")
