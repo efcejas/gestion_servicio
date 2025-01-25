@@ -41,13 +41,7 @@
                     </div>
                     <div class="col-12 col-md-6 mb-3">
                         <label for="{{ form.estudio.id_for_label }}" class="form-label" style="font-size: 0.9em;">Estudio</label>
-                        <select name="estudio" multiple class="form-control form-control-sm" size="3">
-                            {% for estudio in form.estudio.field.queryset %}
-                                <option value="{{ estudio.id }}" data-bs-toggle="tooltip" title="{{ estudio.nombre }}">
-                                    {{ estudio.nombre }}
-                                </option>
-                            {% endfor %}
-                        </select>                        
+                        {{ form.estudio }}         
                     </div>
                     <div class="col-12 col-md-6 mb-3 d-flex flex-column">
                         <!-- Contenido superior -->
@@ -91,14 +85,4 @@
         </div>
     </div>
 </div>
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        var tooltipTriggerList = [].slice.call(
-            document.querySelectorAll('[data-bs-toggle="tooltip"]')
-        );
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    });
-</script>
 {% endblock %}

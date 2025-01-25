@@ -32,7 +32,6 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
             'estudio': forms.SelectMultiple(attrs={  # SelectMultiple con tooltips
                 'class': 'form-control form-control-sm',
                 'size': 3,
-                'data-bs-toggle': 'tooltip',
             }),
             'fecha_del_informe': forms.DateInput(attrs={
                 'type': 'date',
