@@ -1,0 +1,84 @@
+{% extends "layouts/base_dos.html" %}
+{% block title %}Informes por Médico y Mes{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+    <div class="row">
+        <div class="col-12 col-md-8">
+            <h5 class="titulo-h6 text-center text-md-start">Conteo de estudios por médico y mes</h5>
+            <p>En esta sección se podrá consultar el total de regiones informadas por cada médico en un mes determinado.</p>
+        </div>
+        <div class="col-12 col-md-4">
+            <form method="get" class="row g-3">
+                {% csrf_token %}
+                <div class="col-12">
+                    <label for="id_medico" class="form-label">
+                        Médico
+                    </label>
+                    {{ form.medico }}
+                    <div class="form-text">{{ form.medico.help_text }}</div>
+                </div>
+                <div class="col-4 mt-2">
+                    <label for="id_mes" class="form-label">
+                        Mes
+                    </label>
+                    {{ form.mes }}
+                </div>        
+                <div class="col-4 mt-2">
+                    <label for="id_anio" class="form-label">
+                        Año
+                    </label>
+                    {{ form.año }}        
+                </div>
+                <div class="col-4 d-flex justify-content-end align-items-end mt-2">
+                    <button type="submit" class="btn btn-sm btn-primary">Consultar</button>
+                </div>
+            </form>
+        </div>    
+    </div>
+</div>
+<div class="container card py-3 mb-5 shadow-sm">
+    {% for data in medico_data %}
+    <div class="card-header" style="background-color: #e1e1e1;">
+        <div class="row">
+            <div class="col-6 col-md-8">
+                <h5 class="titulo-h6">Resultados</h5>
+                <h6 class="card-title mb-0">Médico: {{ data.medico.nombre }} {{ data.medico.apellido }}</h6>
+                <p class="card-text">Matrícula: {{ data.medico.matricula }}</p>
+            </div>
+            <div class="col-6 col-md-4 d-flex justify-content-end align-items-center">
+                <h6 class="card-title text-center mb-0">Total de regiones: {{ data.total_regiones }}</h6>
+            </div>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th scope="col" style="width: 250px;" class="px-3">Paciente</th>
+                    <th scope="col">Estudio</th>
+                    <th scope="col" style="width: 200px;" class="text-center">Fecha del informe</th>
+                    <th scope="col" style="width: 100px;" class="text-center">Regiones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for registro in data.registros %}
+                <tr>
+                    <td class="px-3">{{ registro.apellido_paciente }} {{ registro.nombre_paciente }}</td>
+                    <td>{{ registro.estudio.all|join:", " }}</td>
+                    <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                    <td class="text-center">{{ registro.total_regiones }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td colspan="3" class="table-success px-3">Total de Regiones</td>
+                    <td class="table-success text-center">{{ data.total_regiones }}</td>
+                </tr>
+            </tfoot>
+        </table>    
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

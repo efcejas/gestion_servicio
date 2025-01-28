@@ -6,9 +6,9 @@
 <div class="container py-4">
     <h1 class="mb-3">Lista de Registros de Estudios por Médico</h1>
     <div class="text-end mt-4">
-        <!-- <a href="{% url 'generar_pdf_liquidacion' %}" class="btn btn-danger">
+        <a href="{% url 'generar_pdf_liquidacion' %}" class="btn btn-danger">
             <i class="fas fa-file-pdf"></i> Descargar PDF
-        </a> -->
+        </a>
     </div>
 
     {% for data in medico_data %}
@@ -19,7 +19,7 @@
 
             <!-- Tabla de Registros -->
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
+                <table class="table table-striped table-hover align-middle table-sm">
                     <thead class="table-dark">
                         <tr class="text-center">
                             <th>Paciente</th>

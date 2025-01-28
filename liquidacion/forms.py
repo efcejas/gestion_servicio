@@ -1,5 +1,6 @@
 from django import forms
 from .models import Medico, Estudios, RegistroEstudiosPorMedico
+from datetime import datetime
 
 class MedicoCreateViewForm(forms.ModelForm):
     class Meta:
@@ -38,3 +39,30 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
                 'class': 'form-control form-control-sm',
             }),
         }
+
+class FiltroMedicoMesForm(forms.Form):
+    medico = forms.ModelChoiceField(
+        queryset=Medico.objects.all(), 
+        required=False, 
+        label="Médico",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        empty_label="Todos los médicos",
+        help_text="Seleccione el médico del cual desea obtener la información."
+    )
+    mes = forms.ChoiceField(
+        choices=[
+            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
+            (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
+            (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
+        ],
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        required=False, 
+        label="Mes"
+    )
+    año = forms.ChoiceField(
+        choices=[(i, i) for i in range(2000, 2031)],
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        required=False, 
+        label="Año",
+        initial=datetime.now().year  # Establecer el año actual como valor inicial
+    )
