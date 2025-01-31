@@ -95,6 +95,6 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
             }),
             'notas': forms.Textarea(attrs={
                 'class': 'form-control form-control-sm',
-                'rows': 5,
+                'rows': 3,
             }),
         }
