@@ -1,5 +1,9 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
+from django.conf import settings
+from django.utils import timezone
+
 
 class Medico(models.Model):
     nombre = models.CharField(max_length=50, verbose_name='Nombre')
@@ -52,3 +56,20 @@ class RegistroEstudiosPorMedico(models.Model):
         Calcula el total de regiones para los estudios asociados a este registro.
         """
         return sum(estudio.conteo_regiones for estudio in self.estudio.all())
+
+class RegistroProcedimientosIntervensionismo(models.Model):
+    medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')
+    nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
+    apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
+    dni_paciente = models.CharField(max_length=50, verbose_name='DNI del paciente')
+    fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
+    fecha_del_procedimiento = models.DateField(verbose_name='Fecha del procedimiento', blank=True, null=True)
+    procedimiento = models.CharField(max_length=150, verbose_name='Procedimiento realizado')
+    notas = models.TextField(verbose_name='Notas', blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Registro de procedimiento de intervencionismo'
+        verbose_name_plural = 'Registros de procedimientos de intervencionismo'
+
+    def __str__(self):
+        return f'{self.medico} - {self.fecha_registro}'

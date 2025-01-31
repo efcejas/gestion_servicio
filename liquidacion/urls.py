@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import MedicoCreateView, EstudiosCreateView, EstudiosListView, RegistroEstudiosPorMedicoCreateView, MedicoListView, RegistroEstudiosPorMedicoListView, generar_pdf_liquidacion, InformadosPorMedicoPorMesListView
+from .views import MedicoCreateView, EstudiosCreateView, EstudiosListView, RegistroEstudiosPorMedicoCreateView, MedicoListView, RegistroEstudiosPorMedicoListView, generar_pdf_liquidacion, InformadosPorMedicoPorMesListView, ProcedimientosIntervensionismoListCreateView
 
 urlpatterns = [
     path('medico/nuevo/', MedicoCreateView.as_view(), name='medico_nuevo'),
@@ -10,4 +10,5 @@ urlpatterns = [
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),
     path('informados-por-medico-por-mes/', InformadosPorMedicoPorMesListView.as_view(), name='informados_por_medico_por_mes'),
+    path('procedimientos-intervensionismo/', ProcedimientosIntervensionismoListCreateView.as_view(), name='procedimientos_intervensionismo'),
 ]

@@ -9,8 +9,8 @@ from django.http import FileResponse
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from .models import Medico, Estudios, RegistroEstudiosPorMedico
-from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
+from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -224,4 +224,19 @@ class InformadosPorMedicoPorMesListView(TemplateView):
 
         # Agregar información al contexto
         context['medico_data'] = medico_data
+        return context
+
+class ProcedimientosIntervensionismoListCreateView(CreateView):
+    model = RegistroProcedimientosIntervensionismo
+    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
+    template_name = 'liquidacion/procedimientos_intervensionismo_form.html'
+    success_message = "Registro realizado exitosamente"
+
+    def form_valid(self, form):
+        form.instance.medico = self.request.user
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['registros'] = RegistroProcedimientosIntervensionismo.objects.all().order_by('-fecha_registro')
         return context

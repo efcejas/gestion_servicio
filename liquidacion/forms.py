@@ -1,5 +1,5 @@
 from django import forms
-from .models import Medico, Estudios, RegistroEstudiosPorMedico
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
 from datetime import datetime
 
 class MedicoCreateViewForm(forms.ModelForm):
@@ -66,3 +66,31 @@ class FiltroMedicoMesForm(forms.Form):
         label="Año",
         initial=datetime.now().year  # Establecer el año actual como valor inicial
     )
+
+class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
+    class Meta:
+        model = RegistroProcedimientosIntervensionismo
+        fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_procedimiento', 'procedimiento', 'notas']
+        widgets = {
+            'nombre_paciente': forms.TextInput(attrs={
+                'class': 'form-control form-control-sm',
+            }),
+            'apellido_paciente': forms.TextInput(attrs={
+                'class': 'form-control form-control-sm',
+            }),
+            'dni_paciente': forms.TextInput(attrs={
+                'class': 'form-control form-control-sm',
+                'maxlength': 8,
+            }),
+            'procedimiento': forms.Select(attrs={
+                'class': 'form-control form-control-sm',
+            }),
+            'fecha_del_procedimiento': forms.DateInput(attrs={
+                'type': 'date',
+                'class': 'form-control form-control-sm',
+            }),
+            'notas': forms.Textarea(attrs={
+                'class': 'form-control form-control-sm',
+                'rows': 5,
+            }),
+        }
