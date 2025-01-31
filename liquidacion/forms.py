@@ -82,8 +82,9 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
                 'class': 'form-control form-control-sm',
                 'maxlength': 8,
             }),
-            'procedimiento': forms.Select(attrs={
+            'procedimiento': forms.TextInput(attrs={
                 'class': 'form-control form-control-sm',
+                'row' : 3,
             }),
             'fecha_del_procedimiento': forms.DateInput(attrs={
                 'type': 'date',

@@ -61,7 +61,7 @@ class RegistroProcedimientosIntervensionismo(models.Model):
     medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')
     nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
-    dni_paciente = models.CharField(max_length=50, verbose_name='DNI del paciente')
+    dni_paciente = models.CharField(max_length=50, verbose_name='DNI del paciente', blank=True, null=True)
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
     fecha_del_procedimiento = models.DateField(verbose_name='Fecha del procedimiento', blank=True, null=True)
     procedimiento = models.CharField(max_length=150, verbose_name='Procedimiento realizado')

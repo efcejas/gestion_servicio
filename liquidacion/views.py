@@ -226,10 +226,11 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         context['medico_data'] = medico_data
         return context
 
-class ProcedimientosIntervensionismoListCreateView(CreateView):
+class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = RegistroProcedimientosIntervensionismo
     form_class = RegistroProcedimientosIntervensionismoCreateViewForm
     template_name = 'liquidacion/procedimientos_intervensionismo_form.html'
+    success_url = reverse_lazy('procedimientos_intervensionismo')
     success_message = "Registro realizado exitosamente"
 
     def form_valid(self, form):
