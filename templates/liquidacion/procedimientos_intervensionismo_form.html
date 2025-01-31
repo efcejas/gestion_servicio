@@ -30,9 +30,13 @@
                         <label for="{{ form.fecha_del_procedimiento.id_for_label }}" class="form-label" style="font-size: 0.9em;">Fecha del procedimiento</label>
                         {{ form.fecha_del_procedimiento }}
                     </div>
-                    <div class="col-12 mb-3">
+                    <div class="col-8 mb-3">
                         <label for="{{ form.procedimiento.id_for_label }}" class="form-label" style="font-size: 0.9em;">Procedimiento realizado</label>
                         {{ form.procedimiento }}
+                    </div>
+                    <div class="col-4 mb-3">
+                        <label for="{{ form.conteo_regiones.id_for_label }}" class="form-label" style="font-size: 0.9em;">Conteo de regiones</label>
+                        {{ form.conteo_regiones }}
                     </div>
                     <div class="col-12 mb-3">
                         <label for="{{ form.notas.id_for_label }}" class="form-label" style="font-size: 0.9em;">Notas</label>
@@ -62,19 +66,19 @@
                 <table class="table table-striped table-hover table-sm">
                     <thead>
                         <tr>
-                            <th>Médico</th>
                             <th>Paciente</th>
                             <th>Fecha del procedimiento</th>
                             <th>Procedimiento</th>
+                            <th>Regiones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for registro in registros %}
                         <tr>
-                            <td>{{ registro.medico.apellido }}</td>
                             <td>{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
                             <td>{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
                             <td>{{ registro.procedimiento }}</td>
+                            <td>{{ registro.conteo_regiones }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

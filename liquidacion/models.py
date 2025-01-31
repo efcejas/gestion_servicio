@@ -65,6 +65,7 @@ class RegistroProcedimientosIntervensionismo(models.Model):
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
     fecha_del_procedimiento = models.DateField(verbose_name='Fecha del procedimiento', blank=True, null=True)
     procedimiento = models.CharField(max_length=150, verbose_name='Procedimiento realizado')
+    conteo_regiones = models.IntegerField(verbose_name='Cantidad de regiones', blank=True, null=True, default=0)
     notas = models.TextField(verbose_name='Notas', blank=True, null=True)
 
     class Meta:

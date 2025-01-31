@@ -70,7 +70,7 @@ class FiltroMedicoMesForm(forms.Form):
 class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
     class Meta:
         model = RegistroProcedimientosIntervensionismo
-        fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_procedimiento', 'procedimiento', 'notas']
+        fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_procedimiento', 'procedimiento', 'notas', 'conteo_regiones']
         widgets = {
             'nombre_paciente': forms.TextInput(attrs={
                 'class': 'form-control form-control-sm',
@@ -88,6 +88,9 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
             }),
             'fecha_del_procedimiento': forms.DateInput(attrs={
                 'type': 'date',
+                'class': 'form-control form-control-sm',
+            }),
+            'conteo_regiones': forms.NumberInput(attrs={
                 'class': 'form-control form-control-sm',
             }),
             'notas': forms.Textarea(attrs={
