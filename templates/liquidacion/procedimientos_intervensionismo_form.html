@@ -45,6 +45,7 @@
                     <!-- Botones -->
                     <div class="col-12 d-flex justify-content-end">
                         <button type="submit" class="btn btn-primary btn-sm" name="continuar">Guardar</button>
+                        <a href="{% url 'mis_procedimientos' %}" class="btn btn-secondary btn-sm ms-2">Finalizar</a>
                     </div>
                 </div>
             </form>
@@ -69,13 +70,13 @@
                             <th data-sort="text">
                                 Paciente <i class="fa fa-sort"></i>
                             </th>
-                            <th data-sort="date">
+                            <th data-sort="date" class="text-center">
                                 Fecha <i class="fa fa-sort"></i>
                             </th>
-                            <th data-sort="text">
+                            <th data-sort="text" class="text-center">
                                 Procedimiento <i class="fa fa-sort"></i>
                             </th>
-                            <th data-sort="number">
+                            <th data-sort="number" class="text-center">
                                 Regiones <i class="fa fa-sort"></i>
                             </th>
                         </tr>
@@ -84,9 +85,9 @@
                         {% for registro in registros %}
                         <tr>
                             <td>{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
-                            <td>{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
-                            <td>{{ registro.procedimiento }}</td>
-                            <td>{{ registro.conteo_regiones }}</td>
+                            <td class="text-center">{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
+                            <td class="text-center">{{ registro.procedimiento }}</td>
+                            <td class="text-center">{{ registro.conteo_regiones }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

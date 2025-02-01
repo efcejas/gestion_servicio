@@ -241,3 +241,17 @@ class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMe
         context = super().get_context_data(**kwargs)
         context['registros'] = RegistroProcedimientosIntervensionismo.objects.all().order_by('-fecha_registro')
         return context
+
+class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
+    model = RegistroProcedimientosIntervensionismo
+    template_name = 'liquidacion/procedimientos_intervensionismo_list.html'
+    context_object_name = 'registros'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        registros = RegistroProcedimientosIntervensionismo.objects.filter().order_by('fecha_registro')
+        context['registros'] = registros
+        context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
+        context['total_pacientes'] = registros.count()
+        return context

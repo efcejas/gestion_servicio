@@ -75,6 +75,7 @@
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
                             <li><a class="dropdown-item" href="{% url 'procedimientos_intervensionismo' %}">Intervencionismo</a></li>
+                            <li><a class="dropdown-item" href="{% url 'mis_procedimientos' %}">Mis registros</a></li>
                             {% if user.is_superuser %}
                             <li><a class="dropdown-item" href="{% url 'registroestudios_nuevo' %}">Registrar estudios por médico</a></li>
                             <li><a class="dropdown-item" href="{% url 'registroestudios_list' %}">Estudios registrados por médico</a></li>

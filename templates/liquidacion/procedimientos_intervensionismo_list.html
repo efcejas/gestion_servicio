@@ -1,0 +1,76 @@
+{% extends "layouts/base.html" %}
+{% block title %}Mis Procedimientos de Intervencionismo{% endblock %}
+
+{% block content %}
+<div class="container py-3">
+
+    <!-- Tarjetas de Información -->
+    <div class="row mb-3 g-3">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">¡Hola {{ user.first_name }}! Aquí podrás ver tus registros y filtrarlos por mes.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">Debería ir un filtro para buscar los registros.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resultados y Tabla -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header" style="background-color: #e1e1e1;">
+            <div class="row align-items-center py-3">
+                <div class="col-6 col-md-8">
+                    <h5 class="titulo-h6 mb-0">Resultados</h5>
+                </div>
+                <div class="col-6 col-md-4 text-md-end">
+                    <h6 class="card-title mb-0">Total de pacientes: {{ total_pacientes }}</h6>
+                    <h6 class="card-title mb-0">Total de regiones: {{ total_regiones }}</h6>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla de Resultados -->
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" style="width: 250px;" class="px-3">Paciente</th>
+                        <th scope="col" class="text-center">Fecha del procedimiento</th>
+                        <th scope="col" class="text-center">Procedimiento</th>
+                        <th scope="col" class="text-center">Regiones</th>
+                        <th scope="col">Notas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros %}
+                    <tr>
+                        <td scope="row" class="px-3">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                        <td class="text-center">{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
+                        <td class="text-center">{{ registro.procedimiento }}</td>
+                        <td class="text-center">{{ registro.conteo_regiones }}</td>
+                        <td>{{ registro.notas }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-2">No se encontraron registros.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>                
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
