@@ -89,6 +89,10 @@
                             <td class="text-center">{{ registro.procedimiento }}</td>
                             <td class="text-center">{{ registro.conteo_regiones }}</td>
                         </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-2">Aún no se han realizado registros.</td>
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>

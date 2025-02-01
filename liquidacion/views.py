@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
-from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm
+from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm, FiltroProcedimientosIntervensionismoForm
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -239,7 +239,8 @@ class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMe
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['registros'] = RegistroProcedimientosIntervensionismo.objects.all().order_by('-fecha_registro')
+        user = self.request.user
+        context['registros'] = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('-fecha_registro')
         return context
 
 class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
@@ -250,7 +251,18 @@ class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        registros = RegistroProcedimientosIntervensionismo.objects.filter().order_by('fecha_registro')
+        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
+        registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('fecha_registro')
+
+        if form.is_valid():
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
+            if mes:
+                registros = registros.filter(fecha_del_procedimiento__month=mes)
+            if año:
+                registros = registros.filter(fecha_del_procedimiento__year=año)
+
+        context['form'] = form
         context['registros'] = registros
         context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
         context['total_pacientes'] = registros.count()

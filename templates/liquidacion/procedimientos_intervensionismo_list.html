@@ -7,22 +7,38 @@
     <!-- Tarjetas de Información -->
     <div class="row mb-3 g-3">
         <div class="col-md-6">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm h-100">
                 <div class="card-header">
                     <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
                 </div>
-                <div class="card-body">
+                <div class="card-body text-center">
                     <p class="mb-0">¡Hola {{ user.first_name }}! Aquí podrás ver tus registros y filtrarlos por mes.</p>
                 </div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card shadow-sm">
+            <div class="card shadow-sm h-100">
                 <div class="card-header">
-                    <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
+                    <h5 class="titulo-h6 text-center text-md-start mb-0">Filtrar por mes</h5>
                 </div>
                 <div class="card-body">
-                    <p class="mb-0">Debería ir un filtro para buscar los registros.</p>
+                    <form method="get" class="row g-2 d-flex justify-content-center">
+                        {% csrf_token %}
+                        <!-- Campo Mes -->
+                        <div class="col-6 col-md-auto d-flex align-items-center">
+                            <label for="id_mes" class="form-label me-2 mb-0">Mes</label>
+                            {{ form.mes }}
+                        </div>
+                        <!-- Campo Año -->
+                        <div class="col-6 col-md-auto d-flex align-items-center">
+                            <label for="id_anio" class="form-label me-2 mb-0">Año</label>
+                            {{ form.año }}
+                        </div>
+                        <!-- Botón Consultar -->
+                        <div class="col-12 col-md-auto ms-md-3 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-primary btn-sm w-100 w-md-auto">Consultar</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

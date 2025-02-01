@@ -3,6 +3,7 @@
 {% block title %}Bienvenido al sistema de gestión{% endblock %}
 
 {% block content %}
+{% if user.is_superuser %}
 <div class="container-fluid">
     <div class="row">
         <!-- Contenido principal -->
@@ -56,4 +57,32 @@
         </div>
     </div>
 </div>
+{% endif %}
+{% if user.is_authenticated and not user.is_superuser %}
+<div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0" style="background-color: #e3f3fa; border-radius: 0;" role="alert">
+    <div class="d-flex flex-column flex-md-row align-items-center p-3">
+        <!-- Ícono -->
+        <div class="me-md-4 mb-3 mb-md-0">
+            <i class="fa fa-user-circle fa-3x" style="color: #0468bf;"></i>
+        </div>
+
+        <!-- Mensaje -->
+        <div class="flex-grow-1 text-center text-md-start">
+            <h4 class="fw-bold mb-2" style="color: #03396c;">¡Hola, {{ user.first_name }}!</h4>
+            <p class="text-muted mb-3 mb-md-0">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+        </div>
+
+        <!-- Botones de Acción -->
+       <!--  <div class="d-flex gap-2">
+            <a href="#" class="btn btn-sm" style="background-color: #0468bf; color: white;">Mis procedimientos</a>
+            <a href="#" class="btn btn-outline-primary btn-sm" style="border-color: #0468bf; color: #0468bf;">Obtener ayuda</a>
+        </div> -->
+    </div>
+</div>
+<div class="container alert alert-warning mt-5" role="alert">
+    <h5 class="alert-heading">Página en desarrollo</h5>
+    <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
+    <p class="mb-0">Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a> o <a href="{% url 'procedimientos_intervensionismo' %}" class="alert-link">registrar un nuevo estudio</a>.</p>
+</div>
+{% endif %}
 {% endblock %}
