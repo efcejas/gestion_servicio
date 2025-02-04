@@ -1,6 +1,9 @@
 from django import forms
 from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
 from datetime import datetime
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+
 
 class MedicoCreateViewForm(forms.ModelForm):
     class Meta:
@@ -99,7 +102,15 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
             }),
         }
 
+User = get_user_model()
+
 class FiltroProcedimientosIntervensionismoForm(forms.Form):
+    medico = forms.ModelChoiceField(
+        queryset=User.objects.filter(groups__name='Médicos de staff').order_by('first_name', 'last_name'),
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        required=False,
+        label="Médico"
+    )
     mes = forms.ChoiceField(
         choices=[
             (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
@@ -117,3 +128,7 @@ class FiltroProcedimientosIntervensionismoForm(forms.Form):
         label="Año",
         initial=datetime.now().year  # Establecer el año actual como valor inicial
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"

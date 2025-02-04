@@ -15,6 +15,7 @@ from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
+from django.contrib.auth import get_user_model
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -266,4 +267,45 @@ class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
         context['registros'] = registros
         context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
         context['total_pacientes'] = registros.count()
+        return context
+
+User = get_user_model()
+
+class ProcedimientosPorMedicoPorMesListView(TemplateView):
+    template_name = 'liquidacion/procedimientos_por_medico_por_mes.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
+        context['form'] = form
+
+        medico_data = []
+
+        if form.is_valid():
+            medicos = User.objects.filter(groups__name='Médicos de staff')
+            medico = form.cleaned_data.get('medico')
+            mes = int(form.cleaned_data.get('mes')) if form.cleaned_data.get('mes') else None
+            año = int(form.cleaned_data.get('año')) if form.cleaned_data.get('año') else None
+
+            if medico:
+                medicos = medicos.filter(id=medico.id)
+
+            for medico in medicos:
+                registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=medico)
+
+                if mes and año:
+                    registros = registros.filter(fecha_del_procedimiento__year=año, fecha_del_procedimiento__month=mes)
+
+                registros = registros.order_by('-fecha_del_procedimiento')
+
+                total_regiones = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
+
+                medico_data.append({
+                    'medico': medico,
+                    'registros': registros,
+                    'total_regiones': total_regiones,
+                    'total_pacientes': registros.count(),
+                })
+
+        context['medico_data'] = medico_data
         return context

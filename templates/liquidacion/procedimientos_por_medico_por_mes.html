@@ -1,0 +1,93 @@
+{% extends "layouts/base_dos.html" %}
+{% block title %}Informes por Médico y Mes{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="container card py-0 p-0 mb-3 shadow-sm mt-3">
+        <div class="card-header">
+            <h5 class="titulo-h6 text-center text-md-start mb-0">Conteo mensual de procedimientos realizados por médico</h5>
+        </div>
+        <div class="card-body">
+            <p class="mb-0">En esta sección se podrá consultar el total de pacientes y regiones en los procedimientos de intervencionismo realizados por cada médico en un mes determinado.</p>
+        </div>
+    </div>
+    <div class="container card py-3 mb-3 shadow-sm">
+        <div class="col-12">
+            <form method="get" class="row g-2 d-flex justify-content-center">
+                {% csrf_token %}
+                <!-- Campo Médico -->
+                <div class="col-12 col-md-4 d-flex align-items-center">
+                    <label for="id_medico" class="form-label me-2 mb-0">Médico</label>
+                    {{ form.medico }}
+                </div>
+                <!-- Campo Mes -->
+                <div class="col-6 col-md-2 d-flex align-items-center">
+                    <label for="id_mes" class="form-label me-2 mb-0">Mes</label>
+                    {{ form.mes }}
+                </div>
+                <!-- Campo Año -->
+                <div class="col-6 col-md-2 d-flex align-items-center">
+                    <label for="id_anio" class="form-label me-2 mb-0">Año</label>
+                    {{ form.año }}
+                </div>
+                <!-- Botón Consultar -->
+                <div class="col-12 col-md-2 ms-md-3 d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary btn-sm w-100 w-md-auto">Consultar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="container card py-3 shadow-sm">
+        {% if medico_data %}
+            {% for data in medico_data %}
+            <div class="card-header" style="background-color: #e1e1e1;">
+                <div class="row">
+                    <div class="col-12 col-md-8">
+                        <h5 class="titulo-h6">Resultados</h5>
+                        <h6 class="card-title mb-0">Médico: {{ data.medico.first_name }} {{ data.medico.last_name }}</h6>
+                    </div>
+                    <div class="col-12 col-md-4 d-flex justify-content-center align-items-center flex-column mt-3 mt-md-0">
+                        <h6 class="card-title text-center mb-0">Total de pacientes: {{ data.total_pacientes }}</h6>
+                        <h6 class="card-title text-center mb-0">Total de regiones: {{ data.total_regiones }}</h6>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width: 250px;" class="px-3">Paciente</th>
+                            <th scope="col" class="text-center">DNI</th>
+                            <th scope="col" class="text-center">Procedimiento</th>
+                            <th scope="col" style="width: 200px;" class="text-center">Fecha del procedimiento</th>
+                            <th scope="col" style="width: 100px;" class="text-center">Regiones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for registro in data.registros %}
+                        <tr>
+                            <td class="px-3">{{ registro.apellido_paciente }} {{ registro.nombre_paciente }}</td>
+                            <td class="text-center">{{ registro.dni_paciente }}</td>
+                            <td class="text-center">{{ registro.procedimiento }}</td>
+                            <td class="text-center">{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
+                            <td class="text-center">{{ registro.conteo_regiones }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="4" class="table-success px-3">Total de Regiones</td>
+                            <td class="table-success text-center">{{ data.total_regiones }}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="card-body">
+                <p class="text-center mb-0">Por favor, seleccione un médico y un mes para consultar los procedimientos.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
