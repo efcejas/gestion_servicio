@@ -207,6 +207,9 @@ class InformadosPorMedicoPorMesListView(TemplateView):
             if mes and año:
                 registros = registros.filter(fecha_registro__year=int(año), fecha_registro__month=int(mes))
 
+            # Ordenar los registros por la fecha del informe (de más reciente a más antiguo)
+            registros = registros.order_by('-fecha_del_informe')
+
             # Calcular el total de regiones
             total_regiones = registros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
 
