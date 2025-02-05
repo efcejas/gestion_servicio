@@ -49,15 +49,19 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
     template_name = 'liquidacion/registroestudios_form.html'
-    # Redirigir a la misma vista por defecto
     success_url = reverse_lazy('registroestudios_nuevo')
-    success_message = "Registro realizado exitosamente"  # Mensaje de éxito
+    success_message = "Registro realizado exitosamente"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Agregar los registros existentes al contexto
+        user = self.request.user
         context['registros'] = RegistroEstudiosPorMedico.objects.all().order_by('-fecha_registro')
         return context
+
+    def form_valid(self, form):
+        # Asignar el usuario logueado al campo 'medico'
+        form.instance.medico = self.request.user
+        return super().form_valid(form)
 
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
     template_name = 'liquidacion/registroestudios_list.html'
@@ -178,6 +182,8 @@ def generar_pdf_liquidacion(request):
 
 # Vistas para quienes consultan la liquidación sin loguearse
 
+CustomUser = get_user_model()  # Obtener el modelo de usuario personalizado
+
 class InformadosPorMedicoPorMesListView(TemplateView):
     template_name = 'liquidacion/informados_por_medico_por_mes.html'
 
@@ -186,44 +192,30 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         form = FiltroMedicoMesForm(self.request.GET or None)
         context['form'] = form
 
-        # Inicializar datos de médicos vacíos
         medico_data = []
 
-        # Solo calcular datos si el formulario es válido
         if form.is_valid():
-            # Obtener todos los médicos
-            medicos = Medico.objects.all()
-
-            # Filtrar por médico y mes si se proporcionan
-            medico = form.cleaned_data.get('medico')
+            medicos = User.objects.filter(groups__name='Médicos de staff - informes')
             mes = int(form.cleaned_data.get('mes')) if form.cleaned_data.get('mes') else None
             año = int(form.cleaned_data.get('año')) if form.cleaned_data.get('año') else None
 
+            registros = RegistroEstudiosPorMedico.objects.all()
+
             if medico:
-                medicos = medicos.filter(id=medico.id)
+                registros = registros.filter(medico=medico)
 
-            # Calcular datos por médico
-            for medico in medicos:
-                registros = RegistroEstudiosPorMedico.objects.filter(medico=medico)
+            if mes and año:
+                registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
 
-                if mes and año:
-                    registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
+            # Calcular los datos para el médico seleccionado
+            total_regiones = registros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
 
-                registros = registros.prefetch_related('estudio').order_by('-fecha_registro')
+            medico_data.append({
+                'medico': medico,
+                'registros': registros,
+                'total_regiones': total_regiones,
+            })
 
-                # Calcular el total de regiones para el médico
-                total_regiones = registros.aggregate(
-                    total=Sum('estudio__conteo_regiones')
-                )['total'] or 0
-
-                # Reunir información en un diccionario por médico
-                medico_data.append({
-                    'medico': medico,
-                    'registros': registros,
-                    'total_regiones': total_regiones,
-                })
-
-        # Agregar información al contexto
         context['medico_data'] = medico_data
         return context
 

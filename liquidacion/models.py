@@ -34,7 +34,7 @@ class Estudios(models.Model):
         return f'{self.nombre}'
 
 class RegistroEstudiosPorMedico(models.Model):
-    medico = models.ForeignKey(Medico, on_delete=models.CASCADE, verbose_name='Médico')
+    medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')
     nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
     dni_paciente = models.CharField(verbose_name='DNI del paciente')

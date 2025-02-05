@@ -44,8 +44,9 @@
                 <div class="row">
                     <div class="col-6 col-md-8">
                         <h5 class="titulo-h6">Resultados</h5>
-                        <h6 class="card-title mb-0">Médico: {{ data.medico.nombre }} {{ data.medico.apellido }}</h6>
-                        <p class="card-text">Matrícula: {{ data.medico.matricula }}</p>
+                        <!-- Cambié nombre, apellido y matrícula -->
+                        <h6 class="card-title mb-0">Médico: {{ data.medico.first_name }} {{ data.medico.last_name }}</h6>
+                        <p class="card-text">Correo electrónico: {{ data.medico.email }}</p>
                     </div>
                     <div class="col-6 col-md-4 d-flex justify-content-end align-items-center">
                         <h6 class="card-title text-center mb-0">Total de regiones: {{ data.total_regiones }}</h6>
@@ -87,7 +88,7 @@
             <div class="card-body">
                 <p class="text-center mb-0">Por favor, seleccione un médico y un mes para consultar los informes.</p>
             </div>
-        {% endif %}</div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

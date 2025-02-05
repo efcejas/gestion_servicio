@@ -15,10 +15,6 @@
                 <!-- Campos -->
                 <div class="row">
                     <div class="col-12 col-md-6 mb-3">
-                        <label for="{{ form.medico.id_for_label }}" class="form-label" style="font-size: 0.9em;">Médico</label>
-                        {{ form.medico }}
-                    </div>
-                    <div class="col-12 col-md-6 mb-3">
                         <label for="{{ form.nombre_paciente.id_for_label }}" class="form-label" style="font-size: 0.9em;">Nombre del paciente</label>
                         {{ form.nombre_paciente }}
                     </div>
@@ -75,7 +71,6 @@
                 <table class="table table-striped table-hover table-sm">
                     <thead>
                         <tr>
-                            <th>Médico</th>
                             <th>Paciente</th>
                             <th>Fecha del informe</th>
                             <th>Regiones</th>
@@ -84,7 +79,6 @@
                     <tbody>
                         {% for registro in registros %}
                         <tr>
-                            <td>{{ registro.medico.apellido }}</td>
                             <td>{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
                             <td>{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
                             <td>{{ registro.total_regiones }}</td>
