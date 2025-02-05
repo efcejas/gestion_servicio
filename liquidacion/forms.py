@@ -44,10 +44,11 @@ User = get_user_model()
 
 class FiltroMedicoMesForm(forms.Form):
     medico = forms.ModelChoiceField(
-        queryset=User.objects.filter(groups__name='Médicos de staff - informes').order_by('first_name', 'last_name'),
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        queryset=User.objects.filter(groups__name='Médicos de staff - informes').order_by('last_name', 'first_name'),
         required=False,
-        label="Médico"
+        label="Médico",
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        empty_label="Todos los médicos"
     )
     mes = forms.ChoiceField(
         choices=[
@@ -55,21 +56,20 @@ class FiltroMedicoMesForm(forms.Form):
             (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
             (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
         ],
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         required=False,
-        label="Mes"
+        label="Mes",
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
     año = forms.ChoiceField(
         choices=[(i, i) for i in range(2000, 2031)],
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         required=False,
         label="Año",
-        initial=datetime.now().year
+        initial=datetime.now().year,
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Personalizar la etiqueta del campo médico
         self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
 class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):

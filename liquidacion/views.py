@@ -182,8 +182,6 @@ def generar_pdf_liquidacion(request):
 
 # Vistas para quienes consultan la liquidación sin loguearse
 
-CustomUser = get_user_model()  # Obtener el modelo de usuario personalizado
-
 class InformadosPorMedicoPorMesListView(TemplateView):
     template_name = 'liquidacion/informados_por_medico_por_mes.html'
 
@@ -194,22 +192,25 @@ class InformadosPorMedicoPorMesListView(TemplateView):
 
         medico_data = []
 
+        # Solo realizar la consulta si el formulario es válido
         if form.is_valid():
-            medicos = User.objects.filter(groups__name='Médicos de staff - informes')
-            mes = int(form.cleaned_data.get('mes')) if form.cleaned_data.get('mes') else None
-            año = int(form.cleaned_data.get('año')) if form.cleaned_data.get('año') else None
+            medico = form.cleaned_data.get('medico')  # Ahora es una instancia de CustomUser
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
 
+            # Filtrar registros
             registros = RegistroEstudiosPorMedico.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
 
             if mes and año:
-                registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
+                registros = registros.filter(fecha_registro__year=int(año), fecha_registro__month=int(mes))
 
-            # Calcular los datos para el médico seleccionado
+            # Calcular el total de regiones
             total_regiones = registros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
 
+            # Agregar datos al contexto
             medico_data.append({
                 'medico': medico,
                 'registros': registros,
