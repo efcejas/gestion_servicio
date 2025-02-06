@@ -63,6 +63,10 @@ class ResumenGuardiasView(TemplateView):
                     'horas': horas
                 })
 
+            # Ordenar los detalles por fecha en cada médico
+            for medico_data in resumen_guardias.values():
+                medico_data['detalles'].sort(key=lambda x: x['fecha'])
+
             context['resumen_guardias'] = resumen_guardias
 
         return context
