@@ -1,5 +1,5 @@
 {% extends "layouts/base.html" %}
-
+{% load static custom_filters %}
 {% block title %}Bienvenido al sistema de gestión{% endblock %}
 
 {% block content %}
@@ -82,7 +82,14 @@
 <div class="container alert alert-warning mt-5" role="alert">
     <h5 class="alert-heading">Página en desarrollo</h5>
     <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
-    <p class="mb-0">Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a> o <a href="{% url 'procedimientos_intervensionismo' %}" class="alert-link">registrar un nuevo estudio</a>.</p>
-</div>
+    <p class="mb-0">
+        {% if user|has_group:'Médicos de staff' %}
+            Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a>.
+        {% elif user|has_group:'Médicos de staff - informes' %}
+            Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo estudio</a>.
+        {% else %}
+            En breve podrás acceder a otras funcionalidades.
+        {% endif %}
+    </p>
 {% endif %}
 {% endblock %}

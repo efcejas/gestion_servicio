@@ -10,7 +10,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
-from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm, FiltroProcedimientosIntervensionismoForm
+from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm, FiltroProcedimientosIntervensionismoForm, FiltroEstudiosPorMedicoForm
 from datetime import datetime
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -55,7 +55,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        context['registros'] = RegistroEstudiosPorMedico.objects.all().order_by('-fecha_registro')
+        context['registros'] = RegistroEstudiosPorMedico.objects.filter(medico=user).order_by('-fecha_registro')
         return context
 
     def form_valid(self, form):
@@ -68,29 +68,36 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        form = FiltroEstudiosPorMedicoForm(self.request.GET or None)
+        context['form'] = form
 
-        # Obtener todos los médicos
-        medicos = Medico.objects.all()
-
-        # Calcular datos por médico
         medico_data = []
-        for medico in medicos:
-            registros = RegistroEstudiosPorMedico.objects.filter(
-                medico=medico).prefetch_related('estudio').order_by('-fecha_registro')
 
-            # Calcular el total de regiones para el médico
-            total_regiones = registros.aggregate(
-                total=Sum('estudio__conteo_regiones')
-            )['total'] or 0
+        if form.is_valid():
+            medico = form.cleaned_data.get('medico')
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
 
-            # Reunir información en un diccionario por médico
-            medico_data.append({
-                'medico': medico,
-                'registros': registros,
-                'total_regiones': total_regiones,
-            })
+            # Filtrar registros
+            registros = RegistroEstudiosPorMedico.objects.all()
 
-        # Agregar información al contexto
+            if medico:
+                registros = registros.filter(medico=medico)
+
+            if mes and año:
+                registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
+
+            # Agrupar registros por médico
+            for medico in registros.values('medico').distinct():
+                registros_medico = registros.filter(medico=medico['medico'])
+                total_regiones = registros_medico.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+
+                medico_data.append({
+                    'medico': registros_medico.first().medico,
+                    'registros': registros_medico,
+                    'total_regiones': total_regiones,
+                })
+
         context['medico_data'] = medico_data
         return context
 
@@ -180,6 +187,48 @@ def generar_pdf_liquidacion(request):
     buffer.seek(0)
     return FileResponse(buffer, as_attachment=True, filename="Estudios_por_medico.pdf")
 
+class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    model = RegistroProcedimientosIntervensionismo
+    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
+    template_name = 'liquidacion/procedimientos_intervensionismo_form.html'
+    success_url = reverse_lazy('procedimientos_intervensionismo')
+    success_message = "Registro realizado exitosamente"
+
+    def form_valid(self, form):
+        form.instance.medico = self.request.user
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context['registros'] = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('-fecha_registro')
+        return context
+
+class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
+    model = RegistroProcedimientosIntervensionismo
+    template_name = 'liquidacion/procedimientos_intervensionismo_list.html'
+    context_object_name = 'registros'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
+        registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('fecha_registro')
+
+        if form.is_valid():
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
+            if mes:
+                registros = registros.filter(fecha_del_procedimiento__month=mes)
+            if año:
+                registros = registros.filter(fecha_del_procedimiento__year=año)
+
+        context['form'] = form
+        context['registros'] = registros
+        context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
+        context['total_pacientes'] = registros.count()
+        return context
+
 # Vistas para quienes consultan la liquidación sin loguearse
 
 class InformadosPorMedicoPorMesListView(TemplateView):
@@ -221,48 +270,6 @@ class InformadosPorMedicoPorMesListView(TemplateView):
             })
 
         context['medico_data'] = medico_data
-        return context
-
-class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    model = RegistroProcedimientosIntervensionismo
-    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
-    template_name = 'liquidacion/procedimientos_intervensionismo_form.html'
-    success_url = reverse_lazy('procedimientos_intervensionismo')
-    success_message = "Registro realizado exitosamente"
-
-    def form_valid(self, form):
-        form.instance.medico = self.request.user
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        context['registros'] = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('-fecha_registro')
-        return context
-
-class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
-    model = RegistroProcedimientosIntervensionismo
-    template_name = 'liquidacion/procedimientos_intervensionismo_list.html'
-    context_object_name = 'registros'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
-        registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('fecha_registro')
-
-        if form.is_valid():
-            mes = form.cleaned_data.get('mes')
-            año = form.cleaned_data.get('año')
-            if mes:
-                registros = registros.filter(fecha_del_procedimiento__month=mes)
-            if año:
-                registros = registros.filter(fecha_del_procedimiento__year=año)
-
-        context['form'] = form
-        context['registros'] = registros
-        context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
-        context['total_pacientes'] = registros.count()
         return context
 
 User = get_user_model()

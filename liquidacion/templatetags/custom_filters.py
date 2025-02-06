@@ -15,3 +15,8 @@ def unique(queryset):
             unique_items.append(item.get_tipo_display())
             seen.add(item.get_tipo_display())
     return unique_items
+
+@register.filter(name='has_group')
+def has_group(user, group_name):
+    """Verifica si el usuario pertenece a un grupo específico."""
+    return user.groups.filter(name=group_name).exists()

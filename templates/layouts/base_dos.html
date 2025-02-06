@@ -43,6 +43,13 @@
                 Intervencionismo
             </a>
         </li>
+        <!-- Guardias -->
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'coberturas_medico' %}active{% endif %}" 
+               href="{% url 'coberturas_medico' %}">
+                Guardias
+            </a>
+        </li>
     </ul>
     <main class="container-fluid p-0">
         {% block content %}

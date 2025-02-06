@@ -134,3 +134,33 @@ class FiltroProcedimientosIntervensionismoForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
+
+class FiltroEstudiosPorMedicoForm(forms.Form):
+    medico = forms.ModelChoiceField(
+        queryset=User.objects.filter(groups__name='Médicos de staff - informes').order_by('last_name', 'first_name'),
+        required=False,
+        label="Médico",
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        empty_label="Todos los médicos"
+    )
+    mes = forms.ChoiceField(
+        choices=[
+            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
+            (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
+            (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
+        ],
+        required=False,
+        label="Mes",
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+    )
+    año = forms.ChoiceField(
+        choices=[(i, i) for i in range(2000, 2031)],
+        required=False,
+        label="Año",
+        initial=datetime.now().year,
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
