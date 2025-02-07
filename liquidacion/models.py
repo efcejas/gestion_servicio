@@ -70,11 +70,5 @@ class RegistroProcedimientosIntervensionismo(models.Model):
         verbose_name = 'Registro de procedimiento de intervencionismo'
         verbose_name_plural = 'Registros de procedimientos de intervencionismo'
 
-    def save(self, *args, **kwargs):
-        self.nombre_paciente = self.nombre_paciente.title()
-        self.apellido_paciente = self.apellido_paciente.title()
-        self.procedimiento = self.procedimiento.title()
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return f'{self.medico} - {self.fecha_registro}'
