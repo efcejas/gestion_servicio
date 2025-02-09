@@ -4,7 +4,6 @@ from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 
-
 class MedicoCreateViewForm(forms.ModelForm):
     class Meta:
         model = Medico
@@ -151,6 +150,8 @@ class FiltroProcedimientosIntervensionismoForm(forms.Form):
         self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
 class FiltroEstudiosPorMedicoForm(forms.Form):
+    fecha_actual = datetime.now()
+    
     mes = forms.ChoiceField(
         choices=[
             (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
@@ -159,12 +160,14 @@ class FiltroEstudiosPorMedicoForm(forms.Form):
         ],
         required=False,
         label="Mes",
+        initial=fecha_actual.month,  # Inicializar con el mes actual
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
+
     año = forms.ChoiceField(
         choices=[(i, i) for i in range(2000, 2031)],
         required=False,
         label="Año",
-        initial=datetime.now().year,
+        initial=fecha_actual.year,  # Inicializar con el año actual
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )

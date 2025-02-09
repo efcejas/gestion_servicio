@@ -48,9 +48,16 @@
     <!-- Resultados de Ecografía -->
     <div class="card shadow-sm mb-3">
         <div class="card-header text-white" style="background-color: #164569;">
-            <h5 class="mb-2">Resultados: Ecografía</h5>
-            <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_eco|length }}</p>
-            <p class="mb-2"><strong>Total de regiones:</strong> {{ total_regiones_eco }}</p>
+            <div class="row align-items-center py-0">
+                <div class="col-6 col-md-8">
+                    <h5 class="mb-0">Resultados: Ecografía</h5>
+                    <p class="mb-0"><strong>{{ mes }}</strong> de <strong>{{ año }}</strong></p>
+                </div>
+                <div class="col-6 col-md-4 text-md-end">
+                    <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_eco|length }}</p>
+                    <p class="mb-0"><strong>Total de regiones:</strong> {{ total_regiones_eco }}</p>
+                </div>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
@@ -74,7 +81,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-2">No se encontraron registros de ecografía.</td>
+                        <td colspan="5" class="text-center py-2">No se encontraron registros de ecografía para el corriente mes.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -85,9 +92,16 @@
     <!-- Resultados de Otros Estudios -->
     <div class="card shadow-sm mb-3">
         <div class="card-header text-white" style="background-color: #1CA6A6;">
-            <h5 class="mb-2">Resultados: Radiografía, Tomografía y Resonancia</h5>
-            <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_otros|length }}</p>
-            <p class="mb-2"><strong>Total de regiones:</strong> {{ total_regiones_otros }}</p>
+            <div class="row align-items-center py-0">
+                <div class="col-6 col-md-8">
+                    <h5 class="mb-0">Resultados: Radiografía, Tomografía y Resonancia</h5>
+                    <p class="mb-0"><strong>{{ mes }}</strong> de <strong>{{ año }}</strong></p>
+                </div>
+                <div class="col-6 col-md-4 text-md-end">
+                <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_otros|length }}</p>
+                <p class="mb-2"><strong>Total de regiones:</strong> {{ total_regiones_otros }}</p>
+                </div>
+            </div>
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
@@ -111,7 +125,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-2">No se encontraron registros de estos estudios.</td>
+                        <td colspan="5" class="text-center py-2">No se encontraron registros de estos estudios para el corriente mes.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

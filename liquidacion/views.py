@@ -11,7 +11,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
 from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm, FiltroProcedimientosIntervensionismoForm, FiltroEstudiosPorMedicoForm
-from datetime import datetime
+from datetime import datetime, date
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
@@ -71,38 +71,64 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         form.instance.medico = self.request.user
         return super().form_valid(form)
 
+from datetime import datetime
+from django.db.models import Sum
+from liquidacion.forms import FiltroEstudiosPorMedicoForm
+from liquidacion.models import RegistroEstudiosPorMedico
+from django.views.generic import TemplateView
+from django.contrib.auth.mixins import LoginRequiredMixin
+
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
     template_name = 'liquidacion/registroestudios_list.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        form = FiltroEstudiosPorMedicoForm(self.request.GET or None)
-        context['form'] = form
 
-        registros_eco = []
-        registros_otros = []
-        total_regiones_eco = 0
-        total_regiones_otros = 0
+        # Fecha actual
+        fecha_actual = datetime.now()
+        mes_actual = fecha_actual.month
+        año_actual = fecha_actual.year
+
+        # Inicializar el formulario
+        form = FiltroEstudiosPorMedicoForm(self.request.GET or None)
 
         if form.is_valid():
-            mes = form.cleaned_data.get('mes')
-            año = form.cleaned_data.get('año')
+            mes = form.cleaned_data.get('mes') or mes_actual
+            año = form.cleaned_data.get('año') or año_actual
+        else:
+            mes, año = mes_actual, año_actual
 
-            # Filtrar registros del usuario logueado
-            registros = RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
+        # Convertir el mes a un valor entero si es necesario (por ejemplo, si el formulario lo devuelve como cadena)
+        mes = int(mes)
 
-            # Filtrar por `fecha_del_informe`
-            if mes and año:
-                registros = registros.filter(fecha_del_informe__year=año, fecha_del_informe__month=mes)
+        # Diccionario de nombres de meses
+        MESES = {
+            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+        }
 
-            # Separar registros
-            registros_eco = registros.filter(estudio__tipo='ECO').distinct()
-            registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
+        # Pasar los valores al contexto
+        context['form'] = form
+        context['mes'] = MESES.get(mes, 'Desconocido')  # Mostrar el nombre del mes
+        context['año'] = año
 
-            # Calcular el total de regiones usando aggregate en lugar de sum manual
-            total_regiones_eco = registros_eco.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
-            total_regiones_otros = registros_otros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+        # Filtrar registros del usuario logueado usando `fecha_del_informe`
+        registros = RegistroEstudiosPorMedico.objects.filter(
+            medico=self.request.user,
+            fecha_del_informe__year=año,
+            fecha_del_informe__month=mes
+        )
 
+        # Separar registros por tipo de estudio
+        registros_eco = registros.filter(estudio__tipo='ECO').distinct()
+        registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
+
+        # Calcular totales de regiones
+        total_regiones_eco = registros_eco.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+        total_regiones_otros = registros_otros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+
+        # Agregar registros al contexto
         context['registros_eco'] = registros_eco
         context['total_regiones_eco'] = total_regiones_eco
         context['registros_otros'] = registros_otros
