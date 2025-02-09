@@ -1,0 +1,118 @@
+{% extends "layouts/base.html" %}
+
+{% block content %}
+<div class="container py-3">
+    <h3 class="mb-3 titulo-h6">Editar Registro</h3>
+    <form method="post">
+        {% csrf_token %}
+        <div class="row gy-3 gx-4">
+            <div class="col-12 col-md-4">
+                <label for="{{ form.nombre_paciente.id_for_label }}" class="form-label small">Nombre del paciente</label>
+                {{ form.nombre_paciente }}
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="{{ form.apellido_paciente.id_for_label }}" class="form-label small">Apellido del paciente</label>
+                {{ form.apellido_paciente }}
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="{{ form.dni_paciente.id_for_label }}" class="form-label small">DNI del paciente</label>
+                {{ form.dni_paciente }}
+            </div>
+        </div>
+
+        <div class="row gy-3 gx-4 mt-0">
+            <div class="col-12 col-md-3">
+                <label for="{{ form.tipo_estudio.id_for_label }}" class="form-label small">Tipo de estudio</label>
+                {{ form.tipo_estudio }}
+            </div>
+            <div class="col-12 col-md-9">
+                <label for="{{ form.estudio.id_for_label }}" class="form-label small">Estudio</label>
+                {{ form.estudio }}
+                <p class="form-text small mb-0">Para seleccionar más de un estudio, mantenga presionada la tecla Ctrl.</p>
+            </div>
+        </div>
+
+        <div class="row gy-3 gx-4 mt-0">
+            <div class="col-12 col-md-3">
+                <label for="{{ form.cantidad_estudio.id_for_label }}" class="form-label small">Cantidad</label>
+                {{ form.cantidad_estudio }}
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="{{ form.fecha_del_informe.id_for_label }}" class="form-label small">Fecha del informe</label>
+                {{ form.fecha_del_informe }}
+            </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a href="{% url 'registroestudios_list' %}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+        const estudioSelect = document.getElementById('id_estudio');
+        const estudios = JSON.parse('{{ estudios|escapejs }}');
+
+        // Estudios seleccionados al cargar la página
+        let estudiosSeleccionados = {{ estudios_seleccionados|safe }};
+
+        function mostrarMensajeSeleccionarTipo() {
+            estudioSelect.innerHTML = '';
+            const optionMensaje = document.createElement('option');
+            optionMensaje.textContent = 'Debe seleccionar un tipo de estudio';
+            optionMensaje.disabled = true;
+            optionMensaje.selected = true;
+            estudioSelect.appendChild(optionMensaje);
+        }
+
+        function cargarEstudios(tipoSeleccionado) {
+            if (!tipoSeleccionado) {
+                mostrarMensajeSeleccionarTipo();
+                return;
+            }
+
+            const estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+            estudioSelect.innerHTML = '';
+
+            if (estudiosFiltrados.length === 0) {
+                const optionMensaje = document.createElement('option');
+                optionMensaje.textContent = 'Aún no existen estudios cargados para esta modalidad';
+                optionMensaje.disabled = true;
+                optionMensaje.selected = true;
+                estudioSelect.appendChild(optionMensaje);
+            } else {
+                estudiosFiltrados.forEach(estudio => {
+                    const option = document.createElement('option');
+                    option.value = estudio.id;
+                    option.textContent = estudio.nombre;
+
+                    // Marcar como seleccionado si está en la lista inicial
+                    if (estudiosSeleccionados.includes(estudio.id)) {
+                        option.selected = true;
+                    }
+
+                    estudioSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Cargar los estudios si ya hay un tipo preseleccionado
+        const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+        if (tipoEstudioSeleccionado) {
+            tipoEstudioSelect.value = tipoEstudioSeleccionado;
+            cargarEstudios(tipoEstudioSeleccionado);
+        } else {
+            mostrarMensajeSeleccionarTipo();
+        }
+
+        // Evento para cambiar el tipo de estudio y limpiar la selección previa
+        tipoEstudioSelect.addEventListener('change', function () {
+            estudiosSeleccionados = [];  // Limpiar la selección anterior
+            cargarEstudios(this.value);
+        });
+    });
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, TemplateView
+from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
@@ -16,6 +16,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -70,13 +71,6 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # Asignar el usuario logueado al campo 'medico'
         form.instance.medico = self.request.user
         return super().form_valid(form)
-
-from datetime import datetime
-from django.db.models import Sum
-from liquidacion.forms import FiltroEstudiosPorMedicoForm
-from liquidacion.models import RegistroEstudiosPorMedico
-from django.views.generic import TemplateView
-from django.contrib.auth.mixins import LoginRequiredMixin
 
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
     template_name = 'liquidacion/registroestudios_list.html'
@@ -135,6 +129,42 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['total_regiones_otros'] = total_regiones_otros
 
         return context
+
+class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
+    model = RegistroEstudiosPorMedico
+    form_class = RegistroEstudiosPorMedicoCreateViewForm
+    template_name = 'liquidacion/registroestudios_update.html'
+    success_url = reverse_lazy('registroestudios_list')
+
+    def get_queryset(self):
+        # Limita los registros al usuario logueado
+        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Cargar todos los estudios y convertirlos a JSON
+        context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
+
+        # Obtener el tipo de estudio y los estudios seleccionados en el registro
+        registro = self.object
+        if registro and registro.estudio.exists():
+            context['tipo_estudio_seleccionado'] = registro.estudio.first().tipo
+            context['estudios_seleccionados'] = list(registro.estudio.values_list('id', flat=True))
+        else:
+            context['tipo_estudio_seleccionado'] = ''
+            context['estudios_seleccionados'] = []
+
+        return context
+
+class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
+    model = RegistroEstudiosPorMedico
+    template_name = 'liquidacion/registroestudios_confirm_delete.html'
+    success_url = reverse_lazy('registroestudios_list')
+
+    def get_queryset(self):
+        # Limita los registros a los del usuario logueado
+        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
 def generar_pdf_liquidacion(request):
     buffer = io.BytesIO()
