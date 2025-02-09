@@ -4,7 +4,7 @@ from django.views.generic import ListView, CreateView, TemplateView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
-import io
+import io, json
 from django.http import FileResponse
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -55,7 +55,15 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        context['registros'] = RegistroEstudiosPorMedico.objects.filter(medico=user).order_by('-fecha_registro')
+        tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')  # Obtener el tipo de estudio seleccionado
+        context['tipo_estudio_seleccionado'] = tipo_estudio_seleccionado
+        context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
+        today = datetime.today()
+        context['registros'] = RegistroEstudiosPorMedico.objects.filter(
+            medico=user,
+            fecha_registro__year=today.year,
+            fecha_registro__month=today.month
+        ).order_by('-fecha_registro')
         return context
 
     def form_valid(self, form):
@@ -71,34 +79,37 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         form = FiltroEstudiosPorMedicoForm(self.request.GET or None)
         context['form'] = form
 
-        medico_data = []
+        registros_eco = []
+        registros_otros = []
+        total_regiones_eco = 0
+        total_regiones_otros = 0
 
         if form.is_valid():
-            medico = form.cleaned_data.get('medico')
             mes = form.cleaned_data.get('mes')
             año = form.cleaned_data.get('año')
 
-            # Filtrar registros
-            registros = RegistroEstudiosPorMedico.objects.all()
-
-            if medico:
-                registros = registros.filter(medico=medico)
+            # Filtrar registros del usuario logueado
+            registros = RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
             if mes and año:
                 registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
 
-            # Agrupar registros por médico
-            for medico in registros.values('medico').distinct():
-                registros_medico = registros.filter(medico=medico['medico'])
-                total_regiones = registros_medico.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+            # Separar los registros según el tipo de estudio
+            print(f"Total de registros iniciales: {registros.count()}")
+            for registro in registros:
+                estudios_tipos = [est.tipo for est in registro.estudio.all()]
+                print(f"Registro: {registro.nombre_paciente}, Tipos de estudio: {estudios_tipos}")
+                if 'ECO' in estudios_tipos:
+                    registros_eco.append(registro)
+                    total_regiones_eco += registro.total_regiones()
+                else:
+                    registros_otros.append(registro)
+                    total_regiones_otros += registro.total_regiones()
 
-                medico_data.append({
-                    'medico': registros_medico.first().medico,
-                    'registros': registros_medico,
-                    'total_regiones': total_regiones,
-                })
-
-        context['medico_data'] = medico_data
+        context['registros_eco'] = registros_eco
+        context['total_regiones_eco'] = total_regiones_eco
+        context['registros_otros'] = registros_otros
+        context['total_regiones_otros'] = total_regiones_otros
         return context
 
 def generar_pdf_liquidacion(request):

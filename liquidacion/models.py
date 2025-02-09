@@ -41,6 +41,7 @@ class RegistroEstudiosPorMedico(models.Model):
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
     fecha_del_informe = models.DateField(verbose_name='Fecha del informe', blank=True, null=True)
     estudio = models.ManyToManyField(Estudios, verbose_name='Estudios')
+    cantidad_estudio = models.PositiveIntegerField(default=1, blank=True, null=True, verbose_name='Cantidad por estudio')  # Nuevo campo
 
     class Meta:
         verbose_name = 'Registro de estudio por médico'
@@ -51,9 +52,14 @@ class RegistroEstudiosPorMedico(models.Model):
 
     def total_regiones(self):
         """
-        Calcula el total de regiones para los estudios asociados a este registro.
+        Calcula el total de regiones para los estudios asociados a este registro,
+        considerando la cantidad de cada estudio.
         """
-        return sum(estudio.conteo_regiones for estudio in self.estudio.all())
+        total = 0
+        for estudio in self.estudio.all():
+            cantidad = self.cantidad_estudio or 1  # Si cantidad_estudio es None, usar 1 como predeterminado
+            total += estudio.conteo_regiones * cantidad
+        return total
 
 class RegistroProcedimientosIntervensionismo(models.Model):
     medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')

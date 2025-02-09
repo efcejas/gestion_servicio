@@ -15,7 +15,6 @@ class GuardiaListView(ListView):
         return Guardia.objects.filter(fecha__gte=timezone.now()).order_by('fecha')
 
 
-
 class ResumenGuardiasView(TemplateView):
     template_name = 'control_guardias/resumen_guardias.html'
 

@@ -12,7 +12,7 @@
                     <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
                 </div>
                 <div class="card-body text-center">
-                    <p class="mb-0">¡Hola {{ user.first_name }}! Aquí podrás ver tus registros y filtrarlos por médico y mes.</p>
+                    <p class="mb-0">¡Hola {{ user.first_name }}! Aquí podrás ver tus registros y filtrarlos por mes.</p>
                 </div>
             </div>
         </div>
@@ -24,18 +24,13 @@
                 <div class="card-body">
                     <form method="get" class="row g-2 d-flex justify-content-center">
                         {% csrf_token %}
-                        <!-- Campo Médico -->
-                        <div class="col-12 col-md-4 d-flex align-items-center">
-                            <label for="id_medico" class="form-label me-2 mb-0">Médico</label>
-                            {{ form.medico }}
-                        </div>
                         <!-- Campo Mes -->
-                        <div class="col-6 col-md-2 d-flex align-items-center">
+                        <div class="col-6 col-md-4 d-flex align-items-center">
                             <label for="id_mes" class="form-label me-2 mb-0">Mes</label>
                             {{ form.mes }}
                         </div>
                         <!-- Campo Año -->
-                        <div class="col-6 col-md-2 d-flex align-items-center">
+                        <div class="col-6 col-md-4 d-flex align-items-center">
                             <label for="id_año" class="form-label me-2 mb-0">Año</label>
                             {{ form.año }}
                         </div>
@@ -49,26 +44,16 @@
         </div>
     </div>
 
-    <!-- Resultados por médico -->
-    {% for data in medico_data %}
+    <!-- Resultados de Ecografía -->
     <div class="card shadow-sm mb-3">
-        <div class="card-header" style="background-color: #e1e1e1;">
-            <div class="row align-items-center py-3">
-                <div class="col-6 col-md-8">
-                    <h5 class="titulo-h6 mb-0">Resultados</h5>
-                </div>
-                <div class="col-6 col-md-4 text-md-end">
-                    <h6 class="card-title mb-0">Total de regiones: {{ data.total_regiones }}</h6>
-                </div>
-            </div>
+        <div class="card-header bg-info text-white">
+            <h5 class="titulo-h6 mb-0">Resultados: Ecografía</h5>
         </div>
-
-        <!-- Tabla de registros del médico -->
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th scope="col" style="width: 250px;" class="px-3">Paciente</th>
+                        <th scope="col" class="px-3">Paciente</th>
                         <th scope="col">DNI</th>
                         <th scope="col" class="text-center col-2">Fecha del informe</th>
                         <th scope="col">Estudios</th>
@@ -76,9 +61,9 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for registro in data.registros %}
+                    {% for registro in registros_eco %}
                     <tr>
-                        <td scope="row" class="px-3">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                        <td class="px-3">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
                         <td>{{ registro.dni_paciente }}</td>
                         <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
                         <td>{{ registro.estudio.all|join:", " }}</td>
@@ -86,16 +71,47 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-2">No se encontraron registros.</td>
+                        <td colspan="5" class="text-center py-2">No se encontraron registros de ecografía.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-    {% empty %}
-    <p class="text-center text-muted">No se encontraron registros de estudios para ningún médico.</p>
-    {% endfor %}
+
+    <!-- Resultados de Otros Estudios -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="titulo-h6 mb-0">Resultados: Radiografía, Tomografía y Resonancia</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col" class="px-3">Paciente</th>
+                        <th scope="col">DNI</th>
+                        <th scope="col" class="text-center col-2">Fecha del informe</th>
+                        <th scope="col">Estudios</th>
+                        <th scope="col" class="text-center px-3">Regiones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for registro in registros_otros %}
+                    <tr>
+                        <td class="px-3">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                        <td>{{ registro.dni_paciente }}</td>
+                        <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                        <td>{{ registro.estudio.all|join:", " }}</td>
+                        <td class="text-center px-3">{{ registro.total_regiones }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-2">No se encontraron registros de estos estudios.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}
-
