@@ -91,25 +91,23 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             # Filtrar registros del usuario logueado
             registros = RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
+            # Filtrar por `fecha_del_informe`
             if mes and año:
-                registros = registros.filter(fecha_registro__year=año, fecha_registro__month=mes)
+                registros = registros.filter(fecha_del_informe__year=año, fecha_del_informe__month=mes)
 
-            # Separar los registros según el tipo de estudio
-            print(f"Total de registros iniciales: {registros.count()}")
-            for registro in registros:
-                estudios_tipos = [est.tipo for est in registro.estudio.all()]
-                print(f"Registro: {registro.nombre_paciente}, Tipos de estudio: {estudios_tipos}")
-                if 'ECO' in estudios_tipos:
-                    registros_eco.append(registro)
-                    total_regiones_eco += registro.total_regiones()
-                else:
-                    registros_otros.append(registro)
-                    total_regiones_otros += registro.total_regiones()
+            # Separar registros
+            registros_eco = registros.filter(estudio__tipo='ECO').distinct()
+            registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
+
+            # Calcular el total de regiones usando aggregate en lugar de sum manual
+            total_regiones_eco = registros_eco.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+            total_regiones_otros = registros_otros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
 
         context['registros_eco'] = registros_eco
         context['total_regiones_eco'] = total_regiones_eco
         context['registros_otros'] = registros_otros
         context['total_regiones_otros'] = total_regiones_otros
+
         return context
 
 def generar_pdf_liquidacion(request):
@@ -258,14 +256,14 @@ class InformadosPorMedicoPorMesListView(TemplateView):
             mes = form.cleaned_data.get('mes')
             año = form.cleaned_data.get('año')
 
-            # Filtrar registros
-            registros = RegistroEstudiosPorMedico.objects.all()
+            # Filtrar registros excluyendo los estudios de tipo 'ECO'
+            registros = RegistroEstudiosPorMedico.objects.exclude(estudio__tipo='ECO').distinct()
 
             if medico:
                 registros = registros.filter(medico=medico)
 
             if mes and año:
-                registros = registros.filter(fecha_registro__year=int(año), fecha_registro__month=int(mes))
+                registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
 
             # Ordenar los registros por la fecha del informe (de más reciente a más antiguo)
             registros = registros.order_by('-fecha_del_informe')

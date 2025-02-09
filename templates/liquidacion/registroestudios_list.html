@@ -12,7 +12,7 @@
                     <h5 class="titulo-h6 text-center text-md-start mb-0">Mis registros</h5>
                 </div>
                 <div class="card-body text-center">
-                    <p class="mb-0">¡Hola {{ user.first_name }}! Aquí podrás ver tus registros y filtrarlos por mes.</p>
+                    <p class="mb-0">¡Hola <strong>{{ user.first_name }}</strong>! Aquí podrás ver tus registros y filtrarlos por mes.</p>
                 </div>
             </div>
         </div>
@@ -22,6 +22,7 @@
                     <h5 class="titulo-h6 text-center text-md-start mb-0">Filtrar por mes</h5>
                 </div>
                 <div class="card-body">
+                    <p class="mb-3 text-center">El filtro se aplica sobre la <strong>fecha del informe</strong>.</p>
                     <form method="get" class="row g-2 d-flex justify-content-center">
                         {% csrf_token %}
                         <!-- Campo Mes -->
@@ -46,8 +47,10 @@
 
     <!-- Resultados de Ecografía -->
     <div class="card shadow-sm mb-3">
-        <div class="card-header bg-info text-white">
-            <h5 class="titulo-h6 mb-0">Resultados: Ecografía</h5>
+        <div class="card-header text-white" style="background-color: #164569;">
+            <h5 class="mb-2">Resultados: Ecografía</h5>
+            <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_eco|length }}</p>
+            <p class="mb-2"><strong>Total de regiones:</strong> {{ total_regiones_eco }}</p>
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">
@@ -81,8 +84,10 @@
 
     <!-- Resultados de Otros Estudios -->
     <div class="card shadow-sm mb-3">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="titulo-h6 mb-0">Resultados: Radiografía, Tomografía y Resonancia</h5>
+        <div class="card-header text-white" style="background-color: #1CA6A6;">
+            <h5 class="mb-2">Resultados: Radiografía, Tomografía y Resonancia</h5>
+            <p class="mb-0"><strong>Total de pacientes:</strong> {{ registros_otros|length }}</p>
+            <p class="mb-2"><strong>Total de regiones:</strong> {{ total_regiones_otros }}</p>
         </div>
         <div class="table-responsive">
             <table class="table table-sm table-hover align-middle">

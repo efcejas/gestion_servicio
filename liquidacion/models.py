@@ -51,13 +51,9 @@ class RegistroEstudiosPorMedico(models.Model):
         return f'{self.medico} - {self.fecha_registro}'
 
     def total_regiones(self):
-        """
-        Calcula el total de regiones para los estudios asociados a este registro,
-        considerando la cantidad de cada estudio.
-        """
         total = 0
         for estudio in self.estudio.all():
-            cantidad = self.cantidad_estudio or 1  # Si cantidad_estudio es None, usar 1 como predeterminado
+            cantidad = self.cantidad_estudio or 1  # Evitar problemas si es None
             total += estudio.conteo_regiones * cantidad
         return total
 
