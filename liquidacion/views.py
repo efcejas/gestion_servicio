@@ -3,7 +3,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Count, Q, Prefetch
 import io, json
 from django.http import FileResponse
 from reportlab.lib.pagesizes import letter
@@ -305,16 +305,17 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         form = FiltroMedicoMesForm(self.request.GET or None)
         context['form'] = form
 
-        medico_data = []
+        registros_por_medico = defaultdict(list)
 
-        # Solo realizar la consulta si el formulario es válido
         if form.is_valid():
-            medico = form.cleaned_data.get('medico')  # Ahora es una instancia de CustomUser
+            medico = form.cleaned_data.get('medico')
             mes = form.cleaned_data.get('mes')
             año = form.cleaned_data.get('año')
 
-            # Filtrar registros excluyendo los estudios de tipo 'ECO'
-            registros = RegistroEstudiosPorMedico.objects.exclude(estudio__tipo='ECO').distinct()
+            # Filtrar registros excluyendo los estudios tipo 'ECO'
+            registros = RegistroEstudiosPorMedico.objects.exclude(estudio__tipo='ECO').prefetch_related(
+                Prefetch('estudio', queryset=Estudios.objects.all())
+            ).distinct()
 
             if medico:
                 registros = registros.filter(medico=medico)
@@ -322,13 +323,14 @@ class InformadosPorMedicoPorMesListView(TemplateView):
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
 
-            # Ordenar los registros por la fecha del informe (de más reciente a más antiguo)
-            registros = registros.order_by('-fecha_del_informe')
+            # Agrupar registros por médico
+            for registro in registros.order_by('-fecha_del_informe'):
+                registros_por_medico[registro.medico].append(registro)
 
-            # Calcular el total de regiones
-            total_regiones = registros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
-
-            # Agregar datos al contexto
+        # Preparar el contexto con datos por médico
+        medico_data = []
+        for medico, registros in registros_por_medico.items():
+            total_regiones = sum(registro.total_regiones() for registro in registros)
             medico_data.append({
                 'medico': medico,
                 'registros': registros,
