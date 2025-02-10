@@ -3,7 +3,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 import io, json
 from django.http import FileResponse
 from reportlab.lib.pagesizes import letter
@@ -17,6 +17,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from collections import defaultdict
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -347,7 +348,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
         form = FiltroMedicoMesForm(self.request.GET or None)
         context['form'] = form
 
-        medico_data = []
+        registros_por_medico = defaultdict(list)
 
         if form.is_valid():
             medico = form.cleaned_data.get('medico')
@@ -363,12 +364,14 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
 
-            # Ordenar registros
-            registros = registros.order_by('-fecha_del_informe')
+            # Agrupar registros por médico
+            for registro in registros.order_by('-fecha_del_informe'):
+                registros_por_medico[registro.medico].append(registro)
 
-            # Calcular el total de regiones usando el método total_regiones()
+        # Preparar el contexto con datos por médico
+        medico_data = []
+        for medico, registros in registros_por_medico.items():
             total_regiones = sum(registro.total_regiones() for registro in registros)
-
             medico_data.append({
                 'medico': medico,
                 'registros': registros,
