@@ -3,7 +3,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum
+from django.db.models import Sum, Count
 import io, json
 from django.http import FileResponse
 from reportlab.lib.pagesizes import letter
@@ -338,6 +338,45 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         return context
 
 User = get_user_model()
+
+class EcografiasPorMedicoPorMesListView(TemplateView):
+    template_name = 'liquidacion/ecografias_por_medico_por_mes.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = FiltroMedicoMesForm(self.request.GET or None)
+        context['form'] = form
+
+        medico_data = []
+
+        if form.is_valid():
+            medico = form.cleaned_data.get('medico')
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
+
+            # Filtrar registros de tipo ECO
+            registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').distinct()
+
+            if medico:
+                registros = registros.filter(medico=medico)
+
+            if mes and año:
+                registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+
+            # Ordenar registros
+            registros = registros.order_by('-fecha_del_informe')
+
+            # Calcular el total de regiones usando el método total_regiones()
+            total_regiones = sum(registro.total_regiones() for registro in registros)
+
+            medico_data.append({
+                'medico': medico,
+                'registros': registros,
+                'total_regiones': total_regiones,
+            })
+
+        context['medico_data'] = medico_data
+        return context
 
 class ProcedimientosPorMedicoPorMesListView(TemplateView):
     template_name = 'liquidacion/procedimientos_por_medico_por_mes.html'

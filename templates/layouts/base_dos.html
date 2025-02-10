@@ -35,7 +35,13 @@
                 Informes de Rx, TC y RM
             </a>
         </li>
-    
+        <!-- Ecografías -->
+        <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'ecografias_por_medico_por_mes' %}active{% endif %}" 
+               href="{% url 'ecografias_por_medico_por_mes' %}">
+                Ecografías
+            </a>
+        </li>
         <!-- Intervencionismo -->
         <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'procedimientos_por_medico_por_mes' %}active{% endif %}" 

@@ -12,7 +12,8 @@ from .views import (
     InformadosPorMedicoPorMesListView,
     ProcedimientosIntervensionismoListCreateView,
     ProcedimientosIntervensionismoListView,
-    ProcedimientosPorMedicoPorMesListView
+    ProcedimientosPorMedicoPorMesListView,
+    EcografiasPorMedicoPorMesListView,
 )
 
 urlpatterns = [
@@ -27,6 +28,7 @@ urlpatterns = [
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),
     path('informados-por-medico-por-mes/', InformadosPorMedicoPorMesListView.as_view(), name='informados_por_medico_por_mes'),
     path('procedimientos-intervensionismo/', ProcedimientosIntervensionismoListCreateView.as_view(), name='procedimientos_intervensionismo'),
+    path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
     path('mis-procedimientos/', ProcedimientosIntervensionismoListView.as_view(), name='mis_procedimientos'),
     path('procedimientos-por-medico-por-mes/', ProcedimientosPorMedicoPorMesListView.as_view(), name='procedimientos_por_medico_por_mes'),
 ]
