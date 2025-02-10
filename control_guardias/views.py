@@ -31,7 +31,7 @@ class ResumenGuardiasView(TemplateView):
             año = form.cleaned_data.get('año')
 
             # Filtrar guardias según los criterios del formulario
-            guardias = Guardia.objects.filter(cubierta=True)
+            guardias = Guardia.objects.filter(cubierta=True, fecha__lte=timezone.now())
             if medico:
                 guardias = guardias.filter(medico=medico)
             if mes and año:

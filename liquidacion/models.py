@@ -39,7 +39,7 @@ class RegistroEstudiosPorMedico(models.Model):
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
     dni_paciente = models.CharField(verbose_name='DNI del paciente')
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
-    fecha_del_informe = models.DateField(verbose_name='Fecha del informe', blank=True, null=True)
+    fecha_del_informe = models.DateField(verbose_name='Fecha del informe')
     estudio = models.ManyToManyField(Estudios, verbose_name='Estudios')
     cantidad_estudio = models.PositiveIntegerField(default=1, blank=True, null=True, verbose_name='Cantidad por estudio')  # Nuevo campo
 
@@ -63,7 +63,7 @@ class RegistroProcedimientosIntervensionismo(models.Model):
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
     dni_paciente = models.CharField(max_length=50, verbose_name='DNI del paciente', blank=True, null=True)
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
-    fecha_del_procedimiento = models.DateField(verbose_name='Fecha del procedimiento', blank=True, null=True)
+    fecha_del_procedimiento = models.DateField(verbose_name='Fecha del procedimiento', default=timezone.now)
     procedimiento = models.CharField(max_length=150, verbose_name='Procedimiento realizado')
     conteo_regiones = models.IntegerField(verbose_name='Cantidad de regiones', blank=True, null=True, default=0)
     notas = models.TextField(verbose_name='Notas', blank=True, null=True)
