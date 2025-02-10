@@ -73,6 +73,8 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         form.instance.medico = self.request.user
         return super().form_valid(form)
 
+User = get_user_model()
+
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
     template_name = 'liquidacion/registroestudios_list.html'
 
@@ -119,9 +121,17 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         registros_eco = registros.filter(estudio__tipo='ECO').distinct()
         registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
 
-        # Calcular totales de regiones
-        total_regiones_eco = registros_eco.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
-        total_regiones_otros = registros_otros.aggregate(total=Sum('estudio__conteo_regiones'))['total'] or 0
+        # Calcular totales de regiones considerando la cantidad de estudios
+        total_regiones_eco = sum(
+            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
+            for registro in registros_eco
+            for estudio in registro.estudio.all()
+        )
+        total_regiones_otros = sum(
+            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
+            for registro in registros_otros
+            for estudio in registro.estudio.all()
+        )
 
         # Agregar registros al contexto
         context['registros_eco'] = registros_eco
