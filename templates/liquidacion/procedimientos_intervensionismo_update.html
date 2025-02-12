@@ -1,0 +1,45 @@
+{% extends "layouts/base.html" %}
+{% block content %}
+<div class="container py-3">
+    <h3 class="mb-3 titulo-h6">Editar Procedimiento Intervencionismo</h3>
+    <form method="post">
+        {% csrf_token %}
+        <div class="row gy-3 gx-4">
+            <div class="col-12 col-md-4">
+                <label for="{{ form.nombre_paciente.id_for_label }}" class="form-label small">Nombre del paciente</label>
+                {{ form.nombre_paciente }}
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="{{ form.apellido_paciente.id_for_label }}" class="form-label small">Apellido del paciente</label>
+                {{ form.apellido_paciente }}
+            </div>
+            <div class="col-12 col-md-4">
+                <label for="{{ form.dni_paciente.id_for_label }}" class="form-label small">DNI del paciente</label>
+                {{ form.dni_paciente }}
+            </div>
+        </div>
+        <div class="row gy-3 gx-4 mt-0">
+            <div class="col-12 col-md-3">
+                <label for="{{ form.fecha_del_procedimiento.id_for_label }}" class="form-label" style="font-size: 0.9em;">Fecha del procedimiento</label>
+                {{ form.fecha_del_procedimiento }}
+            </div>
+            <div class="col-12 col-md-2">
+                <label for="{{ form.procedimiento.id_for_label }}" class="form-label" style="font-size: 0.9em;">Procedimiento realizado</label>
+                {{ form.procedimiento }}
+            </div>
+            <div class="col-12 col-md-2">
+                <label for="{{ form.conteo_regiones.id_for_label }}" class="form-label" style="font-size: 0.9em;">Conteo de regiones</label>
+                {{ form.conteo_regiones }}
+            </div>
+            <div class="col-12 col-md-5">
+                <label for="{{ form.notas.id_for_label }}" class="form-label" style="font-size: 0.9em;">Notas</label>
+                {{ form.notas }}
+            </div>
+        </div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            <a href="{% url 'mis_procedimientos' %}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

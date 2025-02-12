@@ -12,6 +12,8 @@ from .views import (
     InformadosPorMedicoPorMesListView,
     ProcedimientosIntervensionismoListCreateView,
     ProcedimientosIntervensionismoListView,
+    ProcedimientosIntervensionismoUpdateView,
+    ProcedimientosIntervensionismoDeleteView,
     ProcedimientosPorMedicoPorMesListView,
     EcografiasPorMedicoPorMesListView,
 )
@@ -30,5 +32,7 @@ urlpatterns = [
     path('procedimientos-intervensionismo/', ProcedimientosIntervensionismoListCreateView.as_view(), name='procedimientos_intervensionismo'),
     path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
     path('mis-procedimientos/', ProcedimientosIntervensionismoListView.as_view(), name='mis_procedimientos'),
+    path('procedimientos_intervensionismo/<int:pk>/editar/', ProcedimientosIntervensionismoUpdateView.as_view(), name='editar_procedimiento'),
+    path('procedimientos_intervensionismo/<int:pk>/eliminar/', ProcedimientosIntervensionismoDeleteView.as_view(), name='eliminar_procedimiento'),
     path('procedimientos-por-medico-por-mes/', ProcedimientosPorMedicoPorMesListView.as_view(), name='procedimientos_por_medico_por_mes'),
 ]

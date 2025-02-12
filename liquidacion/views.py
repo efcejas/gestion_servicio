@@ -1,23 +1,29 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Count, Q, Prefetch
-import io, json
 from django.http import FileResponse
+from django.contrib.auth import get_user_model
+import io, json
+from datetime import datetime, date
+from collections import defaultdict
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
-from .forms import RegistroEstudiosPorMedicoCreateViewForm, MedicoCreateViewForm, FiltroMedicoMesForm, RegistroProcedimientosIntervensionismoCreateViewForm, FiltroProcedimientosIntervensionismoForm, FiltroEstudiosPorMedicoForm
-from datetime import datetime, date
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
-from collections import defaultdict
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
+from .forms import (
+    RegistroEstudiosPorMedicoCreateViewForm, 
+    MedicoCreateViewForm, 
+    FiltroMedicoMesForm, 
+    RegistroProcedimientosIntervensionismoCreateViewForm, 
+    FiltroProcedimientosIntervensionismoForm, 
+    FiltroEstudiosPorMedicoForm
+)
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -288,22 +294,55 @@ class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
-        registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('fecha_registro')
+        
+        # Obtener el mes y año actual
+        fecha_actual = datetime.now()
+        mes_actual = fecha_actual.month
+        año_actual = fecha_actual.year
 
+        # Inicializar el formulario con los valores actuales
+        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None, initial={'mes': mes_actual, 'año': año_actual})
+
+        # Inicializar los valores de mes y año con los valores actuales
+        mes = mes_actual
+        año = año_actual
+
+        # Si el formulario es válido, actualizar los valores de mes y año
         if form.is_valid():
-            mes = form.cleaned_data.get('mes')
-            año = form.cleaned_data.get('año')
-            if mes:
-                registros = registros.filter(fecha_del_procedimiento__month=mes)
-            if año:
-                registros = registros.filter(fecha_del_procedimiento__year=año)
+            mes = form.cleaned_data.get('mes') or mes_actual
+            año = form.cleaned_data.get('año') or año_actual
+
+        # Filtrar registros del usuario logueado para el mes y año seleccionados
+        registros = RegistroProcedimientosIntervensionismo.objects.filter(
+            medico=user,
+            fecha_del_procedimiento__month=mes,
+            fecha_del_procedimiento__year=año
+        ).order_by('fecha_registro')
 
         context['form'] = form
         context['registros'] = registros
         context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
         context['total_pacientes'] = registros.count()
+        context['mes'] = mes
+        context['año'] = año
         return context
+
+class ProcedimientosIntervensionismoUpdateView(LoginRequiredMixin, UpdateView):
+    model = RegistroProcedimientosIntervensionismo
+    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
+    template_name = 'liquidacion/procedimientos_intervensionismo_update.html'
+    success_url = reverse_lazy('mis_procedimientos')
+
+    def get_queryset(self):
+        return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
+
+class ProcedimientosIntervensionismoDeleteView(LoginRequiredMixin, DeleteView):
+    model = RegistroProcedimientosIntervensionismo
+    template_name = 'liquidacion/procedimientos_intervensionismo_confirm_delete.html'
+    success_url = reverse_lazy('mis_procedimientos')
+
+    def get_queryset(self):
+        return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
 
 # Vistas para quienes consultan la liquidación sin loguearse
 
