@@ -14,45 +14,33 @@ class MedicoCreateViewForm(forms.ModelForm):
             'matricula': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+from django.utils import timezone
+
 class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
     tipo_estudio = forms.ChoiceField(
         choices=[('', 'Seleccione')] + list(Estudios.TIPO_ESTUDIO_CHOICES),
         required=True,
         label="Tipo de estudio",
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm', 'id': 'id_tipo_estudio'}),
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm', 'id': 'id_tipo_estudio'}),
     )
 
     class Meta:
         model = RegistroEstudiosPorMedico
         fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_informe', 'estudio', 'cantidad_estudio']
         widgets = {
-            'nombre_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-            }),
-            'apellido_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-            }),
-            'dni_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-                'maxlength': 8,
-            }),
-            'estudio': forms.SelectMultiple(attrs={
-                'class': 'form-control form-control-sm',
-                'size': 4,
-            }),
-            'cantidad_estudio': forms.NumberInput(attrs={
-                'class': 'form-control form-control-sm',
-                'min': 1,
-            }),
-            'fecha_del_informe': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control form-control-sm',
-            }),
+            'nombre_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'apellido_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'dni_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'maxlength': 8}),
+            'estudio': forms.SelectMultiple(attrs={'class': 'form-control form-control-sm', 'size': '5'}),
+            'cantidad_estudio': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': 1}),
+            'fecha_del_informe': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),  # Se mantiene el 'type': 'date'
         }
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.fields['estudio'].choices = []  # Sin opciones al inicio
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['estudio'].choices = []  # Sin opciones al inicio
+        if not self.initial.get('fecha_del_informe'):
+            self.fields['fecha_del_informe'].initial = timezone.now().date()  # Preselecciona la fecha actual
 
 User = get_user_model()
 

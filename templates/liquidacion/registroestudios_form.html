@@ -124,15 +124,58 @@
         // Obtener los elementos del formulario
         const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
         const estudioSelect = document.getElementById('id_estudio');
+        const fechaInput = document.getElementById("id_fecha_del_informe");
+
+        // Establecer la fecha actual si el campo está vacío
+        if (!fechaInput.value) {
+            const hoy = new Date();
+            const dia = String(hoy.getDate()).padStart(2, '0');
+            const mes = String(hoy.getMonth() + 1).padStart(2, '0'); // Enero es 0
+            const año = hoy.getFullYear();
+            fechaInput.value = `${año}-${mes}-${dia}`;
+        }
 
         // Parsear los datos de estudios desde el contexto
         const estudios = JSON.parse('{{ estudios|escapejs }}');
 
-        // Obtener el tipo de estudio seleccionado desde el contexto
+        // Obtener el tipo de estudio y los estudios preseleccionados
         const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+        const estudiosSeleccionados = JSON.parse('{{ estudios_seleccionados|safe }}' || '[]');
 
-        // Mostrar un mensaje inicial si no hay un tipo seleccionado
-        if (!tipoEstudioSeleccionado) {
+        // Función para cargar los estudios filtrados
+        function cargarEstudios(tipoSeleccionado) {
+            const estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+
+            // Limpiar el select de estudios
+            estudioSelect.innerHTML = '';
+
+            if (estudiosFiltrados.length === 0) {
+                const optionMensaje = document.createElement('option');
+                optionMensaje.textContent = 'Aún no existen estudios cargados para esta modalidad';
+                optionMensaje.disabled = true;
+                estudioSelect.appendChild(optionMensaje);
+            } else {
+                estudiosFiltrados.forEach(estudio => {
+                    const option = document.createElement('option');
+                    option.value = estudio.id;
+                    option.textContent = estudio.nombre;
+
+                    // Marcar como seleccionado si estaba en la selección previa
+                    if (estudiosSeleccionados.includes(estudio.id)) {
+                        option.selected = true;
+                    }
+
+                    estudioSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Preseleccionar el tipo de estudio si hay uno guardado
+        if (tipoEstudioSeleccionado) {
+            tipoEstudioSelect.value = tipoEstudioSeleccionado;
+            cargarEstudios(tipoEstudioSeleccionado);
+        } else {
+            // Si no hay selección previa, mostrar un mensaje inicial en el campo de estudios
             estudioSelect.innerHTML = '';
             const optionInicial = document.createElement('option');
             optionInicial.textContent = 'Seleccione el tipo de estudio para ver opciones';
@@ -141,17 +184,11 @@
             estudioSelect.appendChild(optionInicial);
         }
 
-        // Preseleccionar el tipo de estudio si existe y cargar los estudios correspondientes
-        if (tipoEstudioSeleccionado) {
-            tipoEstudioSelect.value = tipoEstudioSeleccionado;
-            tipoEstudioSelect.dispatchEvent(new Event('change'));  // Disparar el evento 'change' para cargar estudios
-        }
-
-        // Evento para actualizar las opciones de estudios al cambiar el tipo
+        // Evento para actualizar la lista de estudios cuando cambia el tipo de estudio
         tipoEstudioSelect.addEventListener('change', function () {
             const tipoSeleccionado = this.value;
 
-            // Si no se selecciona ningún tipo, mostrar el mensaje inicial
+            // Si no se selecciona ningún tipo, mostrar un mensaje inicial
             if (!tipoSeleccionado) {
                 estudioSelect.innerHTML = '';
                 const optionMensaje = document.createElement('option');
@@ -162,25 +199,8 @@
                 return;
             }
 
-            // Filtrar los estudios según el tipo seleccionado
-            const estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
-
-            // Limpiar el desplegable y mostrar los estudios filtrados
-            estudioSelect.innerHTML = '';
-            if (estudiosFiltrados.length === 0) {
-                const optionMensaje = document.createElement('option');
-                optionMensaje.textContent = 'Aún no existen estudios cargados para esta modalidad';
-                optionMensaje.disabled = true;
-                optionMensaje.selected = true;
-                estudioSelect.appendChild(optionMensaje);
-            } else {
-                estudiosFiltrados.forEach(estudio => {
-                    const option = document.createElement('option');
-                    option.value = estudio.id;
-                    option.textContent = estudio.nombre;
-                    estudioSelect.appendChild(option);
-                });
-            }
+            // Cargar los estudios según el tipo seleccionado
+            cargarEstudios(tipoSeleccionado);
         });
     });
 </script>

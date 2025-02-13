@@ -63,15 +63,25 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')  # Obtener el tipo de estudio seleccionado
+        today = datetime.today()
+        
+        # Obtener el tipo de estudio desde el POST si el usuario lo ha cambiado recientemente
+        tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')
+
+        # Si no hay selección en el POST, recuperar el último tipo de estudio usado por el usuario
+        if not tipo_estudio_seleccionado:
+            ultimo_registro = RegistroEstudiosPorMedico.objects.filter(medico=user).order_by('-fecha_registro').first()
+            if ultimo_registro and ultimo_registro.estudio.exists():
+                tipo_estudio_seleccionado = ultimo_registro.estudio.first().tipo
+
         context['tipo_estudio_seleccionado'] = tipo_estudio_seleccionado
         context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
-        today = datetime.today()
         context['registros'] = RegistroEstudiosPorMedico.objects.filter(
             medico=user,
             fecha_registro__year=today.year,
             fecha_registro__month=today.month
         ).order_by('-fecha_registro')
+
         return context
 
     def form_valid(self, form):
