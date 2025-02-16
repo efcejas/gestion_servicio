@@ -20,3 +20,7 @@ def unique(queryset):
 def has_group(user, group_name):
     """Verifica si el usuario pertenece a un grupo específico."""
     return user.groups.filter(name=group_name).exists()
+
+@register.filter(name='add_class')
+def add_class(field, css_class):
+    return field.as_widget(attrs={"class": css_class})
