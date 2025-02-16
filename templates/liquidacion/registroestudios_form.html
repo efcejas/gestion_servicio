@@ -2,12 +2,11 @@
 {% block title %}Nuevo Registro Diario{% endblock %}
 
 {% block content %}
-<div class="container container-md-fluid py-2">
+<div class="container container-md-fluid py-2 position-relative">
     <div class="row">
         <div class="col-12 col-lg-6">
             <!-- Título -->
-            <div
-                class="container-fluid d-flex flex-column flex-md-row justify-content-center justify-content-md-between py-3 px-0">
+            <div class="container-fluid d-flex flex-column flex-md-row justify-content-center justify-content-md-between py-3 px-0">
                 <h5 class="titulo-h6 text-center text-md-start">Registro de estudio por médico</h5>
             </div>
             <!-- Formulario -->
@@ -16,60 +15,51 @@
                 <!-- Campos -->
                 <div class="row">
                     <div class="col-12 col-md-4 mb-3">
-                        <label for="{{ form.nombre_paciente.id_for_label }}" class="form-label"
-                            style="font-size: 0.9em;">Nombre del paciente</label>
+                        <label for="{{ form.nombre_paciente.id_for_label }}" class="form-label" style="font-size: 0.9em;">Nombre del paciente</label>
                         {{ form.nombre_paciente }}
                     </div>
                     <div class="col-12 col-md-4 mb-3">
-                        <label for="{{ form.apellido_paciente.id_for_label }}" class="form-label"
-                            style="font-size: 0.9em;">Apellido del paciente</label>
+                        <label for="{{ form.apellido_paciente.id_for_label }}" class="form-label" style="font-size: 0.9em;">Apellido del paciente</label>
                         {{ form.apellido_paciente }}
                     </div>
                     <div class="col-12 col-md-4 mb-3">
-                        <label for="{{ form.dni_paciente.id_for_label }}" class="form-label"
-                            style="font-size: 0.9em;">DNI del paciente</label>
+                        <label for="{{ form.dni_paciente.id_for_label }}" class="form-label" style="font-size: 0.9em;">DNI del paciente</label>
                         {{ form.dni_paciente }}
                     </div>
                     <div class="col-12 mb-3">
                         <div class="row">
                             <!-- Campo Tipo de Estudio -->
                             <div class="col-12 col-md-3 mb-3">
-                                <label for="{{ form.tipo_estudio.id_for_label }}" class="form-label small">Tipo de
-                                    estudio</label>
+                                <label for="{{ form.tipo_estudio.id_for_label }}" class="form-label small">Tipo de estudio</label>
                                 {{ form.tipo_estudio }}
                             </div>
                             <!-- Campo Estudio -->
                             <div class="col-12 col-md-9 mb-3">
                                 <label for="{{ form.estudio.id_for_label }}" class="form-label small">Estudio</label>
+                                <!-- Campo de búsqueda -->
+                                <input type="text" id="buscarEstudio" class="form-control form-control-sm mb-2" placeholder="Buscar estudio...">
                                 {{ form.estudio }}
-                                <p class="form-text small mb-0">Para seleccionar más de un estudio, mantenga presionada
-                                    la tecla
-                                    Ctrl y haga clic en los estudios deseados.</p>
+                                <p class="form-text small mb-0">Para seleccionar más de un estudio, mantenga presionada la tecla Ctrl y haga clic en los estudios deseados.</p>
                             </div>
                             <!-- Campo Fecha del Informe, Cantidad y Botones distribuidos de manera optimizada -->
                             <div class="col-12 mt-0">
                                 <div class="row g-3 align-items-center align-items-md-end justify-content-between">
                                     <!-- Campo Cantidad -->
                                     <div class="col-12 col-md-3">
-                                        <label for="{{ form.cantidad_estudio.id_for_label }}"
-                                            class="form-label small">Cantidad</label>
+                                        <label for="{{ form.cantidad_estudio.id_for_label }}" class="form-label small">Cantidad</label>
                                         {{ form.cantidad_estudio }}
                                     </div>
 
                                     <!-- Campo Fecha del Informe -->
                                     <div class="col-12 col-md-5">
-                                        <label for="{{ form.fecha_del_informe.id_for_label }}"
-                                            class="form-label small">Fecha del informe</label>
+                                        <label for="{{ form.fecha_del_informe.id_for_label }}" class="form-label small">Fecha del informe</label>
                                         {{ form.fecha_del_informe }}
                                     </div>
 
                                     <!-- Botones de acción -->
-                                    <!-- Botones de acción distribuidos correctamente -->
                                     <div class="col-12 col-md-4 d-flex justify-content-center justify-content-md-end align-items-center align-items-center gap-2 mt-2 mt-md-0">
-                                        <button type="submit" class="btn btn-primary btn-sm"
-                                            name="continuar">Guardar</button>
-                                        <a href="{% url 'registroestudios_list' %}"
-                                            class="btn btn-secondary btn-sm">Finalizar</a>
+                                        <button type="submit" class="btn btn-primary btn-sm" name="continuar">Guardar</button>
+                                        <a href="{% url 'registroestudios_list' %}" class="btn btn-secondary btn-sm">Finalizar</a>
                                     </div>
                                 </div>
                             </div>
@@ -79,17 +69,21 @@
             </form>
         </div>
         <div class="col-12 col-lg-6">
-            <div
-                class="container-fluid d-flex flex-column flex-md-row justify-content-center justify-content-md-between py-3 px-0">
+            <div class="container-fluid d-flex flex-column flex-md-row justify-content-center justify-content-md-between py-3 px-0">
                 <h5 class="titulo-h6 text-center text-md-start">Registros realizados</h5>
                 {% if messages %}
-                {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show d-flex justify-content-between align-items-center mt-2 mt-md-0 mb-md-0"
-                    role="alert">
-                    <span>{{ message }}</span>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                <div id="toast-container" class="position-absolute top-0 end-0 p-3" style="z-index: 1050;">
+                    {% for message in messages %}
+                    <div class="toast align-items-center text-bg-{{ message.tags }} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                {{ message }}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
                 {% endif %}
             </div>
             <div style="max-height: 220px; overflow-y: auto;">
@@ -125,6 +119,7 @@
         const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
         const estudioSelect = document.getElementById('id_estudio');
         const fechaInput = document.getElementById("id_fecha_del_informe");
+        const buscarEstudioInput = document.getElementById('buscarEstudio');
 
         // Establecer la fecha actual si el campo está vacío
         if (!fechaInput.value) {
@@ -202,6 +197,24 @@
             // Cargar los estudios según el tipo seleccionado
             cargarEstudios(tipoSeleccionado);
         });
+
+        // Evento para filtrar la lista de estudios cuando se escribe en el campo de búsqueda
+        buscarEstudioInput.addEventListener('input', function () {
+            const filtro = this.value.toLowerCase();
+            const opciones = estudioSelect.options;
+
+            for (let i = 0; i < opciones.length; i++) {
+                const texto = opciones[i].textContent.toLowerCase();
+                opciones[i].style.display = texto.includes(filtro) ? '' : 'none';
+            }
+        });
+
+        // Inicializar los toasts de Bootstrap
+        const toastElList = [].slice.call(document.querySelectorAll('.toast'));
+        const toastList = toastElList.map(function (toastEl) {
+            return new bootstrap.Toast(toastEl);
+        });
+        toastList.forEach(toast => toast.show());
     });
 </script>
 {% endblock %}
