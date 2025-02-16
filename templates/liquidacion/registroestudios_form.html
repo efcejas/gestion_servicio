@@ -59,7 +59,7 @@
                                     <!-- Botones de acción -->
                                     <div class="col-12 col-md-4 d-flex justify-content-center justify-content-md-end align-items-center align-items-center gap-2 mt-2 mt-md-0">
                                         <button type="submit" class="btn btn-primary btn-sm" name="continuar">Guardar</button>
-                                        <a href="{% url 'registroestudios_list' %}" class="btn btn-secondary btn-sm">Finalizar</a>
+                                        <a href="#" class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#confirmModal">Finalizar</a>
                                     </div>
                                 </div>
                             </div>
@@ -109,6 +109,24 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal de confirmación -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalLabel">Confirmar finalización de registro</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                ¿Está seguro de que desea finalizar? Asegúrese de haber guardado el último registro.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <a id="confirmFinalizar" href="{% url 'registroestudios_list' %}" class="btn btn-primary">Finalizar</a>
             </div>
         </div>
     </div>
