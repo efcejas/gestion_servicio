@@ -106,6 +106,11 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
             }),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.initial.get('fecha_del_procedimiento'):
+            self.fields['fecha_del_procedimiento'].initial = timezone.now().date()
+
 User = get_user_model()
 
 class FiltroProcedimientosIntervensionismoForm(forms.Form):

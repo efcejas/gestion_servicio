@@ -101,48 +101,61 @@
     </div>
 </div>
 <script>
-    document.querySelectorAll('#registroProcedimientosTable th').forEach(header => {
-        header.addEventListener('click', () => {
-            const table = header.closest('table');
-            const tbody = table.querySelector('tbody');
-            const rows = Array.from(tbody.querySelectorAll('tr'));
-            const index = Array.from(header.parentNode.children).indexOf(header);
-            const type = header.getAttribute('data-sort');
+    document.addEventListener('DOMContentLoaded', function() {
+        // Establecer la fecha actual si el campo está vacío
+        const fechaInput = document.getElementById("id_fecha_del_procedimiento");
+        if (!fechaInput.value) {
+            const hoy = new Date();
+            const dia = String(hoy.getDate()).padStart(2, '0');
+            const mes = String(hoy.getMonth() + 1).padStart(2, '0'); // Enero es 0
+            const año = hoy.getFullYear();
+            fechaInput.value = `${año}-${mes}-${dia}`;
+        }
 
-            // Determinar la dirección de ordenamiento
-            const currentDirection = header.dataset.direction || 'asc';
-            const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
-            header.dataset.direction = newDirection;
+        // Ordenar la tabla al hacer clic en los encabezados
+        document.querySelectorAll('#registroProcedimientosTable th').forEach(header => {
+            header.addEventListener('click', () => {
+                const table = header.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const index = Array.from(header.parentNode.children).indexOf(header);
+                const type = header.getAttribute('data-sort');
 
-            // Actualizar los íconos en los encabezados
-            document.querySelectorAll('#registroProcedimientosTable th i').forEach(icon => {
-                icon.className = 'fa fa-sort';  // Resetear todos los íconos
+                // Determinar la dirección de ordenamiento
+                const currentDirection = header.dataset.direction || 'asc';
+                const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+                header.dataset.direction = newDirection;
+
+                // Actualizar los íconos en los encabezados
+                document.querySelectorAll('#registroProcedimientosTable th i').forEach(icon => {
+                    icon.className = 'fa fa-sort';  // Resetear todos los íconos
+                });
+                const icon = header.querySelector('i');
+                icon.className = newDirection === 'asc' ? 'fa fa-sort-up' : 'fa fa-sort-down';
+
+                // Ordenar las filas
+                rows.sort((a, b) => {
+                    let aText = a.children[index].textContent.trim();
+                    let bText = b.children[index].textContent.trim();
+
+                    if (type === 'number') {
+                        aText = parseFloat(aText) || 0;
+                        bText = parseFloat(bText) || 0;
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else if (type === 'date') {
+                        aText = new Date(aText.split('/').reverse().join('-'));
+                        bText = new Date(bText.split('/').reverse().join('-'));
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else {
+                        return newDirection === 'asc'
+                            ? aText.localeCompare(bText)
+                            : bText.localeCompare(aText);
+                    }
+                });
+
+                // Reinsertar las filas ordenadas
+                rows.forEach(row => tbody.appendChild(row));
             });
-            const icon = header.querySelector('i');
-            icon.className = newDirection === 'asc' ? 'fa fa-sort-up' : 'fa fa-sort-down';
-
-            // Ordenar las filas
-            rows.sort((a, b) => {
-                let aText = a.children[index].textContent.trim();
-                let bText = b.children[index].textContent.trim();
-
-                if (type === 'number') {
-                    aText = parseFloat(aText) || 0;
-                    bText = parseFloat(bText) || 0;
-                    return newDirection === 'asc' ? aText - bText : bText - aText;
-                } else if (type === 'date') {
-                    aText = new Date(aText.split('/').reverse().join('-'));
-                    bText = new Date(bText.split('/').reverse().join('-'));
-                    return newDirection === 'asc' ? aText - bText : bText - aText;
-                } else {
-                    return newDirection === 'asc'
-                        ? aText.localeCompare(bText)
-                        : bText.localeCompare(aText);
-                }
-            });
-
-            // Reinsertar las filas ordenadas
-            rows.forEach(row => tbody.appendChild(row));
         });
     });
 </script>

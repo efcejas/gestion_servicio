@@ -60,13 +60,13 @@
 
         <!-- Tabla de Resultados -->
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle">
+            <table class="table table-sm table-hover align-middle" id="registroProcedimientosTable">
                 <thead class="table-light">
                     <tr>
-                        <th scope="col" style="width: 250px;" class="px-3">Paciente</th>
-                        <th scope="col" class="text-center">Fecha del procedimiento</th>
-                        <th scope="col" class="text-center">Procedimiento</th>
-                        <th scope="col" class="text-center">Regiones</th>
+                        <th scope="col" style="width: 250px;" class="px-3" data-sort="text">Paciente <i class="fa fa-sort"></i></th>
+                        <th scope="col" class="text-center" data-sort="date">Fecha del procedimiento <i class="fa fa-sort"></i></th>
+                        <th scope="col" class="text-center" data-sort="text">Procedimiento <i class="fa fa-sort"></i></th>
+                        <th scope="col" class="text-center" data-sort="number">Regiones <i class="fa fa-sort"></i></th>
                         <th scope="col" class="col-2">Notas</th>
                         <th scope="col" class="text-center">Acciones</th>
                     </tr>
@@ -99,4 +99,52 @@
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#registroProcedimientosTable th').forEach(header => {
+            header.addEventListener('click', () => {
+                const table = header.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const index = Array.from(header.parentNode.children).indexOf(header);
+                const type = header.getAttribute('data-sort');
+
+                // Determinar la dirección de ordenamiento
+                const currentDirection = header.dataset.direction || 'asc';
+                const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+                header.dataset.direction = newDirection;
+
+                // Actualizar los íconos en los encabezados
+                document.querySelectorAll('#registroProcedimientosTable th i').forEach(icon => {
+                    icon.className = 'fa fa-sort';  // Resetear todos los íconos
+                });
+                const icon = header.querySelector('i');
+                icon.className = newDirection === 'asc' ? 'fa fa-sort-up' : 'fa fa-sort-down';
+
+                // Ordenar las filas
+                rows.sort((a, b) => {
+                    let aText = a.children[index].textContent.trim();
+                    let bText = b.children[index].textContent.trim();
+
+                    if (type === 'number') {
+                        aText = parseFloat(aText) || 0;
+                        bText = parseFloat(bText) || 0;
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else if (type === 'date') {
+                        aText = new Date(aText.split('/').reverse().join('-'));
+                        bText = new Date(bText.split('/').reverse().join('-'));
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else {
+                        return newDirection === 'asc'
+                            ? aText.localeCompare(bText)
+                            : bText.localeCompare(aText);
+                    }
+                });
+
+                // Reinsertar las filas ordenadas
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    });
+</script>
 {% endblock %}
