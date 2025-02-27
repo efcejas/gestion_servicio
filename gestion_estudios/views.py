@@ -2,6 +2,19 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 
+from django.core.mail import send_mail
+from django.http import HttpResponse
+
+def send_test_email(request):
+    send_mail(
+        'Correo de prueba',
+        'Este es un correo de prueba enviado desde Django usando Gmail.',
+        'ensofermincejas@gmail.com',
+        ['efccejas@hotmail.com'],
+        fail_silently=False,
+    )
+    return HttpResponse("Correo enviado exitosamente")
+
 # Vista personalizada para la página de login
 class CustomLoginView(LoginView):
     template_name = 'registration/login.html'

@@ -145,11 +145,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Configuración del correo electrónico
-""" EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("MAILGUN_SMTP_SERVER", default="smtp.mailgun.org")
+EMAIL_PORT = config("MAILGUN_SMTP_PORT", default=587, cast=int)
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey'  # Literalmente 'apikey', esto no cambia
-EMAIL_HOST_PASSWORD = config('SENDGRID_API_KEY')  # Recupera la clave desde el archivo .env
-DEFAULT_FROM_EMAIL = 'EnsoFermin.Cejas@proveedores.dupuytren.com.ar'  # Tu dirección de correo verificada en SendGrid """
+EMAIL_HOST_USER = config("MAILGUN_SMTP_LOGIN")
+EMAIL_HOST_PASSWORD = config("MAILGUN_SMTP_PASSWORD")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
