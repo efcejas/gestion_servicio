@@ -12,12 +12,26 @@
         <div class="card-body">
             <form method="post" novalidate>
                 {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}
+                            <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
                 <div class="row mb-3">
                     <div class="col-md-12 titulo-h6">
                         <p class="h6 col-12">Información de cuenta</p>
                     </div>
                     <div class="col-lg-5 mb-2 mb-lg-0">
                         {{ form.username }}
+                        {% if form.username.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.username.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="col-lg-7 d-lg-flex align-items-center">
                         <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">{{ form.username.help_text }}</p>
@@ -29,9 +43,23 @@
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.first_name }}
+                        {% if form.first_name.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.first_name.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.last_name }}
+                        {% if form.last_name.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.last_name.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
                 <div class="row">
@@ -40,9 +68,23 @@
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.email }}
+                        {% if form.email.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.email.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.telefono }}
+                        {% if form.telefono.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.telefono.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Debe ingresar el número de la siguiente manera: 1112345678</p>
                     </div>
                 </div>
@@ -52,6 +94,13 @@
                     </div>
                     <div class="col-lg-5 mb-2 mb-lg-0">
                         {{ form.cargo }}
+                        {% if form.cargo.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.cargo.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
                     <div class="col-lg-7 d-lg-flex align-items-center">
                         <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">Debe seleccionar el tipo de cargo que desempeña en el servicio.</p>
@@ -63,10 +112,24 @@
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.password1 }}
+                        {% if form.password1.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.password1.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Su contraseña no puede ser similar a otros datos personales y debe contener al menos 8 caracteres.</p>
                     </div>
                     <div class="col-md-6 mb-2 mb-lg-0">
                         {{ form.password2 }}
+                        {% if form.password2.errors %}
+                            <div class="alert alert-danger mt-2">
+                                {% for error in form.password2.errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">{{ form.password2.help_text }}</p>
                     </div>
                 </div>
