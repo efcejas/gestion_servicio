@@ -27,6 +27,7 @@ from .forms import (
 import openpyxl
 from openpyxl.styles import Alignment, Font
 from django.utils import timezone
+from openpyxl import Workbook
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -642,17 +643,16 @@ def exportar_excel_procedimientos(request):
     print(f"Filtros - Medico ID: {medico_id}, Mes: {mes}, Año: {año}")
 
     # Filtrar registros basados en los parámetros
-    registros = RegistroProcedimientosIntervensionismo.objects.all().prefetch_related(
-        Prefetch('estudio', queryset=Estudios.objects.all())
-    ).distinct()
+    registros = RegistroProcedimientosIntervensionismo.objects.all()
 
     print(f"Total registros antes de filtrar: {registros.count()}")
 
     if medico_id:
         registros = registros.filter(medico_id=medico_id)
         print(f"Registros después de filtrar por medico_id: {registros.count()}")
+
     if mes and año:
-        registros = registros.filter(fecha_del_procedimiento__year=int(año), fecha_del_procedimiento__month=int(mes))
+        registros = registros.filter(fecha_del_procedimiento__month=mes, fecha_del_procedimiento__year=año)
         print(f"Registros después de filtrar por mes y año: {registros.count()}")
 
     # Verificar si hay registros después del filtrado
@@ -667,14 +667,12 @@ def exportar_excel_procedimientos(request):
         nombre_medico = "todos_los_medicos"
 
     # Crear un libro de Excel
-    wb = openpyxl.Workbook()
+    wb = Workbook()
     ws = wb.active
-    ws.title = "Procedimientos por Médico"
+    ws.title = "Procedimientos"
 
     # Establecer la fila de encabezados
-    headers = [
-        "Paciente", "DNI", "Fecha del Procedimiento", "Estudios", "Cantidad", "Total de Regiones"
-    ]
+    headers = ["Paciente", "DNI", "Fecha del Procedimiento", "Procedimiento", "Cantidad de Regiones", "Notas"]
     ws.append(headers)
 
     # Alinear encabezados al centro
@@ -683,14 +681,14 @@ def exportar_excel_procedimientos(request):
 
     # Agregar registros al Excel
     for registro in registros:
-        estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
+        nombre_completo = f"{registro.nombre_paciente} {registro.apellido_paciente}"
         ws.append([
-            f"{registro.nombre_paciente} {registro.apellido_paciente}",
+            nombre_completo,
             registro.dni_paciente,
             registro.fecha_del_procedimiento.strftime("%d/%m/%Y"),
-            estudios_nombres,
-            registro.cantidad_estudio or 1,
-            registro.total_regiones()
+            registro.procedimiento,
+            registro.conteo_regiones,
+            registro.notas
         ])
 
     # Ajustar ancho de columnas automáticamente
@@ -700,6 +698,6 @@ def exportar_excel_procedimientos(request):
 
     # Preparar respuesta HTTP
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="procedimientos_medicos_{nombre_medico}.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="procedimientos_{nombre_medico}.xlsx"'
     wb.save(response)
     return response
