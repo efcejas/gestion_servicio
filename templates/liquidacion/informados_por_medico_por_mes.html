@@ -44,7 +44,6 @@
                 <div class="row">
                     <div class="col-6 col-md-8">
                         <h5 class="titulo-h6">Resultados</h5>
-                        <!-- Cambié nombre, apellido y matrícula -->
                         <h6 class="card-title mb-0">Médico: {{ data.medico.first_name }} {{ data.medico.last_name }}</h6>
                         <p class="card-text">Correo electrónico: {{ data.medico.email }}</p>
                     </div>
@@ -82,6 +81,11 @@
                         </tr>
                     </tfoot>
                 </table>
+            </div>
+            <div class="d-flex justify-content-end mb-3">
+                <a href="{% url 'exportar_excel_informes' %}?medico={{ data.medico.id }}&mes={{ form.mes.value }}&año={{ form.año.value }}" class="btn btn-success btn-sm">
+                    Descargar Excel
+                </a>
             </div>
             {% endfor %}
         {% else %}

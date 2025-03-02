@@ -83,6 +83,11 @@
                     </tfoot>
                 </table>
             </div>
+            <div class="d-flex justify-content-end mb-3">
+                <a href="{% url 'exportar_excel_ecografias' %}?medico={{ data.medico.id }}&mes={{ form.mes.value }}&año={{ form.año.value }}" class="btn btn-success btn-sm">
+                    Descargar Excel
+                </a>
+            </div>
             {% endfor %}
         {% else %}
         <div class="text-center card-body">
