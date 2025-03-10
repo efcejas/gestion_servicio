@@ -84,12 +84,15 @@
     <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
     <p class="mb-0">
         {% if user|has_group:'Médicos de staff' %}
-            Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a>.
+        Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios
+            registrados</a>.
         {% elif user|has_group:'Médicos de staff - informes' %}
-            Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo estudio</a>.
+        Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo
+            estudio</a>.
         {% else %}
-            En breve podrás acceder a otras funcionalidades.
+        En breve podrás acceder a otras funcionalidades.
         {% endif %}
     </p>
+</div>
 {% endif %}
 {% endblock %}

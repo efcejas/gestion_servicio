@@ -643,13 +643,7 @@ def exportar_excel_procedimientos(request):
     print(f"Filtros - Medico ID: {medico_id}, Mes: {mes}, Año: {año}")
 
     # Filtrar registros basados en los parámetros
-    registros = RegistroProcedimientosIntervensionismo.objects.filter(
-            medico=user,
-            fecha_del_procedimiento__month=mes,
-            fecha_del_procedimiento__year=año
-        ).order_by('-fecha_registro')
-
-    print(f"Total registros antes de filtrar: {registros.count()}")
+    registros = RegistroProcedimientosIntervensionismo.objects.all()
 
     if medico_id:
         registros = registros.filter(medico_id=medico_id)
