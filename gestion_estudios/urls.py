@@ -18,11 +18,10 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
 from .views import CustomLoginView, HomeView, send_test_email
-from tasks.views import TareasImportantesView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', TareasImportantesView.as_view(), name='home'),
+    path('', HomeView.as_view(), name='home'),
     path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('accounts/', include('django.contrib.auth.urls')),  # Primero incluimos las de Django
     path('accounts/', include('accounts.urls')),  # Luego las personalizadas
