@@ -542,7 +542,7 @@ def exportar_excel_informes(request):
     for registro in registros:
         estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
         ws.append([
-            f"{registro.nombre_paciente} {registro.apellido_paciente}",
+            f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
             registro.dni_paciente,
             registro.fecha_del_informe.strftime("%d/%m/%Y"),
             estudios_nombres,
@@ -614,7 +614,7 @@ def exportar_excel_ecografias(request):
     for registro in registros:
         estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
         ws.append([
-            f"{registro.nombre_paciente} {registro.apellido_paciente}",
+            f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
             registro.dni_paciente,
             registro.fecha_del_informe.strftime("%d/%m/%Y"),
             estudios_nombres,
@@ -679,12 +679,12 @@ def exportar_excel_procedimientos(request):
 
     # Agregar registros al Excel
     for registro in registros:
-        nombre_completo = f"{registro.nombre_paciente} {registro.apellido_paciente}"
+        nombre_completo = f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}"
         ws.append([
             nombre_completo,
             registro.dni_paciente,
             registro.fecha_del_procedimiento.strftime("%d/%m/%Y"),
-            registro.procedimiento,
+            registro.procedimiento.upper(),
             registro.conteo_regiones,
             registro.notas
         ])

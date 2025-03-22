@@ -67,7 +67,7 @@
                     <tbody>
                         {% for registro in data.registros %}
                         <tr>
-                            <td class="px-3">{{ registro.apellido_paciente }} {{ registro.nombre_paciente }}</td>
+                            <td class="px-3">{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
                             <td class="text-center">{{ registro.dni_paciente }}</td>
                             <td class="text-center">{{ registro.procedimiento }}</td>
                             <td class="text-center">{{ registro.fecha_del_procedimiento|date:"d/m/Y" }}</td>
