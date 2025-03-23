@@ -600,32 +600,19 @@ def exportar_excel_informes(request):
     return response
 
 def exportar_excel_ecografias(request):
-    # Obtener los filtros de la URL
     medico_id = request.GET.get('medico')
     mes = request.GET.get('mes')
     año = request.GET.get('año')
 
-    # Imprimir los valores de los filtros para depuración
-    print(f"Filtros - Medico ID: {medico_id}, Mes: {mes}, Año: {año}")
-
-    # Filtrar registros basados en los parámetros, solo estudios tipo 'ECO'
     registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').prefetch_related(
         Prefetch('estudio', queryset=Estudios.objects.all())
     ).distinct()
 
-    print(f"Total registros antes de filtrar: {registros.count()}")
-
     if medico_id:
         registros = registros.filter(medico_id=medico_id)
-        print(f"Registros después de filtrar por medico_id: {registros.count()}")
     if mes and año:
         registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-        print(f"Registros después de filtrar por mes y año: {registros.count()}")
 
-    # Verificar si hay registros después del filtrado
-    print(f"Registros encontrados: {registros.count()}")
-
-    # Obtener el nombre del médico
     medico = None
     if medico_id:
         medico = get_object_or_404(User, id=medico_id)
@@ -633,39 +620,75 @@ def exportar_excel_ecografias(request):
     else:
         nombre_medico = "todos_los_medicos"
 
-    # Crear un libro de Excel
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Ecografías por Médico"
 
-    # Establecer la fila de encabezados
-    headers = [
-        "Paciente", "DNI", "Fecha del Informe", "Estudios", "Cantidad", "Total de Regiones"
-    ]
-    ws.append(headers)
-
-    # Alinear encabezados al centro
+    ws.append(["Paciente", "DNI", "Fecha del Informe", "Estudios", "Cantidad", "Total de Regiones"])
     for cell in ws[1]:
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Agregar registros al Excel
-    for registro in registros:
-        estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
+    # Agrupar por día
+    from collections import defaultdict
+    registros_por_dia = defaultdict(list)
+    for r in registros:
+        registros_por_dia[r.fecha_del_informe].append(r)
+
+    total_regiones_mes = 0
+    total_complemento_mes = 0
+    fecha_minima = date(date.today().year, 3, 1)
+
+    for fecha, registros_dia in sorted(registros_por_dia.items()):
+        regiones_dia = 0
+
+        # Filas de pacientes
+        for r in registros_dia:
+            estudios_nombres = ", ".join([e.nombre for e in r.estudio.all()])
+            total = r.total_regiones()
+            ws.append([
+                f"{r.apellido_paciente.upper()} {r.nombre_paciente.upper()}",
+                r.dni_paciente,
+                r.fecha_del_informe.strftime("%d/%m/%Y"),
+                estudios_nombres,
+                r.cantidad_estudio or 1,
+                total
+            ])
+            regiones_dia += total
+
+        # Resumen del día
+        es_computable = fecha >= fecha_minima
+        faltantes = max(0, 12 - regiones_dia) if es_computable else 0
+        total_a_pagar = regiones_dia + faltantes
+
+        if es_computable:
+            total_complemento_mes += faltantes
+        total_regiones_mes += regiones_dia
+
         ws.append([
-            f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
-            registro.dni_paciente,
-            registro.fecha_del_informe.strftime("%d/%m/%Y"),
-            estudios_nombres,
-            registro.cantidad_estudio or 1,
-            registro.total_regiones()
+            f"→ Total {fecha.strftime('%d/%m/%Y')}", "", "", "",
+            f"Faltantes: {faltantes}" if es_computable else "Sin complemento",
+            f"Total a pagar: {total_a_pagar}"
         ])
 
-    # Ajustar ancho de columnas automáticamente
+    # Línea en blanco
+    ws.append([])
+
+    # Resumen mensual
+    ws.append(["RESUMEN MENSUAL"])
+    ws.append(["Total de regiones reales", total_regiones_mes])
+    ws.append(["Total de complemento", total_complemento_mes])
+    ws.append(["Total a pagar", total_regiones_mes + total_complemento_mes])
+
+    # Estilizar resumen
+    for row in ws.iter_rows(min_row=ws.max_row - 2, max_row=ws.max_row):
+        for cell in row:
+            cell.font = Font(bold=True)
+
+    # Ajustar anchos
     for column in ws.columns:
-        max_length = max(len(str(cell.value)) for cell in column) + 2
+        max_length = max(len(str(cell.value or '')) for cell in column) + 2
         ws.column_dimensions[column[0].column_letter].width = max_length
 
-    # Preparar respuesta HTTP
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     response["Content-Disposition"] = f'attachment; filename="ecografias_medicos_{nombre_medico}.xlsx"'
     wb.save(response)
