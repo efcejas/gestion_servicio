@@ -47,11 +47,25 @@
                         <h6 class="card-title mb-0">Médico: {{ data.medico.first_name }} {{ data.medico.last_name }}</h6>
                         <p class="card-text">Correo electrónico: {{ data.medico.email }}</p>
                     </div>
-                    <div class="col-6 col-md-4 d-flex justify-content-end align-items-center">
-                        <h6 class="card-title text-center mb-0">Total de regiones: {{ data.total_regiones }}</h6>
-                    </div>
+                    <div class="col-6 col-md-4 d-flex flex-column align-items-end justify-content-center">
+                        {% if mostrar_totales_con_complemento %}
+                            <h6 class="mb-0">Total Regiones Reales: {{ data.total_regiones_mes }}</h6>
+                            <h6 class="mb-0">+ Complemento: {{ data.total_complemento_mes }}</h6>
+                            <h6 class="mb-0 fw-bold text-primary">= Total a Pagar: {{ data.total_a_pagar_mes }}</h6>
+                        {% else %}
+                            <h6 class="mb-0">Total de Regiones: {{ data.total_regiones_mes }}</h6>
+                        {% endif %}
+                    </div>                    
                 </div>
             </div>
+
+            {% if not mostrar_totales_con_complemento %}
+            <div class="alert alert-info mt-3 mb-0 rounded-0" role="alert">
+                <strong>Nota:</strong> Los registros corresponden a una fecha anterior al 1° de marzo del {{ now|date:"Y" }}.
+                Por lo tanto, <u>no se aplica el cálculo de complemento por mínimo garantizado</u>.
+            </div>
+            {% endif %}
+
             <div class="table-responsive">
                 <table class="table table-sm table-hover">
                     <thead class="table-light">
@@ -65,22 +79,51 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for registro in data.registros %}
-                        <tr>
-                            <td class="px-3">{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
-                            <td class="px-3">{{ registro.dni_paciente }}</td>
-                            <td class="text-center px-3">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
-                            <td class="px-3">{{ registro.estudio.all|join:", " }}</td>
-                            <td class="text-center px-3">{{ registro.total_regiones }}</td>
-                        </tr>
+                        {% for dia in data.dias %}
+                            {% for registro in dia.registros %}
+                            <tr>
+                                <td>{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
+                                <td>{{ registro.dni_paciente }}</td>
+                                <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                                <td>{{ registro.estudio.all|join:", " }}</td>
+                                <td class="text-center">{{ registro.total_regiones }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-secondary fw-bold text-center">
+                                <td colspan="2">Total del día {{ dia.fecha|date:"d/m/Y" }}</td>
+                                <td>{{ dia.regiones_hechas }}</td>
+                                {% if dia.mostrar_complemento %}
+                                    <td>Faltantes: {{ dia.regiones_faltantes }}</td>
+                                    <td>Total a pagar: {{ dia.total_a_pagar }}</td>
+                                {% else %}
+                                    <td colspan="2">Sin complemento (previo a marzo)</td>
+                                {% endif %}
+                            </tr>                            
                         {% endfor %}
                     </tbody>
+                    {% if mostrar_totales_con_complemento %}
+                    <tfoot>
+                        <tr class="fw-bold">
+                            <td colspan="4" class="table-success px-3">Total Regiones Reales</td>
+                            <td class="table-success text-center">{{ data.total_regiones_mes }}</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td colspan="4" class="table-warning px-3">Total Complemento</td>
+                            <td class="table-warning text-center">{{ data.total_complemento_mes }}</td>
+                        </tr>
+                        <tr class="fw-bold">
+                            <td colspan="4" class="table-primary px-3">Total a Pagar</td>
+                            <td class="table-primary text-center">{{ data.total_a_pagar_mes }}</td>
+                        </tr>
+                    </tfoot>
+                    {% else %}
                     <tfoot>
                         <tr class="fw-bold">
                             <td colspan="4" class="table-success px-3">Total de Regiones</td>
-                            <td class="table-success text-center">{{ data.total_regiones }}</td>
+                            <td class="table-success text-center">{{ data.total_regiones_mes }}</td>
                         </tr>
                     </tfoot>
+                    {% endif %}                   
                 </table>
             </div>
             <div class="d-flex justify-content-end mb-3">

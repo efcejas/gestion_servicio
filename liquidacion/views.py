@@ -26,7 +26,7 @@ from .forms import (
 )
 import openpyxl
 from openpyxl.styles import Alignment, Font
-from django.utils import timezone
+from django.utils.timezone import now
 from openpyxl import Workbook
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
@@ -328,11 +328,17 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
         context['form'] = form
 
         registros_por_medico = defaultdict(list)
+        mostrar_totales_con_complemento = False  # 🚨 Inicializamos en False
+        fecha_minima = date(date.today().year, 3, 1)
 
         if form.is_valid():
             medico = form.cleaned_data.get('medico')
             mes = form.cleaned_data.get('mes')
             año = form.cleaned_data.get('año')
+
+            # 🚨 Si el mes consultado es marzo o posterior, habilitamos mostrar complementos
+            if mes and año and (int(año), int(mes)) >= (fecha_minima.year, fecha_minima.month):
+                mostrar_totales_con_complemento = True
 
             # Filtrar registros de tipo ECO
             registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').distinct()
@@ -348,16 +354,48 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                 registros_por_medico[registro.medico].append(registro)
 
         # Preparar el contexto con datos por médico
+        fecha_minima = date(date.today().year, 3, 1)
+
         medico_data = []
+
         for medico, registros in registros_por_medico.items():
-            total_regiones = sum(registro.total_regiones() for registro in registros)
+            registros_por_dia = defaultdict(list)
+            for registro in registros:
+                registros_por_dia[registro.fecha_del_informe].append(registro)
+
+            dias = []
+            total_regiones_mes = 0
+            total_complemento_mes = 0
+
+            for fecha, registros_dia in registros_por_dia.items():
+                regiones_hechas = sum(r.total_regiones() for r in registros_dia)
+                es_computable = fecha >= fecha_minima
+                regiones_faltantes = max(0, 12 - regiones_hechas) if es_computable else 0
+                total_regiones_mes += regiones_hechas
+                if es_computable:
+                    total_complemento_mes += regiones_faltantes
+
+                dias.append({
+                    'fecha': fecha,
+                    'registros': registros_dia,
+                    'regiones_hechas': regiones_hechas,
+                    'regiones_faltantes': regiones_faltantes,
+                    'total_a_pagar': regiones_hechas + regiones_faltantes,
+                    'mostrar_complemento': es_computable,
+                })
+
             medico_data.append({
                 'medico': medico,
-                'registros': registros,
-                'total_regiones': total_regiones,
+                'dias': dias,
+                'total_regiones_mes': total_regiones_mes,
+                'total_complemento_mes': total_complemento_mes,
+                'total_a_pagar_mes': total_regiones_mes + total_complemento_mes,
             })
 
         context['medico_data'] = medico_data
+        context['mostrar_totales_con_complemento'] = mostrar_totales_con_complemento  # 🚨 Lo pasamos al template
+        context['now'] = now()  # 🚨 Pasamos la fecha actual al template
+
         return context
 
 class ProcedimientosPorMedicoPorMesListView(TemplateView):
