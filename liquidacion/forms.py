@@ -1,5 +1,5 @@
 from django import forms
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -41,6 +41,15 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
         self.fields['estudio'].choices = []  # Sin opciones al inicio
         if not self.initial.get('fecha_del_informe'):
             self.fields['fecha_del_informe'].initial = timezone.now().date()  # Preselecciona la fecha actual
+
+class DiaSinPacientesForm(forms.ModelForm):
+    class Meta:
+        model = DiaSinPacientes
+        fields = ['fecha', 'observacion']
+        widgets = {
+            'fecha': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'observacion': forms.Textarea(attrs={'rows': 2, 'class': 'form-control'}),
+        }
 
 User = get_user_model()
 

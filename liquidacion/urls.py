@@ -18,7 +18,8 @@ from .views import (
     EcografiasPorMedicoPorMesListView,
     exportar_excel_informes,
     exportar_excel_ecografias,
-    exportar_excel_procedimientos
+    exportar_excel_procedimientos,
+    RegistrarDiaSinPacientesView
 )
 
 urlpatterns = [
@@ -35,6 +36,7 @@ urlpatterns = [
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
     path('editar/<int:pk>/', RegistroEstudiosPorMedicoUpdateView.as_view(), name='registroestudios_edit'),
     path('eliminar/<int:pk>/', RegistroEstudiosPorMedicoDeleteView.as_view(), name='registroestudios_delete'),
+    path('registrar-dia-sin-pacientes/', RegistrarDiaSinPacientesView.as_view(), name='registrar_dia_sin_pacientes'),
 
     # Rutas para Informes por Medico por Mes
     path('informados-por-medico-por-mes/', InformadosPorMedicoPorMesListView.as_view(), name='informados_por_medico_por_mes'),

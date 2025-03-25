@@ -67,6 +67,8 @@
                     </div>
                 </div>
             </form>
+            <!-- Acá el botón para registro de día sin pacientes -->
+            
         </div>
         <div class="col-12 col-lg-6">
             <div class="container-fluid d-flex flex-column flex-md-row justify-content-center justify-content-md-between py-3 px-0">
@@ -110,6 +112,20 @@
                     </tbody>
                 </table>
             </div>
+            <!-- <hr class="mt-4">
+    
+                <div class="alert alert-warning mt-3">
+                    <h6 class="mb-2">¿No tuviste pacientes hoy?</h6>
+                    <p class="mb-2 small">
+                        Este botón es solo para médicos que <strong>asistieron a una lista de ecografías</strong> pero
+                        <strong>no tuvieron pacientes</strong>. De lo contrario, <strong>no lo utilices</strong>.
+                    </p>
+                    <button type="button" class="btn btn-outline-danger btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalConfirmarSinPacientes">
+                        Registrar día sin pacientes
+                    </button>
+                </div> -->
         </div>
     </div>
 </div>
@@ -128,6 +144,61 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <a id="confirmFinalizar" href="{% url 'registroestudios_list' %}" class="btn btn-primary">Finalizar</a>
             </div>
+        </div>
+    </div>
+</div>
+<!-- Modal de Confirmación: ¿Estás seguro de que no vas a tener pacientes? -->
+<div class="modal fade" id="modalConfirmarSinPacientes" tabindex="-1" aria-labelledby="modalConfirmarSinPacientesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-warning">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="modalConfirmarSinPacientesLabel">¿Registrar día sin pacientes?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                Estás por declarar que <strong>no tuviste pacientes</strong> en el día de hoy.<br>
+                Esto registrará <strong>automáticamente 12 regiones compensadas</strong> para facturación.
+                <hr>
+                ¿Estás seguro de que no vas a registrar ningún paciente más hoy?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <!-- Este botón abrirá el segundo modal (formulario) -->
+                <button type="button" class="btn btn-primary"
+                        data-bs-dismiss="modal"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalFormSinPacientes">
+                    Sí, registrar día sin pacientes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal 2: Formulario para registrar día sin pacientes -->
+<div class="modal fade" id="modalFormSinPacientes" tabindex="-1" aria-labelledby="modalFormSinPacientesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-primary">
+            <form method="post" action="{% url 'registrar_dia_sin_pacientes' %}">
+                {% csrf_token %}
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="modalFormSinPacientesLabel">Registrar día sin pacientes</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="id_fecha" class="form-label">Fecha</label>
+                        {{ form_dia_sin_pacientes.fecha }}
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_observacion" class="form-label">Observación (opcional)</label>
+                        {{ form_dia_sin_pacientes.observacion }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

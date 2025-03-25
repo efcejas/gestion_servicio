@@ -1,7 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
+from django.views.generic.edit import FormView
 from django.contrib.messages.views import SuccessMessageMixin
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum, Count, Q, Prefetch
 from django.http import FileResponse, HttpResponse
@@ -15,14 +17,15 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm, 
     MedicoCreateViewForm, 
     FiltroMedicoMesForm, 
     RegistroProcedimientosIntervensionismoCreateViewForm, 
     FiltroProcedimientosIntervensionismoForm, 
-    FiltroEstudiosPorMedicoForm
+    FiltroEstudiosPorMedicoForm,
+    DiaSinPacientesForm
 )
 import openpyxl
 from openpyxl.styles import Alignment, Font
@@ -85,12 +88,33 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             fecha_registro__year=today.year,
             fecha_registro__month=today.month
         ).order_by('-fecha_registro')
+        context['form_dia_sin_pacientes'] = DiaSinPacientesForm()
 
         return context
 
     def form_valid(self, form):
         # Asignar el usuario logueado al campo 'medico'
         form.instance.medico = self.request.user
+        return super().form_valid(form)
+
+class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
+    template_name = 'liquidacion/registroestudios_form.html'
+    form_class = DiaSinPacientesForm
+    success_url = reverse_lazy('registroestudios_nuevo')  # Redirigir a la página de registro de estudios
+
+    def form_valid(self, form):
+        fecha = form.cleaned_data['fecha']
+        medico = self.request.user
+
+        # Evitar duplicado
+        if DiaSinPacientes.objects.filter(medico=medico, fecha=fecha).exists():
+            messages.warning(self.request, f"Ya registraste el día {fecha.strftime('%d/%m/%Y')}.")
+        else:
+            dia = form.save(commit=False)
+            dia.medico = medico
+            dia.save()
+            messages.success(self.request, f"Se registró el día {fecha.strftime('%d/%m/%Y')} como sin pacientes.")
+
         return super().form_valid(form)
 
 User = get_user_model()
@@ -395,6 +419,15 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
         context['medico_data'] = medico_data
         context['mostrar_totales_con_complemento'] = mostrar_totales_con_complemento  # 🚨 Lo pasamos al template
         context['now'] = now()  # 🚨 Pasamos la fecha actual al template
+        
+        if form.is_valid() and not medico_data:
+            medico_seleccionado = form.cleaned_data.get('medico')
+            if medico_seleccionado:
+                context['mensaje_sin_registros'] = (
+                    f"No se encontraron registros para el profesional seleccionado ({medico_seleccionado.get_full_name()}) en el mes consultado."
+                )
+            else:
+                context['mensaje_sin_registros'] = "No se encontraron registros para ningún médico en el mes consultado."
 
         return context
 

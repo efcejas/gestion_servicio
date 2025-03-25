@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo
+from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
 
 @admin.register(Medico)
 class MedicoAdmin(admin.ModelAdmin):
@@ -37,6 +37,12 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         return obj.total_regiones()
 
     mostrar_total_regiones.short_description = 'Total de regiones'
+    
+@admin.register(DiaSinPacientes)
+class DiaSinPacientesAdmin(admin.ModelAdmin):
+    list_display = ('medico', 'fecha', 'fecha_creacion')
+    list_filter = ('fecha', 'medico')
+    search_fields = ('medico__first_name', 'medico__last_name', 'fecha')
 
 @admin.register(RegistroProcedimientosIntervensionismo)
 class RegistroProcedimientosIntervensionismoAdmin(admin.ModelAdmin):
