@@ -378,8 +378,6 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                 registros_por_medico[registro.medico].append(registro)
 
         # Preparar el contexto con datos por médico
-        fecha_minima = date(date.today().year, 3, 1)
-
         medico_data = []
 
         for medico, registros in registros_por_medico.items():
