@@ -82,7 +82,7 @@
                     {% for dia in data.dias %}
                     {% for registro in dia.registros %}
                     <tr>
-                        <td>{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
+                        <td class="px-3">{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
                         <td>{{ registro.dni_paciente }}</td>
                         <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
                         <td>{{ registro.estudio.all|join:", " }}</td>
