@@ -352,7 +352,8 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
         context['form'] = form
 
         registros_por_medico = defaultdict(list)
-        mostrar_totales_con_complemento = False  # 🚨 Inicializamos en False
+        dias_sin_pacientes_por_medico = defaultdict(list)
+        mostrar_totales_con_complemento = False
         fecha_minima = date(date.today().year, 3, 1)
 
         if form.is_valid():
@@ -360,39 +361,54 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             mes = form.cleaned_data.get('mes')
             año = form.cleaned_data.get('año')
 
-            # 🚨 Si el mes consultado es marzo o posterior, habilitamos mostrar complementos
             if mes and año and (int(año), int(mes)) >= (fecha_minima.year, fecha_minima.month):
                 mostrar_totales_con_complemento = True
 
-            # Filtrar registros de tipo ECO
             registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').distinct()
+            dias_sin_pacientes = DiaSinPacientes.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
+                dias_sin_pacientes = dias_sin_pacientes.filter(medico=medico)
 
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+                dias_sin_pacientes = dias_sin_pacientes.filter(fecha__year=int(año), fecha__month=int(mes))
 
-            # Agrupar registros por médico
             for registro in registros.order_by('-fecha_del_informe'):
                 registros_por_medico[registro.medico].append(registro)
 
-        # Preparar el contexto con datos por médico
-        medico_data = []
+            for dia in dias_sin_pacientes:
+                dias_sin_pacientes_por_medico[dia.medico].append(dia)
 
-        for medico, registros in registros_por_medico.items():
+        medico_data = []
+        todos_medicos = set(registros_por_medico.keys()) | set(dias_sin_pacientes_por_medico.keys())
+
+        for medico in todos_medicos:
+            registros = registros_por_medico.get(medico, [])
             registros_por_dia = defaultdict(list)
             for registro in registros:
                 registros_por_dia[registro.fecha_del_informe].append(registro)
+
+            for dia in dias_sin_pacientes_por_medico.get(medico, []):
+                if dia.fecha not in registros_por_dia:
+                    registros_por_dia[dia.fecha] = []
 
             dias = []
             total_regiones_mes = 0
             total_complemento_mes = 0
 
-            for fecha, registros_dia in registros_por_dia.items():
+            for fecha, registros_dia in sorted(registros_por_dia.items()):
                 regiones_hechas = sum(r.total_regiones() for r in registros_dia)
                 es_computable = fecha >= fecha_minima
-                regiones_faltantes = max(0, 12 - regiones_hechas) if es_computable else 0
+                es_dia_sin_pacientes = len(registros_dia) == 0 and any(
+                    d.fecha == fecha for d in dias_sin_pacientes_por_medico.get(medico, [])
+                )
+
+                regiones_faltantes = 0
+                if es_computable:
+                    regiones_faltantes = 12 if es_dia_sin_pacientes else max(0, 12 - regiones_hechas)
+
                 total_regiones_mes += regiones_hechas
                 if es_computable:
                     total_complemento_mes += regiones_faltantes
@@ -404,6 +420,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                     'regiones_faltantes': regiones_faltantes,
                     'total_a_pagar': regiones_hechas + regiones_faltantes,
                     'mostrar_complemento': es_computable,
+                    'es_dia_sin_pacientes': es_dia_sin_pacientes,
                 })
 
             medico_data.append({
@@ -415,9 +432,9 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             })
 
         context['medico_data'] = medico_data
-        context['mostrar_totales_con_complemento'] = mostrar_totales_con_complemento  # 🚨 Lo pasamos al template
-        context['now'] = now()  # 🚨 Pasamos la fecha actual al template
-        
+        context['mostrar_totales_con_complemento'] = mostrar_totales_con_complemento
+        context['now'] = now()
+
         if form.is_valid() and not medico_data:
             medico_seleccionado = form.cleaned_data.get('medico')
             if medico_seleccionado:
@@ -639,18 +656,33 @@ def exportar_excel_ecografias(request):
         Prefetch('estudio', queryset=Estudios.objects.all())
     ).distinct()
 
+    dias_sin_pacientes = DiaSinPacientes.objects.all()
+
     if medico_id:
         registros = registros.filter(medico_id=medico_id)
-    if mes and año:
-        registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-
-    medico = None
-    if medico_id:
+        dias_sin_pacientes = dias_sin_pacientes.filter(medico_id=medico_id)
         medico = get_object_or_404(User, id=medico_id)
         nombre_medico = f"{medico.first_name}_{medico.last_name}"
     else:
         nombre_medico = "todos_los_medicos"
+        medico = None  # no lo usamos si son todos
 
+    if mes and año:
+        registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+        dias_sin_pacientes = dias_sin_pacientes.filter(fecha__year=int(año), fecha__month=int(mes))
+
+    # Agrupar registros por día
+    from collections import defaultdict
+    registros_por_dia = defaultdict(list)
+    for r in registros:
+        registros_por_dia[r.fecha_del_informe].append(r)
+
+    # Agregar días sin pacientes si no están
+    for dia in dias_sin_pacientes:
+        if dia.fecha not in registros_por_dia:
+            registros_por_dia[dia.fecha] = []
+
+    # Crear Excel
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Ecografías por Médico"
@@ -659,20 +691,16 @@ def exportar_excel_ecografias(request):
     for cell in ws[1]:
         cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Agrupar por día
-    from collections import defaultdict
-    registros_por_dia = defaultdict(list)
-    for r in registros:
-        registros_por_dia[r.fecha_del_informe].append(r)
-
     total_regiones_mes = 0
     total_complemento_mes = 0
     fecha_minima = date(date.today().year, 3, 1)
 
     for fecha, registros_dia in sorted(registros_por_dia.items()):
         regiones_dia = 0
+        es_computable = fecha >= fecha_minima
+        es_dia_sin_pacientes = len(registros_dia) == 0 and dias_sin_pacientes.filter(fecha=fecha).exists()
 
-        # Filas de pacientes
+        # Agregar pacientes si los hay
         for r in registros_dia:
             estudios_nombres = ", ".join([e.nombre for e in r.estudio.all()])
             total = r.total_regiones()
@@ -686,13 +714,19 @@ def exportar_excel_ecografias(request):
             ])
             regiones_dia += total
 
-        # Resumen del día
-        es_computable = fecha >= fecha_minima
-        faltantes = max(0, 12 - regiones_dia) if es_computable else 0
-        total_a_pagar = regiones_dia + faltantes
+        # Si fue día sin pacientes
+        if es_dia_sin_pacientes:
+            ws.append([
+                "DÍA SIN PACIENTES", "", fecha.strftime("%d/%m/%Y"),
+                "Se compensan 12 regiones", "", ""
+            ])
 
+        # Resumen del día
+        faltantes = 0
         if es_computable:
+            faltantes = 12 if es_dia_sin_pacientes else max(0, 12 - regiones_dia)
             total_complemento_mes += faltantes
+        total_a_pagar = regiones_dia + faltantes
         total_regiones_mes += regiones_dia
 
         ws.append([
@@ -701,7 +735,7 @@ def exportar_excel_ecografias(request):
             f"Total a pagar: {total_a_pagar}"
         ])
 
-    # Línea en blanco
+    # Línea vacía
     ws.append([])
 
     # Resumen mensual
@@ -710,12 +744,11 @@ def exportar_excel_ecografias(request):
     ws.append(["Total de complemento", total_complemento_mes])
     ws.append(["Total a pagar", total_regiones_mes + total_complemento_mes])
 
-    # Estilizar resumen
+    # Estilizar
     for row in ws.iter_rows(min_row=ws.max_row - 2, max_row=ws.max_row):
         for cell in row:
             cell.font = Font(bold=True)
 
-    # Ajustar anchos
     for column in ws.columns:
         max_length = max(len(str(cell.value or '')) for cell in column) + 2
         ws.column_dimensions[column[0].column_letter].width = max_length

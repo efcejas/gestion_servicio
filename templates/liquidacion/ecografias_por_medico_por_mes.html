@@ -80,27 +80,35 @@
                 </thead>
                 <tbody>
                     {% for dia in data.dias %}
-                    {% for registro in dia.registros %}
-                    <tr>
-                        <td class="px-3">{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
-                        <td>{{ registro.dni_paciente }}</td>
-                        <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
-                        <td>{{ registro.estudio.all|join:", " }}</td>
-                        <td class="text-center">{{ registro.total_regiones }}</td>
-                    </tr>
-                    {% endfor %}
-                    <tr class="table-secondary fw-bold text-center">
-                        <td colspan="2">Total del día {{ dia.fecha|date:"d/m/Y" }}</td>
-                        <td>{{ dia.regiones_hechas }}</td>
-                        {% if dia.mostrar_complemento %}
-                        <td>Faltantes: {{ dia.regiones_faltantes }}</td>
-                        <td>Total a pagar: {{ dia.total_a_pagar }}</td>
-                        {% else %}
-                        <td colspan="2">Sin complemento (previo a marzo)</td>
+                        {% if dia.es_dia_sin_pacientes %}
+                            <tr class="table-light text-muted text-center fst-italic">
+                                <td colspan="5">
+                                    Día sin asistencia de pacientes ({{ dia.fecha|date:"d/m/Y" }}).
+                                    Se compensan 12 regiones.
+                                </td>
+                            </tr>
                         {% endif %}
-                    </tr>
+                        {% for registro in dia.registros %}
+                            <tr>
+                                <td class="px-3">{{ registro.apellido_paciente|upper }} {{ registro.nombre_paciente|upper }}</td>
+                                <td>{{ registro.dni_paciente }}</td>
+                                <td class="text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                                <td>{{ registro.estudio.all|join:", " }}</td>
+                                <td class="text-center">{{ registro.total_regiones }}</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="table-secondary fw-bold text-center">
+                            <td colspan="2">Total del día {{ dia.fecha|date:"d/m/Y" }}</td>
+                            <td>{{ dia.regiones_hechas }}</td>
+                            {% if dia.mostrar_complemento %}
+                                <td>Faltantes: {{ dia.regiones_faltantes }}</td>
+                                <td>Total a pagar: {{ dia.total_a_pagar }}</td>
+                            {% else %}
+                                <td colspan="2">Sin complemento (previo a marzo)</td>
+                            {% endif %}
+                        </tr>
                     {% endfor %}
-                </tbody>
+                </tbody>                
                 {% if mostrar_totales_con_complemento %}
                 <tfoot>
                     <tr class="fw-bold">
