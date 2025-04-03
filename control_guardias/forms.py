@@ -1,6 +1,6 @@
 from django import forms
 from datetime import datetime
-from .models import MedicoGuardia
+from .models import MedicoGuardia, Guardia
 
 class FiltroGuardiasPorMedicoForm(forms.Form):
     medico = forms.ModelChoiceField(
@@ -27,3 +27,14 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         initial=datetime.now().year,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
+
+class GuardiaForm(forms.ModelForm):
+    class Meta:
+        model = Guardia
+        fields = ['franja_horaria', 'cubierta', 'medico', 'fecha']
+        widgets = {
+            'franja_horaria': forms.Select(attrs={'class': 'form-select'}),
+            'cubierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'medico': forms.Select(attrs={'class': 'form-select'}),
+            'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }

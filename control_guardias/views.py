@@ -1,8 +1,7 @@
-from django.shortcuts import render
-from django.views.generic import ListView, TemplateView
-from .models import Guardia, MedicoGuardia
 from django.utils import timezone
-from django.db.models import Count, Sum
+from django.views.generic import ListView, TemplateView
+
+from .models import Guardia
 from .forms import FiltroGuardiasPorMedicoForm
 
 class GuardiaListView(ListView):
