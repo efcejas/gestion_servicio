@@ -43,7 +43,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
             RegistroEstudiosPorMedico.objects
             .values('medico')  # Obtener solo el ID del médico
             .annotate(ultima_fecha=Max('fecha_registro'))  # Obtener la última fecha de cada médico
-            .order_by('-ultima_fecha')[:3]  # Tomar los 3 más recientes
+            .order_by('-ultima_fecha')[:4]  # Tomar los 3 más recientes
         )
 
         # Obtener los objetos completos de los registros usando las fechas anteriores

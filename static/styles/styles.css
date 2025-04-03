@@ -37,6 +37,27 @@ body {
     color: #164569;
 }
 
+.text-violeta {
+    color: #4b49c0 !important;
+}
+
+.border-violeta {
+    border-color: #4b49c0 !important;
+}
+
+.card-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-hover:hover {
+    background-color: #4b49c0 !important;
+    color: white !important;
+    border-color: #4b49c0;
+    transition: all 0.2s ease-in-out;
+}
+
 /* Estilos de botón de login */
 .btn.btn-login {
     background-color: #4CAF50;

@@ -50,7 +50,6 @@ class EstudiosCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Estudios
     fields = ['nombre', 'tipo', 'conteo_regiones']
     template_name = 'liquidacion/estudios_form.html'
-    # Usa reverse_lazy para resolver el nombre de la URL
     success_url = reverse_lazy('estudios_list')
     success_message = "El estudio fue registrado exitosamente"  # Mensaje de éxito
 
