@@ -40,11 +40,28 @@
                 <img src="{% static 'images/drcejaslogo.png' %}" alt="Logo" class="img-fluid" style="max-height: 80px;">
             </div>
             <div class="user-info text-md-end d-none d-md-block">
-                <span>
-                    <strong>{{ user.get_full_name }}</strong><br>
-                    <p class="text-muted mb-2">{{ user.email }}</p>
-                </span>
-                {% include 'includes/logout_form.html' %}
+                <div class="d-flex align-items-center gap-2">
+                    <div>
+                        <strong>{{ user.get_full_name }}</strong><br>
+                        <small class="text-muted">{{ user.email }}</small>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="userOptionsDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-gear-fill"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userOptionsDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{% url 'password_change' %}">
+                                    <i class="bi bi-key-fill me-2"></i>Cambiar contraseña
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    {% include 'includes/logout_form.html' %}
+                </div>
             </div>
         </div>
     </header>
@@ -61,12 +78,27 @@
                 <ul class="navbar-nav">
                     <!-- Opciones para usuarios autenticados -->
                     <li class="nav-item d-md-none text-end">
-                        <div class="user-info">
+                        <div class="user-info d-grid align-items-center justify-content-end gap-2">
                             <span>
                                 <strong>{{ user.get_full_name }}</strong><br>
-                                <p class="text-muted mb-2">{{ user.email }}</p>
+                                <p class="text-muted mb-0">{{ user.email }}</p>
                             </span>
-                            {% include 'includes/logout_form.html' %}
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="userOptionsDropdown"
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="bi bi-gear-fill"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userOptionsDropdown">
+                                    <li>
+                                        <a class="dropdown-item" href="{% url 'password_change' %}">
+                                            <i class="bi bi-key-fill me-2"></i>Cambiar contraseña
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                {% include 'includes/logout_form.html' %}
+                            </div>
                         </div>
                     </li>
                     <li class="nav-item">
