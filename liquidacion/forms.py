@@ -3,6 +3,7 @@ from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedi
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.utils import timezone
 
 class MedicoCreateViewForm(forms.ModelForm):
     class Meta:
@@ -14,8 +15,6 @@ class MedicoCreateViewForm(forms.ModelForm):
             'matricula': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
-from django.utils import timezone
-
 class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
     tipo_estudio = forms.ChoiceField(
         choices=[('', 'Seleccione')] + list(Estudios.TIPO_ESTUDIO_CHOICES),
@@ -26,21 +25,37 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
 
     class Meta:
         model = RegistroEstudiosPorMedico
-        fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_informe', 'estudio', 'cantidad_estudio']
+        fields = [
+            'nombre_paciente',
+            'apellido_paciente',
+            'dni_paciente',
+            'fecha_del_informe',
+            'estudio',
+            'cantidad_estudio',
+        ]
         widgets = {
             'nombre_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
             'apellido_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
             'dni_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'maxlength': 8}),
             'estudio': forms.SelectMultiple(attrs={'class': 'form-control form-control-sm', 'size': '5'}),
             'cantidad_estudio': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': 1}),
-            'fecha_del_informe': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),  # Se mantiene el 'type': 'date'
+            'fecha_del_informe': forms.DateInput(
+                attrs={'type': 'date', 'class': 'form-control form-control-sm'},
+                format='%Y-%m-%d'  # 👈 este formato es CLAVE
+            ),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['estudio'].choices = []  # Sin opciones al inicio
-        if not self.initial.get('fecha_del_informe'):
-            self.fields['fecha_del_informe'].initial = timezone.now().date()  # Preselecciona la fecha actual
+
+        self.fields['estudio'].choices = []  # vacío al inicio
+
+        # Solo precargar la fecha si se está creando el registro
+        if not self.instance.pk and not self.initial.get('fecha_del_informe'):
+            self.fields['fecha_del_informe'].initial = timezone.now().date()
+
+        # Asegurar el formato correcto incluso cuando ya hay valor
+        self.fields['fecha_del_informe'].input_formats = ['%Y-%m-%d']
 
 class DiaSinPacientesForm(forms.ModelForm):
     class Meta:

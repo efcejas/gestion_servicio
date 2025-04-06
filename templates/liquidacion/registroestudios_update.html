@@ -1,4 +1,5 @@
 {% extends "layouts/base.html" %}
+{% load custom_filters %}
 
 {% block content %}
 <div class="container py-3">
@@ -27,8 +28,8 @@
             </div>
             <div class="col-12 col-md-9">
                 <label for="{{ form.estudio.id_for_label }}" class="form-label small">Estudio</label>
-                {{ form.estudio }}
-                <p class="form-text small mb-0">Para seleccionar más de un estudio, mantenga presionada la tecla Ctrl.</p>
+                {{ form.estudio|add_class:"form-control-sm select2" }}
+                <p class="form-text small mb-0">Puede buscar y seleccionar varios estudios.</p>
             </div>
         </div>
 
@@ -52,65 +53,70 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        $('#id_estudio').select2({
+            placeholder: 'Buscar estudio...',
+            allowClear: true,
+            width: '100%'
+        });
+
         const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
         const estudioSelect = document.getElementById('id_estudio');
         const estudios = JSON.parse('{{ estudios|escapejs }}');
-
-        // Estudios seleccionados al cargar la página
         let estudiosSeleccionados = {{ estudios_seleccionados|safe }};
 
         function mostrarMensajeSeleccionarTipo() {
             estudioSelect.innerHTML = '';
-            const optionMensaje = document.createElement('option');
-            optionMensaje.textContent = 'Debe seleccionar un tipo de estudio';
-            optionMensaje.disabled = true;
-            optionMensaje.selected = true;
-            estudioSelect.appendChild(optionMensaje);
+            const option = document.createElement('option');
+            option.textContent = 'Seleccione el tipo de estudio';
+            option.disabled = true;
+            option.selected = true;
+            estudioSelect.appendChild(option);
         }
 
-        function cargarEstudios(tipoSeleccionado) {
-            if (!tipoSeleccionado) {
+        function cargarEstudios(tipo) {
+            if (!tipo) {
                 mostrarMensajeSeleccionarTipo();
                 return;
             }
 
-            const estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+            const filtrados = estudios.filter(e => e.tipo === tipo);
             estudioSelect.innerHTML = '';
 
-            if (estudiosFiltrados.length === 0) {
-                const optionMensaje = document.createElement('option');
-                optionMensaje.textContent = 'Aún no existen estudios cargados para esta modalidad';
-                optionMensaje.disabled = true;
-                optionMensaje.selected = true;
-                estudioSelect.appendChild(optionMensaje);
+            if (filtrados.length === 0) {
+                const option = document.createElement('option');
+                option.textContent = 'Aún no existen estudios para esta modalidad';
+                option.disabled = true;
+                option.selected = true;
+                estudioSelect.appendChild(option);
             } else {
-                estudiosFiltrados.forEach(estudio => {
+                filtrados.forEach(estudio => {
                     const option = document.createElement('option');
                     option.value = estudio.id;
                     option.textContent = estudio.nombre;
-
-                    // Marcar como seleccionado si está en la lista inicial
                     if (estudiosSeleccionados.includes(estudio.id)) {
                         option.selected = true;
                     }
-
                     estudioSelect.appendChild(option);
                 });
             }
+
+            $(estudioSelect).select2({
+                placeholder: 'Buscar estudio...',
+                allowClear: true,
+                width: '100%'
+            });
         }
 
-        // Cargar los estudios si ya hay un tipo preseleccionado
-        const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
-        if (tipoEstudioSeleccionado) {
-            tipoEstudioSelect.value = tipoEstudioSeleccionado;
-            cargarEstudios(tipoEstudioSeleccionado);
+        const tipoSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+        if (tipoSeleccionado) {
+            tipoEstudioSelect.value = tipoSeleccionado;
+            cargarEstudios(tipoSeleccionado);
         } else {
             mostrarMensajeSeleccionarTipo();
         }
 
-        // Evento para cambiar el tipo de estudio y limpiar la selección previa
         tipoEstudioSelect.addEventListener('change', function () {
-            estudiosSeleccionados = [];  // Limpiar la selección anterior
+            estudiosSeleccionados = [];
             cargarEstudios(this.value);
         });
     });
