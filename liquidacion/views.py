@@ -31,6 +31,8 @@ import openpyxl
 from openpyxl.styles import Alignment, Font
 from django.utils.timezone import now
 from openpyxl import Workbook
+from django.urls import reverse
+from django.utils.http import urlencode
 
 class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Medico
@@ -188,20 +190,21 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
     template_name = 'liquidacion/registroestudios_update.html'
-    success_url = reverse_lazy('registroestudios_list')
 
     def get_queryset(self):
-        # Limita los registros al usuario logueado
+        # Filtra los registros que pertenecen al usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        # Cargar todos los estudios y convertirlos a JSON
-        context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
-
-        # Obtener el tipo de estudio y los estudios seleccionados en el registro
         registro = self.object
+
+        # JSON para Select2 con todos los estudios (id, nombre, tipo)
+        context['estudios'] = json.dumps(
+            list(Estudios.objects.values('id', 'nombre', 'tipo'))
+        )
+
+        # Estudios y tipo preseleccionado
         if registro and registro.estudio.exists():
             context['tipo_estudio_seleccionado'] = registro.estudio.first().tipo
             context['estudios_seleccionados'] = list(registro.estudio.values_list('id', flat=True))
@@ -209,7 +212,22 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             context['tipo_estudio_seleccionado'] = ''
             context['estudios_seleccionados'] = []
 
+        # URL del botón cancelar: vuelve a la lista con mes/año filtrados
+        fecha = registro.fecha_del_informe
+        context['cancel_url'] = f"{reverse('registroestudios_list')}?{urlencode({'mes': fecha.month, 'año': fecha.year})}"
+
         return context
+
+    def form_valid(self, form):
+        # Agrega mensaje de éxito si el formulario fue válido
+        messages.success(self.request, "El registro fue actualizado correctamente.")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        # Redirige a la lista con el mes y año del registro actualizado
+        fecha = self.object.fecha_del_informe
+        query_string = urlencode({'mes': fecha.month, 'año': fecha.year})
+        return f"{reverse('registroestudios_list')}?{query_string}"
 
 class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroEstudiosPorMedico
