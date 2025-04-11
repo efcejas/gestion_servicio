@@ -5,77 +5,142 @@
 
 {% block content %}
 <style>
-    /* Estilos actuales del calendario */
-    #calendar {
-        z-index: 1;
-        position: relative;
-        min-height: 500px;
-        margin-bottom: 20px;
-    }
+  #calendar {
+    z-index: 1;
+    position: relative;
+    min-height: 500px;
+    margin-bottom: 20px;
+  }
 
-    /* 🔵 Resaltar sábados y domingos */
-    .fc-day-sat,
-    .fc-day-sun {
-        background-color: #f4f9ff !important;
-    }
+  .fc-day-sat,
+  .fc-day-sun {
+    background-color: #f4f9ff !important;
+  }
 
-    .fc-day-sat .fc-daygrid-day-number,
-    .fc-day-sun .fc-daygrid-day-number {
-        color: #0d6efd;
-        font-weight: bold;
-    }
+  .fc-day-sat .fc-daygrid-day-number,
+  .fc-day-sun .fc-daygrid-day-number {
+    color: #0d6efd;
+    font-weight: bold;
+  }
 
-    /* Opcional: resaltar feriados manuales */
-    .feriado {
-        background-color: #fff0f3 !important;
-    }
+  .feriado {
+    background-color: #fff0f3 !important;
+  }
 
-    /* Estilo más claro y legible para los eventos */
-    .fc-event {
-        font-size: 0.85rem;
-        white-space: pre-wrap;
-        /* Permite saltos de línea en el título */
-        line-height: 1.2;
-        padding: 4px 6px;
-        border-radius: 0.375rem;
-    }
+  .fc-event {
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    line-height: 1.2;
+    padding: 4px 6px;
+    border-radius: 0.375rem;
+  }
 
-    /* Mejor visibilidad en hover */
-    .fc-event:hover {
-        filter: brightness(0.95);
-        box-shadow: 0 0 0.25rem rgba(0, 0, 0, 0.2);
-        cursor: pointer;
-    }
+  .fc-event:hover {
+    filter: brightness(0.95);
+    box-shadow: 0 0 0.25rem rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+  }
 </style>
 
 <div class="container my-4">
   <h2 class="h4 mb-4">Calendario de Guardias</h2>
   <div id="calendar"></div>
+
+  <!-- Modal para crear guardia -->
+  <div class="modal fade" id="modalCrearGuardia" tabindex="-1" aria-labelledby="modalCrearGuardiaLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalCrearGuardiaLabel">Nueva guardia</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div id="formulario-guardia"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<!-- FullCalendar y sus dependencias -->
+<!-- FullCalendar -->
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales-all.global.min.js"></script>
 
-<!-- Inicialización del calendario -->
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var calendarEl = document.getElementById('calendar');
+  document.addEventListener('DOMContentLoaded', function () {
+    var calendarEl = document.getElementById('calendar');
 
-        var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            locale: 'es',
-            themeSystem: 'bootstrap5',
-            headerToolbar: {
-                left: 'prev,next today',
-                center: 'title',
-                right: 'dayGridMonth,listWeek'
-            },
-            events: "{% url 'guardias_api' %}",
-        });
+    window.calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'es',
+      themeSystem: 'bootstrap5',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,listWeek'
+      },
+      events: "{% url 'guardias_api' %}",
 
-        calendar.render();
+      dateClick: function(info) {
+        fetch("{% url 'crear_guardia' %}?fecha=" + info.dateStr)
+          .then(response => response.text())
+          .then(html => {
+            document.getElementById('formulario-guardia').innerHTML = html;
+            var modal = new bootstrap.Modal(document.getElementById('modalCrearGuardia'));
+            modal.show();
+          });
+      }
     });
+
+    calendar.render();
+  });
+
+  // Manejo de formulario cargado dinámicamente
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+
+    if (form.closest('#modalCrearGuardia')) {
+      e.preventDefault();
+
+      fetch(form.action || window.location.href, {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new FormData(form)
+      })
+      .then(response => {
+        if (response.ok) {
+          const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrearGuardia'));
+          modal.hide();
+          calendar.refetchEvents();
+
+          const msg = document.createElement('div');
+          msg.className = 'alert alert-success position-fixed top-0 end-0 m-3 fade show shadow-sm';
+          msg.style.zIndex = '1055';  // más alto que el calendario
+          msg.setAttribute('role', 'alert');
+          msg.innerHTML = `
+            ✅ Guardia creada con éxito
+            <button type="button" class="btn-close ms-2" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+          `;
+          document.body.appendChild(msg);
+
+          setTimeout(() => {
+            msg.classList.remove('show');
+            setTimeout(() => msg.remove(), 300);
+          }, 3000);
+
+        } else {
+          return response.text().then(html => {
+            document.getElementById('formulario-guardia').innerHTML = html;
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Error al enviar el formulario:', error);
+      });
+    }
+  });
 </script>
 {% endblock %}

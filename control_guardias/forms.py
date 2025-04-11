@@ -31,7 +31,7 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
 class GuardiaForm(forms.ModelForm):
     class Meta:
         model = Guardia
-        fields = ['franja_horaria', 'cubierta', 'medico', 'fecha']
+        fields = ['franja_horaria', 'medico', 'fecha']
         widgets = {
             'franja_horaria': forms.Select(attrs={'class': 'form-select'}),
             'cubierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),

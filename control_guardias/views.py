@@ -7,8 +7,9 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import ListView, TemplateView
 from django.views.generic.edit import CreateView
+from django.contrib.messages.views import SuccessMessageMixin
 
-from .forms import FiltroGuardiasPorMedicoForm
+from .forms import FiltroGuardiasPorMedicoForm, GuardiaForm
 from .models import Guardia
 
 class GuardiaListView(ListView):
@@ -107,8 +108,16 @@ class GuardiaEventsView(View):
 
         return JsonResponse(eventos, safe=False)
     
-class GuardiaCreateView(LoginRequiredMixin, CreateView):
+class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Guardia
+    form_class = GuardiaForm
     template_name = 'control_guardias/crear_guardia.html'
-    fields = ['fecha', 'franja_horaria', 'cubierta', 'medico']
     success_url = reverse_lazy('calendario_guardias_full')
+    success_message = "Guardia creada con éxito."
+
+    def get_initial(self):
+        initial = super().get_initial()
+        fecha_param = self.request.GET.get('fecha')
+        if fecha_param:
+            initial['fecha'] = fecha_param
+        return initial

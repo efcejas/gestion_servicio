@@ -1,20 +1,23 @@
-{% extends "layouts/base.html" %}
-{% load static %}
+<form method="post" action="{% url 'crear_guardia' %}">
+  {% csrf_token %}
 
-{% block title %}Crear nueva guardia{% endblock %}
+  <div class="mb-3">
+    <label for="{{ form.fecha.id_for_label }}" class="form-label">Fecha</label>
+    {{ form.fecha }}
+    {{ form.fecha.errors }}
+  </div>
 
-{% block content %}
-<div class="container my-5">
-  <h2 class="mb-4">Crear una nueva guardia</h2>
+  <div class="mb-3">
+    <label for="{{ form.franja_horaria.id_for_label }}" class="form-label">Franja horaria</label>
+    {{ form.franja_horaria }}
+    {{ form.franja_horaria.errors }}
+  </div>
 
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
+  <div class="mb-3">
+    <label for="{{ form.medico.id_for_label }}" class="form-label">Médico</label>
+    {{ form.medico }}
+    {{ form.medico.errors }}
+  </div>
 
-    <button type="submit" class="btn btn-primary">
-      Crear guardia
-    </button>
-    <a href="{% url 'calendario_guardias_full' %}" class="btn btn-secondary ms-2">Cancelar</a>
-  </form>
-</div>
-{% endblock %}
+  <button type="submit" class="btn btn-primary">Crear guardia</button>
+</form>
