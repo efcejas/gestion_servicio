@@ -23,7 +23,7 @@ class Guardia(models.Model):
     ]
 
     franja_horaria = models.CharField(max_length=25, choices=FRANJA_HORARIA_CHOICES)
-    cubierta = models.BooleanField(default=False)
+    cubierta = models.BooleanField(default=True)
     medico = models.ForeignKey(
         'MedicoGuardia',
         on_delete=models.CASCADE,

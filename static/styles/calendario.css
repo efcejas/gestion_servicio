@@ -1,0 +1,84 @@
+.calendario-container {
+    max-width: auto;
+    margin: 0 auto;
+    padding: 1em;
+}
+
+.titulo-calendario {
+    font-size: 1.8em;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-align: left;
+    color: #2c3e50;
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 0.4rem;
+  }  
+
+.fila-encabezado, 
+.fila-semana {
+    display: flex;
+}
+
+.celda-encabezado {
+    flex: 1;
+    text-align: center;
+    padding: 0.5em;
+    font-weight: bold;
+    border-bottom: 2px solid #ccc;
+    background-color: #f0f0f0;
+}
+
+.celda-dia {
+    flex: 1;
+    border: 1px solid #ddd;
+    min-height: 120px;
+    padding: 5px;
+    position: relative;
+    background-color: #fff;
+}
+
+.celda-otro-mes {
+    background-color: #f9f9f9;
+    color: #7d7d7d;
+}
+
+.numero-dia {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.85em;
+    color: #333;
+}
+
+.guardia {
+    margin-top: 25px;
+    font-size: 0.85em;
+    padding: 4px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.cubierta {
+    background-color: #d4f7d4;
+    border: 1px solid #7fc87f;
+}
+
+.no-cubierta {
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+}
+
+.medico {
+    display: block;
+    margin-top: 2px;
+}
+
+.pendiente {
+    color: #cc0000;
+    font-weight: bold;
+}
+
+.horario {
+    font-weight: bold;
+}
+

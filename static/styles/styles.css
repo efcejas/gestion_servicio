@@ -73,8 +73,8 @@ body {
 
 /* Estilos de pie de página */
 footer {
-    position: sticky;
-    bottom: 0;
+    position: relative; /* o simplemente quitá esta línea */
+    bottom: auto;
     width: 100%;
 }
 

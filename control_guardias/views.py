@@ -1,8 +1,15 @@
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import JsonResponse
+from django.urls import reverse_lazy
 from django.utils import timezone
+from django.utils.decorators import method_decorator
+from django.views import View
 from django.views.generic import ListView, TemplateView
+from django.views.generic.edit import CreateView
 
-from .models import Guardia
 from .forms import FiltroGuardiasPorMedicoForm
+from .models import Guardia
 
 class GuardiaListView(ListView):
     model = Guardia
@@ -67,3 +74,41 @@ class ResumenGuardiasView(TemplateView):
             context['resumen_guardias'] = resumen_guardias
 
         return context
+
+class FullCalendarView(TemplateView):
+    template_name = 'control_guardias/fullcalendar_view.html'
+
+@method_decorator(login_required, name='dispatch')
+class GuardiaEventsView(View):
+    def get(self, request):
+        eventos = []
+
+        guardias = Guardia.objects.all()
+
+        for g in guardias:
+            if g.cubierta and g.medico:
+                eventos.append({
+                    'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {g.medico}',
+                    'start': g.fecha.isoformat(),
+                    'backgroundColor': '#d9eaff',     # Celeste institucional suave
+                    'borderColor': '#164569',         # Azul institucional
+                    'textColor': '#000',
+                    'display': 'block',
+                })
+            else:
+                eventos.append({
+                    'title': '⚠️ Guardia no cubierta',
+                    'start': g.fecha.isoformat(),
+                    'backgroundColor': '#fff3cd',
+                    'borderColor': '#ffc107',
+                    'textColor': '#000',
+                    'display': 'block',
+                })
+
+        return JsonResponse(eventos, safe=False)
+    
+class GuardiaCreateView(LoginRequiredMixin, CreateView):
+    model = Guardia
+    template_name = 'control_guardias/crear_guardia.html'
+    fields = ['fecha', 'franja_horaria', 'cubierta', 'medico']
+    success_url = reverse_lazy('calendario_guardias_full')
