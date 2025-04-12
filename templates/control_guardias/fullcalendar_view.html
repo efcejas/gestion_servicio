@@ -12,15 +12,64 @@
     margin-bottom: 20px;
   }
 
+  /* Estilo para los encabezados de las columnas (días de la semana) */
+  .fc-col-header-cell {
+    background-color: #f4f9ff;
+    /* Fondo claro */
+    color: #164569 !important;
+    /* Color azul oscuro para el texto */
+    font-weight: bold;
+    /* Negrita para destacar */
+    text-align: center;
+    /* Centrar el texto */
+  }
+
+  /* Asegúrate de que el texto dentro de los encabezados también tenga el color */
+  .fc-col-header-cell-cushion {
+    color: #164569 !important;
+    /* Aplica el color azul oscuro al texto */
+  }
+
+  /* Estilo para las teclas de navegación */
+  .fc-button {
+    background-color: #164569 !important; /* Asegura que este estilo se aplique */
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 5px !important;
+    padding: 5px 5px !important;
+    font-weight: bold !important;
+    margin: 0 3px !important; /* Agrega espacio horizontal entre botones */
+  }
+
+  /* Cambiar el estilo al pasar el mouse */
+  .fc-button:hover {
+    background-color: #0d3552 !important;
+    /* Azul más oscuro */
+    cursor: pointer;
+  }
+
+  /* Estilo para el botón activo (por ejemplo, "Hoy") */
+  .fc-button.fc-button-active {
+    background-color: #28a745 !important;
+    /* Verde para el botón activo */
+    color: #ffffff;
+  }
+ 
+  .fc-today-button {
+    background-color: #28a745 !important; /* Verde */
+    color: #ffffff !important;
+  }
+
+  .fc-daygrid-day-number {
+    color: #164569;
+    /* Aplica el color azul oscuro a todos los días */
+    font-weight: bold;
+    /* Aplica negrita a todos los días */
+  }
+
   .fc-day-sat,
   .fc-day-sun {
     background-color: #f4f9ff !important;
-  }
-
-  .fc-day-sat .fc-daygrid-day-number,
-  .fc-day-sun .fc-daygrid-day-number {
-    color: #0d6efd;
-    font-weight: bold;
   }
 
   .feriado {
@@ -80,9 +129,16 @@
         center: 'title',
         right: 'dayGridMonth,listWeek'
       },
+      buttonText: {
+        today: 'Hoy', // Cambia "today" a "Hoy"
+        month: 'Mes', // Cambia "dayGridMonth" a "Mes"
+        week: 'Semana', // Cambia "listWeek" a "Semana"
+        day: 'Día', // Opcional, si usas vista de día
+        list: 'Lista' // Cambia "listWeek" a "Lista"
+      },
       events: "{% url 'guardias_api' %}",
 
-      dateClick: function(info) {
+      dateClick: function (info) {
         fetch("{% url 'crear_guardia' %}?fecha=" + info.dateStr)
           .then(response => response.text())
           .then(html => {
@@ -110,36 +166,36 @@
         },
         body: new FormData(form)
       })
-      .then(response => {
-        if (response.ok) {
-          const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrearGuardia'));
-          modal.hide();
-          calendar.refetchEvents();
+        .then(response => {
+          if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalCrearGuardia'));
+            modal.hide();
+            calendar.refetchEvents();
 
-          const msg = document.createElement('div');
-          msg.className = 'alert alert-success position-fixed top-0 end-0 m-3 fade show shadow-sm';
-          msg.style.zIndex = '1055';  // más alto que el calendario
-          msg.setAttribute('role', 'alert');
-          msg.innerHTML = `
+            const msg = document.createElement('div');
+            msg.className = 'alert alert-success position-fixed top-0 end-0 m-3 fade show shadow-sm';
+            msg.style.zIndex = '1055';  // más alto que el calendario
+            msg.setAttribute('role', 'alert');
+            msg.innerHTML = `
             ✅ Guardia creada con éxito
             <button type="button" class="btn-close ms-2" data-bs-dismiss="alert" aria-label="Cerrar"></button>
           `;
-          document.body.appendChild(msg);
+            document.body.appendChild(msg);
 
-          setTimeout(() => {
-            msg.classList.remove('show');
-            setTimeout(() => msg.remove(), 300);
-          }, 3000);
+            setTimeout(() => {
+              msg.classList.remove('show');
+              setTimeout(() => msg.remove(), 300);
+            }, 3000);
 
-        } else {
-          return response.text().then(html => {
-            document.getElementById('formulario-guardia').innerHTML = html;
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Error al enviar el formulario:', error);
-      });
+          } else {
+            return response.text().then(html => {
+              document.getElementById('formulario-guardia').innerHTML = html;
+            });
+          }
+        })
+        .catch(error => {
+          console.error('Error al enviar el formulario:', error);
+        });
     }
   });
 </script>
