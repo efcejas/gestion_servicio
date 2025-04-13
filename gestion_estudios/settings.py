@@ -147,9 +147,9 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = config("MAILGUN_SMTP_SERVER", default="smtp.mailgun.org")
-EMAIL_PORT = config("MAILGUN_SMTP_PORT", default=587, cast=int)
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("MAILGUN_SMTP_LOGIN")
-EMAIL_HOST_PASSWORD = config("MAILGUN_SMTP_PASSWORD")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+EMAIL_HOST_USER = config("GMAIL_USER")  # Tu dirección de correo de Gmail
+EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD")  # Contraseña o App Password de Gmail
+DEFAULT_FROM_EMAIL = config("GMAIL_USER")
