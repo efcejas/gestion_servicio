@@ -1,4 +1,4 @@
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, PasswordResetView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import TemplateView
 from django.core.mail import send_mail
@@ -19,6 +19,10 @@ def send_test_email(request):
         fail_silently=False,
     )
     return HttpResponse("Correo enviado exitosamente")
+
+class CustomPasswordResetView(PasswordResetView):
+    html_email_template_name = 'registration/password_reset_email.html'  # Plantilla HTML
+    subject_template_name = 'registration/password_reset_subject.txt'  # Plantilla para el asunto del correo
 
 # Vista personalizada para la página de login
 class CustomLoginView(LoginView):
