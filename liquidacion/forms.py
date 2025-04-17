@@ -123,6 +123,7 @@ class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
             }),
             'conteo_regiones': forms.NumberInput(attrs={
                 'class': 'form-control form-control-sm',
+                'min': 0,
             }),
             'notas': forms.Textarea(attrs={
                 'class': 'form-control form-control-sm',
