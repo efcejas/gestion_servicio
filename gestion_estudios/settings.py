@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'tasks.apps.TasksConfig',
     'control_guardias.apps.ControlGuardiasConfig',
     'liquidacion.apps.LiquidacionConfig',
+    'gestion_eventos.apps.GestionEventosConfig',
 ]
 
 MIDDLEWARE = [

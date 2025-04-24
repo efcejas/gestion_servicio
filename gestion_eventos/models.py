@@ -1,0 +1,51 @@
+from django.db import models
+from django.conf import settings
+
+class EventoServicio(models.Model):
+    TIPO_EVENTO_CHOICES = [
+        ('cancelado', 'Estudio cancelado'),
+        ('demorado', 'Estudio demorado'),
+        ('pendiente', 'Estudio pendiente'),
+        ('tecnico', 'Problema técnico'),
+        ('conflicto', 'Conflicto o situación interpersonal'),
+        ('otro', 'Otro')
+    ]
+
+    ESTADO_CHOICES = [
+        ('abierto', 'Abierto'),
+        ('pendiente', 'Pendiente'),
+        ('resuelto', 'Resuelto'),
+        ('cancelado', 'Cancelado')
+    ]
+
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='eventos_creados'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    tipo_evento = models.CharField(max_length=20, choices=TIPO_EVENTO_CHOICES)
+    descripcion = models.TextField()
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='abierto')
+
+    # Campos opcionales
+    nombre_paciente = models.CharField(max_length=100, blank=True, null=True)
+    dni_paciente = models.CharField(max_length=20, blank=True, null=True)
+    estudio_relacionado = models.CharField(max_length=150, blank=True, null=True)
+
+    def __str__(self):
+        return f"[{self.get_tipo_evento_display()}] {self.descripcion[:40]}..."
+
+
+class NotaEvento(models.Model):
+    evento = models.ForeignKey(EventoServicio, on_delete=models.CASCADE, related_name='notas')
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notas_evento'
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    comentario = models.TextField()
+
+    def __str__(self):
+        return f"Nota por {self.creado_por} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"

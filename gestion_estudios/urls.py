@@ -21,7 +21,7 @@ from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test
 
 urlpatterns = [
     # Administración
-    path('admin/', admin.site.urls),
+    path('admin/', admin.site.urls, name='admin'),
 
     # Página principal
     path('', HomeView.as_view(), name='home'),
@@ -35,6 +35,7 @@ urlpatterns = [
     path('tareas/', include('tasks.urls')),  # URLs para la gestión de tareas
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
+    path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
 
     # Restablecimiento de contraseñas
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
