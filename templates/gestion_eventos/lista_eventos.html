@@ -1,0 +1,87 @@
+{% extends "layouts/base.html" %}
+{% block title %}Eventos del Servicio{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Novedades del servicio</h5>
+            <a href="{% url 'gestion_eventos:evento_nuevo' %}" class="btn btn-sm btn-light">
+                <i class="bi bi-plus-lg"></i> Nuevo evento
+            </a>
+        </div>
+        <div class="card-body">
+            {% if eventos %}
+                <div class="list-group">
+                    {% for evento in eventos %}
+                        <div class="list-group-item mb-3 border rounded shadow-sm">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <h6 class="mb-0">
+                                        <i class="bi bi-info-circle text-primary me-1"></i>
+                                        <strong>[{{ evento.get_tipo_evento_display }}]</strong>
+                                    </h6>
+                                    {% if evento.sector_de_pedido %}
+                                        <small class="text-muted">Sector: {{ evento.sector_de_pedido }}</small>
+                                    {% endif %}
+                                </div>
+
+                                {% with estado=evento.estado %}
+                                    <span class="badge 
+                                        {% if estado == 'abierto' %}bg-primary
+                                        {% elif estado == 'pendiente' %}bg-warning text-dark
+                                        {% elif estado == 'resuelto' %}bg-success
+                                        {% elif estado == 'cancelado' %}bg-danger
+                                        {% else %}bg-secondary
+                                        {% endif %}
+                                    ">
+                                        {{ evento.get_estado_display }}
+                                    </span>
+                                {% endwith %}
+                            </div>
+
+                            <p class="mb-1">{{ evento.descripcion|truncatechars:100 }}</p>
+
+                            {% if evento.nombre_paciente %}
+                                <p class="mb-0 text-muted small">
+                                    <i class="bi bi-person-fill"></i>
+                                    Paciente <strong>{{ evento.nombre_paciente }}{% if evento.dni_paciente %} - DNI: {{ evento.dni_paciente }}{% endif %}</strong>
+                                </p>
+                            {% endif %}
+
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-clock-history"></i>
+                                Registrado por <em>{{ evento.creado_por.get_full_name }}</em> el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+                            </small>
+                            
+                            {% if evento.ultima_nota %}
+                            <div class="bg-light border rounded px-3 py-2 mt-3">
+                                <div class="d-flex align-items-center mb-1">
+                                    <i class="bi bi-chat-left-dots-fill text-info me-2"></i>
+                                    <strong class="me-1">Última nota</strong>
+                                    <small class="text-muted">
+                                        por <em>{{ evento.ultima_nota.creado_por.get_full_name }}</em>
+                                        el {{ evento.ultima_nota.fecha|date:"d/m/Y H:i" }}
+                                    </small>
+                                </div>
+                                <p class="mb-0 small fst-italic text-muted">
+                                    “{{ evento.ultima_nota.comentario|truncatechars:100 }}”
+                                </p>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-end mt-3 mb-2">
+                                <a href="{% url 'gestion_eventos:detalle_evento' evento.pk %}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-eye"></i> Ver detalle
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">No se han registrado eventos aún.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

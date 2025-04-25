@@ -29,6 +29,7 @@ class EventoServicio(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='abierto')
 
     # Campos opcionales
+    sector_de_pedido = models.CharField(max_length=100, blank=True, null=True)
     nombre_paciente = models.CharField(max_length=100, blank=True, null=True)
     dni_paciente = models.CharField(max_length=20, blank=True, null=True)
     estudio_relacionado = models.CharField(max_length=150, blank=True, null=True)
@@ -36,6 +37,13 @@ class EventoServicio(models.Model):
     def __str__(self):
         return f"[{self.get_tipo_evento_display()}] {self.descripcion[:40]}..."
 
+    @property
+    def ultima_nota(self):
+        """
+        Devuelve el objeto de la última nota asociada al evento.
+        Si no hay notas, devuelve None.
+        """
+        return self.notas.order_by('-fecha').first()
 
 class NotaEvento(models.Model):
     evento = models.ForeignKey(EventoServicio, on_delete=models.CASCADE, related_name='notas')

@@ -1,0 +1,92 @@
+{% extends "layouts/base.html" %}
+{% block title %}Detalle del Evento{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Detalle del evento</h5>
+            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-sm btn-light">
+                <i class="bi bi-arrow-left"></i> Volver a la lista
+            </a>
+        </div>
+        <div class="card-body">
+            <h5 class="mb-2">
+                <i class="bi bi-info-circle text-primary me-2"></i>
+                <strong>{{ evento.get_tipo_evento_display }}</strong>
+            </h5>
+            {% if evento.sector_de_pedido %}
+                <p class="text-muted mb-1"><i class="bi bi-diagram-3-fill me-1"></i> Sector: {{ evento.sector_de_pedido }}</p>
+            {% endif %}
+            <p class="mb-2">{{ evento.descripcion }}</p>
+
+            {% if evento.nombre_paciente %}
+                <p class="text-muted mb-2">
+                    <i class="bi bi-person-fill"></i> Paciente: <strong>{{ evento.nombre_paciente }}</strong>
+                    {% if evento.dni_paciente %} - DNI: <strong>{{ evento.dni_paciente }}</strong>{% endif %}
+                </p>
+            {% endif %}
+
+            <p class="text-muted mb-1">
+                <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name }}</em>
+                el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+            </p>
+
+            <div class="mb-3">
+                <span class="badge 
+                    {% if evento.estado == 'abierto' %}bg-primary
+                    {% elif evento.estado == 'pendiente' %}bg-warning text-dark
+                    {% elif evento.estado == 'resuelto' %}bg-success
+                    {% elif evento.estado == 'cancelado' %}bg-danger
+                    {% else %}bg-secondary
+                    {% endif %}">
+                    {{ evento.get_estado_display }}
+                </span>
+                </div>
+                
+                <!-- Formulario de actualización de estado alineado a la derecha -->
+                <div class="d-flex justify-content-end mb-4">
+                    <form method="post" class="d-flex align-items-center">
+                        {% csrf_token %}
+                        <div class="input-group input-group-sm">
+                            {{ estado_form.estado }}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-arrow-repeat"></i> Actualizar estado
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <hr>
+
+            <!-- Notas -->
+            <h6 class="mb-3"><i class="bi bi-chat-left-dots-fill text-secondary me-1"></i>Notas</h6>
+            {% for nota in notas %}
+                <div class="border rounded px-3 py-2 mb-2 bg-light">
+                    <p class="mb-1 small fst-italic text-muted">
+                        “{{ nota.comentario }}”
+                    </p>
+                    <small class="text-muted">
+                        <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name }} |
+                        <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
+                    </small>
+                </div>
+            {% empty %}
+                <p class="text-muted">Este evento aún no tiene notas registradas.</p>
+            {% endfor %}
+
+            <!-- Formulario para nueva nota -->
+            <hr>
+            <h6 class="mb-2"><i class="bi bi-plus-circle"></i> Agregar nueva nota</h6>
+            <form method="post">
+                {% csrf_token %}
+                {{ nota_form.comentario.label_tag }}
+                {{ nota_form.comentario }}
+                <button type="submit" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-save"></i> Guardar nota
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

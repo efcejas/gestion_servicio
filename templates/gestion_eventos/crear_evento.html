@@ -5,7 +5,7 @@
 <div class="container mt-4 mb-5">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">Registrar nuevo evento</h5>
+            <h5 class="mb-0">Registro</h5>
         </div>
         <div class="card-body">
             <form method="post">
@@ -33,38 +33,50 @@
                     {% endif %}
                 </div>
 
-                <p class="text-muted">Los siguientes campos se completan según corresponda el evento.</p>
+                <p class="text-muted h6">Los siguientes campos se completan según corresponda el evento.</p>
 
+                
                 <div class="mb-3">
                     {{ form.nombre_paciente.label_tag }}
                     {{ form.nombre_paciente }}
                     {% if form.nombre_paciente.errors %}
-                        <div class="text-danger small">
-                            {{ form.nombre_paciente.errors|join:", " }}
-                        </div>
+                    <div class="text-danger small">
+                        {{ form.nombre_paciente.errors|join:", " }}
+                    </div>
                     {% endif %}
                 </div>
-
+                
                 <div class="mb-3">
                     {{ form.dni_paciente.label_tag }}
                     {{ form.dni_paciente }}
                     {% if form.dni_paciente.errors %}
-                        <div class="text-danger small">
-                            {{ form.dni_paciente.errors|join:", " }}
-                        </div>
+                    <div class="text-danger small">
+                        {{ form.dni_paciente.errors|join:", " }}
+                    </div>
                     {% endif %}
                 </div>
-
+                
                 <div class="mb-3">
                     {{ form.estudio_relacionado.label_tag }}
                     {{ form.estudio_relacionado }}
                     {% if form.estudio_relacionado.errors %}
+                    <div class="text-danger small">
+                        {{ form.estudio_relacionado.errors|join:", " }}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    {{ form.sector_de_pedido.label_tag }}
+                    {{ form.sector_de_pedido }}
+                    <small class="form-text text-muted">{{ form.sector_de_pedido.help_text }}</small>
+                    {% if form.sector_de_pedido.errors %}
                         <div class="text-danger small">
-                            {{ form.estudio_relacionado.errors|join:", " }}
+                            {{ form.sector_de_pedido.errors|join:", " }}
                         </div>
                     {% endif %}
                 </div>
-
+                
                 <div class="d-flex justify-content-end mt-3">
                     <a href="#" class="btn btn-secondary me-2">Cancelar</a>
                     <button type="submit" class="btn btn-primary">Registrar</button>
