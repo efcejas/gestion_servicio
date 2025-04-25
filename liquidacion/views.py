@@ -68,12 +68,17 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     success_url = reverse_lazy('registroestudios_nuevo')
     success_message = "Registro realizado exitosamente"
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.groups.filter(name='Médicos de staff - informes').exists():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')  # o donde quieras mandarlo
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         today = datetime.today()
-        
-        # Obtener el tipo de estudio desde el POST si el usuario lo ha cambiado recientemente
+
         tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')
 
         # Si no hay selección en el POST, recuperar el último tipo de estudio usado por el usuario
