@@ -104,6 +104,9 @@
                     <li class="nav-item">
                         <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
+                    </li>
                     {% if user|has_group:'Médicos de staff - informes' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'registroestudios_nuevo' %}">Registrar estudios</a>
@@ -118,9 +121,6 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'mis_procedimientos' %}">Mis registros</a> 
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
                     </li>
                     {% endif %}
                     {% if user.is_superuser %}

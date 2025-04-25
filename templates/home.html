@@ -164,8 +164,15 @@
         <!-- Mensaje -->
         <div class="flex-grow-1 text-center text-md-start">
             <h4 class="fw-bold mb-2" style="color: #03396c;">¡Hola, {{ user.first_name }}!</h4>
+            {% if user|has_group:'Médicos de staff' %}
             <p class="text-muted mb-3 mb-md-0">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar
                 con nosotros!</p>
+            {% elif user|has_group:'Médicos de staff - informes' %}
+            <p class="text-muted mb-3 mb-md-0">Aquí podrás registrar nuevos estudios y procedimientos. ¡Gracias por
+                estar con nosotros!</p>
+            {% else %}
+            <p class="text-muted mb-3 mb-md-0">Esta es la plataforma interna del servicio de imágenes donde contaremos con la comunicación de las novedades. ¡Gracias por estar con nosotros!</p>
+            {% endif %}
         </div>
 
         <!-- Botones de Acción -->
