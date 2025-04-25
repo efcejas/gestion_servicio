@@ -19,7 +19,11 @@
                                 <div>
                                     <h6 class="mb-0">
                                         <i class="bi bi-info-circle text-primary me-1"></i>
-                                        <strong>[{{ evento.get_tipo_evento_display }}]</strong>
+                                        {% if evento.estado == 'resuelto' %}
+                                            <strong class="text-success">Completado</strong>
+                                        {% else %}
+                                            <strong>[{{ evento.get_tipo_evento_display }}]</strong>
+                                        {% endif %}
                                     </h6>
                                     {% if evento.sector_de_pedido %}
                                         <small class="text-muted">Sector: {{ evento.sector_de_pedido }}</small>
