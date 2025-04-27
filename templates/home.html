@@ -69,28 +69,6 @@
         </div>
     </div>
 </div>
-{% if messages %}
-<div class="position-fixed end-0 p-3" style="top: 175px; z-index: 1055;">
-    {% for message in messages %}
-    <div class="alert alert-success alert-dismissible fade show shadow" role="alert" id="autoDismissAlert"
-        style="min-width: 280px;">
-        <i class="bi bi-check-circle-fill me-2"></i>{{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-    </div>
-    {% endfor %}
-</div>
-
-<script>
-    // Espera 3 segundos y luego cierra la alerta
-    setTimeout(function () {
-        var alert = document.getElementById('autoDismissAlert');
-        if (alert) {
-            var bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
-            bsAlert.close();
-        }
-    }, 3000); 
-</script>
-{% endif %}
 {% endif %}
 {% if user.is_authenticated and not user.is_superuser %}
 <div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0"
