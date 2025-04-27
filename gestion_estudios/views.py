@@ -1,12 +1,13 @@
-from django.contrib.auth.views import LoginView, PasswordResetView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import TemplateView
+from django.contrib.auth.views import LoginView, PasswordResetView
 from django.core.mail import send_mail
-from django.http import HttpResponse
 from django.db.models import Max
-from django.contrib import messages
+from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.views.generic import TemplateView
+from django.contrib import messages
 
+from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
 
 def send_test_email(request):
@@ -34,6 +35,8 @@ class CustomLoginView(LoginView):
         context['hide_navbar'] = True  # Ocultar la barra de navegación en la página de login
         return context
 
+from gestion_eventos.models import EventoServicio
+
 class HomeView(LoginRequiredMixin, TemplateView):
     template_name = 'home.html'
     login_url = 'login'
@@ -42,7 +45,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = False
 
-        # Obtener los últimos 4 médicos que hicieron registros
+        # Últimos registros médicos
         ultimos_medicos = (
             RegistroEstudiosPorMedico.objects
             .values('medico')
@@ -56,4 +59,17 @@ class HomeView(LoginRequiredMixin, TemplateView):
         ).order_by('-fecha_registro')
 
         context['ultimos_registros_medicos'] = ultimos_registros
+
+        # 🚀 Datos de eventos actuales
+        eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'pendiente'])
+        context['cantidad_eventos_abiertos'] = eventos_abiertos.count()
+
+        ultima_actualizacion = None
+        for evento in eventos_abiertos:
+            if evento.ultima_nota:
+                if not ultima_actualizacion or evento.ultima_nota.fecha > ultima_actualizacion:
+                    ultima_actualizacion = evento.ultima_nota.fecha
+        
+        context['ultima_actualizacion_evento'] = ultima_actualizacion
+
         return context
