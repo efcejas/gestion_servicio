@@ -2,7 +2,7 @@
 {% block title %}Historial de Eventos{% endblock %}
 
 {% block content %}
-{% if messages %}
+<!-- {% if messages %}
 <div class="container mt-3">
     {% for message in messages %}
     <div class="alert alert-{{ message.tags }} alert-dismissible fade show auto-dismiss" role="alert">
@@ -11,7 +11,7 @@
     </div>
     {% endfor %}
 </div>
-{% endif %}
+{% endif %} -->
 <div class="container mt-4 mb-5">
     <div class="card shadow-sm">
         <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
@@ -145,7 +145,7 @@
         </div>
     </div>
 </div>
-<script>
+<!-- <script>
     document.addEventListener('DOMContentLoaded', function () {
         const alerts = document.querySelectorAll('.auto-dismiss');
         alerts.forEach(function (alert) {
@@ -155,5 +155,5 @@
             }, 4000); // 4000 milisegundos = 4 segundos
         });
     });
-</script>
+</script> -->
 {% endblock %}
