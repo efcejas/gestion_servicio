@@ -22,13 +22,13 @@
 
             {% if evento.nombre_paciente %}
                 <p class="text-muted mb-2">
-                    <i class="bi bi-person-fill"></i> Paciente: <strong>{{ evento.nombre_paciente }}</strong>
+                    <i class="bi bi-person-fill"></i> Paciente: <strong>{{ evento.nombre_paciente|upper }}</strong>
                     {% if evento.dni_paciente %} - DNI: <strong>{{ evento.dni_paciente }}</strong>{% endif %}
                 </p>
             {% endif %}
 
             <p class="text-muted mb-1">
-                <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name }}</em>
+                <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em>
                 el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
             </p>
 
@@ -67,7 +67,7 @@
                         “{{ nota.comentario }}”
                     </p>
                     <small class="text-muted">
-                        <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name }} |
+                        <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name|title }} |
                         <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
                     </small>
                 </div>

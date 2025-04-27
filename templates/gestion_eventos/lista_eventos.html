@@ -20,7 +20,9 @@
                                     <h6 class="mb-0">
                                         <i class="bi bi-info-circle text-primary me-1"></i>
                                         {% if evento.estado == 'resuelto' %}
-                                            <strong class="text-success">Completado</strong>
+                                            <strong class="text-success">Completado</strong> 
+                                            <!-- Debo ver si conviene hacer lo mismo cuando el estudio dice cancelado -->
+                                            <!-- Algo similar debería pasar en la sección de detalle -->
                                         {% else %}
                                             <strong>[{{ evento.get_tipo_evento_display }}]</strong>
                                         {% endif %}
@@ -49,13 +51,13 @@
                             {% if evento.nombre_paciente %}
                                 <p class="mb-0 text-muted small">
                                     <i class="bi bi-person-fill"></i>
-                                    Paciente <strong>{{ evento.nombre_paciente }}{% if evento.dni_paciente %} - DNI: {{ evento.dni_paciente }}{% endif %}</strong>
+                                    Paciente <strong>{{ evento.nombre_paciente|upper }}{% if evento.dni_paciente %} - DNI: {{ evento.dni_paciente }}{% endif %}</strong>
                                 </p>
                             {% endif %}
 
                             <small class="text-muted d-block mt-1">
                                 <i class="bi bi-clock-history"></i>
-                                Registrado por <em>{{ evento.creado_por.get_full_name }}</em> el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+                                Registrado Por <em>{{ evento.creado_por.get_full_name|title }}</em> El {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
                             </small>
                             
                             {% if evento.ultima_nota %}
@@ -64,7 +66,7 @@
                                     <i class="bi bi-chat-left-dots-fill text-info me-2"></i>
                                     <strong class="me-1">Última nota</strong>
                                     <small class="text-muted">
-                                        por <em>{{ evento.ultima_nota.creado_por.get_full_name }}</em>
+                                        por <em>{{ evento.ultima_nota.creado_por.get_full_name|title }}</em>
                                         el {{ evento.ultima_nota.fecha|date:"d/m/Y H:i" }}
                                     </small>
                                 </div>
