@@ -20,11 +20,6 @@
                         class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center">
                         <i class="bi bi-bar-chart-line me-2"></i>Ver total de estudios por profesional
                     </a>
-                    <button
-                        class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center"
-                        data-bs-toggle="modal" data-bs-target="#modalNuevaGuardia">
-                        <i class="bi bi-plus-circle me-2"></i>Registrar guardia
-                    </button>
                     <a href="{% url 'calendario_guardias_full' %}"
                         class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center">
                         <i class="bi bi-calendar-event me-2"></i>Calendario de guardias
@@ -71,61 +66,6 @@
                 class="card shadow h-100 card-hover text-center text-muted d-flex align-items-center justify-content-center p-4 border border-dashed">
                 <p class="mb-0"><i class="bi bi-box me-2"></i>Espacio reservado para funcionalidades futuras</p>
             </div>
-        </div>
-    </div>
-</div>
-<!-- Modal de creación de guardia -->
-<div class="modal fade" id="modalNuevaGuardia" tabindex="-1" aria-labelledby="modalNuevaGuardiaLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <form method="post">
-                {% csrf_token %}
-                <div class="modal-header">
-                    <h5 class="modal-title" id="modalNuevaGuardiaLabel">Registrar nueva guardia</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="{{ form.franja_horaria.id_for_label }}" class="form-label">Franja horaria</label>
-                        {{ form.franja_horaria }}
-                        {% if form.franja_horaria.errors %}
-                        <div class="text-danger small">{{ form.franja_horaria.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="mb-3 form-check">
-                        {{ form.cubierta }}
-                        <label class="form-check-label" for="{{ form.cubierta.id_for_label }}">¿Guardia
-                            cubierta?</label>
-                        {% if form.cubierta.errors %}
-                        <div class="text-danger small">{{ form.cubierta.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="{{ form.medico.id_for_label }}" class="form-label">Médico</label>
-                        {{ form.medico }}
-                        {% if form.medico.errors %}
-                        <div class="text-danger small">{{ form.medico.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="{{ form.fecha.id_for_label }}" class="form-label">Fecha</label>
-                        {{ form.fecha }}
-                        {% if form.fecha.errors %}
-                        <div class="text-danger small">{{ form.fecha.errors|striptags }}</div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
         </div>
     </div>
 </div>

@@ -5,6 +5,7 @@ from django.utils.timezone import now
 from django.views.generic import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
+from django.core.paginator import Paginator
 
 from .forms import EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm
 from .models import EventoServicio, NotaEvento
@@ -23,7 +24,22 @@ class EventoServicioListView(ListView):
     model = EventoServicio
     template_name = 'gestion_eventos/lista_eventos.html'
     context_object_name = 'eventos'
-    ordering = ['-fecha_creacion']
+    
+    def get_queryset(self):
+        return EventoServicio.objects.filter(
+            estado__in=['abierto', 'pendiente']
+        ).order_by('-fecha_creacion')
+        
+class HistorialEventoListView(ListView):
+    model = EventoServicio
+    template_name = 'gestion_eventos/historial_eventos.html'
+    context_object_name = 'eventos'
+    paginate_by = 4
+
+    def get_queryset(self):
+        return EventoServicio.objects.filter(
+            estado__in=['resuelto', 'cancelado']
+        ).order_by('-fecha_creacion')
 
 class EventoServicioDetailView(LoginRequiredMixin, DetailView):
     model = EventoServicio

@@ -1,11 +1,11 @@
 {% extends "layouts/base.html" %}
-{% block title %}Eventos del Servicio{% endblock %}
+{% block title %}Historial de Eventos{% endblock %}
 
 {% block content %}
 <div class="container mt-4 mb-5">
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Novedades del servicio</h5>
+        <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Historial de eventos resueltos o cancelados</h5>
             <a href="{% url 'gestion_eventos:evento_nuevo' %}" class="btn btn-sm btn-light">
                 <i class="bi bi-plus-lg"></i> Nuevo evento
             </a>
@@ -26,11 +26,11 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <div>
                                     <h6 class="mb-0">
-                                        <i class="bi bi-info-circle text-primary me-1"></i>
+                                        <i class="bi bi-archive-fill text-secondary me-1"></i>
                                         {% if evento.estado == 'resuelto' %}
                                             <strong class="text-success">Completado</strong> 
-                                            <!-- Debo ver si conviene hacer lo mismo cuando el estudio dice cancelado -->
-                                            <!-- Algo similar debería pasar en la sección de detalle -->
+                                        {% elif evento.estado == 'cancelado' %}
+                                            <strong class="text-danger">Cancelado</strong>
                                         {% else %}
                                             <strong>[{{ evento.get_tipo_evento_display }}]</strong>
                                         {% endif %}
@@ -42,9 +42,7 @@
 
                                 {% with estado=evento.estado %}
                                     <span class="badge 
-                                        {% if estado == 'abierto' %}bg-primary
-                                        {% elif estado == 'pendiente' %}bg-warning text-dark
-                                        {% elif estado == 'resuelto' %}bg-success
+                                        {% if estado == 'resuelto' %}bg-success
                                         {% elif estado == 'cancelado' %}bg-danger
                                         {% else %}bg-secondary
                                         {% endif %}
@@ -65,7 +63,7 @@
 
                             <small class="text-muted d-block mt-1">
                                 <i class="bi bi-clock-history"></i>
-                                Registrado Por <em>{{ evento.creado_por.get_full_name|title }}</em> El {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+                                Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em> el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
                             </small>
                             
                             {% if evento.ultima_nota %}
@@ -93,7 +91,46 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <p class="text-muted">No hay eventos abiertos en este momento. Si estás buscando un evento específico, puedes ver el historial de eventos.</p>
+                <p class="text-muted">No hay eventos resueltos o cancelados aún.</p>
+            {% endif %}
+            {% if is_paginated %}
+            <div class="mt-4 d-flex justify-content-center">
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Anterior">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link" aria-hidden="true">&laquo;</span>
+                        </li>
+                        {% endif %}
+
+                        {% for num in paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Siguiente">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link" aria-hidden="true">&raquo;</span>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
             {% endif %}
         </div>
     </div>

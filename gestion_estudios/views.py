@@ -8,7 +8,6 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from liquidacion.models import RegistroEstudiosPorMedico
-from control_guardias.forms import GuardiaForm
 
 def send_test_email(request):
     send_mail(
@@ -42,7 +41,6 @@ class HomeView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = False
-        context['form'] = context.get('form') or GuardiaForm()
 
         # Obtener los últimos 4 médicos que hicieron registros
         ultimos_medicos = (
@@ -59,13 +57,3 @@ class HomeView(LoginRequiredMixin, TemplateView):
 
         context['ultimos_registros_medicos'] = ultimos_registros
         return context
-
-    from django.contrib import messages
-
-    def post(self, request, *args, **kwargs):
-        form = GuardiaForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Guardia registrada con éxito.")
-            return redirect('home')
-        return self.render_to_response(self.get_context_data(form=form))
