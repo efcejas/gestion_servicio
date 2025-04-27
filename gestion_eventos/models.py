@@ -15,7 +15,6 @@ class EventoServicio(models.Model):
         ('abierto', 'Abierto'),
         ('pendiente', 'Pendiente'),
         ('resuelto', 'Resuelto'),
-        ('cancelado', 'Cancelado')
     ]
 
     creado_por = models.ForeignKey(

@@ -8,7 +8,7 @@ from django.views.generic.list import ListView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 
-from .forms import EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm
+from .forms import ActualizarTipoEventoForm, EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm
 from .models import EventoServicio, NotaEvento
 
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
@@ -21,6 +21,7 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
         form.instance.creado_por = self.request.user
         return super().form_valid(form)
 
+# Lista de eventos activos (abiertos o pendientes)
 class EventoServicioListView(ListView):
     model = EventoServicio
     template_name = 'gestion_eventos/lista_eventos.html'
@@ -30,7 +31,8 @@ class EventoServicioListView(ListView):
         return EventoServicio.objects.filter(
             estado__in=['abierto', 'pendiente']
         ).order_by('-fecha_creacion')
-        
+
+# Lista del historial (eventos resueltos)
 class HistorialEventoListView(ListView):
     model = EventoServicio
     template_name = 'gestion_eventos/historial_eventos.html'
@@ -39,7 +41,7 @@ class HistorialEventoListView(ListView):
 
     def get_queryset(self):
         return EventoServicio.objects.filter(
-            estado__in=['resuelto', 'cancelado']
+            estado='resuelto'  # 🚨 Ahora sólo los resueltos
         ).order_by('-fecha_creacion')
         
     def get_context_data(self, **kwargs):
@@ -58,6 +60,7 @@ class HistorialEventoListView(ListView):
         context['eventos'] = eventos_paginados
         return context
 
+# Vista detalle de evento, para agregar notas o cambiar estado
 class EventoServicioDetailView(LoginRequiredMixin, DetailView):
     model = EventoServicio
     template_name = 'gestion_eventos/detalle_evento.html'
@@ -68,6 +71,7 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
         context['notas'] = self.object.notas.order_by('fecha')
         context['nota_form'] = NotaEventoForm()
         context['estado_form'] = ActualizarEstadoEventoForm(initial={'estado': self.object.estado})
+        context['tipo_evento_form'] = ActualizarTipoEventoForm(initial={'tipo_evento': self.object.tipo_evento})
         return context
 
     def post(self, request, *args, **kwargs):
@@ -84,4 +88,10 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
             if estado_form.is_valid():
                 self.object.estado = estado_form.cleaned_data['estado']
                 self.object.save()
+        
+        elif 'tipo_evento' in request.POST:
+            tipo_evento_form = ActualizarTipoEventoForm(request.POST, instance=self.object)
+            if tipo_evento_form.is_valid():
+                tipo_evento_form.save()
+
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))

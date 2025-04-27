@@ -11,20 +11,32 @@
             </a>
         </div>
         <div class="card-body">
-            <h5 class="mb-2">
-                <i class="bi bi-info-circle text-primary me-2"></i>
-                <strong>{{ evento.get_tipo_evento_display }}</strong>
-            </h5>
+            <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-info-circle text-primary me-2"></i>
+                    <h5 class="mb-0"><strong>{{ evento.get_tipo_evento_display }}</strong></h5>
+                </div>
+                <form method="post" class="d-flex align-items-center ms-3 mt-2 mt-md-0">
+                    {% csrf_token %}
+                    <div class="input-group input-group-sm">
+                        {{ tipo_evento_form.tipo_evento }}
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-arrow-repeat"></i> Actualizar
+                        </button>
+                    </div>
+                </form>
+            </div>
             {% if evento.sector_de_pedido %}
-                <p class="text-muted mb-1"><i class="bi bi-diagram-3-fill me-1"></i> Sector: {{ evento.sector_de_pedido }}</p>
+            <p class="text-muted mb-1"><i class="bi bi-diagram-3-fill me-1"></i> Sector: {{ evento.sector_de_pedido }}
+            </p>
             {% endif %}
             <p class="mb-2">{{ evento.descripcion }}</p>
 
             {% if evento.nombre_paciente %}
-                <p class="text-muted mb-2">
-                    <i class="bi bi-person-fill"></i> Paciente: <strong>{{ evento.nombre_paciente|upper }}</strong>
-                    {% if evento.dni_paciente %} - DNI: <strong>{{ evento.dni_paciente }}</strong>{% endif %}
-                </p>
+            <p class="text-muted mb-2">
+                <i class="bi bi-person-fill"></i> Paciente: <strong>{{ evento.nombre_paciente|upper }}</strong>
+                {% if evento.dni_paciente %} - DNI: <strong>{{ evento.dni_paciente }}</strong>{% endif %}
+            </p>
             {% endif %}
 
             <p class="text-muted mb-1">
@@ -32,47 +44,55 @@
                 el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
             </p>
 
-            <div class="mb-3">
-                <span class="badge 
-                    {% if evento.estado == 'abierto' %}bg-primary
-                    {% elif evento.estado == 'pendiente' %}bg-warning text-dark
-                    {% elif evento.estado == 'resuelto' %}bg-success
-                    {% elif evento.estado == 'cancelado' %}bg-danger
-                    {% else %}bg-secondary
-                    {% endif %}">
-                    {{ evento.get_estado_display }}
-                </span>
-                </div>
-                
-                <!-- Formulario de actualización de estado alineado a la derecha -->
-                <div class="d-flex justify-content-end mb-4">
+            <!-- Sección de estado del evento -->
+            <div class="card border-0 shadow-sm bg-light p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <span class="badge 
+                            {% if evento.estado == 'abierto' %}bg-primary
+                            {% elif evento.estado == 'pendiente' %}bg-warning text-dark
+                            {% elif evento.estado == 'resuelto' %}bg-success
+                            {% elif evento.estado == 'cancelado' %}bg-danger
+                            {% else %}bg-secondary
+                            {% endif %}
+                        ">
+                            {{ evento.get_estado_display }}
+                        </span>
+                    </div>
                     <form method="post" class="d-flex align-items-center">
                         {% csrf_token %}
                         <div class="input-group input-group-sm">
                             {{ estado_form.estado }}
                             <button type="submit" class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-arrow-repeat"></i> Actualizar estado
+                                <i class="bi bi-arrow-repeat"></i> Actualizar
                             </button>
                         </div>
                     </form>
                 </div>
-                
-                <hr>
+                <div class="alert alert-info small mb-0" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>¿Cómo usar esta sección?</strong> Actualice el estado del evento si corresponde (por ejemplo, marcarlo como resuelto).
+                    Para registrar más detalles sobre el caso, utilice la sección de notas debajo.
+                </div>
+            </div>
+
+
+            <hr>
 
             <!-- Notas -->
             <h6 class="mb-3"><i class="bi bi-chat-left-dots-fill text-secondary me-1"></i>Notas</h6>
             {% for nota in notas %}
-                <div class="border rounded px-3 py-2 mb-2 bg-light">
-                    <p class="mb-1 small fst-italic text-muted">
-                        “{{ nota.comentario }}”
-                    </p>
-                    <small class="text-muted">
-                        <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name|title }} |
-                        <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
-                    </small>
-                </div>
+            <div class="border rounded px-3 py-2 mb-2 bg-light">
+                <p class="mb-1 small fst-italic text-muted">
+                    “{{ nota.comentario }}”
+                </p>
+                <small class="text-muted">
+                    <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name|title }} |
+                    <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
+                </small>
+            </div>
             {% empty %}
-                <p class="text-muted">Este evento aún no tiene notas registradas.</p>
+            <p class="text-muted">Este evento aún no tiene notas registradas.</p>
             {% endfor %}
 
             <!-- Formulario para nueva nota -->

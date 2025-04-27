@@ -68,3 +68,14 @@ class ActualizarEstadoEventoForm(forms.ModelForm):
         labels = {
             'estado': 'Actualizar estado del evento'
         }
+
+class ActualizarTipoEventoForm(forms.ModelForm):
+    class Meta:
+        model = EventoServicio
+        fields = ['tipo_evento']
+        widgets = {
+            'tipo_evento': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
+        labels = {
+            'tipo_evento': 'Tipo de evento',
+        }
