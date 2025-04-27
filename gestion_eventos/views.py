@@ -5,7 +5,8 @@ from django.utils.timezone import now
 from django.views.generic import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib import messages
 
 from .forms import EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm
 from .models import EventoServicio, NotaEvento
@@ -40,6 +41,22 @@ class HistorialEventoListView(ListView):
         return EventoServicio.objects.filter(
             estado__in=['resuelto', 'cancelado']
         ).order_by('-fecha_creacion')
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        eventos = self.get_queryset()
+        paginator = Paginator(eventos, self.paginate_by)
+
+        page = self.request.GET.get('page')
+        try:
+            eventos_paginados = paginator.page(page)
+        except PageNotAnInteger:
+            eventos_paginados = paginator.page(1)  # 🚨 Si no es número, mostrar la página 1
+        except EmptyPage:
+            eventos_paginados = paginator.page(paginator.num_pages)
+
+        context['eventos'] = eventos_paginados
+        return context
 
 class EventoServicioDetailView(LoginRequiredMixin, DetailView):
     model = EventoServicio
