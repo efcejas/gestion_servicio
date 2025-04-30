@@ -23,47 +23,48 @@
                 <div class="list-group">
                     {% for evento in eventos %}
                         <div class="list-group-item mb-3 border rounded shadow-sm">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <div>
-                                    <h6 class="mb-0">
+                            <div class="d-colum d-md-flex justify-content-between align-items-center mb-2">
+                                <div class="mt-2 text-center text-md-start">
+                                    <h5 class="mb-1">
                                         <i class="bi bi-info-circle text-primary me-1"></i>
                                         {% if evento.estado == 'resuelto' %}
-                                            <strong class="text-success">Completado</strong> 
-                                            <!-- Debo ver si conviene hacer lo mismo cuando el estudio dice cancelado -->
-                                            <!-- Algo similar debería pasar en la sección de detalle -->
+                                        <strong class="text-success">Completado</strong> 
+                                        <!-- Debo ver si conviene hacer lo mismo cuando el estudio dice cancelado -->
+                                        <!-- Algo similar debería pasar en la sección de detalle -->
                                         {% else %}
-                                            <strong>[{{ evento.get_tipo_evento_display }}]</strong>
+                                        <strong>{{ evento.get_tipo_evento_display }}</strong>
                                         {% endif %}
-                                    </h6>
+                                    </h5>
+                                    {% with estado=evento.estado %}
+                                        <span class="badge 
+                                            {% if estado == 'abierto' %}bg-primary
+                                            {% elif estado == 'pendiente' %}bg-warning text-dark
+                                            {% elif estado == 'resuelto' %}bg-success
+                                            {% elif estado == 'cancelado' %}bg-danger
+                                            {% else %}bg-secondary
+                                            {% endif %}
+                                        ">
+                                            {{ evento.get_estado_display }}
+                                        </span>
+                                    {% endwith %}
+                                </div>
+                                <div class="d-flex flex-column align-items-start align-items-md-end mt-2">
+                                    {% if evento.nombre_paciente %}
+                                    <p class="mb-0 text-muted small">
+                                        <i class="bi bi-person-fill"></i>
+                                        Paciente <strong>{{ evento.nombre_paciente|upper }}{% if evento.dni_paciente %} - DNI: {{ evento.dni_paciente }}{% endif %}</strong>
+                                    </p>
+                                    {% endif %}
                                     {% if evento.sector_de_pedido %}
                                         <small class="text-muted">Sector: {{ evento.sector_de_pedido }}</small>
                                     {% endif %}
                                 </div>
 
-                                {% with estado=evento.estado %}
-                                    <span class="badge 
-                                        {% if estado == 'abierto' %}bg-primary
-                                        {% elif estado == 'pendiente' %}bg-warning text-dark
-                                        {% elif estado == 'resuelto' %}bg-success
-                                        {% elif estado == 'cancelado' %}bg-danger
-                                        {% else %}bg-secondary
-                                        {% endif %}
-                                    ">
-                                        {{ evento.get_estado_display }}
-                                    </span>
-                                {% endwith %}
                             </div>
 
-                            <p class="mb-1">{{ evento.descripcion|truncatechars:100 }}</p>
+                            <p class="mt-3 mb-3">{{ evento.descripcion|truncatechars:100 }}</p>
 
-                            {% if evento.nombre_paciente %}
-                                <p class="mb-0 text-muted small">
-                                    <i class="bi bi-person-fill"></i>
-                                    Paciente <strong>{{ evento.nombre_paciente|upper }}{% if evento.dni_paciente %} - DNI: {{ evento.dni_paciente }}{% endif %}</strong>
-                                </p>
-                            {% endif %}
-
-                            <small class="text-muted d-block mt-1">
+                            <small class="text-muted d-flex justify-content-center justify-content-md-end">
                                 <i class="bi bi-clock-history"></i>
                                 Registrado Por <em>{{ evento.creado_por.get_full_name|title }}</em> El {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
                             </small>
