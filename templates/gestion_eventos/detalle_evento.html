@@ -65,16 +65,16 @@
                     </button>
                 </div>
             </form> -->
-            <p class="mb-2 mt-3">{{ evento.descripcion }}</p>
-
-
-            <p class="text-muted mb-3 mt-4 text-end">
-                <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em>
-                el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
-            </p>
+            <div class="bg-light border rounded px-3 py-2 mb-3">
+                <p class="mb-2 mt-3">{{ evento.descripcion }}</p>
+                <p class="text-muted mb-3 mt-4 text-end">
+                    <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em>
+                    el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+                </p>
+            </div>
 
             <!-- Sección de estado del evento -->
-            <div class="card border-0 shadow-sm bg-light p-3 mb-4">
+            <div class="bg-light border rounded px-3 p-3 mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <form method="post" class="d-flex align-items-center">
                         {% csrf_token %}
