@@ -64,29 +64,28 @@
 
                             <div class="bg-light border rounded px-3 py-2 mt-3">
                                 <p class="mt-3 mb-3">{{ evento.descripcion|truncatechars:100 }}</p>
-                                <small class="text-muted d-flex justify-content-center justify-content-md-end">
-                                    <i class="bi bi-clock-history"></i>
-                                    Registrado Por <em>{{ evento.creado_por.get_full_name|title }}</em> El {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
-                                </small>
+                                <p class="text-muted mb-3 mt-4 text-end">
+                                    <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em>
+                                    el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
+                                </p>
                             </div>
                             
                             {% if evento.ultima_nota %}
                             <div class="bg-light border rounded px-3 py-2 mt-3">
-                                <div class="d-flex align-items-center mb-1">
-                                    <i class="bi bi-chat-left-dots-fill text-info me-2"></i>
-                                    <strong class="me-1">Última nota</strong>
+                                <div class="d-flex flex-column mb-3">
+                                    <strong class="me-1"><i class="bi bi-chat-left-dots-fill text-info me-2"></i>Última nota</strong>
                                     <small class="text-muted">
                                         por <em>{{ evento.ultima_nota.creado_por.get_full_name|title }}</em>
                                         el {{ evento.ultima_nota.fecha|date:"d/m/Y H:i" }}
                                     </small>
                                 </div>
-                                <p class="mb-0 small fst-italic text-muted">
+                                <p class="mb-0 small fst-italic mb-2">
                                     “{{ evento.ultima_nota.comentario|truncatechars:100 }}”
                                 </p>
                             </div>
                             {% endif %}
                             
-                            <div class="d-flex justify-content-end mt-3 mb-2">
+                            <div class="d-flex justify-content-end mt-3 mb-3">
                                 <a href="{% url 'gestion_eventos:detalle_evento' evento.pk %}" class="btn btn-outline-primary btn-sm">
                                     <i class="bi bi-eye"></i> Ver detalle
                                 </a>
