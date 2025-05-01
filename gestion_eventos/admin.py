@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import EventoServicio, NotaEvento
+from .models import EventoServicio, NotaEvento, HistorialEvento
 
 @admin.register(EventoServicio)
 class EventoServicioAdmin(admin.ModelAdmin):
@@ -14,5 +14,13 @@ class NotaEventoAdmin(admin.ModelAdmin):
     list_display = ('id', 'evento', 'creado_por', 'fecha')
     list_filter = ('fecha',)
     search_fields = ('comentario', 'evento__descripcion', 'creado_por__username')
+    date_hierarchy = 'fecha'
+    ordering = ['-fecha']
+
+@admin.register(HistorialEvento)
+class HistorialEventoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'evento', 'usuario', 'fecha', 'cambio', 'valor_anterior', 'valor_nuevo')
+    list_filter = ('cambio', 'fecha', 'usuario')
+    search_fields = ('evento__descripcion', 'usuario__username', 'valor_anterior', 'valor_nuevo')
     date_hierarchy = 'fecha'
     ordering = ['-fecha']
