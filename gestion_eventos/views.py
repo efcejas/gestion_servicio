@@ -76,6 +76,7 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
         return context
 
     def post(self, request, *args, **kwargs):
+        print(request.POST)
         self.object = self.get_object()
 
         if 'comentario' in request.POST:
@@ -91,9 +92,11 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
             if estado_form.is_valid():
                 estado_form.save(usuario=request.user)  # 👈 importante
 
-        elif 'tipo_evento' in request.POST:
+        elif 'actualizar_tipo_evento' in request.POST:
             tipo_evento_form = ActualizarTipoEventoForm(request.POST, instance=self.object)
             if tipo_evento_form.is_valid():
-                tipo_evento_form.save(usuario=request.user)  # 👈 importante
-
+                tipo_evento_form.save(usuario=request.user)
+            else:
+                print(tipo_evento_form.errors)  # Muestra los errores del formulario
+                
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))

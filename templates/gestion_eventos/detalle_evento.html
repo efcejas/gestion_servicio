@@ -153,35 +153,47 @@
                     Use esta sección para modificar el estado o el tipo del evento si hubo cambios significativos en la situación.
                 </div>
 
-                <form method="post" class="row g-2">
-                    {% csrf_token %}
-
+                <div class="row">
+                    <!-- Contenedor para actualizar tipo de evento -->
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Actualizar tipo de evento</label>
-                        <div class="input-group input-group-sm">
-                            {{ tipo_evento_form.tipo_evento }}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_tipo_evento">
-                                <i class="bi bi-arrow-repeat"></i>
-                                Actualizar
-                            </button>
+                        <div class="bg-white border rounded p-3">
+                            <h6 class="mb-2"><i class="bi bi-pencil-square"></i> Actualizar tipo de evento</h6>
+                            <form method="post" class="row g-2 align-items-end">
+                                {% csrf_token %}
+                                <div class="col-12">
+                                    <div class="input-group input-group-sm">
+                                        {{ tipo_evento_form.tipo_evento }}
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_tipo_evento">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                            Actualizar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
 
+                    <!-- Contenedor para actualizar estado -->
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Actualizar estado</label>
-                        <div class="input-group input-group-sm">
-                            {{ estado_form.estado }}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_estado">
-                                <i class="bi bi-arrow-repeat"></i>
-                                Actualizar
-                            </button>
+                        <div class="bg-white border rounded p-3">
+                            <h6 class="mb-2"><i class="bi bi-pencil-square"></i> Actualizar estado</h6>
+                            <form method="post" class="row g-2">
+                                {% csrf_token %}
+                                <div class="col-12">
+                                    <div class="input-group input-group-sm">
+                                        {{ estado_form.estado }}
+                                        <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_estado">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                            Actualizar
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
-
-                </form>
+                </div>
 
             </div>
-
         </div>
     </div>
 </div>
