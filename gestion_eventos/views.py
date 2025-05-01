@@ -72,10 +72,12 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
         context['nota_form'] = NotaEventoForm()
         context['estado_form'] = ActualizarEstadoEventoForm(initial={'estado': self.object.estado})
         context['tipo_evento_form'] = ActualizarTipoEventoForm(initial={'tipo_evento': self.object.tipo_evento})
+        context['historial'] = self.object.historial.order_by('-fecha')
         return context
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
+
         if 'comentario' in request.POST:
             nota_form = NotaEventoForm(request.POST)
             if nota_form.is_valid():
@@ -83,15 +85,17 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
                 nota.evento = self.object
                 nota.creado_por = request.user
                 nota.save()
+
         elif 'estado' in request.POST:
             estado_form = ActualizarEstadoEventoForm(request.POST)
             if estado_form.is_valid():
                 self.object.estado = estado_form.cleaned_data['estado']
-                self.object.save()
-        
+                self.object.save(usuario=request.user)  # 👈 Registramos el usuario que hizo el cambio
+
         elif 'tipo_evento' in request.POST:
             tipo_evento_form = ActualizarTipoEventoForm(request.POST, instance=self.object)
             if tipo_evento_form.is_valid():
-                tipo_evento_form.save()
-
+                self.object = tipo_evento_form.save(commit=False)
+                self.object.save(usuario=request.user) # 👈 También lo registramos aquí
+        
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))

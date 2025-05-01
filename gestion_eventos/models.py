@@ -44,6 +44,29 @@ class EventoServicio(models.Model):
         """
         return self.notas.order_by('-fecha').first()
 
+    def save(self, *args, **kwargs):
+        # Detectar cambios en estado o tipo_evento
+        if self.pk:  # Solo si el objeto ya existe
+            original = EventoServicio.objects.get(pk=self.pk)
+            usuario = kwargs.pop('usuario', None)  # Usuario que realiza el cambio
+            if original.estado != self.estado:
+                HistorialEvento.objects.create(
+                    evento=self,
+                    usuario=usuario,
+                    cambio='estado',
+                    valor_anterior=original.estado,
+                    valor_nuevo=self.estado
+                )
+            if original.tipo_evento != self.tipo_evento:
+                HistorialEvento.objects.create(
+                    evento=self,
+                    usuario=usuario,
+                    cambio='tipo_evento',
+                    valor_anterior=original.tipo_evento,
+                    valor_nuevo=self.tipo_evento
+                )
+        super().save(*args, **kwargs)
+
 class NotaEvento(models.Model):
     evento = models.ForeignKey(EventoServicio, on_delete=models.CASCADE, related_name='notas')
     creado_por = models.ForeignKey(
@@ -56,3 +79,20 @@ class NotaEvento(models.Model):
 
     def __str__(self):
         return f"Nota por {self.creado_por} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
+
+class HistorialEvento(models.Model):
+    evento = models.ForeignKey(EventoServicio, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_eventos'
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    cambio = models.CharField(max_length=50)  # 'estado' o 'tipo_evento'
+    valor_anterior = models.CharField(max_length=50, blank=True, null=True)
+    valor_nuevo = models.CharField(max_length=50, blank=True, null=True)
+
+    def __str__(self):
+        return f"Cambio en {self.cambio} por {self.usuario} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"

@@ -56,15 +56,6 @@
                 </div>
             </div>
             
-            <!-- <form method="post" class="d-flex align-items-center ms-3 mt-2 mt-md-0">
-                {% csrf_token %}
-                <div class="input-group input-group-sm">
-                    {{ tipo_evento_form.tipo_evento }}
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-arrow-repeat"></i> Actualizar
-                    </button>
-                </div>
-            </form> -->
             <div class="bg-light border rounded px-3 py-2 mb-3">
                 <p class="mb-2 mt-3">{{ evento.descripcion }}</p>
                 {% if evento.estudio_relacionado %}
@@ -76,56 +67,114 @@
                 </p>
             </div>
 
-            <!-- Sección de estado del evento -->
-            <div class="bg-light border rounded px-3 p-3 mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <form method="post" class="d-flex align-items-center">
-                        {% csrf_token %}
-                        <div class="input-group input-group-sm">
-                            {{ estado_form.estado }}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm">
-                                <i class="bi bi-arrow-repeat"></i> Actualizar
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                <div class="alert alert-info small mb-0" role="alert">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>¿Cómo usar esta sección?</strong> Actualice el estado del evento si corresponde (por ejemplo, marcarlo como resuelto).
-                    Para registrar más detalles sobre el caso, utilice la sección de notas debajo.
-                </div>
-            </div>
-
-
             <hr>
 
-            <!-- Notas -->
-            <h6 class="mb-3"><i class="bi bi-chat-left-dots-fill text-secondary me-1"></i>Notas</h6>
-            {% for nota in notas %}
-            <div class="border rounded px-3 py-2 mb-2 bg-light">
-                <p class="mb-1 small fst-italic text-muted">
-                    “{{ nota.comentario }}”
-                </p>
-                <small class="text-muted">
-                    <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name|title }} |
-                    <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
-                </small>
+            <!-- Notas del evento -->
+            <div class="mb-2">
+                <h6 class="mb-3">
+                    <i class="bi bi-chat-left-dots-fill text-secondary me-1"></i>
+                    Historial de notas
+                </h6>
+
+                {% if notas %}
+                    <div class="list-group">
+                        {% for nota in notas %}
+                        <div class="list-group-item bg-light border rounded mb-2">
+                            <p class="mb-1 small fst-italic text-muted">
+                                “{{ nota.comentario }}”
+                            </p>
+                            <small class="text-muted">
+                                <i class="bi bi-person-lines-fill"></i> {{ nota.creado_por.get_full_name|title }} |
+                                <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">Este evento aún no tiene notas registradas.</p>
+                {% endif %}
             </div>
-            {% empty %}
-            <p class="text-muted">Este evento aún no tiene notas registradas.</p>
-            {% endfor %}
 
             <!-- Formulario para nueva nota -->
+            <div class="bg-light border rounded p-3">
+                <h6 class="mb-2">
+                    <i class="bi bi-plus-circle"></i> Agregar una nueva nota
+                </h6>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        {{ nota_form.comentario }}
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-save"></i> Guardar nota
+                    </button>
+                </form>
+            </div>
+
             <hr>
-            <h6 class="mb-2"><i class="bi bi-plus-circle"></i> Agregar nueva nota</h6>
-            <form method="post">
-                {% csrf_token %}
-                {{ nota_form.comentario.label_tag }}
-                {{ nota_form.comentario }}
-                <button type="submit" class="btn btn-primary btn-sm mt-2">
-                    <i class="bi bi-save"></i> Guardar nota
-                </button>
-            </form>
+
+            <h6 class="mb-3"><i class="bi bi-clock-history"></i> Historial de cambios</h6>
+            {% if historial %}
+                <ul class="list-group mb-2">
+                    {% for cambio in historial %}
+                    <li class="list-group-item small d-flex justify-content-between align-items-start">
+                        <div>
+                            <i class="bi bi-arrow-left-right me-1 text-muted"></i>
+                            <strong>{{ cambio.get_cambio_display|default:cambio.cambio|capfirst }}</strong> cambiado de 
+                            <code>{{ cambio.valor_anterior|capfirst }}</code> a 
+                            <code>{{ cambio.valor_nuevo|capfirst }}</code>
+                        </div>
+                        <small class="text-muted text-end">
+                            <em>{{ cambio.usuario.get_full_name|default:"Usuario desconocido" }}</em><br>
+                            {{ cambio.fecha|date:"d/m/Y H:i" }}
+                        </small>
+                    </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted">No hay historial de cambios registrado aún.</p>
+            {% endif %}
+
+            <hr>
+
+            <!-- Sección de gestión del evento -->
+            <div class="bg-light border rounded px-3 py-3 mb-4">
+                <h6 class="mb-3"><i class="bi bi-tools me-1"></i> Gestión del evento</h6>
+                
+                <div class="alert alert-info small mt-3 mb-3 text-center" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    Use esta sección para modificar el estado o el tipo del evento si hubo cambios significativos en la situación.
+                </div>
+
+                <form method="post" class="row g-2">
+                    {% csrf_token %}
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Actualizar tipo de evento</label>
+                        <div class="input-group input-group-sm">
+                            {{ tipo_evento_form.tipo_evento }}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="tipo_evento">
+                                <i class="bi bi-arrow-repeat"></i>
+                                Actualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Actualizar estado</label>
+                        <div class="input-group input-group-sm">
+                            {{ estado_form.estado }}
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="estado">
+                                <i class="bi bi-arrow-repeat"></i>
+                                Actualizar
+                            </button>
+                        </div>
+                    </div>
+
+                </form>
+
+            </div>
+
         </div>
     </div>
 </div>
