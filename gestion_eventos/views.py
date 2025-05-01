@@ -87,15 +87,13 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
                 nota.save()
 
         elif 'estado' in request.POST:
-            estado_form = ActualizarEstadoEventoForm(request.POST)
+            estado_form = ActualizarEstadoEventoForm(request.POST, instance=self.object)
             if estado_form.is_valid():
-                self.object.estado = estado_form.cleaned_data['estado']
-                self.object.save(usuario=request.user)  # 👈 Registramos el usuario que hizo el cambio
+                estado_form.save(usuario=request.user)  # 👈 importante
 
         elif 'tipo_evento' in request.POST:
             tipo_evento_form = ActualizarTipoEventoForm(request.POST, instance=self.object)
             if tipo_evento_form.is_valid():
-                self.object = tipo_evento_form.save(commit=False)
-                self.object.save(usuario=request.user) # 👈 También lo registramos aquí
-        
+                tipo_evento_form.save(usuario=request.user)  # 👈 importante
+
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))

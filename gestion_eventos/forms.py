@@ -69,6 +69,12 @@ class ActualizarEstadoEventoForm(forms.ModelForm):
             'estado': 'Actualizar estado del evento'
         }
 
+    def save(self, commit=True, usuario=None):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save(usuario=usuario)
+        return instance
+
 class ActualizarTipoEventoForm(forms.ModelForm):
     class Meta:
         model = EventoServicio
@@ -79,3 +85,9 @@ class ActualizarTipoEventoForm(forms.ModelForm):
         labels = {
             'tipo_evento': 'Tipo de evento',
         }
+
+    def save(self, commit=True, usuario=None):
+        instance = super().save(commit=False)
+        if commit:
+            instance.save(usuario=usuario)
+        return instance

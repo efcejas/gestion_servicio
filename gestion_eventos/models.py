@@ -45,10 +45,9 @@ class EventoServicio(models.Model):
         return self.notas.order_by('-fecha').first()
 
     def save(self, *args, **kwargs):
-        # Detectar cambios en estado o tipo_evento
-        if self.pk:  # Solo si el objeto ya existe
+        usuario = kwargs.pop('usuario', None)
+        if self.pk:
             original = EventoServicio.objects.get(pk=self.pk)
-            usuario = kwargs.pop('usuario', None)  # Usuario que realiza el cambio
             if original.estado != self.estado:
                 HistorialEvento.objects.create(
                     evento=self,
