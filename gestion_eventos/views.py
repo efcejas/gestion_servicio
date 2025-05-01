@@ -68,7 +68,7 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['notas'] = self.object.notas.order_by('fecha')
+        context['notas'] = self.object.notas.order_by('-fecha')
         context['nota_form'] = NotaEventoForm()
         context['estado_form'] = ActualizarEstadoEventoForm(initial={'estado': self.object.estado})
         context['tipo_evento_form'] = ActualizarTipoEventoForm(initial={'tipo_evento': self.object.tipo_evento})
