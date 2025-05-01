@@ -79,13 +79,15 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
         print(request.POST)
         self.object = self.get_object()
 
-        if 'comentario' in request.POST:
+        if 'guardar_nota' in request.POST:  # Cambiado de 'comentario' a 'guardar_nota'
             nota_form = NotaEventoForm(request.POST)
             if nota_form.is_valid():
                 nota = nota_form.save(commit=False)
                 nota.evento = self.object
                 nota.creado_por = request.user
                 nota.save()
+            else:
+                print(nota_form.errors)  # Muestra los errores del formulario
 
         elif 'estado' in request.POST:
             estado_form = ActualizarEstadoEventoForm(request.POST, instance=self.object)
