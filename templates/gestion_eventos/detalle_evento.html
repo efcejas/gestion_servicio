@@ -67,6 +67,9 @@
             </form> -->
             <div class="bg-light border rounded px-3 py-2 mb-3">
                 <p class="mb-2 mt-3">{{ evento.descripcion }}</p>
+                {% if evento.estudio_relacionado %}
+                <p class="mt-3 mb-3 small">Estudio solicitado: <strong>{{ evento.estudio_relacionado }}</strong></p>
+                {% endif %}
                 <p class="text-muted mb-3 mt-4 text-end">
                     <i class="bi bi-clock-history"></i> Registrado por <em>{{ evento.creado_por.get_full_name|title }}</em>
                     el {{ evento.fecha_creacion|date:"d/m/Y H:i" }}
