@@ -10,6 +10,13 @@
                 <i class="bi bi-arrow-left"></i> Volver a la lista
             </a>
         </div>
+        {% if messages %}
+            <div class="alert alert-info">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+        {% endif %}
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-12 col-md-6 mb-2 mb-md-0">
@@ -105,7 +112,7 @@
                     <div class="mb-2">
                         {{ nota_form.comentario }}
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm">
+                    <button type="submit" class="btn btn-primary btn-sm" name="comentario">
                         <i class="bi bi-save"></i> Guardar nota
                     </button>
                 </form>
@@ -153,7 +160,7 @@
                         <label class="form-label small fw-semibold">Actualizar tipo de evento</label>
                         <div class="input-group input-group-sm">
                             {{ tipo_evento_form.tipo_evento }}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="tipo_evento">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_tipo_evento">
                                 <i class="bi bi-arrow-repeat"></i>
                                 Actualizar
                             </button>
@@ -164,7 +171,7 @@
                         <label class="form-label small fw-semibold">Actualizar estado</label>
                         <div class="input-group input-group-sm">
                             {{ estado_form.estado }}
-                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="estado">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" name="actualizar_estado">
                                 <i class="bi bi-arrow-repeat"></i>
                                 Actualizar
                             </button>

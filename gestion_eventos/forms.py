@@ -43,6 +43,7 @@ class EventoServicioForm(forms.ModelForm):
             ),
         }
 
+
 class NotaEventoForm(forms.ModelForm):
     class Meta:
         model = NotaEvento
@@ -58,6 +59,7 @@ class NotaEventoForm(forms.ModelForm):
             'comentario': 'Comentario'
         }
 
+
 class ActualizarEstadoEventoForm(forms.ModelForm):
     class Meta:
         model = EventoServicio
@@ -71,9 +73,12 @@ class ActualizarEstadoEventoForm(forms.ModelForm):
 
     def save(self, commit=True, usuario=None):
         instance = super().save(commit=False)
-        if commit:
-            instance.save(usuario=usuario)
+        if usuario:
+            instance.save(usuario=usuario)  # Pasa el usuario al método save del modelo
+        elif commit:
+            instance.save()  # Guarda normalmente si no se pasa usuario
         return instance
+
 
 class ActualizarTipoEventoForm(forms.ModelForm):
     class Meta:
@@ -88,6 +93,8 @@ class ActualizarTipoEventoForm(forms.ModelForm):
 
     def save(self, commit=True, usuario=None):
         instance = super().save(commit=False)
-        if commit:
-            instance.save(usuario=usuario)
+        if usuario:
+            instance.save(usuario=usuario)  # Pasa el usuario al método save del modelo
+        elif commit:
+            instance.save()  # Guarda normalmente si no se pasa usuario
         return instance
