@@ -7,12 +7,26 @@ class PedidoEstudio(models.Model):
         ('en_proceso', 'En proceso'),
         ('realizado', 'Realizado'),
     ]
+    
+    MODALIDAD_CHOICES = [
+        ('TC', 'Tomografía Computada'),
+        ('RM', 'Resonancia Magnética'),
+        ('ECO', 'Ecografía'),
+    ]
+    
+    PRIORIDAD_CHOICES = [
+        ('urgente', 'Urgente'),
+        ('media', 'Media'),
+        ('baja', 'Baja'),
+    ]
 
     nombre_paciente = models.CharField(max_length=100)
     dni_paciente = models.CharField(max_length=20, blank=True, null=True)
+    modalidad = models.CharField(max_length=3, choices=MODALIDAD_CHOICES, default='TC')
     tipo_estudio = models.CharField(max_length=150)
     sector_solicitante = models.CharField(max_length=100)
     medico_solicitante = models.CharField(max_length=100, blank=True, null=True)
+    prioridad = models.CharField(max_length=10, choices=PRIORIDAD_CHOICES, default='media')
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='pendiente')
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -30,3 +44,4 @@ class PedidoEstudioNota(models.Model):
 
     def __str__(self):
         return f"Nota de {self.creado_por} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
+    

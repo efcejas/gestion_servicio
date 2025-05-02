@@ -124,16 +124,21 @@
             {% if historial %}
                 <ul class="list-group mb-2">
                     {% for cambio in historial %}
-                    <li class="list-group-item small d-flex justify-content-between align-items-start">
+                    <li class="list-group-item small d-flex flex-column flex-md-row justify-content-between align-items-start">
                         <div>
                             <i class="bi bi-arrow-left-right me-1 text-muted"></i>
-                            <strong>{{ cambio.get_cambio_display|default:cambio.cambio|capfirst }}</strong> cambiado de 
+                            {% if cambio.cambio == "estado" %}
+                                <strong>Estado</strong> cambiado de 
+                            {% elif cambio.cambio == "tipo_evento" %}
+                                <strong>Tipo de evento</strong> cambiado de 
+                            {% else %}
+                                <strong>{{ cambio.get_cambio_display }}</strong> cambiado de 
+                            {% endif %}
                             <code>{{ cambio.valor_anterior|capfirst }}</code> a 
                             <code>{{ cambio.valor_nuevo|capfirst }}</code>
                         </div>
-                        <small class="text-muted text-end">
-                            <em>{{ cambio.usuario.get_full_name|default:"Usuario desconocido" }}</em><br>
-                            {{ cambio.fecha|date:"d/m/Y H:i" }}
+                        <small class="text-muted text-end align-self-end">
+                            <em>{{ cambio.usuario.get_full_name|default:"Usuario desconocido" }}</em> {{ cambio.fecha|date:"d/m/Y H:i" }}
                         </small>
                     </li>
                     {% endfor %}
@@ -174,7 +179,7 @@
                     </div>
 
                     <!-- Contenedor para actualizar estado -->
-                    <div class="col-md-6">
+                    <div class="col-md-6 mt-3 mt-md-0">
                         <div class="bg-white border rounded p-3">
                             <h6 class="mb-2"><i class="bi bi-pencil-square"></i> Actualizar estado</h6>
                             <form method="post" class="row g-2">
