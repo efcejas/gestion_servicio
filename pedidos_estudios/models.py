@@ -32,6 +32,24 @@ class PedidoEstudio(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_recepcion = models.DateTimeField(blank=True, null=True)
     fecha_realizacion = models.DateTimeField(blank=True, null=True)
+    
+    def save(self, *args, **kwargs):
+        usuario = kwargs.pop('usuario', None)  # Extraer el usuario si se pasa
+        valor_anterior = None
+    
+        if self.pk:  # Si el objeto ya existe en la base de datos
+            valor_anterior = PedidoEstudio.objects.get(pk=self.pk).estado
+    
+        super().save(*args, **kwargs)  # Guardar el nuevo estado
+    
+        if usuario and valor_anterior != self.estado:  # Registrar solo si hubo un cambio
+            HistorialPedidoEstudio.objects.create(
+                pedido=self,
+                usuario=usuario,
+                cambio='estado',
+                valor_anterior=valor_anterior,
+                valor_nuevo=self.estado,
+            )
 
     def __str__(self):
         return f"{self.nombre_paciente} - {self.tipo_estudio} ({self.get_estado_display()})"
@@ -44,4 +62,31 @@ class PedidoEstudioNota(models.Model):
 
     def __str__(self):
         return f"Nota de {self.creado_por} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
-    
+
+class HistorialPedidoEstudio(models.Model):
+    TIPO_CAMBIO_CHOICES = [
+        ('estado', 'Cambio de estado'),
+        ('prioridad', 'Cambio de prioridad'),
+        ('modalidad', 'Cambio de modalidad'),
+        ('visualizacion', 'Visualización del pedido'),
+        ('otro', 'Otro cambio'),
+    ]
+
+    pedido = models.ForeignKey(PedidoEstudio, on_delete=models.CASCADE, related_name='historial')
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_pedidos'
+    )
+    fecha = models.DateTimeField(auto_now_add=True)
+    cambio = models.CharField(max_length=50, choices=TIPO_CAMBIO_CHOICES)
+    valor_anterior = models.CharField(max_length=100, blank=True, null=True)
+    valor_nuevo = models.CharField(max_length=100, blank=True, null=True)
+    es_visualizacion = models.BooleanField(default=False)
+
+    def __str__(self):
+        if self.es_visualizacion:
+            return f"Visualizado por {self.usuario} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
+        return f"{self.get_cambio_display()} por {self.usuario} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PedidoEstudio, PedidoEstudioNota
+from .models import PedidoEstudio, PedidoEstudioNota, HistorialPedidoEstudio
 
 class PedidoEstudioNotaInline(admin.TabularInline):
     model = PedidoEstudioNota
@@ -26,3 +26,11 @@ class PedidoEstudioNotaAdmin(admin.ModelAdmin):
     search_fields = ('comentario',)
     list_filter = ('creado_por', 'fecha')
     ordering = ('-fecha',)
+
+@admin.register(HistorialPedidoEstudio)
+class HistorialPedidoEstudioAdmin(admin.ModelAdmin):
+    list_display = ('pedido', 'usuario', 'cambio', 'fecha', 'es_visualizacion')
+    list_filter = ('cambio', 'es_visualizacion', 'fecha', 'usuario')
+    search_fields = ('pedido__nombre_paciente', 'usuario__username', 'valor_anterior', 'valor_nuevo')
+    ordering = ('-fecha',)
+    readonly_fields = ('pedido', 'usuario', 'fecha', 'cambio', 'valor_anterior', 'valor_nuevo', 'es_visualizacion')

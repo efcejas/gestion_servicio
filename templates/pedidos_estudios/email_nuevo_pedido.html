@@ -1,0 +1,13 @@
+<p>Se ha registrado un nuevo pedido de estudio en el sistema.</p>
+
+<ul>
+  <li><strong>🧑 Paciente:</strong> {{ pedido.nombre_paciente }} (DNI: {{ pedido.dni_paciente|default:"no informado" }})</li>
+  <li><strong>📄 Estudio solicitado:</strong> {{ pedido.tipo_estudio }}</li>
+  <li><strong>🧪 Modalidad:</strong> {{ pedido.get_modalidad_display }}</li>
+  <li><strong>🏥 Sector solicitante:</strong> {{ pedido.sector_solicitante }}</li>
+  <li><strong>👨‍⚕️ Médico solicitante:</strong> {{ pedido.medico_solicitante|default:"no informado" }}</li>
+  <li><strong>⚠️ Prioridad:</strong> {{ pedido.get_prioridad_display }}</li>
+  <li><strong>📅 Fecha de solicitud:</strong> {{ pedido.fecha_creacion|date:"d/m/Y H:i" }}</li>
+</ul>
+
+<p>Por favor, ingrese al sistema para gestionar este pedido.</p>

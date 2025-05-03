@@ -1,0 +1,150 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}Detalle del Pedido{% endblock %}
+
+{% block content %}
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    {% if messages %}
+        {% for message in messages %}
+        <div class="toast align-items-center text-bg-{{ message.tags }} border-0" role="alert" aria-live="assertive" aria-atomic="true" data-bs-autohide="true" data-bs-delay="3000">
+            <div class="d-flex">
+                <div class="toast-body">
+                    {{ message }}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>
+<div class="container mt-4 mb-5">
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">Detalle del pedido</h5>
+      <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-light btn-sm">
+        <i class="bi bi-arrow-left"></i> Volver a la lista
+      </a>
+    </div>
+
+    <div class="card-body">
+
+      <!-- Detalles del pedido -->
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <p><strong>Paciente:</strong> {{ pedido.nombre_paciente }} {% if pedido.dni_paciente %}- DNI: {{ pedido.dni_paciente }}{% endif %}</p>
+          <p><strong>Modalidad:</strong> {{ pedido.get_modalidad_display }}</p>
+          <p><strong>Tipo de estudio:</strong> {{ pedido.tipo_estudio }}</p>
+        </div>
+        <div class="col-md-6">
+          <p><strong>Sector solicitante:</strong> {{ pedido.sector_solicitante }}</p>
+          <p><strong>Médico solicitante:</strong> {{ pedido.medico_solicitante|default:"No informado" }}</p>
+          <p>
+            <strong>Prioridad:</strong> 
+            <span class="badge bg-secondary">{{ pedido.get_prioridad_display }}</span>
+          </p>
+          <p>
+            <strong>Estado:</strong> 
+            <span class="badge 
+              {% if pedido.estado == 'pendiente' %}bg-warning text-dark
+              {% elif pedido.estado == 'en_proceso' %}bg-info
+              {% elif pedido.estado == 'realizado' %}bg-success
+              {% else %}bg-secondary{% endif %}">
+              {{ pedido.get_estado_display }}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- Notas -->
+      <div class="mb-4">
+        <h6><i class="bi bi-chat-left-dots-fill me-1"></i> Comentarios registrados</h6>
+        {% if notas %}
+          <ul class="list-group">
+            {% for nota in notas %}
+            <li class="list-group-item small">
+              <p class="mb-1 fst-italic text-muted">“{{ nota.comentario }}”</p>
+              <small class="text-muted">
+                <i class="bi bi-person-fill"></i> {{ nota.creado_por.get_full_name|default:nota.creado_por.username }} |
+                <i class="bi bi-clock"></i> {{ nota.fecha|date:"d/m/Y H:i" }}
+              </small>
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted small">Este pedido aún no tiene comentarios registrados.</p>
+        {% endif %}
+      </div>
+
+      <!-- Formulario para agregar nota -->
+      <div class="bg-light border rounded p-3 mb-4">
+        <h6 class="mb-2"><i class="bi bi-pencil-square me-1"></i> Agregar nuevo comentario</h6>
+        <form method="post">
+          {% csrf_token %}
+          {{ nota_form.comentario }}
+          <button type="submit" class="btn btn-sm btn-primary mt-2">
+            <i class="bi bi-save me-1"></i> Guardar comentario
+          </button>
+        </form>
+      </div>
+
+      <hr>
+
+      <!-- Formulario de actualización de estado -->
+      <div class="bg-light border rounded p-3 mb-4">
+        <h6 class="mb-2"><i class="bi bi-arrow-repeat me-1"></i> Actualizar estado del pedido</h6>
+        <form method="post">
+            {% csrf_token %}
+            <div class="input-group input-group-sm">
+                {{ estado_form.estado }}
+                <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" name="actualizar_estado">
+                    <i class="bi bi-arrow-up-circle"></i> Actualizar
+                </button>                
+            </div>
+        </form>
+      </div>
+
+      <hr>
+
+      <!-- Historial -->
+      <div class="mb-2">
+        <h6><i class="bi bi-clock-history me-1"></i> Historial</h6>
+        {% if historial %}
+          <ul class="list-group">
+            {% for h in historial %}
+              <li class="list-group-item small d-flex justify-content-between align-items-start">
+                <div>
+                  {% if h.cambio == 'visualizacion' %}
+                    <i class="bi bi-eye text-info me-1"></i> 
+                    Visualizado por <strong>{{ h.usuario.get_full_name|default:"Usuario" }}</strong>
+                  {% else %}
+                    <i class="bi bi-arrow-left-right text-muted me-1"></i>
+                    <strong>{{ h.get_cambio_display }}</strong> de 
+                    <code>{{ h.valor_anterior }}</code> a <code>{{ h.valor_nuevo }}</code>
+                  {% endif %}
+                </div>
+                <small class="text-muted text-end">
+                  {{ h.fecha|date:"d/m/Y H:i" }}
+                </small>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted small">No hay historial registrado.</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+        var toastList = toastElList.map(function (toastEl) {
+            return new bootstrap.Toast(toastEl);
+        });
+        toastList.forEach(toast => toast.show());
+    });
+</script>
+{% endblock %}
