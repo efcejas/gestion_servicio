@@ -33,7 +33,7 @@
         <div class="col-md-6">
           <p><strong>Paciente:</strong> {{ pedido.nombre_paciente }} {% if pedido.dni_paciente %}- DNI: {{ pedido.dni_paciente }}{% endif %}</p>
           <p><strong>Modalidad:</strong> {{ pedido.get_modalidad_display }}</p>
-          <p><strong>Tipo de estudio:</strong> {{ pedido.tipo_estudio }}</p>
+          <p><strong>Estudio solicitado:</strong> {{ pedido.tipo_estudio }}</p>
         </div>
         <div class="col-md-6">
           <p><strong>Sector solicitante:</strong> {{ pedido.sector_solicitante }}</p>
@@ -126,7 +126,7 @@
                   {% endif %}
                 </div>
                 <small class="text-muted text-end">
-                  {{ h.fecha|date:"d/m/Y H:i" }}
+                <i class="bi bi-person-fill"></i> <em>{{ h.usuario.get_full_name|default:"Usuario" }} </em> {{ h.fecha|date:"d/m/Y H:i" }}
                 </small>
               </li>
             {% endfor %}

@@ -1,8 +1,9 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
+from django.shortcuts import redirect
 from django.template.loader import render_to_string
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, FormMixin
@@ -61,7 +62,7 @@ class PedidoEstudioDetailView(LoginRequiredMixin, FormMixin, DetailView):
                 messages.error(request, "No se pudo actualizar el estado. Verifica los datos ingresados.")
                 print(estado_form.errors)  # Imprime los errores del formulario en la consola
 
-        return self.get(request, *args, **kwargs)
+        return redirect(reverse('pedidos_estudios:detalle_pedido', kwargs={'pk': self.object.pk}))
 
 class PedidoEstudioListView(LoginRequiredMixin, ListView):
     model = PedidoEstudio

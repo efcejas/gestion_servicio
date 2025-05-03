@@ -26,7 +26,7 @@ class PedidoEstudioForm(forms.ModelForm):
             'nombre_paciente': 'Nombre y Apellido del Paciente',
             'dni_paciente': 'DNI del Paciente',
             'modalidad': 'Modalidad',
-            'tipo_estudio': 'Tipo de Estudio',
+            'tipo_estudio': 'Estudio Solicitado',
             'sector_solicitante': 'Sector Solicitante',
             'medico_solicitante': 'Médico Solicitante',
             'prioridad': 'Prioridad',
@@ -36,7 +36,7 @@ class PedidoEstudioForm(forms.ModelForm):
             'dni_paciente': 'Ingrese el DNI del paciente (opcional).',
             'modalidad': 'Seleccione la modalidad del estudio.',
             'tipo_estudio': 'Ingrese el tipo de estudio solicitado.',
-            'sector_solicitante': 'Ingrese el sector que solicita el estudio.',
+            'sector_solicitante': 'Ingrese a qué sector pertenece la solicitud. Por ejemplo: Habitación 345, UTI 212, Guardia, etc.',
             'medico_solicitante': 'Ingrese el nombre del médico solicitante (opcional).',
             'prioridad': 'Seleccione la prioridad del estudio.',
         }
