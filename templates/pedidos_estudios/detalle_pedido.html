@@ -121,7 +121,8 @@
                   {% else %}
                     <i class="bi bi-arrow-left-right text-muted me-1"></i>
                     <strong>{{ h.get_cambio_display }}</strong> de 
-                    <code>{{ h.valor_anterior }}</code> a <code>{{ h.valor_nuevo }}</code>
+                    <code>{{ h.get_valor_anterior_display }}</code> a 
+                    <code>{{ h.get_valor_nuevo_display }}</code>
                   {% endif %}
                 </div>
                 <small class="text-muted text-end">

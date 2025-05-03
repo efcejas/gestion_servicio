@@ -86,7 +86,16 @@ class HistorialPedidoEstudio(models.Model):
     valor_nuevo = models.CharField(max_length=100, blank=True, null=True)
     es_visualizacion = models.BooleanField(default=False)
 
-    def __str__(self):
-        if self.es_visualizacion:
-            return f"Visualizado por {self.usuario} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
-        return f"{self.get_cambio_display()} por {self.usuario} el {self.fecha.strftime('%d/%m/%Y %H:%M')}"
+    def get_valor_anterior_display(self):
+        """Convierte el valor anterior en su representación legible."""
+        if self.cambio == 'estado':
+            estado_dict = dict(PedidoEstudio.ESTADO_CHOICES)
+            return estado_dict.get(self.valor_anterior, self.valor_anterior)
+        return self.valor_anterior
+
+    def get_valor_nuevo_display(self):
+        """Convierte el valor nuevo en su representación legible."""
+        if self.cambio == 'estado':
+            estado_dict = dict(PedidoEstudio.ESTADO_CHOICES)
+            return estado_dict.get(self.valor_nuevo, self.valor_nuevo)
+        return self.valor_nuevo
