@@ -2,24 +2,118 @@
 {% block title %}Nuevo pedido{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h4 class="mb-4">Registrar nuevo pedido de estudio</h4>
-    <form method="post">
-        {% csrf_token %}
-        {{ form.non_field_errors }}
-        {% for field in form %}
-            <div class="mb-3">
-                {{ field.label_tag }}
-                {{ field }}
-                {% if field.help_text %}
-                    <small class="form-text text-muted">{{ field.help_text }}</small>
-                {% endif %}
-                {% for error in field.errors %}
-                    <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-            </div>
-        {% endfor %}
-        <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Crear pedido</button>
-    </form>
+
+<div class="container mt-4 mb-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Registrar nuevo pedido</h5>
+            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-light btn-sm">
+                <i class="bi bi-arrow-left"></i> Volver a la lista
+            </a>
+        </div>
+        <div class="card-body">
+            <p class="text-muted h6">Complete el siguiente formulario para registrar un nuevo pedido de estudio.</p>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    {{ form.non_field_errors }}
+                    {% for error in form.non_field_errors %}
+                        <div class="text-danger small">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="d-flex flex-column flex-md-row justify-content-start gap-1 gap-md-4">
+
+                    <div class="mb-3">
+                        {{ form.nombre_paciente.label_tag }}
+                        {{ form.nombre_paciente }}
+                        {% if form.nombre_paciente.errors %}
+                            <div class="text-danger small">
+                                {{ form.nombre_paciente.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.nombre_paciente.help_text }}</small>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.dni_paciente.label_tag }}
+                        {{ form.dni_paciente }}
+                        {% if form.dni_paciente.errors %}
+                            <div class="text-danger small">
+                                {{ form.dni_paciente.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.dni_paciente.help_text }}</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.modalidad.label_tag }}
+                        {{ form.modalidad }}
+                        {% if form.modalidad.errors %}
+                            <div class="text-danger small">
+                                {{ form.modalidad.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.modalidad.help_text }}</small>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex flex-column flex-md-row justify-content-start gap-1 gap-md-4">
+                    <div class="mb-3">
+                        {{ form.medico_solicitante.label_tag }}
+                        {{ form.medico_solicitante }}
+                        {% if form.medico_solicitante.errors %}
+                            <div class="text-danger small">
+                                {{ form.medico_solicitante.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.medico_solicitante.help_text }}</small>
+                    </div>
+                    
+                    <div class="flex-fill mb-3">
+                        {{ form.tipo_estudio.label_tag }}
+                        {{ form.tipo_estudio }}
+                        {% if form.tipo_estudio.errors %}
+                            <div class="text-danger small">
+                                {{ form.tipo_estudio.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.tipo_estudio.help_text }}</small>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-flex flex-column flex-md-row justify-content-start gap-1 gap-md-4">
+                    <div class="mb-3">
+                        {{ form.sector_solicitante.label_tag }}
+                        {{ form.sector_solicitante }}
+                        {% if form.sector_solicitante.errors %}
+                            <div class="text-danger small">
+                                {{ form.sector_solicitante.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.sector_solicitante.help_text }}</small>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.prioridad.label_tag }}
+                        {{ form.prioridad }}
+                        {% if form.prioridad.errors %}
+                            <div class="text-danger small">
+                                {{ form.prioridad.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <small class="form-text text-muted">{{ form.prioridad.help_text }}</small>
+                    </div>
+                </div>
+            
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Crear pedido</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
