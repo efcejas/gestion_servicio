@@ -104,9 +104,23 @@
                     <li class="nav-item">
                         <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
                     </li>
+                    {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
                     </li>
+                    {% endif %}
+                    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarPedidosDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                            Gestión de pedidos
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarPedidosDropdown">
+                            <li><a class="dropdown-item" href="{% url 'pedidos_estudios:crear_pedido' %}">Nuevo pedido</a></li>
+                            <li><a class="dropdown-item" href="{% url 'pedidos_estudios:lista_pedidos' %}">Ver todos los pedidos</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
                     {% if user|has_group:'Médicos de staff - informes' %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'registroestudios_nuevo' %}">Registrar estudios</a>

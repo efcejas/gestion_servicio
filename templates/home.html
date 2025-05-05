@@ -105,49 +105,88 @@
 </div>
 {% endif %}
 {% if user.is_authenticated and not user.is_superuser %}
-<div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0"
-    style="background-color: #e3f3fa; border-radius: 0;" role="alert">
-    <div class="d-flex flex-column flex-md-row align-items-center p-3">
-        <!-- Ícono -->
-        <div class="me-md-4 mb-3 mb-md-0">
-            <i class="fa fa-user-circle fa-3x" style="color: #0468bf;"></i>
-        </div>
+    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+        <div class="container-fluid mt-4">
+            <div class="row g-4 justify-content-center">
+                <!-- Tarjeta 1: Crear nuevo pedido -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-primary"><i class="bi bi-plus-circle me-2"></i>Nuevo pedido</h5>
+                                <p class="card-text">Solicitá un nuevo estudio desde el formulario guiado.</p>
+                            </div>
+                            <a href="{% url 'pedidos_estudios:crear_pedido' %}" class="btn btn-primary mt-3">
+                                <i class="bi bi-plus-circle"></i> Solicitar estudio
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Mensaje -->
-        <div class="flex-grow-1 text-center text-md-start">
-            <h4 class="fw-bold mb-2" style="color: #03396c;">¡Hola, {{ user.first_name }}!</h4>
-            {% if user|has_group:'Médicos de staff' %}
-            <p class="text-muted mb-3 mb-md-0">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar
-                con nosotros!</p>
-            {% elif user|has_group:'Médicos de staff - informes' %}
-            <p class="text-muted mb-3 mb-md-0">Aquí podrás registrar nuevos estudios y procedimientos. ¡Gracias por
-                estar con nosotros!</p>
-            {% else %}
-            <p class="text-muted mb-3 mb-md-0">Esta es la plataforma interna del servicio de imágenes donde contaremos con la comunicación de las novedades. ¡Gracias por estar con nosotros!</p>
-            {% endif %}
-        </div>
+                <!-- Tarjeta 2: Lista de pedidos -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-secondary"><i class="bi bi-list-task me-2"></i>Estudios solicitados</h5>
+                                <p class="card-text">Consultá todos los estudios solicitados y su estado actual.</p>
+                            </div>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-outline-secondary mt-3">
+                                <i class="bi bi-list"></i> Ver lista
+                            </a>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Botones de Acción -->
-        <!--  <div class="d-flex gap-2">
-            <a href="#" class="btn btn-sm" style="background-color: #0468bf; color: white;">Mis procedimientos</a>
-            <a href="#" class="btn btn-outline-primary btn-sm" style="border-color: #0468bf; color: #0468bf;">Obtener ayuda</a>
-        </div> -->
-    </div>
-</div>
-<div class="container alert alert-warning mt-5" role="alert">
-    <h5 class="alert-heading">Página en desarrollo</h5>
-    <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
-    <p class="mb-0">
-        {% if user|has_group:'Médicos de staff' %}
-        Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios
-            registrados</a>.
-        {% elif user|has_group:'Médicos de staff - informes' %}
-        Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo
-            estudio</a>.
-        {% else %}
-        En breve podrás acceder a otras funcionalidades.
-        {% endif %}
-    </p>
-</div>
+                <!-- Tarjeta 3: Ayuda o contacto (opcional) -->
+                <!-- <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border-0 h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-info"><i class="bi bi-question-circle me-2"></i>Soporte</h5>
+                                <p class="card-text">¿Necesitás ayuda o querés reportar un problema?</p>
+                            </div>
+                            <a href="#" class="btn btn-outline-info mt-3 disabled">
+                                En desarrollo
+                            </a>
+                        </div>
+                    </div>
+                </div> -->
+            </div>
+        </div>
+    {% else %}
+        <!-- Cartel para otros usuarios autenticados -->
+        <div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0"
+            style="background-color: #e3f3fa; border-radius: 0;" role="alert">
+            <div class="d-flex flex-column flex-md-row align-items-center p-3">
+                <div class="me-md-4 mb-3 mb-md-0">
+                    <i class="fa fa-user-circle fa-3x" style="color: #0468bf;"></i>
+                </div>
+                <div class="flex-grow-1 text-center text-md-start">
+                    <h4 class="fw-bold mb-2" style="color: #03396c;">¡Hola, {{ user.first_name }}!</h4>
+                    {% if user|has_group:'Médicos de staff' %}
+                    <p class="text-muted mb-3 mb-md-0">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+                    {% elif user|has_group:'Médicos de staff - informes' %}
+                    <p class="text-muted mb-3 mb-md-0">Aquí podrás registrar nuevos estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+                    {% else %}
+                    <p class="text-muted mb-3 mb-md-0">Esta es la plataforma interna del servicio de imágenes donde contaremos con la comunicación de las novedades. ¡Gracias por estar con nosotros!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="container alert alert-warning mt-5" role="alert">
+            <h5 class="alert-heading">Página en desarrollo</h5>
+            <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
+            <p class="mb-0">
+                {% if user|has_group:'Médicos de staff' %}
+                Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a>.
+                {% elif user|has_group:'Médicos de staff - informes' %}
+                Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo estudio</a>.
+                {% else %}
+                En breve podrás acceder a otras funcionalidades.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
 {% endif %}
 {% endblock %}
