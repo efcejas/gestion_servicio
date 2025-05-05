@@ -1,5 +1,6 @@
 {% extends "layouts/base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}Detalle del Pedido{% endblock %}
 
 {% block content %}
@@ -89,6 +90,7 @@
     </form>
     </div>
 
+    {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
     <hr>
 
     <!-- Formulario de actualización de estado -->
@@ -104,6 +106,7 @@
       </div>
     </form>
     </div>
+    {% endif %}
 
     <hr>
 
