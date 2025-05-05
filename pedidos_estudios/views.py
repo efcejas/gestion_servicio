@@ -108,7 +108,7 @@ class PedidoEstudioCreateView(CreateView):
             subject,
             cuerpo_texto,
             None,  # Reemplazá con tu mail remitente si hace falta
-            ['efccejas@hotmail.com'],     # Cambiá esto por el mail real del área administrativa
+            ['analia.fernandez@dupuytren.com.ar'],     # Cambiá esto por el mail real del área administrativa
             fail_silently=False,
         )
 
