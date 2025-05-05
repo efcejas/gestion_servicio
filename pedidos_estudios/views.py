@@ -72,7 +72,20 @@ class PedidoEstudioListView(LoginRequiredMixin, ListView):
     paginate_by = 10  # Opcional: para paginación
 
     def get_queryset(self):
-        return PedidoEstudio.objects.select_related().order_by('-fecha_creacion')
+        queryset = PedidoEstudio.objects.all().order_by('-fecha_creacion')
+
+        estado = self.request.GET.get('estado')
+        prioridad = self.request.GET.get('prioridad')
+        modalidad = self.request.GET.get('modalidad')
+
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if prioridad:
+            queryset = queryset.filter(prioridad=prioridad)
+        if modalidad:
+            queryset = queryset.filter(modalidad=modalidad)
+
+        return queryset
 
 class PedidoEstudioCreateView(CreateView):
     model = PedidoEstudio

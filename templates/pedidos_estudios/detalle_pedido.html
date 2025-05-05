@@ -45,8 +45,8 @@
           <p>
             <strong>Estado:</strong> 
             <span class="badge 
-              {% if pedido.estado == 'pendiente' %}bg-warning text-dark
-              {% elif pedido.estado == 'en_proceso' %}bg-info
+              {% if pedido.estado == 'pendiente' %}bg-primary
+              {% elif pedido.estado == 'en_proceso' %}bg-info text-dark
               {% elif pedido.estado == 'realizado' %}bg-success
               {% else %}bg-secondary{% endif %}">
               {{ pedido.get_estado_display }}
