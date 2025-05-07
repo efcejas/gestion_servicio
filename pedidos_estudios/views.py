@@ -107,8 +107,7 @@ class PedidoEstudioCreateView(CreateView):
         send_mail(
             subject,
             cuerpo_texto,
-            None,  # Reemplazá con tu mail remitente si hace falta
-            ['analia.fernandez@dupuytren.com.ar'],     # Cambiá esto por el mail real del área administrativa
+            ['analia.fernandez@dupuytren.com.ar', 'imagenes.dupuytren@galenoargentina.com.ar'],  # Lista de correos
             fail_silently=False,
         )
 
