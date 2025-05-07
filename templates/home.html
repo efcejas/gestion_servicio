@@ -155,8 +155,8 @@
             </div>
         </div>
     {% else %}
-                <!-- Cartel para otros usuarios autenticados -->
-        <div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0"
+        <!-- Cartel para otros usuarios autenticados -->
+        <div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0 d-flex justify-content-center"
             style="background-color: #e3f3fa; border-radius: 0;" role="alert">
             <div class="d-flex flex-column flex-md-row align-items-center p-3">
                 <div class="me-md-4 mb-3 mb-md-0">
@@ -177,7 +177,7 @@
         
         <!-- Mostrar alerta solo si el usuario tiene cargo administrativo o jefe administrativo -->
         {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
-        <!-- Tarjetas con resúmenes de novedades -->
+        <!-- Tarjetas de gestión de eventos -->
         <div class="container mt-5 mb-4">
             <div class="row g-4 justify-content-center">
                 <div class="col-md-4">
@@ -210,6 +210,34 @@
                             <a href="{% url 'gestion_eventos:evento_nuevo' %}" class="btn btn-warning text-dark">
                                 <i class="bi bi-exclamation-triangle"></i> Registrar 
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
+        <!-- Tarjetas de gestión de eventos para técnicos radiólogos y jefe técnico -->
+        <div class="container mt-0 mt-md-4 mb-4">       
+            <div class="row g-4 justify-content-start">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="bi bi-bell me-2"></i>Novedades</h5>
+                            <p class="card-text">Consulta las últimas novedades del servicio registradas en el sistema.</p>
+                            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-primary">
+                                <i class="bi bi-list-task"></i> Ver novedades
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-success"><i class="bi bi-file-earmark-text me-2"></i>Estudios pendientes</h5>
+                            <p class="card-text">Consulta las solicitudes pendientes de los estudios a realizar.</p>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-success">
+                                <i class="bi bi-file-earmark-text"></i> Ver pendientes
+                            </a>   
                         </div>
                     </div>
                 </div>

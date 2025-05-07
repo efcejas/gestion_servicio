@@ -108,6 +108,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'pedidos_estudios:lista_pedidos' %}">Estudios solicitados</a>
+                    </li>
                     {% endif %}
                     {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
                     <li class="nav-item dropdown">
@@ -137,6 +140,7 @@
                         <a class="nav-link" href="{% url 'mis_procedimientos' %}">Mis registros</a> 
                     </li>
                     {% endif %}
+                    <!-- Opciones para usuarios con permisos de superusuario -->
                     {% if user.is_superuser %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
