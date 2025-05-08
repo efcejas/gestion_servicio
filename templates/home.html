@@ -175,7 +175,6 @@
             </div>
         </div>
         
-        <!-- Mostrar alerta solo si el usuario tiene cargo administrativo o jefe administrativo -->
         {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
         <!-- Tarjetas de gestión de eventos -->
         <div class="container mt-5 mb-4">
@@ -218,7 +217,7 @@
         {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
         <!-- Tarjetas de gestión de eventos para técnicos radiólogos y jefe técnico -->
         <div class="container mt-0 mt-md-4 mb-4">       
-            <div class="row g-4 justify-content-start">
+            <div class="row g-4 justify-content-center">
                 <div class="col-md-4">
                     <div class="card shadow-sm border h-100">
                         <div class="card-body">
@@ -263,7 +262,7 @@
                         <div class="card-body">
                             <h5 class="card-title text-secondary"><i class="bi bi-list-task me-2"></i>Estudios registrados</h5>
                             <p class="card-text">Consulta todos los estudios que has registrado.</p>
-                            <a href="{% url 'registroestudios_list' %}" class="btn btn-secondary">
+                            <a href="{% url 'registroestudios_lista' %}" class="btn btn-secondary">
                                 <i class="bi bi-list"></i> Ver lista
                             </a>
                         </div>
@@ -276,24 +275,19 @@
                             <p class="card-text">Consulta las últimas novedades del servicio registradas en el sistema.</p>
                             <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-primary">
                                 <i class="bi bi-list-task"></i> Ver novedades
-                            </a>   
+                            </a>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         {% else %}
+        <!-- Mensaje de desarrollo para otros usuarios -->
         <div class="container alert alert-warning mt-5" role="alert">
             <h5 class="alert-heading">Página en desarrollo</h5>
             <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
             <p class="mb-0">
-                {% if user.cargo == 'administrativo' %}
-                Mientras tanto, puedes acceder a tus <a href="{% url 'mis_procedimientos' %}" class="alert-link">estudios registrados</a>.
-                {% elif user.cargo == 'jefe administrativo' %}
-                Mientras tanto, puedes <a href="{% url 'registroestudios_nuevo' %}" class="alert-link">registrar un nuevo estudio</a>.
-                {% else %}
                 En breve podrás acceder a otras funcionalidades.
-                {% endif %}
             </p>
         </div>
         {% endif %}
