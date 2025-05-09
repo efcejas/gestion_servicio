@@ -133,8 +133,20 @@
                             {% else %}
                                 <strong>{{ cambio.get_cambio_display }}</strong> cambiado de 
                             {% endif %}
-                            <code>{{ cambio.valor_anterior|capfirst }}</code> a 
-                            <code>{{ cambio.valor_nuevo|capfirst }}</code>
+                            <code>
+                                {% if cambio.valor_anterior == "en_revision" %}
+                                    En revisión
+                                {% else %}
+                                    {{ cambio.valor_anterior|capfirst }}
+                                {% endif %}
+                            </code> a 
+                            <code>
+                                {% if cambio.valor_nuevo == "en_revision" %}
+                                    En revisión
+                                {% else %}
+                                    {{ cambio.valor_nuevo|capfirst }}
+                                {% endif %}
+                            </code>
                         </div>
                         <small class="text-muted text-end align-self-end">
                             <em>{{ cambio.usuario.get_full_name|default:"Usuario desconocido" }}</em> {{ cambio.fecha|date:"d/m/Y H:i" }}
