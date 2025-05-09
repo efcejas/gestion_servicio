@@ -180,7 +180,7 @@
         <div class="container mt-5 mb-4">
             <div class="row g-4 justify-content-center">
                 <div class="col-md-4">
-                    <div class="card shadow-sm border-0 h-100">
+                    <div class="card shadow-sm border h-100">
                         <div class="card-body">
                             <h5 class="card-title text-primary"><i class="bi bi-bell me-2"></i>Novedades recientes</h5>
                             <p class="card-text">Consulta las últimas novedades reportadas en el sistema.</p>
@@ -191,7 +191,7 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card shadow-sm border-0 h-100">
+                    <div class="card shadow-sm border h-100">
                         <div class="card-body">
                             <h5 class="card-title text-success"><i class="bi bi-check-circle me-2"></i>Novedades resueltas</h5>
                             <p class="card-text">Revisa las novedades que ya han sido resueltas.</p>
@@ -202,12 +202,23 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="card shadow-sm border-0 h-100">
+                    <div class="card shadow-sm border h-100">
                         <div class="card-body">
                             <h5 class="card-title text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Registrar novedades</h5>
                             <p class="card-text"> Si necesitas registrar una nueva novedad, hazlo aquí.</p>
                             <a href="{% url 'gestion_eventos:evento_nuevo' %}" class="btn btn-warning text-dark">
                                 <i class="bi bi-exclamation-triangle"></i> Registrar 
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Estudios pendientes</h5>
+                            <p class="card-text">Consulta las solicitudes pendientes de los estudios a realizar.</p>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-secondary">
+                                <i class="bi bi-file-earmark-text"></i> Ver pendientes
                             </a>
                         </div>
                     </div>
