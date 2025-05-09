@@ -37,20 +37,13 @@
                                 <div class="mt-2 text-center text-md-start">
                                     <h5 class="mb-1">
                                         <i class="bi bi-info-circle text-primary me-1"></i>
-                                        {% if evento.estado == 'resuelto' %}
-                                        <strong class="text-success">Completado</strong> 
-                                        <!-- Debo ver si conviene hacer lo mismo cuando el estudio dice cancelado -->
-                                        <!-- Algo similar debería pasar en la sección de detalle -->
-                                        {% else %}
-                                        <strong>{{ evento.get_tipo_evento_display }}</strong>
-                                        {% endif %}
+                                        <strong>{{ evento.get_tipo_evento_display }}</strong>                                     
                                     </h5>
                                     {% with estado=evento.estado %}
                                         <span class="badge 
                                             {% if estado == 'abierto' %}bg-primary
-                                            {% elif estado == 'pendiente' %}bg-warning text-dark
+                                            {% elif estado == 'en_revision' %}bg-warning text-dark
                                             {% elif estado == 'resuelto' %}bg-success
-                                            {% elif estado == 'cancelado' %}bg-danger
                                             {% else %}bg-secondary
                                             {% endif %}
                                         ">
