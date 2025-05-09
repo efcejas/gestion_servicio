@@ -29,7 +29,7 @@ class EventoServicioListView(ListView):
     
     def get_queryset(self):
         return EventoServicio.objects.filter(
-            estado__in=['abierto', 'pendiente']
+            estado__in=['abierto', 'en_revision'],  # 🚨 Cambiado de 'abierto' a 'en_revision'
         ).order_by('-fecha_creacion')
 
 # Lista del historial (eventos resueltos)

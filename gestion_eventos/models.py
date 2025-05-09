@@ -13,7 +13,7 @@ class EventoServicio(models.Model):
 
     ESTADO_CHOICES = [
         ('abierto', 'Abierto'),
-        ('pendiente', 'Pendiente'),
+        ('en_revision', 'En revisión'),
         ('resuelto', 'Resuelto'),
     ]
 

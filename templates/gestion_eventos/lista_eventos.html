@@ -38,9 +38,8 @@
                                     {% with estado=evento.estado %}
                                         <span class="badge 
                                             {% if estado == 'abierto' %}bg-primary
-                                            {% elif estado == 'pendiente' %}bg-warning text-dark
+                                            {% elif estado == 'en_revision' %}bg-warning text-dark
                                             {% elif estado == 'resuelto' %}bg-success
-                                            {% elif estado == 'cancelado' %}bg-danger
                                             {% else %}bg-secondary
                                             {% endif %}
                                         ">

@@ -33,9 +33,8 @@
                         <small 
                           class="badge 
                             {% if evento.estado == 'abierto' %}bg-primary
-                            {% elif evento.estado == 'pendiente' %}bg-warning text-dark
+                            {% elif evento.estado == 'en_revision' %}bg-warning text-dark
                             {% elif evento.estado == 'resuelto' %}bg-success
-                            {% elif evento.estado == 'cancelado' %}bg-danger
                             {% else %}bg-secondary
                             {% endif %}
                           ">
