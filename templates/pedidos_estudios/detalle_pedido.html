@@ -78,16 +78,11 @@
     {% endif %}
     </div>
 
-    <!-- Formulario para agregar nota -->
-    <div class="bg-light border rounded p-3 mb-4">
-    <h6 class="mb-2"><i class="bi bi-pencil-square me-1"></i> Agregar nuevo comentario</h6>
-    <form method="post">
-      {% csrf_token %}
-      {{ nota_form.comentario }}
-      <button type="submit" class="btn btn-sm btn-primary mt-2">
-      <i class="bi bi-save me-1"></i> Guardar comentario
-      </button>
-    </form>
+    <!-- Botón para abrir el modal -->
+    <div class="text-end mb-3">
+        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalAgregarNota">
+            <i class="bi bi-pencil-square me-1"></i> Agregar nuevo comentario
+        </button>
     </div>
 
     {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
@@ -141,7 +136,28 @@
   </div>
   </div>
 </div>
-
+<!-- Modal para agregar una nueva nota -->
+<div class="modal fade" id="modalAgregarNota" tabindex="-1" aria-labelledby="modalAgregarNotaLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAgregarNotaLabel"><i class="bi bi-pencil-square me-1"></i> Agregar nuevo comentario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        {{ nota_form.comentario }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i> Guardar comentario
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     var toastElList = [].slice.call(document.querySelectorAll('.toast'));

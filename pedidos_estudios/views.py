@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.shortcuts import redirect
+from django.conf import settings
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
@@ -107,7 +108,8 @@ class PedidoEstudioCreateView(CreateView):
         send_mail(
             subject,
             cuerpo_texto,
-            ['analia.fernandez@dupuytren.com.ar', 'imagenes.dupuytren@galenoargentina.com.ar'],  # Lista de correos
+            settings.EMAIL_HOST_USER,  # Usa el remitente configurado en settings.py
+            ['ensofermin.cejas@dupuytren.com.ar', 'imagenes.dupuytren@galenoargentina.com.ar'],  # Lista de destinatarios
             fail_silently=False,
         )
 
