@@ -7,8 +7,10 @@ from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
+from django.utils.dateparse import parse_date
+from django.db import models
 
-from .forms import ActualizarTipoEventoForm, EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm
+from .forms import ActualizarTipoEventoForm, EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm, FiltroEventoForm
 from .models import EventoServicio, NotaEvento
 
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
@@ -40,9 +42,29 @@ class HistorialEventoListView(ListView):
     paginate_by = 4
 
     def get_queryset(self):
-        return EventoServicio.objects.filter(
-            estado='resuelto'  # 🚨 Ahora sólo los resueltos
-        ).order_by('-fecha_creacion')
+        queryset = EventoServicio.objects.filter(estado='resuelto').order_by('-fecha_creacion')
+        self.form = FiltroEventoForm(self.request.GET)
+        
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                models.Q(nombre_paciente__icontains=q) |
+                models.Q(dni_paciente__icontains=q)
+            )
+        
+        if self.form.is_valid():
+            tipo_evento = self.form.cleaned_data.get('tipo_evento')
+            fecha_inicio = self.form.cleaned_data.get('fecha_inicio')
+            fecha_fin = self.form.cleaned_data.get('fecha_fin')
+
+            if tipo_evento:
+                queryset = queryset.filter(tipo_evento=tipo_evento)
+            if fecha_inicio:
+                queryset = queryset.filter(fecha_creacion__gte=fecha_inicio)
+            if fecha_fin:
+                queryset = queryset.filter(fecha_creacion__lte=fecha_fin)
+                
+        return queryset
         
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -58,6 +80,8 @@ class HistorialEventoListView(ListView):
             eventos_paginados = paginator.page(paginator.num_pages)
 
         context['eventos'] = eventos_paginados
+        context['form'] = self.form
+        
         return context
 
 # Vista detalle de evento, para agregar notas o cambiar estado

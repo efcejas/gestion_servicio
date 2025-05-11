@@ -43,7 +43,6 @@ class EventoServicioForm(forms.ModelForm):
             ),
         }
 
-
 class NotaEventoForm(forms.ModelForm):
     class Meta:
         model = NotaEvento
@@ -58,7 +57,6 @@ class NotaEventoForm(forms.ModelForm):
         labels = {
             'comentario': 'Comentario'
         }
-
 
 class ActualizarEstadoEventoForm(forms.ModelForm):
     class Meta:
@@ -79,7 +77,6 @@ class ActualizarEstadoEventoForm(forms.ModelForm):
             instance.save()  # Guarda normalmente si no se pasa usuario
         return instance
 
-
 class ActualizarTipoEventoForm(forms.ModelForm):
     class Meta:
         model = EventoServicio
@@ -98,3 +95,32 @@ class ActualizarTipoEventoForm(forms.ModelForm):
         elif commit:
             instance.save()  # Guarda normalmente si no se pasa usuario
         return instance
+
+class FiltroEventoForm(forms.Form):
+    q = forms.CharField(
+        required=False,
+        label="Buscar",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-sm',
+            'placeholder': 'Buscar por paciente o DNI'
+        })
+    )
+    tipo_evento = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todos')] + EventoServicio.TIPO_EVENTO_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    fecha_inicio = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control form-control-sm',
+            'type': 'date'
+        })
+    )
+    fecha_fin = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            'class': 'form-control form-control-sm',
+            'type': 'date'
+        })
+    )

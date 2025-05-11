@@ -28,14 +28,43 @@
                 <a href="{% url 'gestion_eventos:historial_eventos' %}" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-archive"></i> Historial de Eventos
                 </a>
-            </div>            
+            </div>
+            <div class="bg-light border rounded p-2 mb-2">
+                <form method="get" class="row justify-content-center g-2">
+                    <!-- Renderiza todos los campos del formulario -->
+                    <div class="col-md-auto">
+                        {{ form.q.label_tag }}
+                        {{ form.q }}
+                    </div>
+                    <div class="col-md-auto">
+                        {{ form.tipo_evento.label_tag }}
+                        {{ form.tipo_evento }}
+                    </div>
+                    <div class="col-md-auto">
+                        {{ form.fecha_inicio.label_tag }}
+                        {{ form.fecha_inicio }}
+                    </div>
+                    <div class="col-md-auto">
+                        {{ form.fecha_fin.label_tag }}
+                        {{ form.fecha_fin }}
+                    </div>
+                    <div class="col-md-auto d-flex align-items-end justify-content-end">
+                        <button type="submit" class="btn btn-primary btn-sm me-2">
+                            <i class="bi bi-funnel"></i> Filtrar
+                        </button>
+                        <a href="{% url 'gestion_eventos:historial_eventos' %}" class="btn btn-outline-secondary btn-sm">
+                            Limpiar
+                        </a>
+                    </div>
+                </form>
+            </div>
             {% if eventos %}
-                <div class="list-group">
-                    {% for evento in eventos %}
-                        <div class="list-group-item mb-3 border rounded shadow-sm">
-                            <div class="d-colum d-md-flex justify-content-between align-items-center mb-2">
-                                <div class="mt-2 text-center text-md-start">
-                                    <h5 class="mb-1">
+            <div class="list-group">
+                {% for evento in eventos %}
+                <div class="list-group-item mb-3 border rounded shadow-sm">
+                    <div class="d-colum d-md-flex justify-content-between align-items-center mb-2">
+                        <div class="mt-2 text-center text-md-start">
+                            <h5 class="mb-1">
                                         <i class="bi bi-info-circle text-primary me-1"></i>
                                         <strong>{{ evento.get_tipo_evento_display }}</strong>                                     
                                     </h5>
@@ -101,7 +130,7 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <p class="text-muted">No hay eventos resueltos o cancelados aún.</p>
+                <p class="text-muted p-2">No se encontraron eventos en el historial para los filtros seleccionados.</p>
             {% endif %}
             {% if is_paginated %}
             <div class="mt-4 d-flex justify-content-center">
