@@ -6,11 +6,12 @@ from django.conf import settings
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.utils.html import strip_tags
+from django.db import models
 from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, FormMixin
 from django.views.generic.list import ListView
 
-from .forms import ActualizarEstadoPedidoForm, PedidoEstudioForm, PedidoEstudioNotaForm
+from .forms import ActualizarEstadoPedidoForm, PedidoEstudioForm, PedidoEstudioNotaForm, FiltroPedidoEstudioForm
 from .models import HistorialPedidoEstudio, PedidoEstudio, PedidoEstudioNota
 
 class PedidoEstudioDetailView(LoginRequiredMixin, FormMixin, DetailView):
@@ -69,25 +70,37 @@ class PedidoEstudioListView(LoginRequiredMixin, ListView):
     model = PedidoEstudio
     template_name = 'pedidos_estudios/lista_pedidos.html'
     context_object_name = 'pedidos'
-    ordering = ['-fecha_creacion']
-    paginate_by = 10  # Opcional: para paginación
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = PedidoEstudio.objects.all().order_by('-fecha_creacion')
+        self.form = FiltroPedidoEstudioForm(self.request.GET)
 
-        estado = self.request.GET.get('estado')
-        prioridad = self.request.GET.get('prioridad')
-        modalidad = self.request.GET.get('modalidad')
+        if self.form.is_valid():
+            q = self.form.cleaned_data.get('q')
+            estado = self.form.cleaned_data.get('estado')
+            prioridad = self.form.cleaned_data.get('prioridad')
+            modalidad = self.form.cleaned_data.get('modalidad')
 
-        if estado:
-            queryset = queryset.filter(estado=estado)
-        if prioridad:
-            queryset = queryset.filter(prioridad=prioridad)
-        if modalidad:
-            queryset = queryset.filter(modalidad=modalidad)
+            if q:
+                queryset = queryset.filter(
+                    models.Q(nombre_paciente__icontains=q) |
+                    models.Q(dni_paciente__icontains=q)
+                )
+            if estado:
+                queryset = queryset.filter(estado=estado)
+            if prioridad:
+                queryset = queryset.filter(prioridad=prioridad)
+            if modalidad:
+                queryset = queryset.filter(modalidad=modalidad)
 
         return queryset
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = self.form
+        return context
+    
 class PedidoEstudioCreateView(CreateView):
     model = PedidoEstudio
     form_class = PedidoEstudioForm

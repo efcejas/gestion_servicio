@@ -28,44 +28,42 @@
             {% endif %}
         </div>
         <div class="bg-light border rounded p-3 m-3">
-            <form method="get" class="row g-2 d-flex justify-content-center">
+            <form method="get" class="row justify-content-center g-2">
+                <!-- Campo de búsqueda -->
                 <div class="col-md-auto">
-                  <select name="estado" class="form-select form-select-sm">
-                    <option value="">Estado (todos)</option>
-                    <option value="pendiente" {% if request.GET.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                    <option value="en_proceso" {% if request.GET.estado == 'en_proceso' %}selected{% endif %}>En proceso</option>
-                    <option value="realizado" {% if request.GET.estado == 'realizado' %}selected{% endif %}>Realizado</option>
-                  </select>
+                    {{ form.q.label_tag }}
+                    {{ form.q }}
                 </div>
-            
+        
+                <!-- Campo de estado -->
                 <div class="col-md-auto">
-                  <select name="prioridad" class="form-select form-select-sm">
-                    <option value="">Prioridad (todas)</option>
-                    <option value="urgente" {% if request.GET.prioridad == 'urgente' %}selected{% endif %}>Urgente</option>
-                    <option value="media" {% if request.GET.prioridad == 'media' %}selected{% endif %}>Media</option>
-                    <option value="baja" {% if request.GET.prioridad == 'baja' %}selected{% endif %}>Baja</option>
-                  </select>
+                    {{ form.estado.label_tag }}
+                    {{ form.estado }}
                 </div>
-            
+        
+                <!-- Campo de prioridad -->
                 <div class="col-md-auto">
-                  <select name="modalidad" class="form-select form-select-sm">
-                    <option value="">Modalidad (todas)</option>
-                    <option value="ECO" {% if request.GET.modalidad == 'ECO' %}selected{% endif %}>Ecografía</option>
-                    <option value="TC" {% if request.GET.modalidad == 'TC' %}selected{% endif %}>Tomografía</option>
-                    <option value="RM" {% if request.GET.modalidad == 'RM' %}selected{% endif %}>Resonancia</option>
-                  </select>
+                    {{ form.prioridad.label_tag }}
+                    {{ form.prioridad }}
                 </div>
-            
-                <div class="col-md-auto d-flex align-items-center justify-content-center">
-                  <button type="submit" class="btn btn-primary btn-sm me-2">
-                    <i class="bi bi-funnel"></i> Filtrar
-                  </button>
-                  <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-outline-secondary btn-sm">
-                    Limpiar
-                  </a>
+        
+                <!-- Campo de modalidad -->
+                <div class="col-md-auto">
+                    {{ form.modalidad.label_tag }}
+                    {{ form.modalidad }}
+                </div>
+        
+                <!-- Botones -->
+                <div class="col-md-auto d-flex align-items-end justify-content-center">
+                    <button type="submit" class="btn btn-primary btn-sm me-2">
+                        <i class="bi bi-funnel"></i> Filtrar
+                    </button>
+                    <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-outline-secondary btn-sm">
+                        Limpiar
+                    </a>
                 </div>
             </form>
-        </div>             
+        </div>
         <div class="card-body border border-top p-0"></div>
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">

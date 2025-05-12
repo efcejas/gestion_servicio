@@ -67,4 +67,33 @@ class ActualizarEstadoPedidoForm(forms.ModelForm):
         if commit:
             instance.save(usuario=usuario)  # 👈 activa la lógica del modelo
         return instance
+    
+# filtro para el listado de pedidos
 
+class FiltroPedidoEstudioForm(forms.Form):
+    q = forms.CharField(
+        required=False,
+        label="Buscar",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-sm',
+            'placeholder': 'Buscar por nombre o DNI'
+        })
+    )
+    estado = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todos')] + PedidoEstudio.ESTADO_CHOICES,
+        label="Estado",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    prioridad = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todas')] + PedidoEstudio.PRIORIDAD_CHOICES,
+        label="Prioridad",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+    modalidad = forms.ChoiceField(
+        required=False,
+        choices=[('', 'Todas')] + PedidoEstudio.MODALIDAD_CHOICES,
+        label="Modalidad",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
