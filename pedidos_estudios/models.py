@@ -12,6 +12,7 @@ class PedidoEstudio(models.Model):
         ('TC', 'Tomografía Computada'),
         ('RM', 'Resonancia Magnética'),
         ('ECO', 'Ecografía'),
+        ('RX', 'Radiografía'),
     ]
     
     PRIORIDAD_CHOICES = [
