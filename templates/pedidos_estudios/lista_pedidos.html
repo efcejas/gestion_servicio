@@ -99,6 +99,7 @@
                                 <span class="badge 
                                     {% if pedido.estado == 'pendiente' %}bg-primary
                                     {% elif pedido.estado == 'en_proceso' %}bg-info text-dark
+                                    {% elif pedido.estado == 'cancelado' %}bg-danger
                                     {% elif pedido.estado == 'realizado' %}bg-success
                                     {% endif %}">
                                     {{ pedido.get_estado_display }}

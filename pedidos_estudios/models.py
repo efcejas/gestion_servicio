@@ -5,6 +5,7 @@ class PedidoEstudio(models.Model):
     ESTADO_CHOICES = [
         ('pendiente', 'Pendiente'),
         ('en_proceso', 'En proceso'),
+        ('cancelado', 'Cancelado'),
         ('realizado', 'Realizado'),
     ]
     
