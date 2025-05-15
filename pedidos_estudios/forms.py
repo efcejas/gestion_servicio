@@ -35,7 +35,7 @@ class PedidoEstudioForm(forms.ModelForm):
             'nombre_paciente': 'Ingrese el nombre y apellido del paciente.',
             'dni_paciente': 'Ingrese el DNI del paciente (opcional).',
             'modalidad': 'Seleccione la modalidad del estudio.',
-            'tipo_estudio': 'Ingrese el estudio solicitado. Por ejemplo: TC de abdomen, TC de tórax, etc.',
+            'tipo_estudio': 'Ingrese el estudio solicitado. Por ejemplo: TC de abdomen, TC de tórax, etc. De ser posible, incluir el diagnóstico o el motivo de la solicitud.',
             'sector_solicitante': 'Ingrese a qué sector pertenece la solicitud. Por ejemplo: Habitación 345, UTI 212, Guardia, etc.',
             'medico_solicitante': 'Ingrese el nombre del médico solicitante (opcional).',
             'prioridad': 'Seleccione la prioridad del estudio.',
