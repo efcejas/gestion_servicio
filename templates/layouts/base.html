@@ -76,95 +76,101 @@
             <!-- Menú colapsable -->
             <div class="collapse navbar-collapse justify-content-end" id="navbarNavDropdown">
                 <ul class="navbar-nav">
-                    <!-- Opciones para usuarios autenticados -->
-                    <li class="nav-item d-md-none text-end">
-                        <div class="user-info d-grid align-items-center justify-content-end gap-2">
-                            <span>
-                                <strong>{{ user.get_full_name }}</strong><br>
-                                <p class="text-muted mb-0">{{ user.email }}</p>
-                            </span>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="userOptionsDropdown"
-                                    data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="bi bi-gear-fill"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userOptionsDropdown">
-                                    <li>
-                                        <a class="dropdown-item" href="{% url 'password_change' %}">
-                                            <i class="bi bi-key-fill me-2"></i>Cambiar contraseña
-                                        </a>
-                                    </li>
-                                </ul>
+                    {% if user.cargo == 'enfermero/a' or user.cargo == 'jefe de enfermería' %}
+                        <li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'pedidos_estudios:lista_pedidos' %}">Estudios solicitados</a>
+                        </li>
+                    {% else %}
+                        <!-- Opciones para usuarios autenticados -->
+                        <li class="nav-item d-md-none text-end">
+                            <div class="user-info d-grid align-items-center justify-content-end gap-2">
+                                <span>
+                                    <strong>{{ user.get_full_name }}</strong><br>
+                                    <p class="text-muted mb-0">{{ user.email }}</p>
+                                </span>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="userOptionsDropdown"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-gear-fill"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userOptionsDropdown">
+                                        <li>
+                                            <a class="dropdown-item" href="{% url 'password_change' %}">
+                                                <i class="bi bi-key-fill me-2"></i>Cambiar contraseña
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    {% include 'includes/logout_form.html' %}
+                                </div>
                             </div>
-                            <div>
-                                {% include 'includes/logout_form.html' %}
-                            </div>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
-                    </li>
-                    {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'pedidos_estudios:lista_pedidos' %}">Estudios solicitados</a>
-                    </li>
-                    {% endif %}
-                    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarPedidosDropdown" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Gestión de pedidos
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarPedidosDropdown">
-                            <li><a class="dropdown-item" href="{% url 'pedidos_estudios:crear_pedido' %}">Nuevo pedido</a></li>
-                            <li><a class="dropdown-item" href="{% url 'pedidos_estudios:lista_pedidos' %}">Ver todos los pedidos</a></li>
-                        </ul>
-                    </li>
-                    {% endif %}
-                    {% if user|has_group:'Médicos de staff - informes' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'registroestudios_nuevo' %}">Registrar estudios</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'registroestudios_list' %}">Estudios registrados</a>
-                    </li>
-                    {% endif %}
-                    {% if user|has_group:'Médicos de staff' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'procedimientos_intervensionismo' %}">Registrar estudio</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'mis_procedimientos' %}">Mis registros</a> 
-                    </li>
-                    {% endif %}
-                    <!-- Opciones para usuarios con permisos de superusuario -->
-                    {% if user.is_superuser %}
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Liquidaciones
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
-                            <li><a class="dropdown-item" href="{% url 'procedimientos_intervensionismo' %}">Intervencionismo</a></li>
-                            <li><a class="dropdown-item" href="{% url 'mis_procedimientos' %}">Mis registros</a></li>                            
-                            <li><a class="dropdown-item" href="{% url 'registroestudios_nuevo' %}">Registrar estudios por médico</a></li>
-                            <li><a class="dropdown-item" href="{% url 'registroestudios_list' %}">Estudios registrados por médico</a></li>
-                            <!-- <li><a class="dropdown-item" href="{% url 'medico_list' %}">Gestión de médicos</a></li> -->
-                            <!-- <li><a class="dropdown-item" href="{% url 'estudios_list' %}">Gestión de estudios</a></li> -->
-                        </ul>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
-                            data-bs-toggle="dropdown" aria-expanded="false">
-                            Más opciones
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
-                            <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
-                        </ul>
-                    </li>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
+                        </li>
+                        {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'pedidos_estudios:lista_pedidos' %}">Estudios solicitados</a>
+                        </li>
+                        {% endif %}
+                        {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarPedidosDropdown" role="button"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                                Gestión de pedidos
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarPedidosDropdown">
+                                <li><a class="dropdown-item" href="{% url 'pedidos_estudios:crear_pedido' %}">Nuevo pedido</a></li>
+                                <li><a class="dropdown-item" href="{% url 'pedidos_estudios:lista_pedidos' %}">Ver todos los pedidos</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+                        {% if user|has_group:'Médicos de staff - informes' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'registroestudios_nuevo' %}">Registrar estudios</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'registroestudios_list' %}">Estudios registrados</a>
+                        </li>
+                        {% endif %}
+                        {% if user|has_group:'Médicos de staff' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'procedimientos_intervensionismo' %}">Registrar estudio</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'mis_procedimientos' %}">Mis registros</a> 
+                        </li>
+                        {% endif %}
+                        {% if user.is_superuser %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                                Liquidaciones
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                                <li><a class="dropdown-item" href="{% url 'procedimientos_intervensionismo' %}">Intervencionismo</a></li>
+                                <li><a class="dropdown-item" href="{% url 'mis_procedimientos' %}">Mis registros</a></li>                            
+                                <li><a class="dropdown-item" href="{% url 'registroestudios_nuevo' %}">Registrar estudios por médico</a></li>
+                                <li><a class="dropdown-item" href="{% url 'registroestudios_list' %}">Estudios registrados por médico</a></li>
+                            </ul>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button"
+                                data-bs-toggle="dropdown" aria-expanded="false">
+                                Más opciones
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+                                <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
                     {% endif %}
                 </ul>
             </div>

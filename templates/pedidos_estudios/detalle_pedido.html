@@ -79,30 +79,29 @@
     </div>
 
     <!-- Botón para abrir el modal -->
-    <div class="text-end mb-3">
+    <div class="text-end mb-4">
         <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modalAgregarNota">
             <i class="bi bi-pencil-square me-1"></i> Agregar nuevo comentario
         </button>
     </div>
 
-    {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+    {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" and user.cargo != "enfermero/a" and user.cargo != "jefe de enfermería" %}
     <hr>
-
     <!-- Formulario de actualización de estado -->
     <div class="bg-light border rounded p-3 mb-4">
-    <h6 class="mb-2"><i class="bi bi-arrow-repeat me-1"></i> Actualizar estado del pedido</h6>
-    <form method="post">
-      {% csrf_token %}
-      <div class="input-group input-group-sm">
-        {{ estado_form.estado }}
-        <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" name="actualizar_estado">
-          <i class="bi bi-arrow-up-circle"></i> Actualizar
-        </button>                
-      </div>
-    </form>
+      <h6 class="mb-2"><i class="bi bi-arrow-repeat me-1"></i> Actualizar estado del pedido</h6>
+      <form method="post">
+        {% csrf_token %}
+        <div class="input-group input-group-sm">
+          {{ estado_form.estado }}
+          <button type="submit" class="btn btn-outline-secondary btn-sm ms-2" name="actualizar_estado">
+            <i class="bi bi-arrow-up-circle"></i> Actualizar
+          </button>
+        </div>
+      </form>
     </div>
     {% endif %}
-
+    
     <hr>
 
     <!-- Historial -->
