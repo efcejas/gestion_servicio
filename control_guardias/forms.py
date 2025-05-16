@@ -18,6 +18,7 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         ],
         required=False,
         label="Mes",
+        initial=datetime.now().month,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
     año = forms.ChoiceField(

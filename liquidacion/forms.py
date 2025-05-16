@@ -84,6 +84,7 @@ class FiltroMedicoMesForm(forms.Form):
         ],
         required=False,
         label="Mes",
+        initial=datetime.now().month,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
     año = forms.ChoiceField(
@@ -141,9 +142,10 @@ User = get_user_model()
 class FiltroProcedimientosIntervensionismoForm(forms.Form):
     medico = forms.ModelChoiceField(
         queryset=User.objects.filter(groups__name='Médicos de staff').order_by('first_name', 'last_name'),
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         required=False,
-        label="Médico"
+        label="Médico",
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        empty_label="Todos los médicos"
     )
     mes = forms.ChoiceField(
         choices=[
@@ -151,6 +153,7 @@ class FiltroProcedimientosIntervensionismoForm(forms.Form):
             (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
             (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
         ],
+        initial=datetime.now().month,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
         required=False, 
         label="Mes"
