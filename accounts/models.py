@@ -10,6 +10,8 @@ class CustomUser(AbstractUser):
         ('médico residente', 'Médico residente'),
         ('técnico radiólogo', 'Técnico radiólogo'),
         ('administrativo', 'Administrativo'),
+        ('enfermero/a', 'Enfermero/a'),
+        ('jefe de enfermería', 'Jefe de enfermería'),
         ('otro', 'Otro'),
     ]
 

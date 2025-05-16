@@ -26,7 +26,10 @@
 
                     <div class="mb-3">
                         {{ form.nombre_paciente.label_tag }}
-                        {{ form.nombre_paciente }}
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-person"></i></span>
+                            {{ form.nombre_paciente }}
+                        </div>
                         {% if form.nombre_paciente.errors %}
                             <div class="text-danger small">
                                 {{ form.nombre_paciente.errors|join:", " }}
@@ -37,7 +40,11 @@
 
                     <div class="mb-3">
                         {{ form.dni_paciente.label_tag }}
-                        {{ form.dni_paciente }}
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-person-vcard"></i></i></span>
+                            {{ form.dni_paciente }}
+                        </div>
+
                         {% if form.dni_paciente.errors %}
                             <div class="text-danger small">
                                 {{ form.dni_paciente.errors|join:", " }}
