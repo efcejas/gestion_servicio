@@ -114,7 +114,7 @@
         <div>
           {% if h.cambio == 'visualizacion' %}
           <i class="bi bi-eye text-info me-1"></i> 
-          Visualizado por <strong>{{ h.usuario.get_full_name|default:"Usuario" }}</strong>
+          Visualizado por
           {% else %}
           <i class="bi bi-arrow-left-right text-muted me-1"></i>
           <strong>{{ h.get_cambio_display }}</strong> de 
@@ -123,7 +123,7 @@
           {% endif %}
         </div>
         <small class="text-muted text-end">
-        <i class="bi bi-person-fill"></i> <em>{{ h.usuario.get_full_name|default:"Usuario" }} </em> {{ h.fecha|date:"d/m/Y H:i" }}
+        <i class="bi bi-person-fill"></i> <strong class="text-capitalize">{{ h.usuario.get_full_name|default:"Usuario"|capfirst }}</strong> {{ h.fecha|date:"d/m/Y H:i" }}
         </small>
         </li>
       {% endfor %}
