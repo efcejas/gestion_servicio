@@ -87,12 +87,12 @@ class GuardiaEventsView(View):
         guardias = Guardia.objects.all()
 
         for g in guardias:
-            if g.cubierta and g.medico:
+            if g.cubierta and g.medico and g.medico.user:
                 eventos.append({
-                    'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {g.medico}',
+                    'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {g.medico.user.get_full_name()}',
                     'start': g.fecha.isoformat(),
-                    'backgroundColor': '#d9eaff',     # Celeste institucional suave
-                    'borderColor': '#164569',         # Azul institucional
+                    'backgroundColor': '#d9eaff',
+                    'borderColor': '#164569',
                     'textColor': '#000',
                     'display': 'block',
                 })

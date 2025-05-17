@@ -57,7 +57,7 @@
                     <tbody>
                         {% for medico, data in resumen_guardias.items %}
                         <tr>
-                            <td class="px-3">{{ medico.nombre }} {{ medico.apellido }}</td>
+                            <td class="px-3">{{ medico.user.get_full_name }}</td>  
                             <td class="text-center">{{ data.total_guardias }}</td>
                             <td class="text-center">{{ data.total_horas }}</td>
                             <td>

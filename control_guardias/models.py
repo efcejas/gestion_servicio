@@ -3,8 +3,6 @@ from django.db import models
 from accounts.models import CustomUser
 
 class MedicoGuardia(models.Model):
-    nombre = models.CharField(max_length=100)
-    apellido = models.CharField(max_length=100)
     dni = models.CharField(max_length=8, unique=True, blank=True, null=True)
     matricula = models.CharField(max_length=6, unique=True, blank=True, null=True)
     user = models.ForeignKey(
@@ -20,7 +18,7 @@ class MedicoGuardia(models.Model):
         verbose_name_plural = "Médicos"
 
     def __str__(self):
-        return f"{self.nombre} {self.apellido}"
+        return f"{self.user.get_full_name() if self.user else 'Sin usuario'} - {self.dni} - {self.matricula}" if self.user else f"{self.dni} - {self.matricula}"
 
 class Guardia(models.Model):
     FRANJA_HORARIA_CHOICES = [

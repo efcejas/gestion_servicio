@@ -4,7 +4,7 @@ from .models import MedicoGuardia, Guardia
 
 class FiltroGuardiasPorMedicoForm(forms.Form):
     medico = forms.ModelChoiceField(
-        queryset=MedicoGuardia.objects.all().order_by('apellido', 'nombre'),
+        queryset=MedicoGuardia.objects.select_related('user').order_by('user__last_name', 'user__first_name'), 
         required=False,
         label="Médico",
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
@@ -28,6 +28,10 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         initial=datetime.now().year,
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['medico'].label_from_instance = lambda obj: obj.user.get_full_name() if obj.user else "Sin usuario"
 
 class GuardiaForm(forms.ModelForm):
     class Meta:
@@ -35,7 +39,10 @@ class GuardiaForm(forms.ModelForm):
         fields = ['franja_horaria', 'medico', 'fecha']
         widgets = {
             'franja_horaria': forms.Select(attrs={'class': 'form-select'}),
-            'cubierta': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'medico': forms.Select(attrs={'class': 'form-select'}),
             'fecha': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['medico'].label_from_instance = lambda obj: obj.user.get_full_name() if obj.user else "Sin usuario"
