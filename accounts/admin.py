@@ -8,6 +8,7 @@ class CustomUserAdmin(UserAdmin):
     form = CustomUserChangeForm
     model = CustomUser
     list_display = ['username', 'first_name', 'last_name', 'email', 'cargo', 'telefono', 'is_staff']
+    list_filter = ['date_joined']
 
     # Configuración de los campos en la vista de cambio de usuario
     fieldsets = (
