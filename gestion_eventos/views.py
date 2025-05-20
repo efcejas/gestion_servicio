@@ -24,7 +24,7 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 # Lista de eventos activos (abiertos o pendientes)
-class EventoServicioListView(ListView):
+class EventoServicioListView(ListView, LoginRequiredMixin):
     model = EventoServicio
     template_name = 'gestion_eventos/lista_eventos.html'
     context_object_name = 'eventos'
@@ -35,7 +35,7 @@ class EventoServicioListView(ListView):
         ).order_by('-fecha_creacion')
 
 # Lista del historial (eventos resueltos)
-class HistorialEventoListView(ListView):
+class HistorialEventoListView(ListView, LoginRequiredMixin):
     model = EventoServicio
     template_name = 'gestion_eventos/historial_eventos.html'
     context_object_name = 'eventos'
