@@ -1,17 +1,25 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib import messages
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db import models
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils.dateparse import parse_date
 from django.utils.timezone import now
 from django.views.generic import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.contrib import messages
-from django.utils.dateparse import parse_date
-from django.db import models
 
-from .forms import ActualizarTipoEventoForm, EventoServicioForm, NotaEventoForm, ActualizarEstadoEventoForm, FiltroEventoForm
-from .models import EventoServicio, NotaEvento
+from .forms import (
+    ActualizarEstadoEventoForm,
+    ActualizarTipoEventoForm,
+    EventoServicioForm,
+    FiltroEventoForm,
+    NotaEventoForm,
+)
+
+from .models import EventoServicio
 
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
     model = EventoServicio
@@ -24,17 +32,38 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 # Lista de eventos activos (abiertos o pendientes)
+User = get_user_model()
+
 class EventoServicioListView(ListView, LoginRequiredMixin):
     model = EventoServicio
     template_name = 'gestion_eventos/lista_eventos.html'
     context_object_name = 'eventos'
     
     def get_queryset(self):
-        return EventoServicio.objects.filter(
-            estado__in=['abierto', 'en_revision'],  # 🚨 Cambiado de 'abierto' a 'en_revision'
-        ).order_by('-fecha_creacion')
+        user = self.request.user
 
-# Lista del historial (eventos resueltos)
+        # Técnicos de tomografía
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de tomografía")
+            return EventoServicio.objects.filter(
+                estado__in=['abierto', 'en_revision'],
+                creado_por__in=usuarios_del_grupo
+            ).order_by('-fecha_creacion')
+
+        # Técnicos de resonancia
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de resonancia")
+            return EventoServicio.objects.filter(
+                estado__in=['abierto', 'en_revision'],
+                creado_por__in=usuarios_del_grupo
+            ).order_by('-fecha_creacion')
+
+        # Médicos, administrativos, etc. ven todo
+        else:
+            return EventoServicio.objects.filter(
+                estado__in=['abierto', 'en_revision']
+            ).order_by('-fecha_creacion')
+
 class HistorialEventoListView(ListView, LoginRequiredMixin):
     model = EventoServicio
     template_name = 'gestion_eventos/historial_eventos.html'
@@ -42,7 +71,26 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
     paginate_by = 4
 
     def get_queryset(self):
-        queryset = EventoServicio.objects.filter(estado='resuelto').order_by('-fecha_creacion')
+        user = self.request.user
+
+        # Filtra por grupo igual que en la vista de eventos activos
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de tomografía")
+            queryset = EventoServicio.objects.filter(
+                estado='resuelto',
+                creado_por__in=usuarios_del_grupo
+            ).order_by('-fecha_creacion')
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de resonancia")
+            queryset = EventoServicio.objects.filter(
+                estado='resuelto',
+                creado_por__in=usuarios_del_grupo
+            ).order_by('-fecha_creacion')
+        else:
+            queryset = EventoServicio.objects.filter(
+                estado='resuelto'
+            ).order_by('-fecha_creacion')
+
         self.form = FiltroEventoForm(self.request.GET)
         
         q = self.request.GET.get('q')
@@ -65,7 +113,7 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
                 queryset = queryset.filter(fecha_creacion__lte=fecha_fin)
                 
         return queryset
-        
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         eventos = self.get_queryset()
@@ -75,7 +123,7 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
         try:
             eventos_paginados = paginator.page(page)
         except PageNotAnInteger:
-            eventos_paginados = paginator.page(1)  # 🚨 Si no es número, mostrar la página 1
+            eventos_paginados = paginator.page(1)
         except EmptyPage:
             eventos_paginados = paginator.page(paginator.num_pages)
 
