@@ -21,7 +21,18 @@
                         </div>
                     {% endif %}
                 </div>
-
+                
+                <div class="mb-3">
+                    {{ form.descripcion.label_tag }}
+                    {{ form.descripcion }}
+                    <small class="form-text text-muted">{{ form.descripcion.help_text }}</small>
+                    {% if form.descripcion.errors %}
+                    <div class="text-danger small">
+                        {{ form.descripcion.errors|join:", " }}
+                    </div>
+                    {% endif %}
+                </div>
+                
                 {% if request.user.is_authenticated and request.user.cargo in "médico, médico residente" %}
                     <div class="mb-3">
                         {{ form.servicio_origen_evento.label_tag }}
@@ -34,17 +45,6 @@
                         {% endif %}
                     </div>
                 {% endif %}
-
-                <div class="mb-3">
-                    {{ form.descripcion.label_tag }}
-                    {{ form.descripcion }}
-                    <small class="form-text text-muted">{{ form.descripcion.help_text }}</small>
-                    {% if form.descripcion.errors %}
-                        <div class="text-danger small">
-                            {{ form.descripcion.errors|join:", " }}
-                        </div>
-                    {% endif %}
-                </div>
 
                 <p class="text-muted h6">Los siguientes campos se completan según corresponda el evento.</p>
 
