@@ -16,6 +16,13 @@ class EventoServicio(models.Model):
         ('en_revision', 'En revisión'),
         ('resuelto', 'Resuelto'),
     ]
+    
+    SERVICIO_CHOICE = [
+        ('tomografia', 'Tomografía'),
+        ('resonancia', 'Resonancia'),
+        ('ecografia', 'Ecografía'),
+        ('radiologia', 'Radiología'),
+    ]
 
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -28,6 +35,7 @@ class EventoServicio(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='abierto')
 
     # Campos opcionales
+    servicio_origen_evento = models.CharField(max_length=20, choices=SERVICIO_CHOICE, blank=True, null=True)
     sector_de_pedido = models.CharField(max_length=100, blank=True, null=True)
     nombre_paciente = models.CharField(max_length=100, blank=True, null=True)
     dni_paciente = models.CharField(max_length=20, blank=True, null=True)

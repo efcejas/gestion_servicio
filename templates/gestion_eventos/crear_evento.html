@@ -22,6 +22,19 @@
                     {% endif %}
                 </div>
 
+                {% if request.user.is_authenticated and request.user.cargo in "médico, médico residente" %}
+                    <div class="mb-3">
+                        {{ form.servicio_origen_evento.label_tag }}
+                        {{ form.servicio_origen_evento }}
+                        <small class="form-text text-muted">{{ form.servicio_origen_evento.help_text }}</small>
+                        {% if form.servicio_origen_evento.errors %}
+                            <div class="text-danger small">
+                                {{ form.servicio_origen_evento.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
                 <div class="mb-3">
                     {{ form.descripcion.label_tag }}
                     {{ form.descripcion }}

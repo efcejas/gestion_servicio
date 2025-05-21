@@ -11,7 +11,8 @@ class EventoServicioForm(forms.ModelForm):
             'sector_de_pedido',
             'nombre_paciente',
             'dni_paciente',
-            'estudio_relacionado'
+            'estudio_relacionado',
+            'servicio_origen_evento',
         ]
         widgets = {
             'tipo_evento': forms.Select(attrs={'class': 'form-control'}),
@@ -20,6 +21,7 @@ class EventoServicioForm(forms.ModelForm):
                 'rows': 4,
                 'cols': 40
             }),
+            'servicio_origen_evento': forms.Select(attrs={'class': 'form-select'}),
             'sector_de_pedido': forms.TextInput(attrs={'class': 'form-control'}),
             'nombre_paciente': forms.TextInput(attrs={'class': 'form-control'}),
             'dni_paciente': forms.TextInput(attrs={'class': 'form-control'}),
@@ -28,6 +30,7 @@ class EventoServicioForm(forms.ModelForm):
         labels = {
             'tipo_evento': 'Tipo de evento',
             'descripcion': 'Descripción del evento',
+            'servicio_origen_evento': 'Servicio',
             'sector_de_pedido': 'Sector de pedido',
             'nombre_paciente': 'Nombre y apellido del paciente',
             'dni_paciente': 'DNI del paciente',
@@ -37,6 +40,10 @@ class EventoServicioForm(forms.ModelForm):
             'descripcion': (
                 'Proporcione una descripción detallada del evento, incluyendo, '
                 'si aplica, el nombre y apellido de la persona con quien se habló.'
+            ),
+            'servicio_origen_evento': (
+                'Seleccione el servicio desde donde se generó el evento. '
+                'Por ejemplo: si el evento es sobre un paciente de ecografía, seleccione "Ecografía".'
             ),
             'sector_de_pedido': (
                 'Si aplica, indique desde donde se generó el pedido y/o donde se localiza el paciente. ejemplo: Guardia, habitación 123, etc.'
