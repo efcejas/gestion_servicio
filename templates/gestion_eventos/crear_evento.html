@@ -21,7 +21,7 @@
                         </div>
                     {% endif %}
                 </div>
-                
+
                 <div class="mb-3">
                     {{ form.descripcion.label_tag }}
                     {{ form.descripcion }}
@@ -33,7 +33,7 @@
                     {% endif %}
                 </div>
                 
-                {% if request.user.is_authenticated and request.user.cargo in "médico, médico residente" %}
+                {% if request.user.is_authenticated and request.user.cargo in "médico, médico residente, jefe administrativo, administrativo" %}
                     <div class="mb-3">
                         {{ form.servicio_origen_evento.label_tag }}
                         {{ form.servicio_origen_evento }}

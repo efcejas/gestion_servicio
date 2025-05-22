@@ -28,7 +28,16 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('gestion_eventos:lista_eventos')
 
     def form_valid(self, form):
-        form.instance.creado_por = self.request.user
+        user = self.request.user
+        form.instance.creado_por = user
+
+        # Si es técnico, asigna el área automáticamente
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            form.instance.servicio_origen_evento = 'tomografia'
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            form.instance.servicio_origen_evento = 'resonancia'
+        # Si es médico, administrativo, etc., deja lo que venga del formulario
+
         return super().form_valid(form)
 
 # Lista de eventos activos (abiertos o pendientes)
@@ -42,24 +51,22 @@ class EventoServicioListView(ListView, LoginRequiredMixin):
     def get_queryset(self):
         user = self.request.user
 
-        # Técnicos de tomografía
         if user.groups.filter(name="Técnicos de tomografía").exists():
-            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de tomografía")
+            # Solo eventos de tomografía
             return EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision'],
-                creado_por__in=usuarios_del_grupo
+                servicio_origen_evento='tomografia'
             ).order_by('-fecha_creacion')
 
-        # Técnicos de resonancia
         elif user.groups.filter(name="Técnicos de resonancia").exists():
-            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de resonancia")
+            # Solo eventos de resonancia
             return EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision'],
-                creado_por__in=usuarios_del_grupo
+                servicio_origen_evento='resonancia'
             ).order_by('-fecha_creacion')
 
-        # Médicos, administrativos, etc. ven todo
         else:
+            # Médicos, administrativos, etc. ven todo
             return EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision']
             ).order_by('-fecha_creacion')
@@ -73,52 +80,45 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
     def get_queryset(self):
         user = self.request.user
 
-        # Filtra por grupo igual que en la vista de eventos activos
         if user.groups.filter(name="Técnicos de tomografía").exists():
-            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de tomografía")
             queryset = EventoServicio.objects.filter(
                 estado='resuelto',
-                creado_por__in=usuarios_del_grupo
+                servicio_origen_evento='tomografia'
             ).order_by('-fecha_creacion')
         elif user.groups.filter(name="Técnicos de resonancia").exists():
-            usuarios_del_grupo = User.objects.filter(groups__name="Técnicos de resonancia")
             queryset = EventoServicio.objects.filter(
                 estado='resuelto',
-                creado_por__in=usuarios_del_grupo
+                servicio_origen_evento='resonancia'
             ).order_by('-fecha_creacion')
         else:
             queryset = EventoServicio.objects.filter(
                 estado='resuelto'
             ).order_by('-fecha_creacion')
 
+        # Filtros adicionales (búsqueda, fechas, etc.)
         self.form = FiltroEventoForm(self.request.GET)
-        
         q = self.request.GET.get('q')
         if q:
             queryset = queryset.filter(
                 models.Q(nombre_paciente__icontains=q) |
                 models.Q(dni_paciente__icontains=q)
             )
-        
         if self.form.is_valid():
             tipo_evento = self.form.cleaned_data.get('tipo_evento')
             fecha_inicio = self.form.cleaned_data.get('fecha_inicio')
             fecha_fin = self.form.cleaned_data.get('fecha_fin')
-
             if tipo_evento:
                 queryset = queryset.filter(tipo_evento=tipo_evento)
             if fecha_inicio:
                 queryset = queryset.filter(fecha_creacion__gte=fecha_inicio)
             if fecha_fin:
                 queryset = queryset.filter(fecha_creacion__lte=fecha_fin)
-                
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         eventos = self.get_queryset()
         paginator = Paginator(eventos, self.paginate_by)
-
         page = self.request.GET.get('page')
         try:
             eventos_paginados = paginator.page(page)
@@ -126,10 +126,8 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
             eventos_paginados = paginator.page(1)
         except EmptyPage:
             eventos_paginados = paginator.page(paginator.num_pages)
-
         context['eventos'] = eventos_paginados
         context['form'] = self.form
-        
         return context
 
 # Vista detalle de evento, para agregar notas o cambiar estado
