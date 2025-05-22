@@ -17,10 +17,9 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm, 
-    MedicoCreateViewForm, 
     FiltroMedicoMesForm, 
     RegistroProcedimientosIntervensionismoCreateViewForm, 
     FiltroProcedimientosIntervensionismoForm, 
@@ -33,20 +32,6 @@ from django.utils.timezone import now
 from openpyxl import Workbook
 from django.urls import reverse
 from django.utils.http import urlencode
-
-class MedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    model = Medico
-    form_class = MedicoCreateViewForm
-    template_name = 'liquidacion/medico_form.html'
-    # Usa reverse_lazy para resolver el nombre de la URL
-    success_url = reverse_lazy('medico_list')
-    # success_message = "El médico fue registrado exitosamente"  # Mensaje de éxito
-
-class MedicoListView(LoginRequiredMixin, ListView):
-    model = Medico
-    template_name = 'liquidacion/medico_list.html'
-    # Asegúrate de usar el nombre correcto en la plantilla
-    context_object_name = 'medicos'
 
 class EstudiosCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Estudios

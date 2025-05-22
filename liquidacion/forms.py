@@ -1,19 +1,9 @@
 from django import forms
-from .models import Medico, Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils import timezone
-
-class MedicoCreateViewForm(forms.ModelForm):
-    class Meta:
-        model = Medico
-        fields = ['nombre', 'apellido', 'matricula']
-        widgets = {
-            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
-            'apellido': forms.TextInput(attrs={'class': 'form-control'}),
-            'matricula': forms.TextInput(attrs={'class': 'form-control'}),
-        }
 
 class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
     tipo_estudio = forms.ChoiceField(

@@ -3,18 +3,6 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.conf import settings
 
-class Medico(models.Model):
-    nombre = models.CharField(max_length=50, verbose_name='Nombre')
-    apellido = models.CharField(max_length=50, verbose_name='Apellido')
-    matricula = models.CharField(max_length=6, verbose_name='Matrícula', unique=True, blank=True, null=True)
-
-    class Meta:
-        verbose_name = 'Médico'
-        verbose_name_plural = 'Médicos'
-
-    def __str__(self):
-        return f'{self.nombre} {self.apellido}'
-
 class Estudios(models.Model):
     nombre = models.CharField(max_length=150, unique=True, verbose_name='Nombre del estudio')
     TIPO_ESTUDIO_CHOICES = (

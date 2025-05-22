@@ -1,7 +1,5 @@
 from django.urls import path
 from .views import (
-    MedicoCreateView,
-    MedicoListView,
     EstudiosCreateView,
     EstudiosListView,
     RegistroEstudiosPorMedicoCreateView,
@@ -23,9 +21,6 @@ from .views import (
 )
 
 urlpatterns = [
-    # Rutas para Medico
-    path('medico/nuevo/', MedicoCreateView.as_view(), name='medico_nuevo'),
-    path('medico/', MedicoListView.as_view(), name='medico_list'),
 
     # Rutas para Estudios
     path('estudios/nuevo/', EstudiosCreateView.as_view(), name='estudios_nuevo'),
