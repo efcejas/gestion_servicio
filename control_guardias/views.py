@@ -9,9 +9,10 @@ from django.views.generic import ListView, TemplateView
 from django.views.generic.edit import CreateView
 from django.contrib.messages.views import SuccessMessageMixin
 
-from .forms import FiltroGuardiasPorMedicoForm, GuardiaForm
+from .forms import FiltroGuardiasPorMedicoForm, FiltroMisGuardiasForm, GuardiaForm
 from .models import Guardia
 
+# Esto lo ven usuarios sin restricciones
 class GuardiaListView(ListView):
     model = Guardia
     template_name = 'control_guardias/lista_guardias.html'
@@ -21,6 +22,7 @@ class GuardiaListView(ListView):
     def get_queryset(self):
         return Guardia.objects.filter(fecha__gte=timezone.now()).order_by('fecha')
 
+# Esto lo ven usuarios sin logueo
 class ResumenGuardiasView(TemplateView):
     template_name = 'control_guardias/resumen_guardias.html'
 
@@ -76,6 +78,49 @@ class ResumenGuardiasView(TemplateView):
 
         return context
 
+# Quiero crear la vista que le permita ver a cada usuario que hace guardias, las que tiene asignadas y las que ha hecho
+
+class MisGuardiasView(LoginRequiredMixin, ListView):
+    model = Guardia
+    template_name = 'control_guardias/mis_guardias.html'
+    context_object_name = 'mis_guardias'
+    login_url = 'login'
+
+    def get_queryset(self):
+        return Guardia.objects.filter(medico__user=self.request.user).order_by('fecha')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = timezone.now().date()
+        queryset = self.get_queryset()
+
+        # Procesar el formulario de filtro
+        form = FiltroMisGuardiasForm(self.request.GET or None)
+        if form.is_valid():
+            mes = form.cleaned_data.get('mes') or hoy.month
+            año = form.cleaned_data.get('año') or hoy.year
+        else:
+            mes = hoy.month
+            año = hoy.year
+
+        # Guardias pasadas del mes/año seleccionado
+        guardias_mes = queryset.filter(
+            fecha__lt=hoy,
+            fecha__month=mes,
+            fecha__year=año
+        ).order_by('-fecha')
+
+        context['guardias_mes'] = guardias_mes
+        context['mes_actual'] = int(mes)
+        context['año_actual'] = int(año)
+        context['filtro_form'] = form
+
+        # Próximas guardias (sin filtro)
+        context['proximas_guardias'] = queryset.filter(fecha__gte=hoy)
+
+        return context
+    
+# Esto es de uso exclusivo de los administradores
 class FullCalendarView(TemplateView):
     template_name = 'control_guardias/fullcalendar_view.html'
 

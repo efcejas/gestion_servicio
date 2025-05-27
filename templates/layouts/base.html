@@ -139,6 +139,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'registroestudios_list' %}">Estudios registrados</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'mis_guardias' %}">Mis guardias</a>
+                        </li>
                         {% endif %}
                         {% if user|has_group:'Médicos de staff' %}
                         <li class="nav-item">
