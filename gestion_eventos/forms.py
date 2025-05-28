@@ -1,8 +1,27 @@
 from django import forms
 from .models import EventoServicio, NotaEvento
 
-
 class EventoServicioForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        # Opciones base (todas menos guardia/internado)
+        base_choices = [
+            ('cancelado', 'Estudio cancelado'),
+            ('demorado', 'Estudio demorado'),
+            ('pendiente', 'Estudio pendiente'),
+            ('tecnico', 'Problema técnico'),
+            ('conflicto', 'Conflicto o situación interpersonal'),
+            ('otro', 'Otro'),
+        ]
+        # Si es técnico de resonancia, agrega las opciones extra
+        if user and user.groups.filter(name="Técnicos de resonancia").exists():
+            base_choices += [
+                ('guardia', 'Estudio de guardia realizado'),
+                ('internado', 'Estudio de paciente internado realizado'),
+            ]
+        self.fields['tipo_evento'].choices = base_choices
+
     class Meta:
         model = EventoServicio
         fields = [

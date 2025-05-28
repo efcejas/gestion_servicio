@@ -8,6 +8,8 @@ class EventoServicio(models.Model):
         ('pendiente', 'Estudio pendiente'),
         ('tecnico', 'Problema técnico'),
         ('conflicto', 'Conflicto o situación interpersonal'),
+        ('guardia', 'Estudio de guardia realizado'),
+        ('internado', 'Estudio de paciente internado realizado'),
         ('otro', 'Otro')
     ]
 

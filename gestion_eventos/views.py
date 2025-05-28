@@ -27,6 +27,11 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
     template_name = 'gestion_eventos/crear_evento.html'
     success_url = reverse_lazy('gestion_eventos:lista_eventos')
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user  # Pasa el usuario al formulario
+        return kwargs
+
     def form_valid(self, form):
         user = self.request.user
         form.instance.creado_por = user
