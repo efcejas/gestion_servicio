@@ -1,0 +1,117 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load static %}
+{% load guardias_extras %}
+{% block title %}Calendario de Guardias - Médicos de imágenes{% endblock %}
+
+{% block content %}
+<div class="max-w-screen-xl mx-auto px-4 py-10">
+    <!-- Navegación -->
+    <div class="flex justify-between items-center mb-6">
+        <a href="?year={{ prev_year }}&month={{ prev_month }}"
+            class="px-3 py-1 bg-blue-200 rounded hover:bg-blue-300 text-sm font-medium">
+            ← Anterior
+        </a>
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-slate-800">
+            Guardias · {{ month }}/{{ year }}
+        </h1>
+        <a href="?year={{ next_year }}&month={{ next_month }}"
+            class="px-3 py-1 bg-blue-200 rounded hover:bg-blue-300 text-sm font-medium">
+            Siguiente →
+        </a>
+    </div>
+
+    <!-- Header días -->
+    <div class="hidden lg:grid grid-cols-7 text-center text-slate-500 text-sm font-semibold uppercase mb-2">
+        <div>Lun</div>
+        <div>Mar</div>
+        <div>Mié</div>
+        <div>Jue</div>
+        <div>Vie</div>
+        <div>Sáb</div>
+        <div>Dom</div>
+    </div>
+
+    <!-- Calendario GRID para desktop -->
+    <div class="hidden lg:grid grid-cols-7 gap-2">
+        {% for dia in dias_mes %}
+        {% with guardias=guardias_por_dia|dict_get:dia %}
+        <div class="min-h-[7rem] p-2 rounded border shadow-sm 
+        {% if dia.month != month %} bg-gray-100 text-gray-400 
+        {% elif guardias %} bg-blue-50 
+        {% else %} bg-white 
+        {% endif %} 
+        flex flex-col hover:shadow-md transition">
+
+            <!-- Número del día (arriba) -->
+            <div class="text-sm font-semibold text-slate-700 mb-2">
+                {{ dia.day }}
+            </div>
+
+            <!-- Guardias (inmediatamente debajo del número) -->
+            {% if guardias %}
+            <div class="text-xs space-y-1">
+                {% for g in guardias %}
+                <div class="p-1 bg-white border border-blue-200 rounded">
+                    <div class="text-blue-700 font-medium">
+                        {{ g.get_franja_horaria_display }}
+                    </div>
+                    <div class="mt-1">
+                        {% if g.cubierta and g.medico %}
+                        <span class="text-green-700">👨‍⚕️ {{ g.medico.user.get_full_name }}</span>
+                        {% else %}
+                        <span class="text-red-600">⚠️ No cubierta</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endwith %}
+        {% endfor %}
+    </div>
+
+    <!-- Vista lista para mobile -->
+    <div class="lg:hidden space-y-4">
+        {% for dia in dias_mes %}
+        {% if dia.month == month %}
+        {% with guardias=guardias_por_dia|dict_get:dia %}
+        <div class="rounded-lg border p-4 
+          {% if guardias %} bg-blue-50 
+          {% else %} bg-white 
+          {% endif %}">
+
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold text-slate-800 text-base">
+                    {{ dia|date:"l d/m/Y" }}
+                </span>
+                {% if guardias %}
+                <span class="text-xs text-blue-600">{{ guardias|length }} guardia{{ guardias|length|pluralize }}</span>
+                {% endif %}
+            </div>
+
+            {% if guardias %}
+            <div class="space-y-2 text-sm">
+                {% for g in guardias %}
+                <div class="p-2 rounded bg-white border border-blue-200 shadow-sm">
+                    <div class="text-blue-700 font-medium">
+                        {{ g.get_franja_horaria_display }}
+                    </div>
+                    <div class="mt-1 leading-tight">
+                        {% if g.cubierta and g.medico %}
+                        <span class="text-green-700">👨‍⚕️ {{ g.medico.user.get_full_name }}</span>
+                        {% else %}
+                        <span class="text-red-600">⚠️ No cubierta</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endwith %}
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

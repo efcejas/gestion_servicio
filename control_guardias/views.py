@@ -1,5 +1,9 @@
+import calendar
+from datetime import date
+
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.messages.views import SuccessMessageMixin
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -7,12 +11,13 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.generic import ListView, TemplateView
 from django.views.generic.edit import CreateView
-from django.contrib.messages.views import SuccessMessageMixin
 
 from .forms import FiltroGuardiasPorMedicoForm, FiltroMisGuardiasForm, GuardiaForm
 from .models import Guardia
 
 # Esto lo ven usuarios sin restricciones
+
+
 class GuardiaListView(ListView):
     model = Guardia
     template_name = 'control_guardias/lista_guardias.html'
@@ -23,6 +28,8 @@ class GuardiaListView(ListView):
         return Guardia.objects.filter(fecha__gte=timezone.now()).order_by('fecha')
 
 # Esto lo ven usuarios sin logueo
+
+
 class ResumenGuardiasView(TemplateView):
     template_name = 'control_guardias/resumen_guardias.html'
 
@@ -39,7 +46,8 @@ class ResumenGuardiasView(TemplateView):
             año = form.cleaned_data.get('año')
 
             # Filtrar guardias según los criterios del formulario
-            guardias = Guardia.objects.filter(cubierta=True, fecha__lte=timezone.now())
+            guardias = Guardia.objects.filter(
+                cubierta=True, fecha__lte=timezone.now())
             if medico:
                 guardias = guardias.filter(medico=medico)
             if mes and año:
@@ -80,6 +88,7 @@ class ResumenGuardiasView(TemplateView):
 
 # Quiero crear la vista que le permita ver a cada usuario que hace guardias, las que tiene asignadas y las que ha hecho
 
+
 class MisGuardiasView(LoginRequiredMixin, ListView):
     model = Guardia
     template_name = 'control_guardias/mis_guardias.html'
@@ -119,10 +128,13 @@ class MisGuardiasView(LoginRequiredMixin, ListView):
         context['proximas_guardias'] = queryset.filter(fecha__gte=hoy)
 
         return context
-    
+
 # Esto es de uso exclusivo de los administradores
+
+
 class FullCalendarView(TemplateView):
     template_name = 'control_guardias/fullcalendar_view.html'
+
 
 @method_decorator(login_required, name='dispatch')
 class GuardiaEventsView(View):
@@ -152,7 +164,8 @@ class GuardiaEventsView(View):
                 })
 
         return JsonResponse(eventos, safe=False)
-    
+
+
 class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Guardia
     form_class = GuardiaForm
@@ -166,3 +179,55 @@ class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         if fecha_param:
             initial['fecha'] = fecha_param
         return initial
+
+# control_guardias/views.py
+
+
+class CalendarioGuardiasView(TemplateView):
+    template_name = 'control_guardias/calendario_guardias.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Obtener año y mes desde la URL o usar actuales
+        year = int(self.request.GET.get('year', timezone.now().year))
+        month = int(self.request.GET.get('month', timezone.now().month))
+
+        # Calcular mes anterior y siguiente
+        if month == 1:
+            prev_month = 12
+            prev_year = year - 1
+        else:
+            prev_month = month - 1
+            prev_year = year
+
+        if month == 12:
+            next_month = 1
+            next_year = year + 1
+        else:
+            next_month = month + 1
+            next_year = year
+
+        # Generar los días del calendario
+        cal = calendar.Calendar(firstweekday=0)  # lunes=0
+        dias_mes = list(cal.itermonthdates(year, month))
+
+        # Obtener guardias del mes
+        guardias = Guardia.objects.filter(fecha__year=year, fecha__month=month)
+
+        # Agrupar guardias por día
+        guardias_por_dia = {}
+        for g in guardias:
+            guardias_por_dia.setdefault(g.fecha, []).append(g)
+
+        context.update({
+            'dias_mes': dias_mes,
+            'guardias_por_dia': guardias_por_dia,
+            'year': year,
+            'month': month,
+            'prev_year': prev_year,
+            'prev_month': prev_month,
+            'next_year': next_year,
+            'next_month': next_month,
+        })
+        return context

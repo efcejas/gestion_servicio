@@ -32,6 +32,11 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
         kwargs['user'] = self.request.user  # Pasa el usuario al formulario
         return kwargs
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form._user = self.request.user  # Pasar usuario para validación anti-duplicados
+        return form
+
     def form_valid(self, form):
         user = self.request.user
         form.instance.creado_por = user

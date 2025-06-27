@@ -2,6 +2,27 @@
 {% block title %}Registrar Evento del Servicio{% endblock %}
 
 {% block content %}
+<style>
+.btn:disabled {
+    cursor: not-allowed !important;
+    opacity: 0.7 !important;
+}
+.form-submitting {
+    position: relative;
+}
+.form-submitting::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.1);
+    pointer-events: none;
+    z-index: 1;
+}
+</style>
+
 <div class="container mt-4 mb-5">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
@@ -92,10 +113,102 @@
                 
                 <div class="d-flex justify-content-end mt-3">
                     <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-secondary me-2">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">Registrar</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Registrar</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submitBtn');
+    let isSubmitting = false;
+    
+    // Función para deshabilitar el formulario
+    function disableForm() {
+        isSubmitting = true;
+        submitBtn.disabled = true;
+        submitBtn.style.pointerEvents = 'none';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Registrando...';
+        submitBtn.classList.add('btn-warning');
+        submitBtn.classList.remove('btn-primary');
+        
+        // Agregar clase visual al formulario
+        form.classList.add('form-submitting');
+        
+        // Deshabilitar todos los campos del formulario
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => input.disabled = true);
+    }
+    
+    // Función para re-habilitar el formulario (en caso de error)
+    function enableForm() {
+        isSubmitting = false;
+        submitBtn.disabled = false;
+        submitBtn.style.pointerEvents = 'auto';
+        submitBtn.innerHTML = 'Registrar';
+        submitBtn.classList.remove('btn-warning');
+        submitBtn.classList.add('btn-primary');
+        
+        // Quitar clase visual del formulario
+        form.classList.remove('form-submitting');
+        
+        // Re-habilitar todos los campos del formulario
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(input => input.disabled = false);
+    }
+    
+    // Prevenir múltiples envíos
+    form.addEventListener('submit', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // Validar que los campos requeridos estén completos
+        const requiredFields = form.querySelectorAll('[required]');
+        let hasErrors = false;
+        
+        requiredFields.forEach(field => {
+            if (!field.value.trim()) {
+                hasErrors = true;
+            }
+        });
+        
+        if (hasErrors) {
+            return; // Dejar que Django maneje la validación
+        }
+        
+        // Deshabilitar inmediatamente si no hay errores obvios
+        disableForm();
+        
+        // Re-habilitar después de 10 segundos por si hay algún error de red o validación
+        setTimeout(function() {
+            if (isSubmitting) {
+                enableForm();
+            }
+        }, 10000);
+    });
+    
+    // Prevenir doble clic en el botón
+    submitBtn.addEventListener('click', function(e) {
+        if (isSubmitting) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    });
+    
+    // Prevenir envío con Enter múltiple
+    form.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && isSubmitting) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+
 {% endblock %}

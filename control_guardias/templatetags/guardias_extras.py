@@ -9,3 +9,7 @@ def get_guardia_for_franja(guardias, franja):
 @register.filter
 def dict_get(d, key):
     return d.get(key, '')
+
+@register.filter
+def dict_get(dictionary, key):
+    return dictionary.get(key)

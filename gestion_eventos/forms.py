@@ -1,4 +1,6 @@
 from django import forms
+from django.utils import timezone
+from datetime import timedelta
 from .models import EventoServicio, NotaEvento
 
 class EventoServicioForm(forms.ModelForm):
@@ -68,6 +70,45 @@ class EventoServicioForm(forms.ModelForm):
                 'Si aplica, indique desde donde se generó el pedido y/o donde se localiza el paciente. ejemplo: Guardia, habitación 123, etc.'
             ),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Solo validar si tenemos los datos mínimos necesarios
+        if not cleaned_data.get('tipo_evento') or not cleaned_data.get('descripcion'):
+            return cleaned_data
+        
+        # Verificar duplicados en los últimos 5 minutos
+        hace_5_minutos = timezone.now() - timedelta(minutes=5)
+        
+        # Obtener el usuario desde la vista (si está disponible)
+        user = getattr(self, '_user', None)
+        if not user:
+            return cleaned_data
+            
+        duplicados = EventoServicio.objects.filter(
+            creado_por=user,
+            tipo_evento=cleaned_data['tipo_evento'],
+            descripcion=cleaned_data['descripcion'],
+            dni_paciente=cleaned_data.get('dni_paciente', ''),
+            fecha_creacion__gte=hace_5_minutos
+        )
+        
+        if duplicados.exists():
+            raise forms.ValidationError(
+                "Ya has registrado un evento similar en los últimos 5 minutos. "
+                "Por favor, revisa la lista de eventos antes de crear uno nuevo."
+            )
+        
+        return cleaned_data
+
+    def save(self, commit=True):
+        # Almacenar el usuario para la validación
+        if hasattr(self, '_user'):
+            instance = super().save(commit=False)
+            if commit:
+                instance.save()
+            return instance
+        return super().save(commit=commit)
 
 class NotaEventoForm(forms.ModelForm):
     class Meta:

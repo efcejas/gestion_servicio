@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import FullCalendarView, GuardiaCreateView, GuardiaEventsView, GuardiaListView, ResumenGuardiasView, MisGuardiasView
+from .views import CalendarioGuardiasView, FullCalendarView, GuardiaCreateView, GuardiaEventsView, GuardiaListView, ResumenGuardiasView, MisGuardiasView
 
 urlpatterns = [
     path('coberturas-semanal/', GuardiaListView.as_view(), name='coberturas_semanal'),
@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/guardias/', GuardiaEventsView.as_view(), name='guardias_api'),
     path('crear-guardia/', GuardiaCreateView.as_view(), name='crear_guardia'),
     path('mis-guardias/', MisGuardiasView.as_view(), name='mis_guardias'),
+    path('calendario-guardias/', CalendarioGuardiasView.as_view(), name='calendario_guardias'),
 ]
