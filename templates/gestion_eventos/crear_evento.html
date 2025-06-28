@@ -2,6 +2,43 @@
 {% block title %}Registrar Evento del Servicio{% endblock %}
 
 {% block content %}
+<style>
+/* Estilo para cuando el formulario se está enviando */
+.form-submitting .submit-btn {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    pointer-events: none;
+}
+
+.form-submitting .submit-btn::after {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    margin-left: 8px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.form-submitting .submit-text {
+    display: none;
+}
+
+.form-submitting .submit-loading {
+    display: inline;
+}
+
+.submit-loading {
+    display: none;
+}
+</style>
+
 <div class="container mt-4 mb-5">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-primary text-white">
@@ -103,7 +140,10 @@
                 
                 <div class="d-flex justify-content-end mt-3">
                     <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-secondary me-2">Cancelar</a>
-                    <button type="submit" class="btn btn-primary">Registrar</button>
+                    <button type="submit" class="btn btn-primary submit-btn" onclick="this.form.classList.add('form-submitting')">
+                        <span class="submit-text">Registrar</span>
+                        <span class="submit-loading">Registrando...</span>
+                    </button>
                 </div>
             </form>
         </div>
