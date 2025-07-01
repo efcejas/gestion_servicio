@@ -40,11 +40,18 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Apps principales del proyecto
     'accounts.apps.AccountsConfig',
     'control_guardias.apps.ControlGuardiasConfig',
     'liquidacion.apps.LiquidacionConfig',
     'gestion_eventos.apps.GestionEventosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',
+    
+    # Tailwind CSS
+    'tailwind',
+    'theme',
+    'django_browser_reload',
 ]
 
 MIDDLEWARE = [
@@ -146,6 +153,22 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =============================================================================
+# CONFIGURACIÓN DE TAILWIND CSS
+# =============================================================================
+
+# Nombre de la app que contendrá los estilos de Tailwind
+TAILWIND_APP_NAME = 'theme'
+
+# Configuración solo para desarrollo - hot reload
+if DEBUG:
+    INTERNAL_IPS = [
+        "127.0.0.1",
+    ]
+
+# Configuración del navegador para desarrollo (opcional)
+NPM_BIN_PATH = "npm"  # Ruta al binario de npm
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
