@@ -4,15 +4,22 @@
   "description": "Tailwind CSS theme for Django project",
   "main": "index.js",
   "scripts": {
-    "build": "tailwindcss -i ./src/styles.css -o ../static/css/styles.css --watch",
-    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/styles.css --minify"
+    "build": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch && copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\"",
+    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --minify && copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\""
   },
-  "keywords": ["tailwind", "css", "django"],
+  "keywords": [
+    "tailwind",
+    "css",
+    "django"
+  ],
   "author": "Tu Nombre",
   "license": "MIT",
   "devDependencies": {
-    "tailwindcss": "^3.4.0",
     "@tailwindcss/forms": "^0.5.7",
-    "@tailwindcss/typography": "^0.5.10"
+    "@tailwindcss/typography": "^0.5.10",
+    "tailwindcss": "^3.4.0"
+  },
+  "dependencies": {
+    "flowbite": "^3.1.2"
   }
 }

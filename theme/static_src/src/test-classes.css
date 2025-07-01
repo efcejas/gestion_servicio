@@ -1,0 +1,5 @@
+/* Este archivo fuerza la inclusión de clases específicas en Tailwind */
+.test-classes {
+  @apply bg-blue-500 bg-blue-700 text-white p-8 m-4 text-4xl font-bold text-lg rounded-lg shadow-lg mb-4;
+  @apply hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium text-sm px-5 py-2.5;
+}

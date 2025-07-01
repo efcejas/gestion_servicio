@@ -1,15 +1,19 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
-    // Templates de Django
+    // Templates de Django - rutas corregidas
     '../../templates/**/*.html',
     '../../**/templates/**/*.html',
     
-    // Archivos Python con posibles clases CSS
-    '../../**/*.py',
-    
-    // JavaScript files
+    // Archivos JavaScript
     '../../static/**/*.js',
+    
+    // FLOWBITE: Incluir archivos de Flowbite para detectar clases
+    './node_modules/flowbite/**/*.js',
+    
+    // Para asegurar que detecte nuestras clases de prueba
+    '../templates/simple_tailwind_test.html',
+    '../templates/flowbite_test.html',
   ],
   theme: {
     extend: {
@@ -29,6 +33,8 @@ module.exports = {
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
+    // FLOWBITE: Plugin para componentes interactivos
+    require('flowbite/plugin')
   ],
   
   // IMPORTANTE: Configuración para coexistir con Bootstrap

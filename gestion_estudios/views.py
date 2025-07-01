@@ -73,3 +73,30 @@ class HomeView(LoginRequiredMixin, TemplateView):
         context['ultima_actualizacion_evento'] = ultima_actualizacion
 
         return context
+
+# Vista para probar Flowbite
+class FlowbiteTestView(TemplateView):
+    template_name = 'flowbite_test.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True  # Ocultar navbar de Bootstrap para esta prueba
+        return context
+
+# Vista para prueba simple de Tailwind
+class SimpleTailwindTestView(TemplateView):
+    template_name = 'simple_tailwind_test.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True  # Ocultar navbar de Bootstrap para esta prueba
+        return context
+
+# Vista para debug de Tailwind CSS
+class DebugTailwindView(TemplateView):
+    template_name = 'debug_tailwind.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True  # Ocultar navbar de Bootstrap para esta prueba
+        return context
