@@ -1,0 +1,215 @@
+# 🔧 CONFIGURACIÓN CRÍTICA - RESPALDO
+# Archivo de respaldo rápido con configuraciones esenciales
+
+# ============================================================================
+# DJANGO SETTINGS (gestion_estudios/settings.py) - SOLO LAS PARTES CRÍTICAS
+# ============================================================================
+
+INSTALLED_APPS = [
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    
+    # Apps principales del proyecto
+    'accounts.apps.AccountsConfig',
+    'control_guardias.apps.ControlGuardiasConfig',
+    'liquidacion.apps.LiquidacionConfig',
+    'gestion_eventos.apps.GestionEventosConfig',
+    'pedidos_estudios.apps.PedidosEstudiosConfig',
+    
+    # Tailwind CSS - CONFIGURACIÓN LIMPIA
+    'tailwind',
+    'theme',
+    # NOTA: django_browser_reload REMOVIDO para flujo manual
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+    # NOTA: BrowserReloadMiddleware REMOVIDO
+]
+
+# Configuración de Tailwind
+TAILWIND_APP_NAME = 'theme'
+
+# Solo para desarrollo
+if DEBUG:
+    INTERNAL_IPS = ["127.0.0.1"]
+
+# ============================================================================
+# URLS (gestion_estudios/urls.py) - URLS DE PRUEBA
+# ============================================================================
+
+# Agregar estas importaciones:
+from .views import (CustomLoginView, CustomPasswordResetView, HomeView, 
+                   send_test_email, FlowbiteTestView, SimpleTailwindTestView, 
+                   DebugTailwindView, TestFlujoTrabajoView)
+
+# URLs de prueba (agregar al final):
+if settings.DEBUG:
+    urlpatterns += [
+        path('simple-tailwind-test/', SimpleTailwindTestView.as_view(), name='simple_tailwind_test'),
+        path('flowbite-test/', FlowbiteTestView.as_view(), name='flowbite_test'),
+        path('debug-tailwind/', DebugTailwindView.as_view(), name='debug_tailwind'),
+        path('test-flujo/', TestFlujoTrabajoView.as_view(), name='test_flujo_trabajo'),
+    ]
+
+# ============================================================================
+# VIEWS (gestion_estudios/views.py) - VISTAS DE PRUEBA
+# ============================================================================
+
+# Agregar estas vistas al final del archivo:
+
+class SimpleTailwindTestView(TemplateView):
+    template_name = 'simple_tailwind_test.html'
+
+class FlowbiteTestView(TemplateView):
+    template_name = 'flowbite_test.html'
+    
+class DebugTailwindView(TemplateView):
+    template_name = 'debug_tailwind.html'
+
+class TestFlujoTrabajoView(TemplateView):
+    template_name = 'test_flujo_trabajo.html'
+
+# ============================================================================
+# PACKAGE.JSON (theme/static_src/package.json)
+# ============================================================================
+
+{
+  "name": "theme",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run tailwind-watch\" \"npm run copy-watch\"",
+    "tailwind-watch": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch",
+    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --minify && npm run copy-styles",
+    "copy-styles": "copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\""
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "@tailwindcss/typography": "^0.5.10",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.0",
+    "tailwindcss": "^3.4.0"
+  },
+  "dependencies": {
+    "flowbite": "^3.1.2"
+  }
+}
+
+# ============================================================================
+# TAILWIND CONFIG (theme/static_src/tailwind.config.js)
+# ============================================================================
+
+module.exports = {
+  content: [
+    '../../templates/**/*.html',
+    '../../**/templates/**/*.html',
+    '../../static/**/*.js',
+    './node_modules/flowbite/**/*.js',
+  ],
+  safelist: [
+    // TODOS los colores automáticamente
+    {
+      pattern: /bg-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
+      variants: ['hover', 'focus', 'active', 'dark', 'dark:hover']
+    },
+    {
+      pattern: /text-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
+      variants: ['hover', 'focus', 'active', 'dark', 'dark:hover']
+    },
+    // Gradientes
+    {
+      pattern: /from-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/
+    },
+    {
+      pattern: /via-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/
+    },
+    {
+      pattern: /to-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/
+    },
+    // Utilidades comunes
+    'bg-gradient-to-r', 'bg-gradient-to-br', 'hover:bg-gradient-to-br',
+    'focus:outline-none', 'focus:ring-4', 'shadow-lg', 'font-medium'
+  ],
+  theme: {
+    extend: {
+      colors: {
+        'medical-blue': '#2563eb',
+        'medical-green': '#16a34a',
+        'medical-red': '#dc2626',
+      }
+    }
+  },
+  plugins: [
+    require('flowbite/plugin'),
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+  ],
+}
+
+# ============================================================================
+# CSS BASE (theme/static_src/src/styles.css)
+# ============================================================================
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados */
+@layer components {
+  .btn-medical {
+    @apply bg-medical-blue hover:bg-blue-700 text-white font-bold py-2 px-4 rounded;
+  }
+}
+
+# ============================================================================
+# COMANDOS DE INSTALACIÓN RÁPIDA
+# ============================================================================
+
+# 1. Instalar dependencias Node.js
+cd theme/static_src
+npm install
+
+# 2. Compilar CSS inicial
+npm run build-prod
+
+# 3. Copiar archivos estáticos
+cd ../..
+python manage.py collectstatic --noinput
+
+# 4. Iniciar desarrollo
+start-dev.bat
+
+# ============================================================================
+# URLs DE VERIFICACIÓN
+# ============================================================================
+
+http://127.0.0.1:8000/test-flujo/           # Prueba completa
+http://127.0.0.1:8000/simple-tailwind-test/ # Prueba básica
+http://127.0.0.1:8000/flowbite-test/        # Componentes Flowbite
+
+# ============================================================================
+# FLUJO DE TRABAJO
+# ============================================================================
+
+1. Ejecutar: start-dev.bat
+2. Editar templates HTML
+3. Ctrl+S (guardar)
+4. F5 (recargar navegador)
+5. ¡Ver cambios al instante!
+
+# ============================================================================
+# ESTADO: ✅ COMPLETAMENTE FUNCIONAL
+# FECHA: 1 de julio de 2025
+# VERSIÓN: Producción Lista
+# ============================================================================
