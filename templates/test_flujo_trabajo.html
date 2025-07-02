@@ -122,72 +122,216 @@
             <div class="flex items-center justify-between mb-6">
                 <div>
                     <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-                    <p class="text-gray-300">Sistema de Gestión Médica - Dr. Cejas</p>
+                    <p class="text-gray-300">Sistema de Gestión - Dr. Cejas</p>
                 </div>
                 <div class="flex items-center space-x-4">
+                    <!-- Indicador de eventos -->
+                    {% if cantidad_eventos_abiertos > 0 %}
+                        <div class="flex items-center space-x-2 bg-red-900 px-3 py-1 rounded-full">
+                            <div class="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+                            <span class="text-sm text-red-300 font-medium">{{ cantidad_eventos_abiertos }} evento{{ cantidad_eventos_abiertos|pluralize }}!</span>
+                        </div>
+                    {% else %}
+                        <div class="flex items-center space-x-2 bg-green-900 px-3 py-1 rounded-full">
+                            <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span class="text-sm text-green-300 font-medium">Sin eventos</span>
+                        </div>
+                    {% endif %}
                     <span class="text-sm text-gray-400">Último acceso: Hoy 14:30</span>
                     <div class="w-3 h-3 bg-green-400 rounded-full"></div>
                 </div>
             </div>
 
-            <!-- Cards de estadísticas -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="flex items-center justify-center h-24 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold">142</div>
-                        <div class="text-sm">Pacientes Activos</div>
+            <!-- Cards de estadísticas principales -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <!-- Card: Eventos Abiertos -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Eventos del Servicio</h3>
+                            <div class="text-3xl font-bold {% if cantidad_eventos_abiertos > 0 %}text-red-400{% else %}text-gray-400{% endif %}">
+                                {{ cantidad_eventos_abiertos|default:0 }}
+                            </div>
+                            <p class="text-sm text-gray-400 mt-1">Eventos abiertos</p>
+                        </div>
+                        <div class="{% if cantidad_eventos_abiertos > 0 %}bg-red-500{% else %}bg-gray-500{% endif %} rounded-full p-3">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    {% if ultimo_evento_abierto %}
+                        <div class="mt-4 p-3 bg-red-900 rounded-lg">
+                            <div class="text-sm text-red-300 font-medium">{{ ultimo_evento_abierto.get_tipo_evento_display }}</div>
+                            <div class="text-xs text-red-400 mt-1 truncate">{{ ultimo_evento_abierto.descripcion|truncatechars:60 }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Card: Regiones del Mes -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Regiones - Mes Actual</h3>
+                            <div class="text-3xl font-bold text-yellow-400">
+                                {{ total_regiones_mes|default:0 }}
+                            </div>
+                            <p class="text-sm text-gray-400 mt-1">Total registradas</p>
+                        </div>
+                        <div class="bg-yellow-500 rounded-full p-3">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-sm text-gray-300">
+                        <span class="text-blue-400 font-medium">{{ medicos_activos_semana }}</span> médicos activos esta semana
                     </div>
                 </div>
-                <div class="flex items-center justify-center h-24 rounded-lg bg-gradient-to-r from-green-500 to-green-600 text-white">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold">18</div>
-                        <div class="text-sm">Estudios Hoy</div>
+
+                <!-- Card: Médico de Guardia -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-white mb-2">Médico de Guardia</h3>
+                            <div class="text-lg font-bold {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-400{% else %}text-green-400{% endif %} truncate">
+                                {{ nombre_medico_guardia|default:"No asignado" }}
+                            </div>
+                            {% if franja_horaria_guardia %}
+                                <p class="text-sm text-blue-300 mt-1">{{ franja_horaria_guardia }}</p>
+                            {% else %}
+                                <p class="text-sm text-gray-400 mt-1">Guardia de hoy</p>
+                            {% endif %}
+                        </div>
+                        <div class="{% if 'Sin cubrir' in nombre_medico_guardia %}bg-red-500{% else %}bg-green-500{% endif %} rounded-full p-3">
+                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                {% if 'Sin cubrir' in nombre_medico_guardia %}
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                {% else %}
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                {% endif %}
+                            </svg>
+                        </div>
                     </div>
-                </div>
-                <div class="flex items-center justify-center h-24 rounded-lg bg-gradient-to-r from-pink-600 to-pink-800 text-white">
-                    <div class="text-center">
-                        <div class="text-2xl font-bold">$45,280</div>
-                        <div class="text-sm">Ingresos Mes</div>
-                    </div>
+                    {% if nombre_proximo_medico %}
+                        <div class="mt-4 pt-3 border-t border-gray-600">
+                            <div class="text-xs text-gray-400 mb-1">Próximo de guardia</div>
+                            <div class="text-sm text-gray-300 font-medium">{{ nombre_proximo_medico }}</div>
+                            <div class="text-xs text-gray-500">{{ fecha_proxima_guardia }}</div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
-            <!-- Área principal de contenido -->
-            <div class="flex items-center justify-center h-48 mb-4 rounded-lg bg-gray-800 border-2 border-dashed border-gray-600">
-                <div class="text-center">
-                    <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    <h3 class="mt-2 text-sm font-medium text-white">Gráfico Principal</h3>
-                    <p class="mt-1 text-sm text-gray-400">Aquí irían los gráficos de estadísticas</p>
+            <!-- Últimos médicos que registraron -->
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-white">Últimos Médicos Activos</h3>
+                    <span class="text-xs text-gray-400">Los 5 médicos que registraron más recientemente</span>
                 </div>
+                {% if ultimos_medicos_activos %}
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-300">
+                            <thead class="text-xs text-gray-400 uppercase bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3">Médico</th>
+                                    <th class="px-4 py-3">Último Paciente</th>
+                                    <th class="px-4 py-3">Total Estudios</th>
+                                    <th class="px-4 py-3">Total Regiones</th>
+                                    <th class="px-4 py-3">Última Actividad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for medico_data in ultimos_medicos_activos %}
+                                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-750">
+                                    <td class="px-4 py-3 font-medium text-white">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3">
+                                                <span class="text-white text-sm font-medium">
+                                                    {{ medico_data.medico.first_name|first|default:medico_data.medico.username|first }}{{ medico_data.medico.last_name|first|default:"" }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-lg">{{ medico_data.medico.first_name|default:medico_data.medico.username }} {{ medico_data.medico.last_name }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <div>
+                                            <div class="font-medium">{{ medico_data.nombre_paciente }}</div>
+                                            <div class="text-xs text-gray-400">DNI: {{ medico_data.ultimo_registro.dni_paciente }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="bg-blue-900 text-blue-300 px-4 py-2 rounded-full text-sm font-bold">
+                                            {{ medico_data.total_estudios }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <span class="bg-green-900 text-green-300 px-4 py-2 rounded-full text-sm font-bold">
+                                            {{ medico_data.total_regiones }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-gray-400">
+                                        <div>
+                                            <div class="text-sm font-medium text-white">{{ medico_data.ultima_fecha|date:"d/m/Y" }}</div>
+                                            <div class="text-xs text-gray-400">{{ medico_data.ultima_fecha|date:"H:i" }}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="flex items-center justify-center h-32">
+                        <div class="text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            <h3 class="mt-2 text-sm font-medium text-white">Sin actividad reciente</h3>
+                            <p class="mt-1 text-sm text-gray-400">No hay médicos con registros recientes</p>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
 
-            <!-- Grid de widgets -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div class="rounded-lg bg-gray-800 border border-gray-700 h-32 p-4">
-                    <h3 class="text-lg font-semibold text-white mb-2">Próximas Citas</h3>
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-300">Juan Pérez - 15:30</span>
-                            <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">Ecografía</span>
+
+
+            <!-- Widgets adicionales -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                <!-- Widget: Estadísticas rápidas -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Resumen Rápido</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-blue-400">{{ total_pacientes_activos|default:0 }}</div>
+                            <div class="text-sm text-gray-400">Pacientes Únicos</div>
                         </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-300">María García - 16:00</span>
-                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Consulta</span>
+                        <div class="text-center">
+                            <div class="text-2xl font-bold text-purple-400">{{ medicos_activos_semana|default:0 }}</div>
+                            <div class="text-sm text-gray-400">Médicos Activos</div>
                         </div>
                     </div>
                 </div>
-                <div class="rounded-lg bg-gray-800 border border-gray-700 h-32 p-4">
-                    <h3 class="text-lg font-semibold text-white mb-2">Estudios Pendientes</h3>
-                    <div class="space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-300">Resonancia - Ana López</span>
-                            <span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">Pendiente</span>
+
+                <!-- Widget: Próximas citas (ejemplo) -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Próximas Citas</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <div>
+                                <div class="text-sm text-gray-300 font-medium">Juan Pérez</div>
+                                <div class="text-xs text-gray-400">Ecografía abdominal</div>
+                            </div>
+                            <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded">15:30</span>
                         </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-300">TAC - Carlos Ruiz</span>
-                            <span class="text-xs bg-red-900 text-red-300 px-2 py-1 rounded">Urgente</span>
+                        <div class="flex justify-between items-center p-2 bg-gray-700 rounded">
+                            <div>
+                                <div class="text-sm text-gray-300 font-medium">María García</div>
+                                <div class="text-xs text-gray-400">Consulta seguimiento</div>
+                            </div>
+                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">16:00</span>
                         </div>
                     </div>
                 </div>
