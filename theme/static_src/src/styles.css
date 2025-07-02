@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Importar estilos de Flowbite directamente */
+@import 'flowbite/dist/flowbite.min.css';
+
 /* Forzar inclusión de clases específicas para pruebas */
 @layer utilities {
   .force-include {

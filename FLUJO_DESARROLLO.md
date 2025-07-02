@@ -101,13 +101,20 @@ npm run build-prod
 
 ### 🌊 **Usando Flowbite**
 ```html
-<!-- ✅ Componentes listos para usar -->
-<button data-modal-target="default-modal" data-modal-toggle="default-modal">
-    Abrir Modal
-</button>
-
-<!-- ✅ JavaScript incluido automáticamente -->
-<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+<!-- ✅ IMPORTANTE: Incluir TANTO CSS como JavaScript de Flowbite -->
+<head>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+</head>
+<body>
+    <!-- ✅ Componentes listos para usar -->
+    <button class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">
+        Botón Flowbite
+    </button>
+    
+    <!-- ✅ JavaScript incluido automáticamente -->
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+</body>
 ```
 
 ## 🔧 Configuración Técnica (Ya Completada)
