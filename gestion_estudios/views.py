@@ -100,3 +100,6 @@ class DebugTailwindView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = True  # Ocultar navbar de Bootstrap para esta prueba
         return context
+
+class TestFlujoTrabajoView(TemplateView):
+    template_name = 'test_flujo_trabajo.html'

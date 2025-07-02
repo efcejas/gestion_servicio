@@ -3,3 +3,16 @@
   @apply bg-blue-500 bg-blue-700 text-white p-8 m-4 text-4xl font-bold text-lg rounded-lg shadow-lg mb-4;
   @apply hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium text-sm px-5 py-2.5;
 }
+
+/* Forzar inclusión de clases púrpura */
+.purple-classes {
+  @apply bg-purple-700 hover:bg-purple-800 focus:ring-purple-300 focus:outline-none;
+  @apply dark:bg-purple-600 dark:hover:bg-purple-700 dark:focus:ring-purple-900;
+  @apply space-y-4;
+}
+
+/* Clases adicionales púrpura para asegurar inclusión */
+.purple-colors {
+  background-color: #7c3aed; /* bg-purple-700 */
+  background-color: #6b21a8; /* bg-purple-800 para hover */
+}

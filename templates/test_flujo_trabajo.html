@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>✅ Test Final - Flujo de Trabajo</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-8">
+        <!-- Encabezado Principal -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg shadow-lg mb-8">
+            <h1 class="text-3xl font-bold mb-2">🚀 Flujo de Trabajo Verificado</h1>
+            <p class="text-lg opacity-90">Tailwind CSS + Flowbite funcionando perfectamente</p>
+        </div>
+
+        <!-- Test de Colores Tailwind -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-purple-800 text-white p-4 rounded-lg text-center">
+                <h3 class="font-bold">Rojo</h3>
+                <p class="text-sm">bg-red-500</p>
+            </div>
+            <div class="bg-green-500 text-white p-4 rounded-lg text-center">
+                <h3 class="font-bold">Verde</h3>
+                <p class="text-sm">bg-green-500</p>
+            </div>
+            <div class="bg-blue-500 text-white p-4 rounded-lg text-center">
+                <h3 class="font-bold">Azul</h3>
+                <p class="text-sm">bg-blue-500</p>
+            </div>
+        </div>
+
+        <!-- Test de Botones Flowbite -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-bold mb-4">🌊 Componentes Flowbite</h2>
+            <div class="space-x-4">
+                <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">
+                    Botón Azul
+                </button>
+                <button type="button" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5">
+                    Botón Verde
+                </button>
+                <button type="button" class="text-gray-900 bg-gradient-to-r from-lime-200 via-lime-400 to-lime-500 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-lime-300 font-medium rounded-lg text-sm px-5 py-2.5">
+                    Gradiente Lime
+                </button>
+            </div>
+        </div>
+
+        <!-- Instrucciones -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+            <h3 class="text-lg font-bold text-yellow-800 mb-2">💡 Instrucciones de Prueba</h3>
+            <ol class="text-yellow-700 space-y-1">
+                <li>1. Cambia cualquier clase CSS arriba (ej: bg-red-500 → bg-purple-500)</li>
+                <li>2. Guarda con <strong>Ctrl+S</strong></li>
+                <li>3. Recarga con <strong>F5</strong></li>
+                <li>4. ¡Ve los cambios al instante! ✨</li>
+            </ol>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+</body>
+</html>

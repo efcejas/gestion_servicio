@@ -4,8 +4,12 @@
   "description": "Tailwind CSS theme for Django project",
   "main": "index.js",
   "scripts": {
+    "dev": "concurrently \"npm run tailwind-watch\" \"npm run copy-watch\"",
+    "tailwind-watch": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch",
+    "copy-watch": "chokidar \"../static/css/tailwind.css\" -c \"npm run copy-styles\"",
     "build": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch && copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\"",
-    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --minify && copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\""
+    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --minify && npm run copy-styles",
+    "copy-styles": "copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\""
   },
   "keywords": [
     "tailwind",
@@ -17,6 +21,8 @@
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.0",
     "tailwindcss": "^3.4.0"
   },
   "dependencies": {

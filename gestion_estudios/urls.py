@@ -17,7 +17,7 @@ Incluyendo otra URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, FlowbiteTestView, SimpleTailwindTestView, DebugTailwindView, DebugTailwindView
+from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, FlowbiteTestView, SimpleTailwindTestView, DebugTailwindView, TestFlujoTrabajoView
 
 urlpatterns = [
     # Administración
@@ -54,6 +54,6 @@ urlpatterns = [
     path('simple-tailwind-test/', SimpleTailwindTestView.as_view(), name='simple_tailwind_test'),
     # Debug de Tailwind CSS
     path('debug-tailwind/', DebugTailwindView.as_view(), name='debug_tailwind'),
-    # Django Browser Reload (solo en desarrollo)
-    path('__reload__/', include('django_browser_reload.urls')),
+    # Test de flujo de trabajo
+    path('test-flujo/', TestFlujoTrabajoView.as_view(), name='test_flujo_trabajo'),
 ]
