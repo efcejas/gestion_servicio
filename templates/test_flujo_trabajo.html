@@ -128,10 +128,12 @@
                     <form method="post" action="{% url 'logout' %}" class="m-0">
                         {% csrf_token %}
                         <button type="submit" class="flex items-center w-full p-2 text-white rounded-lg hover:bg-red-900 group">
-                            <svg class="w-5 h-5 text-gray-400 transition duration-75 group-hover:text-red-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 16">
-                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"/>
-                            </svg>
-                            <span class="flex-1 ms-3 whitespace-nowrap group-hover:text-red-400">Cerrar Sesión</span>
+                            <span class="flex items-center">
+                                <svg class="w-5 h-5 text-gray-400 transition duration-75 group-hover:text-red-400 mr-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 18 16">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 8h11m0 0L8 4m4 4-4 4m4-11h3a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-3"/>
+                                </svg>
+                                <span class="flex-1 whitespace-nowrap group-hover:text-red-400">Cerrar Sesión</span>
+                            </span>
                         </button>
                     </form>
                 </li>
