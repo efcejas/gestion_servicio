@@ -17,7 +17,7 @@ Incluyendo otra URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, TestFlujoTrabajoView
+from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView
 
 urlpatterns = [
     # Administración
@@ -25,6 +25,9 @@ urlpatterns = [
 
     # Página principal
     path('', HomeView.as_view(), name='home'),
+
+    # Tablero de administración
+    path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),  # Nueva URL más descriptiva
 
     # Autenticación y cuentas
     path('accounts/login/', CustomLoginView.as_view(), name='login'),  # Vista personalizada de inicio de sesión
@@ -47,7 +50,4 @@ urlpatterns = [
 
     # Prueba de envío de correos
     path('send-test-email/', send_test_email, name='send_test_email'),
-    
-    # Test de flujo de trabajo
-    path('test-flujo/', TestFlujoTrabajoView.as_view(), name='test_flujo_trabajo'),
 ]

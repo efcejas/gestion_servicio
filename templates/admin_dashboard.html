@@ -4,10 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>✅ Test Final - Flujo de Trabajo</title>
+    <title>Dashboard Administrativo - Dr. Cejas</title>
+    <!-- Usar archivos estáticos locales en lugar de CDNs -->
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
-    <!-- CSS de Flowbite para estilos completos -->
-    <link href="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{% static 'css/flowbite.min.css' %}">
 </head>
 <body class="bg-gray-900 dark">
     <!-- Botón para abrir sidebar en móvil -->
@@ -345,49 +345,10 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Widget: Próximas citas (ejemplo) -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
-                    <h3 class="text-base md:text-lg font-semibold text-white mb-4">Próximas Citas</h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center p-2 md:p-3 bg-gray-700 rounded">
-                            <div class="min-w-0 flex-1">
-                                <div class="text-sm text-gray-300 font-medium break-words">Juan Pérez</div>
-                                <div class="text-xs text-gray-400 break-words">Ecografía abdominal</div>
-                            </div>
-                            <span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded ml-2 flex-shrink-0">15:30</span>
-                        </div>
-                        <div class="flex justify-between items-center p-2 md:p-3 bg-gray-700 rounded">
-                            <div class="min-w-0 flex-1">
-                                <div class="text-sm text-gray-300 font-medium break-words">María García</div>
-                                <div class="text-xs text-gray-400 break-words">Consulta seguimiento</div>
-                            </div>
-                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded ml-2 flex-shrink-0">16:00</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Test de Flowbite - Mantenerlo para verificar que funciona -->
-            <div class="bg-gray-800 p-4 md:p-6 rounded-lg border border-gray-700 mb-4">
-                <h2 class="text-lg md:text-xl font-bold mb-4 text-white">🌊 Componentes Flowbite - Test</h2>
-                <div class="space-y-4">
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-4 md:px-5 py-2 md:py-2.5">
-                            Botón Azul
-                        </button>
-                        <button type="button" class="text-white bg-green-700 hover:bg-green-800 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 md:px-5 py-2 md:py-2.5">
-                            Botón Verde
-                        </button>
-                        <button type="button" class="text-gray-900 bg-gradient-to-r from-lime-200 via-lime-400 to-lime-500 hover:bg-gradient-to-br focus:ring-4 focus:outline-none focus:ring-lime-300 font-medium rounded-lg text-sm px-4 md:px-5 py-2 md:py-2.5">
-                            Gradiente Lime
-                        </button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+    <script src="{% static 'js/flowbite.min.js' %}"></script>
 </body>
 </html>

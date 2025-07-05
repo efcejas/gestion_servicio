@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView, PasswordResetView
 from django.core.mail import send_mail
 from django.db.models import Count, Max
@@ -45,6 +45,12 @@ class HomeView(LoginRequiredMixin, TemplateView):
     template_name = 'home.html'
     login_url = 'login'
 
+    def dispatch(self, request, *args, **kwargs):
+        """Redirigir superusuarios al dashboard de admin"""
+        if request.user.is_authenticated and request.user.is_superuser:
+            return redirect('admin_dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = False
@@ -78,8 +84,13 @@ class HomeView(LoginRequiredMixin, TemplateView):
 
         return context
 
-class TestFlujoTrabajoView(TemplateView):
-    template_name = 'test_flujo_trabajo.html'
+class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = 'admin_dashboard.html'
+    login_url = 'login'  # Redirigir a login si no está autenticado
+    
+    def test_func(self):
+        """Solo permite acceso a superusuarios"""
+        return self.request.user.is_superuser
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
