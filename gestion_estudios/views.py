@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -85,10 +85,6 @@ class TestFlujoTrabajoView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = True
 
-        # Usar fecha local en lugar de UTC para evitar problemas de zona horaria
-        from django.utils import timezone
-        from datetime import datetime
-        
         # Obtener la fecha actual local (sin zona horaria para simplificar)
         ahora_local = datetime.now()
         hoy = ahora_local.date()
@@ -122,8 +118,6 @@ class TestFlujoTrabajoView(TemplateView):
             context.update(self.get_guardias_context(hoy, hora_actual))
         except Exception as e:
             print(f"❌ Error en guardias: {e}")
-            import traceback
-            traceback.print_exc()
             context.update({
                 'nombre_medico_guardia': "Error al cargar",
                 'franja_horaria_guardia': f"Error: {str(e)}",
