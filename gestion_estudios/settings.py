@@ -167,7 +167,7 @@ if DEBUG:
     ]
 
 # Configuración del navegador para desarrollo (opcional)
-NPM_BIN_PATH = "npm"  # Ruta al binario de npm
+NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"  # Ruta al binario de npm
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"

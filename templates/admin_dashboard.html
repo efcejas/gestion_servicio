@@ -5,9 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Administrativo - Dr. Cejas</title>
-    <!-- Usar archivos estáticos locales en lugar de CDNs -->
-    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
-    <link rel="stylesheet" href="{% static 'css/flowbite.min.css' %}">
+    <!-- Tailwind CSS compilado localmente -->
+    <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
+    <!-- Flowbite CSS desde CDN -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-900 dark">
     <!-- Botón para abrir sidebar en móvil -->
@@ -349,6 +350,7 @@
         </div>
     </div>
 
-    <script src="{% static 'js/flowbite.min.js' %}"></script>
+    <!-- Flowbite JS desde CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
 </body>
 </html>
