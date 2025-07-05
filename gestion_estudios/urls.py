@@ -17,7 +17,7 @@ Incluyendo otra URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, FlowbiteTestView, SimpleTailwindTestView, DebugTailwindView, TestFlujoTrabajoView
+from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, TestFlujoTrabajoView
 
 urlpatterns = [
     # Administración
@@ -48,12 +48,6 @@ urlpatterns = [
     # Prueba de envío de correos
     path('send-test-email/', send_test_email, name='send_test_email'),
     
-    # Prueba de Flowbite + Tailwind CSS
-    path('flowbite-test/', FlowbiteTestView.as_view(), name='flowbite_test'),
-    # Prueba simple de Tailwind CSS
-    path('simple-tailwind-test/', SimpleTailwindTestView.as_view(), name='simple_tailwind_test'),
-    # Debug de Tailwind CSS
-    path('debug-tailwind/', DebugTailwindView.as_view(), name='debug_tailwind'),
     # Test de flujo de trabajo
     path('test-flujo/', TestFlujoTrabajoView.as_view(), name='test_flujo_trabajo'),
 ]
