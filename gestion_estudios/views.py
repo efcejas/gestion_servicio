@@ -112,8 +112,14 @@ class TestFlujoTrabajoView(TemplateView):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = True
 
-        hoy = timezone.now().date()
-        hora_actual = timezone.now().time()
+        # Usar fecha local en lugar de UTC para evitar problemas de zona horaria
+        from django.utils import timezone
+        from datetime import datetime
+        
+        # Obtener la fecha actual local (sin zona horaria para simplificar)
+        ahora_local = datetime.now()
+        hoy = ahora_local.date()
+        hora_actual = ahora_local.time()
 
         try:
             context.update(self.get_eventos_context())
@@ -245,52 +251,47 @@ class TestFlujoTrabajoView(TemplateView):
     # ------------------------ GUARDIAS ------------------------
 
     def get_guardias_context(self, fecha_hoy, hora_actual):
-        """Devuelve información sobre el médico de guardia actual o el próximo de hoy si aún no comenzó."""
-
-        # 1. Intentar encontrar guardia activa ahora
-        guardia_activa = self.buscar_guardia_activa(fecha_hoy, hora_actual, cubierta=True)
-
-        if guardia_activa and guardia_activa.medico:
-            # Hay una guardia activa
-            nombre_guardia = self.formatear_nombre_medico(guardia_activa.medico)
-            franja_guardia = guardia_activa.get_franja_horaria_display()
-
-            # Si la guardia activa es de ayer y sigue hoy por la mañana
-            if guardia_activa.fecha == fecha_hoy - timedelta(days=1):
-                franja_guardia += " (continúa)"
+        """Devuelve información sobre el médico de guardia hoy y mañana de forma simple."""
+        
+        # 1. Buscar guardia de HOY según la hora actual
+        guardias_hoy = Guardia.objects.filter(
+            fecha=fecha_hoy,
+            cubierta=True,
+            medico__isnull=False
+        ).select_related('medico').order_by('franja_horaria')
+        
+        # Determinar qué guardia está activa según la hora
+        guardia_hoy = None
+        
+        if hora_actual.hour >= 20 or hora_actual.hour < 8:
+            # Es horario nocturno (20:00 - 07:59)
+            guardia_hoy = guardias_hoy.filter(franja_horaria__in=['NOCHE', 'NOCHE_FIN_SEMANA', 'DIA_COMPLETO']).first()
         else:
-            # 2. No hay guardia activa, buscar si hay alguna programada para hoy
-            guardias_hoy = Guardia.objects.filter(
-                fecha=fecha_hoy,
-                cubierta=True
-            ).order_by('franja_horaria').select_related('medico')
+            # Es horario diurno (08:00 - 19:59)
+            guardia_hoy = guardias_hoy.filter(franja_horaria__in=['DIA', 'DIA_FIN_SEMANA', 'DIA_COMPLETO']).first()
 
-            proxima_hoy = next((g for g in guardias_hoy if g.medico), None)
+        if guardia_hoy:
+            nombre_guardia = self.formatear_nombre_medico(guardia_hoy.medico)
+            franja_guardia = guardia_hoy.get_franja_horaria_display()
+        else:
+            nombre_guardia = "No asignado"
+            franja_guardia = "Sin guardia programada"
 
-            if proxima_hoy:
-                nombre_guardia = self.formatear_nombre_medico(proxima_hoy.medico)
-                franja_guardia = f"Esta noche • {self.formatear_rango_horario(proxima_hoy.franja_horaria)}"
-            else:
-                # 3. Ni guardia activa ni programada hoy → fallback
-                nombre_guardia, franja_guardia = "No asignado", "Guardia no programada"
-
-        # 4. Buscar guardia de mañana (día siguiente)
+        # 2. Buscar guardia de MAÑANA (día siguiente)
         fecha_manana = fecha_hoy + timedelta(days=1)
-        guardias_manana = Guardia.objects.filter(
+        
+        guardia_manana = Guardia.objects.filter(
             fecha=fecha_manana,
-            cubierta=True
-        ).order_by('franja_horaria').select_related('medico')
+            cubierta=True,
+            medico__isnull=False
+        ).select_related('medico').first()
 
-        # Buscar la primera guardia de mañana que tenga médico asignado
-        guardia_manana = next((g for g in guardias_manana if g.medico), None)
-
-        if guardia_manana and guardia_manana.medico:
+        if guardia_manana:
             nombre_proximo = self.formatear_nombre_medico(guardia_manana.medico)
-            franja_manana = guardia_manana.get_franja_horaria_display()
-            rango_horario = self.formatear_rango_horario(guardia_manana.franja_horaria)
-            fecha_proxima = f"Mañana • {franja_manana} ({rango_horario})"
+            fecha_proxima = f"Mañana • {guardia_manana.get_franja_horaria_display()}"
         else:
-            nombre_proximo, fecha_proxima = "No programado", "Sin guardia mañana"
+            nombre_proximo = "No programado"
+            fecha_proxima = "Sin guardia mañana"
 
         return {
             'nombre_medico_guardia': nombre_guardia,
@@ -299,112 +300,21 @@ class TestFlujoTrabajoView(TemplateView):
             'fecha_proxima_guardia': fecha_proxima,
         }
 
-    def esta_guardia_activa(self, g, hora, fecha):
-        if g.franja_horaria == 'DIA_COMPLETO':
-            return True
-        elif g.franja_horaria in ['DIA', 'DIA_FIN_SEMANA']:
-            return 8 <= hora.hour < 20
-        elif g.franja_horaria in ['NOCHE', 'NOCHE_FIN_SEMANA']:
-            # Guardia de hoy: activa desde las 20:00
-            if g.fecha == fecha:
-                return hora.hour >= 20
-            # Guardia de ayer: activa hasta las 08:00
-            else:
-                return hora.hour < 8
-        return False
-
-    def buscar_guardia_activa(self, fecha, hora, cubierta=True):
-        fecha_ayer = fecha - timedelta(days=1)
-        guardias = Guardia.objects.filter(fecha__in=[fecha, fecha_ayer], cubierta=cubierta).select_related('medico')
-        
-        for g in guardias:
-            if self.esta_guardia_activa(g, hora, fecha):
-                return g
-        
-        return None
-
-    def buscar_proxima_guardia(self, actual, fecha):
-        inicio = actual.fecha + timedelta(days=1) if actual else fecha
-        for i in range(7):
-            dia = inicio + timedelta(days=i)
-            guardias = Guardia.objects.filter(fecha=dia, cubierta=True).select_related('medico')
-            for g in guardias:
-                if not actual or g.fecha != actual.fecha or g.franja_horaria != actual.franja_horaria:
-                    return g
-        return None
-
-    def formatear_nombre_medico(self, medico_obj, sufijo=""):
+    def formatear_nombre_medico(self, medico_obj):
         # Si es un MedicoGuardia
         if hasattr(medico_obj, 'user') and medico_obj.user:
             nombre = medico_obj.user.get_full_name()
             if nombre.strip():
-                return f"Dr. {nombre}{sufijo}"
+                return f"Dr. {nombre}"
             else:
-                return f"Dr. {medico_obj.user.username}{sufijo}"
+                return f"Dr. {medico_obj.user.username}"
         # Si es un User directamente
         elif hasattr(medico_obj, 'get_full_name'):
             nombre = medico_obj.get_full_name()
             if nombre.strip():
-                return f"Dr. {nombre}{sufijo}"
+                return f"Dr. {nombre}"
             else:
-                return f"Dr. {medico_obj.username}{sufijo}"
+                return f"Dr. {medico_obj.username}"
         # Fallback
         else:
-            return f"Dr. {str(medico_obj)}{sufijo}"
-
-    def formatear_fecha_guardia(self, guardia, hoy):
-        if guardia.fecha == hoy:
-            return f"Hoy • {guardia.get_franja_horaria_display()}"
-        elif guardia.fecha == hoy + timedelta(days=1):
-            return f"Mañana • {guardia.get_franja_horaria_display()}"
-        return f"{guardia.fecha.strftime('%d/%m')} • {guardia.get_franja_horaria_display()}"
-
-    def formatear_rango_horario(self, franja):
-        if franja == "DIA":
-            return "08:00 - 20:00"
-        elif franja == "NOCHE":
-            return "20:00 - 08:00"
-        elif franja == "DIA_COMPLETO":
-            return "00:00 - 23:59"
-        return ""
-
-    def crear_guardias_prueba(self, fecha_hoy):
-        """Crea guardias de prueba si no existen"""
-        try:
-            from accounts.models import CustomUser
-            
-            # Verificar si ya hay guardias para hoy
-            if Guardia.objects.filter(fecha=fecha_hoy).exists():
-                return
-            
-            # Buscar o crear un médico de prueba
-            usuario_admin = CustomUser.objects.filter(is_superuser=True).first()
-            if not usuario_admin:
-                return
-                
-            medico_prueba, created = MedicoGuardia.objects.get_or_create(
-                user=usuario_admin,
-                defaults={
-                    'dni': '12345678',
-                    'matricula': '123456'
-                }
-            )
-            
-            # Crear guardia de día para hoy
-            Guardia.objects.create(
-                fecha=fecha_hoy,
-                franja_horaria='DIA',
-                cubierta=True,
-                medico=medico_prueba
-            )
-            
-            # Crear guardia nocturna para hoy
-            Guardia.objects.create(
-                fecha=fecha_hoy,
-                franja_horaria='NOCHE',
-                cubierta=True,
-                medico=medico_prueba
-            )
-            
-        except Exception:
-            pass
+            return f"Dr. {str(medico_obj)}"
