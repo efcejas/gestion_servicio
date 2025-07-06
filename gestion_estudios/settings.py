@@ -143,6 +143,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Directorios adicionales de archivos estáticos
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'theme/static'),  # <- ESTA LÍNEA NUEVA
 ]
 
 # Almacenamiento para Heroku
