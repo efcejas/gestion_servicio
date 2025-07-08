@@ -1,0 +1,136 @@
+<!-- Modal de Eventos -->
+<div class="space-y-4">
+    <!-- Header del modal con tabs -->
+    <div class="border-b border-gray-600">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Eventos del Servicio</h3>
+            <div class="text-center">
+                <div class="text-blue-400 font-bold text-lg">{{ total_eventos }}</div>
+                <div class="text-gray-400">{% if estado_actual == 'abierto' %}Abiertos{% elif estado_actual == 'en_revision' %}En Revisión{% elif estado_actual == 'resuelto' %}Resueltos (7d){% else %}Total{% endif %}</div>
+            </div>
+        </div>
+        
+        <!-- Tabs de filtros -->
+        <div class="flex space-x-1 mb-4">
+            <button onclick="filtrarEventos('abierto')" 
+                    class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg transition-colors
+                           {% if estado_actual == 'abierto' %}bg-red-900 text-red-300 border-b-2 border-red-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
+                🔴 Abiertos <span class="ml-1 px-2 py-0.5 text-xs bg-red-800 rounded-full">{{ conteos.abierto }}</span>
+            </button>
+            <button onclick="filtrarEventos('en_revision')" 
+                    class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg transition-colors
+                           {% if estado_actual == 'en_revision' %}bg-yellow-900 text-yellow-300 border-b-2 border-yellow-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
+                🟡 En Revisión <span class="ml-1 px-2 py-0.5 text-xs bg-yellow-800 rounded-full">{{ conteos.en_revision }}</span>
+            </button>
+            <button onclick="filtrarEventos('resuelto')" 
+                    class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg transition-colors
+                           {% if estado_actual == 'resuelto' %}bg-green-900 text-green-300 border-b-2 border-green-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
+                🟢 Resueltos (7d) <span class="ml-1 px-2 py-0.5 text-xs bg-green-800 rounded-full">{{ conteos.resuelto }}</span>
+            </button>
+            <button onclick="filtrarEventos('todos')" 
+                    class="tab-button px-4 py-2 text-sm font-medium rounded-t-lg transition-colors
+                           {% if estado_actual == 'todos' %}bg-blue-900 text-blue-300 border-b-2 border-blue-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
+                📋 Todos <span class="ml-1 px-2 py-0.5 text-xs bg-blue-800 rounded-full">{{ conteos.todos }}</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de eventos -->
+    {% if eventos %}
+        <div class="max-h-96 overflow-y-auto space-y-3">
+            {% for evento in eventos %}
+            <div class="bg-gray-700 border border-gray-600 rounded-lg p-4 hover:bg-gray-650 transition-colors">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-900 text-red-300">
+                                {{ evento.get_tipo_evento_display|default:"Evento" }}
+                            </span>
+                            {% if evento.servicio_origen_evento %}
+                            <span class="px-2 py-1 text-xs font-medium rounded-full bg-blue-900 text-blue-300">
+                                {{ evento.get_servicio_origen_evento_display|default:evento.servicio_origen_evento }}
+                            </span>
+                            {% endif %}
+                            <span class="text-xs text-gray-400">
+                                {{ evento.fecha_creacion|timesince }} ago
+                            </span>
+                        </div>
+                        <p class="text-gray-300 text-sm">{{ evento.descripcion|default:"Sin descripción" }}</p>
+                        {% if evento.creado_por %}
+                        <p class="text-xs text-gray-500 mt-2">
+                            Creado por: {{ evento.creado_por.get_full_name|default:evento.creado_por.username }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="flex-shrink-0 ml-4">
+                        <div class="flex flex-col space-y-2">
+                            <!-- Dropdown de estado -->
+                            <select class="px-3 py-1 text-xs bg-gray-600 border border-gray-500 text-white rounded-md transition-colors focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    onchange="cambiarEstadoEvento({{ evento.id }}, this.value)">
+                                <option value="abierto" {% if evento.estado == 'abierto' %}selected{% endif %}>Abierto</option>
+                                <option value="en_revision" {% if evento.estado == 'en_revision' %}selected{% endif %}>En revisión</option>
+                                <option value="resuelto" {% if evento.estado == 'resuelto' %}selected{% endif %}>Resuelto</option>
+                            </select>
+                            
+                            <!-- Badge de estado actual -->
+                            <span class="px-2 py-1 text-xs font-medium rounded-full text-center
+                                {% if evento.estado == 'abierto' %}bg-red-900 text-red-300
+                                {% elif evento.estado == 'en_revision' %}bg-yellow-900 text-yellow-300
+                                {% elif evento.estado == 'resuelto' %}bg-green-900 text-green-300
+                                {% endif %}">
+                                {{ evento.get_estado_display }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-8">
+            <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {% if estado_actual == 'abierto' %}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                {% elif estado_actual == 'en_revision' %}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                {% elif estado_actual == 'resuelto' %}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                {% else %}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                {% endif %}
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-white">
+                {% if estado_actual == 'abierto' %}¡Excelente!
+                {% elif estado_actual == 'en_revision' %}Sin eventos en revisión
+                {% elif estado_actual == 'resuelto' %}Sin eventos resueltos
+                {% else %}Sin eventos registrados
+                {% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-400">
+                {% if estado_actual == 'abierto' %}No hay eventos abiertos en este momento
+                {% elif estado_actual == 'en_revision' %}No hay eventos pendientes de revisión
+                {% elif estado_actual == 'resuelto' %}No se han resuelto eventos en los últimos 7 días
+                {% else %}No hay eventos registrados en el sistema
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    // Guardar valores originales de los selects para poder revertir en caso de error
+    document.querySelectorAll('select[onchange*="cambiarEstadoEvento"]').forEach(select => {
+        select.setAttribute('data-original-value', select.value);
+    });
+</script>
+
+<script>
+function resolverEvento(eventoId) {
+    if (confirm('¿Estás seguro de que quieres marcar este evento como resuelto?')) {
+        // Aquí podrías hacer una llamada AJAX para resolver el evento
+        // Por ahora, simplemente recargamos la página
+        alert('Funcionalidad de resolver evento pendiente de implementar');
+        // location.reload();
+    }
+}
+</script>

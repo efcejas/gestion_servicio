@@ -6,8 +6,8 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView, PasswordResetView
 from django.core.mail import send_mail
 from django.db.models import Count, Max
-from django.http import HttpResponse
-from django.shortcuts import redirect
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.generic import TemplateView
 
@@ -141,9 +141,21 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     # ------------------------ EVENTOS ------------------------
 
     def get_eventos_context(self):
+        # Contar eventos por estado
         eventos_abiertos = EventoServicio.objects.filter(estado='abierto')
+        eventos_en_revision = EventoServicio.objects.filter(estado='en_revision')
+        
+        # Para resueltos, contar solo los de hoy
+        hoy = timezone.now().date()
+        eventos_resueltos_hoy = EventoServicio.objects.filter(
+            estado='resuelto',
+            fecha_creacion__date=hoy
+        )
+        
         return {
             'cantidad_eventos_abiertos': eventos_abiertos.count(),
+            'cantidad_eventos_en_revision': eventos_en_revision.count(),
+            'cantidad_eventos_resueltos_hoy': eventos_resueltos_hoy.count(),
             'ultimo_evento_abierto': eventos_abiertos.order_by('-fecha_creacion').first(),
         }
 
@@ -296,3 +308,73 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         # Fallback
         else:
             return f"Dr. {str(medico_obj)}"
+
+def eventos_modal(request):
+    """Vista para mostrar eventos filtrados por estado en el modal"""
+    # Obtener el filtro de estado (por defecto: abierto)
+    estado_filtro = request.GET.get('estado', 'abierto')
+    
+    # Filtrar eventos según el estado
+    if estado_filtro == 'todos':
+        eventos = EventoServicio.objects.all()
+    elif estado_filtro == 'resuelto':
+        # Para resueltos, mostrar solo los últimos 7 días
+        hace_7_dias = timezone.now() - timedelta(days=7)
+        eventos = EventoServicio.objects.filter(
+            estado='resuelto',
+            fecha_creacion__gte=hace_7_dias
+        )
+    else:
+        eventos = EventoServicio.objects.filter(estado=estado_filtro)
+    
+    eventos = eventos.order_by('-fecha_creacion')
+    
+    # Obtener conteos para cada estado
+    conteos = {
+        'abierto': EventoServicio.objects.filter(estado='abierto').count(),
+        'en_revision': EventoServicio.objects.filter(estado='en_revision').count(),
+        'resuelto': EventoServicio.objects.filter(
+            estado='resuelto',
+            fecha_creacion__gte=timezone.now() - timedelta(days=7)
+        ).count(),
+        'todos': EventoServicio.objects.count(),
+    }
+    
+    context = {
+        'eventos': eventos,
+        'total_eventos': eventos.count(),
+        'estado_actual': estado_filtro,
+        'conteos': conteos,
+    }
+    
+    return render(request, 'dashboard/eventos_modal.html', context)
+
+def cambiar_estado_evento(request, evento_id):
+    """Vista para cambiar el estado de un evento"""
+    if request.method == 'POST':
+        try:
+            evento = EventoServicio.objects.get(id=evento_id)
+            nuevo_estado = request.POST.get('estado')
+            
+            # Validar que el estado sea válido
+            estados_validos = [choice[0] for choice in EventoServicio.ESTADO_CHOICES]
+            if nuevo_estado not in estados_validos:
+                return JsonResponse({'success': False, 'error': 'Estado no válido'})
+            
+            # Cambiar el estado
+            evento.estado = nuevo_estado
+            evento.save(usuario=request.user)
+            
+            return JsonResponse({
+                'success': True, 
+                'message': f'Estado cambiado a {evento.get_estado_display()}',
+                'nuevo_estado': nuevo_estado,
+                'nuevo_estado_display': evento.get_estado_display()
+            })
+            
+        except EventoServicio.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Evento no encontrado'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+    
+    return JsonResponse({'success': False, 'error': 'Método no permitido'})

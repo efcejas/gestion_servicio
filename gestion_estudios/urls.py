@@ -17,7 +17,9 @@ Incluyendo otra URLconf
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import path, include
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView
+
+from accounts import views
+from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento
 
 urlpatterns = [
     # Administración
@@ -50,4 +52,8 @@ urlpatterns = [
 
     # Prueba de envío de correos
     path('send-test-email/', send_test_email, name='send_test_email'),
+
+    # URL para el modal de eventos del dashboard
+    path('dashboard/eventos/modal/', eventos_modal, name='eventos_modal'),
+    path('dashboard/eventos/<int:evento_id>/cambiar-estado/', cambiar_estado_evento, name='cambiar_estado_evento'),
 ]

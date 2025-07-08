@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Administrativo - Dr. Cejas</title>
+    <titoard Administrativo - Dr. Cejas</title>
     <!-- Tailwind CSS compilado localmente -->
     <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
     <!-- Flowbite CSS desde CDN -->
@@ -160,54 +160,66 @@
                     <h1 class="text-2xl font-bold text-white">Dashboard</h1>
                     <p class="text-gray-300">Sistema de Gestión - Dr. Cejas</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-3">
-                    <!-- Indicador de eventos -->
-                    {% if cantidad_eventos_abiertos > 0 %}
-                        <div class="flex items-center space-x-2 bg-red-900 px-3 py-2 rounded-full">
-                            <div class="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
-                            <span class="text-sm text-red-300 font-medium">{{ cantidad_eventos_abiertos }} evento{{ cantidad_eventos_abiertos|pluralize }}!</span>
-                        </div>
-                    {% else %}
-                        <div class="flex items-center space-x-2 bg-green-900 px-3 py-2 rounded-full">
-                            <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-                            <span class="text-sm text-green-300 font-medium">Sin eventos</span>
-                        </div>
-                    {% endif %}
-                    <!-- <div class="hidden md:flex items-center space-x-3">
-                        <span class="text-sm text-gray-400">Último acceso: Hoy 14:30</span>
-                        <div class="w-3 h-3 bg-green-400 rounded-full"></div>
-                    </div> -->
-                </div>
             </div>
 
             <!-- Cards de estadísticas principales -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
-                <!-- Card: Eventos Abiertos -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
+                <!-- Card: Eventos del Servicio -->
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 cursor-pointer hover:bg-gray-750 transition-colors group" onclick="openEventsModal()">
                     <div class="flex items-center justify-between">
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Eventos del Servicio</h3>
-                            <div class="text-2xl md:text-3xl font-bold {% if cantidad_eventos_abiertos > 0 %}text-red-400{% else %}text-gray-400{% endif %}">
-                                {{ cantidad_eventos_abiertos|default:0 }}
+                            <h3 class="text-base md:text-lg font-semibold text-white mb-2 group-hover:text-blue-300 transition-colors">Eventos del Servicio</h3>
+                            
+                            <div class="text-2xl md:text-3xl font-bold {% if cantidad_eventos_abiertos > 0 %}text-red-400{% elif cantidad_eventos_en_revision > 0 %}text-yellow-400{% else %}text-green-400{% endif %}">
+                                {{ cantidad_eventos_abiertos|add:cantidad_eventos_en_revision|default:0 }}
                             </div>
-                            <p class="text-sm text-gray-400 mt-1">Eventos abiertos</p>
+                            <p class="text-sm text-gray-400 mt-1">
+                                {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}
+                                    Eventos abiertos
+                                {% else %}
+                                    Todo bajo control
+                                {% endif %}
+                            </p>
                         </div>
-                        <div class="flex-shrink-0 {% if cantidad_eventos_abiertos > 0 %}bg-red-500{% else %}bg-gray-500{% endif %} rounded-full p-3">
+                        <div class="flex-shrink-0 {% if cantidad_eventos_abiertos > 0 %}bg-red-500{% elif cantidad_eventos_en_revision > 0 %}bg-yellow-500{% else %}bg-green-500{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
                             <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                                {% else %}
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                {% endif %}
                             </svg>
                         </div>
                     </div>
+                    
                     {% if ultimo_evento_abierto %}
-                        <div class="mt-4 p-3 bg-red-900 rounded-lg">
+                        <div class="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
                             <div class="text-sm text-red-300 font-medium break-words">{{ ultimo_evento_abierto.get_tipo_evento_display }}</div>
                             <div class="text-xs text-red-400 mt-1 break-words">{{ ultimo_evento_abierto.descripcion|truncatechars:60 }}</div>
+                            <div class="text-xs text-red-500 mt-2 flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Hace {{ ultimo_evento_abierto.fecha_creacion|timesince }}
+                            </div>
                         </div>
                     {% endif %}
+                    
+                    <!-- Botón Ver todos -->
+                    <div class="mt-4 pt-4 border-t border-gray-600">
+                        <div class="flex justify-end">
+                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
+                                <span class="text-xs font-medium">Ver todos</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Card: Médico de Guardia -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 md:col-span-2 lg:col-span-1">
+                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
                     <div class="flex items-start justify-between gap-3 md:gap-4">
                         <div class="flex-1 min-w-0">
                             <h3 class="text-base md:text-lg font-semibold text-white mb-2">Médico de Guardia</h3>
@@ -358,7 +370,243 @@
         </div>
     </div>
 
+    <!-- Modal de Eventos -->
+    <div id="eventos-modal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
+        <div class="relative p-4 w-full max-w-4xl max-h-full">
+            <!-- Modal content -->
+            <div class="relative bg-gray-800 rounded-lg shadow border border-gray-700">
+                <!-- Modal header -->
+                <div class="flex items-center justify-between p-4 md:p-5 border-b border-gray-600">
+                    <h3 class="text-xl font-semibold text-white">
+                        Eventos del Servicio
+                    </h3>
+                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-700 hover:text-white rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center" onclick="closeEventsModal()">
+                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                        </svg>
+                        <span class="sr-only">Cerrar modal</span>
+                    </button>
+                </div>
+                <!-- Modal body -->
+                <div id="eventos-modal-content" class="p-4 md:p-5">
+                    <div class="flex justify-center items-center h-32">
+                        <div class="text-center">
+                            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="text-gray-400 mt-2">Cargando eventos...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Flowbite JS desde CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    
+    <!-- JavaScript personalizado -->
+    <script>
+        function openEventsModal(estado = 'abierto') {
+            console.log('Abriendo modal de eventos con filtro:', estado);
+            
+            // Mostrar el modal
+            const modal = document.getElementById('eventos-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Cargar contenido del modal con filtro
+            fetch(`/dashboard/eventos/modal/?estado=${estado}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error al cargar eventos');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    document.getElementById('eventos-modal-content').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('eventos-modal-content').innerHTML = `
+                        <div class="text-center py-8">
+                            <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <h3 class="mt-2 text-sm font-medium text-white">Error al cargar eventos</h3>
+                            <p class="mt-1 text-sm text-gray-400">No se pudieron cargar los eventos. Intenta nuevamente.</p>
+                            <button onclick="openEventsModal('${estado}')" class="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md">
+                                Reintentar
+                            </button>
+                        </div>
+                    `;
+                });
+        }
+
+        function filtrarEventos(estado) {
+            console.log('Filtrando eventos por estado:', estado);
+            
+            // Mostrar loading
+            document.getElementById('eventos-modal-content').innerHTML = `
+                <div class="flex justify-center items-center h-32">
+                    <div class="text-center">
+                        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-gray-400 mt-2">Cargando eventos...</p>
+                    </div>
+                </div>
+            `;
+            
+            // Cargar eventos filtrados
+            fetch(`/dashboard/eventos/modal/?estado=${estado}`)
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById('eventos-modal-content').innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('Error al filtrar eventos', 'error');
+                });
+        }
+
+        function closeEventsModal() {
+            const modal = document.getElementById('eventos-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function resolverEvento(eventoId) {
+            if (confirm('¿Estás seguro de que quieres marcar este evento como resuelto?')) {
+                cambiarEstadoEvento(eventoId, 'resuelto');
+            }
+        }
+
+        function cambiarEstadoEvento(eventoId, nuevoEstado) {
+            // Mostrar indicador de carga
+            const selectElement = document.querySelector(`select[onchange*="${eventoId}"]`);
+            if (selectElement) {
+                selectElement.disabled = true;
+            }
+
+            fetch(`/dashboard/eventos/${eventoId}/cambiar-estado/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `estado=${nuevoEstado}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensaje de éxito
+                    showNotification(`Estado cambiado a: ${data.nuevo_estado_display}`, 'success');
+                    
+                    // Si se resolvió, recargar el modal para actualizar la lista
+                    if (nuevoEstado === 'resuelto') {
+                        setTimeout(() => {
+                            openEventsModal();
+                        }, 1500);
+                    }
+                } else {
+                    showNotification(`Error: ${data.error}`, 'error');
+                    // Restaurar el valor anterior si hay error
+                    if (selectElement) {
+                        selectElement.value = selectElement.getAttribute('data-original-value') || 'abierto';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Error al cambiar el estado del evento', 'error');
+                // Restaurar el valor anterior si hay error
+                if (selectElement) {
+                    selectElement.value = selectElement.getAttribute('data-original-value') || 'abierto';
+                }
+            })
+            .finally(() => {
+                // Rehabilitar el select
+                if (selectElement) {
+                    selectElement.disabled = false;
+                }
+            });
+        }
+
+        function showNotification(message, type = 'info') {
+            // Crear elemento de notificación
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
+            
+            if (type === 'success') {
+                notification.className += ' bg-green-800 border border-green-600 text-green-100';
+            } else if (type === 'error') {
+                notification.className += ' bg-red-800 border border-red-600 text-red-100';
+            } else {
+                notification.className += ' bg-blue-800 border border-blue-600 text-blue-100';
+            }
+            
+            notification.innerHTML = `
+                <div class="flex items-center">
+                    <div class="flex-1">
+                        <p class="text-sm font-medium">${message}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animar entrada
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+                notification.classList.add('translate-x-0');
+            }, 100);
+            
+            // Auto remover después de 3 segundos
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    if (notification.parentElement) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Función para obtener el CSRF token
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Cerrar modal con tecla Escape
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('eventos-modal');
+                if (!modal.classList.contains('hidden')) {
+                    closeEventsModal();
+                }
+            }
+        });
+
+        // Cerrar modal al hacer clic fuera de él
+        document.getElementById('eventos-modal').addEventListener('click', function(event) {
+            if (event.target === this) {
+                closeEventsModal();
+            }
+        });
+    </script>
 </body>
 </html>
