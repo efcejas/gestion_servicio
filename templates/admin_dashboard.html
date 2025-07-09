@@ -223,18 +223,18 @@
                     <div class="flex items-start justify-between gap-3 md:gap-4">
                         <div class="flex-1 min-w-0">
                             <h3 class="text-base md:text-lg font-semibold text-white mb-2">Médico de Guardia</h3>
-                            <div class="text-base md:text-lg font-bold {% if 'No asignado' in nombre_medico_guardia %}text-red-400{% else %}text-green-400{% endif %} break-words">
+                            <div class="text-base md:text-lg font-bold {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-400{% else %}text-green-400{% endif %} break-words">
                                 {{ nombre_medico_guardia|default:"No asignado" }}
                             </div>
-                            {% if franja_horaria_guardia and 'Sin guardia' not in franja_horaria_guardia %}
+                            {% if franja_horaria_guardia %}
                                 <p class="text-sm text-blue-300 mt-1 break-words">{{ franja_horaria_guardia }}</p>
                             {% else %}
-                                <p class="text-sm text-gray-400 mt-1">{{ franja_horaria_guardia|default:"Guardia de hoy" }}</p>
+                                <p class="text-sm text-gray-400 mt-1">Guardia de hoy</p>
                             {% endif %}
                         </div>
-                        <div class="flex-shrink-0 {% if 'No asignado' in nombre_medico_guardia %}bg-red-500{% else %}bg-green-500{% endif %} rounded-full p-3">
+                        <div class="flex-shrink-0 {% if 'Sin cubrir' in nombre_medico_guardia %}bg-red-500{% else %}bg-green-500{% endif %} rounded-full p-3">
                             <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {% if 'No asignado' in nombre_medico_guardia %}
+                                {% if 'Sin cubrir' in nombre_medico_guardia %}
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                                 {% else %}
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -242,18 +242,11 @@
                             </svg>
                         </div>
                     </div>
-                    {% if nombre_proximo_medico and 'No programado' not in nombre_proximo_medico %}
+                    {% if nombre_proximo_medico %}
                         <div class="mt-4 pt-3 border-t border-gray-600">
                             <div class="text-xs text-gray-400 mb-1">Próximo de guardia</div>
                             <div class="text-sm text-gray-300 font-medium break-words">{{ nombre_proximo_medico }}</div>
                             <div class="text-xs text-gray-500 break-words">{{ fecha_proxima_guardia }}</div>
-                        </div>
-                    {% endif %}
-                    
-                    <!-- Opcional: Mostrar total de guardias -->
-                    {% if total_guardias %}
-                        <div class="mt-3 text-xs text-gray-500">
-                            {{ total_guardias }} guardia{{ total_guardias|pluralize }} programada{{ total_guardias|pluralize }}
                         </div>
                     {% endif %}
                 </div>

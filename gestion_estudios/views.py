@@ -126,7 +126,7 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             })
 
         try:
-            context.update(self.get_guardias_context(hoy, hora_actual))
+            context.update(self.get_guardias_context(hoy))
         except Exception as e:
             print(f"❌ Error en guardias: {e}")
             context.update({
