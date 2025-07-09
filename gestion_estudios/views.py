@@ -316,7 +316,7 @@ def eventos_modal(request):
     else:
         eventos = EventoServicio.objects.filter(estado=estado_filtro)
     
-    eventos = eventos.order_by('-fecha_creacion')
+    eventos = eventos.prefetch_related('notas__creado_por').order_by('-fecha_creacion')
     
     # Obtener conteos para cada estado
     conteos = {

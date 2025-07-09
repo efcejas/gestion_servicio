@@ -1554,10 +1554,6 @@ input:checked + .toggle-bg {
   max-height: 100%;
 }
 
-.min-h-\[36px\] {
-  min-height: 36px;
-}
-
 .min-h-\[7rem\] {
   min-height: 7rem;
 }
@@ -1730,6 +1726,10 @@ input:checked + .toggle-bg {
   grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
+.flex-row {
+  flex-direction: row;
+}
+
 .flex-col {
   flex-direction: column;
 }
@@ -1886,6 +1886,10 @@ input:checked + .toggle-bg {
 
 .border-b {
   border-bottom-width: 1px;
+}
+
+.border-l-4 {
+  border-left-width: 4px;
 }
 
 .border-r {
@@ -88361,11 +88365,6 @@ input:checked + .toggle-bg {
 .py-1 {
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
-}
-
-.py-1\.5 {
-  padding-top: 0.375rem;
-  padding-bottom: 0.375rem;
 }
 
 .py-10 {
@@ -270275,10 +270274,6 @@ input:checked + .toggle-bg {
     margin-bottom: 1rem;
   }
 
-  .sm\:ml-4 {
-    margin-left: 1rem;
-  }
-
   .sm\:ml-64 {
     margin-left: 16rem;
   }
@@ -270309,10 +270304,6 @@ input:checked + .toggle-bg {
 
   .sm\:w-12 {
     width: 3rem;
-  }
-
-  .sm\:flex-none {
-    flex: none;
   }
 
   .sm\:translate-x-0 {
@@ -270348,32 +270339,14 @@ input:checked + .toggle-bg {
     gap: 0px;
   }
 
-  .sm\:gap-2 {
-    gap: 0.5rem;
-  }
-
-  .sm\:space-x-0 > :not([hidden]) ~ :not([hidden]) {
-    --tw-space-x-reverse: 0;
-    margin-right: calc(0px * var(--tw-space-x-reverse));
-    margin-left: calc(0px * calc(1 - var(--tw-space-x-reverse)));
+  .sm\:gap-3 {
+    gap: 0.75rem;
   }
 
   .sm\:space-x-1 > :not([hidden]) ~ :not([hidden]) {
     --tw-space-x-reverse: 0;
     margin-right: calc(0.25rem * var(--tw-space-x-reverse));
     margin-left: calc(0.25rem * calc(1 - var(--tw-space-x-reverse)));
-  }
-
-  .sm\:space-y-0 > :not([hidden]) ~ :not([hidden]) {
-    --tw-space-y-reverse: 0;
-    margin-top: calc(0px * calc(1 - var(--tw-space-y-reverse)));
-    margin-bottom: calc(0px * var(--tw-space-y-reverse));
-  }
-
-  .sm\:space-y-2 > :not([hidden]) ~ :not([hidden]) {
-    --tw-space-y-reverse: 0;
-    margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
-    margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
   }
 
   .sm\:space-y-3 > :not([hidden]) ~ :not([hidden]) {
@@ -270395,11 +270368,6 @@ input:checked + .toggle-bg {
 
   .sm\:p-4 {
     padding: 1rem;
-  }
-
-  .sm\:px-3 {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
   }
 
   .sm\:px-4 {
