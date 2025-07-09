@@ -2,65 +2,30 @@
 <div class="space-y-3 sm:space-y-4">
     <!-- Header del modal con tabs -->
     <div class="border-b border-gray-600">
-        <!-- Header principal -->
-        <div class="flex items-center justify-between mb-3 sm:mb-4">
-            <h3 class="text-base sm:text-lg font-semibold text-white">Eventos del Servicio</h3>
-            <div class="text-center">
-                <div class="text-blue-400 font-bold text-base sm:text-lg">{{ total_eventos }}</div>
-                <div class="text-gray-400 text-xs sm:text-sm">
-                    {% if estado_actual == 'abierto' %}Abiertos
-                    {% elif estado_actual == 'en_revision' %}En Revisión
-                    {% elif estado_actual == 'resuelto' %}Resueltos (7d)
-                    {% else %}Total
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-        
         <!-- Tabs de filtros - Responsivos -->
         <div class="grid grid-cols-2 sm:flex sm:space-x-1 gap-1 sm:gap-0 mb-3 sm:mb-4">
             <button onclick="filtrarEventos('abierto')" 
                     class="tab-button px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg sm:rounded-t-lg transition-colors
                            {% if estado_actual == 'abierto' %}bg-red-900 text-red-300 border-2 border-red-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600{% endif %}">
-                <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-1">
-                    <span class="text-xs">🔴</span>
-                    <span class="hidden sm:inline">Abiertos</span>
-                    <span class="sm:hidden text-xs">Abiertos</span>
-                    <span class="px-1.5 py-0.5 text-xs bg-red-800 rounded-full">{{ conteos.abierto }}</span>
-                </div>
+                🔴 Abiertos ({{ conteos.abierto }})
             </button>
             
             <button onclick="filtrarEventos('en_revision')" 
                     class="tab-button px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg sm:rounded-t-lg transition-colors
                            {% if estado_actual == 'en_revision' %}bg-yellow-900 text-yellow-300 border-2 border-yellow-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600{% endif %}">
-                <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-1">
-                    <span class="text-xs">🟡</span>
-                    <span class="hidden sm:inline">En Revisión</span>
-                    <span class="sm:hidden text-xs">Revisión</span>
-                    <span class="px-1.5 py-0.5 text-xs bg-yellow-800 rounded-full">{{ conteos.en_revision }}</span>
-                </div>
+                🟡 En Revisión ({{ conteos.en_revision }})
             </button>
             
             <button onclick="filtrarEventos('resuelto')" 
                     class="tab-button px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg sm:rounded-t-lg transition-colors
                            {% if estado_actual == 'resuelto' %}bg-green-900 text-green-300 border-2 border-green-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600{% endif %}">
-                <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-1">
-                    <span class="text-xs">🟢</span>
-                    <span class="hidden sm:inline">Resueltos (7d)</span>
-                    <span class="sm:hidden text-xs">Resueltos</span>
-                    <span class="px-1.5 py-0.5 text-xs bg-green-800 rounded-full">{{ conteos.resuelto }}</span>
-                </div>
+                🟢 Resueltos ({{ conteos.resuelto }}) <span class="text-xs opacity-75">7d</span>
             </button>
             
             <button onclick="filtrarEventos('todos')" 
                     class="tab-button px-2 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-lg sm:rounded-t-lg transition-colors
                            {% if estado_actual == 'todos' %}bg-blue-900 text-blue-300 border-2 border-blue-400{% else %}text-gray-400 hover:text-white hover:bg-gray-700 border border-gray-600{% endif %}">
-                <div class="flex flex-col sm:flex-row items-center justify-center sm:space-x-1">
-                    <span class="text-xs">📋</span>
-                    <span class="hidden sm:inline">Todos</span>
-                    <span class="sm:hidden text-xs">Todos</span>
-                    <span class="px-1.5 py-0.5 text-xs bg-blue-800 rounded-full">{{ conteos.todos }}</span>
-                </div>
+                📋 Todos ({{ conteos.todos }})
             </button>
         </div>
     </div>
