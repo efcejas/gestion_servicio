@@ -240,54 +240,43 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
 
     # ------------------------ GUARDIAS ------------------------
 
-    def get_guardias_context(self, fecha_hoy, hora_actual):
-        """Devuelve información sobre el médico de guardia hoy y mañana de forma simple."""
+    def get_guardias_context(self, fecha_hoy):
+        """Versión simplificada: obtiene las 2 guardias más próximas desde hoy hacia el futuro."""
         
-        # 1. Buscar guardia de HOY según la hora actual
-        guardias_hoy = Guardia.objects.filter(
-            fecha=fecha_hoy,
+        # Obtener las 2 guardias más próximas (desde hoy hacia el futuro)
+        guardias_proximas = Guardia.objects.filter(
+            fecha__gte=fecha_hoy,  # Desde hoy en adelante
             cubierta=True,
             medico__isnull=False
-        ).select_related('medico').order_by('franja_horaria')
+        ).select_related('medico').order_by('fecha', 'franja_horaria')[:2]
         
-        # Determinar qué guardia está activa según la hora
-        guardia_hoy = None
-        
-        if hora_actual.hour >= 20 or hora_actual.hour < 8:
-            # Es horario nocturno (20:00 - 07:59)
-            guardia_hoy = guardias_hoy.filter(franja_horaria__in=['NOCHE', 'NOCHE_FIN_SEMANA', 'DIA_COMPLETO']).first()
-        else:
-            # Es horario diurno (08:00 - 19:59)
-            guardia_hoy = guardias_hoy.filter(franja_horaria__in=['DIA', 'DIA_FIN_SEMANA', 'DIA_COMPLETO']).first()
-
-        if guardia_hoy:
-            nombre_guardia = self.formatear_nombre_medico(guardia_hoy.medico)
-            franja_guardia = guardia_hoy.get_franja_horaria_display()
+        # Si hay guardias, tomar la primera como "actual" y la segunda como "próxima"
+        if guardias_proximas:
+            guardia_actual = guardias_proximas[0]
+            nombre_guardia = self.formatear_nombre_medico(guardia_actual.medico)
+            franja_guardia = guardia_actual.get_franja_horaria_display()
+            
+            # Si hay una segunda guardia, usarla como "próxima"
+            if len(guardias_proximas) > 1:
+                guardia_proxima = guardias_proximas[1]
+                nombre_proximo = self.formatear_nombre_medico(guardia_proxima.medico)
+                fecha_proxima = f"{guardia_proxima.fecha.strftime('%d/%m')} • {guardia_proxima.get_franja_horaria_display()}"
+            else:
+                nombre_proximo = "No programado"
+                fecha_proxima = "Sin más guardias"
         else:
             nombre_guardia = "No asignado"
             franja_guardia = "Sin guardia programada"
-
-        # 2. Buscar guardia de MAÑANA (día siguiente)
-        fecha_manana = fecha_hoy + timedelta(days=1)
-        
-        guardia_manana = Guardia.objects.filter(
-            fecha=fecha_manana,
-            cubierta=True,
-            medico__isnull=False
-        ).select_related('medico').first()
-
-        if guardia_manana:
-            nombre_proximo = self.formatear_nombre_medico(guardia_manana.medico)
-            fecha_proxima = f"Mañana • {guardia_manana.get_franja_horaria_display()}"
-        else:
             nombre_proximo = "No programado"
-            fecha_proxima = "Sin guardia mañana"
+            fecha_proxima = "Sin guardias futuras"
 
         return {
             'nombre_medico_guardia': nombre_guardia,
             'franja_horaria_guardia': franja_guardia,
             'nombre_proximo_medico': nombre_proximo,
             'fecha_proxima_guardia': fecha_proxima,
+            'guardias_proximas': guardias_proximas,  # Para usar en el template si quieres
+            'total_guardias': Guardia.objects.filter(cubierta=True).count(),
         }
 
     def formatear_nombre_medico(self, medico_obj):

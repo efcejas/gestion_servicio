@@ -58,7 +58,7 @@
                         <p class="text-gray-300 text-sm">{{ evento.descripcion|default:"Sin descripción" }}</p>
                         {% if evento.creado_por %}
                         <p class="text-xs text-gray-500 mt-2">
-                            Creado por: {{ evento.creado_por.get_full_name|default:evento.creado_por.username }}
+                            Creado por: {{ evento.creado_por.get_full_name|default:evento.creado_por.username|title }}
                         </p>
                         {% endif %}
                     </div>
