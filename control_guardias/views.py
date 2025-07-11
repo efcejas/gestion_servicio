@@ -1,4 +1,3 @@
-import calendar
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
@@ -180,54 +179,4 @@ class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             initial['fecha'] = fecha_param
         return initial
 
-# control_guardias/views.py
 
-
-class CalendarioGuardiasView(TemplateView):
-    template_name = 'control_guardias/calendario_guardias.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # Obtener año y mes desde la URL o usar actuales
-        year = int(self.request.GET.get('year', timezone.now().year))
-        month = int(self.request.GET.get('month', timezone.now().month))
-
-        # Calcular mes anterior y siguiente
-        if month == 1:
-            prev_month = 12
-            prev_year = year - 1
-        else:
-            prev_month = month - 1
-            prev_year = year
-
-        if month == 12:
-            next_month = 1
-            next_year = year + 1
-        else:
-            next_month = month + 1
-            next_year = year
-
-        # Generar los días del calendario
-        cal = calendar.Calendar(firstweekday=0)  # lunes=0
-        dias_mes = list(cal.itermonthdates(year, month))
-
-        # Obtener guardias del mes
-        guardias = Guardia.objects.filter(fecha__year=year, fecha__month=month)
-
-        # Agrupar guardias por día
-        guardias_por_dia = {}
-        for g in guardias:
-            guardias_por_dia.setdefault(g.fecha, []).append(g)
-
-        context.update({
-            'dias_mes': dias_mes,
-            'guardias_por_dia': guardias_por_dia,
-            'year': year,
-            'month': month,
-            'prev_year': prev_year,
-            'prev_month': prev_month,
-            'next_year': next_year,
-            'next_month': next_month,
-        })
-        return context
