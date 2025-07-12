@@ -1,16 +1,25 @@
+# Importaciones de bibliotecas estándar de Python
+from datetime import datetime
+
+# Importaciones de Django (ordenadas alfabéticamente)
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib import messages
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db import models
+from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
+from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.timezone import now
 from django.views.generic import DetailView
 from django.views.generic.edit import CreateView
 from django.views.generic.list import ListView
 
+# Importaciones locales de la aplicación
 from .forms import (
     ActualizarEstadoEventoForm,
     ActualizarTipoEventoForm,
@@ -18,8 +27,11 @@ from .forms import (
     FiltroEventoForm,
     NotaEventoForm,
 )
-
 from .models import EventoServicio
+
+# Variables globales
+User = get_user_model()
+
 
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
     model = EventoServicio
@@ -50,8 +62,6 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
 
         return super().form_valid(form)
 
-# Lista de eventos activos (abiertos o pendientes)
-User = get_user_model()
 
 class EventoServicioListView(ListView, LoginRequiredMixin):
     model = EventoServicio
@@ -182,3 +192,86 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
                 print(tipo_evento_form.errors)  # Muestra los errores del formulario
                 
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))
+    
+# Vista para mostrar los eventos al personal administrativo de piso con permisos 
+
+class EventosAdministrativosListView(LoginRequiredMixin, ListView):
+    model = EventoServicio
+    template_name = 'gestion_eventos/eventos_para_administrativos.html'
+    context_object_name = 'eventos'
+    paginate_by = 10
+    login_url = 'login'
+
+    def get_queryset(self):
+    
+        # Filtrar solo eventos del mes actual
+        ahora = timezone.now()
+        inicio_mes = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        queryset = EventoServicio.objects.filter(
+            fecha_creacion__gte=inicio_mes
+        ).order_by('-fecha_creacion')
+        
+        search_query = self.request.GET.get('search')
+        if search_query:
+            queryset = queryset.filter(
+                Q(nombre_paciente__icontains=search_query) |
+                Q(dni_paciente__icontains=search_query)
+            )
+        return queryset
+
+# Vista AJAX para obtener detalles del evento para el modal
+class EventoServicioAjaxDetailView(LoginRequiredMixin, DetailView):
+    model = EventoServicio
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        context = self.get_context_data(object=self.object)
+        html = render_to_string('gestion_eventos/includes/partial_evento_detail.html', context, request=request)
+        return JsonResponse({'html': html})
+
+# Vista AJAX para obtener detalles del evento en formato JSON
+class EventoDetalleAjaxView(LoginRequiredMixin, DetailView):
+    model = EventoServicio
+    
+    def get(self, request, *args, **kwargs):
+        evento = self.get_object()
+        
+        # Obtener notas y historial relacionados
+        notas = evento.notas.order_by('-fecha')
+        historial = evento.historial.order_by('-fecha')
+        
+        # Preparar datos para JSON
+        data = {
+            'id': evento.id,
+            'tipo_evento': evento.get_tipo_evento_display(),
+            'descripcion': evento.descripcion,
+            'estado': evento.get_estado_display(),
+            'fecha_creacion': evento.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+            'creado_por': f"{evento.creado_por.first_name} {evento.creado_por.last_name}",
+            'servicio_origen': evento.get_servicio_origen_evento_display() if evento.servicio_origen_evento else 'No especificado',
+            'sector_pedido': evento.sector_de_pedido or 'No especificado',
+            'nombre_paciente': evento.nombre_paciente or 'No especificado',
+            'dni_paciente': evento.dni_paciente or 'No informado',
+            'estudio_relacionado': evento.estudio_relacionado or 'No especificado',
+            'notas': [
+                {
+                    'comentario': nota.comentario,
+                    'creado_por': f"{nota.creado_por.first_name} {nota.creado_por.last_name}",
+                    'fecha': nota.fecha.strftime('%d/%m/%Y %H:%M')
+                }
+                for nota in notas
+            ],
+            'historial': [
+                {
+                    'cambio': h.cambio,
+                    'valor_anterior': h.valor_anterior,
+                    'valor_nuevo': h.valor_nuevo,
+                    'usuario': f"{h.usuario.first_name} {h.usuario.last_name}" if h.usuario else 'Sistema',
+                    'fecha': h.fecha.strftime('%d/%m/%Y %H:%M')
+                }
+                for h in historial
+            ]
+        }
+        
+        return JsonResponse(data)
