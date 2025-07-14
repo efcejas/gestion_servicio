@@ -14,7 +14,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 
-<body class="bg-gray-900 dark min-h-screen flex flex-col">
+<body class="bg-gray-900 dark w-full">
     <!-- Header principal limpio y simple -->
     <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -179,7 +179,7 @@
                                     </div>
                                 </td>
                                 <td class="px-4 py-4">
-                                    <div class="text-sm text-gray-900 dark:text-white">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">
                                         {{ evento.sector_de_pedido|default:"No especificado" }}
                                     </div>
                                     {% if evento.servicio_origen_evento %}
@@ -189,7 +189,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="px-4 py-4">
-                                    <div class="text-sm text-gray-900 dark:text-white font-medium">
+                                    <div class="text-sm font-medium text-gray-900 dark:text-white">
                                         {{ evento.get_tipo_evento_display }}
                                     </div>
                                     {% if evento.estudio_relacionado %}

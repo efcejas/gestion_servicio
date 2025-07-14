@@ -197,7 +197,7 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
 
 class EventosAdministrativosListView(LoginRequiredMixin, ListView):
     model = EventoServicio
-    template_name = 'gestion_eventos/eventos_para_administrativos.html'
+    template_name = 'gestion_eventos/control_administrativo_eventos.html'
     context_object_name = 'eventos'
     paginate_by = 10
     login_url = 'login'
