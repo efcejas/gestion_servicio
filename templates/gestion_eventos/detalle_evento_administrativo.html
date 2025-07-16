@@ -201,9 +201,12 @@
     <div class="mx-auto max-w-10xl grid grid-cols-1 md:grid-cols-2 px-2 mt-4 mb-4 sm:px-4 md:px-8 gap-4">
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
             <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 col-span-1 md:col-span-2">
-                Detalles del Evento
+                Detalles del evento
             </h1>
             <p class="text-gray-300">{{ evento.descripcion|default:"No especificado" }}</p>
+            <div class="mt-4 border-t border-gray-700 pt-4">
+                <span class="text-gray-400">Estudio solicitado: {{ evento.estudio_relacionado|default:"No especificado" }}</span>
+            </div>
         </div>
         <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
             <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 col-span-1 md:col-span-2">Notas e historial</h1>
