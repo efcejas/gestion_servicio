@@ -1,0 +1,289 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Administrativo - Dr. Cejas</title>
+    <!-- Tailwind CSS compilado localmente -->
+    <link href="{% static 'css/tailwind.css' %}" rel="stylesheet">
+    <!-- Flowbite CSS desde CDN -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-900 dark">
+
+    <!-- Acá iría el header --->
+    <header
+        class="flex items-center justify-between mx-auto px-4 sm:px-6 lg:px-8 h-24 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+        <img src="{% static 'images/LogoSimple.png' %}" class="md:hidden h-14 md:h-16 lg:h-18" alt="Dr. Cejas Logo">
+        <img src="{% static 'images/Logo Personal Negativo - Letra Grande.png' %}"
+            class="hidden md:block h-full max-h-24" alt="Dr. Cejas Logo">
+        <div class="text-right">
+            <div class="flex items-center space-x-3">
+                <div class="text-right">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">{{ user.first_name }} {{ user.last_name }}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ user.get_cargo_display|default:"Personal Administrativo" }}</div>
+                </div>
+                <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                    <span class="text-sm font-medium text-blue-600 dark:text-blue-400">{{ user.first_name.0 }}{{ user.last_name.0 }}</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Acá va una barra de navecación -->
+    <nav class="bg-white dark:bg-gray-700 shadow-sm relative">
+        <div class="mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-12 relative">
+
+                <!-- Botón hamburguesa visible solo en móvil -->
+                <button data-collapse-toggle="mobile-menu" type="button"
+                    class="inline-flex items-center p-2 text-sm text-gray-500 rounded-lg sm:hidden hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-600"
+                    aria-controls="mobile-menu" aria-expanded="false">
+                    <span class="sr-only">Abrir menú</span>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                </button>
+
+                <!-- Enlaces a la derecha (visible solo en desktop) -->
+                <div class="hidden sm:flex items-center gap-1 ml-auto">
+                    <a href="{% url 'home' %}"
+                        class="dark:text-gray-300 text-gray-800 bg-gray-700 hover:bg-teal-600 px-2 py-1 font-medium text-sm rounded-lg transition-colors">Inicio</a>
+                    <form method="post" action="{% url 'logout' %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit"
+                            class="inline-flex items-center px-2 py-1 text-sm font-medium text-red-600 hover:text-red-500 dark:text-red-400 focus:outline-none hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors gap-1">
+                            <span class="align-middle">Salir</span>
+                            <svg class="w-[18px] h-[18px] text-red-600 dark:text-red-400" aria-hidden="true"
+                                xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none"
+                                viewBox="0 0 24 24">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M20 12H8m12 0-4 4m4-4-4-4M9 4H7a3 3 0 0 0-3 3v10a3 3 0 0 0 3 3h2" />
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Menú desplegable para móvil -->
+            <div class="sm:hidden hidden mt-2" id="mobile-menu">
+                <div class="flex flex-col gap-2 py-2">
+                    <a href="{% url 'home' %}"
+                        class="block w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg">Inicio</a>
+                    <form method="post" action="{% url 'logout' %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit"
+                            class="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                            Salir
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido principal -->
+    <main class="mx-auto max-w-10xl px-2 mt-4 sm:px-4 md:px-8">
+    
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
+                <div class="flex items-center justify-between border-b border-gray-700 pb-4">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base md:text-lg font-semibold text-white mb-2">Paciente</h3>
+                        <div class="text-2xl md:text-3xl font-bold text-yellow-400">
+                            <p class="text-2xl md:text-3xl font-bold">{{ evento.nombre_paciente|title|default:"Noespecificado"|cut:"." }}</p>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-1">DNI: {{ evento.dni_paciente|default:"No especificado"|cut:"." }}
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 bg-yellow-500 rounded-full p-3">
+                        <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true"
+                            xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                            viewBox="0 0 24 24">
+                            <path fill-rule="evenodd"
+                                d="M12 20a7.966 7.966 0 0 1-5.002-1.756l.002.001v-.683c0-1.794 1.492-3.25 3.333-3.25h3.334c1.84 0 3.333 1.456 3.333 3.25v.683A7.966 7.966 0 0 1 12 20ZM2 12C2 6.477 6.477 2 12 2s10 4.477 10 10c0 5.5-4.44 9.963-9.932 10h-.138C6.438 21.962 2 17.5 2 12Zm10-5c-1.84 0-3.333 1.455-3.333 3.25S10.159 13.5 12 13.5c1.84 0 3.333-1.455 3.333-3.25S13.841 7 12 7Z"
+                                clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-300 break-words flex items-center gap-2">
+                    <svg class="w-6 h-6 text-gray-800 dark:text-white flex-shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24"
+                        height="24" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd"
+                            d="M4 4a1 1 0 0 1 1-1h14a1 1 0 1 1 0 2v14a1 1 0 1 1 0 2H5a1 1 0 1 1 0-2V5a1 1 0 0 1-1-1Zm5 2a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H9Zm5 0a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1Zm-5 4a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1H9Zm5 0a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1a1 1 0 0 0-1-1h-1Zm-3 4a2 2 0 0 0-2 2v3h2v-3h2v3h2v-3a2 2 0 0 0-2-2h-2Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                    <span>
+                        <span class="text-blue-400 font-medium">{{ evento.sector_de_pedido|default:"No especificado"|cut:"." }}</span>
+                    </span>
+                </div>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
+                <div class="flex items-center justify-between border-b border-gray-700 pb-4">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base md:text-lg font-semibold text-white mb-2">Tipo de reporte</h3>
+                        <div class="text-2xl md:text-3xl font-bold text-blue-400">
+                            <p class="text-2xl md:text-3xl font-bold">{{ evento.get_tipo_evento_display|cut:"." }}</p>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-1">Para - {{ evento.get_servicio_origen_evento_display }}</p>
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 bg-blue-500 rounded-full p-3">
+                        <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24"
+                            height="24" fill="currentColor" viewBox="0 0 24 24">
+                            <path fill-rule="evenodd"
+                                d="M8 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1h2a2 2 0 0 1 2 2v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2Zm6 1h-4v2H9a1 1 0 0 0 0 2h6a1 1 0 1 0 0-2h-1V4Zm-3 8a1 1 0 0 1 1-1h3a1 1 0 1 1 0 2h-3a1 1 0 0 1-1-1Zm-2-1a1 1 0 1 0 0 2h.01a1 1 0 1 0 0-2H9Zm2 5a1 1 0 0 1 1-1h3a1 1 0 1 1 0 2h-3a1 1 0 0 1-1-1Zm-2-1a1 1 0 1 0 0 2h.01a1 1 0 1 0 0-2H9Z"
+                                clip-rule="evenodd" />
+                        </svg>      
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-300 break-words flex items-center gap-2">
+                    {% if evento.estado == 'abierto' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-red-500 text-white dark:bg-red-600 dark:text-white">
+                            Pendiente
+                        </span>
+                    {% elif evento.estado == 'en_revision' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-500 text-white dark:bg-blue-600 dark:text-white">
+                            En proceso
+                        </span>
+                    {% elif evento.estado == 'resuelto' %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-500 text-white dark:bg-green-600 dark:text-white">
+                            Finalizado
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-gray-500 text-white dark:bg-gray-600 dark:text-white">
+                            Estado desconocido
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
+                <div class="flex items-center justify-between border-b border-gray-700 pb-4">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-base md:text-lg font-semibold text-white mb-2">Fecha de creación</h3>
+                        <div class="text-2xl md:text-3xl font-bold text-green-400">
+                            <p class="text-2xl md:text-3xl font-bold">{{ evento.fecha_creacion|date:"d/m/Y" }}</p>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-1">Hora: {{ evento.fecha_creacion|date:"H:i" }}</p>
+                    </div>
+                    <div class="flex-shrink-0 bg-green-500 rounded-full p-3">
+                        <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24"
+                            height="24" fill="none" viewBox="0 0 24 24">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="m14.304 4.844 2.852 2.852M7 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-4.5m2.409-9.91a2.017 2.017 0 0 1 0 2.853l-6.844 6.844L8 14l.713-3.565 6.844-6.844a2.015 2.015 0 0 1 2.852 0Z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-300 break-words flex items-center gap-2">
+                    <svg class="w-6 h-6 text-gray-800 dark:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24"
+                        height="24" fill="currentColor" viewBox="0 0 24 24">
+                        <path fill-rule="evenodd"
+                            d="M5 8a4 4 0 1 1 7.796 1.263l-2.533 2.534A4 4 0 0 1 5 8Zm4.06 5H7a4 4 0 0 0-4 4v1a2 2 0 0 0 2 2h2.172a2.999 2.999 0 0 1-.114-1.588l.674-3.372a3 3 0 0 1 .82-1.533L9.06 13Zm9.032-5a2.907 2.907 0 0 0-2.056.852L9.967 14.92a1 1 0 0 0-.273.51l-.675 3.373a1 1 0 0 0 1.177 1.177l3.372-.675a1 1 0 0 0 .511-.273l6.07-6.07a2.91 2.91 0 0 0-.944-4.742A2.907 2.907 0 0 0 18.092 8Z"
+                            clip-rule="evenodd" />
+                    </svg>
+                
+                    <span>
+                        <span class="text-blue-400 font-medium">{{ evento.creado_por.first_name|default:"No especificado"|cut:"." }} {{ evento.creado_por.last_name|default:"No especificado"|cut:"." }}</span>
+                        <span class="text-gray-400">({{ evento.creado_por.get_cargo_display|default:"No especificado" }})</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+    
+    <div class="mx-auto max-w-10xl grid grid-cols-1 md:grid-cols-2 px-2 mt-4 mb-4 sm:px-4 md:px-8 gap-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 col-span-1 md:col-span-2">
+                Detalles del Evento
+            </h1>
+            <p class="text-gray-300">{{ evento.descripcion|default:"No especificado" }}</p>
+        </div>
+        <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 col-span-1 md:col-span-2">Notas e historial</h1>
+            <div class="mb-4 border-b border-gray-700">
+                <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="tabs-notas-historial" data-tabs-toggle="#tabs-notas-historial-content" role="tablist">
+                    <li class="me-2">
+                        <button class="inline-block p-4 border-b-2 rounded-t-lg text-white border-transparent hover:text-blue-400 hover:border-blue-400" id="notas-tab" data-tabs-target="#notas" type="button" role="tab" aria-controls="notas" aria-selected="true">Notas</button>
+                    </li>
+                    <li class="me-2">
+                        <button class="inline-block p-4 border-b-2 rounded-t-lg text-white border-transparent hover:text-blue-400 hover:border-blue-400" id="historial-tab" data-tabs-target="#historial" type="button" role="tab" aria-controls="historial" aria-selected="false">Historial</button>
+                    </li>
+                </ul>
+            </div>
+            <div id="tabs-notas-historial-content">
+                <div class="hidden" id="notas" role="tabpanel" aria-labelledby="notas-tab">
+                    <div class="space-y-4">
+                        {% for nota in notas %}
+                            <div class="bg-gray-700 p-4 rounded-lg">
+                                <p class="text-gray-300">{{ nota.comentario|default:"No especificado" }}</p>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    Creado por: {{ nota.creado_por.first_name|title }} {{ nota.creado_por.last_name|title }} el {{ nota.fecha|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                        {% empty %}
+                            <p class="text-gray-400">No hay notas disponibles.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="hidden" id="historial" role="tabpanel" aria-labelledby="historial-tab">
+                    <div class="space-y-4">
+                        {% for cambio in historial %}
+                            <div class="bg-gray-700 p-4 rounded-lg">
+                                <p class="text-gray-300">
+                                    <span class="font-bold">
+                                        {% if cambio.cambio == 'estado' %}Estado{% elif cambio.cambio == 'tipo_evento' %}Tipo de evento{% else %}{{ cambio.cambio|capfirst }}{% endif %}
+                                    </span>:
+                                    <span class="text-gray-400">de</span>
+                                    <span class="font-semibold text-red-400">
+                                        {% if cambio.cambio == 'estado' %}
+                                            {% if cambio.valor_anterior == 'abierto' %}Abierto{% elif cambio.valor_anterior == 'en_revision' %}En revisión{% elif cambio.valor_anterior == 'resuelto' %}Resuelto{% else %}{{ cambio.valor_anterior|default:"-" }}{% endif %}
+                                        {% elif cambio.cambio == 'tipo_evento' %}
+                                            {% if cambio.valor_anterior == 'cancelado' %}Estudio cancelado{% elif cambio.valor_anterior == 'demorado' %}Estudio demorado{% elif cambio.valor_anterior == 'pendiente' %}Estudio pendiente{% elif cambio.valor_anterior == 'tecnico' %}Problema técnico{% elif cambio.valor_anterior == 'conflicto' %}Conflicto o situación interpersonal{% elif cambio.valor_anterior == 'guardia' %}Estudio de guardia realizado{% elif cambio.valor_anterior == 'internado' %}Estudio de paciente internado realizado{% elif cambio.valor_anterior == 'otro' %}Otro{% else %}{{ cambio.valor_anterior|default:"-" }}{% endif %}
+                                        {% else %}
+                                            {{ cambio.valor_anterior|default:"-" }}
+                                        {% endif %}
+                                    </span>
+                                    <span class="text-gray-400">a</span>
+                                    <span class="font-semibold text-green-400">
+                                        {% if cambio.cambio == 'estado' %}
+                                            {% if cambio.valor_nuevo == 'abierto' %}Abierto{% elif cambio.valor_nuevo == 'en_revision' %}En revisión{% elif cambio.valor_nuevo == 'resuelto' %}Resuelto{% else %}{{ cambio.valor_nuevo|default:"-" }}{% endif %}
+                                        {% elif cambio.cambio == 'tipo_evento' %}
+                                            {% if cambio.valor_nuevo == 'cancelado' %}Estudio cancelado{% elif cambio.valor_nuevo == 'demorado' %}Estudio demorado{% elif cambio.valor_nuevo == 'pendiente' %}Estudio pendiente{% elif cambio.valor_nuevo == 'tecnico' %}Problema técnico{% elif cambio.valor_nuevo == 'conflicto' %}Conflicto o situación interpersonal{% elif cambio.valor_nuevo == 'guardia' %}Estudio de guardia realizado{% elif cambio.valor_nuevo == 'internado' %}Estudio de paciente internado realizado{% elif cambio.valor_nuevo == 'otro' %}Otro{% else %}{{ cambio.valor_nuevo|default:"-" }}{% endif %}
+                                        {% else %}
+                                            {{ cambio.valor_nuevo|default:"-" }}
+                                        {% endif %}
+                                    </span>
+                                </p>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    Por: {{ cambio.usuario.first_name|default:"-"|title }} {{ cambio.usuario.last_name|default:"-"|title }} el {{ cambio.fecha|date:"d/m/Y H:i" }}
+                                </p>
+                            </div>
+                        {% empty %}
+                            <p class="text-gray-400">No hay historial de cambios.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end mt-6">
+                <a href="{% url 'gestion_eventos:eventos_administrativos' %}" class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Volver
+                </a>
+            </div>
+        </div>
+    </div>
+    <!-- Flowbite JS desde CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+</body>
+
+</html>
+

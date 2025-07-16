@@ -220,58 +220,14 @@ class EventosAdministrativosListView(LoginRequiredMixin, ListView):
             )
         return queryset
 
-# Vista AJAX para obtener detalles del evento para el modal
-class EventoServicioAjaxDetailView(LoginRequiredMixin, DetailView):
+class EventoServicioAdminDetailView(LoginRequiredMixin, DetailView):
     model = EventoServicio
+    template_name = 'gestion_eventos/detalle_evento_administrativo.html'
+    context_object_name = 'evento'
 
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        context = self.get_context_data(object=self.object)
-        html = render_to_string('gestion_eventos/includes/partial_evento_detail.html', context, request=request)
-        return JsonResponse({'html': html})
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['notas'] = self.object.notas.order_by('-fecha')
+        context['historial'] = self.object.historial.order_by('-fecha')
+        return context
 
-# Vista AJAX para obtener detalles del evento en formato JSON
-class EventoDetalleAjaxView(LoginRequiredMixin, DetailView):
-    model = EventoServicio
-    
-    def get(self, request, *args, **kwargs):
-        evento = self.get_object()
-        
-        # Obtener notas y historial relacionados
-        notas = evento.notas.order_by('-fecha')
-        historial = evento.historial.order_by('-fecha')
-        
-        # Preparar datos para JSON
-        data = {
-            'id': evento.id,
-            'tipo_evento': evento.get_tipo_evento_display(),
-            'descripcion': evento.descripcion,
-            'estado': evento.get_estado_display(),
-            'fecha_creacion': evento.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
-            'creado_por': f"{evento.creado_por.first_name} {evento.creado_por.last_name}",
-            'servicio_origen': evento.get_servicio_origen_evento_display() if evento.servicio_origen_evento else 'No especificado',
-            'sector_pedido': evento.sector_de_pedido or 'No especificado',
-            'nombre_paciente': evento.nombre_paciente or 'No especificado',
-            'dni_paciente': evento.dni_paciente or 'No informado',
-            'estudio_relacionado': evento.estudio_relacionado or 'No especificado',
-            'notas': [
-                {
-                    'comentario': nota.comentario,
-                    'creado_por': f"{nota.creado_por.first_name} {nota.creado_por.last_name}",
-                    'fecha': nota.fecha.strftime('%d/%m/%Y %H:%M')
-                }
-                for nota in notas
-            ],
-            'historial': [
-                {
-                    'cambio': h.cambio,
-                    'valor_anterior': h.valor_anterior,
-                    'valor_nuevo': h.valor_nuevo,
-                    'usuario': f"{h.usuario.first_name} {h.usuario.last_name}" if h.usuario else 'Sistema',
-                    'fecha': h.fecha.strftime('%d/%m/%Y %H:%M')
-                }
-                for h in historial
-            ]
-        }
-        
-        return JsonResponse(data)
