@@ -189,7 +189,7 @@
                     </svg>
                 
                     <span>
-                        <span class="text-blue-400 font-medium">{{ evento.creado_por.first_name|default:"No especificado"|cut:"." }} {{ evento.creado_por.last_name|default:"No especificado"|cut:"." }}</span>
+                        <span class="text-blue-400 font-medium">{{ evento.creado_por.first_name|default:"No especificado"|title|cut:"." }} {{ evento.creado_por.last_name|default:"No especificado"|title|cut:"." }}</span>
                         <span class="text-gray-400">({{ evento.creado_por.get_cargo_display|default:"No especificado" }})</span>
                     </span>
                 </div>
