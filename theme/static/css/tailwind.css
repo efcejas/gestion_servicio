@@ -270439,10 +270439,6 @@ input:checked + .toggle-bg {
     margin-bottom: calc(1rem * var(--tw-space-y-reverse));
   }
 
-  .sm\:rounded-lg {
-    border-radius: 0.5rem;
-  }
-
   .sm\:rounded-t-lg {
     border-top-left-radius: 0.5rem;
     border-top-right-radius: 0.5rem;
