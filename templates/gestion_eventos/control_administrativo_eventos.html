@@ -90,7 +90,25 @@
 
     <!-- Contenido principal -->
     <main class="mx-auto max-w-7xl min-h-screen m-4 px-4">
-    
+        <div class="flex items-center justify-between flex-column flex-wrap md:flex-row space-y-4 md:space-y-0 pb-4 bg-white dark:bg-gray-900">
+            <form method="get" class="flex flex-col sm:flex-row gap-2 w-full">
+                <label for="table-search-users" class="sr-only">Buscar</label>
+                <div class="relative flex-1">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z" />
+                        </svg>
+                    </div>
+                    <input type="text" id="table-search-users" name="search" value="{{ request.GET.search }}"
+                        class="block p-2 pl-10 text-sm text-gray-900 border border-gray-300 rounded-lg w-full bg-gray-50 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                        placeholder="Buscar por paciente o DNI">
+                </div>
+                <!-- Aquí puedes agregar el dropdown de estado y el botón filtrar si lo deseas -->
+                {% if request.GET.search or request.GET.estado %}
+                <a href="{{ request.path }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors h-[38px] flex items-center justify-center whitespace-nowrap">Limpiar</a>
+                {% endif %}
+            </form>
+        </div>
         <div class="relative overflow-x-auto shadow-md rounded-lg">
             <table class="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                 <thead class="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -165,8 +183,18 @@
                     </tr>
                 {% empty %}
                     <tr class="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
-                        <td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
-                            No hay eventos registrados.
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            {% if request.GET.search or request.GET.estado %}
+                                <div class="flex flex-col items-center">
+                                    <svg class="w-12 h-12 mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <h3 class="mb-1 text-base font-medium text-gray-900 dark:text-white">No se encontraron datos para los filtros seleccionados</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Prueba cambiando los filtros o la búsqueda.</p>
+                                </div>
+                            {% else %}
+                                No hay eventos registrados.
+                            {% endif %}
                         </td>  
                     </tr>
                 {% endfor %}
