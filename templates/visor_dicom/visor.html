@@ -1,0 +1,86 @@
+{% extends 'layouts/base.html' %}
+{% block content %}
+<div class="max-w-2xl mx-auto py-10">
+    <h1 class="text-2xl font-bold mb-4">Visor DICOM</h1>
+    <div class="mb-4">
+        <p class="text-gray-600">Arrastra un archivo DICOM aquí o haz clic para seleccionarlo.</p>
+        <input type="file" id="dicomFileInput" accept=".dcm,application/dicom" class="mt-2 block" />
+        <button id="visualizarBtn" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50" disabled>Visualizar</button>
+    </div>
+    <div id="dicomDropZone" class="border-2 border-dashed border-blue-400 rounded-lg h-96 flex items-center justify-center bg-gray-50 dark:bg-gray-800 cursor-pointer">
+        <div id="dicomImage" class="w-full h-full"></div>
+        <span id="dropText" class="text-gray-400 absolute">Suelta aquí el archivo DICOM</span>
+    </div>
+</div>
+
+<!-- CornerstoneJS y dependencias desde CDN -->
+<script src="https://unpkg.com/cornerstone-core@2.7.1/dist/cornerstone.js"></script>
+<script src="https://unpkg.com/cornerstone-math@0.1.10/dist/cornerstoneMath.js"></script>
+<script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.1/dist/cornerstoneWADOImageLoader.js"></script>
+<script src="https://unpkg.com/dicom-parser@1.8.6/dist/dicomParser.js"></script>
+
+<script>
+// Configuración necesaria para cargar archivos locales con CornerstoneJS
+cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+cornerstoneWADOImageLoader.configure({ useWebWorkers: false });
+
+const element = document.getElementById('dicomImage');
+cornerstone.enable(element);
+
+function loadAndViewImage(imageId) {
+    cornerstone.loadImage(imageId).then(function(image) {
+        cornerstone.displayImage(element, image);
+    }, function(err) {
+        alert('No se pudo cargar la imagen DICOM: ' + err);
+        dropText.style.display = '';
+    });
+}
+
+// Drag & drop y file input
+const dropZone = document.getElementById('dicomDropZone');
+const fileInput = document.getElementById('dicomFileInput');
+const dropText = document.getElementById('dropText');
+const visualizarBtn = document.getElementById('visualizarBtn');
+
+let selectedFile = null;
+
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('bg-blue-100');
+});
+dropZone.addEventListener('dragleave', function(e) {
+    dropZone.classList.remove('bg-blue-100');
+});
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('bg-blue-100');
+    setFile(e.dataTransfer.files[0]);
+});
+dropZone.addEventListener('click', function() {
+    fileInput.click();
+});
+fileInput.addEventListener('change', function(e) {
+    setFile(e.target.files[0]);
+});
+
+function setFile(file) {
+    if (!file) return;
+    selectedFile = file;
+    dropText.style.display = 'none';
+    visualizarBtn.disabled = false;
+}
+
+visualizarBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (!selectedFile) return;
+    try {
+        const imageId = cornerstoneWADOImageLoader.wadouri.fileManager.add(selectedFile);
+        loadAndViewImage(imageId);
+    } catch (err) {
+        alert('El archivo seleccionado no es un DICOM válido.');
+        dropText.style.display = '';
+    }
+});
+</script>
+{% endblock %}

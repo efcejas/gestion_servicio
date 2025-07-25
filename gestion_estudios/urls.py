@@ -16,7 +16,10 @@ Incluyendo otra URLconf
 """
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 from accounts import views
 from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento
@@ -38,6 +41,7 @@ urlpatterns = [
 
     # Aplicaciones específicas
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
+    path('visor-dicom/', include('visor_dicom.urls', namespace='visor_dicom')),  # Visor DICOM
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
@@ -57,3 +61,7 @@ urlpatterns = [
     path('dashboard/eventos/modal/', eventos_modal, name='eventos_modal'),
     path('dashboard/eventos/<int:evento_id>/cambiar-estado/', cambiar_estado_evento, name='cambiar_estado_evento'),
 ]
+
+# Servir archivos subidos por usuarios (MEDIA) en desarrollo
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

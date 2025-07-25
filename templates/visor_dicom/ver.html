@@ -1,0 +1,131 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block content %}
+<div class="max-w-3xl text-white mx-auto py-10">
+    <h1 class="text-2xl font-bold mb-6">Detalle del archivo DICOM</h1>
+
+    <div class="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <p><strong>Nombre:</strong> {{ dicom.nombre_subido }}</p>
+        <p><strong>Archivo:</strong> <a href="{{ dicom.archivo.url }}" class="text-blue-600 underline" download>Descargar</a></p>
+        <p><strong>Subido en:</strong> {{ dicom.subido_en }}</p>
+    </div>
+
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold mb-2">Visualización DICOM</h2>
+
+        <!-- Controles -->
+        <div class="flex flex-wrap justify-center gap-2 mb-4">
+            <button id="btn-Zoom" onclick="setTool('Zoom')" class="dicom-tool-btn px-3 py-1 bg-blue-600 text-white rounded">Zoom</button>
+            <button id="btn-Pan" onclick="setTool('Pan')" class="dicom-tool-btn px-3 py-1 bg-gray-700 text-white rounded">Pan</button>
+            <button id="btn-Wwwc" onclick="setTool('Wwwc')" class="dicom-tool-btn px-3 py-1 bg-gray-700 text-white rounded">Contraste</button>
+            <button id="btn-Length" onclick="setTool('Length')" class="dicom-tool-btn px-3 py-1 bg-gray-700 text-white rounded">Medir</button>
+            <button onclick="resetViewport()" class="px-3 py-1 bg-red-600 text-white rounded">Reset</button>
+            <button onclick="exportPNG()" class="px-3 py-1 bg-green-700 text-white rounded">Guardar PNG</button>
+        </div>
+
+        <!-- Visor DICOM -->
+        <div id="dicomImage"
+             class="w-full max-w-[512px] h-[512px] mx-auto border rounded shadow bg-black"
+             oncontextmenu="return false;"></div>
+
+        <!-- Info del estudio -->
+        <div id="dicomInfo" class="text-sm mt-4 text-gray-300 text-center"></div>
+    </div>
+
+    <a href="{% url 'visor_dicom:subir_dicom' %}" class="inline-block mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Subir otro archivo</a>
+</div>
+
+<!-- Librerías -->
+<script src="https://unpkg.com/dicom-parser@1.8.7/dist/dicomParser.min.js"></script>
+<script src="https://unpkg.com/cornerstone-core@2.3.0/dist/cornerstone.js"></script>
+<script src="https://unpkg.com/cornerstone-wado-image-loader@3.0.0/dist/cornerstoneWADOImageLoader.js"></script>
+<script src="https://unpkg.com/cornerstone-tools@4.22.1/dist/cornerstoneTools.min.js"></script>
+
+<script>
+  const element = document.getElementById('dicomImage');
+
+  // Inicializar cornerstone
+  cornerstoneWADOImageLoader.external.cornerstone = cornerstone;
+  cornerstoneWADOImageLoader.external.dicomParser = dicomParser;
+  cornerstoneWADOImageLoader.webWorkerManager.initialize({
+    webWorkerPath: 'https://unpkg.com/cornerstone-wado-image-loader@3.0.0/dist/cornerstoneWADOImageLoaderWebWorker.min.js',
+    taskConfiguration: {
+      decodeTask: {
+        codecsPath: 'https://unpkg.com/cornerstone-wado-image-loader@3.0.0/dist/cornerstoneWADOImageLoaderCodecs.js'
+      }
+    }
+  });
+
+  cornerstone.enable(element);
+  const tools = cornerstoneTools;
+  tools.init();
+
+  // Registrar herramientas
+  tools.addTool(tools.ZoomTool);
+  tools.addTool(tools.PanTool);
+  tools.addTool(tools.WwwcTool);
+  tools.addTool(tools.LengthTool);
+
+  // Desactivar todas por defecto
+  ['Zoom', 'Pan', 'Wwwc', 'Length'].forEach(name => {
+    tools.setToolDisabledForElement(element, name);
+  });
+
+  // Cargar imagen
+  const dicomUrl = '{{ dicom.archivo.url }}';
+  const imageId = 'wadouri:' + window.location.origin + dicomUrl;
+
+  cornerstone.loadImage(imageId).then(function(image) {
+    cornerstone.displayImage(element, image);
+
+    // Mostrar metadatos
+    const info = `
+      <strong>Dimensiones:</strong> ${image.columns} x ${image.rows}<br>
+      <strong>Espesor de píxel:</strong> ${image.rowPixelSpacing || '-'} mm<br>
+      <strong>Modalidad:</strong> ${image.data.string('x00080060') || 'Desconocida'}<br>
+      <strong>Fecha:</strong> ${image.data.string('x00080020') || 'Sin fecha'}
+    `;
+    document.getElementById('dicomInfo').innerHTML = info;
+
+    // Activar herramienta por defecto
+    setTool('Zoom');
+  }).catch(function(err) {
+    console.error("Error al cargar imagen:", err);
+    alert("No se pudo mostrar el archivo DICOM. ¿Es un archivo DICOM válido?");
+  });
+
+  // Cambiar herramienta activa
+  function setTool(toolName) {
+    ['Zoom', 'Pan', 'Wwwc', 'Length'].forEach(name => {
+      cornerstoneTools.setToolDisabledForElement(element, name);
+    });
+    cornerstoneTools.setToolActiveForElement(element, toolName, { mouseButtonMask: 1 });
+
+    document.querySelectorAll('.dicom-tool-btn').forEach(btn => {
+      btn.classList.remove('bg-blue-600', 'text-white');
+      btn.classList.add('bg-gray-700');
+    });
+    const btn = document.getElementById('btn-' + toolName);
+    if (btn) {
+      btn.classList.remove('bg-gray-700');
+      btn.classList.add('bg-blue-600', 'text-white');
+    }
+  }
+
+  // Reset viewport
+  function resetViewport() {
+    const defaultViewport = cornerstone.getDefaultViewportForImage(element, cornerstone.getImage(element));
+    cornerstone.setViewport(element, defaultViewport);
+  }
+
+  // Exportar como imagen PNG
+  function exportPNG() {
+    const canvas = element.querySelector('canvas');
+    const link = document.createElement('a');
+    link.download = 'captura.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
+</script>
+{% endblock %}

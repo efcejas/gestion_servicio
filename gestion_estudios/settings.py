@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'liquidacion.apps.LiquidacionConfig',
     'gestion_eventos.apps.GestionEventosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',
+    'visor_dicom',
     
     # Tailwind CSS
     'tailwind',
@@ -133,6 +134,7 @@ USE_I18N = True
 USE_TZ = True
 
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
@@ -148,6 +150,10 @@ STATICFILES_DIRS = [
 
 # Almacenamiento para Heroku
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Archivos subidos por usuarios (DICOM, imágenes, etc.)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Tipo de campo de clave principal predeterminado
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
