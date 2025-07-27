@@ -182,3 +182,7 @@ class FiltroEstudiosPorMedicoForm(forms.Form):
         initial=fecha_actual.year,  # Inicializar con el año actual
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
+
+# A continuación, se agrega el formulario para carga masiva de estudios
+class CargaExcelForm(forms.Form):
+    archivo_excel = forms.FileField(label="Subí el archivo Excel")

@@ -108,6 +108,15 @@
                         <span class="flex-1 ms-3 whitespace-nowrap">Eventos</span>
                     </a>
                 </li>
+
+                <li>
+                    <a href="{% url 'carga-masiva' %}" class="flex items-center p-2 text-white rounded-lg hover:bg-gray-700 group {% if request.resolver_match.url_name == 'carga-masiva' %}bg-blue-900 text-blue-400{% endif %}">
+                        <svg class="w-5 h-5 {% if request.resolver_match.url_name == 'carga-masiva' %}text-blue-400{% else %}text-gray-400{% endif %} transition duration-75 group-hover:text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        <span class="flex-1 ms-3 whitespace-nowrap">Carga Masiva</span>
+                    </a>
+                </li>
                 
                 <!-- Separador -->
                 <li class="pt-4 mt-4 space-y-2 border-t border-gray-700">

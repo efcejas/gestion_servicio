@@ -1,0 +1,107 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block page_title %}Carga masiva de estudios{% endblock %}
+{% block title %}Carga Masiva de Estudios{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto bg-white dark:bg-gray-800 shadow-lg p-6 rounded-xl mt-10">
+    <form method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-stretch gap-3">
+        {% csrf_token %}
+        <label for="id_archivo_excel" class="sr-only">Archivo Excel</label>
+        <input type="file" name="archivo_excel" id="id_archivo_excel" accept=".xlsx,.xls"
+            class="file-input file-input-bordered file-input-primary flex-1 min-w-0 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
+            required>
+        <button type="submit"
+            class="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 whitespace-nowrap">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 4v12"/>
+            </svg>
+            Subir y Previsualizar
+        </button>
+    </form>
+    {% if form.archivo_excel.errors %}
+        <p class="text-red-600 text-xs mt-2">{{ form.archivo_excel.errors.0 }}</p>
+    {% endif %}
+</div>
+{% if messages %}
+  <div class="max-w-4xl mx-auto mt-6 px-4">
+    {% for message in messages %}
+      <div x-data="{ show: true }" x-show="show" class="mb-4 p-4 rounded-lg border-l-4 relative transition-all duration-300
+        {% if message.tags == 'success' %}bg-green-50 border-green-500 text-green-800
+        {% elif message.tags == 'error' %}bg-red-50 border-red-500 text-red-800
+        {% else %}bg-blue-50 border-blue-500 text-blue-800{% endif %}">
+        <p class="font-medium">{{ message }}</p>
+        <button type="button" @click="show = false" class="absolute top-2 right-2 text-xl text-gray-400 hover:text-gray-700 dark:hover:text-white transition" aria-label="Cerrar">
+          &times;
+        </button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% if registros %}
+<div class="max-w-6xl mx-auto mt-6 px-4">
+    <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-6 flex items-center gap-2">
+        Previsualización de los registros detectados
+    </h3>
+
+    <div class="overflow-x-auto rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <table class="w-full min-w-[640px] bg-white dark:bg-gray-800 text-sm rounded-xl transition-all">
+            <thead class="bg-blue-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-600 sticky top-0 z-10">
+                <tr>
+                    <th class="py-3 px-4 text-left font-semibold">👨‍⚕️ Médico</th>
+                    <th class="py-3 px-4 text-left font-semibold">Apellido</th>
+                    <th class="py-3 px-4 text-left font-semibold">Nombre</th>
+                    <th class="py-3 px-4 text-left font-semibold">DNI</th>
+                    <th class="py-3 px-4 text-left font-semibold">📅 Fecha</th>
+                    <th class="py-3 px-4 text-left font-semibold">Tipo</th>
+                    <th class="py-3 px-4 text-left font-semibold flex items-center gap-1">
+                        <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                        Estudio Base
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in registros %}
+                <tr class="even:bg-blue-50/60 dark:even:bg-gray-700/40 hover:bg-blue-100 dark:hover:bg-gray-700 transition-colors">
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.medico }}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.apellido }}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.nombre }}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.dni }}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.fecha }}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-gray-700 dark:text-gray-100">{{ r.mod }}</td>
+                    <td class="py-2 px-4 whitespace-nowrap text-green-600 dark:text-green-400 font-medium">
+                        {{ r.estudio_base }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
+        Total detectado: <strong>{{ registros|length }}</strong> registros.
+    </p>
+
+
+    <!-- Formulario de confirmación -->
+    <form method="post" action="{% url 'carga-masiva' %}">
+        {% csrf_token %}
+        <input type="hidden" name="datos_serializados" value='{{ registros_json|escape }}'>
+        <details class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+        <summary>📦 Ver datos serializados</summary>
+        <pre class="overflow-x-auto break-words whitespace-pre-wrap mt-2">{{ registros_json }}</pre>
+        </details>
+        <button type="submit" class="mt-6 w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            Confirmar y guardar en el sistema
+        </button>
+    </form>
+
+</div>
+{% endif %}
+{% endblock %}

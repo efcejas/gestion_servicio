@@ -9,6 +9,7 @@ from django.db.models import Sum, Count, Q, Prefetch
 from django.http import FileResponse, HttpResponse
 from django.contrib.auth import get_user_model
 import io, json
+import pandas as pd
 from datetime import datetime, date
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
@@ -24,7 +25,8 @@ from .forms import (
     RegistroProcedimientosIntervensionismoCreateViewForm, 
     FiltroProcedimientosIntervensionismoForm, 
     FiltroEstudiosPorMedicoForm,
-    DiaSinPacientesForm
+    DiaSinPacientesForm,
+    CargaExcelForm,
 )
 import openpyxl
 from openpyxl.styles import Alignment, Font
@@ -32,6 +34,7 @@ from django.utils.timezone import now
 from openpyxl import Workbook
 from django.urls import reverse
 from django.utils.http import urlencode
+from django.utils.safestring import mark_safe
 
 class EstudiosCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Estudios
@@ -757,7 +760,7 @@ def exportar_excel_ecografias(request):
             cell.font = Font(bold=True)
 
     for column in ws.columns:
-        max_length = max(len(str(cell.value or '')) for cell in column) + 2
+        max_length = max(len(str(cell.value)) for cell in column) + 2
         ws.column_dimensions[column[0].column_letter].width = max_length
 
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -831,3 +834,126 @@ def exportar_excel_procedimientos(request):
     response["Content-Disposition"] = f'attachment; filename="procedimientos_{nombre_medico}.xlsx"'
     wb.save(response)
     return response
+
+# A continuación, se agrega el formulario para carga masiva de estudios
+
+User = get_user_model()
+
+class CargaMasivaView(FormView):
+    template_name = 'liquidacion/carga_formulario.html'
+    form_class = CargaExcelForm
+    success_url = reverse_lazy('carga-masiva')
+
+    def post(self, request, *args, **kwargs):
+        if 'datos_serializados' in request.POST:
+            return self.confirmar_carga(request)
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        archivo = form.cleaned_data['archivo_excel']
+        df = pd.read_excel(archivo)
+
+        registros_preview = []
+
+        mapeo_estudios = {
+            'US': {'tipo': 'ECO', 'nombre': 'ECO ABDOMINAL'},
+            'CR': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
+            'DX': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
+            'CT': {'tipo': 'TC', 'nombre': 'TC DE CEREBRO'},
+            'MR': {'tipo': 'RM', 'nombre': 'RM CEREBRO C/ DIFUSIÓN'}
+        }
+
+        for _, fila in df.iterrows():
+            try:
+                nombre_medico = fila['Informe firmado por'].strip()
+                medico = User.objects.filter(
+                    first_name__in=nombre_medico.split(),
+                    last_name__in=nombre_medico.split()
+                ).first()
+                if not medico:
+                    continue
+
+                dni = str(fila['Id. paciente'])[:8]
+                nombre_completo = fila['Nombre del paciente'].strip()
+                if ',' in nombre_completo:
+                    partes = nombre_completo.split(',')
+                    apellido = partes[0].strip()
+                    nombre = partes[1].strip() if len(partes) > 1 else ''
+                else:
+                    partes = nombre_completo.split()
+                    apellido = partes[0]
+                    nombre = ' '.join(partes[1:]) if len(partes) > 1 else ''
+
+                fecha = pd.to_datetime(fila['Fecha de firma final'], dayfirst=True).date()
+                mod = fila['Mod.'].strip().upper()
+                info_estudio = mapeo_estudios.get(mod)
+                estudio = None
+                if info_estudio:
+                    estudio = Estudios.objects.filter(
+                        tipo=info_estudio['tipo'],
+                        nombre__iexact=info_estudio['nombre']
+                    ).first()
+
+                registros_preview.append({
+                    'medico': medico.get_full_name(),
+                    'nombre': nombre,
+                    'apellido': apellido,
+                    'dni': dni,
+                    'fecha': str(fecha),
+                    'mod': mod,
+                    'estudio_base': info_estudio['nombre'] if info_estudio else 'No encontrado',
+                    'estudio_tipo': info_estudio['tipo'] if info_estudio else '',
+                })
+
+            except Exception:
+                continue
+
+        context = self.get_context_data(form=form)
+        context['registros'] = registros_preview
+        context['registros_json'] = mark_safe(json.dumps(registros_preview, ensure_ascii=False))
+        return self.render_to_response(context)
+
+    def confirmar_carga(self, request):
+        try:
+            registros_json = request.POST.get('datos_serializados')
+            registros = json.loads(registros_json)
+
+            cargados = 0
+            errores = 0
+
+            for item in registros:
+                try:
+                    medico = User.objects.filter(
+                        first_name__in=item['medico'].split(),
+                        last_name__in=item['medico'].split()
+                    ).first()
+                    if not medico:
+                        continue
+
+                    estudio = Estudios.objects.filter(
+                        tipo=item['estudio_tipo'],
+                        nombre__iexact=item['estudio_base']
+                    ).first()
+                    if not estudio:
+                        continue
+
+                    registro = RegistroEstudiosPorMedico.objects.create(
+                        medico=medico,
+                        nombre_paciente=item['nombre'],
+                        apellido_paciente=item['apellido'],
+                        dni_paciente=item['dni'],
+                        fecha_del_informe=item['fecha'],
+                        cantidad_estudio=1
+                    )
+                    registro.estudio.add(estudio)
+                    cargados += 1
+
+                except Exception:
+                    errores += 1
+                    continue
+
+            messages.success(request, f"✅ Se cargaron correctamente {cargados} registros. Errores: {errores}")
+        except Exception as e:
+            messages.error(request, f"❌ Error procesando la carga: {str(e)}")
+
+        return redirect('carga-masiva')
