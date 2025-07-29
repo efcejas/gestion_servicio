@@ -87,7 +87,7 @@
 
 
     <!-- Formulario de confirmación -->
-    <form method="post" action="{% url 'carga-masiva' %}">
+   <!--  <form method="post" action="{% url 'carga-masiva' %}">
         {% csrf_token %}
         <input type="hidden" name="datos_serializados" value='{{ registros_json|escape }}'>
         <details class="mt-4 text-xs text-gray-500 dark:text-gray-400">
@@ -100,7 +100,7 @@
             </svg>
             Confirmar y guardar en el sistema
         </button>
-    </form>
+    </form> -->
 
 </div>
 {% endif %}
