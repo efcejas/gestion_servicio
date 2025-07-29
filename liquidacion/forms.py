@@ -184,5 +184,6 @@ class FiltroEstudiosPorMedicoForm(forms.Form):
     )
 
 # A continuación, se agrega el formulario para carga masiva de estudios
-class CargaExcelForm(forms.Form):
-    archivo_excel = forms.FileField(label="Subí el archivo Excel")
+""" class CargaExcelForm(forms.Form):
+    archivo_excel = forms.FileField(label="Subí el archivo Excel") """
+    

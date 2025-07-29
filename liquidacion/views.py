@@ -837,7 +837,7 @@ def exportar_excel_procedimientos(request):
 
 # A continuación, se agrega el formulario para carga masiva de estudios
 
-User = get_user_model()
+""" User = get_user_model()
 
 class CargaMasivaView(FormView):
     template_name = 'liquidacion/carga_formulario.html'
@@ -859,8 +859,8 @@ class CargaMasivaView(FormView):
             'US': {'tipo': 'ECO', 'nombre': 'ECO ABDOMINAL'},
             'CR': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
             'DX': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
-            'CT': {'tipo': 'TC', 'nombre': 'TC DE CEREBRO'},
-            'MR': {'tipo': 'RM', 'nombre': 'RM CEREBRO C/ DIFUSIÓN'}
+            'CT': {'tipo': 'TOM', 'nombre': 'TC DE CEREBRO'},
+            'MR': {'tipo': 'RES', 'nombre': 'RM CEREBRO C/ DIFUSIÓN'}
         }
 
         for _, fila in df.iterrows():
@@ -956,4 +956,4 @@ class CargaMasivaView(FormView):
         except Exception as e:
             messages.error(request, f"❌ Error procesando la carga: {str(e)}")
 
-        return redirect('carga-masiva')
+        return redirect('carga-masiva') """

@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import (
-    CargaMasivaView,
+    # CargaMasivaView,
     EstudiosCreateView,
     EstudiosListView,
     RegistroEstudiosPorMedicoCreateView,
@@ -58,5 +58,5 @@ urlpatterns = [
     path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
 
     # Rutas para la carga masiva de estudios
-    path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
+    # path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
 ]
