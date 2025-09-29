@@ -839,121 +839,108 @@ def exportar_excel_procedimientos(request):
 
 User = get_user_model()
 
-class CargaMasivaView(FormView):
-    template_name = 'liquidacion/carga_formulario.html'
-    form_class = CargaExcelForm
-    success_url = reverse_lazy('carga-masiva')
-
-    def post(self, request, *args, **kwargs):
-        if 'datos_serializados' in request.POST:
-            return self.confirmar_carga(request)
-        return super().post(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        archivo = form.cleaned_data['archivo_excel']
-        df = pd.read_excel(archivo)
-
-        registros_preview = []
-
-        mapeo_estudios = {
-            'US': {'tipo': 'ECO', 'nombre': 'ECO ABDOMINAL'},
-            'CR': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
-            'DX': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
-            'CT': {'tipo': 'TOM', 'nombre': 'TC DE CEREBRO'},
-            'MR': {'tipo': 'RES', 'nombre': 'RM CEREBRO C/ DIFUSIÓN'}
-        }
-
-        for _, fila in df.iterrows():
-            try:
-                nombre_medico = fila['Informe firmado por'].strip()
-                medico = User.objects.filter(
-                    first_name__in=nombre_medico.split(),
-                    last_name__in=nombre_medico.split()
-                ).first()
-                if not medico:
-                    continue
-
-                dni = str(fila['Id. paciente'])[:8]
-                nombre_completo = fila['Nombre del paciente'].strip()
-                if ',' in nombre_completo:
-                    partes = nombre_completo.split(',')
-                    apellido = partes[0].strip()
-                    nombre = partes[1].strip() if len(partes) > 1 else ''
-                else:
-                    partes = nombre_completo.split()
-                    apellido = partes[0]
-                    nombre = ' '.join(partes[1:]) if len(partes) > 1 else ''
-
-                fecha = pd.to_datetime(fila['Fecha de firma final'], dayfirst=True).date()
-                mod = fila['Mod.'].strip().upper()
-                info_estudio = mapeo_estudios.get(mod)
-                estudio = None
-                if info_estudio:
-                    estudio = Estudios.objects.filter(
-                        tipo=info_estudio['tipo'],
-                        nombre__iexact=info_estudio['nombre']
-                    ).first()
-
-                registros_preview.append({
-                    'medico': medico.get_full_name(),
-                    'nombre': nombre,
-                    'apellido': apellido,
-                    'dni': dni,
-                    'fecha': str(fecha),
-                    'mod': mod,
-                    'estudio_base': info_estudio['nombre'] if info_estudio else 'No encontrado',
-                    'estudio_tipo': info_estudio['tipo'] if info_estudio else '',
-                })
-
-            except Exception:
-                continue
-
-        context = self.get_context_data(form=form)
-        context['registros'] = registros_preview
-        context['registros_json'] = mark_safe(json.dumps(registros_preview, ensure_ascii=False))
-        return self.render_to_response(context)
-
-    def confirmar_carga(self, request):
-        try:
-            registros_json = request.POST.get('datos_serializados')
-            registros = json.loads(registros_json)
-
-            cargados = 0
-            errores = 0
-
-            for item in registros:
-                try:
-                    medico = User.objects.filter(
-                        first_name__in=item['medico'].split(),
-                        last_name__in=item['medico'].split()
-                    ).first()
-                    if not medico:
-                        continue
-
-                    estudio = Estudios.objects.filter(
-                        tipo=item['estudio_tipo'],
-                        nombre__iexact=item['estudio_base']
-                    ).first()
-                    if not estudio:
-                        continue
-
-                    registro = RegistroEstudiosPorMedico.objects.create(
-                        medico=medico,
-                        nombre_paciente=item['nombre'],
-                        apellido_paciente=item['apellido'],
-                        dni_paciente=item['dni'],
-                        fecha_del_informe=item['fecha'],
-                        cantidad_estudio=1
-                    )
-                    registro.estudio.add(estudio)
-                    cargados += 1
-
-                except Exception:
-                    errores += 1
-                    continue
-
-            messages.success(request, f"✅ Se cargaron correctamente {cargados} registros. Errores: {errores}")
-        except Exception as e:
-            messages.error(request, f"❌ Error procesando la carga: {str(e)}")
-
-        return redirect('carga-masiva')
+# --- Carga masiva desactivada temporalmente ---
+# class CargaMasivaView(FormView):
+#     """Vista deshabilitada temporalmente. Restaurar quitando comentarios."""
+#     template_name = 'liquidacion/carga_formulario.html'
+#     form_class = CargaExcelForm
+#     success_url = reverse_lazy('carga-masiva')
+#
+#     def post(self, request, *args, **kwargs):
+#         if 'datos_serializados' in request.POST:
+#             return self.confirmar_carga(request)
+#         return super().post(request, *args, **kwargs)
+#
+#     def form_valid(self, form):
+#         archivo = form.cleaned_data['archivo_excel']
+#         df = pd.read_excel(archivo)
+#         registros_preview = []
+#         mapeo_estudios = {
+#             'US': {'tipo': 'ECO', 'nombre': 'ECO ABDOMINAL'},
+#             'CR': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
+#             'DX': {'tipo': 'RAD', 'nombre': 'RX DE TÓRAX'},
+#             'CT': {'tipo': 'TOM', 'nombre': 'TC DE CEREBRO'},
+#             'MR': {'tipo': 'RES', 'nombre': 'RM CEREBRO C/ DIFUSIÓN'}
+#         }
+#         for _, fila in df.iterrows():
+#             try:
+#                 nombre_medico = fila['Informe firmado por'].strip()
+#                 medico = User.objects.filter(
+#                     first_name__in=nombre_medico.split(),
+#                     last_name__in=nombre_medico.split()
+#                 ).first()
+#                 if not medico:
+#                     continue
+#                 dni = str(fila['Id. paciente'])[:8]
+#                 nombre_completo = fila['Nombre del paciente'].strip()
+#                 if ',' in nombre_completo:
+#                     partes = nombre_completo.split(',')
+#                     apellido = partes[0].strip()
+#                     nombre = partes[1].strip() if len(partes) > 1 else ''
+#                 else:
+#                     partes = nombre_completo.split()
+#                     apellido = partes[0]
+#                     nombre = ' '.join(partes[1:]) if len(partes) > 1 else ''
+#                 fecha = pd.to_datetime(fila['Fecha de firma final'], dayfirst=True).date()
+#                 mod = fila['Mod.'].strip().upper()
+#                 info_estudio = mapeo_estudios.get(mod)
+#                 estudio = None
+#                 if info_estudio:
+#                     estudio = Estudios.objects.filter(
+#                         tipo=info_estudio['tipo'],
+#                         nombre__iexact=info_estudio['nombre']
+#                     ).first()
+#                 registros_preview.append({
+#                     'medico': medico.get_full_name(),
+#                     'nombre': nombre,
+#                     'apellido': apellido,
+#                     'dni': dni,
+#                     'fecha': str(fecha),
+#                     'mod': mod,
+#                     'estudio_base': info_estudio['nombre'] if info_estudio else 'No encontrado',
+#                     'estudio_tipo': info_estudio['tipo'] if info_estudio else '',
+#                 })
+#             except Exception:
+#                 continue
+#         context = self.get_context_data(form=form)
+#         context['registros'] = registros_preview
+#         context['registros_json'] = mark_safe(json.dumps(registros_preview, ensure_ascii=False))
+#         return self.render_to_response(context)
+#
+#     def confirmar_carga(self, request):
+#         try:
+#             registros_json = request.POST.get('datos_serializados')
+#             registros = json.loads(registros_json)
+#             cargados = 0
+#             errores = 0
+#             for item in registros:
+#                 try:
+#                     medico = User.objects.filter(
+#                         first_name__in=item['medico'].split(),
+#                         last_name__in=item['medico'].split()
+#                     ).first()
+#                     if not medico:
+#                         continue
+#                     estudio = Estudios.objects.filter(
+#                         tipo=item['estudio_tipo'],
+#                         nombre__iexact=item['estudio_base']
+#                     ).first()
+#                     if not estudio:
+#                         continue
+#                     registro = RegistroEstudiosPorMedico.objects.create(
+#                         medico=medico,
+#                         nombre_paciente=item['nombre'],
+#                         apellido_paciente=item['apellido'],
+#                         dni_paciente=item['dni'],
+#                         fecha_del_informe=item['fecha'],
+#                         cantidad_estudio=1
+#                     )
+#                     registro.estudio.add(estudio)
+#                     cargados += 1
+#                 except Exception:
+#                     errores += 1
+#                     continue
+#             messages.success(request, f"✅ Se cargaron correctamente {cargados} registros. Errores: {errores}")
+#         except Exception as e:
+#             messages.error(request, f"❌ Error procesando la carga: {str(e)}")
+#         return redirect('carga-masiva')

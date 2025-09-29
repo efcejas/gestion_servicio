@@ -5,6 +5,8 @@
 {% block title %}Carga Masiva de Estudios{% endblock %}
 
 {% block content %}
+<!-- AVISO: La funcionalidad de carga masiva está desactivada temporalmente en el backend.
+    Si necesitás reactivarla, descomenta la vista CargaMasivaView en liquidacion/views.py y la ruta en liquidacion/urls.py -->
 <div class="max-w-xl mx-auto bg-white dark:bg-gray-800 shadow-lg p-6 rounded-xl mt-10">
     <form method="post" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-stretch gap-3">
         {% csrf_token %}
