@@ -1,0 +1,7 @@
+<form method="post" action="{% url 'eliminar_guardia' pk=object.pk %}" class="space-y-4">
+  {% csrf_token %}
+  <p class="text-sm text-gray-700 dark:text-gray-300">¿Estás seguro de eliminar la guardia del <strong>{{ object.fecha }}</strong> ({{ object.get_franja_horaria_display }})?</p>
+  <div class="flex items-center justify-end gap-2">
+    <button type="submit" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">Eliminar</button>
+  </div>
+</form>

@@ -1,0 +1,302 @@
+{% extends "layouts/base_with_sidebar.html" %}
+{% load static %}
+
+{% block title %}Calendario de Guardias (TW){% endblock %}
+
+{% block page_title %}Control de guardias{% endblock %}
+{% block page_description %}Calendario mensual para crear, editar y eliminar guardias{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl px-4 py-0">
+  <div class="flex justify-end gap-4 mb-4">
+    <div class="text-sm text-gray-500 dark:text-gray-400">Click en un día para crear, click en evento para editar/eliminar</div>
+  </div>
+
+  <div class="mb-3">
+    <div id="calendar" class="relative bg-white dark:bg-gray-800 rounded-xl shadow ring-1 ring-gray-200 dark:ring-gray-700 p-3"></div>
+  </div>
+
+  <!-- Modal Tailwind (sin dependencias externas) -->
+  <div id="twModal" class="fixed inset-0 z-50 hidden bg-black/50">
+    <div class="flex h-full w-full items-center justify-center">
+      <div class="mx-4 w-full max-w-2xl rounded-xl bg-white p-4 shadow-xl ring-1 ring-gray-200 dark:bg-gray-800 dark:ring-gray-700">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 id="twModalTitle" class="text-lg font-semibold text-gray-900 dark:text-white">Gestionar guardia</h3>
+        <button id="twClose" type="button" class="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white" aria-label="Cerrar">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5"><path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" /></svg>
+        </button>
+      </div>
+        <div id="twModalBody" class="max-h-[70vh] overflow-y-auto"></div>
+        <div id="twExtra" class="mt-4 hidden">
+          <a id="twDeleteBtn" href="#" class="inline-flex items-center gap-2 rounded-lg border border-red-500 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:border-red-400 dark:text-red-300 dark:hover:bg-red-900/20">Eliminar guardia</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_css %}
+<style>
+  /* Ajustes de colores para modo oscuro de FullCalendar */
+  .fc-theme-standard .fc-scrollgrid { border-color: rgb(55 65 81); } /* gray-700 */
+  .fc .fc-daygrid-day-number { color: rgb(243 244 246); } /* text-gray-100 */
+  .fc .fc-col-header-cell-cushion { color: rgb(209 213 219); } /* text-gray-300 */
+  .fc .fc-toolbar-title { color: rgb(243 244 246); } /* text-gray-100 */
+  .fc .fc-button { background-color: rgb(31 41 55); color: rgb(229 231 235); border-color: rgb(55 65 81); }
+  .fc .fc-button:hover { background-color: rgb(55 65 81); }
+  .fc .fc-button-primary:disabled { background-color: rgb(31 41 55); border-color: rgb(55 65 81); color: rgb(156 163 175); }
+  .fc .fc-daygrid-more-link { color: rgb(147 197 253); } /* text-blue-300 */
+  .fc .fc-list { color: rgb(229 231 235); }
+  .fc .fc-list-day-text, .fc .fc-list-day-side-text { color: rgb(209 213 219); }
+  .fc .fc-list-event:hover td { background: rgb(31 41 55); }
+  .fc .fc-daygrid-event { border: none; }
+  .fc .fc-daygrid-day-frame { background: transparent; }
+  .fc .fc-highlight { background: rgba(59,130,246,0.2); }
+  .fc .fc-event-title { color: inherit; }
+  .fc .fc-daygrid-day-top { align-items: start; }
+  .fc .fc-daygrid-day-number { text-decoration: none; }
+  /* Forzar texto blanco del título de evento (nombre médico) en vista de lista en modo oscuro */
+  .dark .fc .fc-list-event td,
+  .dark .fc .fc-list-event .fc-list-event-title,
+  .dark .fc .fc-list-event .fc-list-event-title a { color: #ffffff !important; }
+  /* Eliminar fondo/padding del contenedor de evento para evitar "tarjeta dentro de tarjeta" */
+  .fc .fc-daygrid-event { background: transparent !important; padding: 0 !important; border-radius: 0 !important; }
+  .fc .fc-daygrid-event .fc-event-main { padding: 0 !important; }
+</style>
+{% endblock %}
+
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales-all.global.min.js"></script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+  const calendarEl = document.getElementById('calendar');
+  let openDetail = null; // referencia al panel de detalle actualmente abierto
+    const modalEl = document.getElementById('twModal');
+    const modalBody = document.getElementById('twModalBody');
+    const extra = document.getElementById('twExtra');
+    const deleteBtn = document.getElementById('twDeleteBtn');
+    const closeBtn = document.getElementById('twClose');
+  const modalTitle = document.getElementById('twModalTitle');
+  // Utilidad para cerrar panel abierto
+  function closeOpenDetail() {
+    if (openDetail) {
+      openDetail.classList.add('hidden');
+      const btn = openDetail._triggerBtn;
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      openDetail = null;
+    }
+  }
+  document.addEventListener('click', (e) => {
+    // Cerrar si se clickea fuera de un contenedor de guardia
+    if (openDetail && !e.target.closest('.guardia-item')) {
+      closeOpenDetail();
+    }
+  });
+
+    function openModal() {
+      modalEl.classList.remove('hidden');
+    }
+    function closeModal() {
+      modalEl.classList.add('hidden');
+    }
+    closeBtn.addEventListener('click', closeModal);
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) closeModal();
+    });
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'es',
+      allDaySlot: false,
+      displayEventTime: false,
+      navLinks: false,
+      showNonCurrentDates: true,
+      dayMaxEventRows: true,
+      eventDidMount: (info) => {
+        // Eliminar el tooltip nativo (title) que agrega FullCalendar para evitar duplicado
+        if (info.el && info.el.hasAttribute('title')) {
+          info.el.removeAttribute('title');
+        }
+      },
+      eventOrder: (a, b) => {
+        const order = {
+          'DIA_COMPLETO': 0,
+          'DIA': 1,
+          'DIA_FIN_SEMANA': 2,
+          'NOCHE': 3,
+          'NOCHE_FIN_SEMANA': 4,
+        };
+        const fa = (a.extendedProps && a.extendedProps.franja_key) || a.extendedProps?.franja || '';
+        const fb = (b.extendedProps && b.extendedProps.franja_key) || b.extendedProps?.franja || '';
+        return (order[fa] ?? 99) - (order[fb] ?? 99);
+      },
+        eventContent: (arg) => {
+          const ev = arg.event;
+          const ex = ev.extendedProps || {};
+          const cubierta = !!ex.cubierta;
+          const medico = ex.medico || '';
+          const franjaCompleta = ex.franja || '';
+          const editUrl = ex.editUrl;
+          const deleteUrl = ex.deleteUrl;
+
+          // Etiqueta principal del chip: médico (o No cubierta)
+          const chipLabel = cubierta ? medico : 'No cubierta';
+          const franjaColor = {
+            '20:00 - 08:00': 'indigo',
+            '24 horas (SA-DO-FE)': 'blue',
+            '08:00 - 20:00': 'green',
+            '20:00 - 08:00 (SA-DO-FE)': 'purple',
+            '08:00 - 20:00 (SA-DO-FE)': 'emerald'
+          }[franjaCompleta] || 'gray';
+          const ringClass = cubierta ? `ring-${franjaColor}-500 dark:ring-${franjaColor}-400` : 'ring-gray-400 dark:ring-gray-600';
+          const dotClass = cubierta ? `bg-${franjaColor}-500 dark:bg-${franjaColor}-400` : 'bg-gray-400 dark:bg-gray-500';
+
+          const container = document.createElement('div');
+          container.className = 'guardia-item';
+
+          // Botón / chip
+          const chipBtn = document.createElement('button');
+          chipBtn.type = 'button';
+          chipBtn.className = [
+            'fc-chip','flex','items-center','gap-1','rounded-md','px-1.5','py-0.5','text-[10px]','font-medium','tracking-tight','cursor-pointer','select-none',
+            'ring-1','ring-inset', ringClass, 'bg-transparent','dark:bg-transparent',
+            'text-gray-800','dark:text-gray-100','focus:outline-none','focus:ring-2','focus:ring-offset-1','focus:ring-indigo-500',
+            'w-full','truncate','justify-start',
+            cubierta ? '' : 'opacity-60'
+          ].join(' ');
+          chipBtn.setAttribute('aria-expanded','false');
+          chipBtn.setAttribute('aria-label', `Detalles guardia ${chipLabel}`);
+
+          const dot = document.createElement('span');
+          dot.className = ['h-2','w-2','rounded-full',dotClass].join(' ');
+          dot.setAttribute('aria-hidden','true');
+          chipBtn.appendChild(dot);
+          const label = document.createElement('span');
+          label.textContent = chipLabel;
+          chipBtn.appendChild(label);
+
+          // Panel detalle (sin fecha redundante)
+          const detail = document.createElement('div');
+          detail.className = 'hidden mt-1 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 p-2 shadow-sm text-[11px] leading-snug space-y-1';
+          detail.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white ${dotClass}">${franjaCompleta}</span>
+            </div>
+            <div class="text-gray-700 dark:text-gray-200">${cubierta ? medico : '<span class=\'text-amber-600 dark:text-amber-400 font-medium\'>No cubierta</span>'}</div>
+            <div class="pt-1 flex gap-2">
+              <button type="button" data-action="edit" class="inline-flex items-center rounded bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 text-[10px] font-medium">Editar</button>
+              <button type="button" data-action="delete" class="inline-flex items-center rounded bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 text-[10px] font-medium">Eliminar</button>
+            </div>`;
+
+          // Eventos
+          chipBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (detail.classList.contains('hidden')) {
+              closeOpenDetail();
+              detail.classList.remove('hidden');
+              chipBtn.setAttribute('aria-expanded','true');
+              detail._triggerBtn = chipBtn;
+              openDetail = detail;
+            } else {
+              detail.classList.add('hidden');
+              chipBtn.setAttribute('aria-expanded','false');
+              openDetail = null;
+            }
+          });
+
+          detail.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-action]');
+            if (!btn) return;
+            const action = btn.getAttribute('data-action');
+            if (action === 'edit') {
+              fetch(editUrl)
+                .then(r => r.text())
+                .then(html => {
+                  modalBody.innerHTML = html;
+                  deleteBtn.href = deleteUrl;
+                  extra.classList.remove('hidden');
+                  modalTitle.textContent = `Editar guardia – ${franjaCompleta}`;
+                  openModal();
+                });
+            } else if (action === 'delete') {
+              fetch(deleteUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+                .then(r => r.text())
+                .then(html => {
+                  modalBody.innerHTML = html;
+                  extra.classList.add('hidden');
+                  modalTitle.textContent = `Eliminar guardia – ${franjaCompleta}`;
+                  openModal();
+                });
+            }
+          });
+
+          container.appendChild(chipBtn);
+          container.appendChild(detail);
+          return { domNodes: [container] };
+        },
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,listWeek'
+      },
+      buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', list: 'Lista' },
+      events: {
+        url: "{% url 'control_guardias:guardias_api' %}",
+        failure: (err) => {
+          console.error('Error cargando eventos', err);
+        }
+      },
+      dateClick: (info) => {
+  fetch("{% url 'control_guardias:crear_guardia' %}?fecha=" + info.dateStr)
+          .then(r => r.text())
+          .then(html => {
+            modalBody.innerHTML = html;
+            extra.classList.add('hidden');
+            modalTitle.textContent = `Nueva guardia – ${info.dateStr}`;
+            openModal();
+          });
+      },
+      eventClick: (info) => {
+        // Se mantiene para compatibilidad (por si el usuario hace click fuera del botón) -> togglear igual
+        const el = info.el.querySelector('button.fc-chip');
+        if (el) el.click();
+      }
+    });
+
+    calendar.render();
+
+    document.addEventListener('submit', function (e) {
+      const form = e.target;
+      if (form.closest('#twModal')) {
+        e.preventDefault();
+        fetch(form.action || window.location.href, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: new FormData(form)
+        }).then(resp => {
+          if (resp.ok) {
+            closeModal();
+            calendar.refetchEvents();
+          } else {
+            return resp.text().then(html => { modalBody.innerHTML = html; });
+          }
+        })
+      }
+    });
+
+    // Cargar confirmación de borrado dentro del modal
+    deleteBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const href = deleteBtn.getAttribute('href');
+      if (!href) return;
+      fetch(href, { headers: { 'X-Requested-With': 'XMLHttpRequest' }})
+        .then(r => r.text())
+        .then(html => {
+          modalBody.innerHTML = html;
+        });
+    });
+  });
+</script>
+{% endblock %}

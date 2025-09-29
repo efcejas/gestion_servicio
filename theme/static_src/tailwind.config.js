@@ -14,15 +14,15 @@ module.exports = {
   safelist: [
     // Incluir TODOS los colores de Tailwind automáticamente
     {
-      pattern: /bg-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
+      pattern: /bg-(red|green|blue|yellow|purple|pink|indigo|gray|orange|amber|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
       variants: ['hover', 'focus', 'active', 'dark', 'dark:hover']
     },
     {
-      pattern: /text-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
+      pattern: /text-(red|green|blue|yellow|purple|pink|indigo|gray|orange|amber|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
       variants: ['hover', 'focus', 'active', 'dark', 'dark:hover']
     },
     {
-      pattern: /border-(red|green|blue|yellow|purple|pink|indigo|gray|orange|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
+      pattern: /border-(red|green|blue|yellow|purple|pink|indigo|gray|orange|amber|lime|emerald|teal|cyan|sky|violet|fuchsia|rose)-(50|100|200|300|400|500|600|700|800|900)/,
       variants: ['hover', 'focus', 'active', 'dark', 'dark:hover']
     },
     {

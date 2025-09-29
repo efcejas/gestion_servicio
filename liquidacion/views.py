@@ -9,7 +9,7 @@ from django.db.models import Sum, Count, Q, Prefetch
 from django.http import FileResponse, HttpResponse
 from django.contrib.auth import get_user_model
 import io, json
-# import pandas as pd
+import pandas as pd
 from datetime import datetime, date
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
@@ -26,7 +26,7 @@ from .forms import (
     FiltroProcedimientosIntervensionismoForm, 
     FiltroEstudiosPorMedicoForm,
     DiaSinPacientesForm,
-    # CargaExcelForm,
+    CargaExcelForm,
 )
 import openpyxl
 from openpyxl.styles import Alignment, Font
@@ -837,7 +837,7 @@ def exportar_excel_procedimientos(request):
 
 # A continuación, se agrega el formulario para carga masiva de estudios
 
-""" User = get_user_model()
+User = get_user_model()
 
 class CargaMasivaView(FormView):
     template_name = 'liquidacion/carga_formulario.html'
@@ -956,4 +956,4 @@ class CargaMasivaView(FormView):
         except Exception as e:
             messages.error(request, f"❌ Error procesando la carga: {str(e)}")
 
-        return redirect('carga-masiva') """
+        return redirect('carga-masiva')
