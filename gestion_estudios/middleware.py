@@ -1,7 +1,10 @@
 import logging
 import traceback
+import sys
 
-logger = logging.getLogger(__name__)
+# Usar un logger específico y también fallback al de django.request
+logger = logging.getLogger("gestion_estudios.middleware")
+django_request_logger = logging.getLogger("django.request")
 
 class LogExceptionsMiddleware:
     """Middleware sencillo para registrar traceback completo de cualquier excepción no capturada.
@@ -18,6 +21,17 @@ class LogExceptionsMiddleware:
             return self.get_response(request)
         except Exception as exc:  # noqa: BLE001
             tb = traceback.format_exc()
-            logger.error("[EXCEPTION] %s %s -> %s\n%s", request.method, request.path, exc, tb)
-            # Re-elevar para que Django siga su flujo normal (500 + handler)
+            message = f"[EXCEPTION] {request.method} {request.path} -> {exc}\n{tb}"
+            # Intentar varios canales para garantizar que aparezca en Heroku logs
+            try:
+                logger.error(message)
+            except Exception:  # pragma: no cover
+                pass
+            try:
+                django_request_logger.error(message)
+            except Exception:  # pragma: no cover
+                pass
+            # Fallback directo a stdout (Heroku captura stdout/stderr)
+            print(message, file=sys.stderr, flush=True)
+            # Re-elevar para que Django genere el 500 estándar
             raise

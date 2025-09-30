@@ -185,3 +185,45 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config("GMAIL_USER")  # Tu dirección de correo de Gmail
 EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD")  # Contraseña o App Password de Gmail
 DEFAULT_FROM_EMAIL = config("GMAIL_USER")
+
+# -----------------------------------------------------------------------------
+# LOGGING: Forzar que los errores del middleware personalizado aparezcan siempre.
+# Heroku captura stdout/stderr, así que añadimos handlers de consola.
+# -----------------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '[{levelname}] {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'gestion_estudios.middleware': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}

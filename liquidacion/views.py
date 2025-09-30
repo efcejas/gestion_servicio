@@ -512,7 +512,7 @@ def generar_pdf_liquidacion(request):
     Story.append(Spacer(1, 10))
 
     # Médicos
-    medicos = Medico.objects.all()
+    medicos = User.objects.all()
     for medico in medicos:
         # Encabezado del médico
         encabezado_medico = Paragraph(
