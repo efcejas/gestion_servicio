@@ -1,4 +1,4 @@
-<form method="post" action="{% url 'eliminar_guardia' pk=object.pk %}" class="space-y-4">
+<form method="post" action="{% url 'control_guardias:eliminar_guardia' pk=object.pk %}" class="space-y-4">
   {% csrf_token %}
   <p class="text-sm text-gray-700 dark:text-gray-300">¿Estás seguro de eliminar la guardia del <strong>{{ object.fecha }}</strong> ({{ object.get_franja_horaria_display }})?</p>
   <div class="flex items-center justify-end gap-2">

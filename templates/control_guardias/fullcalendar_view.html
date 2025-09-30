@@ -136,10 +136,10 @@
         day: 'Día', // Opcional, si usas vista de día
         list: 'Lista' // Cambia "listWeek" a "Lista"
       },
-      events: "{% url 'guardias_api' %}",
+  events: "{% url 'control_guardias:guardias_api' %}",
 
       dateClick: function (info) {
-        fetch("{% url 'crear_guardia' %}?fecha=" + info.dateStr)
+  fetch("{% url 'control_guardias:crear_guardia' %}?fecha=" + info.dateStr)
           .then(response => response.text())
           .then(html => {
             document.getElementById('formulario-guardia').innerHTML = html;
