@@ -134,7 +134,7 @@
                         {% endif %}
                         {% if user|has_group:'Médicos de staff - informes' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'mis_guardias' %}">Mis guardias</a>
+                            <a class="nav-link" href="{% url 'control_guardias:mis_guardias' %}">Mis guardias</a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="navbarEstudiosDropdown" role="button"
