@@ -63,8 +63,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    # Middleware temporal para diagnosticar 500 en producción
-    'gestion_estudios.middleware.LogExceptionsMiddleware',
 ]
 
 ROOT_URLCONF = 'gestion_estudios.urls'
