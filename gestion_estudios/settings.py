@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'liquidacion.apps.LiquidacionConfig',
     'gestion_eventos.apps.GestionEventosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',
-    'visor_dicom',
     
     # Tailwind CSS
     'tailwind',
@@ -151,7 +150,7 @@ STATICFILES_DIRS = [
 # Almacenamiento para Heroku
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Archivos subidos por usuarios (DICOM, imágenes, etc.)
+# Archivos subidos por usuarios (imágenes, documentos, etc.)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

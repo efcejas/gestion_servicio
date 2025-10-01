@@ -41,7 +41,6 @@ urlpatterns = [
 
     # Aplicaciones específicas
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
-    path('visor-dicom/', include('visor_dicom.urls', namespace='visor_dicom')),  # Visor DICOM
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
