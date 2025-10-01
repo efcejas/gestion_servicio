@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.http import JsonResponse
+from django.db import OperationalError
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -125,10 +126,6 @@ class MisGuardiasView(LoginRequiredMixin, ListView):
 # Esto es de uso exclusivo de los administradores
 
 
-class FullCalendarView(TemplateView):
-    template_name = 'control_guardias/fullcalendar_view.html'
-
-
 class TailwindCalendarView(TemplateView):
     template_name = 'control_guardias/fullcalendar_tw.html'
 
@@ -137,42 +134,65 @@ class GuardiaEventsView(View):
     def get(self, request):
         eventos = []
 
-        guardias = Guardia.objects.all()
+        # Filtrado por rango de fechas si FullCalendar manda start/end
+        start_param = request.GET.get('start')
+        end_param = request.GET.get('end')
+        guardias_qs = Guardia.objects.all()
+        if start_param and end_param:
+            # FullCalendar manda ISO con posible zona: YYYY-MM-DDTHH:MM:SS... -> nos quedamos con la fecha
+            try:
+                start_date = start_param.split('T')[0]
+                end_date = end_param.split('T')[0]
+                guardias_qs = guardias_qs.filter(fecha__gte=start_date, fecha__lte=end_date)
+            except ValueError:
+                pass  # si algo falla, ignoramos y devolvemos todo
 
-        for g in guardias:
-            cubierta = bool(g.cubierta)
-            medico_nombre = g.medico.user.get_full_name() if getattr(g.medico, 'user', None) else 'Sin asignar'
-            base_evento = {
-                'id': str(g.pk),
-                'start': g.fecha.isoformat(),
-                'allDay': True,
-                'display': 'block',
-                'extendedProps': {
-                    'cubierta': cubierta,
-                    'medico': medico_nombre,
-                    'franja': g.get_franja_horaria_display(),
-                    'franja_key': g.franja_horaria,
-                    'editUrl': reverse('control_guardias:editar_guardia', args=[g.pk]),
-                    'deleteUrl': reverse('control_guardias:eliminar_guardia', args=[g.pk]),
+        # Optimizar acceso a medico y su user
+        guardias_qs = guardias_qs.select_related('medico__user')
+
+        try:
+            for g in guardias_qs:
+                medico_obj = g.medico
+                user_obj = getattr(medico_obj, 'user', None) if medico_obj else None
+                medico_nombre = user_obj.get_full_name() if user_obj else ''
+
+                # Una guardia realmente "cubierta" sólo si tiene bandera cubierta y un médico asociado con user
+                cubierta_real = bool(g.cubierta and medico_obj and user_obj)
+
+                base_evento = {
+                    'id': str(g.pk),
+                    'start': g.fecha.isoformat(),
+                    'allDay': True,
+                    'display': 'block',
+                    'extendedProps': {
+                        'cubierta': cubierta_real,
+                        'medico': medico_nombre if medico_nombre else 'Sin asignar',
+                        'franja': g.get_franja_horaria_display(),
+                        'franja_key': g.franja_horaria,
+                        'editUrl': reverse('control_guardias:editar_guardia', args=[g.pk]),
+                        'deleteUrl': reverse('control_guardias:eliminar_guardia', args=[g.pk]),
+                    }
                 }
-            }
 
-            if cubierta and g.medico and g.medico.user:
-                base_evento.update({
-                    'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {medico_nombre}',
-                    'backgroundColor': '#d9eaff',
-                    'borderColor': '#164569',
-                    'textColor': '#000',
-                })
-            else:
-                base_evento.update({
-                    'title': '⚠️ Guardia no cubierta',
-                    'backgroundColor': '#fff3cd',
-                    'borderColor': '#ffc107',
-                    'textColor': '#000',
-                })
+                if cubierta_real:
+                    base_evento.update({
+                        'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {medico_nombre}',
+                        'backgroundColor': '#d9eaff',
+                        'borderColor': '#164569',
+                        'textColor': '#000',
+                    })
+                else:
+                    base_evento.update({
+                        'title': '⚠️ Guardia no cubierta',
+                        'backgroundColor': '#fff3cd',
+                        'borderColor': '#ffc107',
+                        'textColor': '#000',
+                    })
 
-            eventos.append(base_evento)
+                eventos.append(base_evento)
+        except OperationalError:
+            # Si hubo un problema de conexión con la BD, devolvemos lista vacía con un flag
+            return JsonResponse({'error': 'db_connection', 'events': []}, status=500)
 
         return JsonResponse(eventos, safe=False)
 
@@ -197,6 +217,12 @@ class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             return HttpResponse(status=200)
         return response
 
+    def form_invalid(self, form):
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            # Devolver el HTML con errores pero con status 400 para que el JS no cierre el modal
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        return super().form_invalid(form)
+
 
 class GuardiaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     model = Guardia
@@ -204,6 +230,11 @@ class GuardiaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     template_name = 'control_guardias/editar_guardia.html'
     success_url = reverse_lazy('control_guardias:calendario_guardias_full_tw')
     success_message = "Guardia actualizada con éxito."
+
+    def form_invalid(self, form):
+        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return self.render_to_response(self.get_context_data(form=form), status=400)
+        return super().form_invalid(form)
 
 
 class GuardiaDeleteView(LoginRequiredMixin, DeleteView):
