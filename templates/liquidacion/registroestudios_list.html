@@ -20,25 +20,40 @@
         <div class="col-md-6">
             <div class="card shadow-sm h-100">
                 <div class="card-header">
-                    <h5 class="titulo-h6 text-center text-md-start mb-0">Filtrar por mes</h5>
+                    <h5 class="titulo-h6 text-center text-md-start mb-0">Filtros y Ordenamiento</h5>
                 </div>
                 <div class="card-body">
-                    <p class="mb-3 text-center">El filtro se aplica sobre la <strong>fecha del informe</strong>.</p>
-                    <form method="get" class="row g-2 d-flex justify-content-center">
+                    <form method="get" class="row g-2">
                         {% csrf_token %}
-                        <!-- Campo Mes -->
-                        <div class="col-6 col-md-4 d-flex align-items-center">
-                            <label for="id_mes" class="form-label me-2 mb-0">Mes</label>
+                        <!-- Búsqueda rápida -->
+                        <div class="col-12 mb-2">
+                            <label for="id_busqueda" class="form-label mb-1">🔍 Buscar paciente:</label>
+                            {{ form.busqueda }}
+                        </div>
+                        
+                        <!-- Filtros por fecha -->
+                        <div class="col-4">
+                            <label for="id_mes" class="form-label mb-1">Mes</label>
                             {{ form.mes }}
                         </div>
-                        <!-- Campo Año -->
-                        <div class="col-6 col-md-4 d-flex align-items-center">
-                            <label for="id_año" class="form-label me-2 mb-0">Año</label>
+                        <div class="col-4">
+                            <label for="id_año" class="form-label mb-1">Año</label>
                             {{ form.año }}
                         </div>
+                        <!-- Se elimina el select de filtro rápido; se usan botones debajo -->
+                                                <!-- Botones de filtro rápido se moverán a cada card de resultados -->
+                        
+                        <!-- Ordenamiento -->
+                        <div class="col-8">
+                            <label for="id_orden" class="form-label mb-1">📊 Ordenar por:</label>
+                            {{ form.orden }}
+                        </div>
+                        
                         <!-- Botón Consultar -->
-                        <div class="col-12 col-md-2 ms-md-3 d-flex justify-content-end">
-                            <button type="submit" class="btn btn-primary btn-sm w-100 w-md-auto">Consultar</button>
+                        <div class="col-4 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-filter me-1"></i>Aplicar
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -47,6 +62,13 @@
     </div>
 
     <!-- Resultados de Ecografía -->
+    <div class="d-flex gap-2 mb-2">
+        <a href="?filtro_rapido=hoy" class="btn btn-outline-primary btn-sm">Hoy</a>
+        <a href="?mes={{ mes_num }}&año={{ año_num }}" class="btn btn-outline-dark btn-sm">Quitar filtros</a>
+        {% if filtro_rapido_label and filtro_rapido == 'hoy' %}
+            <span class="badge bg-info text-dark align-self-center">{{ filtro_rapido_label }}</span>
+        {% endif %}
+    </div>
     <div class="card shadow-sm mb-3">
         <div class="card-header text-white" style="background-color: #164569;">
             <div class="row align-items-center py-0">
@@ -64,12 +86,36 @@
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th scope="col" class="px-3">Paciente</th>
-                        <th scope="col">DNI</th>
-                        <th scope="col" class="text-center col-2">Fecha del informe</th>
-                        <th scope="col">Estudios</th>
-                        <th scope="col" class="text-center px-3">Regiones</th>
-                        <th scope="col" class="text-center col-2">Acciones</th>
+                            <th scope="col" class="px-3">
+                                          <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                                   class="text-decoration-none text-dark d-flex align-items-center">
+                                    Paciente 
+                                    {% if orden == 'paciente_asc' %}
+                                        <i class="fas fa-sort-up ms-1"></i>
+                                    {% elif orden == 'paciente_desc' %}
+                                        <i class="fas fa-sort-down ms-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">DNI</th>
+                            <th scope="col" class="text-center col-2">
+                                          <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                                   class="text-decoration-none text-dark d-flex align-items-center justify-content-center">
+                                    Fecha del informe 
+                                    {% if orden == 'fecha_asc' %}
+                                        <i class="fas fa-sort-up ms-1"></i>
+                                    {% elif orden == 'fecha_desc' %}
+                                        <i class="fas fa-sort-down ms-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">Estudios</th>
+                            <th scope="col" class="text-center px-3">Regiones</th>
+                            <th scope="col" class="text-center col-2">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -81,11 +127,13 @@
                         <td>{{ registro.estudio.all|join:", " }}</td>
                         <td class="text-center px-3">{{ registro.total_regiones }}</td>
                         <td class="text-center px-3">
-                            <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm">
+                                <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
+                                   title="Editar registro" aria-label="Editar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
-                                onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
+                                   title="Eliminar registro" aria-label="Eliminar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}"
+                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                 <i class="fas fa-trash-alt"></i>
                             </a>
                         </td>
@@ -102,6 +150,13 @@
     </div>
 
     <!-- Resultados de Otros Estudios -->
+    <div class="d-flex gap-2 mb-2">
+        <a href="?filtro_rapido=hoy" class="btn btn-outline-primary btn-sm">Hoy</a>
+        <a href="?mes={{ mes_num }}&año={{ año_num }}" class="btn btn-outline-dark btn-sm">Quitar filtros</a>
+        {% if filtro_rapido_label %}
+            <span class="badge bg-info text-dark align-self-center">{{ filtro_rapido_label }}</span>
+        {% endif %}
+    </div>
     <div class="card shadow-sm mb-3">
         <div class="card-header text-white" style="background-color: #1CA6A6;">
             <div class="row align-items-center py-0">
@@ -119,12 +174,36 @@
             <table class="table table-sm table-hover align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th scope="col" class="px-3">Paciente</th>
-                        <th scope="col">DNI</th>
-                        <th scope="col" class="text-center col-2">Fecha del informe</th>
-                        <th scope="col">Estudios</th>
-                        <th scope="col" class="text-center px-3">Regiones</th>
-                        <th scope="col" class="text-center col-2">Acciones</th>
+                            <th scope="col" class="px-3">
+                                          <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                                   class="text-decoration-none text-dark d-flex align-items-center">
+                                    Paciente 
+                                    {% if orden == 'paciente_asc' %}
+                                        <i class="fas fa-sort-up ms-1"></i>
+                                    {% elif orden == 'paciente_desc' %}
+                                        <i class="fas fa-sort-down ms-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">DNI</th>
+                            <th scope="col" class="text-center col-2">
+                                          <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                                   class="text-decoration-none text-dark d-flex align-items-center justify-content-center">
+                                    Fecha del informe 
+                                    {% if orden == 'fecha_asc' %}
+                                        <i class="fas fa-sort-up ms-1"></i>
+                                    {% elif orden == 'fecha_desc' %}
+                                        <i class="fas fa-sort-down ms-1"></i>
+                                    {% else %}
+                                        <i class="fas fa-sort ms-1 text-muted"></i>
+                                    {% endif %}
+                                </a>
+                            </th>
+                            <th scope="col">Estudios</th>
+                            <th scope="col" class="text-center px-3">Regiones</th>
+                            <th scope="col" class="text-center col-2">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -136,11 +215,13 @@
                         <td>{{ registro.estudio.all|join:", " }}</td>
                         <td class="text-center px-3">{{ registro.total_regiones }}</td>
                         <td class="text-center px-3">
-                            <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm">
+                                <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
+                                   title="Editar registro" aria-label="Editar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}">
                                 <i class="fas fa-edit"></i>
                             </a>
-                            <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
-                                onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
+                                   title="Eliminar registro" aria-label="Eliminar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}"
+                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                 <i class="fas fa-trash-alt"></i>
                             </a>
                         </td>
@@ -174,11 +255,47 @@
 </div>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Toast notifications
         const toastElList = [].slice.call(document.querySelectorAll('.toast'));
         const toastList = toastElList.map(function (toastEl) {
             return new bootstrap.Toast(toastEl);
         });
         toastList.forEach(toast => toast.show());
+
+        // Búsqueda en tiempo real
+        const busquedaInput = document.getElementById('id_busqueda');
+        if (busquedaInput) {
+            busquedaInput.addEventListener('input', function() {
+                const valor = this.value.toLowerCase();
+                const filas = document.querySelectorAll('tbody tr:not(.empty-row)');
+                
+                filas.forEach(function(fila) {
+                    const texto = fila.textContent.toLowerCase();
+                    if (texto.includes(valor) || valor === '') {
+                        fila.style.display = '';
+                    } else {
+                        fila.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Tooltip en cabeceras clickeables
+        const cabeceras = document.querySelectorAll('th a');
+        cabeceras.forEach(function(cabecera) {
+            cabecera.setAttribute('title', 'Hacer clic para ordenar por este campo');
+        });
+
+        // Resaltar fila al hacer hover
+        const filas = document.querySelectorAll('tbody tr');
+        filas.forEach(function(fila) {
+            fila.addEventListener('mouseenter', function() {
+                this.style.backgroundColor = '#f8f9fa';
+            });
+            fila.addEventListener('mouseleave', function() {
+                this.style.backgroundColor = '';
+            });
+        });
     });
 </script>
 {% endblock %}

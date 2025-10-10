@@ -183,6 +183,29 @@ class FiltroEstudiosPorMedicoForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
     )
 
+    # Nuevos campos para mejorar interactividad
+    orden = forms.ChoiceField(
+        choices=[
+            ('fecha_desc', 'Más recientes primero'),
+            ('fecha_asc', 'Más antiguos primero'),
+            ('paciente_asc', 'Paciente (A-Z)'),
+            ('paciente_desc', 'Paciente (Z-A)'),
+        ],
+        required=False,
+        initial='fecha_desc',
+        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+    )
+
+    # filtro_rapido se elimina del formulario; se maneja con botones en la UI
+
+    busqueda = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control form-control-sm',
+            'placeholder': 'Buscar por nombre, apellido o DNI...',
+        }),
+    )
+
 # A continuación, se agrega el formulario para carga masiva de estudios
 class CargaExcelForm(forms.Form):
     archivo_excel = forms.FileField(label="Subí el archivo Excel")

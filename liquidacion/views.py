@@ -125,7 +125,13 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         año_actual = fecha_actual.year
 
         # Inicializar el formulario
-        form = FiltroEstudiosPorMedicoForm(self.request.GET or None)
+        # Si en la query no vienen mes/año (caso botones rápidos), forzamos valores actuales
+        params = self.request.GET.copy()
+        if not params.get('mes'):
+            params['mes'] = str(mes_actual)
+        if not params.get('año'):
+            params['año'] = str(año_actual)
+        form = FiltroEstudiosPorMedicoForm(params)
 
         if form.is_valid():
             mes = form.cleaned_data.get('mes') or mes_actual
@@ -143,10 +149,13 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
         }
 
-        # Pasar los valores al contexto
+        # Pasar los valores base al contexto
         context['form'] = form
         context['mes'] = MESES.get(mes, 'Desconocido')  # Mostrar el nombre del mes
         context['año'] = año
+        # Valores numéricos para construir URLs de acciones (orden, botones rápidos)
+        context['mes_num'] = mes
+        context['año_num'] = año
 
         # Filtrar registros del usuario logueado usando `fecha_del_informe`
         registros = RegistroEstudiosPorMedico.objects.filter(
@@ -155,9 +164,59 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             fecha_del_informe__month=mes
         )
 
+        # Obtener parámetros de ordenamiento y filtros
+        orden = self.request.GET.get('orden', 'fecha_desc')  # Por defecto: más recientes primero
+        filtro_rapido = self.request.GET.get('filtro_rapido', '')
+        busqueda = self.request.GET.get('busqueda', '').strip()
+
+        # Aplicar búsqueda por paciente si existe
+        if busqueda:
+            registros = registros.filter(
+                Q(nombre_paciente__icontains=busqueda) | 
+                Q(apellido_paciente__icontains=busqueda) |
+                Q(dni_paciente__icontains=busqueda)
+            )
+
+        # Aplicar filtros rápidos
+        if filtro_rapido == 'hoy':
+            from datetime import date
+            registros = registros.filter(fecha_registro__date=date.today())
+
+        # Aplicar ordenamiento
+        if orden == 'fecha_asc':
+            registros = registros.order_by('fecha_del_informe', 'fecha_registro')
+        elif orden == 'fecha_desc':
+            registros = registros.order_by('-fecha_del_informe', '-fecha_registro')
+        elif orden == 'paciente_asc':
+            registros = registros.order_by('apellido_paciente', 'nombre_paciente')
+        elif orden == 'paciente_desc':
+            registros = registros.order_by('-apellido_paciente', '-nombre_paciente')
+        # Se elimina ordenamiento por DNI según requerimiento
+
+        # Si el filtro rápido es 'hoy', ajustar visualmente mes/año
+        if filtro_rapido == 'hoy':
+            hoy = datetime.now()
+            context['mes'] = MESES.get(hoy.month, 'Desconocido')
+            context['año'] = hoy.year
+            context['mes_num'] = hoy.month
+            context['año_num'] = hoy.year
+
+        # Etiqueta descriptiva del filtro rápido para mostrar en UI
+        filtro_labels = {
+            '': '',
+            'hoy': 'Solo hoy',
+        }
+        context['filtro_rapido'] = filtro_rapido
+        context['filtro_rapido_label'] = filtro_labels.get(filtro_rapido, '')
+
         # Separar registros por tipo de estudio
         registros_eco = registros.filter(estudio__tipo='ECO').distinct()
         registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
+
+        # Agregar contexto para los controles
+        context['orden'] = orden
+        context['filtro_rapido'] = filtro_rapido
+        context['busqueda'] = busqueda
 
         # Calcular totales de regiones considerando la cantidad de estudios
         total_regiones_eco = sum(
