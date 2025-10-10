@@ -17,7 +17,8 @@ from .views import (
     exportar_excel_informes,
     exportar_excel_ecografias,
     exportar_excel_procedimientos,
-    RegistrarDiaSinPacientesView
+    RegistrarDiaSinPacientesView,
+    CargaMasivaView
 )
 
 urlpatterns = [
@@ -56,7 +57,6 @@ urlpatterns = [
     # Rutas para Ecografias por Medico por Mes
     path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
 
-    # Rutas para la carga masiva de estudios (DESACTIVADA TEMPORALMENTE)
-    # Para reactivar: descomentar la importación de CargaMasivaView arriba y esta línea
-    # path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
+    # Ruta para la carga masiva de estudios (solo admin)
+    path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
 ]
