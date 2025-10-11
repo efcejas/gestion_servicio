@@ -26,3 +26,7 @@ media/
 
 # Claves y configuraciones sensibles
 .env
+
+# Node.js dependencies (para Tailwind CSS)
+node_modules/
+theme/static_src/node_modules/
