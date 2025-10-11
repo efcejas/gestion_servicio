@@ -2,9 +2,11 @@ from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView, PasswordResetView
 from django.core.mail import send_mail
+from functools import wraps
 from django.db.models import Count, Max
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -14,6 +16,27 @@ from django.views.generic import TemplateView
 from control_guardias.models import Guardia, MedicoGuardia
 from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
+
+
+def superuser_required(view_func):
+    """
+    Decorador que requiere que el usuario sea superusuario.
+    - Si no está autenticado: redirige a login
+    - Si está autenticado pero no es superusuario: devuelve 403 Forbidden
+    - Si es superusuario: permite el acceso
+    """
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            from django.contrib.auth.views import redirect_to_login
+            return redirect_to_login(request.get_full_path())
+        
+        if not request.user.is_superuser:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("Acceso denegado: Se requieren permisos de superusuario.")
+        
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
 
 
 def send_test_email(request):
@@ -298,6 +321,7 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         else:
             return f"Dr. {str(medico_obj)}"
 
+@superuser_required
 def eventos_modal(request):
     """Vista para mostrar eventos filtrados por estado en el modal"""
     # Obtener el filtro de estado (por defecto: abierto)
@@ -338,6 +362,7 @@ def eventos_modal(request):
     
     return render(request, 'dashboard/eventos_modal.html', context)
 
+@superuser_required
 def cambiar_estado_evento(request, evento_id):
     """Vista para cambiar el estado de un evento"""
     if request.method == 'POST':
