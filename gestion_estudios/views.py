@@ -49,6 +49,21 @@ def send_test_email(request):
     )
     return HttpResponse("Correo enviado exitosamente")
 
+
+class TailwindTestView(TemplateView):
+    """Vista de prueba para verificar la migración a Tailwind CSS"""
+    template_name = 'tailwind_test.html'
+
+
+class LoginTailwindTestView(TemplateView):
+    """Vista de prueba para el login en Tailwind"""
+    template_name = 'registration/login_tailwind.html'
+
+
+class RegisterTailwindTestView(TemplateView):
+    """Vista de prueba para el registro en Tailwind"""
+    template_name = 'registration/register_tailwind.html'
+
 class CustomPasswordResetView(PasswordResetView):
     html_email_template_name = 'registration/password_reset_email.html'  # Plantilla HTML
     subject_template_name = 'registration/password_reset_subject.txt'  # Plantilla para el asunto del correo
