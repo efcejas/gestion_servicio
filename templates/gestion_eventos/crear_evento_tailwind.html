@@ -1,0 +1,357 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load static %}
+
+{% block title %}Nueva Novedad - Dr. Enso Cejas{% endblock %}
+
+
+
+{% block content %}
+<div>
+    <!-- Header Moderno con Gradiente -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
+        <!-- Banner superior con gradiente -->
+        <div class="bg-gradient-to-r from-teal-600 via-emerald-600 to-green-600 px-6 py-8 relative overflow-hidden">
+            <!-- Decoración de fondo -->
+            <div class="absolute inset-0 opacity-10">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+                <div class="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -ml-24 -mb-24"></div>
+            </div>
+            
+            <div class="relative z-10">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-3">
+                            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4 border border-white/30">
+                                <i class="fas fa-plus-circle text-white text-2xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-white mb-1">
+                                    Crear Nuevo Evento
+                                </h1>
+                                <div class="flex items-center gap-2">
+                                    {% if user.groups.all %}
+                                        {% for group in user.groups.all %}
+                                            {% if group.name == "Técnicos de tomografía" %}
+                                                <span class="inline-flex items-center px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-full border border-white/30">
+                                                    <i class="fas fa-x-ray mr-2"></i>Tomografía Computada
+                                                </span>
+                                            {% elif group.name == "Técnicos de resonancia" %}
+                                                <span class="inline-flex items-center px-3 py-1 bg-white/20 backdrop-blur-sm text-white text-sm font-medium rounded-full border border-white/30">
+                                                    <i class="fas fa-magnet mr-2"></i>Resonancia Magnética
+                                                </span>
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-white/90 text-lg max-w-3xl">
+                            {% if user.groups.all %}
+                                {% for group in user.groups.all %}
+                                    {% if group.name == "Técnicos de tomografía" %}
+                                        Registra novedades, incidentes o eventos relacionados con el servicio de Tomografía
+                                    {% elif group.name == "Técnicos de resonancia" %}
+                                        Registra novedades, incidentes o eventos relacionados con el servicio de Resonancia
+                                    {% else %}
+                                        Complete el formulario para registrar un nuevo evento en el sistema
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                Complete el formulario para registrar un nuevo evento en el sistema
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                       class="inline-flex items-center px-5 py-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/30 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-arrow-left mr-2"></i>Volver
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 px-6 py-5 bg-gradient-to-r from-gray-50 to-blue-50/30 border-t border-gray-200">
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-clipboard-list text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Formulario</p>
+                    <p class="text-lg font-bold text-gray-900">Nuevo Evento</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-user text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Registrado por</p>
+                    <p class="text-sm font-bold text-gray-900 truncate">{{ user.get_full_name|title }}</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-asterisk text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Campos</p>
+                    <p class="text-lg font-bold text-gray-900">3 Obligatorios</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-clock text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tiempo estimado</p>
+                    <p class="text-lg font-bold text-gray-900">2-3 minutos</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulario principal -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary p-6">
+            <h2 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-edit mr-3"></i>Datos del Evento
+            </h2>
+            <p class="text-white/80 mt-1">Complete la información del evento que desea registrar</p>
+        </div>
+
+        <form method="post" class="p-6 space-y-6" id="eventoForm">
+            {% csrf_token %}
+            
+            <!-- Errores generales -->
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <i class="fas fa-exclamation-triangle text-red-500 mr-3 mt-0.5"></i>
+                    <div>
+                        <h4 class="font-semibold text-red-800 mb-2">Atención</h4>
+                        {% for error in form.non_field_errors %}
+                            <p class="text-red-700 text-sm">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Información básica -->
+            <div class="space-y-5">
+                <h3 class="text-lg font-semibold text-gray-900 border-b border-gray-200 pb-3 mb-4">
+                    Información Básica
+                </h3>
+                
+                <!-- Tipo de evento -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.tipo_evento.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.tipo_evento }}
+                    {% if form.tipo_evento.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.tipo_evento.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.descripcion.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.descripcion }}
+                    <p class="text-gray-500 text-xs mt-1">{{ form.descripcion.help_text }}</p>
+                    {% if form.descripcion.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.descripcion.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Servicio origen -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.servicio_origen_evento.label }}
+                        <span class="text-red-500">*</span>
+                        {% if form.servicio_origen_evento.widget.attrs.readonly %}
+                            <span class="text-sm text-blue-600 font-normal">(Asignado automáticamente)</span>
+                        {% endif %}
+                    </label>
+                    {{ form.servicio_origen_evento }}
+                    <p class="text-gray-500 text-xs mt-1">{{ form.servicio_origen_evento.help_text }}</p>
+                    {% if form.servicio_origen_evento.errors %}
+                        <p class="text-red-600 text-sm mt-1">{{ form.servicio_origen_evento.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Información del paciente (opcional) -->
+            <div class="space-y-5 mt-8">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-3">
+                    <h3 class="text-lg font-semibold text-gray-900">
+                        Información del Paciente
+                    </h3>
+                    <span class="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-md">(Opcional)</span>
+                </div>
+                <div class="space-y-4">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Nombre del paciente -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                {{ form.nombre_paciente.label }}
+                            </label>
+                            {{ form.nombre_paciente }}
+                            {% if form.nombre_paciente.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.nombre_paciente.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- DNI del paciente -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                {{ form.dni_paciente.label }}
+                            </label>
+                            {{ form.dni_paciente }}
+                            {% if form.dni_paciente.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.dni_paciente.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Estudio relacionado -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                {{ form.estudio_relacionado.label }}
+                            </label>
+                            {{ form.estudio_relacionado }}
+                            {% if form.estudio_relacionado.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.estudio_relacionado.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Sector de pedido -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                {{ form.sector_de_pedido.label }}
+                            </label>
+                            {{ form.sector_de_pedido }}
+                            <p class="text-gray-500 text-xs mt-1">{{ form.sector_de_pedido.help_text }}</p>
+                            {% if form.sector_de_pedido.errors %}
+                                <p class="text-red-600 text-sm mt-1">{{ form.sector_de_pedido.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Acciones -->
+            <div class="flex flex-col sm:flex-row gap-3 justify-end pt-6 border-t border-gray-200">
+                <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                   class="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-times mr-2"></i>Cancelar
+                </a>
+                <button type="submit" 
+                        class="inline-flex items-center justify-center px-6 py-3 bg-medical-primary text-white rounded-lg hover:bg-medical-secondary transition-colors shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                        id="submitBtn">
+                    <i class="fas fa-save mr-2"></i>Registrar Evento
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tips de ayuda -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+        <h4 class="font-semibold text-blue-900 mb-2 flex items-center">
+            <i class="fas fa-lightbulb mr-2"></i>Consejos para un registro efectivo
+        </h4>
+        <ul class="text-blue-800 text-sm space-y-1">
+            <li>• Sea específico en la descripción del evento</li>
+            <li>• Incluya información del paciente cuando sea relevante</li>
+            <li>• Mencione el sector o ubicación si es pertinente</li>
+            <li>• Complete todos los campos que ayuden a resolver el evento</li>
+        </ul>
+    </div>
+</div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('eventoForm');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Validación mejorada en tiempo real
+    function validateForm() {
+        const tipoEvento = form.querySelector('[name="tipo_evento"]').value;
+        const descripcion = form.querySelector('[name="descripcion"]').value;
+        const servicioOrigen = form.querySelector('[name="servicio_origen_evento"]').value;
+        
+        // Validación básica: tipo de evento, descripción mínima y servicio
+        const isValid = tipoEvento && descripcion.trim().length >= 5 && servicioOrigen;
+        
+        if (isValid) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+        
+        return isValid;
+    }
+    
+    // Validar al cargar la página
+    validateForm();
+    
+    // Validar cuando cambian los campos
+    form.addEventListener('input', validateForm);
+    form.addEventListener('change', validateForm);
+    
+    // Prevenir envío múltiple y mostrar estado de carga
+    form.addEventListener('submit', function(e) {
+        if (!validateForm()) {
+            e.preventDefault();
+            return;
+        }
+        
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Registrando...';
+    });
+    
+    // Contar caracteres en descripción
+    const descripcionField = form.querySelector('[name="descripcion"]');
+    const maxChars = 500; // Límite razonable
+    
+    if (descripcionField) {
+        const charCounter = document.createElement('div');
+        charCounter.className = 'text-xs text-gray-500 mt-1 text-right';
+        descripcionField.parentNode.appendChild(charCounter);
+        
+        function updateCharCount() {
+            const remaining = maxChars - descripcionField.value.length;
+            charCounter.textContent = `${descripcionField.value.length}/${maxChars} caracteres`;
+            
+            if (remaining < 50) {
+                charCounter.classList.remove('text-gray-500');
+                charCounter.classList.add('text-yellow-600');
+            } else if (remaining < 0) {
+                charCounter.classList.remove('text-yellow-600');
+                charCounter.classList.add('text-red-600');
+            } else {
+                charCounter.classList.add('text-gray-500');
+                charCounter.classList.remove('text-yellow-600', 'text-red-600');
+            }
+        }
+        
+        descripcionField.addEventListener('input', updateCharCount);
+        updateCharCount();
+    }
+});
+</script>
+{% endblock %}

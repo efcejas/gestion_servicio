@@ -50,19 +50,7 @@ def send_test_email(request):
     return HttpResponse("Correo enviado exitosamente")
 
 
-class TailwindTestView(TemplateView):
-    """Vista de prueba para verificar la migración a Tailwind CSS"""
-    template_name = 'tailwind_test.html'
 
-
-class LoginTailwindTestView(TemplateView):
-    """Vista de prueba para el login en Tailwind"""
-    template_name = 'registration/login_tailwind.html'
-
-
-class RegisterTailwindTestView(TemplateView):
-    """Vista de prueba para el registro en Tailwind"""
-    template_name = 'registration/register_tailwind.html'
 
 class CustomPasswordResetView(PasswordResetView):
     html_email_template_name = 'registration/password_reset_email.html'  # Plantilla HTML
@@ -79,48 +67,7 @@ class CustomLoginView(LoginView):
         context['hide_navbar'] = True  # Ocultar la barra de navegación en la página de login
         return context
 
-class HomeView(LoginRequiredMixin, TemplateView):
-    template_name = 'home.html'
-    login_url = 'login'
 
-    def dispatch(self, request, *args, **kwargs):
-        """Redirigir superusuarios al dashboard de admin"""
-        if request.user.is_authenticated and request.user.is_superuser:
-            return redirect('admin_dashboard')
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['hide_navbar'] = False
-
-        # Últimos registros médicos
-        ultimos_medicos = (
-            RegistroEstudiosPorMedico.objects
-            .values('medico')
-            .annotate(ultima_fecha=Max('fecha_registro'))
-            .order_by('-ultima_fecha')[:4]
-        )
-
-        ultimos_registros = RegistroEstudiosPorMedico.objects.filter(
-            medico__in=[medico['medico'] for medico in ultimos_medicos],
-            fecha_registro__in=[medico['ultima_fecha'] for medico in ultimos_medicos]
-        ).order_by('-fecha_registro')
-
-        context['ultimos_registros_medicos'] = ultimos_registros
-
-        # 🚀 Datos de eventos actuales
-        eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'pendiente'])
-        context['cantidad_eventos_abiertos'] = eventos_abiertos.count()
-
-        ultima_actualizacion = None
-        for evento in eventos_abiertos:
-            if evento.ultima_nota:
-                if not ultima_actualizacion or evento.ultima_nota.fecha > ultima_actualizacion:
-                    ultima_actualizacion = evento.ultima_nota.fecha
-        
-        context['ultima_actualizacion_evento'] = ultima_actualizacion
-
-        return context
 
 class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = 'dashboard_simple.html'
@@ -407,3 +354,51 @@ def cambiar_estado_evento(request, evento_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
+class HomeTailwindView(LoginRequiredMixin, TemplateView):
+    """
+    Dashboard principal con Tailwind CSS, personalizado según tipo de usuario
+    """
+    template_name = 'home.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = False
+
+        # Para superusuarios, incluir datos completos del dashboard
+        if self.request.user.is_superuser:
+            # Últimos registros médicos
+            ultimos_medicos = (
+                RegistroEstudiosPorMedico.objects
+                .values('medico')
+                .annotate(ultima_fecha=Max('fecha_registro'))
+                .order_by('-ultima_fecha')[:4]
+            )
+
+            ultimos_registros = RegistroEstudiosPorMedico.objects.filter(
+                medico__in=[medico['medico'] for medico in ultimos_medicos],
+                fecha_registro__in=[medico['ultima_fecha'] for medico in ultimos_medicos]
+            ).order_by('-fecha_registro')
+
+            context['ultimos_registros_medicos'] = ultimos_registros
+
+            # Datos de eventos actuales
+            eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'pendiente'])
+            context['cantidad_eventos_abiertos'] = eventos_abiertos.count()
+
+            # Contar por estado
+            context['cantidad_abiertos'] = eventos_abiertos.filter(estado='abierto').count()
+            context['cantidad_pendientes'] = eventos_abiertos.filter(estado='pendiente').count()
+
+            # Última actualización de eventos
+            ultima_actualizacion = None
+            for evento in eventos_abiertos:
+                if evento.ultima_nota:
+                    if not ultima_actualizacion or evento.ultima_nota.fecha > ultima_actualizacion:
+                        ultima_actualizacion = evento.ultima_nota.fecha
+            
+            context['ultima_actualizacion_evento'] = ultima_actualizacion
+
+        return context

@@ -36,7 +36,7 @@ User = get_user_model()
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
     model = EventoServicio
     form_class = EventoServicioForm
-    template_name = 'gestion_eventos/crear_evento.html'
+    template_name = 'gestion_eventos/crear_evento_tailwind.html'
     success_url = reverse_lazy('gestion_eventos:lista_eventos')
 
     def get_form_kwargs(self):
@@ -60,7 +60,19 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
             form.instance.servicio_origen_evento = 'resonancia'
         # Si es médico, administrativo, etc., deja lo que venga del formulario
 
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        
+        # Mensaje informativo sobre el evento creado
+        tipo_evento_display = self.object.get_tipo_evento_display()
+        paciente_info = f" - Paciente: {self.object.nombre_paciente}" if self.object.nombre_paciente else ""
+        servicio_info = f" ({self.object.get_servicio_origen_evento_display()})" if self.object.servicio_origen_evento else ""
+        
+        messages.success(
+            self.request, 
+            f'✓ Evento creado exitosamente: "{tipo_evento_display}"{servicio_info}{paciente_info}'
+        )
+        
+        return response
 
 
 class EventoServicioListView(ListView, LoginRequiredMixin):
@@ -71,29 +83,74 @@ class EventoServicioListView(ListView, LoginRequiredMixin):
     def get_queryset(self):
         user = self.request.user
 
+        # Filtro base según el grupo del usuario
         if user.groups.filter(name="Técnicos de tomografía").exists():
-            # Solo eventos de tomografía
-            return EventoServicio.objects.filter(
+            queryset = EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision'],
                 servicio_origen_evento='tomografia'
-            ).order_by('-fecha_creacion')
-
+            )
         elif user.groups.filter(name="Técnicos de resonancia").exists():
-            # Solo eventos de resonancia
-            return EventoServicio.objects.filter(
+            queryset = EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision'],
                 servicio_origen_evento='resonancia'
-            ).order_by('-fecha_creacion')
-
+            )
         else:
-            # Médicos, administrativos, etc. ven todo
-            return EventoServicio.objects.filter(
+            queryset = EventoServicio.objects.filter(
                 estado__in=['abierto', 'en_revision']
-            ).order_by('-fecha_creacion')
+            )
+        
+        # Aplicar filtros de búsqueda
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(nombre_paciente__icontains=q) |
+                Q(dni_paciente__icontains=q)
+            )
+        
+        estado = self.request.GET.get('estado')
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        
+        tipo_evento = self.request.GET.get('tipo_evento')
+        if tipo_evento:
+            queryset = queryset.filter(tipo_evento=tipo_evento)
+        
+        sector = self.request.GET.get('sector')
+        if sector:
+            queryset = queryset.filter(sector_de_pedido__icontains=sector)
+        
+        return queryset.order_by('-fecha_creacion')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Filtro base según el usuario
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            base_filter = {'servicio_origen_evento': 'tomografia'}
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            base_filter = {'servicio_origen_evento': 'resonancia'}
+        else:
+            base_filter = {}
+        
+        # Métricas para el header
+        context['eventos_abiertos'] = EventoServicio.objects.filter(
+            estado='abierto', **base_filter
+        ).count()
+        context['eventos_en_revision'] = EventoServicio.objects.filter(
+            estado='en_revision', **base_filter
+        ).count()
+        context['eventos_con_notas'] = EventoServicio.objects.filter(
+            estado__in=['abierto', 'en_revision'],
+            notas__isnull=False,
+            **base_filter
+        ).distinct().count()
+        
+        return context
 
 class HistorialEventoListView(ListView, LoginRequiredMixin):
     model = EventoServicio
-    template_name = 'gestion_eventos/historial_eventos.html'
+    template_name = 'gestion_eventos/historial_eventos_tailwind.html'
     context_object_name = 'eventos'
     paginate_by = 4
 
@@ -148,6 +205,30 @@ class HistorialEventoListView(ListView, LoginRequiredMixin):
             eventos_paginados = paginator.page(paginator.num_pages)
         context['eventos'] = eventos_paginados
         context['form'] = self.form
+        
+        # Métricas para el header
+        user = self.request.user
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            base_filter = {'servicio_origen_evento': 'tomografia'}
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            base_filter = {'servicio_origen_evento': 'resonancia'}
+        else:
+            base_filter = {}
+        
+        # Total de eventos resueltos (sin filtros de búsqueda)
+        context['total_resueltos'] = EventoServicio.objects.filter(
+            estado='resuelto', **base_filter
+        ).count()
+        
+        # Eventos resueltos este mes
+        hoy = timezone.now()
+        inicio_mes = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        context['resueltos_este_mes'] = EventoServicio.objects.filter(
+            estado='resuelto',
+            fecha_creacion__gte=inicio_mes,
+            **base_filter
+        ).count()
+        
         return context
 
 # Vista detalle de evento, para agregar notas o cambiar estado
@@ -163,36 +244,140 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
         context['estado_form'] = ActualizarEstadoEventoForm(initial={'estado': self.object.estado})
         context['tipo_evento_form'] = ActualizarTipoEventoForm(initial={'tipo_evento': self.object.tipo_evento})
         context['historial'] = self.object.historial.order_by('-fecha')
+        
+        # Contexto de navegación inteligente basado en el estado del evento
+        context['is_from_historial'] = self.object.estado == 'resuelto'
+        
         return context
 
     def post(self, request, *args, **kwargs):
-        print(request.POST)
         self.object = self.get_object()
+        
+        print(f"POST request received: {dict(request.POST)}")
 
-        if 'guardar_nota' in request.POST:  # Cambiado de 'comentario' a 'guardar_nota'
+        if 'guardar_nota' in request.POST:
             nota_form = NotaEventoForm(request.POST)
             if nota_form.is_valid():
                 nota = nota_form.save(commit=False)
                 nota.evento = self.object
                 nota.creado_por = request.user
                 nota.save()
+                
+                # Mensaje contextual con información del evento
+                paciente_info = f" para {self.object.nombre_paciente}" if self.object.nombre_paciente else ""
+                messages.success(
+                    request, 
+                    f'✓ Nota agregada al evento{paciente_info}. Total de notas: {self.object.notas.count()}'
+                )
             else:
-                print(nota_form.errors)  # Muestra los errores del formulario
+                messages.error(request, '✗ No se pudo agregar la nota. Por favor, verifica el contenido.')
 
-        elif 'estado' in request.POST:
+        elif 'actualizar_estado' in request.POST:
             estado_form = ActualizarEstadoEventoForm(request.POST, instance=self.object)
             if estado_form.is_valid():
-                estado_form.save(usuario=request.user)  # 👈 importante
+                estado_anterior = self.object.estado
+                estado_form.save(usuario=request.user)
+                estado_nuevo = self.object.estado
+                
+                # Diccionario de nombres legibles para estados
+                estados_display = {
+                    'abierto': 'Abierto',
+                    'en_revision': 'En Revisión',
+                    'resuelto': 'Resuelto'
+                }
+                
+                # Mensajes contextuales según el cambio de estado
+                if estado_nuevo == 'resuelto':
+                    tipo_evento_display = self.object.get_tipo_evento_display()
+                    messages.success(
+                        request, 
+                        f'✓ Evento "{tipo_evento_display}" marcado como RESUELTO. El evento se ha archivado correctamente.'
+                    )
+                elif estado_nuevo == 'en_revision':
+                    messages.info(
+                        request, 
+                        f'📋 Estado cambiado de "{estados_display.get(estado_anterior)}" a "En Revisión". El evento requiere supervisión.'
+                    )
+                elif estado_nuevo == 'abierto' and estado_anterior == 'en_revision':
+                    messages.warning(
+                        request, 
+                        f'⚠ Evento reabierto desde "En Revisión" a "Abierto". Requiere atención inmediata.'
+                    )
+                else:
+                    messages.success(
+                        request, 
+                        f'✓ Estado actualizado: {estados_display.get(estado_anterior)} → {estados_display.get(estado_nuevo)}'
+                    )
+            else:
+                messages.error(request, '✗ No se pudo actualizar el estado. Intenta nuevamente.')
 
         elif 'actualizar_tipo_evento' in request.POST:
             tipo_evento_form = ActualizarTipoEventoForm(request.POST, instance=self.object)
             if tipo_evento_form.is_valid():
+                tipo_anterior = self.object.tipo_evento
                 tipo_evento_form.save(usuario=request.user)
+                tipo_nuevo = self.object.tipo_evento
+                
+                # Obtener nombres legibles
+                tipo_anterior_display = dict(self.object.TIPO_EVENTO_CHOICES).get(tipo_anterior)
+                tipo_nuevo_display = self.object.get_tipo_evento_display()
+                
+                messages.success(
+                    request, 
+                    f'✓ Tipo de evento reclasificado: "{tipo_anterior_display}" → "{tipo_nuevo_display}"'
+                )
             else:
-                print(tipo_evento_form.errors)  # Muestra los errores del formulario
+                messages.error(request, '✗ No se pudo actualizar el tipo de evento. Verifica la selección.')
                 
         return redirect(reverse('gestion_eventos:detalle_evento', kwargs={'pk': self.object.pk}))
     
+# Vista Dashboard de Eventos con lógica de permisos
+class EventosDashboardView(LoginRequiredMixin, ListView):
+    model = EventoServicio
+    template_name = 'gestion_eventos/dashboard_eventos.html'
+    context_object_name = 'eventos_recientes'
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            return EventoServicio.objects.filter(
+                servicio_origen_evento='tomografia'
+            ).order_by('-fecha_creacion')[:5]
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            return EventoServicio.objects.filter(
+                servicio_origen_evento='resonancia'
+            ).order_by('-fecha_creacion')[:5]
+        else:
+            return EventoServicio.objects.all().order_by('-fecha_creacion')[:5]
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        # Filtros según el grupo del usuario
+        if user.groups.filter(name="Técnicos de tomografía").exists():
+            base_filter = {'servicio_origen_evento': 'tomografia'}
+        elif user.groups.filter(name="Técnicos de resonancia").exists():
+            base_filter = {'servicio_origen_evento': 'resonancia'}
+        else:
+            base_filter = {}
+        
+        # Métricas filtradas por grupo
+        context['eventos_activos'] = EventoServicio.objects.filter(
+            estado__in=['abierto', 'en_revision'], **base_filter
+        ).count()
+        context['eventos_resueltos_hoy'] = EventoServicio.objects.filter(
+            estado='resuelto',
+            fecha_creacion__date=timezone.now().date(),
+            **base_filter
+        ).count()
+        context['eventos_pendientes'] = EventoServicio.objects.filter(
+            estado='abierto', **base_filter
+        ).count()
+        
+        return context
+
 # Vista para mostrar los eventos al personal administrativo de piso con permisos 
 
 class EventosAdministrativosListView(LoginRequiredMixin, ListView):

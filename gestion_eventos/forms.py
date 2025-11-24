@@ -7,7 +7,8 @@ class EventoServicioForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # Opciones base (todas menos guardia/internado)
+        
+        # Configurar opciones de tipo_evento según el usuario
         base_choices = [
             ('cancelado', 'Estudio cancelado'),
             ('demorado', 'Estudio demorado'),
@@ -16,6 +17,7 @@ class EventoServicioForm(forms.ModelForm):
             ('conflicto', 'Conflicto o situación interpersonal'),
             ('otro', 'Otro'),
         ]
+        
         # Si es técnico de resonancia, agrega las opciones extra
         if user and user.groups.filter(name="Técnicos de resonancia").exists():
             base_choices += [
@@ -23,6 +25,23 @@ class EventoServicioForm(forms.ModelForm):
                 ('internado', 'Estudio de paciente internado realizado'),
             ]
         self.fields['tipo_evento'].choices = base_choices
+        
+        # Configurar opciones de servicio según el grupo del usuario
+        if user:
+            if user.groups.filter(name="Técnicos de tomografía").exists():
+                # Solo puede seleccionar tomografía
+                self.fields['servicio_origen_evento'].choices = [('tomografia', 'Tomografía')]
+                self.fields['servicio_origen_evento'].widget.attrs['readonly'] = True
+                self.initial['servicio_origen_evento'] = 'tomografia'
+                
+            elif user.groups.filter(name="Técnicos de resonancia").exists():
+                # Solo puede seleccionar resonancia
+                self.fields['servicio_origen_evento'].choices = [('resonancia', 'Resonancia')]
+                self.fields['servicio_origen_evento'].widget.attrs['readonly'] = True
+                self.initial['servicio_origen_evento'] = 'resonancia'
+                
+            # Para médicos, administrativos, etc., mantener todas las opciones
+            # (no modificamos las choices, quedan las del modelo)
 
     class Meta:
         model = EventoServicio
@@ -36,17 +55,29 @@ class EventoServicioForm(forms.ModelForm):
             'servicio_origen_evento',
         ]
         widgets = {
-            'tipo_evento': forms.Select(attrs={'class': 'form-control'}),
-            'descripcion': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 4,
-                'cols': 40
+            'tipo_evento': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent bg-white'
             }),
-            'servicio_origen_evento': forms.Select(attrs={'class': 'form-select'}),
-            'sector_de_pedido': forms.TextInput(attrs={'class': 'form-control'}),
-            'nombre_paciente': forms.TextInput(attrs={'class': 'form-control'}),
-            'dni_paciente': forms.TextInput(attrs={'class': 'form-control'}),
-            'estudio_relacionado': forms.TextInput(attrs={'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent resize-none',
+                'rows': 4,
+                'style': 'min-height: 100px; resize: vertical;'
+            }),
+            'servicio_origen_evento': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent bg-white'
+            }),
+            'sector_de_pedido': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent'
+            }),
+            'nombre_paciente': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent'
+            }),
+            'dni_paciente': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent'
+            }),
+            'estudio_relacionado': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent'
+            }),
         }
         labels = {
             'tipo_evento': 'Tipo de evento',
@@ -116,7 +147,7 @@ class NotaEventoForm(forms.ModelForm):
         fields = ['comentario']
         widgets = {
             'comentario': forms.Textarea(attrs={
-                'class': 'form-control',
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent resize-none',
                 'rows': 3,
                 'placeholder': 'Agregar una nota sobre este evento...'
             })
@@ -130,7 +161,9 @@ class ActualizarEstadoEventoForm(forms.ModelForm):
         model = EventoServicio
         fields = ['estado']
         widgets = {
-            'estado': forms.Select(attrs={'class': 'form-select'})
+            'estado': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent bg-white'
+            })
         }
         labels = {
             'estado': 'Actualizar estado del evento'
@@ -149,7 +182,9 @@ class ActualizarTipoEventoForm(forms.ModelForm):
         model = EventoServicio
         fields = ['tipo_evento']
         widgets = {
-            'tipo_evento': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'tipo_evento': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent bg-white'
+            }),
         }
         labels = {
             'tipo_evento': 'Tipo de evento',
@@ -168,26 +203,28 @@ class FiltroEventoForm(forms.Form):
         required=False,
         label="Buscar",
         widget=forms.TextInput(attrs={
-            'class': 'form-control form-control-sm',
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent text-sm',
             'placeholder': 'Buscar por paciente o DNI'
         })
     )
     tipo_evento = forms.ChoiceField(
         required=False,
         choices=[('', 'Todos')] + EventoServicio.TIPO_EVENTO_CHOICES,
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+        widget=forms.Select(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent bg-white text-sm'
+        })
     )
     fecha_inicio = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={
-            'class': 'form-control form-control-sm',
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent text-sm',
             'type': 'date'
         })
     )
     fecha_fin = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={
-            'class': 'form-control form-control-sm',
+            'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent text-sm',
             'type': 'date'
         })
     )

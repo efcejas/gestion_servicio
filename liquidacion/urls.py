@@ -21,6 +21,8 @@ from .views import (
     CargaMasivaView
 )
 
+app_name = 'liquidacion'
+
 urlpatterns = [
 
     # Rutas para Estudios

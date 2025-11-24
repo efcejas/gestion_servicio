@@ -1,0 +1,349 @@
+{% extends "layouts/base.html" %}
+{% load static custom_filters %}
+{% block title %}Bienvenido al sistema de gestión{% endblock %}
+
+{% block content %}
+{% if user.is_superuser %}
+<div class="container-fluid py-4">
+    <div class="row g-4">
+        <!-- Columna 1: Acciones rápidas -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow h-100 card-hover">
+                <div class="card-header bg-white border-bottom fw-bold text-violeta">
+                    <i class="bi bi-lightning-charge-fill me-2"></i>Acciones rápidas
+                </div>
+                <div class="card-body d-grid gap-3">
+                    <!-- <a href="#" class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center">
+                                        <i class="bi bi-plus-circle me-2"></i>Registrar nuevo estudio
+                                    </a> -->
+                    <a href="{% url 'informados_por_medico_por_mes' %}"
+                        class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center">
+                        <i class="bi bi-bar-chart-line me-2"></i>Ver total de estudios por profesional
+                    </a>
+                    <a href="{% url 'calendario_guardias_full' %}"
+                        class="btn border border-violeta text-violeta btn-hover d-flex align-items-center justify-content-center">
+                        <i class="bi bi-calendar-event me-2"></i>Calendario de guardias
+                    </a>
+                </div>
+            </div>
+        </div>
+        <!-- Columna 2: Últimos registros -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow h-100 card-hover">
+                <div class="card-header text-white text-center" style="background-color: #4b49c0;">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Últimos registros por médicos
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% if ultimos_registros_medicos %}
+                        {% for registro in ultimos_registros_medicos %}
+                        <div class="list-group-item bg-light">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1">
+                                    <i class="bi bi-person-circle me-2"></i>
+                                    {{ registro.medico.first_name }} {{ registro.medico.last_name }}
+                                </h6>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar me-1"></i>
+                                    {{ registro.fecha_registro|date:"d/m/Y" }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% else %}
+                        <p class="text-muted text-center my-3">No hay registros recientes.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Columna 3: Resumen de eventos -->
+        <div class="col-lg-4">
+            <div class="card shadow h-100 card-hover p-4 border border-dashed">
+                <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                    <h6 class="text-primary mb-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Estado de eventos
+                    </h6>
+        
+                    {% if cantidad_eventos_abiertos > 0 %}
+                        <p class="mb-1">
+                            <strong>{{ cantidad_eventos_abiertos }}</strong> evento(s) abierto(s)
+                        </p>
+        
+                        {% if cantidad_abiertos %}
+                            <span class="badge bg-primary mb-1">Abiertos: {{ cantidad_abiertos }}</span>
+                        {% endif %}
+                        {% if cantidad_pendientes %}
+                            <span class="badge bg-warning text-dark mb-1">Pendientes: {{ cantidad_pendientes }}</span>
+                        {% endif %}
+        
+                        {% if ultima_actualizacion_evento %}
+                            <small class="text-muted">
+                                Última nota el {{ ultima_actualizacion_evento|date:"d/m/Y H:i" }}
+                            </small>
+                        {% else %}
+                            <small class="text-muted">
+                                Sin nuevas notas recientes.
+                            </small>
+                        {% endif %}
+        
+                        <div class="mt-3">
+                            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-list-task"></i> Ver eventos
+                            </a>
+                        </div>
+        
+                    {% else %}
+                        <p class="text-muted mb-0">No hay eventos abiertos.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>              
+    </div>
+</div>
+{% endif %}
+{% if user.is_authenticated and not user.is_superuser %}
+    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+        <div class="container-fluid mt-4">
+            <div class="row g-4 justify-content-center">
+                <!-- Tarjeta 1: Crear nuevo pedido -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-primary"><i class="bi bi-plus-circle me-2"></i>Nuevo pedido</h5>
+                                <p class="card-text">Solicitá un nuevo estudio desde el formulario guiado.</p>
+                            </div>
+                            <a href="{% url 'pedidos_estudios:crear_pedido' %}" class="btn btn-primary mt-3">
+                                <i class="bi bi-plus-circle"></i> Solicitar estudio
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2: Lista de pedidos -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-secondary"><i class="bi bi-list-task me-2"></i>Estudios solicitados</h5>
+                                <p class="card-text">Consultá todos los estudios solicitados y su estado actual.</p>
+                            </div>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-outline-secondary mt-3">
+                                <i class="bi bi-list"></i> Ver lista
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: Reportes de Estudios -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-info"><i class="bi bi-exclamation-triangle me-2"></i>Reportes</h5>
+                                <p class="card-text">Consulta los reportes sobre estudios no realizados o incidencias.</p>
+                            </div>
+                            <a href="{% url 'gestion_eventos:eventos_administrativos' %}" class="btn btn-outline-info mt-3">
+                                <i class="bi bi-search"></i> Consultar reportes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: Ayuda o contacto (opcional) -->
+                <!-- <div class="col-md-6 col-lg-4">
+                    <div class="card shadow-sm border-0 h-100 card-hover">
+                        <div class="card-body d-flex flex-column justify-content-between">
+                            <div>
+                                <h5 class="card-title text-info"><i class="bi bi-question-circle me-2"></i>Soporte</h5>
+                                <p class="card-text">¿Necesitás ayuda o querés reportar un problema?</p>
+                            </div>
+                            <a href="#" class="btn btn-outline-info mt-3 disabled">
+                                En desarrollo
+                            </a>
+                        </div>
+                    </div>
+                </div> -->
+            </div>
+        </div>
+    {% else %}
+        <!-- Cartel para otros usuarios autenticados -->
+        <div class="alert alert-dismissible fade show mt-0 px-3 shadow-sm border-0 d-flex justify-content-center"
+            style="background-color: #e3f3fa; border-radius: 0;" role="alert">
+            <div class="d-flex flex-column flex-md-row align-items-center p-3">
+                <div class="me-md-4 mb-3 mb-md-0">
+                    <i class="fa fa-user-circle fa-3x" style="color: #0468bf;"></i>
+                </div>
+                <div class="flex-grow-1 text-center text-md-start">
+                    <h4 class="fw-bold mb-2" style="color: #03396c;">¡Hola, {{ user.first_name }}!</h4>
+                    {% if user.cargo == 'médico' %}
+                    <p class="text-muted mb-3 mb-md-0">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+                    {% elif user.cargo == 'médico residente' %}
+                    <p class="text-muted mb-3 mb-md-0">Aquí podrás registrar nuevos estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+                    {% else %}
+                    <p class="text-muted mb-3 mb-md-0">Esta es la plataforma interna del servicio de imágenes donde contaremos con la comunicación de las novedades. ¡Gracias por estar con nosotros!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
+        <!-- Tarjetas de gestión de eventos -->
+        <div class="container mt-4 mb-4">
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="bi bi-bell me-2"></i>Novedades recientes</h5>
+                            <p class="card-text">Consulta las últimas novedades reportadas en el sistema.</p>
+                            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-primary">
+                                <i class="bi bi-list-task"></i> Ver novedades
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-success"><i class="bi bi-check-circle me-2"></i>Novedades resueltas</h5>
+                            <p class="card-text">Revisa las novedades que ya han sido resueltas.</p>
+                            <a href="{% url 'gestion_eventos:historial_eventos' %}" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Ver resueltas
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning"><i class="bi bi-exclamation-triangle me-2"></i>Registrar novedades</h5>
+                            <p class="card-text"> Si necesitas registrar una nueva novedad, hazlo aquí.</p>
+                            <a href="{% url 'gestion_eventos:evento_nuevo' %}" class="btn btn-warning text-dark">
+                                <i class="bi bi-exclamation-triangle"></i> Registrar 
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Estudios pendientes</h5>
+                            <p class="card-text">Consulta las solicitudes pendientes de los estudios a realizar.</p>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-secondary">
+                                <i class="bi bi-file-earmark-text"></i> Ver pendientes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
+        <!-- Tarjetas de gestión de eventos para técnicos radiólogos y jefe técnico -->
+        <div class="container mt-0 mt-md-4 mb-4">       
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="bi bi-bell me-2"></i>Novedades</h5>
+                            <p class="card-text">Consulta las últimas novedades del servicio registradas en el sistema.</p>
+                            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-primary">
+                                <i class="bi bi-list-task"></i> Ver novedades
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-success"><i class="bi bi-file-earmark-text me-2"></i>Estudios pendientes</h5>
+                            <p class="card-text">Consulta las solicitudes pendientes de los estudios a realizar.</p>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-success">
+                                <i class="bi bi-file-earmark-text"></i> Ver pendientes
+                            </a>   
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif user.cargo == 'enfermero/a' or user.cargo == 'jefe de enfermería' %}
+        <!-- Tarjetas para ver los estudios pendientes -->
+        <div class="container mt-4 mb-4">
+            <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-secondary"><i class="bi bi-file-earmark-text me-2"></i>Estudios pendientes</h5>
+                            <p class="card-text">Consulta las solicitudes pendientes de los estudios a realizar.</p>
+                            <a href="{% url 'pedidos_estudios:lista_pedidos' %}" class="btn btn-secondary">
+                                <i class="bi bi-file-earmark-text"></i> Ver pendientes
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif user|has_group:"Médicos de staff - informes" %}
+        <!-- Tarjetas de gestión de informes para médicos de staff -->
+        <div class="container mt-0 mt-md-4 mb-4">       
+            <div class="row g-4 justify-content-center">
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-info"><i class="bi bi-plus-circle me-2"></i>Registrar estudios</h5>
+                            <p class="card-text">Accede al formulario para registrar los estudios realizados.</p>
+                            <a href="{% url 'registroestudios_nuevo' %}" class="btn btn-info text-white">
+                                <i class="bi bi-plus-circle"></i> Registrar estudio
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-secondary"><i class="bi bi-list-task me-2"></i>Estudios registrados</h5>
+                            <p class="card-text">Consulta todos los estudios que has registrado.</p>
+                            <a href="{% url 'registroestudios_list' %}" class="btn btn-secondary">
+                                <i class="bi bi-list"></i> Ver lista
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-success"><i class="bi bi-calendar-event me-2"></i>Mis guardias</h5>
+                            <p class="card-text">Accede rápidamente a tu calendario de guardias.</p>
+                            <a href="{% url 'control_guardias:mis_guardias' %}" class="btn btn-success">
+                                <i class="bi bi-calendar-event"></i> Ver mis guardias
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card shadow-sm border h-100">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary"><i class="bi bi-bell me-2"></i>Novedades</h5>
+                            <p class="card-text">Consulta las últimas novedades del servicio registradas en el sistema.</p>
+                            <a href="{% url 'gestion_eventos:lista_eventos' %}" class="btn btn-primary">
+                                <i class="bi bi-list-task"></i> Ver novedades
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Mensaje de desarrollo para otros usuarios -->
+        <div class="container alert alert-warning mt-5" role="alert">
+            <h5 class="alert-heading">Página en desarrollo</h5>
+            <p class="mb-0">Estamos trabajando para mejorar esta sección. ¡Gracias por tu paciencia!</p>
+            <p class="mb-0">
+                En breve podrás acceder a otras funcionalidades.
+            </p>
+        </div>
+        {% endif %}
+    {% endif %}
+{% endif %}
+{% endblock %}

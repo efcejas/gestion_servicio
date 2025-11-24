@@ -1,0 +1,271 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load static %}
+
+{% block title %}Historial de Eventos - Dr. Enso Cejas{% endblock %}
+
+
+
+{% block content %}
+<div>
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-green-600 to-emerald-700 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-archive text-2xl text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold text-white">
+                                Historial de Eventos
+                            </h1>
+                            <p class="text-green-100 mt-1">
+                                Consulta y busca en el historial completo de eventos resueltos
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                       class="inline-flex items-center px-6 py-3 bg-white text-green-700 font-semibold rounded-xl hover:bg-green-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        <i class="fas fa-arrow-left mr-2"></i>Ver Activos
+                    </a>
+                    <a href="{% url 'gestion_eventos:evento_nuevo' %}" 
+                       class="inline-flex items-center px-6 py-3 bg-green-500 hover:bg-green-400 text-white font-semibold rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        <i class="fas fa-plus-circle mr-2"></i>Nueva Novedad
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Stats en el header -->
+            <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-green-100 text-sm font-medium">Total Resueltos</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ total_resueltos }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-green-100 text-sm font-medium">Este Mes</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ resueltos_este_mes }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-green-100 text-sm font-medium">En Vista</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ eventos|length }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <button onclick="toggleFilters()" class="w-full text-left group">
+                        <div class="text-green-100 text-sm font-medium">Filtros</div>
+                        <div class="text-white text-lg font-semibold mt-1 flex items-center group-hover:text-green-100 transition-colors">
+                            <i class="fas fa-filter mr-2"></i>
+                            <span id="filterStatusText">Mostrar</span>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de filtros colapsable -->
+    <div id="filterSection" class="hidden mb-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="p-6">
+                <form method="get" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                            {{ form.q }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de evento</label>
+                            {{ form.tipo_evento }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha desde</label>
+                            {{ form.fecha_inicio }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha hasta</label>
+                            {{ form.fecha_fin }}
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3">
+                        <a href="{% url 'gestion_eventos:historial_eventos' %}" 
+                           class="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-times mr-2"></i>Limpiar
+                        </a>
+                        <button type="submit" 
+                                class="inline-flex items-center px-4 py-2 bg-medical-primary text-white rounded-lg hover:bg-medical-secondary transition-colors">
+                            <i class="fas fa-search mr-2"></i>Filtrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de eventos del historial -->
+    {% if eventos %}
+        <div class="space-y-3">
+            {% for evento in eventos %}
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-all duration-200">
+                    <div class="p-4">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex items-start space-x-3 flex-1">
+                                <!-- Indicador de estado resuelto -->
+                                <div class="flex-shrink-0">
+                                    <div class="w-3 h-3 rounded-full bg-green-500 mt-2"></div>
+                                </div>
+                                
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-3 mb-2">
+                                        <h3 class="font-semibold text-gray-900">
+                                            {{ evento.get_tipo_evento_display }}
+                                        </h3>
+                                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                                            Resuelto
+                                        </span>
+                                        <span class="text-xs text-gray-500">
+                                            {{ evento.fecha_creacion|date:"d/m/Y" }}
+                                        </span>
+                                    </div>
+                                    
+                                    <p class="text-gray-600 text-sm mb-3">{{ evento.descripcion|truncatechars:120 }}</p>
+                                    
+                                    <!-- Información adicional -->
+                                    <div class="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                                        {% if evento.nombre_paciente %}
+                                        <span class="flex items-center">
+                                            <i class="fas fa-user mr-1"></i>{{ evento.nombre_paciente|upper }}
+                                        </span>
+                                        {% endif %}
+                                        {% if evento.sector_de_pedido %}
+                                        <span class="flex items-center">
+                                            <i class="fas fa-map-marker-alt mr-1"></i>{{ evento.sector_de_pedido }}
+                                        </span>
+                                        {% endif %}
+                                        {% if evento.estudio_relacionado %}
+                                        <span class="flex items-center">
+                                            <i class="fas fa-x-ray mr-1"></i>{{ evento.estudio_relacionado }}
+                                        </span>
+                                        {% endif %}
+                                        <span class="flex items-center">
+                                            <i class="fas fa-user-md mr-1"></i>{{ evento.creado_por.get_full_name|title }}
+                                        </span>
+                                        {% if evento.ultima_nota %}
+                                        <span class="flex items-center text-blue-600">
+                                            <i class="fas fa-comment mr-1"></i>{{ evento.notas.count }} nota{% if evento.notas.count != 1 %}s{% endif %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Última nota si existe -->
+                                    {% if evento.ultima_nota %}
+                                    <div class="mt-3 p-3 bg-blue-50 rounded-lg">
+                                        <p class="text-blue-800 text-sm italic">
+                                            "{{ evento.ultima_nota.comentario|truncatechars:100 }}"
+                                        </p>
+                                        <p class="text-blue-600 text-xs mt-1">
+                                            {{ evento.ultima_nota.creado_por.get_full_name|title }} - {{ evento.ultima_nota.fecha|date:"d/m/Y H:i" }}
+                                        </p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- Acción -->
+                            <div class="flex items-center">
+                                <a href="{% url 'gestion_eventos:detalle_evento' evento.pk %}" 
+                                   class="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-medical-primary border border-gray-300 hover:border-medical-primary rounded-lg transition-colors">
+                                    <i class="fas fa-eye mr-2"></i>Ver
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Paginación -->
+        {% if is_paginated %}
+        <div class="mt-8">
+            <nav class="flex items-center justify-center">
+                <div class="flex items-center space-x-2">
+                    {% if page_obj.has_previous %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
+                           class="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-chevron-left mr-1"></i>Anterior
+                        </a>
+                    {% endif %}
+
+                    <span class="px-4 py-2 text-sm text-gray-600">
+                        Página {{ page_obj.number }} de {{ paginator.num_pages }}
+                    </span>
+
+                    {% if page_obj.has_next %}
+                        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
+                           class="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                            Siguiente<i class="fas fa-chevron-right ml-1"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+        {% endif %}
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-search text-2xl text-gray-400"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No se encontraron eventos</h3>
+            <p class="text-gray-600 mb-6">
+                No hay eventos en el historial que coincidan con los filtros seleccionados.
+            </p>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="{% url 'gestion_eventos:historial_eventos' %}" 
+                   class="inline-flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">
+                    <i class="fas fa-times mr-2"></i>Limpiar Filtros
+                </a>
+                <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                   class="inline-flex items-center px-4 py-2 bg-medical-primary text-white rounded-lg hover:bg-medical-secondary transition-colors">
+                    Ver Eventos Activos
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+// Función para alternar la visibilidad de los filtros
+function toggleFilters() {
+    const filterSection = document.getElementById('filterSection');
+    const filterStatusText = document.getElementById('filterStatusText');
+    
+    if (filterSection.classList.contains('hidden')) {
+        // Mostrar filtros
+        filterSection.classList.remove('hidden');
+        filterStatusText.textContent = 'Ocultar';
+    } else {
+        // Ocultar filtros
+        filterSection.classList.add('hidden');
+        filterStatusText.textContent = 'Mostrar';
+    }
+}
+
+// Mostrar filtros automáticamente si hay parámetros de búsqueda
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasFilters = urlParams.has('q') || urlParams.has('tipo_evento') || 
+                      urlParams.has('fecha_inicio') || urlParams.has('fecha_fin');
+    
+    if (hasFilters) {
+        // Si hay filtros activos, mostrar la sección automáticamente
+        const filterSection = document.getElementById('filterSection');
+        const filterStatusText = document.getElementById('filterStatusText');
+        
+        filterSection.classList.remove('hidden');
+        filterStatusText.textContent = 'Ocultar';
+    }
+});
+</script>
+{% endblock %}

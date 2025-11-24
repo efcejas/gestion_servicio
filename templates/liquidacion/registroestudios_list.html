@@ -127,11 +127,11 @@
                         <td>{{ registro.estudio.all|join:", " }}</td>
                         <td class="text-center px-3">{{ registro.total_regiones }}</td>
                         <td class="text-center px-3">
-                                <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
+                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
                                    title="Editar registro" aria-label="Editar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}">
                                 <i class="fas fa-edit"></i>
                             </a>
-                                <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
+                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
                                    title="Eliminar registro" aria-label="Eliminar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}"
                                    onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                 <i class="fas fa-trash-alt"></i>
@@ -215,11 +215,11 @@
                         <td>{{ registro.estudio.all|join:", " }}</td>
                         <td class="text-center px-3">{{ registro.total_regiones }}</td>
                         <td class="text-center px-3">
-                                <a href="{% url 'registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
+                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" class="btn btn-warning btn-sm" 
                                    title="Editar registro" aria-label="Editar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}">
                                 <i class="fas fa-edit"></i>
                             </a>
-                                <a href="{% url 'registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
+                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" class="btn btn-danger btn-sm"
                                    title="Eliminar registro" aria-label="Eliminar registro de {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}"
                                    onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                 <i class="fas fa-trash-alt"></i>

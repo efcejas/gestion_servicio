@@ -1,145 +1,308 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base_tailwind.html" %}
 
-{% block title %}Crear una cuenta{% endblock %}
+{% block title %}Crear Cuenta - Dr. Cejas{% endblock %}
 
 {% block content %}
-<div class="container d-flex justify-content-center align-items-start py-3">
-    <div class="card shadow border-0 w-100">
-        <!-- Ajuste de color personalizado -->
-        <div class="card-header text-white text-center cabecera-tarjeta">
-            <h4 class="mb-0">Registro de usuario</h4>
+<div class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl mx-auto">
+        <div class="text-center mb-8">
+            <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
+                <i class="fas fa-user-plus text-blue-600 text-xl"></i>
+            </div>
+            <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
+                Registro de Usuario
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Crea tu cuenta para acceder al sistema
+            </p>
         </div>
-        <div class="card-body">
-            <form method="post" novalidate>
+
+        <div class="bg-white py-8 px-6 shadow-lg rounded-lg border border-gray-200">
+            {% if form.non_field_errors %}
+            <div class="mb-6">
+                <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle text-red-400 mr-3"></i>
+                        <div>
+                            <strong>Error:</strong>
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="post" class="space-y-8">
                 {% csrf_token %}
-                {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
-                        {% for error in form.non_field_errors %}
-                            <div>{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-                <div class="row mb-3">
-                    <div class="col-md-12 titulo-h6">
-                        <p class="h6 col-12">Información de cuenta</p>
-                    </div>
-                    <div class="col-lg-5 mb-2 mb-lg-0">
-                        {{ form.username }}
-                        {% if form.username.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.username.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                
+                <!-- Información de cuenta -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-user-circle mr-2 text-blue-600"></i>
+                        Información de cuenta
+                    </h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                            <div class="lg:col-span-1">
+                                <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Nombre de usuario
+                                </label>
+                                {{ form.username }}
+                                {% if form.username.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.username.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-lg-7 d-lg-flex align-items-center">
-                        <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">{{ form.username.help_text }}</p>
+                            <div class="lg:col-span-2 flex items-start pt-8">
+                                <div class="text-xs text-gray-500 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
+                                    <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                                    {{ form.username.help_text }}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-12 titulo-h6">
-                        <p class="h6 col-12">Datos personales</p>
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.first_name }}
-                        {% if form.first_name.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.first_name.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+
+                <!-- Datos personales -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-address-card mr-2 text-green-600"></i>
+                        Datos personales
+                    </h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Nombre
+                                </label>
+                                {{ form.first_name }}
+                                {% if form.first_name.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.first_name.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.last_name }}
-                        {% if form.last_name.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.last_name.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                            <div>
+                                <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Apellido
+                                </label>
+                                {{ form.last_name }}
+                                {% if form.last_name.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.last_name.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
+                        </div>
                     </div>
                 </div>
-                <div class="row">
-                    <div class="col-md-12 titulo-h6">
-                        <p class="h6 col-12">Datos de contacto</p>
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.email }}
-                        {% if form.email.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.email.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+
+                <!-- Datos de contacto -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-envelope mr-2 text-purple-600"></i>
+                        Datos de contacto
+                    </h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Email
+                                </label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.email.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.telefono }}
-                        {% if form.telefono.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.telefono.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                            <div>
+                                <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Teléfono
+                                </label>
+                                {{ form.telefono }}
+                                {% if form.telefono.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.telefono.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                                    <i class="fas fa-phone text-yellow-500 mr-1"></i>
+                                    Debe ingresar el número de la siguiente manera: 1112345678
+                                </div>
                             </div>
-                        {% endif %}
-                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Debe ingresar el número de la siguiente manera: 1112345678</p>
+                        </div>
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-12 titulo-h6">
-                        <p class="h6 col-12">Tipo de cargo</p>
-                    </div>
-                    <div class="col-lg-5 mb-2 mb-lg-0">
-                        {{ form.cargo }}
-                        {% if form.cargo.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.cargo.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+
+                <!-- Tipo de cargo -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-briefcase mr-2 text-indigo-600"></i>
+                        Tipo de cargo
+                    </h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                            <div class="lg:col-span-1">
+                                <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Cargo
+                                </label>
+                                {{ form.cargo }}
+                                {% if form.cargo.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.cargo.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-lg-7 d-lg-flex align-items-center">
-                        <p class="form-text text-muted text-center text-lg-start p-0 m-0" style="font-size: 0.7em;">Debe seleccionar el tipo de cargo que desempeña en el servicio.</p>
+                            <div class="lg:col-span-2 flex items-start pt-8">
+                                <div class="text-xs text-gray-500 bg-indigo-50 p-3 rounded border-l-4 border-indigo-400">
+                                    <i class="fas fa-info-circle text-indigo-500 mr-1"></i>
+                                    Debe seleccionar el tipo de cargo que desempeña en el servicio.
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col-md-12 titulo-h6">
-                        <p class="h6 col-12">Contraseña</p>
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.password1 }}
-                        {% if form.password1.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.password1.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+
+                <!-- Contraseña -->
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-lock mr-2 text-red-600"></i>
+                        Contraseña
+                    </h3>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="{{ form.password1.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Contraseña
+                                </label>
+                                {{ form.password1 }}
+                                {% if form.password1.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.password1.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="mt-2 text-xs text-gray-500 bg-red-50 p-2 rounded border-l-4 border-red-400">
+                                    <i class="fas fa-shield-alt text-red-500 mr-1"></i>
+                                    Su contraseña no puede ser similar a otros datos personales y debe contener al menos 8 caracteres.
+                                </div>
                             </div>
-                        {% endif %}
-                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">Su contraseña no puede ser similar a otros datos personales y debe contener al menos 8 caracteres.</p>
-                    </div>
-                    <div class="col-md-6 mb-2 mb-lg-0">
-                        {{ form.password2 }}
-                        {% if form.password2.errors %}
-                            <div class="alert alert-danger mt-2">
-                                {% for error in form.password2.errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
+                            <div>
+                                <label for="{{ form.password2.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Confirmar contraseña
+                                </label>
+                                {{ form.password2 }}
+                                {% if form.password2.errors %}
+                                <div class="mt-2 text-sm text-red-600">
+                                    {% for error in form.password2.errors %}
+                                        <div class="flex items-center">
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="mt-2 text-xs text-gray-500 bg-gray-100 p-2 rounded border-l-4 border-gray-400">
+                                    <i class="fas fa-check-double text-gray-500 mr-1"></i>
+                                    {{ form.password2.help_text }}
+                                </div>
                             </div>
-                        {% endif %}
-                        <p class="form-text text-muted text-center text-lg-start p-0 mt-2 mb-0" style="font-size: 0.7em;">{{ form.password2.help_text }}</p>
+                        </div>
                     </div>
                 </div>
-                <button type="submit" class="btn text-white w-100" style="background-color: #164569;">Crear
-                    cuenta</button>
+
+                <!-- Submit Button -->
+                <div>
+                    <button type="submit" 
+                            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:scale-105">
+                        <span class="flex items-center">
+                            <i class="fas fa-user-plus mr-2"></i>
+                            Crear Cuenta
+                        </span>
+                    </button>
+                </div>
             </form>
-            <p class="text-center mt-3">
-                ¿Ya tienes una cuenta? <a href="{% url 'login' %}" style="color: #164569;">Inicia sesión aquí</a>.
+
+            <div class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-white text-gray-500">¿Ya tienes cuenta?</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-center">
+                    {% url 'login' as login_url %}
+                    {% if login_url %}
+                    <a href="{{ login_url }}" 
+                       class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200 flex items-center justify-center">
+                        <i class="fas fa-sign-in-alt mr-2"></i>Inicia sesión aquí
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-8">
+            <p class="text-xs text-gray-500">
+                © 2025 Dr. Enso Fermín Cejas. Sistema de Gestión Médica.
             </p>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Mejorar la experiencia de usuario en formularios
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-focus en el primer campo
+        const firstField = document.querySelector('input[type="text"]');
+        if (firstField) firstField.focus();
+        
+        // Añadir clases Tailwind dinámicamente a los campos del form
+        const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], select');
+        inputs.forEach(input => {
+            // Clases base
+            input.className = 'w-full px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200';
+            
+            // Manejar errores
+            if (input.parentElement.querySelector('.text-red-600')) {
+                input.className += ' border-red-300 focus:ring-red-500 focus:border-red-500';
+            }
+        });
+    });
+</script>
 {% endblock %}

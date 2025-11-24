@@ -13,5 +13,5 @@ class UserRegisterView(SuccessMessageMixin, CreateView):
     def get_context_data(self, **kwargs):
         """ Agrega la lógica para ocultar la barra de navegación """
         context = super().get_context_data(**kwargs)
-        context['hide_navbar'] = False  # Mostrar la barra de navegación en la página de registro
+        context['hide_navbar'] = True  # Ocultar la barra de navegación en la página de registro
         return context

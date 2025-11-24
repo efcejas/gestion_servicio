@@ -7,8 +7,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'medical-primary': '#164569',
+                        'medical-secondary': '#4b49c0',
+                        'medical-success': '#10b981',
+                        'medical-warning': '#f59e0b',
+                        'medical-error': '#ef4444',
+                        'medical-info': '#3b82f6',
+                        'medical-light': '#f8fafc',
+                        'medical-dark': '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
+    
     <!-- CSS personalizado -->
     <link rel="stylesheet" href="{% static 'styles/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'styles/tailwind-medical.css' %}">
 
     <!-- CSS de Adobe Fonts -->
     <link rel="stylesheet" href="https://use.typekit.net/ces4zfb.css">
@@ -143,20 +165,20 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarEstudiosDropdown">
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'registroestudios_nuevo' %}">Registrar estudios</a>
+                                    <a class="dropdown-item" href="{% url 'liquidacion:registroestudios_nuevo' %}">Registrar estudios</a>
                                 </li>
                                 <li>
-                                    <a class="dropdown-item" href="{% url 'registroestudios_list' %}">Estudios registrados</a>
+                                    <a class="dropdown-item" href="{% url 'liquidacion:registroestudios_list' %}">Estudios registrados</a>
                                 </li>
                             </ul>
                         </li>
                         {% endif %}
                         {% if user|has_group:'Médicos de staff' %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'procedimientos_intervensionismo' %}">Registrar estudio</a>
+                            <a class="nav-link" href="{% url 'liquidacion:procedimientos_intervensionismo' %}">Registrar estudio</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'mis_procedimientos' %}">Mis registros</a> 
+                            <a class="nav-link" href="{% url 'liquidacion:mis_procedimientos' %}">Mis registros</a>
                         </li>
                         {% endif %}
                         {% if user.is_superuser %}

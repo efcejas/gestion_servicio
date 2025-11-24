@@ -22,14 +22,15 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from accounts import views
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento, TailwindTestView, LoginTailwindTestView, RegisterTailwindTestView
+from .views import CustomLoginView, CustomPasswordResetView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento, HomeTailwindView
+from test_toast_view import test_toast
 
 urlpatterns = [
     # Administración
     path('admin/', admin.site.urls, name='admin'),
 
     # Página principal
-    path('', HomeView.as_view(), name='home'),
+    path('', HomeTailwindView.as_view(), name='home'),
 
     # Tablero de administración
     path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),  # Nueva URL más descriptiva
@@ -43,6 +44,9 @@ urlpatterns = [
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
+    
+    # Prueba temporal de toast
+    path('test-toast/', test_toast, name='test_toast'),
     path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
 
     # Restablecimiento de contraseñas
@@ -59,11 +63,7 @@ urlpatterns = [
     # URL para el modal de eventos del dashboard
     path('dashboard/eventos/modal/', eventos_modal, name='eventos_modal'),
     path('dashboard/eventos/<int:evento_id>/cambiar-estado/', cambiar_estado_evento, name='cambiar_estado_evento'),
-    
-    # URLs de prueba para Tailwind
-    path('tailwind-test/', TailwindTestView.as_view(), name='tailwind_test'),
-    path('login-tailwind-test/', LoginTailwindTestView.as_view(), name='login_tailwind_test'),
-    path('register-tailwind-test/', RegisterTailwindTestView.as_view(), name='register_tailwind_test'),
+
 ]
 
 # Servir archivos subidos por usuarios (MEDIA) en desarrollo

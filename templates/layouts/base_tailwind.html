@@ -1,5 +1,6 @@
 {% load static %}
-{% load static custom_filters %}
+{% load user_permissions %}
+{% load custom_filters %}
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-gray-50">
 
@@ -8,10 +9,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Tailwind CSS -->
-    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'medical-primary': '#164569',
+                        'medical-secondary': '#4b49c0',
+                        'medical-success': '#10b981',
+                        'medical-warning': '#f59e0b',
+                        'medical-error': '#ef4444',
+                        'medical-info': '#3b82f6',
+                        'medical-light': '#f8fafc',
+                        'medical-dark': '#0f172a',
+                    }
+                }
+            }
+        }
+    </script>
 
     <!-- CSS personalizado (solo para casos específicos) -->
     <link rel="stylesheet" href="{% static 'styles/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'styles/tailwind-medical.css' %}">
 
     <!-- CSS de Adobe Fonts -->
     <link rel="stylesheet" href="https://use.typekit.net/ces4zfb.css">
@@ -36,68 +56,84 @@
     {% if not hide_navbar %}
     {% if user.is_authenticated %}
     <!-- Header para usuarios autenticados -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
+    <header class="bg-gradient-to-r from-medical-primary via-medical-primary to-medical-secondary shadow-xl border-b border-medical-primary/20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-20">
                 <!-- Logo -->
                 <div class="flex-shrink-0">
-                    <img src="{% static 'images/drcejaslogo.png' %}" alt="Logo Dr. Cejas" class="h-16 w-auto">
+                    <a href="{% url 'home' %}" class="flex items-center space-x-4">
+                        <img src="{% static 'images/Logo Personal Negativo - Letra Grande.png' %}" alt="Logo Dr. Cejas" class="h-20 w-auto">
+                    </a>
                 </div>
 
                 <!-- User Info & Actions -->
                 <div class="flex items-center space-x-4">
                     <!-- User Info (hidden on mobile) -->
                     <div class="hidden md:block text-right">
-                        <div class="text-sm font-semibold text-gray-900">{{ user.get_full_name }}</div>
-                        <div class="text-xs text-gray-500">{{ user.email }}</div>
+                        <div class="text-sm font-semibold text-white drop-shadow-sm">{{ user.get_full_name }}</div>
+                        <div class="text-xs text-white/80">{{ user.email }}</div>
+                        {% if user.cargo %}
+                        <div class="text-xs text-white/90 font-medium">
+                            <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- User Dropdown -->
                     <div class="relative">
                         <button type="button" id="user-menu-button" 
-                                class="flex items-center space-x-2 text-sm bg-white rounded-full p-2 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                class="flex items-center space-x-2 text-sm bg-white/20 backdrop-blur-sm rounded-xl p-3 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 shadow-lg"
                                 data-dropdown-toggle="user-dropdown">
-                            <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                            <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-medical-primary text-sm font-bold shadow-md">
                                 {{ user.get_full_name|first|upper }}
                             </div>
-                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>
                         </button>
 
                         <!-- Dropdown menu -->
                         <div id="user-dropdown" 
-                             class="hidden absolute right-0 z-50 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                            <div class="py-1">
-                                <div class="px-4 py-2 text-sm text-gray-700 border-b border-gray-100 md:hidden">
-                                    <div class="font-semibold">{{ user.get_full_name }}</div>
+                             class="hidden absolute right-0 z-50 mt-3 w-56 bg-white rounded-xl shadow-2xl ring-1 ring-gray-200 focus:outline-none backdrop-blur-sm">
+                            <div class="py-2">
+                                <div class="px-4 py-3 text-sm text-gray-700 border-b border-gray-100 md:hidden bg-gradient-to-r from-medical-primary/5 to-medical-secondary/5">
+                                    <div class="font-semibold text-medical-primary">{{ user.get_full_name }}</div>
                                     <div class="text-xs text-gray-500">{{ user.email }}</div>
+                                    {% if user.cargo %}
+                                    <div class="text-xs text-medical-secondary font-medium mt-1">
+                                        <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 {% url 'home' as home_url %}
                                 {% if home_url %}
-                                <a href="{{ home_url }}" 
-                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                                    <i class="fas fa-home w-4 mr-2 text-gray-400"></i>
-                                    Inicio
-                                </a>
+                                <div class="px-2">
+                                    <a href="{{ home_url }}" 
+                                       class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
+                                        <i class="fas fa-home w-5 mr-3 text-medical-primary group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium">Inicio</span>
+                                    </a>
+                                </div>
                                 {% endif %}
                                 {% url 'password_change' as password_change_url %}
                                 {% if password_change_url %}
-                                <a href="{{ password_change_url }}" 
-                                   class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
-                                    <i class="fas fa-key w-4 mr-2 text-gray-400"></i>
-                                    Cambiar Contraseña
-                                </a>
+                                <div class="px-2">
+                                    <a href="{{ password_change_url }}" 
+                                       class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
+                                        <i class="fas fa-key w-5 mr-3 text-medical-secondary group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium">Cambiar Contraseña</span>
+                                    </a>
+                                </div>
                                 {% endif %}
-                                <div class="border-t border-gray-100"></div>
+                                <div class="border-t border-gray-200 my-2"></div>
                                 {% url 'logout' as logout_url %}
                                 {% if logout_url %}
-                                <form method="post" action="{{ logout_url }}" class="block">
+                                <form method="post" action="{{ logout_url }}" class="block px-2">
                                     {% csrf_token %}
                                     <button type="submit" 
-                                            class="w-full text-left px-4 py-2 text-sm text-red-700 hover:bg-red-50 flex items-center">
-                                        <i class="fas fa-sign-out-alt w-4 mr-2 text-red-400"></i>
-                                        Cerrar Sesión
+                                            class="group w-full text-left px-4 py-3 text-sm text-red-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 transition-all duration-200 rounded-lg flex items-center">
+                                        <i class="fas fa-sign-out-alt w-5 mr-3 text-red-500 group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium">Cerrar Sesión</span>
                                     </button>
                                 </form>
                                 {% endif %}
@@ -110,57 +146,254 @@
     </header>
 
     <!-- Navigation Menu para usuarios autenticados -->
-    <nav class="bg-gray-800 shadow-sm">
+    <nav class="bg-white/95 backdrop-blur-sm shadow-lg border-t border-white/20">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex space-x-8">
+            <div class="flex space-x-1 overflow-x-auto scrollbar-hide">
+                
+                <!-- Dashboard - Todos los usuarios -->
                 {% url 'home' as home_url %}
                 {% if home_url %}
                 <a href="{{ home_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if request.resolver_match.url_name == 'home' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-home mr-2"></i>Dashboard
+                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'home' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                    <i class="fas fa-home mr-2 group-hover:scale-110 transition-transform"></i>Dashboard
+                    {% if request.resolver_match.url_name == 'home' %}
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                    {% endif %}
                 </a>
                 {% endif %}
-                
-                {% url 'pedidos_estudios:listar_pedidos' as pedidos_url %}
-                {% if pedidos_url %}
-                <a href="{{ pedidos_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-clipboard-list mr-2"></i>Pedidos de Estudios
-                </a>
-                {% endif %}
-                
-                {% url 'liquidacion:dashboard' as liquidacion_url %}
-                {% if liquidacion_url %}
-                <a href="{{ liquidacion_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if 'liquidacion' in request.resolver_match.namespace|default:'' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-calculator mr-2"></i>Liquidación
-                </a>
-                {% endif %}
-                
-                {% url 'gestion_eventos:listar_eventos' as eventos_url %}
-                {% if eventos_url %}
-                <a href="{{ eventos_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>Eventos del Servicio
-                </a>
-                {% endif %}
-                
-                {% url 'control_guardias:calendario_guardias_full' as guardias_url %}
-                {% if guardias_url %}
-                <a href="{{ guardias_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-calendar-alt mr-2"></i>Guardias
-                </a>
-                {% endif %}
-                
+
+                <!-- ========== NAVEGACIÓN POR SUPERUSUARIO ========== -->
                 {% if user.is_superuser %}
-                {% url 'admin_dashboard' as admin_url %}
-                {% if admin_url %}
-                <a href="{{ admin_url }}" 
-                   class="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-4 text-sm font-medium transition-colors duration-200 {% if request.resolver_match.url_name == 'admin_dashboard' %}bg-gray-900 text-white{% endif %}">
-                    <i class="fas fa-cog mr-2"></i>Administración
-                </a>
-                {% endif %}
+                    <!-- Estudios por Profesional -->
+                    {% url 'liquidacion:informados_por_medico_por_mes' as estudios_url %}
+                    {% if estudios_url %}
+                    <a href="{{ estudios_url }}" 
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                        <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>Estudios por Profesional
+                    </a>
+                    {% endif %}
+
+                    <!-- Calendario de Guardias -->
+                    {% url 'control_guardias:calendario_guardias_full_tw' as guardias_url %}
+                    {% if guardias_url %}
+                    <a href="{{ guardias_url }}" 
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                        <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
+                    </a>
+                    {% endif %}
+
+                    <!-- Eventos del Servicio -->
+                    {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                    {% if eventos_url %}
+                    <a href="{{ eventos_url }}" 
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-exclamation-triangle mr-2 group-hover:scale-110 transition-transform"></i>Eventos
+                        {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
+                    <!-- Panel de Administración -->
+                    {% url 'admin_dashboard' as admin_url %}
+                    {% if admin_url %}
+                    <a href="{{ admin_url }}" 
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'admin_dashboard' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-cog mr-2 group-hover:scale-110 transition-transform"></i>Administración
+                        {% if request.resolver_match.url_name == 'admin_dashboard' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
+                <!-- ========== NAVEGACIÓN PARA USUARIOS NO SUPERUSER ========== -->
+                {% elif user.is_authenticated and not user.is_superuser %}
+
+                    <!-- ========== ADMINISTRATIVO - SANATORIO (PEDIDOS) ========== -->
+                    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
+                        <!-- Pedidos de Estudios -->
+                        {% url 'pedidos_estudios:crear_pedido' as crear_pedido_url %}
+                        {% if crear_pedido_url %}
+                        <a href="{{ crear_pedido_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Nuevo Pedido
+                            {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+
+                        {% url 'pedidos_estudios:lista_pedidos' as lista_pedidos_url %}
+                        {% if lista_pedidos_url %}
+                        <a href="{{ lista_pedidos_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                            <i class="fas fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Solicitados
+                        </a>
+                        {% endif %}
+
+                        <!-- Reportes -->
+                        {% url 'gestion_eventos:eventos_administrativos' as reportes_url %}
+                        {% if reportes_url %}
+                        <a href="{{ reportes_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                            <i class="fas fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Reportes
+                        </a>
+                        {% endif %}
+
+                    {% else %}
+                        <!-- ========== NAVEGACIÓN SEGÚN CARGO DEL USUARIO ========== -->
+                        
+                        <!-- ADMINISTRATIVOS / JEFE ADMINISTRATIVO -->
+                        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
+                            <!-- Novedades -->
+                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                            {% if eventos_url %}
+                            <a href="{{ eventos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                            <!-- Estudios Pendientes -->
+                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
+                            {% if pedidos_url %}
+                            <a href="{{ pedidos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
+                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                        <!-- TÉCNICO RADIÓLOGO / JEFE TÉCNICO -->
+                        {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
+                            <!-- Novedades -->
+                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                            {% if eventos_url %}
+                            <a href="{{ eventos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                            <!-- Estudios Pendientes -->
+                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
+                            {% if pedidos_url %}
+                            <a href="{{ pedidos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
+                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                        <!-- ENFERMEROS / JEFE DE ENFERMERÍA -->
+                        {% elif user.cargo == 'enfermero/a' or user.cargo == 'jefe de enfermería' %}
+                            <!-- Estudios Pendientes -->
+                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
+                            {% if pedidos_url %}
+                            <a href="{{ pedidos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
+                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                        <!-- MÉDICOS DE STAFF - INFORMES -->
+                        {% elif user|has_group:"Médicos de staff - informes" %}
+                            <!-- Registrar Estudios -->
+                            {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}
+                            {% if nuevo_estudio_url %}
+                            <a href="{{ nuevo_estudio_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Estudios
+                            </a>
+                            {% endif %}
+
+                            <!-- Estudios Registrados -->
+                            {% url 'liquidacion:registroestudios_list' as lista_estudios_url %}
+                            {% if lista_estudios_url %}
+                            <a href="{{ lista_estudios_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                                <i class="fas fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Registrados
+                            </a>
+                            {% endif %}
+
+                            <!-- Mis Guardias -->
+                            {% url 'control_guardias:mis_guardias' as mis_guardias_url %}
+                            {% if mis_guardias_url %}
+                            <a href="{{ mis_guardias_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Mis Guardias
+                                {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                            <!-- Novedades -->
+                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                            {% if eventos_url %}
+                            <a href="{{ eventos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                        <!-- MÉDICOS DE STAFF (solo procedimientos) -->
+                        {% elif user|has_group:"Médicos de staff" %}
+                            <!-- Registrar Procedimientos -->
+                            {% url 'liquidacion:procedimientos_intervensionismo' as procedimientos_url %}
+                            {% if procedimientos_url %}
+                            <a href="{{ procedimientos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Procedimientos
+                                {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                            <!-- Mis Procedimientos -->
+                            {% url 'liquidacion:mis_procedimientos' as mis_procedimientos_url %}
+                            {% if mis_procedimientos_url %}
+                            <a href="{{ mis_procedimientos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
+                                <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Mis Procedimientos
+                            </a>
+                            {% endif %}
+
+                            <!-- Novedades -->
+                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                            {% if eventos_url %}
+                            <a href="{{ eventos_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                        <!-- MÉDICOS SIN GRUPO ASIGNADO - Sin enlaces específicos en navbar -->
+                        {% elif user.cargo == 'médico' or user.cargo == 'médico residente' %}
+                            <!-- No se muestran enlaces específicos para médicos sin grupos asignados -->
+
+                        {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -194,48 +427,17 @@
     {% endif %}
     {% endif %}
 
-    <!-- Messages/Alerts -->
-    {% if messages %}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-        {% for message in messages %}
-        <div class="rounded-lg p-4 mb-4 {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-700{% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700{% elif message.tags == 'warning' %}bg-yellow-50 border border-yellow-200 text-yellow-700{% else %}bg-blue-50 border border-blue-200 text-blue-700{% endif %}" role="alert">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    {% if message.tags == 'success' %}
-                    <i class="fas fa-check-circle text-green-400"></i>
-                    {% elif message.tags == 'error' %}
-                    <i class="fas fa-exclamation-circle text-red-400"></i>
-                    {% elif message.tags == 'warning' %}
-                    <i class="fas fa-exclamation-triangle text-yellow-400"></i>
-                    {% else %}
-                    <i class="fas fa-info-circle text-blue-400"></i>
-                    {% endif %}
-                </div>
-                <div class="ml-3 font-medium">{{ message }}</div>
-                <div class="ml-auto pl-3">
-                    <div class="-mx-1.5 -my-1.5">
-                        <button type="button" 
-                                class="inline-flex rounded-md p-1.5 {% if message.tags == 'success' %}text-green-500 hover:bg-green-100{% elif message.tags == 'error' %}text-red-500 hover:bg-red-100{% elif message.tags == 'warning' %}text-yellow-500 hover:bg-yellow-100{% else %}text-blue-500 hover:bg-blue-100{% endif %} focus:outline-none focus:ring-2 focus:ring-offset-2 {% if message.tags == 'success' %}focus:ring-green-500{% elif message.tags == 'error' %}focus:ring-red-500{% elif message.tags == 'warning' %}focus:ring-yellow-500{% else %}focus:ring-blue-500{% endif %}"
-                                onclick="this.parentElement.parentElement.parentElement.parentElement.style.display='none'">
-                            <span class="sr-only">Cerrar</span>
-                            <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+
+
+    <!-- Toast container (global) -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none"></div>
 
     <!-- Main Content -->
     <main class="flex-1">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <!-- Page Header -->
             {% if not hide_navbar %}
-            <div class="mb-8">
+            <div>
                 <h1 class="text-2xl font-bold text-gray-900 mb-2">{% block page_title %}{% endblock %}</h1>
                 {% block page_description %}{% endblock %}
             </div>
@@ -273,7 +475,7 @@
 
     <!-- Scripts adicionales -->
     {% block extra_js %}{% endblock %}
-    
+
     <script>
         // Inicializar dropdowns de Flowbite
         document.addEventListener('DOMContentLoaded', function() {
@@ -293,6 +495,91 @@
                     }
                 });
             }
+
+            // Sistema de Toast Moderno para Mensajes Django
+            {% if messages %}
+                const toastContainer = document.getElementById('toast-container');
+                const messages = [
+                    {% for message in messages %}
+                    {
+                        text: "{{ message|escapejs }}",
+                        level: "{{ message.tags }}"
+                    }{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                ];
+                
+                messages.forEach((msg, index) => {
+                    const toast = document.createElement('div');
+                    
+                    let borderColor = '';
+                    let iconClass = '';
+                    
+                    switch(msg.level) {
+                        case 'success':
+                            borderColor = 'border-l-green-500';
+                            iconClass = 'fas fa-check-circle text-green-500';
+                            break;
+                        case 'error':
+                            borderColor = 'border-l-red-500';
+                            iconClass = 'fas fa-times-circle text-red-500';
+                            break;
+                        case 'warning':
+                            borderColor = 'border-l-yellow-500';
+                            iconClass = 'fas fa-exclamation-triangle text-yellow-500';
+                            break;
+                        case 'info':
+                            borderColor = 'border-l-blue-500';
+                            iconClass = 'fas fa-info-circle text-blue-500';
+                            break;
+                        default:
+                            borderColor = 'border-l-gray-500';
+                            iconClass = 'fas fa-bell text-gray-500';
+                    }
+                    
+                    toast.className = `pointer-events-auto w-96 bg-white shadow-lg rounded-xl border-l-4 ${borderColor} transform transition-all duration-500 ease-in-out translate-x-full opacity-0`;
+                    
+                    toast.innerHTML = `
+                        <div class="p-4">
+                            <div class="flex items-start">
+                                <div class="flex-shrink-0">
+                                    <i class="${iconClass}"></i>
+                                </div>
+                                <div class="ml-3 w-0 flex-1 pt-0.5">
+                                    <p class="text-sm font-medium text-gray-900">${msg.text}</p>
+                                </div>
+                                <div class="ml-4 flex-shrink-0 flex">
+                                    <button class="toast-close rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" onclick="this.closest('div').closest('div').remove()">
+                                        <span class="sr-only">Cerrar</span>
+                                        <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    toastContainer.appendChild(toast);
+                    
+                    // Animación de entrada con delay escalonado
+                    setTimeout(() => {
+                        toast.classList.remove('translate-x-full', 'opacity-0');
+                        toast.classList.add('translate-x-0', 'opacity-100');
+                    }, 100 + (index * 150));
+                    
+                    // Auto-remover después de 5 segundos
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            toast.classList.add('translate-x-full', 'opacity-0');
+                            setTimeout(() => {
+                                if (toast.parentNode) {
+                                    toast.parentNode.removeChild(toast);
+                                }
+                            }, 300);
+                        }
+                    }, 5000 + (index * 200));
+                });
+            {% endif %}
         });
     </script>
 </body>
