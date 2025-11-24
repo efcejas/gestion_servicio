@@ -1,0 +1,703 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load custom_filters %}
+{% block title %}Registro Diario - Dr. Enso Cejas{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Header Moderno con Gradiente -->
+    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
+        <!-- Banner superior con gradiente -->
+        <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-6 py-8 relative overflow-hidden">
+            <!-- Decoración de fondo -->
+            <div class="absolute inset-0 opacity-10">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-32 -mt-32"></div>
+                <div class="absolute bottom-0 left-0 w-48 h-48 bg-white rounded-full -ml-24 -mb-24"></div>
+            </div>
+            
+            <div class="relative z-10">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center mb-3">
+                            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4 border border-white/30">
+                                <i class="fas fa-clipboard-list text-white text-2xl"></i>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold text-white mb-1">
+                                    Registro Diario de Estudios
+                                </h1>
+                                <p class="text-white/90 text-lg">
+                                    Registra los estudios realizados hoy
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <a href="{% url 'liquidacion:registroestudios_list' %}"
+                       class="inline-flex items-center px-5 py-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/30 shadow-lg hover:shadow-xl">
+                        <i class="fas fa-list mr-2"></i>Ver Mis Registros
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 px-6 py-5 bg-gradient-to-r from-gray-50 to-purple-50/30 border-t border-gray-200">
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-user-md text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Médico</p>
+                    <p class="text-sm font-bold text-gray-900 truncate">{{ user.get_full_name|title }}</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-calendar-day text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Fecha</p>
+                    <p class="text-lg font-bold text-gray-900">Hoy</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-check-circle text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Registrados hoy</p>
+                    <p class="text-lg font-bold text-gray-900">{{ registros|length }}</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                <div class="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+                    <i class="fas fa-chart-bar text-white text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Regiones hoy</p>
+                    <p class="text-lg font-bold text-gray-900">{{ total_regiones_mes }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout de 2 columnas: Formulario + Registros del día -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <!-- Columna izquierda: Formulario de registro -->
+        <div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                    <h2 class="text-xl font-bold text-white flex items-center">
+                        <i class="fas fa-edit mr-3"></i>Nuevo Registro
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    <form method="post" id="registroForm">
+                        {% csrf_token %}
+                        
+                        <!-- Datos del paciente -->
+                        <div class="mb-6">
+                            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
+                                <i class="fas fa-user mr-2 text-blue-500"></i>Datos del Paciente
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Nombre <span class="text-red-500">*</span>
+                                    </label>
+                                    {{ form.nombre_paciente }}
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Apellido <span class="text-red-500">*</span>
+                                    </label>
+                                    {{ form.apellido_paciente }}
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        DNI <span class="text-red-500">*</span>
+                                    </label>
+                                    {{ form.dni_paciente }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Información del estudio -->
+                        <div class="mb-6">
+                            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
+                                <i class="fas fa-x-ray mr-2 text-purple-500"></i>Información del Estudio
+                            </h3>
+                            <div class="space-y-4">
+                                <!-- Tipo de estudio -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Tipo de estudio <span class="text-red-500">*</span>
+                                    </label>
+                                    
+                                    <!-- Select oculto original -->
+                                    <div class="hidden">
+                                        {{ form.tipo_estudio }}
+                                    </div>
+                                    
+                                    <!-- Dropdown personalizado -->
+                                    <div class="relative">
+                                        <button type="button"
+                                                id="tipo-estudio-button"
+                                                class="w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
+                                            <span id="tipo-estudio-text" class="text-gray-700">Seleccione</span>
+                                            <i class="fas fa-chevron-down text-gray-400 transition-transform" id="tipo-estudio-icon"></i>
+                                        </button>
+                                        
+                                        <div id="tipo-estudio-dropdown"
+                                             class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden">
+                                            <div class="py-1">
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700 font-medium border-b border-gray-100"
+                                                     data-value="">
+                                                    Seleccione
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="ECO">
+                                                    Ecografía
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="RAD">
+                                                    Radiografía
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="TOM">
+                                                    Tomografía
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="RES">
+                                                    Resonancia Magnética
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Estudios con Select2 mejorado -->
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Estudios a registrar <span class="text-red-500">*</span>
+                                    </label>
+                                    
+                                    <!-- Select múltiple oculto (mantiene la funcionalidad) -->
+                                    <div class="hidden">
+                                        {{ form.estudio }}
+                                    </div>
+                                    
+                                    <!-- Interface visual mejorada -->
+                                    <div id="estudio-selector-container" class="relative">
+                                        <!-- Barra de búsqueda -->
+                                        <div class="relative mb-3">
+                                            <input type="text" 
+                                                   id="estudio-search" 
+                                                   placeholder="Buscar estudio para agregar..."
+                                                   class="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                                                   disabled>
+                                            <i class="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
+                                        </div>
+                                        
+                                        <!-- Dropdown de resultados (oculto por defecto) -->
+                                        <div id="estudio-dropdown" 
+                                             class="hidden absolute z-50 left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        </div>
+                                        
+                                        <!-- Tags de estudios seleccionados -->
+                                        <div id="estudios-seleccionados" 
+                                             class="flex flex-wrap gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg min-h-[60px]">
+                                            <p class="text-sm text-purple-600 italic w-full" id="empty-message">
+                                                <i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar
+                                            </p>
+                                        </div>
+                                    </div>
+                                    
+                                    <p class="text-xs text-gray-500 mt-2">
+                                        <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
+                                        Puedes seleccionar múltiples estudios si el paciente tiene más de uno
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cantidad y fecha -->
+                        <div class="mb-6">
+                            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
+                                <i class="fas fa-calendar-check mr-2 text-green-500"></i>Detalles del Registro
+                            </h3>
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                <div class="md:col-span-3">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Cantidad
+                                    </label>
+                                    {{ form.cantidad_estudio }}
+                                </div>
+                                <div class="md:col-span-5">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                        Fecha del informe <span class="text-red-500">*</span>
+                                    </label>
+                                    {{ form.fecha_del_informe }}
+                                </div>
+                                <div class="md:col-span-4 flex items-end">
+                                    <button type="submit" 
+                                            name="continuar"
+                                            class="w-full inline-flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                                        <i class="fas fa-save mr-2"></i>Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Botón Finalizar -->
+                        <div class="border-t border-gray-200 pt-4">
+                            <button type="button"
+                                    onclick="document.getElementById('confirmModal').classList.remove('hidden')"
+                                    class="w-full inline-flex items-center justify-center px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all shadow-lg hover:shadow-xl">
+                                <i class="fas fa-check-double mr-2"></i>Finalizar y Ver Resumen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna derecha: Registros realizados hoy -->
+        <div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full">
+                <div class="bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-4">
+                    <h2 class="text-xl font-bold text-white flex items-center">
+                        <i class="fas fa-history mr-3"></i>Registros de Hoy
+                        <span class="ml-auto bg-white/20 px-3 py-1 rounded-full text-sm">{{ registros|length }}</span>
+                    </h2>
+                </div>
+                
+                <div class="p-6">
+                    {% if registros %}
+                        <div class="overflow-y-auto" style="max-height: 500px;">
+                            <div class="space-y-3">
+                                {% for registro in registros %}
+                                <div class="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 hover:shadow-md transition-all">
+                                    <div class="flex items-start justify-between">
+                                        <div class="flex-1">
+                                            <p class="font-bold text-gray-900 mb-1">
+                                                {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
+                                            </p>
+                                            <div class="flex items-center gap-4 text-sm text-gray-600">
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-calendar-alt mr-1 text-teal-600"></i>
+                                                    {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                                                </span>
+                                                <span class="flex items-center">
+                                                    <i class="fas fa-chart-bar mr-1 text-purple-600"></i>
+                                                    <strong>{{ registro.total_regiones }}</strong> regiones
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-12">
+                            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i class="fas fa-clipboard text-gray-400 text-2xl"></i>
+                            </div>
+                            <p class="text-gray-600 font-medium mb-2">Sin registros hoy</p>
+                            <p class="text-gray-500 text-sm">Los estudios que registres aparecerán aquí</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección comentada de "día sin pacientes" - mantener para futura activación
+    <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+        <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl mr-4 mt-1"></i>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-yellow-900 mb-2">¿No tuviste pacientes hoy?</h3>
+                <p class="text-yellow-800 text-sm mb-4">
+                    Este botón es solo para médicos que <strong>asistieron a una lista de ecografías</strong> pero
+                    <strong>no tuvieron pacientes</strong>. De lo contrario, <strong>no lo utilices</strong>.
+                </p>
+                <button type="button"
+                        onclick="document.getElementById('modalConfirmarSinPacientes').classList.remove('hidden')"
+                        class="inline-flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-medium rounded-lg transition-colors shadow-md">
+                    <i class="fas fa-calendar-times mr-2"></i>Registrar día sin pacientes
+                </button>
+            </div>
+        </div>
+    </div>
+    -->
+</div>
+
+<!-- Modal de confirmación para finalizar -->
+<div id="confirmModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+        <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-check-circle mr-3"></i>Confirmar Finalización
+            </h3>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-700 mb-6">
+                ¿Está seguro de que desea finalizar? Asegúrese de haber guardado el último registro.
+            </p>
+            <div class="flex gap-3">
+                <button type="button"
+                        onclick="document.getElementById('confirmModal').classList.add('hidden')"
+                        class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <a href="{% url 'liquidacion:registroestudios_list' %}"
+                   class="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all shadow-lg">
+                    <i class="fas fa-arrow-right mr-2"></i>Finalizar
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmación: ¿Día sin pacientes? -->
+<div id="modalConfirmarSinPacientes" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+        <div class="bg-gradient-to-r from-yellow-500 to-orange-500 px-6 py-4">
+            <h3 class="text-xl font-bold text-white flex items-center">
+                <i class="fas fa-exclamation-triangle mr-3"></i>¿Registrar día sin pacientes?
+            </h3>
+        </div>
+        <div class="p-6">
+            <p class="text-gray-700 mb-4">
+                Estás por declarar que <strong>no tuviste pacientes</strong> en el día de hoy.<br>
+                Esto registrará <strong>automáticamente 12 regiones compensadas</strong> para facturación.
+            </p>
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p class="text-blue-800 text-sm">
+                    <i class="fas fa-info-circle mr-2"></i>¿Estás seguro de que no vas a registrar ningún paciente más hoy?
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button type="button"
+                        onclick="document.getElementById('modalConfirmarSinPacientes').classList.add('hidden')"
+                        class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="button"
+                        onclick="document.getElementById('modalConfirmarSinPacientes').classList.add('hidden'); document.getElementById('modalFormSinPacientes').classList.remove('hidden');"
+                        class="flex-1 px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold rounded-lg transition-all">
+                    Sí, continuar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal 2: Formulario para registrar día sin pacientes -->
+<div id="modalFormSinPacientes" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all">
+        <form method="post" action="{% url 'liquidacion:registrar_dia_sin_pacientes' %}">
+            {% csrf_token %}
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <h3 class="text-xl font-bold text-white flex items-center">
+                    <i class="fas fa-calendar-times mr-3"></i>Registrar Día Sin Pacientes
+                </h3>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha</label>
+                    {{ form_dia_sin_pacientes.fecha }}
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Observación (opcional)</label>
+                    {{ form_dia_sin_pacientes.observacion }}
+                </div>
+            </div>
+            <div class="px-6 pb-6 flex gap-3">
+                <button type="button"
+                        onclick="document.getElementById('modalFormSinPacientes').classList.add('hidden')"
+                        class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-lg transition-all shadow-lg">
+                    <i class="fas fa-check mr-2"></i>Registrar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar estilos Tailwind a todos los campos del formulario
+    const formFields = document.querySelectorAll('#registroForm input[type="text"]:not(#estudio-search), #registroForm input[type="number"], #registroForm input[type="date"], #registroForm textarea');
+    formFields.forEach(field => {
+        field.classList.add('w-full', 'px-3', 'py-2', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-blue-500', 'focus:border-blue-500', 'transition-colors');
+        field.classList.remove('form-control', 'form-control-sm', 'form-select', 'form-select-sm');
+    });
+
+    // === DROPDOWN PERSONALIZADO DE TIPO DE ESTUDIO ===
+    const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+    const tipoEstudioButton = document.getElementById('tipo-estudio-button');
+    const tipoEstudioText = document.getElementById('tipo-estudio-text');
+    const tipoEstudioIcon = document.getElementById('tipo-estudio-icon');
+    const tipoEstudioDropdown = document.getElementById('tipo-estudio-dropdown');
+    
+    const tiposIconos = {
+        '': { icon: 'fa-list', text: 'Seleccione', color: 'text-gray-400' },
+        'ECO': { icon: 'fa-ultrasound', text: 'Ecografía', color: 'text-blue-500' },
+        'RAD': { icon: 'fa-x-ray', text: 'Radiografía', color: 'text-green-500' },
+        'TOM': { icon: 'fa-hospital', text: 'Tomografía', color: 'text-purple-500' },
+        'RES': { icon: 'fa-magnet', text: 'Resonancia Magnética', color: 'text-red-500' }
+    };
+    
+    // Toggle dropdown tipo de estudio
+    tipoEstudioButton.addEventListener('click', function(e) {
+        e.stopPropagation();
+        tipoEstudioDropdown.classList.toggle('hidden');
+        tipoEstudioIcon.classList.toggle('rotate-180');
+    });
+    
+    // Seleccionar opción de tipo de estudio
+    tipoEstudioDropdown.querySelectorAll('[data-value]').forEach(option => {
+        option.addEventListener('click', function() {
+            const value = this.dataset.value;
+            const tipo = tiposIconos[value];
+            
+            // Actualizar el select original
+            tipoEstudioSelect.value = value;
+            
+            // Actualizar el botón personalizado (sin icono)
+            tipoEstudioText.textContent = tipo.text;
+            
+            // Cerrar dropdown
+            tipoEstudioDropdown.classList.add('hidden');
+            tipoEstudioIcon.classList.remove('rotate-180');
+            
+            // Trigger evento change en el select original
+            const event = new Event('change', { bubbles: true });
+            tipoEstudioSelect.dispatchEvent(event);
+        });
+    });
+    
+    // === RESTO DEL CÓDIGO ===
+    const estudioSelectOriginal = document.getElementById('id_estudio');
+    const estudioSearch = document.getElementById('estudio-search');
+    const estudioDropdown = document.getElementById('estudio-dropdown');
+    const estudiosSeleccionados = document.getElementById('estudios-seleccionados');
+    const emptyMessage = document.getElementById('empty-message');
+    const fechaInput = document.getElementById("id_fecha_del_informe");
+
+    // Establecer la fecha actual si el campo está vacío
+    if (fechaInput && !fechaInput.value) {
+        const hoy = new Date();
+        const dia = String(hoy.getDate()).padStart(2, '0');
+        const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+        const año = hoy.getFullYear();
+        fechaInput.value = `${año}-${mes}-${dia}`;
+    }
+
+    // Parsear datos
+    const estudios = JSON.parse('{{ estudios|escapejs }}');
+    const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+    let estudiosSeleccionadosIds = [];
+    let estudiosFiltrados = [];
+
+    // Función para actualizar el select original (hidden)
+    function actualizarSelectOriginal() {
+        Array.from(estudioSelectOriginal.options).forEach(opt => opt.selected = false);
+        estudiosSeleccionadosIds.forEach(id => {
+            const option = Array.from(estudioSelectOriginal.options).find(opt => opt.value == id);
+            if (option) option.selected = true;
+        });
+    }
+
+    // Función para renderizar tags de estudios seleccionados
+    function renderizarEstudiosSeleccionados() {
+        if (estudiosSeleccionadosIds.length === 0) {
+            emptyMessage.classList.remove('hidden');
+            estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        emptyMessage.classList.add('hidden');
+        estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
+        
+        estudiosSeleccionadosIds.forEach(id => {
+            const estudio = estudios.find(e => e.id == id);
+            if (!estudio) return;
+            
+            const tag = document.createElement('div');
+            tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
+            tag.innerHTML = `
+                <i class="fas fa-x-ray"></i>
+                <span>${estudio.nombre}</span>
+                <button type="button" 
+                        class="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                        onclick="eliminarEstudio(${id})">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            `;
+            estudiosSeleccionados.appendChild(tag);
+        });
+    }
+
+    // Función global para eliminar estudio
+    window.eliminarEstudio = function(id) {
+        estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
+        actualizarSelectOriginal();
+        renderizarEstudiosSeleccionados();
+    };
+
+    // Función para agregar estudio
+    function agregarEstudio(id) {
+        if (!estudiosSeleccionadosIds.includes(id)) {
+            estudiosSeleccionadosIds.push(id);
+            actualizarSelectOriginal();
+            renderizarEstudiosSeleccionados();
+        }
+        estudioSearch.value = '';
+        estudioDropdown.classList.add('hidden');
+    }
+
+    // Función para filtrar y mostrar estudios
+    function filtrarYMostrarEstudios(busqueda) {
+        const busquedaLower = busqueda.toLowerCase();
+        const resultados = estudiosFiltrados.filter(est => 
+            est.nombre.toLowerCase().includes(busquedaLower)
+        );
+
+        estudioDropdown.innerHTML = '';
+        
+        if (resultados.length === 0) {
+            estudioDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 italic">No se encontraron estudios</div>';
+        } else {
+            resultados.forEach(est => {
+                const yaSeleccionado = estudiosSeleccionadosIds.includes(est.id);
+                const item = document.createElement('div');
+                item.className = `px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors flex items-center justify-between ${yaSeleccionado ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}`;
+                item.innerHTML = `
+                    <span class="flex-1">${est.nombre}</span>
+                    ${yaSeleccionado ? '<i class="fas fa-check text-purple-600"></i>' : ''}
+                `;
+                item.addEventListener('click', () => {
+                    if (!yaSeleccionado) {
+                        agregarEstudio(est.id);
+                    }
+                });
+                estudioDropdown.appendChild(item);
+            });
+        }
+        
+        estudioDropdown.classList.remove('hidden');
+    }
+
+    // Función para cargar estudios según tipo
+    function cargarEstudios(tipoSeleccionado) {
+        estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+        
+        // Actualizar el select original
+        estudioSelectOriginal.innerHTML = '';
+        
+        if (estudiosFiltrados.length === 0) {
+            const option = document.createElement('option');
+            option.textContent = 'No hay estudios disponibles';
+            option.disabled = true;
+            estudioSelectOriginal.appendChild(option);
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'No hay estudios para este tipo';
+        } else {
+            estudiosFiltrados.forEach(est => {
+                const option = document.createElement('option');
+                option.value = est.id;
+                option.textContent = est.nombre;
+                estudioSelectOriginal.appendChild(option);
+            });
+            estudioSearch.disabled = false;
+            estudioSearch.placeholder = 'Buscar estudio para agregar...';
+            emptyMessage.innerHTML = '<i class="fas fa-search mr-1"></i>Busca y selecciona los estudios realizados';
+        }
+        
+        renderizarEstudiosSeleccionados();
+    }
+
+    // Event listeners
+    estudioSearch.addEventListener('input', function() {
+        if (this.value.length > 0) {
+            filtrarYMostrarEstudios(this.value);
+        } else {
+            estudioDropdown.classList.add('hidden');
+        }
+    });
+
+    estudioSearch.addEventListener('focus', function() {
+        if (this.value.length > 0) {
+            filtrarYMostrarEstudios(this.value);
+        }
+    });
+
+    // Evento cambio de tipo de estudio
+    tipoEstudioSelect.addEventListener('change', function() {
+        const tipoSeleccionado = this.value;
+        estudiosSeleccionadosIds = [];
+        
+        if (!tipoSeleccionado) {
+            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
+            emptyMessage.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar';
+            renderizarEstudiosSeleccionados();
+            return;
+        }
+        
+        cargarEstudios(tipoSeleccionado);
+    });
+
+    // Inicialización
+    if (tipoEstudioSeleccionado) {
+        tipoEstudioSelect.value = tipoEstudioSeleccionado;
+        const tipo = tiposIconos[tipoEstudioSeleccionado];
+        if (tipo) {
+            tipoEstudioText.textContent = tipo.text;
+        }
+        cargarEstudios(tipoEstudioSeleccionado);
+    }
+
+    // Cerrar dropdowns al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        // Cerrar dropdown de tipo de estudio
+        if (!tipoEstudioButton.contains(e.target) && !tipoEstudioDropdown.contains(e.target)) {
+            tipoEstudioDropdown.classList.add('hidden');
+            tipoEstudioIcon.classList.remove('rotate-180');
+        }
+        // Cerrar dropdown de estudios
+        if (!estudioSearch.contains(e.target) && !estudioDropdown.contains(e.target)) {
+            estudioDropdown.classList.add('hidden');
+        }
+    });
+
+    // Cerrar modales al hacer clic fuera
+    document.querySelectorAll('[id$="Modal"]').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.add('hidden');
+            }
+        });
+    });
+
+    // Aplicar estilos Tailwind a los campos del formulario de día sin pacientes
+    const modalFields = document.querySelectorAll('#modalFormSinPacientes input, #modalFormSinPacientes textarea');
+    modalFields.forEach(field => {
+        field.classList.add('w-full', 'px-3', 'py-2', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-blue-500', 'focus:border-blue-500', 'transition-colors');
+        field.classList.remove('form-control');
+    });
+});
+</script>
+{% endblock %}

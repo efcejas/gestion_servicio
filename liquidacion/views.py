@@ -52,9 +52,9 @@ class EstudiosListView(LoginRequiredMixin, ListView):
 class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
-    template_name = 'liquidacion/registroestudios_form.html'
-    success_url = reverse_lazy('registroestudios_nuevo')
-    success_message = "Registro realizado exitosamente"
+    template_name = 'liquidacion/registroestudios_form_tailwind.html'
+    success_url = reverse_lazy('liquidacion:registroestudios_nuevo')
+    success_message = "✅ Registro guardado exitosamente"
 
     def dispatch(self, request, *args, **kwargs):
         if not request.user.groups.filter(name='Médicos de staff - informes').exists():
@@ -77,11 +77,24 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
 
         context['tipo_estudio_seleccionado'] = tipo_estudio_seleccionado
         context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
-        context['registros'] = RegistroEstudiosPorMedico.objects.filter(
+        
+        # Registros del mes actual
+        registros = RegistroEstudiosPorMedico.objects.filter(
             medico=user,
             fecha_registro__year=today.year,
             fecha_registro__month=today.month
         ).order_by('-fecha_registro')
+        
+        context['registros'] = registros
+        
+        # Calcular total de regiones del mes
+        total_regiones_mes = sum(
+            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
+            for registro in registros
+            for estudio in registro.estudio.all()
+        )
+        context['total_regiones_mes'] = total_regiones_mes
+        
         context['form_dia_sin_pacientes'] = DiaSinPacientesForm()
 
         return context
@@ -89,6 +102,36 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     def form_valid(self, form):
         # Asignar el usuario logueado al campo 'medico'
         form.instance.medico = self.request.user
+        
+        # Verificar si ya existe un registro duplicado RECIENTE (últimos 5 minutos)
+        # Esto evita doble envío accidental pero permite registros legítimos posteriores
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        dni_paciente = form.cleaned_data['dni_paciente']
+        fecha_informe = form.cleaned_data['fecha_del_informe']
+        estudios_seleccionados = form.cleaned_data['estudio']
+        hace_5_minutos = timezone.now() - timedelta(minutes=5)
+        
+        # Buscar registros recientes (últimos 5 minutos) del mismo médico, paciente y fecha
+        registros_recientes = RegistroEstudiosPorMedico.objects.filter(
+            medico=self.request.user,
+            dni_paciente=dni_paciente,
+            fecha_del_informe=fecha_informe,
+            fecha_registro__gte=hace_5_minutos
+        )
+        
+        # Verificar si alguno tiene los mismos estudios
+        for registro in registros_recientes:
+            estudios_existentes = set(registro.estudio.all())
+            if estudios_existentes == set(estudios_seleccionados):
+                messages.warning(
+                    self.request, 
+                    f"⚠️ Ya registraste este mismo estudio hace menos de 5 minutos. "
+                    f"Si realmente necesitas crear otro registro, espera unos minutos."
+                )
+                return redirect(self.success_url)
+        
         return super().form_valid(form)
 
 class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
@@ -114,7 +157,7 @@ class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
 User = get_user_model()
 
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
-    template_name = 'liquidacion/registroestudios_list.html'
+    template_name = 'liquidacion/registroestudios_list_tailwind.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -241,7 +284,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
-    template_name = 'liquidacion/registroestudios_update.html'
+    template_name = 'liquidacion/registroestudios_update_tailwind.html'
 
     def get_queryset(self):
         # Filtra los registros que pertenecen al usuario logueado
@@ -266,7 +309,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
 
         # URL del botón cancelar: vuelve a la lista con mes/año filtrados
         fecha = registro.fecha_del_informe
-        context['cancel_url'] = f"{reverse('registroestudios_list')}?{urlencode({'mes': fecha.month, 'año': fecha.year})}"
+        context['cancel_url'] = f"{reverse('liquidacion:registroestudios_list')}?{urlencode({'mes': fecha.month, 'año': fecha.year})}"
 
         return context
 
@@ -279,12 +322,12 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Redirige a la lista con el mes y año del registro actualizado
         fecha = self.object.fecha_del_informe
         query_string = urlencode({'mes': fecha.month, 'año': fecha.year})
-        return f"{reverse('registroestudios_list')}?{query_string}"
+        return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
 
 class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroEstudiosPorMedico
-    template_name = 'liquidacion/registroestudios_confirm_delete.html'
-    success_url = reverse_lazy('registroestudios_list')
+    template_name = 'liquidacion/registroestudios_confirm_delete_tailwind.html'
+    success_url = reverse_lazy('liquidacion:registroestudios_list')
 
     def get_queryset(self):
         # Limita los registros a los del usuario logueado

@@ -1,0 +1,538 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}Mis Registros de Estudios{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- Header Hero con gradiente -->
+    <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl shadow-xl p-8 mb-6 text-white">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold mb-2">
+                    ¡Hola, {{ user.first_name }}!
+                </h1>
+                <p class="text-blue-100 text-lg">
+                    Gestiona tus registros de estudios del período: <strong>{{ mes }}</strong> de <strong>{{ año }}</strong>
+                </p>
+            </div>
+            <div class="mt-4 md:mt-0">
+                <a href="{% url 'liquidacion:registroestudios_nuevo' %}" 
+                   class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                    <i class="fas fa-plus-circle mr-2"></i>Nuevo Registro
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas Generales -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <!-- Card Total Registros -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-md p-5 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium">Total Registros</p>
+                    <p class="text-3xl font-bold mt-1">{{ registros_eco|length|add:registros_otros|length }}</p>
+                </div>
+                <div class="bg-white/20 rounded-full p-3">
+                    <i class="fas fa-file-medical text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Ecografías -->
+        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-md p-5 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-indigo-100 text-sm font-medium">Ecografías</p>
+                    <p class="text-3xl font-bold mt-1">{{ registros_eco|length }}</p>
+                </div>
+                <div class="bg-white/20 rounded-full p-3">
+                    <i class="fas fa-heartbeat text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Otros Estudios -->
+        <div class="bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg shadow-md p-5 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-teal-100 text-sm font-medium">Otros Estudios</p>
+                    <p class="text-3xl font-bold mt-1">{{ registros_otros|length }}</p>
+                </div>
+                <div class="bg-white/20 rounded-full p-3">
+                    <i class="fas fa-procedures text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card Total Regiones -->
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-md p-5 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-purple-100 text-sm font-medium">Total Regiones</p>
+                    <p class="text-3xl font-bold mt-1">{{ total_regiones_eco|add:total_regiones_otros }}</p>
+                </div>
+                <div class="bg-white/20 rounded-full p-3">
+                    <i class="fas fa-layer-group text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de Filtros Mejorado -->
+    <div class="bg-white rounded-xl shadow-md mb-6">
+        <!-- Header colapsable -->
+        <button type="button" id="toggle-filtros" class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-t-xl">
+            <div class="flex items-center">
+                <div class="bg-indigo-100 text-indigo-600 rounded-lg p-2 mr-3">
+                    <i class="fas fa-sliders-h"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800">Filtros y Búsqueda</h2>
+                    <p class="text-sm text-gray-500">Refina tus resultados</p>
+                </div>
+            </div>
+            <i class="fas fa-chevron-down text-gray-400 transition-transform" id="filtros-icon"></i>
+        </button>
+
+        <!-- Contenido de filtros -->
+        <div id="filtros-content" class="px-6 pb-6 border-t border-gray-100">
+            <form method="get" class="mt-4">
+                {% csrf_token %}
+                
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <!-- Búsqueda rápida - más prominente -->
+                    <div class="md:col-span-12">
+                        <label for="id_busqueda" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-search text-indigo-500"></i> Búsqueda rápida por paciente (nombre, apellido o DNI)
+                        </label>
+                        <div class="relative">
+                            {{ form.busqueda }}
+                            <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                                <i class="fas fa-search"></i>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Filtros de fecha -->
+                    <div class="md:col-span-3">
+                        <label for="id_mes" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar text-blue-500"></i> Mes
+                        </label>
+                        {{ form.mes }}
+                    </div>
+                    
+                    <div class="md:col-span-3">
+                        <label for="id_año" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar-alt text-blue-500"></i> Año
+                        </label>
+                        {{ form.año }}
+                    </div>
+                    
+                    <!-- Ordenamiento -->
+                    <div class="md:col-span-4">
+                        <label for="id_orden" class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-sort text-purple-500"></i> Ordenar resultados
+                        </label>
+                        {{ form.orden }}
+                    </div>
+                    
+                    <!-- Botón Aplicar -->
+                    <div class="md:col-span-2 flex items-end">
+                        <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2.5 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                            <i class="fas fa-filter mr-2"></i>Aplicar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtros rápidos -->
+                <div class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-gray-100">
+                    <span class="text-sm font-medium text-gray-600 self-center mr-2">Acceso rápido:</span>
+                    <a href="?filtro_rapido=hoy" 
+                       class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                              {% if filtro_rapido == 'hoy' %}bg-blue-600 text-white shadow-md{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
+                        <i class="fas fa-calendar-day mr-1.5"></i>Registros de hoy
+                    </a>
+                    <a href="?mes={{ mes_num }}&año={{ año_num }}" 
+                       class="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
+                        <i class="fas fa-sync-alt mr-1.5"></i>Restablecer filtros
+                    </a>
+                    {% if filtro_rapido_label and filtro_rapido == 'hoy' %}
+                    <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-green-100 text-green-800 text-sm font-medium">
+                        <i class="fas fa-check-circle mr-1.5"></i>Filtro activo: {{ filtro_rapido_label }}
+                    </span>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabs para alternar entre tipos de estudios -->
+    <div class="mb-6">
+        <div class="border-b border-gray-200">
+            <nav class="flex gap-2" aria-label="Tabs">
+                <button type="button" id="tab-ecografias" 
+                        class="tab-button active px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
+                        onclick="cambiarTab('ecografias')">
+                    <i class="fas fa-heartbeat mr-2"></i>
+                    Ecografías
+                    <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{{ registros_eco|length }}</span>
+                </button>
+                <button type="button" id="tab-otros" 
+                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
+                        onclick="cambiarTab('otros')">
+                    <i class="fas fa-procedures mr-2"></i>
+                    RAD / TOM / RES
+                    <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">{{ registros_otros|length }}</span>
+                </button>
+            </nav>
+        </div>
+    </div>
+
+    <!-- Contenedor de tablas con margen consistente -->
+    <div class="mb-6">
+        <!-- Tabla de Ecografías -->
+        <div id="tabla-ecografias" class="bg-white rounded-lg shadow-md overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-700 to-blue-600 text-white px-6 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h3 class="text-xl font-bold">Ecografías</h3>
+                    <p class="text-blue-100 text-sm mt-1">
+                        <strong>{{ mes }}</strong> de <strong>{{ año }}</strong>
+                    </p>
+                </div>
+                <div class="mt-3 md:mt-0 text-left md:text-right">
+                    <p class="text-sm">
+                        <span class="font-semibold">Pacientes:</span> 
+                        <span class="bg-white/20 px-2 py-1 rounded">{{ registros_eco|length }}</span>
+                    </p>
+                    <p class="text-sm mt-1">
+                        <span class="font-semibold">Regiones:</span> 
+                        <span class="bg-white/20 px-2 py-1 rounded">{{ total_regiones_eco }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                               class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
+                                Paciente
+                                {% if orden == 'paciente_asc' %}
+                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                {% elif orden == 'paciente_desc' %}
+                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            DNI
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                               class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
+                                Fecha del Informe
+                                {% if orden == 'fecha_asc' %}
+                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                {% elif orden == 'fecha_desc' %}
+                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Estudios
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Regiones
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Acciones
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for registro in registros_eco %}
+                    <tr class="hover:bg-blue-50 transition-colors">
+                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+                            {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">
+                            {{ registro.dni_paciente }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                            {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">
+                            {{ registro.estudio.all|join:", " }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">
+                            {{ registro.total_regiones }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
+                                   title="Editar registro">
+                                    <i class="fas fa-edit text-sm"></i>
+                                </a>
+                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
+                                   title="Eliminar registro"
+                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                    <i class="fas fa-trash-alt text-sm"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                            <p>No se encontraron registros de ecografía para el período seleccionado</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        </div>
+
+        <!-- Tabla de Otros Estudios (RAD, TOM, RES) -->
+        <div id="tabla-otros" class="bg-white rounded-lg shadow-md overflow-hidden hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-teal-600 to-teal-500 text-white px-6 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h3 class="text-xl font-bold">Radiografía, Tomografía y Resonancia</h3>
+                    <p class="text-teal-100 text-sm mt-1">
+                        <strong>{{ mes }}</strong> de <strong>{{ año }}</strong>
+                    </p>
+                </div>
+                <div class="mt-3 md:mt-0 text-left md:text-right">
+                    <p class="text-sm">
+                        <span class="font-semibold">Pacientes:</span> 
+                        <span class="bg-white/20 px-2 py-1 rounded">{{ registros_otros|length }}</span>
+                    </p>
+                    <p class="text-sm mt-1">
+                        <span class="font-semibold">Regiones:</span> 
+                        <span class="bg-white/20 px-2 py-1 rounded">{{ total_regiones_otros }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla -->
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th scope="col" class="px-4 py-3 text-left">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                               class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
+                                Paciente
+                                {% if orden == 'paciente_asc' %}
+                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
+                                {% elif orden == 'paciente_desc' %}
+                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            DNI
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                               class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
+                                Fecha del Informe
+                                {% if orden == 'fecha_asc' %}
+                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
+                                {% elif orden == 'fecha_desc' %}
+                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
+                                {% else %}
+                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                {% endif %}
+                            </a>
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Estudios
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Regiones
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                            Acciones
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for registro in registros_otros %}
+                    <tr class="hover:bg-teal-50 transition-colors">
+                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+                            {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">
+                            {{ registro.dni_paciente }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                            {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">
+                            {{ registro.estudio.all|join:", " }}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">
+                            {{ registro.total_regiones }}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
+                                   title="Editar registro">
+                                    <i class="fas fa-edit text-sm"></i>
+                                </a>
+                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
+                                   title="Eliminar registro"
+                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                    <i class="fas fa-trash-alt text-sm"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                            <p>No se encontraron registros de otros estudios para el período seleccionado</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+    <!-- Fin contenedor de tablas -->
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Aplicar clases Tailwind a los campos del formulario
+        const formFields = document.querySelectorAll('#id_busqueda, #id_mes, #id_año, #id_orden');
+        formFields.forEach(field => {
+            field.classList.add('w-full', 'px-4', 'py-2.5', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-indigo-500', 'focus:border-transparent', 'transition-all', 'text-gray-700');
+            field.classList.remove('form-control', 'form-control-sm', 'form-select', 'form-select-sm');
+        });
+
+        // Toggle filtros colapsable
+        const toggleFiltros = document.getElementById('toggle-filtros');
+        const filtrosContent = document.getElementById('filtros-content');
+        const filtrosIcon = document.getElementById('filtros-icon');
+        
+        toggleFiltros.addEventListener('click', function() {
+            filtrosContent.classList.toggle('hidden');
+            filtrosIcon.classList.toggle('rotate-180');
+        });
+
+        // Búsqueda en tiempo real (filtrado de filas)
+        const busquedaInput = document.getElementById('id_busqueda');
+        if (busquedaInput) {
+            // Añadir indicador visual de búsqueda activa
+            busquedaInput.addEventListener('input', function() {
+                const valor = this.value.toLowerCase();
+                const todasLasFilas = document.querySelectorAll('tbody tr');
+                let resultadosVisibles = 0;
+                
+                todasLasFilas.forEach(function(fila) {
+                    // Skip empty state rows
+                    if (fila.querySelector('td[colspan]')) {
+                        return;
+                    }
+                    
+                    const texto = fila.textContent.toLowerCase();
+                    if (texto.includes(valor) || valor === '') {
+                        fila.style.display = '';
+                        resultadosVisibles++;
+                    } else {
+                        fila.style.display = 'none';
+                    }
+                });
+
+                // Feedback visual
+                if (valor !== '' && resultadosVisibles === 0) {
+                    busquedaInput.classList.add('border-red-500', 'focus:ring-red-500');
+                } else {
+                    busquedaInput.classList.remove('border-red-500', 'focus:ring-red-500');
+                }
+            });
+        }
+    });
+
+    // Función para cambiar entre tabs
+    function cambiarTab(tipo) {
+        const tabEco = document.getElementById('tab-ecografias');
+        const tabOtros = document.getElementById('tab-otros');
+        const tablaEco = document.getElementById('tabla-ecografias');
+        const tablaOtros = document.getElementById('tabla-otros');
+
+        if (tipo === 'ecografias') {
+            // Activar tab ecografías
+            tabEco.classList.add('active', 'border-blue-600', 'text-blue-600', 'bg-blue-50');
+            tabEco.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            
+            // Desactivar tab otros
+            tabOtros.classList.remove('active', 'border-teal-600', 'text-teal-600', 'bg-teal-50');
+            tabOtros.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            
+            // Mostrar/ocultar tablas
+            tablaEco.classList.remove('hidden');
+            tablaOtros.classList.add('hidden');
+        } else {
+            // Activar tab otros
+            tabOtros.classList.add('active', 'border-teal-600', 'text-teal-600', 'bg-teal-50');
+            tabOtros.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            
+            // Desactivar tab ecografías
+            tabEco.classList.remove('active', 'border-blue-600', 'text-blue-600', 'bg-blue-50');
+            tabEco.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+            
+            // Mostrar/ocultar tablas
+            tablaOtros.classList.remove('hidden');
+            tablaEco.classList.add('hidden');
+        }
+    }
+</script>
+
+<style>
+    /* Estilos para tabs */
+    .tab-button {
+        border-bottom-color: transparent;
+    }
+    
+    .tab-button.active {
+        border-bottom-width: 3px;
+    }
+    
+    .tab-button:not(.active) {
+        color: #6B7280;
+        border-bottom-color: transparent;
+    }
+    
+    .tab-button:not(.active):hover {
+        color: #374151;
+        background-color: #F9FAFB;
+    }
+</style>
+{% endblock %}
