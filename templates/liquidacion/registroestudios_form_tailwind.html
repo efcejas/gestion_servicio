@@ -268,7 +268,7 @@
 
         <!-- Columna derecha: Registros realizados hoy -->
         <div>
-            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-full">
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden" style="height: 680px; display: flex; flex-direction: column;">
                 <div class="bg-gradient-to-r from-teal-600 to-cyan-600 px-6 py-4">
                     <h2 class="text-xl font-bold text-white flex items-center">
                         <i class="fas fa-history mr-3"></i>Registros de Hoy
@@ -276,9 +276,9 @@
                     </h2>
                 </div>
                 
-                <div class="p-6">
+                <div class="p-6 flex-1 overflow-y-auto">
                     {% if registros %}
-                        <div class="overflow-y-auto" style="max-height: 500px;">
+                        <div class="space-y-3">
                             <div class="space-y-3">
                                 {% for registro in registros %}
                                 <div class="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 hover:shadow-md transition-all">
@@ -302,7 +302,6 @@
                                 </div>
                                 {% endfor %}
                             </div>
-                        </div>
                     {% else %}
                         <div class="text-center py-12">
                             <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">

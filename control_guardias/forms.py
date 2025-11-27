@@ -7,7 +7,9 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         queryset=MedicoGuardia.objects.select_related('user').order_by('user__last_name', 'user__first_name'), 
         required=False,
         label="Médico",
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={
+            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }),
         empty_label="Todos los médicos"
     )
     mes = forms.ChoiceField(
@@ -19,14 +21,18 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         required=False,
         label="Mes",
         initial=datetime.now().month,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={
+            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }),
     )
     año = forms.ChoiceField(
         choices=[(i, i) for i in range(2000, 2031)],
         required=False,
         label="Año",
         initial=datetime.now().year,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={
+            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }),
     )
     
     def __init__(self, *args, **kwargs):
@@ -38,9 +44,16 @@ class GuardiaForm(forms.ModelForm):
         model = Guardia
         fields = ['franja_horaria', 'medico', 'fecha']
         widgets = {
-            'franja_horaria': forms.Select(attrs={'class': 'mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'}),
-            'medico': forms.Select(attrs={'class': 'mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'}),
-            'fecha': forms.DateInput(attrs={'class': 'mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 shadow-sm focus:border-indigo-500 focus:ring-indigo-500', 'type': 'date'}),
+            'franja_horaria': forms.Select(attrs={
+                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            }),
+            'medico': forms.Select(attrs={
+                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            }),
+            'fecha': forms.DateInput(attrs={
+                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'type': 'date'
+            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -57,12 +70,16 @@ class FiltroMisGuardiasForm(forms.Form):
         required=False,
         label="Mes",
         initial=datetime.now().month,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={
+            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }),
     )
     año = forms.ChoiceField(
         choices=[(i, i) for i in range(2000, 2031)],
         required=False,
         label="Año",
         initial=datetime.now().year,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={
+            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+        }),
     )

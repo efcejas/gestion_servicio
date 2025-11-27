@@ -33,6 +33,14 @@ from openpyxl.styles import Alignment, Font
 from django.utils.timezone import now
 from openpyxl import Workbook
 from django.urls import reverse
+
+# ===== PORTAL ADMINISTRATIVO (Sin Login) =====
+
+class PortalLiquidacionInicioView(TemplateView):
+    """Vista de inicio del portal administrativo de liquidación"""
+    template_name = 'liquidacion/portal_inicio.html'
+
+# ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 
@@ -135,9 +143,9 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         return super().form_valid(form)
 
 class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
-    template_name = 'liquidacion/registroestudios_form.html'
+    template_name = 'liquidacion/registroestudios_form_tailwind.html'
     form_class = DiaSinPacientesForm
-    success_url = reverse_lazy('registroestudios_nuevo')  # Redirigir a la página de registro de estudios
+    success_url = reverse_lazy('liquidacion:registroestudios_nuevo')  # Redirigir a la página de registro de estudios
 
     def form_valid(self, form):
         fecha = form.cleaned_data['fecha']
@@ -336,9 +344,9 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
 class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = RegistroProcedimientosIntervensionismo
     form_class = RegistroProcedimientosIntervensionismoCreateViewForm
-    template_name = 'liquidacion/procedimientos_intervensionismo_form.html'
-    success_url = reverse_lazy('procedimientos_intervensionismo')
-    success_message = "Registro realizado exitosamente"
+    template_name = 'liquidacion/procedimientos_intervensionismo_form_tailwind.html'
+    success_url = reverse_lazy('liquidacion:procedimientos_intervensionismo')
+    success_message = "✅ Procedimiento registrado exitosamente"
 
     def form_valid(self, form):
         form.instance.medico = self.request.user
@@ -352,7 +360,7 @@ class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMe
 
 class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
     model = RegistroProcedimientosIntervensionismo
-    template_name = 'liquidacion/procedimientos_intervensionismo_list.html'
+    template_name = 'liquidacion/procedimientos_intervensionismo_list_tailwind.html'
     context_object_name = 'registros'
 
     def get_context_data(self, **kwargs):
@@ -394,16 +402,16 @@ class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
 class ProcedimientosIntervensionismoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroProcedimientosIntervensionismo
     form_class = RegistroProcedimientosIntervensionismoCreateViewForm
-    template_name = 'liquidacion/procedimientos_intervensionismo_update.html'
-    success_url = reverse_lazy('mis_procedimientos')
+    template_name = 'liquidacion/procedimientos_intervensionismo_update_tailwind.html'
+    success_url = reverse_lazy('liquidacion:mis_procedimientos')
 
     def get_queryset(self):
         return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
 
 class ProcedimientosIntervensionismoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroProcedimientosIntervensionismo
-    template_name = 'liquidacion/procedimientos_intervensionismo_confirm_delete.html'
-    success_url = reverse_lazy('mis_procedimientos')
+    template_name = 'liquidacion/procedimientos_intervensionismo_confirm_delete_tailwind.html'
+    success_url = reverse_lazy('liquidacion:mis_procedimientos')
 
     def get_queryset(self):
         return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
@@ -411,7 +419,7 @@ class ProcedimientosIntervensionismoDeleteView(LoginRequiredMixin, DeleteView):
 # Vistas para quienes consultan la liquidación sin loguearse
 
 class InformadosPorMedicoPorMesListView(TemplateView):
-    template_name = 'liquidacion/informados_por_medico_por_mes.html'
+    template_name = 'liquidacion/informados_por_medico_por_mes_tailwind.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -456,7 +464,7 @@ class InformadosPorMedicoPorMesListView(TemplateView):
 User = get_user_model()
 
 class EcografiasPorMedicoPorMesListView(TemplateView):
-    template_name = 'liquidacion/ecografias_por_medico_por_mes.html'
+    template_name = 'liquidacion/ecografias_por_medico_por_mes_tailwind.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -559,7 +567,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
         return context
 
 class ProcedimientosPorMedicoPorMesListView(TemplateView):
-    template_name = 'liquidacion/procedimientos_por_medico_por_mes.html'
+    template_name = 'liquidacion/procedimientos_por_medico_por_mes_tailwind.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -1,11 +1,35 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base_tailwind.html" %}
 
 {% block title %}Página no encontrada{% endblock %}
 
 {% block content %}
-<div class="container text-center py-5">
-    <h1 style="color: #164569;">404</h1>
-    <p>Lo sentimos, la página que buscas no existe.</p>
-    <a href="{% url 'home' %}" class="btn btn-custom" style="max-width: 45%;">Volver al inicio</a>
+<div class="container mx-auto flex min-h-[calc(100vh-200px)] max-w-2xl items-center justify-center px-4 py-12">
+    <div class="w-full text-center">
+        <div class="mb-8">
+            <h1 class="mb-4 text-9xl font-bold text-blue-900">404</h1>
+            <div class="mb-6 flex justify-center">
+                <div class="inline-flex h-32 w-32 items-center justify-center rounded-full bg-blue-50">
+                    <svg class="h-20 w-20 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="mb-8">
+            <h2 class="mb-4 text-2xl font-semibold text-gray-800">
+                Página no encontrada
+            </h2>
+            <p class="text-gray-600">
+                Lo sentimos, la página que buscas no existe o fue movida.
+            </p>
+        </div>
+        <a href="{% url 'home' %}" 
+           class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-3 text-center text-sm font-semibold text-white shadow-md transition-all hover:from-blue-700 hover:to-cyan-700 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            Volver al inicio
+        </a>
+    </div>
 </div>
 {% endblock %}

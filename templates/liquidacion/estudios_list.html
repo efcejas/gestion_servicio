@@ -1,45 +1,57 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base_tailwind.html" %}
 {% block title %}Listado de Estudios{% endblock %}
 
 {% block content %}
-<div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center py-3">
-        <h3 class="mb-0">Listado de estudios</h3>
-        <a href="{% url 'estudios_nuevo' %}" class="btn btn-success">
-            <i class="bi bi-plus-circle"></i> Agregar Estudio
+<div class="container mx-auto max-w-7xl px-4 py-6">
+    <div class="mb-6 flex items-center justify-between">
+        <h3 class="text-2xl font-bold text-gray-800 dark:text-white">Listado de estudios</h3>
+        <a href="{% url 'estudios_nuevo' %}" 
+           class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-4 focus:ring-green-300 dark:focus:ring-green-800">
+            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
+            </svg>
+            Agregar Estudio
         </a>
     </div>
-    <div class="container">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-        {% if estudios %}
-        <table class="table table-striped table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    <th>Práctica</th>
-                    <th>Modalidad</th>
-                    <th>Cantidad de regiones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for estudio in estudios %}
-                <tr>
-                    <td>{{ estudio.nombre }}</td>
-                    <td>{{ estudio.get_tipo_display }}</td>
-                    <td>{{ estudio.conteo_regiones }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <div class="text-center py-5">
-            <p class="lead text-muted">No hay estudios cargados en el sistema.</p>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mb-4 rounded-lg border border-{{ message.tags }}-300 bg-{{ message.tags }}-50 p-4 text-{{ message.tags }}-800 dark:border-{{ message.tags }}-800 dark:bg-gray-800 dark:text-{{ message.tags }}-400">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    {% if estudios %}
+    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow dark:border-gray-700 dark:bg-gray-800">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-700 dark:text-gray-300">
+                <thead class="bg-gray-800 text-xs uppercase text-white dark:bg-gray-700">
+                    <tr>
+                        <th scope="col" class="px-6 py-3">Práctica</th>
+                        <th scope="col" class="px-6 py-3">Modalidad</th>
+                        <th scope="col" class="px-6 py-3">Cantidad de regiones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for estudio in estudios %}
+                    <tr class="border-b border-gray-200 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 font-medium">{{ estudio.nombre }}</td>
+                        <td class="px-6 py-4">{{ estudio.get_tipo_display }}</td>
+                        <td class="px-6 py-4">{{ estudio.conteo_regiones }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% endif %}
     </div>
-    {% endblock %}
+    {% else %}
+    <div class="rounded-lg border border-gray-200 bg-white p-12 text-center shadow dark:border-gray-700 dark:bg-gray-800">
+        <svg class="mx-auto mb-4 h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <p class="text-lg text-gray-500 dark:text-gray-400">No hay estudios cargados en el sistema.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

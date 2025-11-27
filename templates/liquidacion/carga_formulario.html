@@ -89,7 +89,7 @@
 
 
     <!-- Formulario de confirmación -->
-    <form method="post" action="{% url 'carga-masiva' %}">
+    <form method="post" action="{% url 'liquidacion:carga-masiva' %}">
         {% csrf_token %}
         <input type="hidden" name="datos_serializados" value='{{ registros_json|escape }}'>
         <details class="mt-4 text-xs text-gray-500 dark:text-gray-400">
@@ -97,7 +97,7 @@
             <pre class="overflow-x-auto break-words whitespace-pre-wrap mt-2">{{ registros_json }}</pre>
         </details>
         <div class="flex flex-col sm:flex-row gap-3">
-            <a href="{% url 'carga-masiva' %}" class="mt-6 sm:mt-6 flex-1 flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-center">
+            <a href="{% url 'liquidacion:carga-masiva' %}" class="mt-6 sm:mt-6 flex-1 flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 text-center">
                 Cancelar
             </a>
             <button type="submit" class="mt-6 flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">

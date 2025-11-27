@@ -1,0 +1,268 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Informes por Médico y Mes - Portal de Liquidación{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 max-w-7xl">
+
+    <!-- Header de la sección -->
+    <div class="bg-gradient-to-r from-emerald-600 to-green-600 rounded-xl lg:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 mb-4 lg:mb-6 text-white">
+        <div class="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left">
+            <div>
+                <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold mb-1 lg:mb-2">Informes por Médico y Mes</h1>
+                <p class="text-emerald-100 text-sm sm:text-base lg:text-lg">
+                    Conteo mensual de regiones informadas (RAD, TOM, RES)
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {% csrf_token %}
+            
+            <!-- Médico -->
+            <div class="md:col-span-2 relative">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-user-md text-emerald-600 mr-1"></i>Médico
+                </label>
+                <div class="hidden">{{ form.medico }}</div>
+                <button type="button" id="medicoButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
+                    <span id="medicoText" class="text-gray-700">Todos los médicos</span>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="medicoIcon"></i>
+                </button>
+                <div id="medicoDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
+                    <!-- Opciones cargadas por JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Mes -->
+            <div class="relative">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-calendar-alt text-blue-600 mr-1"></i>Mes
+                </label>
+                <div class="hidden">{{ form.mes }}</div>
+                <button type="button" id="mesButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
+                    <span id="mesText" class="text-gray-700">Seleccione mes</span>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="mesIcon"></i>
+                </button>
+                <div id="mesDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
+                    <!-- Opciones cargadas por JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Año -->
+            <div class="relative">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-calendar text-purple-600 mr-1"></i>Año
+                </label>
+                <div class="hidden">{{ form.año }}</div>
+                <button type="button" id="añoButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
+                    <span id="añoText" class="text-gray-700">Seleccione año</span>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="añoIcon"></i>
+                </button>
+                <div id="añoDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
+                    <!-- Opciones cargadas por JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Botón Consultar -->
+            <div class="md:col-span-4 flex justify-end">
+                <button type="submit" 
+                        class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-lg hover:from-emerald-700 hover:to-green-700 transition-all font-semibold shadow-md hover:shadow-lg">
+                    Consultar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Resultados -->
+    {% if medico_data %}
+        {% for data in medico_data %}
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
+            
+            <!-- Header del médico -->
+            <div class="bg-gradient-to-r from-emerald-100 to-green-100 px-6 py-5 border-b border-emerald-200">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
+                            <i class="fas fa-user-circle text-emerald-600 mr-2"></i>
+                            {{ data.medico.first_name }} {{ data.medico.last_name }}
+                        </h2>
+                        <p class="text-gray-600 text-sm flex items-center">
+                            <i class="fas fa-envelope text-gray-500 mr-2"></i>
+                            {{ data.medico.email }}
+                        </p>
+                    </div>
+                    <div class="mt-3 md:mt-0">
+                        <div class="inline-flex items-center px-5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl shadow-md">
+                            <i class="fas fa-chart-bar text-2xl mr-3"></i>
+                            <div class="text-left">
+                                <p class="text-xs text-emerald-100 uppercase font-semibold">Total Regiones</p>
+                                <p class="text-3xl font-bold">{{ data.total_regiones }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabla de registros -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-user mr-1"></i>Paciente
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-id-card mr-1"></i>DNI
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-x-ray mr-1"></i>Estudio
+                            </th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-calendar-check mr-1"></i>Fecha Informe
+                            </th>
+                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <i class="fas fa-layer-group mr-1"></i>Regiones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for registro in data.registros %}
+                        <tr class="hover:bg-emerald-50 transition-colors">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                                {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600">
+                                {{ registro.dni_paciente|default:"-" }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                                {{ registro.estudio.all|join:", " }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                                {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-emerald-100 text-emerald-800">
+                                    {{ registro.total_regiones }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-emerald-50 border-t-2 border-emerald-300">
+                        <tr>
+                            <td colspan="4" class="px-4 py-4 text-sm font-bold text-gray-800 uppercase">
+                                <i class="fas fa-calculator mr-2 text-emerald-600"></i>Total de Regiones
+                            </td>
+                            <td class="px-4 py-4 text-center">
+                                <span class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xl font-bold bg-emerald-600 text-white shadow-md">
+                                    {{ data.total_regiones }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Botón de exportar -->
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end">
+                <a href="{% url 'liquidacion:exportar_excel_informes' %}?medico={{ data.medico.id }}&mes={{ form.mes.value }}&año={{ form.año.value }}" 
+                   class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg">
+                    <i class="fas fa-file-excel mr-2"></i>Descargar Excel
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-12">
+            <div class="text-center">
+                <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-search text-gray-400 text-4xl"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Sin resultados</h3>
+                <p class="text-gray-600">
+                    Seleccione un médico y un mes para consultar los informes realizados
+                </p>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Aplicando estilos Tailwind a formularios...');
+        
+        // Función para crear dropdown personalizado
+        function crearDropdown(selectId, buttonId, textId, iconId, dropdownId) {
+            const select = document.getElementById(selectId);
+            const button = document.getElementById(buttonId);
+            const text = document.getElementById(textId);
+            const icon = document.getElementById(iconId);
+            const dropdown = document.getElementById(dropdownId);
+            
+            if (!select || !button) return;
+            
+            // Cargar opciones
+            const opciones = Array.from(select.options);
+            dropdown.innerHTML = '';
+            
+            opciones.forEach(option => {
+                const div = document.createElement('div');
+                div.className = 'px-4 py-2.5 hover:bg-emerald-50 cursor-pointer transition-colors text-sm';
+                div.textContent = option.text;
+                div.dataset.value = option.value;
+                
+                if (option.selected) {
+                    text.textContent = option.text;
+                    div.classList.add('bg-emerald-100', 'font-semibold');
+                }
+                
+                div.addEventListener('click', function() {
+                    select.value = this.dataset.value;
+                    text.textContent = this.textContent;
+                    dropdown.classList.add('hidden');
+                    icon.classList.remove('rotate-180');
+                    
+                    // Actualizar estilo seleccionado
+                    dropdown.querySelectorAll('div').forEach(d => {
+                        d.classList.remove('bg-emerald-100', 'font-semibold');
+                    });
+                    this.classList.add('bg-emerald-100', 'font-semibold');
+                });
+                
+                dropdown.appendChild(div);
+            });
+            
+            // Toggle dropdown
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dropdown.classList.toggle('hidden');
+                icon.classList.toggle('rotate-180');
+                
+                // Cerrar otros dropdowns
+                document.querySelectorAll('[id$="Dropdown"]').forEach(d => {
+                    if (d !== dropdown) d.classList.add('hidden');
+                });
+                document.querySelectorAll('[id$="Icon"]').forEach(i => {
+                    if (i !== icon) i.classList.remove('rotate-180');
+                });
+            });
+        }
+        
+        // Crear los 3 dropdowns
+        crearDropdown('id_medico', 'medicoButton', 'medicoText', 'medicoIcon', 'medicoDropdown');
+        crearDropdown('id_mes', 'mesButton', 'mesText', 'mesIcon', 'mesDropdown');
+        crearDropdown('id_año', 'añoButton', 'añoText', 'añoIcon', 'añoDropdown');
+        
+        // Cerrar dropdowns al hacer clic fuera
+        document.addEventListener('click', function() {
+            document.querySelectorAll('[id$="Dropdown"]').forEach(d => d.classList.add('hidden'));
+            document.querySelectorAll('[id$="Icon"]').forEach(i => i.classList.remove('rotate-180'));
+        });
+    });
+</script>
+{% endblock %}

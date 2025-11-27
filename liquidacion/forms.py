@@ -63,7 +63,7 @@ class FiltroMedicoMesForm(forms.Form):
         queryset=User.objects.filter(groups__name='Médicos de staff - informes').order_by('last_name', 'first_name'),
         required=False,
         label="Médico",
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={}),
         empty_label="Todos los médicos"
     )
     mes = forms.ChoiceField(
@@ -75,14 +75,14 @@ class FiltroMedicoMesForm(forms.Form):
         required=False,
         label="Mes",
         initial=datetime.now().month,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={}),
     )
     año = forms.ChoiceField(
         choices=[(i, i) for i in range(2000, 2031)],
         required=False,
         label="Año",
         initial=datetime.now().year,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
+        widget=forms.Select(attrs={}),
     )
 
     def __init__(self, *args, **kwargs):

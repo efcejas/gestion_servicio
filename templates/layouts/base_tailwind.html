@@ -173,13 +173,15 @@
                     </a>
                     {% endif %}
 
-                    <!-- Calendario de Guardias -->
+                    <!-- Calendario de Guardias (solo superusuarios) -->
+                    {% if user.is_superuser %}
                     {% url 'control_guardias:calendario_guardias_full_tw' as guardias_url %}
                     {% if guardias_url %}
                     <a href="{{ guardias_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
                         <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
                     </a>
+                    {% endif %}
                     {% endif %}
 
                     <!-- Eventos del Servicio -->
@@ -211,26 +213,6 @@
 
                     <!-- ========== ADMINISTRATIVO - SANATORIO (PEDIDOS) ========== -->
                     {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
-                        <!-- Pedidos de Estudios -->
-                        {% url 'pedidos_estudios:crear_pedido' as crear_pedido_url %}
-                        {% if crear_pedido_url %}
-                        <a href="{{ crear_pedido_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Nuevo Pedido
-                            {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-
-                        {% url 'pedidos_estudios:lista_pedidos' as lista_pedidos_url %}
-                        {% if lista_pedidos_url %}
-                        <a href="{{ lista_pedidos_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                            <i class="fas fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Solicitados
-                        </a>
-                        {% endif %}
-
                         <!-- Reportes -->
                         {% url 'gestion_eventos:eventos_administrativos' as reportes_url %}
                         {% if reportes_url %}
@@ -257,18 +239,6 @@
                             </a>
                             {% endif %}
 
-                            <!-- Estudios Pendientes -->
-                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
-                            {% if pedidos_url %}
-                            <a href="{{ pedidos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
-                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
                         <!-- TÉCNICO RADIÓLOGO / JEFE TÉCNICO -->
                         {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
                             <!-- Novedades -->
@@ -283,33 +253,7 @@
                             </a>
                             {% endif %}
 
-                            <!-- Estudios Pendientes -->
-                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
-                            {% if pedidos_url %}
-                            <a href="{{ pedidos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
-                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
                         <!-- ENFERMEROS / JEFE DE ENFERMERÍA -->
-                        {% elif user.cargo == 'enfermero/a' or user.cargo == 'jefe de enfermería' %}
-                            <!-- Estudios Pendientes -->
-                            {% url 'pedidos_estudios:lista_pedidos' as pedidos_url %}
-                            {% if pedidos_url %}
-                            <a href="{{ pedidos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-file-alt mr-2 group-hover:scale-110 transition-transform"></i>Estudios Pendientes
-                                {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                        <!-- MÉDICOS DE STAFF - INFORMES -->
                         {% elif user|has_group:"Médicos de staff - informes" %}
                             <!-- Registrar Estudios -->
                             {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}

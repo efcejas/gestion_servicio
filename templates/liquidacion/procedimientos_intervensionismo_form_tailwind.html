@@ -1,0 +1,272 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}Procedimientos de Intervencionismo{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+
+    <!-- Header Hero -->
+    <div class="bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 rounded-xl shadow-xl p-8 mb-6 text-white">
+        <div class="flex items-center">
+            <div class="bg-white/20 rounded-full p-4 mr-4">
+                <i class="fas fa-syringe text-4xl"></i>
+            </div>
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold mb-1">
+                    Procedimientos de Intervencionismo
+                </h1>
+                <p class="text-cyan-100 text-lg">
+                    Dr. {{ user.get_full_name }} - Registro de procedimientos realizados
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layout de 2 columnas: Formulario + Registros recientes -->
+    <div class="grid grid-cols-1 xl:grid-cols-5 gap-6">
+        
+        <!-- Columna izquierda: Formulario (2/5) -->
+        <div class="xl:col-span-2">
+            <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden sticky top-6">
+                <div class="bg-gradient-to-r from-cyan-600 to-teal-600 px-5 py-3">
+                    <h2 class="text-lg font-bold text-white flex items-center">
+                        <i class="fas fa-plus-circle mr-2"></i>Nuevo Procedimiento
+                    </h2>
+                </div>
+                
+                <form method="post" id="form-procedimiento" class="p-5">
+                    {% csrf_token %}
+                    
+                    <!-- Datos del Paciente -->
+                    <div class="mb-5">
+                        <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 flex items-center">
+                            <i class="fas fa-user text-cyan-500 mr-1.5 text-sm"></i>Paciente
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Nombre *
+                                </label>
+                                {{ form.nombre_paciente }}
+                            </div>
+                            
+                            <div>
+                                <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Apellido *
+                                </label>
+                                {{ form.apellido_paciente }}
+                            </div>
+                            
+                            <div>
+                                <label for="{{ form.dni_paciente.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    DNI
+                                </label>
+                                {{ form.dni_paciente }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Datos del Procedimiento -->
+                    <div class="mb-5">
+                        <h3 class="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2 flex items-center">
+                            <i class="fas fa-procedures text-teal-500 mr-1.5 text-sm"></i>Procedimiento
+                        </h3>
+                        <div class="space-y-3">
+                            <div>
+                                <label for="{{ form.fecha_del_procedimiento.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Fecha *
+                                </label>
+                                {{ form.fecha_del_procedimiento }}
+                            </div>
+                            
+                            <div>
+                                <label for="{{ form.procedimiento.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Descripción *
+                                </label>
+                                {{ form.procedimiento }}
+                            </div>
+                            
+                            <div>
+                                <label for="{{ form.conteo_regiones.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Regiones
+                                </label>
+                                {{ form.conteo_regiones }}
+                            </div>
+                            
+                            <div>
+                                <label for="{{ form.notas.id_for_label }}" class="block text-xs font-medium text-gray-700 mb-1">
+                                    Notas
+                                </label>
+                                {{ form.notas }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="flex gap-2 pt-3 border-t border-gray-200">
+                        <button type="submit" name="continuar"
+                                class="flex-1 bg-gradient-to-r from-cyan-600 to-teal-600 text-white px-4 py-2 rounded-lg hover:from-cyan-700 hover:to-teal-700 transition-all font-medium shadow-sm hover:shadow text-sm">
+                            <i class="fas fa-save mr-1.5"></i>Guardar
+                        </button>
+                        <a href="{% url 'liquidacion:mis_procedimientos' %}"
+                           class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-all font-medium border border-gray-300 text-center text-sm">
+                            <i class="fas fa-check mr-1.5"></i>Finalizar
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Columna derecha: Registros recientes (3/5) -->
+        <div class="xl:col-span-3">
+            <div class="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+                <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-white flex items-center">
+                            <i class="fas fa-list-alt mr-3"></i>Registros de Hoy
+                        </h2>
+                        <span class="bg-white/20 px-3 py-1 rounded-full text-white font-semibold">
+                            {{ registros|length }} registro{{ registros|length|pluralize }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tabla scrolleable -->
+                <div class="overflow-x-auto" style="max-height: 600px; overflow-y: auto;">
+                    <table class="w-full" id="registroProcedimientosTable">
+                        <thead class="bg-gray-50 border-b-2 border-gray-200 sticky top-0">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" data-sort="text">
+                                    <span class="flex items-center">
+                                        Paciente
+                                        <i class="fas fa-sort ml-2 text-gray-400"></i>
+                                    </span>
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" data-sort="date">
+                                    <span class="flex items-center justify-center">
+                                        Fecha
+                                        <i class="fas fa-sort ml-2 text-gray-400"></i>
+                                    </span>
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" data-sort="text">
+                                    <span class="flex items-center justify-center">
+                                        Procedimiento
+                                        <i class="fas fa-sort ml-2 text-gray-400"></i>
+                                    </span>
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors" data-sort="number">
+                                    <span class="flex items-center justify-center">
+                                        Regiones
+                                        <i class="fas fa-sort ml-2 text-gray-400"></i>
+                                    </span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for registro in registros %}
+                            <tr class="hover:bg-teal-50 transition-colors">
+                                <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+                                    {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                                    {{ registro.fecha_del_procedimiento|date:"d/m/Y" }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                                    {{ registro.procedimiento }}
+                                </td>
+                                <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                                        {{ registro.conteo_regiones }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="px-4 py-12 text-center text-gray-500">
+                                    <i class="fas fa-inbox text-5xl text-gray-300 mb-3"></i>
+                                    <p class="text-lg">Aún no se han realizado registros hoy.</p>
+                                    <p class="text-sm mt-1">Completa el formulario para agregar el primer procedimiento.</p>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar estilos Tailwind a todos los campos del formulario
+        const formFields = document.querySelectorAll('#form-procedimiento input:not([type="hidden"]), #form-procedimiento textarea');
+        formFields.forEach(field => {
+            if (field.tagName === 'TEXTAREA') {
+                field.classList.add('w-full', 'px-2.5', 'py-1.5', 'text-sm', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-teal-500', 'focus:border-transparent', 'transition-all', 'min-h-[60px]');
+            } else {
+                field.classList.add('w-full', 'px-2.5', 'py-1.5', 'text-sm', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-teal-500', 'focus:border-transparent', 'transition-all');
+            }
+            field.classList.remove('form-control', 'form-control-sm');
+        });
+
+        // Establecer la fecha actual si el campo está vacío
+        const fechaInput = document.getElementById("id_fecha_del_procedimiento");
+        if (fechaInput && !fechaInput.value) {
+            const hoy = new Date();
+            const dia = String(hoy.getDate()).padStart(2, '0');
+            const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+            const año = hoy.getFullYear();
+            fechaInput.value = `${año}-${mes}-${dia}`;
+        }
+
+        // Ordenar tabla al hacer clic en encabezados
+        document.querySelectorAll('#registroProcedimientosTable th[data-sort]').forEach(header => {
+            header.addEventListener('click', () => {
+                const table = header.closest('table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr:not(:has(td[colspan]))'));
+                const index = Array.from(header.parentNode.children).indexOf(header);
+                const type = header.getAttribute('data-sort');
+
+                // Determinar dirección de ordenamiento
+                const currentDirection = header.dataset.direction || 'asc';
+                const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+                header.dataset.direction = newDirection;
+
+                // Actualizar iconos
+                document.querySelectorAll('#registroProcedimientosTable th i').forEach(icon => {
+                    icon.className = 'fas fa-sort ml-2 text-gray-400';
+                });
+                const icon = header.querySelector('i');
+                icon.className = newDirection === 'asc' 
+                    ? 'fas fa-sort-up ml-2 text-teal-600' 
+                    : 'fas fa-sort-down ml-2 text-teal-600';
+
+                // Ordenar filas
+                rows.sort((a, b) => {
+                    let aText = a.children[index].textContent.trim();
+                    let bText = b.children[index].textContent.trim();
+
+                    if (type === 'number') {
+                        aText = parseFloat(aText) || 0;
+                        bText = parseFloat(bText) || 0;
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else if (type === 'date') {
+                        aText = new Date(aText.split('/').reverse().join('-'));
+                        bText = new Date(bText.split('/').reverse().join('-'));
+                        return newDirection === 'asc' ? aText - bText : bText - aText;
+                    } else {
+                        return newDirection === 'asc'
+                            ? aText.localeCompare(bText)
+                            : bText.localeCompare(aText);
+                    }
+                });
+
+                // Reinsertar filas ordenadas
+                rows.forEach(row => tbody.appendChild(row));
+            });
+        });
+    });
+</script>
+{% endblock %}

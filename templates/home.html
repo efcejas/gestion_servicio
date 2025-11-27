@@ -6,155 +6,13 @@
 
 {% block content %}
 
-<!-- Dashboard para Superusuario -->
-{% if user.is_superuser %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-    <!-- Acciones Rápidas -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary p-4">
-            <h3 class="text-white font-bold text-lg flex items-center">
-                <i class="fas fa-bolt mr-3"></i>Acciones Rápidas
-            </h3>
-        </div>
-        <div class="p-6 space-y-4">
-            {% url 'informados_por_medico_por_mes' as estudios_url %}
-            {% if estudios_url %}
-            <a href="{{ estudios_url }}" 
-               class="group flex items-center justify-end p-4 border-2 border-medical-primary text-medical-primary rounded-xl hover:bg-medical-primary hover:text-white transition-all duration-300">
-                <span class="font-semibold">Estudios por Profesional</span>
-            </a>
-            {% endif %}
-            
-            {% url 'calendario_guardias_full' as guardias_url %}
-            {% if guardias_url %}
-            <a href="{{ guardias_url }}" 
-               class="group flex items-center justify-end p-4 border-2 border-medical-secondary text-medical-secondary rounded-xl hover:bg-medical-secondary hover:text-white transition-all duration-300">
-                <span class="font-semibold">Calendario de Guardias</span>
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Últimos Registros -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div class="bg-gradient-to-r from-medical-secondary to-purple-600 p-4">
-            <h3 class="text-white font-bold text-lg flex items-center">
-                <i class="fas fa-clock mr-3"></i>Últimos Registros
-            </h3>
-        </div>
-        <div class="p-0">
-            {% if ultimos_registros_medicos %}
-            <div class="divide-y divide-gray-100">
-                {% for registro in ultimos_registros_medicos %}
-                <div class="p-4 hover:bg-gray-50 transition-colors">
-                    <div class="flex justify-between items-center">
-                        <div class="flex items-center">
-                            <div class="w-10 h-10 bg-medical-primary/10 rounded-full flex items-center justify-center mr-3">
-                                <i class="fas fa-user-md text-medical-primary"></i>
-                            </div>
-                            <div>
-                                <h6 class="font-semibold text-gray-900">
-                                    {{ registro.medico.first_name }} {{ registro.medico.last_name }}
-                                </h6>
-                                <p class="text-sm text-gray-500">{{ registro.fecha_registro|date:"d/m/Y" }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="p-6 text-center text-gray-500">
-                <i class="fas fa-inbox text-3xl mb-2 opacity-50"></i>
-                <p>No hay registros recientes</p>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Estado de Eventos -->
-    <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-        <div class="text-center">
-            <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center justify-center">
-                <i class="fas fa-exclamation-triangle mr-3 text-amber-500"></i>Estado de Eventos
-            </h3>
-            
-            {% if cantidad_eventos_abiertos > 0 %}
-                <div class="mb-4">
-                    <div class="text-3xl font-bold text-medical-primary mb-2">{{ cantidad_eventos_abiertos }}</div>
-                    <p class="text-gray-600">evento(s) abierto(s)</p>
-                </div>
-                
-                <div class="flex flex-wrap justify-center gap-2 mb-4">
-                    {% if cantidad_abiertos %}
-                        <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                            Abiertos: {{ cantidad_abiertos }}
-                        </span>
-                    {% endif %}
-                    {% if cantidad_pendientes %}
-                        <span class="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
-                            Pendientes: {{ cantidad_pendientes }}
-                        </span>
-                    {% endif %}
-                </div>
-                
-                {% if ultima_actualizacion_evento %}
-                    <p class="text-sm text-gray-500 mb-4">
-                        Última nota el {{ ultima_actualizacion_evento|date:"d/m/Y H:i" }}
-                    </p>
-                {% endif %}
-                
-                <a href="{% url 'gestion_eventos:lista_eventos' %}" 
-                   class="inline-flex items-center justify-end px-4 py-2 bg-medical-primary text-white rounded-lg hover:bg-medical-secondary transition-colors ml-auto">
-                    Ver Eventos
-                </a>
-            {% else %}
-                <div class="text-center py-8">
-                    <i class="fas fa-check-circle text-5xl text-green-500 mb-4"></i>
-                    <p class="text-gray-600">No hay eventos abiertos</p>
-                </div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- ========== USUARIOS AUTENTICADOS (NO SUPERUSER) ========== -->
-{% elif user.is_authenticated and not user.is_superuser %}
+<!-- ========== USUARIOS AUTENTICADOS ========== -->
+{% if user.is_authenticated %}
 
     <!-- ========== ADMINISTRATIVO - SANATORIO (PEDIDOS) ========== -->
     {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
     <div class="container mx-auto mt-6">
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 justify-center">
-            <!-- Nuevo Pedido -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
-                    <i class="fas fa-plus-circle text-2xl text-white"></i>
-                </div>
-                <h5 class="text-xl font-bold text-gray-900 mb-2">Nuevo pedido</h5>
-                <p class="text-gray-600 mb-4">Solicitá un nuevo estudio desde el formulario guiado.</p>
-                <div class="flex justify-end">
-                    <a href="{% url 'pedidos_estudios:crear_pedido' %}" 
-                       class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                        Solicitar estudio
-                    </a>
-                </div>
-            </div>
-
-            <!-- Lista de Pedidos -->
-            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl mb-4">
-                    <i class="fas fa-list-task text-2xl text-white"></i>
-                </div>
-                <h5 class="text-xl font-bold text-gray-900 mb-2">Estudios solicitados</h5>
-                <p class="text-gray-600 mb-4">Consultá todos los estudios solicitados y su estado actual.</p>
-                <div class="flex justify-end">
-                    <a href="{% url 'pedidos_estudios:lista_pedidos' %}" 
-                       class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                        Ver lista
-                    </a>
-                </div>
-            </div>
-
+        <div class="grid grid-cols-1 md:grid-cols-1 gap-6 justify-center max-w-md mx-auto">
             <!-- Reportes -->
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                 <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl mb-4">
@@ -242,21 +100,6 @@
                         </a>
                     </div>
                 </div>
-
-                <!-- Estudios Pendientes -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl mb-4">
-                        <i class="fas fa-file-alt text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Estudios pendientes</h5>
-                    <p class="text-gray-600 mb-4">Consulta las solicitudes pendientes de los estudios a realizar.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'pedidos_estudios:lista_pedidos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                            Ver pendientes
-                        </a>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -278,46 +121,10 @@
                         </a>
                     </div>
                 </div>
-
-                <!-- Estudios Pendientes -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
-                        <i class="fas fa-file-alt text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Estudios pendientes</h5>
-                    <p class="text-gray-600 mb-4">Consulta las solicitudes pendientes de los estudios a realizar.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'pedidos_estudios:lista_pedidos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-                            Ver pendientes
-                        </a>
-                    </div>
-                </div>
             </div>
         </div>
 
         <!-- ENFERMEROS / JEFE DE ENFERMERÍA -->
-        {% elif user.cargo == 'enfermero/a' or user.cargo == 'jefe de enfermería' %}
-        <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6 justify-center max-w-md mx-auto">
-                <!-- Estudios Pendientes -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl mb-4">
-                        <i class="fas fa-file-alt text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Estudios pendientes</h5>
-                    <p class="text-gray-600 mb-4">Consulta las solicitudes pendientes de los estudios a realizar.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'pedidos_estudios:lista_pedidos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                            Ver pendientes
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MÉDICOS DE STAFF - INFORMES -->
         {% elif user|has_group:"Médicos de staff - informes" %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

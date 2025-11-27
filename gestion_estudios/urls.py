@@ -47,7 +47,6 @@ urlpatterns = [
     
     # Prueba temporal de toast
     path('test-toast/', test_toast, name='test_toast'),
-    path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
 
     # Restablecimiento de contraseñas
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),

@@ -1,13 +1,62 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base_tailwind.html" %}
 {% block title %}Carga de estudios{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <form method="post">
-        {% csrf_token %}
-        <h1>Carga de estudios</h1>
-        <p>{{ form.as_p }}</p>
-        <button type="submit">Guardar</button>
-    </form>
+<div class="container mx-auto max-w-3xl px-4 py-12">
+    <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
+        <div class="border-b border-gray-200 bg-gradient-to-r from-blue-600 to-cyan-600 px-6 py-4 dark:border-gray-700">
+            <h1 class="text-2xl font-bold text-white">Carga de estudios</h1>
+        </div>
+        <div class="px-6 py-6">
+            <form method="post" class="space-y-4">
+                {% csrf_token %}
+                <div class="space-y-4">
+                    {% for field in form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {{ field.label }}
+                        </label>
+                        {% if field.field.widget.input_type == 'select' %}
+                            <select name="{{ field.name }}" id="{{ field.id_for_label }}" 
+                                    class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                                    {% if field.field.required %}required{% endif %}>
+                                {% for value, label in field.field.choices %}
+                                    <option value="{{ value }}" {% if field.value == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elif field.field.widget.input_type == 'textarea' %}
+                            <textarea name="{{ field.name }}" id="{{ field.id_for_label }}" rows="3"
+                                      class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                                      {% if field.field.required %}required{% endif %}>{{ field.value|default:'' }}</textarea>
+                        {% else %}
+                            <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}" id="{{ field.id_for_label }}" 
+                                   value="{{ field.value|default:'' }}"
+                                   class="block w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                                   {% if field.field.required %}required{% endif %}>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% if field.errors %}
+                            {% for error in field.errors %}
+                                <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ error }}</p>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="flex justify-end gap-2 pt-4">
+                    <a href="{% url 'estudios_lista' %}" 
+                       class="rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-4 focus:ring-gray-200 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white dark:focus:ring-gray-700">
+                        Cancelar
+                    </a>
+                    <button type="submit" 
+                            class="rounded-lg bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-2.5 text-center text-sm font-medium text-white transition-all hover:from-blue-700 hover:to-cyan-700 focus:outline-none focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

@@ -1,7 +1,7 @@
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.http import JsonResponse
 from django.db import OperationalError
@@ -126,8 +126,13 @@ class MisGuardiasView(LoginRequiredMixin, ListView):
 # Esto es de uso exclusivo de los administradores
 
 
-class TailwindCalendarView(TemplateView):
+class TailwindCalendarView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = 'control_guardias/fullcalendar_tw.html'
+    login_url = 'login'
+    
+    def test_func(self):
+        """Solo permite acceso a superusuarios"""
+        return self.request.user.is_superuser
 
 
 class GuardiaEventsView(View):

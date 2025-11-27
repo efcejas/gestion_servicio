@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'control_guardias.apps.ControlGuardiasConfig',
     'liquidacion.apps.LiquidacionConfig',
     'gestion_eventos.apps.GestionEventosConfig',
-    'pedidos_estudios.apps.PedidosEstudiosConfig',
     
     # Tailwind CSS
     'tailwind',
