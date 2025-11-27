@@ -273,6 +273,60 @@
                 </div>
             </div>
 
+            <!-- Navegación Rápida -->
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-white mb-4">Acceso Rápido</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <a href="{% url 'control_guardias:coberturas_semanal' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            <div>
+                                <h4 class="font-medium text-white">Guardias</h4>
+                                <p class="text-sm text-gray-300">Control semanal</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'gestion_eventos:lista_eventos' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                            </svg>
+                            <div>
+                                <h4 class="font-medium text-white">Eventos</h4>
+                                <p class="text-sm text-gray-300">Gestión de eventos</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'liquidacion:informados_por_medico_por_mes' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <div>
+                                <h4 class="font-medium text-white">Liquidación</h4>
+                                <p class="text-sm text-gray-300">Informes médicos</p>
+                            </div>
+                        </div>
+                    </a>
+                    
+                    <a href="{% url 'liquidacion:carga-masiva' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-purple-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                            <div>
+                                <h4 class="font-medium text-white">Carga Masiva</h4>
+                                <p class="text-sm text-gray-300">Importar estudios</p>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
             <!-- Últimos médicos que registraron -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
                 <div class="flex items-center justify-between mb-4">

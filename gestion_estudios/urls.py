@@ -32,8 +32,8 @@ urlpatterns = [
     # Página principal
     path('', HomeTailwindView.as_view(), name='home'),
 
-    # Tablero de administración
-    path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),  # Nueva URL más descriptiva
+    # Dashboard antiguo (redirige a home)
+    path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),
 
     # Autenticación y cuentas
     path('accounts/login/', CustomLoginView.as_view(), name='login'),  # Vista personalizada de inicio de sesión

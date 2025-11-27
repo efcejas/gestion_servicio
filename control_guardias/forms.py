@@ -8,7 +8,7 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         required=False,
         label="Médico",
         widget=forms.Select(attrs={
-            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
         }),
         empty_label="Todos los médicos"
     )
@@ -22,7 +22,7 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         label="Mes",
         initial=datetime.now().month,
         widget=forms.Select(attrs={
-            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
         }),
     )
     año = forms.ChoiceField(
@@ -31,7 +31,7 @@ class FiltroGuardiasPorMedicoForm(forms.Form):
         label="Año",
         initial=datetime.now().year,
         widget=forms.Select(attrs={
-            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
         }),
     )
     
@@ -45,13 +45,13 @@ class GuardiaForm(forms.ModelForm):
         fields = ['franja_horaria', 'medico', 'fecha']
         widgets = {
             'franja_horaria': forms.Select(attrs={
-                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+                'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
             }),
             'medico': forms.Select(attrs={
-                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+                'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
             }),
             'fecha': forms.DateInput(attrs={
-                'class': 'block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500',
+                'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400',
                 'type': 'date'
             }),
         }
@@ -71,7 +71,7 @@ class FiltroMisGuardiasForm(forms.Form):
         label="Mes",
         initial=datetime.now().month,
         widget=forms.Select(attrs={
-            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
         }),
     )
     año = forms.ChoiceField(
@@ -80,6 +80,6 @@ class FiltroMisGuardiasForm(forms.Form):
         label="Año",
         initial=datetime.now().year,
         widget=forms.Select(attrs={
-            'class': 'rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-900 transition-colors focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'
+            'class': 'w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-medical-primary transition-all bg-white hover:border-gray-400'
         }),
     )
