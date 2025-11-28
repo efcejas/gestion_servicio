@@ -54,13 +54,13 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Debe ir después de SecurityMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'gestion_estudios.urls'
@@ -142,12 +142,24 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Directorios adicionales de archivos estáticos
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
-    os.path.join(BASE_DIR, 'theme/static'),  # <- ESTA LÍNEA NUEVA
+    os.path.join(BASE_DIR, 'theme/static'),  # Tailwind CSS compilado por django-tailwind
+    os.path.join(BASE_DIR, 'static'),  # Otros archivos estáticos (imágenes, etc.)
 ]
 
-# Almacenamiento para Heroku
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Almacenamiento para Heroku con WhiteNoise
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+# Configuración de WhiteNoise
+WHITENOISE_AUTOREFRESH = True if DEBUG else False
+WHITENOISE_USE_FINDERS = DEBUG
+WHITENOISE_MAX_AGE = 0 if DEBUG else 31536000  # 1 año en producción
 
 # Archivos subidos por usuarios (imágenes, documentos, etc.)
 MEDIA_URL = '/media/'
