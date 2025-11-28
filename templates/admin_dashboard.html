@@ -404,23 +404,6 @@
                 {% endif %}
             </div>
 
-            <!-- Widgets adicionales -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4">
-                <!-- Widget: Estadísticas rápidas -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
-                    <h3 class="text-base md:text-lg font-semibold text-white mb-4">Resumen Rápido</h3>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="text-center">
-                            <div class="text-xl md:text-2xl font-bold text-blue-400">{{ total_pacientes_activos|default:0 }}</div>
-                            <div class="text-xs md:text-sm text-gray-400">Pacientes Únicos</div>
-                        </div>
-                        <div class="text-center">
-                            <div class="text-xl md:text-2xl font-bold text-purple-400">{{ medicos_activos_semana|default:0 }}</div>
-                            <div class="text-xs md:text-sm text-gray-400">Médicos Activos</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
