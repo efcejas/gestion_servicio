@@ -7,26 +7,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'medical-primary': '#164569',
-                        'medical-secondary': '#4b49c0',
-                        'medical-success': '#10b981',
-                        'medical-warning': '#f59e0b',
-                        'medical-error': '#ef4444',
-                        'medical-info': '#3b82f6',
-                        'medical-light': '#f8fafc',
-                        'medical-dark': '#0f172a',
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS - Archivo local compilado -->
+    <link href="{% static 'css/tailwind.css' %}?v=20251128" rel="stylesheet">
     
     <!-- CSS personalizado -->
     <link rel="stylesheet" href="{% static 'styles/styles.css' %}">

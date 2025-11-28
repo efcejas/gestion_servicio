@@ -8,26 +8,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'medical-primary': '#164569',
-                        'medical-secondary': '#4b49c0',
-                        'medical-success': '#10b981',
-                        'medical-warning': '#f59e0b',
-                        'medical-error': '#ef4444',
-                        'medical-info': '#3b82f6',
-                        'medical-light': '#f8fafc',
-                        'medical-dark': '#0f172a',
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS compilado localmente -->
+    <link href="{% static 'css/tailwind.css' %}?v=20251128" rel="stylesheet">
 
     <!-- CSS personalizado (solo para casos específicos) -->
     <link rel="stylesheet" href="{% static 'styles/styles.css' %}">
@@ -36,15 +18,15 @@
     <!-- CSS de Adobe Fonts -->
     <link rel="stylesheet" href="https://use.typekit.net/ces4zfb.css">
 
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Font Awesome local -->
+    <link rel="stylesheet" href="{% static 'css/font-awesome.min.css' %}">
 
-    <!-- Select2 para dropdowns mejorados -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- Select2 local -->
+    <link href="{% static 'css/select2.min.css' %}" rel="stylesheet" />
 
-    <!-- jQuery (necesario para algunas funcionalidades existentes) -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <!-- jQuery local -->
+    <script src="{% static 'js/jquery.min.js' %}"></script>
+    <script src="{% static 'js/select2.min.js' %}"></script>
 
     <!-- Flowbite para componentes interactivos -->
     <script src="{% static 'js/flowbite.min.js' %}"></script>

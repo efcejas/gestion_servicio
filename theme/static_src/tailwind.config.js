@@ -95,6 +95,15 @@ module.exports = {
           'green': '#059669', 
           'red': '#dc2626',
         },
+        // Colores extendidos con prefijo medical-
+        'medical-primary': '#164569',
+        'medical-secondary': '#4b49c0',
+        'medical-success': '#10b981',
+        'medical-warning': '#f59e0b',
+        'medical-error': '#ef4444',
+        'medical-info': '#3b82f6',
+        'medical-light': '#f8fafc',
+        'medical-dark': '#0f172a',
         // Mantener colores originales del proyecto
         'project-blue': '#164569',
         'project-purple': '#4b49c0',

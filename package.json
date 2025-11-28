@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "@fullcalendar/core": "^6.1.19",
+    "@fullcalendar/daygrid": "^6.1.19",
+    "@fullcalendar/interaction": "^6.1.19",
+    "@fullcalendar/timegrid": "^6.1.19",
+    "font-awesome": "^4.7.0",
+    "fullcalendar": "^6.1.19",
+    "jquery": "^3.7.1",
+    "select2": "^4.1.0-rc.0"
+  }
+}
