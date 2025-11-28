@@ -18,8 +18,8 @@
     <!-- CSS de Adobe Fonts -->
     <link rel="stylesheet" href="https://use.typekit.net/ces4zfb.css">
 
-    <!-- Font Awesome local -->
-    <link rel="stylesheet" href="{% static 'css/font-awesome.min.css' %}">
+    <!-- Font Awesome 6 local -->
+    <link rel="stylesheet" href="{% static 'css/all.min.css' %}">
 
     <!-- Select2 local -->
     <link href="{% static 'css/select2.min.css' %}" rel="stylesheet" />
@@ -56,7 +56,7 @@
                         <div class="text-xs text-white/80">{{ user.email }}</div>
                         {% if user.cargo %}
                         <div class="text-xs text-white/90 font-medium">
-                            <i class="fa fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                            <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
                         </div>
                         {% endif %}
                     </div>
@@ -83,7 +83,7 @@
                                     <div class="text-xs text-gray-500">{{ user.email }}</div>
                                     {% if user.cargo %}
                                     <div class="text-xs text-medical-secondary font-medium mt-1">
-                                        <i class="fa fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                                        <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
                                     </div>
                                     {% endif %}
                                 </div>
@@ -92,7 +92,7 @@
                                 <div class="px-2">
                                     <a href="{{ home_url }}" 
                                        class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
-                                        <i class="fa fa-home w-5 mr-3 text-medical-primary group-hover:scale-110 transition-transform"></i>
+                                        <i class="fas fa-home w-5 mr-3 text-medical-primary group-hover:scale-110 transition-transform"></i>
                                         <span class="font-medium">Inicio</span>
                                     </a>
                                 </div>
@@ -102,7 +102,7 @@
                                 <div class="px-2">
                                     <a href="{{ password_change_url }}" 
                                        class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
-                                        <i class="fa fa-key w-5 mr-3 text-medical-secondary group-hover:scale-110 transition-transform"></i>
+                                        <i class="fas fa-key w-5 mr-3 text-medical-secondary group-hover:scale-110 transition-transform"></i>
                                         <span class="font-medium">Cambiar Contraseña</span>
                                     </a>
                                 </div>
@@ -114,7 +114,7 @@
                                     {% csrf_token %}
                                     <button type="submit" 
                                             class="group w-full text-left px-4 py-3 text-sm text-red-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 transition-all duration-200 rounded-lg flex items-center">
-                                        <i class="fa fa-sign-out-alt w-5 mr-3 text-red-500 group-hover:scale-110 transition-transform"></i>
+                                        <i class="fas fa-sign-out-alt w-5 mr-3 text-red-500 group-hover:scale-110 transition-transform"></i>
                                         <span class="font-medium">Cerrar Sesión</span>
                                     </button>
                                 </form>
@@ -137,7 +137,7 @@
                 {% if home_url %}
                 <a href="{{ home_url }}" 
                    class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'home' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                    <i class="fa fa-home mr-2 group-hover:scale-110 transition-transform"></i>Dashboard
+                    <i class="fas fa-home mr-2 group-hover:scale-110 transition-transform"></i>Dashboard
                     {% if request.resolver_match.url_name == 'home' %}
                     <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                     {% endif %}
@@ -151,7 +151,7 @@
                     {% if estudios_url %}
                     <a href="{{ estudios_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                        <i class="fa fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>Estudios por Profesional
+                        <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>Estudios por Profesional
                     </a>
                     {% endif %}
 
@@ -161,7 +161,7 @@
                     {% if guardias_url %}
                     <a href="{{ guardias_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                        <i class="fa fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
+                        <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
                     </a>
                     {% endif %}
                     {% endif %}
@@ -171,7 +171,7 @@
                     {% if eventos_url %}
                     <a href="{{ eventos_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fa fa-exclamation-triangle mr-2 group-hover:scale-110 transition-transform"></i>Eventos
+                        <i class="fas fa-exclamation-triangle mr-2 group-hover:scale-110 transition-transform"></i>Eventos
                         {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                         {% endif %}
@@ -183,7 +183,7 @@
                     {% if admin_url %}
                     <a href="{{ admin_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'admin_dashboard' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fa fa-cog mr-2 group-hover:scale-110 transition-transform"></i>Administración
+                        <i class="fas fa-cog mr-2 group-hover:scale-110 transition-transform"></i>Administración
                         {% if request.resolver_match.url_name == 'admin_dashboard' %}
                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                         {% endif %}
@@ -200,7 +200,7 @@
                         {% if reportes_url %}
                         <a href="{{ reportes_url }}" 
                            class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                            <i class="fa fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Reportes
+                            <i class="fas fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Reportes
                         </a>
                         {% endif %}
 
@@ -214,7 +214,7 @@
                             {% if eventos_url %}
                             <a href="{{ eventos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                                 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -228,7 +228,7 @@
                             {% if eventos_url %}
                             <a href="{{ eventos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                                 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -242,7 +242,7 @@
                             {% if nuevo_estudio_url %}
                             <a href="{{ nuevo_estudio_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fa fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Estudios
+                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Estudios
                             </a>
                             {% endif %}
 
@@ -251,7 +251,7 @@
                             {% if lista_estudios_url %}
                             <a href="{{ lista_estudios_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fa fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Registrados
+                                <i class="fas fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Registrados
                             </a>
                             {% endif %}
 
@@ -260,7 +260,7 @@
                             {% if mis_guardias_url %}
                             <a href="{{ mis_guardias_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Mis Guardias
+                                <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Mis Guardias
                                 {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -272,7 +272,7 @@
                             {% if eventos_url %}
                             <a href="{{ eventos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                                 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -286,7 +286,7 @@
                             {% if procedimientos_url %}
                             <a href="{{ procedimientos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Procedimientos
+                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Procedimientos
                                 {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -298,7 +298,7 @@
                             {% if mis_procedimientos_url %}
                             <a href="{{ mis_procedimientos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fa fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Mis Procedimientos
+                                <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Mis Procedimientos
                             </a>
                             {% endif %}
 
@@ -307,7 +307,7 @@
                             {% if eventos_url %}
                             <a href="{{ eventos_url }}" 
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fa fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                                 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
@@ -336,14 +336,14 @@
                     {% if login_url %}
                     <a href="{{ login_url }}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-100 hover:bg-blue-200 transition-colors duration-200">
-                        <i class="fa fa-sign-in mr-2"></i>Iniciar Sesión
+                        <i class="fas fa-sign-in mr-2"></i>Iniciar Sesión
                     </a>
                     {% endif %}
                     {% url 'register' as register_url %}
                     {% if register_url %}
                     <a href="{{ register_url }}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">
-                        <i class="fa fa-user-plus mr-2"></i>Registrarse
+                        <i class="fas fa-user-plus mr-2"></i>Registrarse
                     </a>
                     {% endif %}
                 </div>
@@ -385,13 +385,13 @@
                     <a href="mailto:ensofermincejas@gmail.com" 
                        title="Enviar email" 
                        class="text-gray-400 hover:text-white transition-colors duration-200">
-                        <i class="fa fa-envelope"></i>
+                        <i class="fas fa-envelope"></i>
                         <span class="sr-only">Email</span>
                     </a>
                     <a href="tel:+54123456789" 
                        title="Llamar por teléfono"
                        class="text-gray-400 hover:text-white transition-colors duration-200">
-                        <i class="fa fa-phone"></i>
+                        <i class="fas fa-phone"></i>
                         <span class="sr-only">Teléfono</span>
                     </a>
                 </div>

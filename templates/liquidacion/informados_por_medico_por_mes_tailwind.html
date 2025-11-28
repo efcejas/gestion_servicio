@@ -24,12 +24,12 @@
             <!-- Médico -->
             <div class="md:col-span-2 relative">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                    <i class="fa fa-user-md text-emerald-600 mr-1"></i>Médico
+                    <i class="fas fa-user-md text-emerald-600 mr-1"></i>Médico
                 </label>
                 <div class="hidden">{{ form.medico }}</div>
                 <button type="button" id="medicoButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
                     <span id="medicoText" class="text-gray-700">Todos los médicos</span>
-                    <i class="fa fa-chevron-down text-gray-400 transition-transform" id="medicoIcon"></i>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="medicoIcon"></i>
                 </button>
                 <div id="medicoDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
                     <!-- Opciones cargadas por JavaScript -->
@@ -39,12 +39,12 @@
             <!-- Mes -->
             <div class="relative">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                    <i class="fa fa-calendar-alt text-blue-600 mr-1"></i>Mes
+                    <i class="fas fa-calendar-alt text-blue-600 mr-1"></i>Mes
                 </label>
                 <div class="hidden">{{ form.mes }}</div>
                 <button type="button" id="mesButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
                     <span id="mesText" class="text-gray-700">Seleccione mes</span>
-                    <i class="fa fa-chevron-down text-gray-400 transition-transform" id="mesIcon"></i>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="mesIcon"></i>
                 </button>
                 <div id="mesDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
                     <!-- Opciones cargadas por JavaScript -->
@@ -54,12 +54,12 @@
             <!-- Año -->
             <div class="relative">
                 <label class="block text-sm font-semibold text-gray-700 mb-2">
-                    <i class="fa fa-calendar text-purple-600 mr-1"></i>Año
+                    <i class="fas fa-calendar text-purple-600 mr-1"></i>Año
                 </label>
                 <div class="hidden">{{ form.año }}</div>
                 <button type="button" id="añoButton" class="w-full px-3 py-2.5 text-sm text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
                     <span id="añoText" class="text-gray-700">Seleccione año</span>
-                    <i class="fa fa-chevron-down text-gray-400 transition-transform" id="añoIcon"></i>
+                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="añoIcon"></i>
                 </button>
                 <div id="añoDropdown" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-xl max-h-60 overflow-auto">
                     <!-- Opciones cargadas por JavaScript -->
@@ -86,17 +86,17 @@
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800 mb-1 flex items-center">
-                            <i class="fa fa-user-circle text-emerald-600 mr-2"></i>
+                            <i class="fas fa-user-circle text-emerald-600 mr-2"></i>
                             {{ data.medico.first_name }} {{ data.medico.last_name }}
                         </h2>
                         <p class="text-gray-600 text-sm flex items-center">
-                            <i class="fa fa-envelope text-gray-500 mr-2"></i>
+                            <i class="fas fa-envelope text-gray-500 mr-2"></i>
                             {{ data.medico.email }}
                         </p>
                     </div>
                     <div class="mt-3 md:mt-0">
                         <div class="inline-flex items-center px-5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 text-white rounded-xl shadow-md">
-                            <i class="fa fa-chart-bar text-2xl mr-3"></i>
+                            <i class="fas fa-chart-bar text-2xl mr-3"></i>
                             <div class="text-left">
                                 <p class="text-xs text-emerald-100 uppercase font-semibold">Total Regiones</p>
                                 <p class="text-3xl font-bold">{{ data.total_regiones }}</p>
@@ -112,19 +112,19 @@
                     <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <i class="fa fa-user mr-1"></i>Paciente
+                                <i class="fas fa-user mr-1"></i>Paciente
                             </th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <i class="fa fa-id-card mr-1"></i>DNI
+                                <i class="fas fa-id-card mr-1"></i>DNI
                             </th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <i class="fa fa-x-ray mr-1"></i>Estudio
+                                <i class="fas fa-x-ray mr-1"></i>Estudio
                             </th>
                             <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <i class="fa fa-calendar-check mr-1"></i>Fecha Informe
+                                <i class="fas fa-calendar-check mr-1"></i>Fecha Informe
                             </th>
                             <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
-                                <i class="fa fa-layer-group mr-1"></i>Regiones
+                                <i class="fas fa-layer-group mr-1"></i>Regiones
                             </th>
                         </tr>
                     </thead>
@@ -154,7 +154,7 @@
                     <tfoot class="bg-emerald-50 border-t-2 border-emerald-300">
                         <tr>
                             <td colspan="4" class="px-4 py-4 text-sm font-bold text-gray-800 uppercase">
-                                <i class="fa fa-calculator mr-2 text-emerald-600"></i>Total de Regiones
+                                <i class="fas fa-calculator mr-2 text-emerald-600"></i>Total de Regiones
                             </td>
                             <td class="px-4 py-4 text-center">
                                 <span class="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xl font-bold bg-emerald-600 text-white shadow-md">
@@ -170,7 +170,7 @@
             <div class="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end">
                 <a href="{% url 'liquidacion:exportar_excel_informes' %}?medico={{ data.medico.id }}&mes={{ form.mes.value }}&año={{ form.año.value }}" 
                    class="inline-flex items-center px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-semibold shadow-md hover:shadow-lg">
-                    <i class="fa fa-file-excel mr-2"></i>Descargar Excel
+                    <i class="fas fa-file-excel mr-2"></i>Descargar Excel
                 </a>
             </div>
         </div>
@@ -180,7 +180,7 @@
         <div class="bg-white rounded-xl shadow-md border border-gray-200 p-12">
             <div class="text-center">
                 <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fa fa-search text-gray-400 text-4xl"></i>
+                    <i class="fas fa-search text-gray-400 text-4xl"></i>
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2">Sin resultados</h3>
                 <p class="text-gray-600">

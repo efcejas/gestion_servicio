@@ -7,7 +7,7 @@
     <div class="max-w-2xl mx-auto">
         <div class="text-center mb-8">
             <div class="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-blue-100">
-                <i class="fa fa-user-plus text-blue-600 text-xl"></i>
+                <i class="fas fa-user-plus text-blue-600 text-xl"></i>
             </div>
             <h2 class="mt-6 text-3xl font-extrabold text-gray-900">
                 Registro de Usuario
@@ -22,7 +22,7 @@
             <div class="mb-6">
                 <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
                     <div class="flex items-center">
-                        <i class="fa fa-exclamation-circle text-red-400 mr-3"></i>
+                        <i class="fas fa-exclamation-circle text-red-400 mr-3"></i>
                         <div>
                             <strong>Error:</strong>
                             {% for error in form.non_field_errors %}
@@ -40,7 +40,7 @@
                 <!-- Información de cuenta -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <i class="fa fa-user-circle mr-2 text-blue-600"></i>
+                        <i class="fas fa-user-circle mr-2 text-blue-600"></i>
                         Información de cuenta
                     </h3>
                     <div class="bg-gray-50 p-4 rounded-lg">
@@ -54,7 +54,7 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.username.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -62,7 +62,7 @@
                             </div>
                             <div class="lg:col-span-2 flex items-start pt-8">
                                 <div class="text-xs text-gray-500 bg-blue-50 p-3 rounded border-l-4 border-blue-400">
-                                    <i class="fa fa-info-circle text-blue-500 mr-1"></i>
+                                    <i class="fas fa-info-circle text-blue-500 mr-1"></i>
                                     {{ form.username.help_text }}
                                 </div>
                             </div>
@@ -73,7 +73,7 @@
                 <!-- Datos personales -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <i class="fa fa-address-card mr-2 text-green-600"></i>
+                        <i class="fas fa-address-card mr-2 text-green-600"></i>
                         Datos personales
                     </h3>
                     <div class="bg-gray-50 p-4 rounded-lg">
@@ -87,7 +87,7 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.first_name.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -102,7 +102,7 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.last_name.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -115,7 +115,7 @@
                 <!-- Datos de contacto -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <i class="fa fa-envelope mr-2 text-purple-600"></i>
+                        <i class="fas fa-envelope mr-2 text-purple-600"></i>
                         Datos de contacto
                     </h3>
                     <div class="bg-gray-50 p-4 rounded-lg">
@@ -129,7 +129,7 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.email.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -144,13 +144,13 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.telefono.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
                                 <div class="mt-2 text-xs text-gray-500 bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
-                                    <i class="fa fa-phone text-yellow-500 mr-1"></i>
+                                    <i class="fas fa-phone text-yellow-500 mr-1"></i>
                                     Debe ingresar el número de la siguiente manera: 1112345678
                                 </div>
                             </div>
@@ -161,7 +161,7 @@
                 <!-- Tipo de cargo -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <i class="fa fa-briefcase mr-2 text-indigo-600"></i>
+                        <i class="fas fa-briefcase mr-2 text-indigo-600"></i>
                         Tipo de cargo
                     </h3>
                     <div class="bg-gray-50 p-4 rounded-lg">
@@ -175,7 +175,7 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.cargo.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
@@ -183,7 +183,7 @@
                             </div>
                             <div class="lg:col-span-2 flex items-start pt-8">
                                 <div class="text-xs text-gray-500 bg-indigo-50 p-3 rounded border-l-4 border-indigo-400">
-                                    <i class="fa fa-info-circle text-indigo-500 mr-1"></i>
+                                    <i class="fas fa-info-circle text-indigo-500 mr-1"></i>
                                     Debe seleccionar el tipo de cargo que desempeña en el servicio.
                                 </div>
                             </div>
@@ -194,7 +194,7 @@
                 <!-- Contraseña -->
                 <div>
                     <h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                        <i class="fa fa-lock mr-2 text-red-600"></i>
+                        <i class="fas fa-lock mr-2 text-red-600"></i>
                         Contraseña
                     </h3>
                     <div class="bg-gray-50 p-4 rounded-lg">
@@ -208,13 +208,13 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.password1.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
                                 <div class="mt-2 text-xs text-gray-500 bg-red-50 p-2 rounded border-l-4 border-red-400">
-                                    <i class="fa fa-shield text-red-500 mr-1"></i>
+                                    <i class="fas fa-shield text-red-500 mr-1"></i>
                                     Su contraseña no puede ser similar a otros datos personales y debe contener al menos 8 caracteres.
                                 </div>
                             </div>
@@ -227,13 +227,13 @@
                                 <div class="mt-2 text-sm text-red-600">
                                     {% for error in form.password2.errors %}
                                         <div class="flex items-center">
-                                            <i class="fa fa-exclamation-circle mr-1"></i>{{ error }}
+                                            <i class="fas fa-exclamation-circle mr-1"></i>{{ error }}
                                         </div>
                                     {% endfor %}
                                 </div>
                                 {% endif %}
                                 <div class="mt-2 text-xs text-gray-500 bg-gray-100 p-2 rounded border-l-4 border-gray-400">
-                                    <i class="fa fa-check text-gray-500 mr-1"></i>
+                                    <i class="fas fa-check text-gray-500 mr-1"></i>
                                     {{ form.password2.help_text }}
                                 </div>
                             </div>
@@ -246,7 +246,7 @@
                     <button type="submit" 
                             class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 transform hover:scale-105">
                         <span class="flex items-center">
-                            <i class="fa fa-user-plus mr-2"></i>
+                            <i class="fas fa-user-plus mr-2"></i>
                             Crear Cuenta
                         </span>
                     </button>
@@ -268,7 +268,7 @@
                     {% if login_url %}
                     <a href="{{ login_url }}" 
                        class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors duration-200 flex items-center justify-center">
-                        <i class="fa fa-sign-in mr-2"></i>Inicia sesión aquí
+                        <i class="fas fa-sign-in mr-2"></i>Inicia sesión aquí
                     </a>
                     {% endif %}
                 </div>
