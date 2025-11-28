@@ -18,7 +18,7 @@
             <div class="mt-4 md:mt-0">
                 <a href="{% url 'liquidacion:registroestudios_nuevo' %}" 
                    class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 rounded-lg font-semibold hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
-                    <i class="fas fa-plus-circle mr-2"></i>Nuevo Registro
+                    <i class="fa fa-plus-circle mr-2"></i>Nuevo Registro
                 </a>
             </div>
         </div>
@@ -34,7 +34,7 @@
                     <p class="text-3xl font-bold mt-1">{{ registros_eco|length|add:registros_otros|length }}</p>
                 </div>
                 <div class="bg-white/20 rounded-full p-3">
-                    <i class="fas fa-file-medical text-2xl"></i>
+                    <i class="fa fa-file-medical text-2xl"></i>
                 </div>
             </div>
         </div>
@@ -47,7 +47,7 @@
                     <p class="text-3xl font-bold mt-1">{{ registros_eco|length }}</p>
                 </div>
                 <div class="bg-white/20 rounded-full p-3">
-                    <i class="fas fa-heartbeat text-2xl"></i>
+                    <i class="fa fa-heartbeat text-2xl"></i>
                 </div>
             </div>
         </div>
@@ -60,7 +60,7 @@
                     <p class="text-3xl font-bold mt-1">{{ registros_otros|length }}</p>
                 </div>
                 <div class="bg-white/20 rounded-full p-3">
-                    <i class="fas fa-procedures text-2xl"></i>
+                    <i class="fa fa-procedures text-2xl"></i>
                 </div>
             </div>
         </div>
@@ -73,7 +73,7 @@
                     <p class="text-3xl font-bold mt-1">{{ total_regiones_eco|add:total_regiones_otros }}</p>
                 </div>
                 <div class="bg-white/20 rounded-full p-3">
-                    <i class="fas fa-layer-group text-2xl"></i>
+                    <i class="fa fa-layer-group text-2xl"></i>
                 </div>
             </div>
         </div>
@@ -85,14 +85,14 @@
         <button type="button" id="toggle-filtros" class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors rounded-t-xl">
             <div class="flex items-center">
                 <div class="bg-indigo-100 text-indigo-600 rounded-lg p-2 mr-3">
-                    <i class="fas fa-sliders-h"></i>
+                    <i class="fa fa-sliders-h"></i>
                 </div>
                 <div>
                     <h2 class="text-lg font-semibold text-gray-800">Filtros y Búsqueda</h2>
                     <p class="text-sm text-gray-500">Refina tus resultados</p>
                 </div>
             </div>
-            <i class="fas fa-chevron-down text-gray-400 transition-transform" id="filtros-icon"></i>
+            <i class="fa fa-chevron-down text-gray-400 transition-transform" id="filtros-icon"></i>
         </button>
 
         <!-- Contenido de filtros -->
@@ -104,12 +104,12 @@
                     <!-- Búsqueda rápida - más prominente -->
                     <div class="md:col-span-12">
                         <label for="id_busqueda" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-search text-indigo-500"></i> Búsqueda rápida por paciente (nombre, apellido o DNI)
+                            <i class="fa fa-search text-indigo-500"></i> Búsqueda rápida por paciente (nombre, apellido o DNI)
                         </label>
                         <div class="relative">
                             {{ form.busqueda }}
                             <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                                <i class="fas fa-search"></i>
+                                <i class="fa fa-search"></i>
                             </span>
                         </div>
                     </div>
@@ -117,14 +117,14 @@
                     <!-- Filtros de fecha -->
                     <div class="md:col-span-3">
                         <label for="id_mes" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-calendar text-blue-500"></i> Mes
+                            <i class="fa fa-calendar text-blue-500"></i> Mes
                         </label>
                         {{ form.mes }}
                     </div>
                     
                     <div class="md:col-span-3">
                         <label for="id_año" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-calendar-alt text-blue-500"></i> Año
+                            <i class="fa fa-calendar-alt text-blue-500"></i> Año
                         </label>
                         {{ form.año }}
                     </div>
@@ -132,7 +132,7 @@
                     <!-- Ordenamiento -->
                     <div class="md:col-span-4">
                         <label for="id_orden" class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-sort text-purple-500"></i> Ordenar resultados
+                            <i class="fa fa-sort text-purple-500"></i> Ordenar resultados
                         </label>
                         {{ form.orden }}
                     </div>
@@ -140,7 +140,7 @@
                     <!-- Botón Aplicar -->
                     <div class="md:col-span-2 flex items-end">
                         <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2.5 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
-                            <i class="fas fa-filter mr-2"></i>Aplicar
+                            <i class="fa fa-filter mr-2"></i>Aplicar
                         </button>
                     </div>
                 </div>
@@ -151,15 +151,15 @@
                     <a href="?filtro_rapido=hoy" 
                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                               {% if filtro_rapido == 'hoy' %}bg-blue-600 text-white shadow-md{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
-                        <i class="fas fa-calendar-day mr-1.5"></i>Registros de hoy
+                        <i class="fa fa-calendar-day mr-1.5"></i>Registros de hoy
                     </a>
                     <a href="?mes={{ mes_num }}&año={{ año_num }}" 
                        class="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
-                        <i class="fas fa-sync-alt mr-1.5"></i>Restablecer filtros
+                        <i class="fa fa-sync-alt mr-1.5"></i>Restablecer filtros
                     </a>
                     {% if filtro_rapido_label and filtro_rapido == 'hoy' %}
                     <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-green-100 text-green-800 text-sm font-medium">
-                        <i class="fas fa-check-circle mr-1.5"></i>Filtro activo: {{ filtro_rapido_label }}
+                        <i class="fa fa-check-circle mr-1.5"></i>Filtro activo: {{ filtro_rapido_label }}
                     </span>
                     {% endif %}
                 </div>
@@ -174,14 +174,14 @@
                 <button type="button" id="tab-ecografias" 
                         class="tab-button active px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
                         onclick="cambiarTab('ecografias')">
-                    <i class="fas fa-heartbeat mr-2"></i>
+                    <i class="fa fa-heartbeat mr-2"></i>
                     Ecografías
                     <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{{ registros_eco|length }}</span>
                 </button>
                 <button type="button" id="tab-otros" 
                         class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
                         onclick="cambiarTab('otros')">
-                    <i class="fas fa-procedures mr-2"></i>
+                    <i class="fa fa-procedures mr-2"></i>
                     RAD / TOM / RES
                     <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">{{ registros_otros|length }}</span>
                 </button>
@@ -225,11 +225,11 @@
                                class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
                                 Paciente
                                 {% if orden == 'paciente_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                    <i class="fa fa-sort-up ml-1 text-blue-600"></i>
                                 {% elif orden == 'paciente_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                    <i class="fa fa-sort-down ml-1 text-blue-600"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fa fa-sort ml-1 text-gray-400"></i>
                                 {% endif %}
                             </a>
                         </th>
@@ -241,11 +241,11 @@
                                class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
                                 Fecha del Informe
                                 {% if orden == 'fecha_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                    <i class="fa fa-sort-up ml-1 text-blue-600"></i>
                                 {% elif orden == 'fecha_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                    <i class="fa fa-sort-down ml-1 text-blue-600"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fa fa-sort ml-1 text-gray-400"></i>
                                 {% endif %}
                             </a>
                         </th>
@@ -283,13 +283,13 @@
                                 <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
                                    title="Editar registro">
-                                    <i class="fas fa-edit text-sm"></i>
+                                    <i class="fa fa-edit text-sm"></i>
                                 </a>
                                 <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
                                    title="Eliminar registro"
                                    onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
-                                    <i class="fas fa-trash-alt text-sm"></i>
+                                    <i class="fa fa-trash-alt text-sm"></i>
                                 </a>
                             </div>
                         </td>
@@ -297,7 +297,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                            <i class="fa fa-inbox text-4xl text-gray-300 mb-2"></i>
                             <p>No se encontraron registros de ecografía para el período seleccionado</p>
                         </td>
                     </tr>
@@ -341,11 +341,11 @@
                                class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
                                 Paciente
                                 {% if orden == 'paciente_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
+                                    <i class="fa fa-sort-up ml-1 text-teal-600"></i>
                                 {% elif orden == 'paciente_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
+                                    <i class="fa fa-sort-down ml-1 text-teal-600"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fa fa-sort ml-1 text-gray-400"></i>
                                 {% endif %}
                             </a>
                         </th>
@@ -357,11 +357,11 @@
                                class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
                                 Fecha del Informe
                                 {% if orden == 'fecha_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
+                                    <i class="fa fa-sort-up ml-1 text-teal-600"></i>
                                 {% elif orden == 'fecha_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
+                                    <i class="fa fa-sort-down ml-1 text-teal-600"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fa fa-sort ml-1 text-gray-400"></i>
                                 {% endif %}
                             </a>
                         </th>
@@ -399,13 +399,13 @@
                                 <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
                                    title="Editar registro">
-                                    <i class="fas fa-edit text-sm"></i>
+                                    <i class="fa fa-edit text-sm"></i>
                                 </a>
                                 <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
                                    title="Eliminar registro"
                                    onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
-                                    <i class="fas fa-trash-alt text-sm"></i>
+                                    <i class="fa fa-trash-alt text-sm"></i>
                                 </a>
                             </div>
                         </td>
@@ -413,7 +413,7 @@
                     {% empty %}
                     <tr>
                         <td colspan="6" class="px-4 py-8 text-center text-gray-500">
-                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
+                            <i class="fa fa-inbox text-4xl text-gray-300 mb-2"></i>
                             <p>No se encontraron registros de otros estudios para el período seleccionado</p>
                         </td>
                     </tr>
