@@ -1,0 +1,270 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} Plantilla - Dictado con IA{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                        <i class="fas fa-{% if form.instance.pk %}edit{% else %}plus-circle{% endif %} text-3xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold">{% if form.instance.pk %}Editar Plantilla{% else %}Nueva Plantilla{% endif %}</h1>
+                        <p class="text-indigo-100 mt-1">Configure la plantilla de informe</p>
+                    </div>
+                </div>
+                <a href="{% url 'dictado_informes:plantilla_list' %}" 
+                   class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 font-semibold rounded-lg shadow-lg hover:bg-indigo-50 transition-all duration-200">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Volver
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 pb-12">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- Errores generales -->
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                <div class="flex">
+                    <i class="fas fa-exclamation-circle text-red-500 mt-1 mr-3"></i>
+                    <div>
+                        {% for error in form.non_field_errors %}
+                        <p class="text-red-700">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Información Básica -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <div class="flex items-center mb-6 pb-4 border-b">
+                    <i class="fas fa-info-circle text-2xl text-indigo-600 mr-3"></i>
+                    <h2 class="text-xl font-bold text-gray-800">Información Básica</h2>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Nombre -->
+                    <div class="md:col-span-2">
+                        <label for="id_nombre" class="block text-sm font-medium text-gray-700 mb-2">
+                            Nombre de la Plantilla <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               name="nombre" 
+                               id="id_nombre"
+                               value="{{ form.nombre.value|default:'' }}"
+                               required
+                               placeholder="Ej: Resonancia Magnética de Cerebro - Protocolo Estándar"
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 {% if form.nombre.errors %}border-red-500{% endif %}">
+                        {% if form.nombre.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.nombre.errors.0 }}</p>
+                        {% endif %}
+                        <p class="mt-1 text-xs text-gray-500">Un nombre descriptivo para identificar fácilmente la plantilla</p>
+                    </div>
+
+                    <!-- Tipo de Estudio -->
+                    <div>
+                        <label for="id_tipo_estudio" class="block text-sm font-medium text-gray-700 mb-2">
+                            Tipo de Estudio <span class="text-red-500">*</span>
+                        </label>
+                        <select name="tipo_estudio" 
+                                id="id_tipo_estudio"
+                                required
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 {% if form.tipo_estudio.errors %}border-red-500{% endif %}">
+                            <option value="">Seleccione...</option>
+                            {% for value, label in form.fields.tipo_estudio.choices %}
+                            {% if value %}
+                            <option value="{{ value }}" {% if form.tipo_estudio.value == value %}selected{% endif %}>{{ label }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        {% if form.tipo_estudio.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.tipo_estudio.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Activa -->
+                    <div>
+                        <label for="id_activa" class="block text-sm font-medium text-gray-700 mb-2">
+                            Estado
+                        </label>
+                        <div class="flex items-center h-10">
+                            <input type="checkbox" 
+                                   name="activa" 
+                                   id="id_activa"
+                                   {% if form.activa.value %}checked{% elif not form.instance.pk %}checked{% endif %}
+                                   class="w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            <label for="id_activa" class="ml-3 text-gray-700">
+                                <span class="font-medium">Plantilla activa</span>
+                                <p class="text-xs text-gray-500">Disponible para uso en nuevos informes</p>
+                            </label>
+                        </div>
+                        {% if form.activa.errors %}
+                        <p class="mt-1 text-sm text-red-600">{{ form.activa.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenido de la Plantilla -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <div class="flex items-center mb-6 pb-4 border-b">
+                    <i class="fas fa-file-alt text-2xl text-purple-600 mr-3"></i>
+                    <h2 class="text-xl font-bold text-gray-800">Contenido de la Plantilla</h2>
+                </div>
+                
+                <div>
+                    <label for="id_contenido" class="block text-sm font-medium text-gray-700 mb-2">
+                        Contenido <span class="text-red-500">*</span>
+                    </label>
+                    <div class="mb-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                        <div class="flex items-start">
+                            <i class="fas fa-lightbulb text-blue-600 mt-1 mr-3"></i>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-semibold mb-2">Consejos para crear plantillas efectivas:</p>
+                                <ul class="list-disc list-inside space-y-1 text-xs">
+                                    <li>Usa variables entre llaves dobles: <code class="bg-blue-100 px-1 rounded">{{"{{"}}nombre_variable{{"}}"}}</code></li>
+                                    <li>Incluye todas las secciones: Técnica, Hallazgos, Conclusión</li>
+                                    <li>Usa terminología médica estándar</li>
+                                    <li>Deja espacios para personalización</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <textarea name="contenido" 
+                              id="id_contenido"
+                              rows="20"
+                              required
+                              placeholder="Ejemplo:
+
+TÉCNICA:
+Se realiza estudio de {{"{{"}}region{{"}}"}} mediante secuencias {{"{{"}}secuencias{{"}}"}}.
+
+HALLAZGOS:
+[Describir hallazgos aquí]
+
+CONCLUSIÓN:
+[Conclusión diagnóstica]"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm {% if form.contenido.errors %}border-red-500{% endif %}">{{ form.contenido.value|default:'' }}</textarea>
+                    {% if form.contenido.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.contenido.errors.0 }}</p>
+                    {% endif %}
+                    
+                    <!-- Contador de caracteres -->
+                    <div class="flex justify-between items-center mt-2 text-xs text-gray-500">
+                        <span>Use formato de texto plano. Las variables se reemplazarán automáticamente.</span>
+                        <span id="charCount">0 caracteres</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Variables (JSONField) -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <div class="flex items-center mb-6 pb-4 border-b">
+                    <i class="fas fa-code text-2xl text-green-600 mr-3"></i>
+                    <h2 class="text-xl font-bold text-gray-800">Variables de la Plantilla</h2>
+                </div>
+                
+                <div>
+                    <label for="id_variables" class="block text-sm font-medium text-gray-700 mb-2">
+                        Variables (formato JSON)
+                    </label>
+                    <div class="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p class="text-xs text-yellow-800">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <strong>Formato JSON:</strong> Lista de variables que se pueden usar en el contenido. 
+                            Ejemplo: <code class="bg-yellow-100 px-1 rounded">["region", "secuencias", "contraste"]</code>
+                        </p>
+                    </div>
+                    <textarea name="variables" 
+                              id="id_variables"
+                              rows="3"
+                              placeholder='["region", "secuencias", "contraste"]'
+                              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm {% if form.variables.errors %}border-red-500{% endif %}">{{ form.variables.value|default:'' }}</textarea>
+                    {% if form.variables.errors %}
+                    <p class="mt-1 text-sm text-red-600">{{ form.variables.errors.0 }}</p>
+                    {% endif %}
+                    <p class="mt-1 text-xs text-gray-500">Opcional. Deje vacío si no usa variables.</p>
+                </div>
+            </div>
+
+            <!-- Vista Previa -->
+            <div class="bg-gradient-to-r from-gray-50 to-slate-50 rounded-xl shadow-md p-6 border-2 border-dashed border-gray-300">
+                <div class="flex items-center mb-4">
+                    <i class="fas fa-eye text-xl text-gray-600 mr-2"></i>
+                    <h3 class="text-lg font-bold text-gray-800">Vista Previa</h3>
+                </div>
+                <div id="preview" class="bg-white rounded-lg p-4 min-h-[100px] text-sm text-gray-700 whitespace-pre-wrap border">
+                    <span class="text-gray-400 italic">El contenido aparecerá aquí mientras escribes...</span>
+                </div>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="flex items-center justify-between bg-gray-50 p-6 rounded-xl">
+                <a href="{% url 'dictado_informes:plantilla_list' %}" 
+                   class="px-6 py-3 bg-white text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:bg-gray-50 transition-colors">
+                    <i class="fas fa-times mr-2"></i> Cancelar
+                </a>
+                <button type="submit" 
+                        class="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-lg shadow-lg hover:from-purple-700 hover:to-indigo-700 transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-save mr-2"></i> Guardar Plantilla
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Actualizar vista previa
+const contenidoField = document.getElementById('id_contenido');
+const preview = document.getElementById('preview');
+const charCount = document.getElementById('charCount');
+
+contenidoField.addEventListener('input', function() {
+    const content = this.value;
+    if (content.trim()) {
+        preview.textContent = content;
+        preview.classList.remove('text-gray-400', 'italic');
+    } else {
+        preview.innerHTML = '<span class="text-gray-400 italic">El contenido aparecerá aquí mientras escribes...</span>';
+    }
+    
+    // Actualizar contador
+    charCount.textContent = `${content.length} caracteres`;
+});
+
+// Inicializar vista previa si hay contenido
+if (contenidoField.value.trim()) {
+    preview.textContent = contenidoField.value;
+    preview.classList.remove('text-gray-400', 'italic');
+    charCount.textContent = `${contenidoField.value.length} caracteres`;
+}
+
+// Validar JSON en variables
+const variablesField = document.getElementById('id_variables');
+variablesField.addEventListener('blur', function() {
+    const value = this.value.trim();
+    if (value && value !== '[]') {
+        try {
+            JSON.parse(value);
+            this.classList.remove('border-red-500');
+            this.classList.add('border-green-500');
+        } catch (e) {
+            this.classList.remove('border-green-500');
+            this.classList.add('border-red-500');
+            alert('El formato JSON no es válido. Ejemplo: ["variable1", "variable2"]');
+        }
+    }
+});
+</script>
+{% endblock %}

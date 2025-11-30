@@ -1,0 +1,240 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}Informes - Dictado con IA{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                        <i class="fas fa-file-medical text-3xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold">Gestión de Informes</h1>
+                        <p class="text-indigo-100 mt-1">{{ informes.paginator.count }} informe(s) encontrado(s)</p>
+                    </div>
+                </div>
+                <a href="{% url 'dictado_informes:informe_create' %}" 
+                   class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 font-semibold rounded-lg shadow-lg hover:bg-indigo-50 transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Nuevo Informe
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <form method="get" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <!-- Búsqueda -->
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-search mr-1"></i> Buscar
+                        </label>
+                        <input type="text" 
+                               name="q" 
+                               value="{{ request.GET.q }}"
+                               placeholder="Nombre, apellido, DNI o N° estudio..."
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+
+                    <!-- Tipo de Estudio -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-microscope mr-1"></i> Tipo de Estudio
+                        </label>
+                        <select name="tipo_estudio" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">Todos</option>
+                            {% for value, label in tipos_estudio %}
+                            <option value="{{ value }}" {% if request.GET.tipo_estudio == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Estado -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-flag mr-1"></i> Estado
+                        </label>
+                        <select name="estado" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">Todos</option>
+                            {% for value, label in estados %}
+                            <option value="{{ value }}" {% if request.GET.estado == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-4 border-t">
+                    <a href="{% url 'dictado_informes:informe_list' %}" 
+                       class="text-gray-600 hover:text-gray-900 font-medium">
+                        <i class="fas fa-undo mr-1"></i> Limpiar filtros
+                    </a>
+                    <button type="submit" 
+                            class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                        <i class="fas fa-filter mr-2"></i> Aplicar Filtros
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tabla de Informes -->
+        <div class="bg-white rounded-xl shadow-md overflow-hidden">
+            {% if informes %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gradient-to-r from-gray-50 to-gray-100">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Paciente
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                N° Estudio
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Tipo
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Fecha
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Estado
+                            </th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Médico
+                            </th>
+                            <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                                Acciones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for informe in informes %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">
+                                    {{ informe.apellido }}, {{ informe.nombre }}
+                                </div>
+                                <div class="text-sm text-gray-500">DNI: {{ informe.dni_paciente }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {{ informe.numero_estudio }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    {{ informe.get_tipo_estudio_display }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ informe.fecha_estudio|date:"d/m/Y" }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {% if informe.estado == 'BOR' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-edit mr-1"></i> Borrador
+                                </span>
+                                {% elif informe.estado == 'REV' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-hourglass-half mr-1"></i> En Revisión
+                                </span>
+                                {% elif informe.estado == 'FIN' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-check mr-1"></i> Finalizado
+                                </span>
+                                {% elif informe.estado == 'FIR' %}
+                                <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                    <i class="fas fa-signature mr-1"></i> Firmado
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ informe.medico.get_full_name|default:informe.medico.username }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                <div class="flex items-center justify-center space-x-2">
+                                    <a href="{% url 'dictado_informes:informe_detail' informe.pk %}" 
+                                       class="text-indigo-600 hover:text-indigo-900 transition-colors"
+                                       title="Ver detalle">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'dictado_informes:informe_update' informe.pk %}" 
+                                       class="text-green-600 hover:text-green-900 transition-colors"
+                                       title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if informe.estado != 'FIR' %}
+                                    <a href="{% url 'dictado_informes:informe_delete' informe.pk %}" 
+                                       class="text-red-600 hover:text-red-900 transition-colors"
+                                       title="Eliminar">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginación -->
+            {% if informes.paginator.num_pages > 1 %}
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-gray-700">
+                        Página {{ informes.number }} de {{ informes.paginator.num_pages }}
+                    </div>
+                    <div class="flex space-x-2">
+                        {% if informes.has_previous %}
+                        <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_estudio %}&tipo_estudio={{ request.GET.tipo_estudio }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}" 
+                           class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <i class="fas fa-angle-double-left"></i>
+                        </a>
+                        <a href="?page={{ informes.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_estudio %}&tipo_estudio={{ request.GET.tipo_estudio }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}" 
+                           class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <i class="fas fa-angle-left"></i>
+                        </a>
+                        {% endif %}
+                        
+                        {% if informes.has_next %}
+                        <a href="?page={{ informes.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_estudio %}&tipo_estudio={{ request.GET.tipo_estudio }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}" 
+                           class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <i class="fas fa-angle-right"></i>
+                        </a>
+                        <a href="?page={{ informes.paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.tipo_estudio %}&tipo_estudio={{ request.GET.tipo_estudio }}{% endif %}{% if request.GET.estado %}&estado={{ request.GET.estado }}{% endif %}" 
+                           class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            <i class="fas fa-angle-double-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-16">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-xl text-gray-500 font-medium">No se encontraron informes</p>
+                <p class="text-gray-400 mt-2">Crea tu primer informe para comenzar</p>
+                <a href="{% url 'dictado_informes:informe_create' %}" 
+                   class="inline-flex items-center mt-6 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Crear Informe
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

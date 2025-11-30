@@ -1,0 +1,197 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}Plantillas - Dictado con IA{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white shadow-xl">
+        <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+                        <i class="fas fa-file-contract text-3xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-bold">Plantillas de Informes</h1>
+                        <p class="text-indigo-100 mt-1">{{ plantillas.count }} plantilla(s) disponible(s)</p>
+                    </div>
+                </div>
+                <a href="{% url 'dictado_informes:plantilla_create' %}" 
+                   class="inline-flex items-center px-6 py-3 bg-white text-indigo-600 font-semibold rounded-lg shadow-lg hover:bg-indigo-50 transition-all duration-200 transform hover:scale-105">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Nueva Plantilla
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 pb-12">
+        <!-- Filtros -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+            <form method="get" class="flex items-end gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-microscope mr-1"></i> Tipo de Estudio
+                    </label>
+                    <select name="tipo_estudio" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Todos los tipos</option>
+                        {% for value, label in tipos_estudio %}
+                        <option value="{{ value }}" {% if request.GET.tipo_estudio == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-toggle-on mr-1"></i> Estado
+                    </label>
+                    <select name="activa" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Todas</option>
+                        <option value="true" {% if request.GET.activa == 'true' %}selected{% endif %}>Activas</option>
+                        <option value="false" {% if request.GET.activa == 'false' %}selected{% endif %}>Inactivas</option>
+                    </select>
+                </div>
+                <button type="submit" 
+                        class="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                    <i class="fas fa-filter mr-2"></i> Filtrar
+                </button>
+                <a href="{% url 'dictado_informes:plantilla_list' %}" 
+                   class="px-6 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                    <i class="fas fa-undo mr-2"></i> Limpiar
+                </a>
+            </form>
+        </div>
+
+        <!-- Lista de Plantillas -->
+        {% if plantillas %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for plantilla in plantillas %}
+            <div class="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden">
+                <!-- Header de la Card -->
+                <div class="p-6 {% if plantilla.activa %}bg-gradient-to-r from-purple-50 to-indigo-50{% else %}bg-gray-50{% endif %} border-b">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-bold text-gray-900 mb-2">{{ plantilla.nombre }}</h3>
+                            <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {{ plantilla.get_tipo_estudio_display }}
+                            </span>
+                        </div>
+                        <div class="ml-2">
+                            {% if plantilla.activa %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                <i class="fas fa-check-circle mr-1"></i> Activa
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                                <i class="fas fa-pause-circle mr-1"></i> Inactiva
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenido -->
+                <div class="p-6">
+                    <div class="mb-4">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Contenido (extracto)</h4>
+                        <div class="bg-gray-50 rounded p-3 text-sm text-gray-700 h-24 overflow-y-auto">
+                            {{ plantilla.contenido|truncatewords:30 }}
+                        </div>
+                    </div>
+
+                    {% if plantilla.variables %}
+                    <div class="mb-4">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2">Variables</h4>
+                        <div class="flex flex-wrap gap-1">
+                            {% for var in plantilla.variables %}
+                            <span class="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">{{ var }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="text-xs text-gray-500 mb-4">
+                        <i class="fas fa-user mr-1"></i> {{ plantilla.creada_por.get_full_name|default:plantilla.creada_por.username }}
+                        <br>
+                        <i class="fas fa-calendar mr-1"></i> {{ plantilla.fecha_creacion|date:"d/m/Y" }}
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="flex gap-2 pt-4 border-t">
+                        <a href="{% url 'dictado_informes:plantilla_update' plantilla.pk %}" 
+                           class="flex-1 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors text-center">
+                            <i class="fas fa-edit mr-1"></i> Editar
+                        </a>
+                        <button onclick="previewPlantilla({{ plantilla.pk }}, '{{ plantilla.nombre|escapejs }}')"
+                                class="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-300 transition-colors">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-xl shadow-md text-center py-16">
+            <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+            <p class="text-xl text-gray-500 font-medium">No se encontraron plantillas</p>
+            <p class="text-gray-400 mt-2">Crea tu primera plantilla para comenzar</p>
+            <a href="{% url 'dictado_informes:plantilla_create' %}" 
+               class="inline-flex items-center mt-6 px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-md">
+                <i class="fas fa-plus-circle mr-2"></i>
+                Crear Plantilla
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal de Preview -->
+<div id="previewModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 p-6 text-white">
+            <div class="flex items-center justify-between">
+                <h2 id="previewTitle" class="text-2xl font-bold">Vista Previa</h2>
+                <button onclick="closePreview()" class="text-white hover:text-gray-200 transition-colors">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 120px);">
+            <div id="previewContent" class="whitespace-pre-wrap text-gray-800 bg-gray-50 p-4 rounded"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+function previewPlantilla(plantillaId, nombre) {
+    fetch(`{% url 'dictado_informes:obtener_plantilla' 0 %}`.replace('0', plantillaId))
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('previewTitle').textContent = nombre;
+            document.getElementById('previewContent').textContent = data.contenido || 'Sin contenido';
+            document.getElementById('previewModal').classList.remove('hidden');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al cargar la plantilla');
+        });
+}
+
+function closePreview() {
+    document.getElementById('previewModal').classList.add('hidden');
+}
+
+// Cerrar con ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closePreview();
+    }
+});
+</script>
+{% endblock %}

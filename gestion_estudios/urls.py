@@ -44,6 +44,7 @@ urlpatterns = [
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
+    path('dictado_informes/', include('dictado_informes.urls')),  # URLs para dictado de informes con IA
     
     # Prueba temporal de toast
     path('test-toast/', test_toast, name='test_toast'),

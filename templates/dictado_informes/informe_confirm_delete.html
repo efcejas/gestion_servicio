@@ -1,0 +1,160 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}Eliminar Informe - Dictado con IA{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+    <div class="max-w-2xl w-full">
+        <!-- Alerta de Confirmación -->
+        <div class="bg-white rounded-xl shadow-2xl overflow-hidden">
+            <!-- Header con Ícono de Advertencia -->
+            <div class="bg-gradient-to-r from-red-500 to-orange-600 p-8 text-center">
+                <div class="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full mb-4">
+                    <i class="fas fa-exclamation-triangle text-4xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-white">Confirmar Eliminación</h1>
+                <p class="text-red-100 mt-2">Esta acción no se puede deshacer</p>
+            </div>
+
+            <!-- Contenido -->
+            <div class="p-8">
+                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+                    <p class="text-red-800 font-medium">
+                        ¿Está seguro de que desea eliminar este informe?
+                    </p>
+                </div>
+
+                <!-- Detalles del Informe -->
+                <div class="bg-gray-50 rounded-lg p-6 mb-6">
+                    <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-file-medical mr-2 text-indigo-600"></i>
+                        Detalles del Informe
+                    </h2>
+                    
+                    <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Paciente</dt>
+                            <dd class="mt-1 text-base font-semibold text-gray-900">
+                                {{ object.apellido }}, {{ object.nombre }}
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">DNI</dt>
+                            <dd class="mt-1 text-base font-semibold text-gray-900">
+                                {{ object.dni_paciente }}
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Tipo de Estudio</dt>
+                            <dd class="mt-1">
+                                <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    {{ object.get_tipo_estudio_display }}
+                                </span>
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Número de Estudio</dt>
+                            <dd class="mt-1 text-base font-semibold text-gray-900">
+                                {{ object.numero_estudio|default:"N/A" }}
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Fecha del Estudio</dt>
+                            <dd class="mt-1 text-base font-semibold text-gray-900">
+                                {{ object.fecha_estudio|date:"d/m/Y" }}
+                            </dd>
+                        </div>
+                        
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Estado</dt>
+                            <dd class="mt-1">
+                                {% if object.estado == 'BOR' %}
+                                <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    <i class="fas fa-edit mr-1"></i> Borrador
+                                </span>
+                                {% elif object.estado == 'REV' %}
+                                <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                    <i class="fas fa-hourglass-half mr-1"></i> En Revisión
+                                </span>
+                                {% elif object.estado == 'FIN' %}
+                                <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fas fa-check mr-1"></i> Finalizado
+                                </span>
+                                {% elif object.estado == 'FIR' %}
+                                <span class="px-3 py-1 inline-flex text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                                    <i class="fas fa-signature mr-1"></i> Firmado
+                                </span>
+                                {% endif %}
+                            </dd>
+                        </div>
+                        
+                        <div class="md:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">Médico Responsable</dt>
+                            <dd class="mt-1 text-base font-semibold text-gray-900">
+                                {{ object.medico.get_full_name|default:object.medico.username }}
+                            </dd>
+                        </div>
+                    </dl>
+                    
+                    {% if object.hallazgos %}
+                    <div class="mt-4 pt-4 border-t">
+                        <dt class="text-sm font-medium text-gray-500 mb-2">Hallazgos (extracto)</dt>
+                        <dd class="text-sm text-gray-700 bg-white p-3 rounded">
+                            {{ object.hallazgos|truncatewords:30 }}
+                        </dd>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Advertencias Adicionales -->
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded">
+                    <div class="flex">
+                        <i class="fas fa-info-circle text-yellow-700 mt-1 mr-3"></i>
+                        <div>
+                            <p class="text-yellow-700 font-medium mb-2">También se eliminarán:</p>
+                            <ul class="list-disc list-inside text-yellow-700 text-sm space-y-1">
+                                <li>Todos los audios de transcripción asociados</li>
+                                <li>Los registros de procesamiento con IA</li>
+                                <li>El historial de modificaciones</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulario de Confirmación -->
+                <form method="post" class="space-y-6">
+                    {% csrf_token %}
+                    
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <a href="{% url 'dictado_informes:informe_detail' object.pk %}" 
+                           class="flex-1 px-6 py-3 bg-white text-gray-700 font-semibold rounded-lg border-2 border-gray-300 hover:bg-gray-50 transition-colors text-center">
+                            <i class="fas fa-times mr-2"></i>
+                            Cancelar
+                        </a>
+                        
+                        <button type="submit" 
+                                class="flex-1 px-6 py-3 bg-gradient-to-r from-red-600 to-orange-600 text-white font-semibold rounded-lg shadow-lg hover:from-red-700 hover:to-orange-700 transition-all duration-200 transform hover:scale-105">
+                            <i class="fas fa-trash mr-2"></i>
+                            Sí, Eliminar Informe
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Link de Regreso Alternativo -->
+        <div class="text-center mt-6">
+            <a href="{% url 'dictado_informes:informe_list' %}" 
+               class="text-indigo-600 hover:text-indigo-800 font-medium">
+                <i class="fas fa-arrow-left mr-1"></i>
+                Volver a la lista de informes
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
