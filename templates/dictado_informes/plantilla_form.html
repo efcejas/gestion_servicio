@@ -132,7 +132,7 @@
                             <div class="text-sm text-blue-800">
                                 <p class="font-semibold mb-2">Consejos para crear plantillas efectivas:</p>
                                 <ul class="list-disc list-inside space-y-1 text-xs">
-                                    <li>Usa variables entre llaves dobles: <code class="bg-blue-100 px-1 rounded">{{"{{"}}nombre_variable{{"}}"}}</code></li>
+                                    <li>Usa variables entre llaves dobles para datos dinámicos</li>
                                     <li>Incluye todas las secciones: Técnica, Hallazgos, Conclusión</li>
                                     <li>Usa terminología médica estándar</li>
                                     <li>Deja espacios para personalización</li>
@@ -145,16 +145,7 @@
                               id="id_contenido"
                               rows="20"
                               required
-                              placeholder="Ejemplo:
-
-TÉCNICA:
-Se realiza estudio de {{"{{"}}region{{"}}"}} mediante secuencias {{"{{"}}secuencias{{"}}"}}.
-
-HALLAZGOS:
-[Describir hallazgos aquí]
-
-CONCLUSIÓN:
-[Conclusión diagnóstica]"
+                              placeholder="Escriba aquí el contenido de la plantilla..."
                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm {% if form.contenido.errors %}border-red-500{% endif %}">{{ form.contenido.value|default:'' }}</textarea>
                     {% if form.contenido.errors %}
                     <p class="mt-1 text-sm text-red-600">{{ form.contenido.errors.0 }}</p>

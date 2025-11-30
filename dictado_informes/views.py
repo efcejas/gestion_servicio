@@ -6,8 +6,13 @@ from django.urls import reverse_lazy
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Q, Count
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.core.files.base import ContentFile
 from .models import Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, EstadoInforme
+from .ai_services import ai_service
 import json
+import base64
 
 
 class SuperuserRequiredMixin(UserPassesTestMixin):
@@ -128,7 +133,7 @@ class InformeUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
         'region_anatomica', 'indicacion_clinica', 'tecnica', 'hallazgos',
         'conclusion', 'estado', 'plantilla_usada', 'notas_privadas'
     ]
-    success_url = reverse_lazy('dictado_informes:lista_informes')
+    success_url = reverse_lazy('dictado_informes:informe_list')
     
     def form_valid(self, form):
         messages.success(self.request, "✅ Informe actualizado exitosamente")
@@ -158,7 +163,7 @@ class InformeDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
     """Eliminar un informe"""
     model = Informe
     template_name = 'dictado_informes/informe_confirm_delete.html'
-    success_url = reverse_lazy('dictado_informes:lista_informes')
+    success_url = reverse_lazy('dictado_informes:informe_list')
     
     def delete(self, request, *args, **kwargs):
         messages.success(request, "🗑️ Informe eliminado exitosamente")
@@ -199,7 +204,7 @@ class PlantillaCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView
     model = PlantillaInforme
     template_name = 'dictado_informes/plantilla_form.html'
     fields = ['nombre', 'tipo_estudio', 'contenido', 'variables', 'activa']
-    success_url = reverse_lazy('dictado_informes:lista_plantillas')
+    success_url = reverse_lazy('dictado_informes:plantilla_list')
     
     def form_valid(self, form):
         form.instance.creada_por = self.request.user
@@ -212,7 +217,7 @@ class PlantillaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView
     model = PlantillaInforme
     template_name = 'dictado_informes/plantilla_form.html'
     fields = ['nombre', 'tipo_estudio', 'contenido', 'variables', 'activa']
-    success_url = reverse_lazy('dictado_informes:lista_plantillas')
+    success_url = reverse_lazy('dictado_informes:plantilla_list')
     
     def form_valid(self, form):
         messages.success(self.request, "✅ Plantilla actualizada exitosamente")
@@ -247,4 +252,107 @@ def firmar_informe(request, pk):
     informe = get_object_or_404(Informe, pk=pk)
     informe.firmar(request.user)
     messages.success(request, f"✅ Informe firmado exitosamente")
-    return redirect('dictado_informes:detalle_informe', pk=pk)
+    return redirect('dictado_informes:informe_detail', pk=pk)
+
+
+# API para procesar audio dictado
+@require_POST
+def procesar_audio_dictado(request):
+    """
+    Procesa audio dictado: transcribe y mejora con IA
+    Recibe: archivo de audio en base64
+    Retorna: texto transcrito y mejorado
+    """
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    try:
+        # Obtener datos del POST
+        data = json.loads(request.body)
+        audio_base64 = data.get('audio')
+        tipo_estudio = data.get('tipo_estudio', 'OTR')
+        
+        if not audio_base64:
+            return JsonResponse({'error': 'No se recibió audio'}, status=400)
+        
+        # Decodificar audio de base64
+        try:
+            # Remover el prefijo "data:audio/webm;base64," si existe
+            if ',' in audio_base64:
+                audio_base64 = audio_base64.split(',')[1]
+            
+            audio_data = base64.b64decode(audio_base64)
+        except Exception as e:
+            return JsonResponse({'error': f'Error al decodificar audio: {str(e)}'}, status=400)
+        
+        # Crear archivo temporal
+        audio_file = ContentFile(audio_data, name='dictado.webm')
+        
+        # Transcribir con Whisper
+        transcripcion_result = ai_service.transcribe_audio(audio_file)
+        
+        if 'error' in transcripcion_result:
+            return JsonResponse({
+                'success': False,
+                'error': transcripcion_result['error'],
+                'texto_original': ''
+            })
+        
+        texto_original = transcripcion_result['text']
+        
+        # Mejorar con GPT
+        mejora_result = ai_service.improve_medical_text(
+            texto_original,
+            tipo_estudio
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'texto_original': texto_original,
+            'texto_mejorado': mejora_result.get('texto_mejorado', texto_original),
+            'confianza_transcripcion': transcripcion_result.get('confidence', 0.0),
+            'confianza_ia': mejora_result.get('confianza', 0.0),
+            'sugerencias': mejora_result.get('sugerencias', []),
+            'duracion': transcripcion_result.get('duration')
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# API para mejorar texto existente
+@require_POST
+def mejorar_texto_ia(request):
+    """
+    Mejora un texto ya escrito usando IA
+    Útil para mejorar borradores sin dictado
+    """
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        texto = data.get('texto', '')
+        tipo_estudio = data.get('tipo_estudio', 'OTR')
+        
+        if not texto:
+            return JsonResponse({'error': 'No se recibió texto'}, status=400)
+        
+        # Mejorar con GPT
+        result = ai_service.improve_medical_text(texto, tipo_estudio)
+        
+        return JsonResponse({
+            'success': True,
+            'texto_mejorado': result.get('texto_mejorado', texto),
+            'confianza': result.get('confianza', 0.0),
+            'sugerencias': result.get('sugerencias', [])
+        })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
