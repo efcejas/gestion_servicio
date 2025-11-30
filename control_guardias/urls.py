@@ -10,9 +10,14 @@ from .views import (
     GuardiaListView,
     ResumenGuardiasView,
     MisGuardiasView,
+    CoberturasSemanalesPortalView,
 )
 
 urlpatterns = [
+    # Portal público (sin autenticación requerida)
+    path('portal/coberturas-semanal/', CoberturasSemanalesPortalView.as_view(), name='portal_coberturas_semanal'),
+    
+    # Vistas con autenticación
     path('coberturas-semanal/', GuardiaListView.as_view(), name='coberturas_semanal'),
     path('coberturas-medico/', ResumenGuardiasView.as_view(), name='coberturas_medico'),
     path('calendario-full-tw/', TailwindCalendarView.as_view(), name='calendario_guardias_full_tw'),

@@ -152,14 +152,17 @@ class GuardiaViewsTest(TestCase):
         self.client.login(username='drsmith', password='testpass123')
 
     def test_acceso_sin_autenticacion(self):
-        """Verifica que las vistas requieren autenticación"""
+        """Verifica que la URL antigua redirige al portal público"""
         self.client.logout()
         response = self.client.get(reverse('control_guardias:coberturas_semanal'))
-        self.assertEqual(response.status_code, 302)  # Redirige al login
+        self.assertEqual(response.status_code, 301)  # Redirección permanente
+        self.assertRedirects(response, reverse('control_guardias:portal_coberturas_semanal'), 
+                           status_code=301, fetch_redirect_response=False)
 
     def test_coberturas_semanal_view(self):
-        """Verifica que la vista de coberturas semanales funciona"""
-        response = self.client.get(reverse('control_guardias:coberturas_semanal'))
+        """Verifica que la vista del portal público funciona sin autenticación"""
+        self.client.logout()  # Probar acceso sin login
+        response = self.client.get(reverse('control_guardias:portal_coberturas_semanal'))
         self.assertEqual(response.status_code, 200)
 
     def test_crear_guardia_semana_actual(self):

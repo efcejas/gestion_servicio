@@ -1,0 +1,259 @@
+{% extends "layouts/base_portal_guardias.html" %}
+{% load static %}
+{% block title %}Coberturas Semanales - Portal de Guardias{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6">
+    <!-- Tarjeta de Título Principal -->
+    <div class="mb-8 overflow-hidden rounded-2xl shadow-2xl" style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #06b6d4 100%);">
+        <div class="relative px-6 py-8 lg:px-8 lg:py-12">
+            <!-- Decoración de fondo -->
+            <div class="absolute inset-0 opacity-10 pointer-events-none">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-white rounded-full" style="transform: translate(50%, -50%); filter: blur(80px);"></div>
+                <div class="absolute bottom-0 left-0 w-96 h-96 bg-cyan-300 rounded-full" style="transform: translate(-50%, 50%); filter: blur(100px); opacity: 0.5;"></div>
+            </div>
+            
+            <!-- Contenido -->
+            <div class="relative text-center">
+                <div class="mb-4 flex justify-center">
+                    <div class="rounded-full bg-white bg-opacity-20 p-4" style="backdrop-filter: blur(10px);">
+                        <i class="fas fa-calendar-check text-5xl text-white"></i>
+                    </div>
+                </div>
+                <h1 class="mb-3 text-3xl font-bold text-white lg:text-4xl xl:text-5xl">
+                    Coberturas de Guardias
+                </h1>
+                <p class="mx-auto max-w-2xl text-base text-blue-50 lg:text-lg">
+                    Consulta en tiempo real quién está de guardia en el Servicio de Imágenes
+                </p>
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs lg:text-sm text-white">
+                    <div class="flex items-center gap-1.5 rounded-full bg-white bg-opacity-20 px-3 py-1.5" style="backdrop-filter: blur(10px);">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>{{ guardias|length }} guardias programadas</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 rounded-full bg-white bg-opacity-20 px-3 py-1.5" style="backdrop-filter: blur(10px);">
+                        <i class="fas fa-arrow-right"></i>
+                        <span>Desde hoy</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros y búsqueda -->
+    <div class="mb-6 bg-white rounded-lg shadow-md p-4 lg:p-6 no-print">
+        <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-filter text-blue-600"></i>
+                <span class="font-medium">Vista actual:</span>
+                <select id="filtroVista" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="todas">Todas las guardias</option>
+                    <option value="proximas">Próximas 7 días</option>
+                    <option value="mes">Próximo mes</option>
+                </select>
+            </div>
+            <button onclick="window.print()" class="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium">
+                <i class="fas fa-print"></i>
+                <span>Imprimir</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Leyenda de estados -->
+    <div class="mb-6 bg-white rounded-lg shadow-md p-4 lg:p-6">
+        <h3 class="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+            <i class="fas fa-info-circle text-blue-600"></i>
+            Estado de Coberturas
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div class="flex items-center gap-3 p-3 bg-green-50 border-l-4 border-green-500 rounded">
+                <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                <div>
+                    <p class="font-semibold text-green-800">Cubierta</p>
+                    <p class="text-xs text-green-600">Médico asignado a la guardia</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-red-50 border-l-4 border-red-500 rounded">
+                <i class="fas fa-exclamation-circle text-red-600 text-2xl"></i>
+                <div>
+                    <p class="font-semibold text-red-800">No Cubierta</p>
+                    <p class="text-xs text-red-600">Pendiente de asignación</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if guardias %}
+    <!-- Agrupación por semana -->
+    {% regroup guardias by fecha|date:"W/Y" as guardias_por_semana %}
+    
+    {% for semana in guardias_por_semana %}
+    <div class="mb-8" data-semana-grupo>
+        <!-- Encabezado de semana -->
+        <div class="mb-4 flex items-center gap-3">
+            <div class="flex-grow h-px bg-gray-300"></div>
+            <h3 class="text-lg lg:text-xl font-bold text-gray-700 flex items-center gap-2">
+                <i class="fas fa-calendar-week text-blue-600"></i>
+                Semana {{ semana.grouper|slice:":2" }} - {{ semana.list.0.fecha|date:"Y" }}
+            </h3>
+            <div class="flex-grow h-px bg-gray-300"></div>
+        </div>
+
+        <!-- Grid de guardias -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {% for guardia in semana.list %}
+            <div data-guardia-fecha="{{ guardia.fecha|date:'d/m/Y' }}" class="relative overflow-hidden rounded-lg border-2 {% if guardia.cubierta %}border-green-500 bg-white{% else %}border-red-500 bg-red-50{% endif %} shadow-lg hover:shadow-xl transition-shadow">
+                <!-- Badge de estado -->
+                <div class="absolute top-2 right-2 z-10">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold {% if guardia.cubierta %}bg-green-500 text-white{% else %}bg-red-500 text-white{% endif %}">
+                        {% if guardia.cubierta %}
+                            <i class="fas fa-check"></i>
+                            Cubierta
+                        {% else %}
+                            <i class="fas fa-times"></i>
+                            Sin cubrir
+                        {% endif %}
+                    </span>
+                </div>
+
+                <!-- Contenido de la tarjeta -->
+                <div class="p-5 pt-12">
+                    <!-- Fecha -->
+                    <div class="mb-4">
+                        <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold mb-1">
+                            {{ guardia.fecha|date:"l"|capfirst }}
+                        </p>
+                        <p class="text-2xl font-bold text-gray-800">
+                            {{ guardia.fecha|date:"d/m/Y" }}
+                        </p>
+                    </div>
+
+                    <!-- Franja horaria -->
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex items-center gap-2 text-blue-800">
+                            <i class="fas fa-clock text-lg"></i>
+                            <span class="font-semibold text-sm">{{ guardia.get_franja_horaria_display }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Médico asignado -->
+                    <div class="{% if guardia.cubierta %}bg-green-50 border-green-200{% else %}bg-gray-50 border-gray-200{% endif %} border rounded-lg p-3">
+                        {% if guardia.medico and guardia.cubierta %}
+                            <div class="flex items-start gap-2">
+                                <i class="fas fa-user-md text-green-600 text-lg mt-0.5"></i>
+                                <div>
+                                    <p class="text-xs text-gray-600 font-medium mb-0.5">Médico de guardia:</p>
+                                    <p class="font-bold text-gray-800">Dr/a. {{ guardia.medico.user.get_full_name }}</p>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="flex items-center gap-2 text-gray-500">
+                                <i class="fas fa-user-times text-lg"></i>
+                                <p class="text-sm font-medium">Sin asignar</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <!-- Estado vacío -->
+    <div class="flex flex-col items-center justify-center py-16 text-center">
+        <div class="bg-white rounded-full p-6 shadow-lg mb-4">
+            <i class="fas fa-calendar-times text-6xl text-gray-400"></i>
+        </div>
+        <h3 class="text-xl font-semibold text-gray-700 mb-2">No hay guardias programadas</h3>
+        <p class="text-gray-500">No se encontraron guardias para el período seleccionado.</p>
+    </div>
+    {% endif %}
+
+    <!-- Resumen estadístico -->
+    {% if guardias %}
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Total Guardias</p>
+                    <p class="text-3xl font-bold text-gray-800">{{ guardias|length }}</p>
+                </div>
+                <i class="fas fa-calendar-check text-blue-500 text-4xl opacity-20"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-green-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Cubiertas</p>
+                    <p class="text-3xl font-bold text-green-600">
+                        {{ guardias|length|add:"0" }}
+                        {% for g in guardias %}{% if g.cubierta %}{% endif %}{% endfor %}
+                    </p>
+                </div>
+                <i class="fas fa-check-circle text-green-500 text-4xl opacity-20"></i>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-red-500">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-600 mb-1">Sin Cubrir</p>
+                    <p class="text-3xl font-bold text-red-600">
+                        {{ guardias|length|add:"0" }}
+                        {% for g in guardias %}{% if not g.cubierta %}{% endif %}{% endfor %}
+                    </p>
+                </div>
+                <i class="fas fa-exclamation-circle text-red-500 text-4xl opacity-20"></i>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Scripts para funcionalidad interactiva -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filtroVista = document.getElementById('filtroVista');
+    const todasLasGuardias = document.querySelectorAll('[data-guardia-fecha]');
+    
+    if (filtroVista && todasLasGuardias.length > 0) {
+        filtroVista.addEventListener('change', function() {
+            const filtro = this.value;
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            
+            const sietesDias = new Date(hoy);
+            sietesDias.setDate(sietesDias.getDate() + 7);
+            
+            const unMes = new Date(hoy);
+            unMes.setMonth(unMes.getMonth() + 1);
+            
+            todasLasGuardias.forEach(function(tarjeta) {
+                const fechaStr = tarjeta.getAttribute('data-guardia-fecha');
+                const [dia, mes, anio] = fechaStr.split('/');
+                const fechaGuardia = new Date(anio, mes - 1, dia);
+                
+                let mostrar = true;
+                
+                if (filtro === 'proximas') {
+                    mostrar = fechaGuardia >= hoy && fechaGuardia <= sietesDias;
+                } else if (filtro === 'mes') {
+                    mostrar = fechaGuardia >= hoy && fechaGuardia <= unMes;
+                }
+                
+                tarjeta.style.display = mostrar ? '' : 'none';
+            });
+            
+            // Ocultar semanas vacías
+            document.querySelectorAll('[data-semana-grupo]').forEach(function(semana) {
+                const tarjetasVisibles = semana.querySelectorAll('[data-guardia-fecha]:not([style*="display: none"])');
+                semana.style.display = tarjetasVisibles.length > 0 ? '' : 'none';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

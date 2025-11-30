@@ -5,6 +5,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.http import JsonResponse
 from django.db import OperationalError
+from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -16,17 +17,14 @@ from django.http import HttpResponse
 from .forms import FiltroGuardiasPorMedicoForm, FiltroMisGuardiasForm, GuardiaForm
 from .models import Guardia
 
-# Esto lo ven usuarios sin restricciones
-
-
-class GuardiaListView(ListView):
-    model = Guardia
-    template_name = 'control_guardias/lista_guardias.html'
-    context_object_name = 'guardias'
-    ordering = ['fecha']
-
-    def get_queryset(self):
-        return Guardia.objects.filter(fecha__gte=timezone.now()).order_by('fecha')
+# Redirige a la nueva URL del portal público
+class GuardiaListView(View):
+    """
+    Vista heredada que redirige a la nueva URL del portal público.
+    Mantiene compatibilidad con enlaces antiguos.
+    """
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:portal_coberturas_semanal', permanent=True)
 
 
 class ResumenGuardiasView(TemplateView):
@@ -255,3 +253,19 @@ class GuardiaDeleteView(LoginRequiredMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
+# Vista pública del portal de guardias (sin autenticación requerida)
+class CoberturasSemanalesPortalView(TemplateView):
+    """
+    Vista pública para mostrar las coberturas de guardias semanales.
+    Accesible sin autenticación para permitir que la jefa de guardia
+    y otros usuarios vean quién está de guardia.
+    """
+    template_name = 'control_guardias/coberturas_semanal_portal.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Obtener todas las guardias futuras ordenadas por fecha
+        context['guardias'] = Guardia.objects.filter(
+            fecha__gte=timezone.now()
+        ).select_related('medico__user').order_by('fecha')
+        return context
