@@ -1,4 +1,5 @@
 from django.urls import path
+from .views import exportar_excel_guardias
 
 app_name = 'control_guardias'
 from .views import (
@@ -11,11 +12,14 @@ from .views import (
     ResumenGuardiasView,
     MisGuardiasView,
     CoberturasSemanalesPortalView,
+    ResumenGuardiasPortalView,
 )
 
 urlpatterns = [
     # Portal público (sin autenticación requerida)
     path('portal/coberturas-semanal/', CoberturasSemanalesPortalView.as_view(), name='portal_coberturas_semanal'),
+    path('portal/resumen-guardias/', ResumenGuardiasPortalView.as_view(), name='portal_resumen_guardias'),
+    path('exportar-excel-guardias/', exportar_excel_guardias, name='exportar_excel_guardias'),
     
     # Vistas con autenticación
     path('coberturas-semanal/', GuardiaListView.as_view(), name='coberturas_semanal'),

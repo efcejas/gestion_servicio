@@ -170,47 +170,6 @@
         <p class="text-gray-500">No se encontraron guardias para el período seleccionado.</p>
     </div>
     {% endif %}
-
-    <!-- Resumen estadístico -->
-    {% if guardias %}
-    <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-blue-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600 mb-1">Total Guardias</p>
-                    <p class="text-3xl font-bold text-gray-800">{{ guardias|length }}</p>
-                </div>
-                <i class="fas fa-calendar-check text-blue-500 text-4xl opacity-20"></i>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-green-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600 mb-1">Cubiertas</p>
-                    <p class="text-3xl font-bold text-green-600">
-                        {{ guardias|length|add:"0" }}
-                        {% for g in guardias %}{% if g.cubierta %}{% endif %}{% endfor %}
-                    </p>
-                </div>
-                <i class="fas fa-check-circle text-green-500 text-4xl opacity-20"></i>
-            </div>
-        </div>
-        
-        <div class="bg-white rounded-lg shadow-md p-6 border-t-4 border-red-500">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-gray-600 mb-1">Sin Cubrir</p>
-                    <p class="text-3xl font-bold text-red-600">
-                        {{ guardias|length|add:"0" }}
-                        {% for g in guardias %}{% if not g.cubierta %}{% endif %}{% endfor %}
-                    </p>
-                </div>
-                <i class="fas fa-exclamation-circle text-red-500 text-4xl opacity-20"></i>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 </div>
 
 <!-- Scripts para funcionalidad interactiva -->
@@ -225,21 +184,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date();
             hoy.setHours(0, 0, 0, 0);
             
-            const sietesDias = new Date(hoy);
-            sietesDias.setDate(sietesDias.getDate() + 7);
+            const sieteDias = new Date(hoy);
+            sieteDias.setDate(sieteDias.getDate() + 7);
             
             const unMes = new Date(hoy);
             unMes.setMonth(unMes.getMonth() + 1);
             
             todasLasGuardias.forEach(function(tarjeta) {
                 const fechaStr = tarjeta.getAttribute('data-guardia-fecha');
-                const [dia, mes, anio] = fechaStr.split('/');
-                const fechaGuardia = new Date(anio, mes - 1, dia);
+                // Convertir fecha dd/mm/yyyy a objeto Date
+                const partes = fechaStr.split('/');
+                const fechaGuardia = new Date(partes[2], partes[1] - 1, partes[0]);
+                fechaGuardia.setHours(0, 0, 0, 0);
                 
                 let mostrar = true;
                 
                 if (filtro === 'proximas') {
-                    mostrar = fechaGuardia >= hoy && fechaGuardia <= sietesDias;
+                    mostrar = fechaGuardia >= hoy && fechaGuardia <= sieteDias;
                 } else if (filtro === 'mes') {
                     mostrar = fechaGuardia >= hoy && fechaGuardia <= unMes;
                 }
