@@ -13,6 +13,9 @@ from .models import Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
 from .ai_services import ai_service
 import json
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class SuperuserRequiredMixin(UserPassesTestMixin):
@@ -263,35 +266,49 @@ def procesar_audio_dictado(request):
     Recibe: archivo de audio en base64
     Retorna: texto transcrito y mejorado
     """
+    logger.info("=== INICIO procesar_audio_dictado ===")
+    logger.info(f"Usuario: {request.user.username}, Superuser: {request.user.is_superuser}")
+    
     if not request.user.is_superuser:
+        logger.warning("Usuario no autorizado intentó acceder")
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     try:
         # Obtener datos del POST
+        logger.info("Parseando datos del request...")
         data = json.loads(request.body)
         audio_base64 = data.get('audio')
         tipo_estudio = data.get('tipo_estudio', 'OTR')
+        logger.info(f"Tipo estudio: {tipo_estudio}, Audio recibido: {len(audio_base64) if audio_base64 else 0} caracteres")
         
         if not audio_base64:
+            logger.error("No se recibió audio en el request")
             return JsonResponse({'error': 'No se recibió audio'}, status=400)
         
         # Decodificar audio de base64
+        logger.info("Decodificando audio de base64...")
         try:
             # Remover el prefijo "data:audio/webm;base64," si existe
             if ',' in audio_base64:
                 audio_base64 = audio_base64.split(',')[1]
             
             audio_data = base64.b64decode(audio_base64)
+            logger.info(f"Audio decodificado: {len(audio_data)} bytes")
         except Exception as e:
+            logger.error(f"Error al decodificar audio: {str(e)}")
             return JsonResponse({'error': f'Error al decodificar audio: {str(e)}'}, status=400)
         
         # Crear archivo temporal
+        logger.info("Creando archivo temporal...")
         audio_file = ContentFile(audio_data, name='dictado.webm')
         
         # Transcribir con Whisper
+        logger.info("Llamando a Whisper para transcripción...")
         transcripcion_result = ai_service.transcribe_audio(audio_file)
+        logger.info(f"Resultado de Whisper: {transcripcion_result}")
         
         if 'error' in transcripcion_result:
+            logger.error(f"Error en transcripción: {transcripcion_result['error']}")
             return JsonResponse({
                 'success': False,
                 'error': transcripcion_result['error'],
@@ -299,14 +316,17 @@ def procesar_audio_dictado(request):
             })
         
         texto_original = transcripcion_result['text']
+        logger.info(f"Texto transcrito (primeros 100 chars): {texto_original[:100]}")
         
         # Mejorar con GPT
+        logger.info("Llamando a GPT-4 para mejorar texto...")
         mejora_result = ai_service.improve_medical_text(
             texto_original,
             tipo_estudio
         )
+        logger.info(f"Resultado de GPT-4: {str(mejora_result)[:200]}")
         
-        return JsonResponse({
+        response_data = {
             'success': True,
             'texto_original': texto_original,
             'texto_mejorado': mejora_result.get('texto_mejorado', texto_original),
@@ -314,9 +334,12 @@ def procesar_audio_dictado(request):
             'confianza_ia': mejora_result.get('confianza', 0.0),
             'sugerencias': mejora_result.get('sugerencias', []),
             'duracion': transcripcion_result.get('duration')
-        })
+        }
+        logger.info("=== FIN procesar_audio_dictado (éxito) ===")
+        return JsonResponse(response_data)
     
     except Exception as e:
+        logger.exception(f"Error en procesar_audio_dictado: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': str(e)
@@ -329,6 +352,7 @@ def mejorar_texto_ia(request):
     """
     Mejora un texto ya escrito usando IA
     Útil para mejorar borradores sin dictado
+    Soporta modo plantilla para respetar estructuras predefinidas
     """
     if not request.user.is_superuser:
         return JsonResponse({'error': 'No autorizado'}, status=403)
@@ -337,21 +361,30 @@ def mejorar_texto_ia(request):
         data = json.loads(request.body)
         texto = data.get('texto', '')
         tipo_estudio = data.get('tipo_estudio', 'OTR')
+        plantilla = data.get('plantilla', None)  # Nueva: información de plantilla
         
         if not texto:
             return JsonResponse({'error': 'No se recibió texto'}, status=400)
         
-        # Mejorar con GPT
-        result = ai_service.improve_medical_text(texto, tipo_estudio)
+        # Construir contexto
+        contexto = {}
+        if plantilla:
+            contexto['plantilla'] = plantilla
+            logger.info(f"🎯 Mejorando texto con plantilla: {plantilla.get('nombre', 'sin nombre')}")
+        
+        # Mejorar con GPT/Groq
+        result = ai_service.improve_medical_text(texto, tipo_estudio, contexto)
         
         return JsonResponse({
             'success': True,
             'texto_mejorado': result.get('texto_mejorado', texto),
             'confianza': result.get('confianza', 0.0),
-            'sugerencias': result.get('sugerencias', [])
+            'sugerencias': result.get('sugerencias', []),
+            'modo': result.get('modo', 'LIBRE')  # Informar modo usado
         })
     
     except Exception as e:
+        logger.error(f"Error en mejorar_texto_ia: {str(e)}")
         return JsonResponse({
             'success': False,
             'error': str(e)

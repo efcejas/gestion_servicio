@@ -182,8 +182,14 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
         from control_guardias.models import Guardia
         from liquidacion.models import RegistroEstudiosPorMedico
         from django.db.models import Max
+        from datetime import datetime
+        import pytz
         
-        hoy = timezone.now().date()
+        # Usar timezone de Argentina
+        tz_argentina = pytz.timezone('America/Argentina/Buenos_Aires')
+        ahora = timezone.now().astimezone(tz_argentina)
+        hoy = ahora.date()
+        hora_actual = ahora.time()
         fecha_hace_7_dias = hoy - timedelta(days=7)
         
         # Eventos
@@ -194,29 +200,63 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
             fecha_creacion__date=hoy
         )
         
-        # Guardias
-        guardias_hoy = Guardia.objects.filter(fecha=hoy, cubierta=True)
+        # GUARDIA ACTUAL: Determinar qué guardia está activa AHORA según la hora ARGENTINA
+        guardias_hoy = Guardia.objects.filter(fecha=hoy, cubierta=True).select_related('medico')
+        
+        # Determinar franja actual según la hora ARGENTINA
+        # DIA: 08:00 - 20:00
+        # NOCHE: 20:00 - 08:00 (siguiente día)
+        hora_minutos = hora_actual.hour * 60 + hora_actual.minute
+        hora_08_00 = 8 * 60  # 480 minutos
+        hora_20_00 = 20 * 60  # 1200 minutos
+        
+        # Guardia actual según hora
+        guardia_actual = None
+        if hora_minutos >= hora_08_00 and hora_minutos < hora_20_00:
+            # Estamos en horario DIA (08:00 - 20:00)
+            guardia_actual = guardias_hoy.filter(
+                franja_horaria__in=['DIA', 'DIA_COMPLETO', 'DIA_FIN_SEMANA']
+            ).first()
+            franja_actual_texto = "DIA (08:00 - 20:00)"
+        else:
+            # Estamos en horario NOCHE (20:00 - 08:00)
+            # Si es antes de las 08:00, buscamos la guardia de noche de AYER
+            if hora_minutos < hora_08_00:
+                ayer = hoy - timedelta(days=1)
+                guardias_ayer = Guardia.objects.filter(fecha=ayer, cubierta=True).select_related('medico')
+                guardia_actual = guardias_ayer.filter(
+                    franja_horaria__in=['NOCHE', 'DIA_COMPLETO', 'NOCHE_FIN_SEMANA']
+                ).first()
+                franja_actual_texto = f"NOCHE (desde {ayer.strftime('%d/%m')} 20:00)"
+            else:
+                # Es después de las 20:00 de hoy
+                guardia_actual = guardias_hoy.filter(
+                    franja_horaria__in=['NOCHE', 'DIA_COMPLETO', 'NOCHE_FIN_SEMANA']
+                ).first()
+                franja_actual_texto = "NOCHE (20:00 - 08:00)"
+        
+        # Formatear información de guardia actual
+        if guardia_actual and guardia_actual.medico:
+            nombre_medico_guardia = self.formatear_nombre_medico(guardia_actual.medico)
+            franja_horaria_guardia = f"{franja_actual_texto} • Ahora: {ahora.strftime('%H:%M')} hs"
+        else:
+            nombre_medico_guardia = "Sin cubrir"
+            franja_horaria_guardia = f"{franja_actual_texto} • Ahora: {ahora.strftime('%H:%M')} hs • Sin asignar"
+        
+        # Próxima guardia (siguiente turno o día)
         guardias_proximas = Guardia.objects.filter(
             fecha__gte=hoy,
             cubierta=True,
             medico__isnull=False
-        ).select_related('medico').order_by('fecha', 'franja_horaria')[:5]
+        ).select_related('medico').order_by('fecha', 'franja_horaria')
         
-        # Obtener guardia actual (hoy) y próxima
-        guardia_hoy = guardias_hoy.select_related('medico').first()
-        if guardia_hoy and guardia_hoy.medico:
-            nombre_medico_guardia = self.formatear_nombre_medico(guardia_hoy.medico)
-            franja_horaria_guardia = guardia_hoy.get_franja_horaria_display()
-        else:
-            nombre_medico_guardia = "Sin cubrir"
-            franja_horaria_guardia = "No hay guardia asignada"
-        
-        # Próxima guardia (después de hoy)
-        proxima_guardia = Guardia.objects.filter(
-            fecha__gt=hoy,
-            cubierta=True,
-            medico__isnull=False
-        ).select_related('medico').order_by('fecha', 'franja_horaria').first()
+        # Excluir la guardia actual de las próximas
+        proxima_guardia = None
+        for g in guardias_proximas:
+            if guardia_actual and g.id == guardia_actual.id:
+                continue  # Saltar la guardia actual
+            proxima_guardia = g
+            break
         
         if proxima_guardia and proxima_guardia.medico:
             nombre_proximo_medico = self.formatear_nombre_medico(proxima_guardia.medico)
@@ -232,22 +272,84 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
             fecha_del_informe__month=hoy.month
         )
         
-        # Últimos médicos activos
-        ultimos_medicos = (
+        # Calcular regiones del mes
+        total_regiones_mes = sum(r.total_regiones() for r in registros_mes)
+        total_estudios_mes_count = registros_mes.count()
+        
+        # DEBUG: Log para ver qué está pasando
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"=== DASHBOARD DEBUG ===")
+        logger.info(f"Fecha hoy (Argentina): {hoy}")
+        logger.info(f"Hora actual (Argentina): {ahora.strftime('%H:%M:%S')}")
+        logger.info(f"Total registros con fecha_registro hoy: {registros_hoy.count()}")
+        logger.info(f"Total registros mes (fecha_del_informe): {total_estudios_mes_count}")
+        logger.info(f"Total regiones mes: {total_regiones_mes}")
+        
+        # Desglose de regiones por tipo de estudio (para debugging)
+        if total_estudios_mes_count > 0:
+            tipos_estudios = {}
+            for r in registros_mes:
+                for est in r.estudio.all():
+                    tipo = est.get_tipo_display()
+                    if tipo not in tipos_estudios:
+                        tipos_estudios[tipo] = {'cantidad': 0, 'regiones': 0}
+                    cant = r.cantidad_estudio or 1
+                    tipos_estudios[tipo]['cantidad'] += cant
+                    tipos_estudios[tipo]['regiones'] += est.conteo_regiones * cant
+            
+            logger.info(f"Desglose por tipo de estudio:")
+            for tipo, data in tipos_estudios.items():
+                logger.info(f"  - {tipo}: {data['cantidad']} estudios, {data['regiones']} regiones")
+        
+        # Últimos médicos activos - CORREGIDO: Usar timezone aware comparison
+        ultimos_medicos_hoy = (
             RegistroEstudiosPorMedico.objects
+            .filter(fecha_registro__date=hoy)
             .values('medico')
             .annotate(ultima_fecha=Max('fecha_registro'))
             .order_by('-ultima_fecha')[:5]
         )
+        
+        logger.info(f"Médicos que registraron hoy: {ultimos_medicos_hoy.count()}")
+        for m in ultimos_medicos_hoy:
+            logger.info(f"  - Médico ID {m['medico']}: {m['ultima_fecha']}")
+        
+        # Si no hay suficientes médicos de hoy, completar con médicos de los últimos días
+        medicos_ids_hoy = [m['medico'] for m in ultimos_medicos_hoy]
+        cant_faltantes = 5 - len(medicos_ids_hoy)
+        
+        ultimos_medicos_adicionales = []
+        if cant_faltantes > 0:
+            ultimos_medicos_adicionales = (
+                RegistroEstudiosPorMedico.objects
+                .filter(fecha_registro__date__lt=hoy, fecha_registro__date__gte=fecha_hace_7_dias)
+                .exclude(medico__in=medicos_ids_hoy)
+                .values('medico')
+                .annotate(ultima_fecha=Max('fecha_registro'))
+                .order_by('-ultima_fecha')[:cant_faltantes]
+            )
+            logger.info(f"Médicos adicionales (días anteriores): {ultimos_medicos_adicionales.count()}")
+        
+        # Combinar ambos querysets
+        ultimos_medicos = list(ultimos_medicos_hoy) + list(ultimos_medicos_adicionales)
         
         medicos_activos_data = []
         for m in ultimos_medicos:
             medico_id = m['medico']
             fecha = m['ultima_fecha']
             
+            # Convertir fecha a timezone Argentina para comparación correcta
+            if timezone.is_aware(fecha):
+                fecha_argentina = fecha.astimezone(tz_argentina)
+            else:
+                fecha_argentina = tz_argentina.localize(fecha)
+            
+            fecha_date = fecha_argentina.date()
+            
             registros_del_dia = RegistroEstudiosPorMedico.objects.filter(
                 medico_id=medico_id,
-                fecha_registro__date=fecha.date()
+                fecha_registro__date=fecha_date
             ).select_related('medico').prefetch_related('estudio')
             
             if registros_del_dia.exists():
@@ -260,14 +362,23 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
                 )
                 total_regiones = sum(r.total_regiones() for r in registros_del_dia)
                 
+                # Indicar si el registro fue hoy (fecha Argentina)
+                es_hoy = fecha_date == hoy
+                
+                logger.info(f"Médico {medico.get_full_name()}: fecha={fecha_date}, hoy={hoy}, es_hoy={es_hoy}")
+                
                 medicos_activos_data.append({
                     'medico': medico,
-                    'ultima_fecha': fecha,
+                    'ultima_fecha': fecha_argentina,
                     'ultimo_registro': ultimo_registro,
                     'total_estudios': total_estudios,
                     'total_regiones': total_regiones,
                     'nombre_paciente': f"{ultimo_registro.nombre_paciente} {ultimo_registro.apellido_paciente}",
+                    'es_hoy': es_hoy,
                 })
+        
+        logger.info(f"Total médicos en tabla: {len(medicos_activos_data)}")
+        logger.info(f"=== FIN DASHBOARD DEBUG ===")
         
         return {
             'cantidad_eventos_abiertos': eventos_abiertos.count(),
@@ -275,14 +386,17 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
             'cantidad_eventos_resueltos_hoy': eventos_resueltos_hoy.count(),
             'ultimo_evento_abierto': eventos_abiertos.order_by('-fecha_creacion').first(),
             'guardias_hoy': guardias_hoy,
-            'guardias_proximas': guardias_proximas,
+            'guardias_proximas': guardias_proximas[:5],
+            'guardia_actual': guardia_actual,
             'nombre_medico_guardia': nombre_medico_guardia,
             'franja_horaria_guardia': franja_horaria_guardia,
             'nombre_proximo_medico': nombre_proximo_medico,
             'fecha_proxima_guardia': fecha_proxima_guardia,
+            'hora_actual': ahora.strftime('%H:%M'),
+            'fecha_actual': hoy.strftime('%d/%m/%Y'),
             'estudios_hoy': registros_hoy.count(),
-            'total_estudios_mes': registros_mes.count(),
-            'total_regiones_mes': sum(r.total_regiones() for r in registros_mes),
+            'total_estudios_mes': total_estudios_mes_count,
+            'total_regiones_mes': total_regiones_mes,
             'total_pacientes_activos': RegistroEstudiosPorMedico.objects.values(
                 'nombre_paciente', 'apellido_paciente', 'dni_paciente'
             ).distinct().count(),
@@ -290,7 +404,17 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
                 fecha_registro__date__gte=fecha_hace_7_dias
             ).values('medico').distinct().count(),
             'ultimos_medicos_activos': medicos_activos_data,
+            'mes_actual': self._traducir_mes(hoy),  # Para mostrar "Diciembre 2025"
         }
+    
+    def _traducir_mes(self, fecha):
+        """Traduce el mes al español"""
+        meses = {
+            1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril',
+            5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto',
+            9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
+        }
+        return f"{meses[fecha.month]} {fecha.year}"
     
     def formatear_nombre_medico(self, medico_obj):
         """Formatea el nombre del médico para mostrar"""

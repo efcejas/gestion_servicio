@@ -268,11 +268,11 @@
                 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
                     <div class="flex items-center justify-between">
                         <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Regiones - Mes Actual</h3>
+                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Regiones - {{ mes_actual|default:"Mes Actual" }}</h3>
                             <div class="text-2xl md:text-3xl font-bold text-yellow-400">
                                 {{ total_regiones_mes|default:0 }}
                             </div>
-                            <p class="text-sm text-gray-400 mt-1">Total registradas</p>
+                            <p class="text-sm text-gray-400 mt-1">Total de regiones registradas</p>
                         </div>
                         <div class="flex-shrink-0 bg-yellow-500 rounded-full p-3">
                             <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -280,9 +280,26 @@
                             </svg>
                         </div>
                     </div>
-                    <div class="mt-4 text-sm text-gray-300 break-words">
-                        <span class="text-blue-400 font-medium">{{ medicos_activos_semana }}</span> médicos activos esta semana
+                    <div class="mt-4 grid grid-cols-2 gap-3">
+                        <div class="text-sm">
+                            <span class="text-gray-400">Estudios registrados:</span>
+                            <div class="text-blue-400 font-semibold text-lg">{{ total_estudios_mes|default:0 }}</div>
+                        </div>
+                        <div class="text-sm">
+                            <span class="text-gray-400">Médicos activos:</span>
+                            <div class="text-green-400 font-semibold text-lg">{{ medicos_activos_semana|default:0 }}</div>
+                        </div>
                     </div>
+                    {% if estudios_hoy > 0 %}
+                        <div class="mt-3 pt-3 border-t border-gray-600">
+                            <div class="flex items-center text-sm">
+                                <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span class="text-green-300 font-medium">{{ estudios_hoy }} registros hoy</span>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -343,8 +360,8 @@
             <!-- Últimos médicos que registraron -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
                 <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-white">Últimos Médicos Activos</h3>
-                    <span class="text-xs text-gray-400">Los 5 médicos que registraron más recientemente</span>
+                    <h3 class="text-lg font-semibold text-white">Actividad Reciente de Médicos</h3>
+                    <span class="text-xs text-gray-400">Médicos que registraron hoy y en los últimos días</span>
                 </div>
                 {% if ultimos_medicos_activos %}
                     <div class="overflow-x-auto">
@@ -360,16 +377,21 @@
                             </thead>
                             <tbody>
                                 {% for medico_data in ultimos_medicos_activos %}
-                                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-750">
+                                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-750 {% if medico_data.es_hoy %}bg-green-900/20{% endif %}">
                                     <td class="px-4 py-3 font-medium text-white">
                                         <div class="flex items-center">
-                                            <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+                                            <div class="w-10 h-10 {% if medico_data.es_hoy %}bg-green-600{% else %}bg-blue-600{% endif %} rounded-full flex items-center justify-center mr-3 flex-shrink-0">
                                                 <span class="text-white text-sm font-medium">
                                                     {{ medico_data.medico.first_name|first|default:medico_data.medico.username|first }}{{ medico_data.medico.last_name|first|default:"" }}
                                                 </span>
                                             </div>
                                             <div class="min-w-0 flex-1">
-                                                <div class="font-medium text-base break-words">{{ medico_data.medico.first_name|default:medico_data.medico.username }} {{ medico_data.medico.last_name }}</div>
+                                                <div class="font-medium text-base break-words">
+                                                    {{ medico_data.medico.first_name|default:medico_data.medico.username }} {{ medico_data.medico.last_name }}
+                                                    {% if medico_data.es_hoy %}
+                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-500 text-white rounded-full">HOY</span>
+                                                    {% endif %}
+                                                </div>
                                                 <!-- Mostrar último paciente en móvil -->
                                                 <div class="sm:hidden text-xs text-gray-400 mt-1 break-words">
                                                     {{ medico_data.nombre_paciente }} - DNI: {{ medico_data.ultimo_registro.dni_paciente }}
@@ -384,19 +406,27 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-center">
-                                        <span class="bg-blue-900 text-blue-300 px-3 py-1 rounded-full text-sm font-bold inline-block">
+                                        <span class="{% if medico_data.es_hoy %}bg-green-900 text-green-300{% else %}bg-blue-900 text-blue-300{% endif %} px-3 py-1 rounded-full text-sm font-bold inline-block">
                                             {{ medico_data.total_estudios }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 text-center">
-                                        <span class="bg-green-900 text-green-300 px-3 py-1 rounded-full text-sm font-bold inline-block">
+                                        <span class="{% if medico_data.es_hoy %}bg-green-900 text-green-300{% else %}bg-blue-900 text-blue-300{% endif %} px-3 py-1 rounded-full text-sm font-bold inline-block">
                                             {{ medico_data.total_regiones }}
                                         </span>
                                     </td>
                                     <td class="px-4 py-3 text-gray-400 text-center">
                                         <div>
-                                            <div class="text-sm font-medium text-white">{{ medico_data.ultima_fecha|date:"d/m/Y" }}</div>
-                                            <div class="text-xs text-gray-400">{{ medico_data.ultima_fecha|date:"H:i" }}</div>
+                                            <div class="text-sm font-medium {% if medico_data.es_hoy %}text-green-400{% else %}text-white{% endif %}">
+                                                {% if medico_data.es_hoy %}
+                                                    Hoy {{ medico_data.ultima_fecha|date:"H:i" }}
+                                                {% else %}
+                                                    {{ medico_data.ultima_fecha|date:"d/m/Y" }}
+                                                {% endif %}
+                                            </div>
+                                            {% if not medico_data.es_hoy %}
+                                                <div class="text-xs text-gray-500">{{ medico_data.ultima_fecha|date:"H:i" }}</div>
+                                            {% endif %}
                                         </div>
                                     </td>
                                 </tr>
