@@ -435,13 +435,8 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Aplicar estilos Tailwind a todos los campos del formulario
-    const formFields = document.querySelectorAll('#registroForm input[type="text"]:not(#estudio-search), #registroForm input[type="number"], #registroForm input[type="date"], #registroForm textarea');
-    formFields.forEach(field => {
-        field.classList.add('w-full', 'px-3', 'py-2', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-blue-500', 'focus:border-blue-500', 'transition-colors');
-        field.classList.remove('form-control', 'form-control-sm', 'form-select', 'form-select-sm');
-    });
-
+    // ✅ Las clases Tailwind ya están aplicadas desde el formulario Django (sin parpadeo)
+    
     // === DROPDOWN PERSONALIZADO DE TIPO DE ESTUDIO ===
     const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
     const tipoEstudioButton = document.getElementById('tipo-estudio-button');

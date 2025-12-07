@@ -5,12 +5,15 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils import timezone
 
+# Clases Tailwind reutilizables para campos de formulario
+TAILWIND_INPUT_CLASSES = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
+
 class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
     tipo_estudio = forms.ChoiceField(
         choices=[('', 'Seleccione')] + list(Estudios.TIPO_ESTUDIO_CHOICES),
         required=True,
         label="Tipo de estudio",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm', 'id': 'id_tipo_estudio'}),
+        widget=forms.Select(attrs={'class': 'hidden', 'id': 'id_tipo_estudio'}),  # Oculto por defecto
     )
 
     class Meta:
@@ -24,14 +27,14 @@ class RegistroEstudiosPorMedicoCreateViewForm(forms.ModelForm):
             'cantidad_estudio',
         ]
         widgets = {
-            'nombre_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
-            'apellido_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
-            'dni_paciente': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'maxlength': 8}),
-            'estudio': forms.SelectMultiple(attrs={'class': 'form-control form-control-sm', 'size': '5'}),
-            'cantidad_estudio': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': 1}),
+            'nombre_paciente': forms.TextInput(attrs={'class': TAILWIND_INPUT_CLASSES}),
+            'apellido_paciente': forms.TextInput(attrs={'class': TAILWIND_INPUT_CLASSES}),
+            'dni_paciente': forms.TextInput(attrs={'class': TAILWIND_INPUT_CLASSES, 'maxlength': 8}),
+            'estudio': forms.SelectMultiple(attrs={'class': 'hidden', 'size': '5'}),  # Oculto, manejado por Select2
+            'cantidad_estudio': forms.NumberInput(attrs={'class': TAILWIND_INPUT_CLASSES, 'min': 1}),
             'fecha_del_informe': forms.DateInput(
-                attrs={'type': 'date', 'class': 'form-control form-control-sm'},
-                format='%Y-%m-%d'  # 👈 este formato es CLAVE
+                attrs={'type': 'date', 'class': TAILWIND_INPUT_CLASSES},
+                format='%Y-%m-%d'
             ),
         }
 

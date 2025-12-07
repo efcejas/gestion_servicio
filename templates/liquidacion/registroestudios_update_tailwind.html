@@ -223,24 +223,15 @@
     const estudiosSeleccionadosIds = {{ estudios_seleccionados|safe }};
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Aplicar estilos Tailwind a todos los campos del formulario
-        const formFields = document.querySelectorAll('#form-edicion input:not([type="hidden"]), #form-edicion select:not(#id_estudio):not(#id_tipo_estudio)');
-        formFields.forEach(field => {
-            field.classList.add('w-full', 'px-4', 'py-2.5', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-indigo-500', 'focus:border-transparent', 'transition-all');
-            field.classList.remove('form-control', 'form-control-sm', 'form-select');
-        });
-
-        // Ocultar selects originales
-        document.getElementById('id_tipo_estudio').style.display = 'none';
-        document.getElementById('id_estudio').style.display = 'none';
-
+        // ✅ Las clases Tailwind ya están aplicadas desde el formulario Django (sin parpadeo)
+        
+        // Obtener referencias a elementos
         const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+        const estudioSelectOriginal = document.getElementById('id_estudio');
         const tipoEstudioButton = document.getElementById('tipo-estudio-button');
         const tipoEstudioText = document.getElementById('tipo-estudio-text');
         const tipoEstudioIcon = document.getElementById('tipo-estudio-icon');
         const tipoEstudioDropdown = document.getElementById('tipo-estudio-dropdown');
-
-        const estudioSelectOriginal = document.getElementById('id_estudio');
         const estudioSearch = document.getElementById('estudio-search');
         const estudioDropdown = document.getElementById('estudio-dropdown');
         const estudiosSeleccionadosContainer = document.getElementById('estudios-seleccionados');
