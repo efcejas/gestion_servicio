@@ -13,36 +13,85 @@ class AIService:
     """Servicio para integración con OpenAI y Groq"""
     
     def __init__(self):
-        # Intentar Groq primero (gratis, 14,400 req/día)
+        # Configurar AMBOS proveedores si están disponibles
         groq_key = config('GROQ_API_KEY', default=None)
+        openai_key = config('OPENAI_API_KEY', default=None)
+        
+        # Cliente Groq para mejora de texto (gratis, 14,400 req/día)
         if groq_key:
-            self.client = OpenAI(
+            self.groq_client = OpenAI(
                 api_key=groq_key,
                 base_url="https://api.groq.com/openai/v1"
             )
+            self.groq_enabled = True
+            self.model = 'llama-3.3-70b-versatile'
+            logger.info("✅ Groq API configurada para mejora de texto (Gratis)")
+        else:
+            self.groq_client = None
+            self.groq_enabled = False
+        
+        # Cliente OpenAI para Whisper (transcripción de audio)
+        if openai_key:
+            self.openai_client = OpenAI(api_key=openai_key)
+            self.openai_enabled = True
+            logger.info("✅ OpenAI API configurada para Whisper (transcripción)")
+        else:
+            self.openai_client = None
+            self.openai_enabled = False
+        
+        # Prioridad: Groq para texto, OpenAI para audio
+        if self.groq_enabled:
+            self.client = self.groq_client
             self.enabled = True
             self.provider = 'groq'
-            self.model = 'llama-3.3-70b-versatile'  # Modelo más potente de Groq
-            logger.info("✅ Groq API configurada (Gratis)")
+        elif self.openai_enabled:
+            self.client = self.openai_client
+            self.enabled = True
+            self.provider = 'openai'
+            self.model = 'gpt-4o-mini'
         else:
-            # Fallback a OpenAI
-            openai_key = config('OPENAI_API_KEY', default=None)
-            if openai_key:
-                self.client = OpenAI(api_key=openai_key)
-                self.enabled = True
-                self.provider = 'openai'
-                self.model = 'gpt-4o-mini'
-                logger.info("✅ OpenAI API configurada")
-            else:
-                self.client = None
-                self.enabled = False
-                self.provider = None
-                self.model = None
-                logger.warning("⚠️ Ninguna API de IA configurada. Servicios deshabilitados.")
+            self.client = None
+            self.enabled = False
+            self.provider = None
+            self.model = None
+            logger.warning("⚠️ Ninguna API de IA configurada. Servicios deshabilitados.")
+    
+    def get_api_info(self):
+        """Retorna información sobre el proveedor de IA y límites"""
+        if not self.enabled:
+            return {
+                'provider': None,
+                'model': None,
+                'enabled': False,
+                'limits': {}
+            }
+        
+        info = {
+            'provider': self.provider,
+            'model': self.model,
+            'enabled': True
+        }
+        
+        # Límites según proveedor
+        if self.provider == 'groq':
+            info['limits'] = {
+                'requests_per_day': 14400,
+                'requests_per_minute': 30,
+                'tokens_per_minute': 20000,
+                'cost': 'GRATIS',
+                'description': 'Plan gratuito de Groq con límite diario generoso'
+            }
+        elif self.provider == 'openai':
+            info['limits'] = {
+                'cost': 'PAGO',
+                'description': 'Plan de pago según uso de OpenAI'
+            }
+        
+        return info
     
     def transcribe_audio(self, audio_file):
         """
-        Transcribe audio usando Whisper
+        Transcribe audio usando Whisper de OpenAI
         
         Args:
             audio_file: Archivo de audio (ContentFile o FileField)
@@ -50,11 +99,11 @@ class AIService:
         Returns:
             dict: {'text': str, 'confidence': float}
         """
-        if not self.enabled:
+        if not self.openai_enabled:
             return {
                 'text': '',
                 'confidence': 0.0,
-                'error': 'API de OpenAI no configurada'
+                'error': '⚠️ Necesitas configurar OPENAI_API_KEY en el .env para usar Whisper. Crea una cuenta en https://platform.openai.com (incluye $5 gratis)'
             }
         
         try:
@@ -66,34 +115,55 @@ class AIService:
                 with audio_file.open('rb') as audio:
                     audio_content = audio.read()
             
-            # Crear una tupla con el formato esperado por OpenAI
-            # (filename, file_content, content_type)
+            # Crear una tupla con el formato esperado
             file_tuple = ("audio.webm", audio_content, "audio/webm")
             
-            # Transcribir
-            transcript = self.client.audio.transcriptions.create(
+            # Prompt para guiar a Whisper en contexto médico
+            # Optimizado para informes radiológicos con separación automática de conceptos
+            prompt_whisper = (
+                "Informe radiológico estructurado. Terminología médica especializada. "
+                "Pausa breve = coma. Pausa media = punto. Pausa larga = punto y salto de línea. "
+                "Cada hallazgo o estructura anatómica en línea separada. "
+                "Detecta pausas del hablante para separar conceptos automáticamente."
+            )
+            
+            # Transcribir con OpenAI Whisper
+            transcript = self.openai_client.audio.transcriptions.create(
                 model="whisper-1",
                 file=file_tuple,
                 language="es",  # Español
+                prompt=prompt_whisper,  # Contexto para mejorar precisión
+                temperature=0.8,  # 0-1: MÁS sensible a pausas = más puntuación automática (aumentado de 0.5 → 0.8)
                 response_format="verbose_json"
             )
             
+            logger.info(f"✅ Whisper transcripción exitosa: {len(transcript.text)} caracteres")
+            
             return {
                 'text': transcript.text,
-                'confidence': 0.95,  # Whisper no devuelve confianza exacta
-                'duration': getattr(transcript, 'duration', None)
+                'confidence': 0.95,
+                'duration': getattr(transcript, 'duration', None),
+                'provider': 'openai'
             }
         
         except Exception as e:
-            logger.error(f"Error en transcripción: {str(e)}")
+            error_msg = str(e)
+            logger.error(f"❌ Error en transcripción Whisper: {error_msg}")
             logger.exception("Traceback completo:")
+            
+            # Mensaje específico según el error
+            if 'model_not_found' in error_msg or '404' in error_msg:
+                error_msg = "⚠️ Tu API key de OpenAI no tiene acceso a Whisper o está inválida. Verifica en https://platform.openai.com"
+            elif 'insufficient_quota' in error_msg:
+                error_msg = "⚠️ Se agotaron los créditos gratuitos de OpenAI. Agrega créditos en https://platform.openai.com/account/billing"
+            
             return {
                 'text': '',
                 'confidence': 0.0,
-                'error': str(e)
+                'error': error_msg
             }
     
-    def improve_medical_text(self, texto_original, tipo_estudio, contexto=None):
+    def improve_medical_text(self, texto_original, tipo_estudio, contexto=None, usuario=None):
         """
         Mejora el texto dictado usando GPT-4 para darle formato médico profesional
         
@@ -191,7 +261,66 @@ IMPORTANTE:
         else:
             logger.info("📝 Modo LIBRE - generando estructura completa")
             
-            prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado de un informe de {tipo_nombre} y estructura la información en 4 secciones.
+            # Verificar si el usuario quiere solo corrección o estructura completa
+            modo = contexto.get('modo', 'LIBRE') if contexto else 'LIBRE'
+            
+            # Obtener ejemplos de aprendizaje del usuario
+            from .models import CorreccionAprendizaje
+            ejemplos_aprendizaje = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(
+                usuario=usuario,
+                limite=10
+            )
+            
+            if ejemplos_aprendizaje:
+                cantidad_ejemplos = len(ejemplos_aprendizaje.split('\n'))
+                logger.info(f"🧠 Sistema de aprendizaje: {cantidad_ejemplos} ejemplos activos para {usuario}")
+            
+            if modo == 'FIEL':
+                # MODO FIEL: Solo corregir ortografía SIN inventar estructura ni agregar texto
+                prompt_base = f"""Eres un corrector ortográfico ESTRICTO. Tu ÚNICA tarea es corregir errores de ortografía SIN MODIFICAR NADA MÁS.
+
+TEXTO ORIGINAL:
+{texto_original}
+
+INSTRUCCIONES ESTRICTAS:
+1. Corrige ÚNICAMENTE ortografía: acentos, mayúsculas iniciales, términos médicos mal escritos
+2. NO agregues comas donde no hay
+3. NO agregues puntos donde no hay  
+4. NO agregues saltos de línea donde no hay
+5. NO quites comas que ya existen
+6. NO quites puntos que ya existen
+7. NO quites saltos de línea que ya existen
+8. NO cambies el orden de las palabras
+9. NO reorganices las frases
+10. Capitaliza SOLO la primera letra después de punto o salto de línea
+
+PROHIBIDO ABSOLUTAMENTE:
+❌ Agregar o quitar puntuación
+❌ Agregar o quitar saltos de línea
+❌ Cambiar la estructura del texto
+❌ Agregar palabras o frases
+❌ Quitar palabras o frases
+
+EJEMPLO DE LO QUE DEBES HACER:
+ORIGINAL: "la rotula presenta implantacion alta"
+CORRECTO: "La rótula presenta implantación alta"
+INCORRECTO: "La rótula presenta implantación alta." ← NO agregues punto si no había
+
+RESPONDE ÚNICAMENTE CON EL TEXTO CORREGIDO, SIN EXPLICACIONES:"""
+                
+                # Agregar ejemplos de aprendizaje si existen
+                if ejemplos_aprendizaje:
+                    prompt = f"""{prompt_base}
+
+CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
+{ejemplos_aprendizaje}
+"""
+                else:
+                    prompt = prompt_base
+
+            else:
+                # MODO ESTRUCTURADO: Crear informe completo con secciones
+                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado de un informe de {tipo_nombre} y estructura la información en 4 secciones.
 
 TEXTO DICTADO:
 {texto_original}
@@ -253,7 +382,7 @@ IMPORTANTE:
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # Baja temperatura para mayor consistencia
+                temperature=0.1,  # MUY baja para máxima fidelidad en modo FIEL (reducido de 0.3)
                 max_tokens=1500
             )
             

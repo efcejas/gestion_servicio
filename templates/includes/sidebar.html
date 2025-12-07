@@ -59,7 +59,7 @@
             
             <!-- DICTADO DE INFORMES IA - Feature principal con gradiente y badge -->
             <li>
-                <a href="{% url 'dictado_informes:dashboard' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 group {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' %}bg-gradient-to-r from-indigo-600 to-purple-600{% endif %}">
+                <a href="{% url 'dictado_informes:dashboard' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 group {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' and request.resolver_match.url_name == 'dashboard' %}bg-gradient-to-r from-indigo-600 to-purple-600{% endif %}">
                     <svg class="w-5 h-5 {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' %}text-white{% else %}text-indigo-400{% endif %} transition duration-200 group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 0a2 2 0 0 0-2 2v.5a9.5 9.5 0 0 0 0 19v.5a2 2 0 1 0 4 0v-.5a9.5 9.5 0 0 0 0-19V2a2 2 0 0 0-2-2Z"/>
                         <path d="M10 4a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z"/>
@@ -69,6 +69,22 @@
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-900 text-purple-200">
                         IA
                     </span>
+                </a>
+            </li>
+            
+            <!-- Diccionario Médico - Submódulo de Dictado -->
+            <li>
+                <a href="{% url 'dictado_informes:termino_list' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and 'termino' in request.resolver_match.url_name %}bg-purple-900{% endif %} ml-4">
+                    <svg class="w-5 h-5 {% if request.resolver_match and 'termino' in request.resolver_match.url_name %}text-purple-400{% else %}text-gray-400{% endif %} transition duration-200 group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M11.074 4 8.442.408A.95.95 0 0 0 7.014.254L2.926 4h8.148ZM9 13v-1a4 4 0 0 1 4-4h6V6a1 1 0 0 0-1-1H1a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h17a1 1 0 0 0 1-1v-2h-6a4 4 0 0 1-4-4Z"/>
+                        <path d="M19 10h-6a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h6a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1Zm-4.5 3.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2ZM12.62 4h2.78L12.539.41a1.086 1.086 0 1 0-1.7 1.352L12.62 4Z"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap text-sm">Diccionario Médico</span>
+                    {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' %}
+                    <span class="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-purple-500 rounded-full">
+                        {{ terminos_activos|default:"0" }}
+                    </span>
+                    {% endif %}
                 </a>
             </li>
             

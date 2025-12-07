@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PlantillaInforme, Informe, AudioTranscripcion
+from .models import PlantillaInforme, Informe, AudioTranscripcion, TerminoMedico, CorreccionAprendizaje
 
 
 @admin.register(PlantillaInforme)
@@ -92,3 +92,200 @@ class AudioTranscripcionAdmin(admin.ModelAdmin):
             'fields': ('procesado', 'fecha_grabacion', 'fecha_transcripcion')
         }),
     )
+
+
+@admin.register(TerminoMedico)
+class TerminoMedicoAdmin(admin.ModelAdmin):
+    list_display = ['termino_incorrecto', 'termino_correcto', 'categoria', 'frecuencia_uso', 'activo']
+    list_filter = ['categoria', 'activo', 'fecha_creacion']
+    search_fields = ['termino_incorrecto', 'termino_correcto', 'notas']
+    readonly_fields = ['frecuencia_uso', 'fecha_creacion', 'fecha_modificacion']
+    list_editable = ['activo']
+    ordering = ['-frecuencia_uso', 'termino_incorrecto']
+    
+    fieldsets = (
+        ('Corrección', {
+            'fields': ('termino_incorrecto', 'termino_correcto', 'categoria')
+        }),
+        ('Estadísticas', {
+            'fields': ('frecuencia_uso', 'activo')
+        }),
+        ('Información Adicional', {
+            'fields': ('notas', 'fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    actions = ['activar_terminos', 'desactivar_terminos', 'resetear_frecuencia']
+    
+    def activar_terminos(self, request, queryset):
+        count = queryset.update(activo=True)
+        self.message_user(request, f'{count} término(s) activado(s).')
+    activar_terminos.short_description = "✅ Activar términos seleccionados"
+    
+    def desactivar_terminos(self, request, queryset):
+        count = queryset.update(activo=False)
+        self.message_user(request, f'{count} término(s) desactivado(s).')
+    desactivar_terminos.short_description = "❌ Desactivar términos seleccionados"
+    
+    def resetear_frecuencia(self, request, queryset):
+        count = queryset.update(frecuencia_uso=0)
+        self.message_user(request, f'Frecuencia reseteada para {count} término(s).')
+    resetear_frecuencia.short_description = "🔄 Resetear contador de uso"
+
+
+@admin.register(CorreccionAprendizaje)
+class CorreccionAprendizajeAdmin(admin.ModelAdmin):
+    """Admin para ver y analizar correcciones del usuario"""
+    list_display = [
+        'id', 'usuario', 'tipo_estudio', 'preview_cambios', 
+        'cantidad_cambios', 'fue_aplicada', 'fecha_creacion'
+    ]
+    list_filter = ['fue_aplicada', 'tipo_estudio', 'fecha_creacion', 'usuario']
+    search_fields = ['texto_original', 'texto_ia', 'texto_final']
+    readonly_fields = [
+        'fecha_creacion', 'cambios_detectados', 
+        'diferencias_visuales', 'texto_original_preview', 
+        'texto_ia_preview', 'texto_final_preview'
+    ]
+    date_hierarchy = 'fecha_creacion'
+    
+    fieldsets = (
+        ('Información General', {
+            'fields': ('usuario', 'tipo_estudio', 'fecha_creacion', 'fue_aplicada', 'votos_utilidad')
+        }),
+        ('Textos (Preview)', {
+            'fields': ('texto_original_preview', 'texto_ia_preview', 'texto_final_preview'),
+            'description': 'Vista previa de los textos (primeros 200 caracteres)'
+        }),
+        ('Textos Completos', {
+            'fields': ('texto_original', 'texto_ia', 'texto_final'),
+            'classes': ('collapse',)
+        }),
+        ('Análisis de Cambios', {
+            'fields': ('cambios_detectados', 'diferencias_visuales'),
+            'description': 'Diferencias detectadas automáticamente'
+        }),
+    )
+    
+    actions = [
+        'marcar_aplicada', 
+        'recalcular_diferencias', 
+        'exportar_para_entrenamiento',
+        'ver_ejemplos_aprendizaje'
+    ]
+    
+    def preview_cambios(self, obj):
+        """Muestra un preview de los cambios"""
+        if not obj.cambios_detectados:
+            return "Sin cambios"
+        
+        total = len(obj.cambios_detectados)
+        reemplazos = sum(1 for c in obj.cambios_detectados if c.get('tipo') == 'reemplazo')
+        return f"{total} cambios ({reemplazos} reemplazos)"
+    preview_cambios.short_description = "Preview cambios"
+    
+    def cantidad_cambios(self, obj):
+        """Cantidad total de cambios"""
+        return len(obj.cambios_detectados) if obj.cambios_detectados else 0
+    cantidad_cambios.short_description = "# Cambios"
+    
+    def texto_original_preview(self, obj):
+        """Preview del texto original"""
+        return obj.texto_original[:200] + '...' if len(obj.texto_original) > 200 else obj.texto_original
+    texto_original_preview.short_description = "Texto Original (Whisper)"
+    
+    def texto_ia_preview(self, obj):
+        """Preview del texto IA"""
+        return obj.texto_ia[:200] + '...' if len(obj.texto_ia) > 200 else obj.texto_ia
+    texto_ia_preview.short_description = "Texto IA (modo FIEL)"
+    
+    def texto_final_preview(self, obj):
+        """Preview del texto final"""
+        return obj.texto_final[:200] + '...' if len(obj.texto_final) > 200 else obj.texto_final
+    texto_final_preview.short_description = "Texto Final (usuario)"
+    
+    def diferencias_visuales(self, obj):
+        """Muestra las diferencias de forma visual"""
+        if not obj.cambios_detectados:
+            return "Sin cambios detectados"
+        
+        html = "<div style='font-family: monospace;'>"
+        for i, cambio in enumerate(obj.cambios_detectados[:10], 1):  # Primeros 10
+            tipo = cambio.get('tipo', '')
+            if tipo == 'reemplazo':
+                html += f"<div style='margin: 5px 0;'>"
+                html += f"{i}. <span style='background: #ffebee; padding: 2px 4px;'>{cambio['de']}</span> "
+                html += f"→ <span style='background: #e8f5e9; padding: 2px 4px;'>{cambio['a']}</span>"
+                html += f"</div>"
+            elif tipo == 'agregado':
+                html += f"<div style='margin: 5px 0;'>"
+                html += f"{i}. <span style='background: #e8f5e9; padding: 2px 4px;'>+ {cambio['texto']}</span>"
+                html += f"</div>"
+            elif tipo == 'eliminado':
+                html += f"<div style='margin: 5px 0;'>"
+                html += f"{i}. <span style='background: #ffebee; padding: 2px 4px;'>- {cambio['texto']}</span>"
+                html += f"</div>"
+        
+        if len(obj.cambios_detectados) > 10:
+            html += f"<div><em>... y {len(obj.cambios_detectados) - 10} cambios más</em></div>"
+        html += "</div>"
+        
+        from django.utils.safestring import mark_safe
+        return mark_safe(html)
+    diferencias_visuales.short_description = "Diferencias Visuales"
+    
+    def marcar_aplicada(self, request, queryset):
+        count = queryset.update(fue_aplicada=True)
+        self.message_user(request, f'{count} corrección(es) marcada(s) como aplicadas.')
+    marcar_aplicada.short_description = "✅ Marcar como aplicada al modelo"
+    
+    def recalcular_diferencias(self, request, queryset):
+        count = 0
+        for obj in queryset:
+            obj.calcular_diferencias()
+            obj.save()
+            count += 1
+        self.message_user(request, f'Diferencias recalculadas para {count} corrección(es).')
+    recalcular_diferencias.short_description = "🔄 Recalcular diferencias"
+    
+    def exportar_para_entrenamiento(self, request, queryset):
+        """Exporta correcciones en formato para fine-tuning"""
+        import json
+        from django.http import JsonResponse
+        
+        datos_entrenamiento = []
+        for obj in queryset:
+            datos_entrenamiento.append({
+                'input': obj.texto_ia,
+                'output': obj.texto_final,
+                'cambios': obj.cambios_detectados
+            })
+        
+        response = JsonResponse({'correcciones': datos_entrenamiento}, json_dumps_params={'indent': 2})
+        response['Content-Disposition'] = 'attachment; filename="correcciones_entrenamiento.json"'
+        return response
+    exportar_para_entrenamiento.short_description = "📥 Exportar para entrenamiento"
+    
+    def ver_ejemplos_aprendizaje(self, request, queryset):
+        """Muestra los ejemplos que se están usando en el prompt de IA"""
+        from .models import CorreccionAprendizaje
+        
+        # Obtener ejemplos para el usuario seleccionado
+        usuario = queryset.first().usuario if queryset.exists() else None
+        ejemplos = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(usuario=usuario, limite=10)
+        
+        if ejemplos:
+            html = f"""
+            <div style="padding: 20px; background: #f0f0f0; border-radius: 5px; margin: 10px;">
+                <h3>📚 Ejemplos de Aprendizaje Activos (usados en el prompt de IA)</h3>
+                <pre style="background: white; padding: 15px; border-radius: 5px; overflow-x: auto;">{ejemplos}</pre>
+                <p style="margin-top: 10px; color: #666;">
+                    Estos ejemplos se incluyen automáticamente en el prompt cuando la IA procesa nuevos textos.
+                </p>
+            </div>
+            """
+            self.message_user(request, mark_safe(html))
+        else:
+            self.message_user(request, "No hay ejemplos de aprendizaje disponibles todavía.", level='warning')
+    ver_ejemplos_aprendizaje.short_description = "👁️ Ver ejemplos usados en prompt IA"

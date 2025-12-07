@@ -1,0 +1,119 @@
+{% extends "layouts/base_with_sidebar.html" %}
+{% load static %}
+
+{% block title %}{% if object %}Editar{% else %}Agregar{% endif %} Término Médico{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+    
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-xl p-6 mb-6 text-white">
+        <h1 class="text-2xl font-bold">
+            <i class="fas fa-{% if object %}edit{% else %}plus{% endif %} mr-2"></i>
+            {% if object %}Editar Término{% else %}Agregar Nuevo Término{% endif %}
+        </h1>
+        <p class="text-purple-100 mt-1">
+            {% if object %}Modifica los datos del término médico{% else %}Agrega un nuevo término al diccionario{% endif %}
+        </p>
+    </div>
+
+    <!-- Formulario -->
+    <div class="bg-gray-800 rounded-xl shadow-md p-6">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            {% if form.non_field_errors %}
+            <div class="bg-red-900/50 border-l-4 border-red-500 p-4 rounded">
+                <p class="text-red-200">{{ form.non_field_errors }}</p>
+            </div>
+            {% endif %}
+
+            <!-- Término Incorrecto -->
+            <div>
+                <label for="{{ form.termino_incorrecto.id_for_label }}" class="block text-sm font-bold text-gray-200 mb-2">
+                    {{ form.termino_incorrecto.label }}
+                    <span class="text-red-400">*</span>
+                </label>
+                {{ form.termino_incorrecto }}
+                {% if form.termino_incorrecto.errors %}
+                <p class="mt-1 text-sm text-red-400">{{ form.termino_incorrecto.errors.0 }}</p>
+                {% endif %}
+                <p class="mt-1 text-xs text-gray-400">
+                    <i class="fas fa-info-circle"></i> Cómo lo transcribe el navegador (ej: "con artrosis trick compartimental")
+                </p>
+            </div>
+
+            <!-- Término Correcto -->
+            <div>
+                <label for="{{ form.termino_correcto.id_for_label }}" class="block text-sm font-bold text-gray-200 mb-2">
+                    {{ form.termino_correcto.label }}
+                    <span class="text-red-400">*</span>
+                </label>
+                {{ form.termino_correcto }}
+                {% if form.termino_correcto.errors %}
+                <p class="mt-1 text-sm text-red-400">{{ form.termino_correcto.errors.0 }}</p>
+                {% endif %}
+                <p class="mt-1 text-xs text-gray-400">
+                    <i class="fas fa-check-circle"></i> Término médico correcto (ej: "gonartrosis tricompartimental")
+                </p>
+            </div>
+
+            <!-- Categoría -->
+            <div>
+                <label for="{{ form.categoria.id_for_label }}" class="block text-sm font-bold text-gray-200 mb-2">
+                    {{ form.categoria.label }}
+                </label>
+                {{ form.categoria }}
+                {% if form.categoria.errors %}
+                <p class="mt-1 text-sm text-red-400">{{ form.categoria.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Notas -->
+            <div>
+                <label for="{{ form.notas.id_for_label }}" class="block text-sm font-bold text-gray-200 mb-2">
+                    {{ form.notas.label }}
+                </label>
+                {{ form.notas }}
+                {% if form.notas.errors %}
+                <p class="mt-1 text-sm text-red-400">{{ form.notas.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Activo -->
+            <div class="flex items-center">
+                {{ form.activo }}
+                <label for="{{ form.activo.id_for_label }}" class="ml-2 text-sm font-medium text-gray-200">
+                    {{ form.activo.label }}
+                </label>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex gap-4 pt-4">
+                <button type="submit" class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-save mr-2"></i>
+                    {% if object %}Actualizar Término{% else %}Guardar Término{% endif %}
+                </button>
+                <a href="{% url 'dictado_informes:termino_list' %}" 
+                   class="flex-1 bg-gray-700 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-600 transition-colors text-center">
+                    <i class="fas fa-times mr-2"></i>Cancelar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tips -->
+    <div class="mt-6 bg-indigo-900/30 border-l-4 border-indigo-500 rounded-lg p-4">
+        <h3 class="text-sm font-bold text-indigo-200 mb-2">
+            <i class="fas fa-lightbulb mr-2"></i>Tips para agregar términos
+        </h3>
+        <ul class="text-xs text-indigo-100 space-y-1">
+            <li>• Escribe el término incorrecto <strong>exactamente</strong> como lo transcribe el navegador</li>
+            <li>• Usa minúsculas para ambos términos (el sistema hace búsqueda case-insensitive)</li>
+            <li>• Los términos más usados aparecen primero en las correcciones</li>
+            <li>• Podes desactivar temporalmente un término sin eliminarlo</li>
+        </ul>
+    </div>
+
+</div>
+{% endblock %}

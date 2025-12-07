@@ -1,0 +1,74 @@
+{% extends "layouts/base_with_sidebar.html" %}
+{% load static %}
+
+{% block title %}Eliminar Término{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-2xl mx-auto">
+    
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-red-600 to-pink-600 rounded-xl shadow-xl p-6 mb-6 text-white">
+        <h1 class="text-2xl font-bold">
+            <i class="fas fa-trash-alt mr-2"></i>
+            Confirmar Eliminación
+        </h1>
+        <p class="text-red-100 mt-1">
+            Esta acción no se puede deshacer
+        </p>
+    </div>
+
+    <!-- Confirmación -->
+    <div class="bg-gray-800 rounded-xl shadow-md p-6">
+        <div class="mb-6">
+            <p class="text-gray-300 mb-4">
+                ¿Estás seguro que deseas eliminar este término del diccionario?
+            </p>
+            
+            <div class="bg-gray-900 rounded-lg p-4 border-l-4 border-red-500">
+                <div class="space-y-2">
+                    <div class="flex items-start gap-2">
+                        <span class="text-red-400 font-semibold min-w-[100px]">Incorrecto:</span>
+                        <span class="text-gray-300">{{ object.termino_incorrecto }}</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-green-400 font-semibold min-w-[100px]">Correcto:</span>
+                        <span class="text-gray-300">{{ object.termino_correcto }}</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-purple-400 font-semibold min-w-[100px]">Categoría:</span>
+                        <span class="text-gray-300">{{ object.get_categoria_display }}</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="text-indigo-400 font-semibold min-w-[100px]">Veces usado:</span>
+                        <span class="text-gray-300">{{ object.frecuencia_uso }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form method="post" class="flex gap-4">
+            {% csrf_token %}
+            <button type="submit" class="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-red-700 transition-colors">
+                <i class="fas fa-trash mr-2"></i>
+                Sí, Eliminar Término
+            </button>
+            <a href="{% url 'dictado_informes:termino_list' %}" 
+               class="flex-1 bg-gray-700 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-600 transition-colors text-center">
+                <i class="fas fa-times mr-2"></i>No, Cancelar
+            </a>
+        </form>
+    </div>
+
+    <!-- Alternativa -->
+    <div class="mt-6 bg-yellow-900/30 border-l-4 border-yellow-500 rounded-lg p-4">
+        <h3 class="text-sm font-bold text-yellow-200 mb-2">
+            <i class="fas fa-info-circle mr-2"></i>Consejo
+        </h3>
+        <p class="text-xs text-yellow-100">
+            Si no querés eliminar permanentemente el término, podés <strong>desactivarlo</strong> desde la lista. 
+            Así conservas el historial de uso y podés reactivarlo cuando quieras.
+        </p>
+    </div>
+
+</div>
+{% endblock %}

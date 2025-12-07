@@ -6,10 +6,11 @@ from django.urls import reverse_lazy
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Q, Count
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
-from .models import Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, EstadoInforme
+from .models import Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, EstadoInforme, TerminoMedico, CorreccionAprendizaje
+from .forms import TerminoMedicoForm
 from .ai_services import ai_service
 import json
 import base64
@@ -60,7 +61,15 @@ class DashboardDictadoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateV
             'tipo_estudio'
         ).annotate(total=Count('id')).order_by('-total')
         
+        # Información de API de IA
+        context['api_info'] = ai_service.get_api_info()
+        
         return context
+
+
+class DictadoRapidoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView):
+    """Vista simplificada para dictado rápido sin guardar - solo dictar, mejorar y copiar"""
+    template_name = 'dictado_informes/dictado_rapido_whisper.html'
 
 
 class InformeListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
@@ -322,7 +331,8 @@ def procesar_audio_dictado(request):
         logger.info("Llamando a GPT-4 para mejorar texto...")
         mejora_result = ai_service.improve_medical_text(
             texto_original,
-            tipo_estudio
+            tipo_estudio,
+            usuario=request.user if request.user.is_authenticated else None
         )
         logger.info(f"Resultado de GPT-4: {str(mejora_result)[:200]}")
         
@@ -346,6 +356,69 @@ def procesar_audio_dictado(request):
         }, status=500)
 
 
+# API para transcribir audio con Whisper (sin mejora IA)
+@require_POST
+@csrf_exempt  # Temporal para testing, agregar CSRF después
+def transcribir_audio_whisper(request):
+    """
+    Transcribe audio usando Whisper API
+    Solo transcripción, sin mejora de IA
+    """
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        audio_base64 = data.get('audio')
+        
+        if not audio_base64:
+            return JsonResponse({'error': 'No se recibió audio'}, status=400)
+        
+        logger.info("🎤 Transcribiendo audio con Whisper...")
+        
+        # Decodificar audio base64
+        try:
+            audio_data = base64.b64decode(audio_base64.split(',')[1] if ',' in audio_base64 else audio_base64)
+        except Exception as e:
+            logger.error(f"Error decodificando base64: {str(e)}")
+            return JsonResponse({'error': 'Audio inválido'}, status=400)
+        
+        # Crear archivo temporal
+        audio_file = ContentFile(audio_data, name='dictado.webm')
+        
+        # Transcribir con Whisper
+        transcripcion_result = ai_service.transcribe_audio(audio_file)
+        
+        if transcripcion_result.get('error'):
+            return JsonResponse({
+                'success': False,
+                'error': transcripcion_result['error']
+            }, status=500)
+        
+        texto_transcrito = transcripcion_result.get('text', '')
+        
+        # PROCESAR COMANDOS DE VOZ: "punto" → ".", "nueva línea" → "\n", etc.
+        texto_procesado = TerminoMedico.procesar_comandos_voz(texto_transcrito)
+        
+        logger.info(f"✅ Transcripción Whisper: {texto_transcrito[:100]}...")
+        logger.info(f"✅ Texto con comandos procesados: {texto_procesado[:100]}...")
+        
+        return JsonResponse({
+            'success': True,
+            'texto_transcrito': texto_procesado,  # Enviar texto YA con comandos procesados
+            'texto_original': texto_transcrito,  # Por si se necesita el original
+            'confianza': transcripcion_result.get('confidence', 0.95),
+            'duracion': transcripcion_result.get('duration')
+        })
+    
+    except Exception as e:
+        logger.exception(f"Error en transcribir_audio_whisper: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
 # API para mejorar texto existente
 @require_POST
 def mejorar_texto_ia(request):
@@ -359,33 +432,244 @@ def mejorar_texto_ia(request):
     
     try:
         data = json.loads(request.body)
-        texto = data.get('texto', '')
+        # Aceptar tanto 'texto' como 'texto_original' para compatibilidad
+        texto = data.get('texto_original') or data.get('texto', '')
         tipo_estudio = data.get('tipo_estudio', 'OTR')
-        plantilla = data.get('plantilla', None)  # Nueva: información de plantilla
+        modo = data.get('modo', 'LIBRE')
+        plantilla = data.get('plantilla', None)
         
-        if not texto:
-            return JsonResponse({'error': 'No se recibió texto'}, status=400)
+        if not texto or texto.strip() == '':
+            logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
+            return JsonResponse({'error': 'No se recibió texto para mejorar'}, status=400)
         
-        # Construir contexto
-        contexto = {}
+        logger.info(f"📝 Mejorando texto ({len(texto)} caracteres) en modo {modo}")
+        
+        # 1. APLICAR CORRECCIONES DEL DICCIONARIO MÉDICO
+        texto_corregido, correcciones = TerminoMedico.aplicar_correcciones(texto)
+        if correcciones:
+            logger.info(f"✅ Aplicadas {len(correcciones)} correcciones del diccionario")
+            for corr in correcciones:
+                logger.debug(f"   • {corr['de']} → {corr['a']}")
+        
+        # 2. NO procesar comandos de voz aquí (ya vienen procesados de Whisper)
+        texto_procesado = texto_corregido
+        
+        # Construir contexto con modo (FIEL por defecto para dictado rápido)
+        contexto = {
+            'modo': modo  # 'FIEL' = solo corregir, 'ESTRUCTURADO' = crear secciones
+        }
         if plantilla:
             contexto['plantilla'] = plantilla
-            logger.info(f"🎯 Mejorando texto con plantilla: {plantilla.get('nombre', 'sin nombre')}")
+            logger.info(f"🎯 Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
         
-        # Mejorar con GPT/Groq
-        result = ai_service.improve_medical_text(texto, tipo_estudio, contexto)
+        # 3. MEJORAR CON IA
+        result = ai_service.improve_medical_text(
+            texto_procesado, 
+            tipo_estudio, 
+            contexto,
+            usuario=request.user if request.user.is_authenticated else None
+        )
         
         return JsonResponse({
             'success': True,
-            'texto_mejorado': result.get('texto_mejorado', texto),
+            'texto_mejorado': result.get('texto_mejorado', texto_procesado),
             'confianza': result.get('confianza', 0.0),
             'sugerencias': result.get('sugerencias', []),
-            'modo': result.get('modo', 'LIBRE')  # Informar modo usado
+            'correcciones_aplicadas': correcciones,  # Enviar correcciones al frontend
+            'modo': result.get('modo', modo)
         })
     
+    except json.JSONDecodeError as e:
+        logger.error(f"❌ Error decodificando JSON: {str(e)}")
+        return JsonResponse({'error': 'Datos inválidos en la solicitud'}, status=400)
     except Exception as e:
-        logger.error(f"Error en mejorar_texto_ia: {str(e)}")
+        logger.error(f"❌ Error en mejorar_texto_ia: {str(e)}", exc_info=True)
         return JsonResponse({
             'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+# ========================================
+# VISTAS PARA DICCIONARIO MÉDICO
+# ========================================
+
+class TerminoMedicoListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+    """Lista de términos médicos del diccionario"""
+    model = TerminoMedico
+    template_name = 'dictado_informes/termino_list.html'
+    context_object_name = 'terminos'
+    paginate_by = 50
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filtros
+        categoria = self.request.GET.get('categoria')
+        activo = self.request.GET.get('activo')
+        search = self.request.GET.get('q')
+        
+        if categoria:
+            queryset = queryset.filter(categoria=categoria)
+        if activo == 'si':
+            queryset = queryset.filter(activo=True)
+        elif activo == 'no':
+            queryset = queryset.filter(activo=False)
+        if search:
+            queryset = queryset.filter(
+                Q(termino_incorrecto__icontains=search) |
+                Q(termino_correcto__icontains=search) |
+                Q(notas__icontains=search)
+            )
+        
+        return queryset.order_by('-frecuencia_uso', 'termino_incorrecto')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_terminos'] = TerminoMedico.objects.count()
+        context['terminos_activos'] = TerminoMedico.objects.filter(activo=True).count()
+        context['mas_usados'] = TerminoMedico.objects.filter(activo=True).order_by('-frecuencia_uso')[:5]
+        return context
+
+
+class TerminoMedicoCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    """Crear nuevo término médico"""
+    model = TerminoMedico
+    form_class = TerminoMedicoForm
+    template_name = 'dictado_informes/termino_form.html'
+    success_url = reverse_lazy('dictado_informes:termino_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"✅ Término '{form.instance.termino_correcto}' agregado al diccionario")
+        return super().form_valid(form)
+
+
+class TerminoMedicoUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+    """Editar término médico existente"""
+    model = TerminoMedico
+    form_class = TerminoMedicoForm
+    template_name = 'dictado_informes/termino_form.html'
+    success_url = reverse_lazy('dictado_informes:termino_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"✅ Término '{form.instance.termino_correcto}' actualizado")
+        return super().form_valid(form)
+
+
+class TerminoMedicoDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    """Eliminar término médico"""
+    model = TerminoMedico
+    template_name = 'dictado_informes/termino_confirm_delete.html'
+    success_url = reverse_lazy('dictado_informes:termino_list')
+    
+    def delete(self, request, *args, **kwargs):
+        termino = self.get_object()
+        messages.success(request, f"🗑️ Término '{termino.termino_correcto}' eliminado del diccionario")
+        return super().delete(request, *args, **kwargs)
+
+
+@require_POST
+def toggle_termino_activo(request, pk):
+    """Toggle estado activo/inactivo de un término"""
+    termino = get_object_or_404(TerminoMedico, pk=pk)
+    termino.activo = not termino.activo
+    termino.save()
+    
+    estado = "activado" if termino.activo else "desactivado"
+    return JsonResponse({
+        'success': True,
+        'activo': termino.activo,
+        'message': f"Término '{termino.termino_correcto}' {estado}"
+    })
+
+
+@require_POST
+def guardar_correccion_aprendizaje(request):
+    """
+    Guarda una corrección manual del usuario para entrenar la IA.
+    Se llama cuando el usuario edita el texto mejorado y lo guarda.
+    """
+    if not request.user.is_superuser:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    try:
+        data = json.loads(request.body)
+        texto_original = data.get('texto_original', '')  # Transcripción Whisper
+        texto_ia = data.get('texto_ia', '')              # Texto mejorado por IA
+        texto_final = data.get('texto_final', '')        # Texto editado por usuario
+        tipo_estudio = data.get('tipo_estudio', '')
+        
+        if not texto_original or not texto_ia or not texto_final:
+            return JsonResponse({'error': 'Faltan textos requeridos'}, status=400)
+        
+        # Solo guardar si el usuario hizo cambios
+        if texto_ia.strip() == texto_final.strip():
+            return JsonResponse({
+                'success': True,
+                'message': 'No hay cambios para guardar',
+                'guardado': False
+            })
+        
+        # Crear registro de aprendizaje
+        correccion = CorreccionAprendizaje.objects.create(
+            texto_original=texto_original,
+            texto_ia=texto_ia,
+            texto_final=texto_final,
+            usuario=request.user,
+            tipo_estudio=tipo_estudio if tipo_estudio in dict(TipoEstudio.choices) else ''
+        )
+        
+        logger.info(f"✅ Corrección de aprendizaje guardada ID={correccion.id} por {request.user}")
+        logger.info(f"   Cambios detectados: {len(correccion.cambios_detectados)}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'✅ Corrección guardada! {len(correccion.cambios_detectados)} cambios detectados',
+            'guardado': True,
+            'id': correccion.id,
+            'cambios': correccion.cambios_detectados
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error guardando corrección: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@require_http_methods(["GET"])
+def info_aprendizaje(request):
+    """
+    Endpoint para obtener información sobre el sistema de aprendizaje activo
+    """
+    try:
+        from .models import CorreccionAprendizaje
+        
+        # Obtener ejemplos para el usuario actual
+        usuario = request.user if request.user.is_authenticated else None
+        ejemplos = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(usuario=usuario, limite=10)
+        
+        # Contar líneas de ejemplos (cada línea es una corrección)
+        cantidad = len(ejemplos.split('\n')) if ejemplos else 0
+        
+        logger.info(f"📊 Info aprendizaje: usuario={usuario}, cantidad={cantidad}")
+        
+        return JsonResponse({
+            'success': True,
+            'cantidad': cantidad,
+            'tiene_ejemplos': cantidad > 0
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error obteniendo info aprendizaje: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'cantidad': 0,
+            'tiene_ejemplos': False
+        })
+    except Exception as e:
+        logger.exception(f"Error guardando corrección de aprendizaje: {str(e)}")
+        return JsonResponse({
             'error': str(e)
         }, status=500)

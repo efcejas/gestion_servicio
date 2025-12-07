@@ -1,0 +1,210 @@
+{% extends "layouts/base_with_sidebar.html" %}
+{% load static %}
+
+{% block title %}Diccionario Médico{% endblock %}
+
+{% block content %}
+<div class="p-6">
+    
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl shadow-xl p-6 mb-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">
+                    <i class="fas fa-book-medical mr-3"></i>
+                    Diccionario Médico
+                </h1>
+                <p class="text-purple-100">
+                    Gestiona las correcciones automáticas para el dictado de informes
+                </p>
+            </div>
+            <a href="{% url 'dictado_informes:termino_create' %}" 
+               class="bg-white text-purple-600 px-6 py-3 rounded-lg font-bold hover:bg-purple-50 transition-colors shadow-lg">
+                <i class="fas fa-plus mr-2"></i>Agregar Término
+            </a>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-semibold">Total Términos</p>
+                    <p class="text-3xl font-bold mt-1">{{ total_terminos }}</p>
+                </div>
+                <i class="fas fa-book text-4xl text-white/30"></i>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-green-100 text-sm font-semibold">Activos</p>
+                    <p class="text-3xl font-bold mt-1">{{ terminos_activos }}</p>
+                </div>
+                <i class="fas fa-check-circle text-4xl text-white/30"></i>
+            </div>
+        </div>
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-purple-100 text-sm font-semibold">Más Usado</p>
+                    {% if mas_usados %}
+                    <p class="text-lg font-bold mt-1 truncate">{{ mas_usados.0.termino_correcto }}</p>
+                    <p class="text-xs text-purple-100">{{ mas_usados.0.frecuencia_uso }} veces</p>
+                    {% else %}
+                    <p class="text-sm mt-1">Sin datos</p>
+                    {% endif %}
+                </div>
+                <i class="fas fa-trophy text-4xl text-white/30"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-gray-800 rounded-xl shadow-md p-4 mb-6">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <input type="text" name="q" value="{{ request.GET.q }}" 
+                       placeholder="Buscar término..." 
+                       class="w-full rounded-md border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-indigo-500 focus:ring-indigo-500">
+            </div>
+            <div>
+                <select name="categoria" class="w-full rounded-md border-gray-600 bg-gray-700 text-white focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Todas las categorías</option>
+                    <option value="ORTOPEDIA" {% if request.GET.categoria == 'ORTOPEDIA' %}selected{% endif %}>Ortopedia</option>
+                    <option value="RADIOLOGIA" {% if request.GET.categoria == 'RADIOLOGIA' %}selected{% endif %}>Radiología</option>
+                    <option value="ANATOMIA" {% if request.GET.categoria == 'ANATOMIA' %}selected{% endif %}>Anatomía</option>
+                    <option value="GENERAL" {% if request.GET.categoria == 'GENERAL' %}selected{% endif %}>General</option>
+                </select>
+            </div>
+            <div>
+                <select name="activo" class="w-full rounded-md border-gray-600 bg-gray-700 text-white focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Todos los estados</option>
+                    <option value="si" {% if request.GET.activo == 'si' %}selected{% endif %}>✅ Activos</option>
+                    <option value="no" {% if request.GET.activo == 'no' %}selected{% endif %}>❌ Inactivos</option>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-search mr-2"></i>Filtrar
+                </button>
+                <a href="{% url 'dictado_informes:termino_list' %}" class="bg-gray-700 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors">
+                    <i class="fas fa-times"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Términos -->
+    <div class="bg-gray-800 rounded-xl shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-300">
+                <thead class="text-xs uppercase bg-gray-900 text-gray-400">
+                    <tr>
+                        <th class="px-6 py-3">Incorrecto</th>
+                        <th class="px-6 py-3">→ Correcto</th>
+                        <th class="px-6 py-3">Categoría</th>
+                        <th class="px-6 py-3">Uso</th>
+                        <th class="px-6 py-3">Estado</th>
+                        <th class="px-6 py-3">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for termino in terminos %}
+                    <tr class="border-b border-gray-700 hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 font-medium text-red-400">
+                            {{ termino.termino_incorrecto }}
+                        </td>
+                        <td class="px-6 py-4 font-bold text-green-400">
+                            {{ termino.termino_correcto }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
+                                {{ termino.get_categoria_display }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="font-bold text-indigo-400">{{ termino.frecuencia_uso }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="toggleTermino({{ termino.pk }})" 
+                                    id="toggle-{{ termino.pk }}"
+                                    class="px-3 py-1 rounded-full text-xs font-bold transition-colors
+                                           {% if termino.activo %}bg-green-600 hover:bg-green-700{% else %}bg-gray-600 hover:bg-gray-700{% endif %}">
+                                {% if termino.activo %}✅ Activo{% else %}❌ Inactivo{% endif %}
+                            </button>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex gap-2">
+                                <a href="{% url 'dictado_informes:termino_update' termino.pk %}" 
+                                   class="text-indigo-400 hover:text-indigo-300 transition-colors">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'dictado_informes:termino_delete' termino.pk %}" 
+                                   class="text-red-400 hover:text-red-300 transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-2"></i>
+                            <p>No se encontraron términos</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Paginación -->
+        {% if is_paginated %}
+        <div class="bg-gray-900 px-6 py-4 flex items-center justify-between">
+            <div class="text-sm text-gray-400">
+                Mostrando {{ page_obj.start_index }} a {{ page_obj.end_index }} de {{ paginator.count }} términos
+            </div>
+            <div class="flex gap-2">
+                {% if page_obj.has_previous %}
+                <a href="?page=1{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600">Primera</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600">Anterior</a>
+                {% endif %}
+                <span class="px-3 py-1 bg-indigo-600 text-white rounded">{{ page_obj.number }}</span>
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600">Siguiente</a>
+                <a href="?page={{ paginator.num_pages }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}" class="px-3 py-1 bg-gray-700 text-white rounded hover:bg-gray-600">Última</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+function toggleTermino(id) {
+    fetch(`/dictado_informes/diccionario/${id}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const btn = document.getElementById(`toggle-${id}`);
+            if (data.activo) {
+                btn.className = 'px-3 py-1 rounded-full text-xs font-bold bg-green-600 hover:bg-green-700 transition-colors';
+                btn.innerHTML = '✅ Activo';
+            } else {
+                btn.className = 'px-3 py-1 rounded-full text-xs font-bold bg-gray-600 hover:bg-gray-700 transition-colors';
+                btn.innerHTML = '❌ Inactivo';
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
