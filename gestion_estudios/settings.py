@@ -82,6 +82,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'dictado_informes.context_processors.terminos_activos',
+                'gestion_estudios.context_processors.sanatorio_config',
             ],
         },
     },
