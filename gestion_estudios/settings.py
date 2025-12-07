@@ -14,6 +14,9 @@ from pathlib import Path
 from decouple import config
 import dj_database_url
 
+# Importar configuración del sanatorio
+from .config_sanatorio import CONFIG as SANATORIO_CONFIG
+
 # Construya rutas dentro del proyecto de esta manera: BASE_DIR /'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -128,7 +131,8 @@ LOGIN_URL = 'login'  # Página de login predeterminada
 
 LANGUAGE_CODE = 'es-ar'
 
-TIME_ZONE = 'America/Argentina/Buenos_Aires'
+# Usar zona horaria del sanatorio activo
+TIME_ZONE = SANATORIO_CONFIG['ZONA_HORARIA']
 
 USE_I18N = True
 
