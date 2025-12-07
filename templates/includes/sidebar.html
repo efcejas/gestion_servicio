@@ -57,6 +57,7 @@
                 </a>
             </li>
             
+            {% if SANATORIO_MODULOS.dictado %}
             <!-- DICTADO DE INFORMES IA - Feature principal con gradiente y badge -->
             <li>
                 <a href="{% url 'dictado_informes:dashboard' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 group {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' and request.resolver_match.url_name == 'dashboard' %}bg-gradient-to-r from-indigo-600 to-purple-600{% endif %}">
@@ -87,7 +88,9 @@
                     {% endif %}
                 </a>
             </li>
+            {% endif %}
             
+            {% if SANATORIO_MODULOS.liquidacion %}
             <!-- Liquidación -->
             <li>
                 <a href="{% url 'liquidacion:informados_por_medico_por_mes' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and request.resolver_match.app_name == 'liquidacion' %}bg-blue-900 text-blue-400{% endif %}">
@@ -99,7 +102,9 @@
                     <span class="flex-1 ms-3 whitespace-nowrap">Liquidación</span>
                 </a>
             </li>
+            {% endif %}
             
+            {% if SANATORIO_MODULOS.guardias %}
             <!-- Control Guardias -->
             <li>
                 <a href="{% url 'control_guardias:calendario_guardias_full_tw' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and request.resolver_match.app_name == 'control_guardias' %}bg-blue-900 text-blue-400{% endif %}">
@@ -109,7 +114,9 @@
                     <span class="flex-1 ms-3 whitespace-nowrap">Control Guardias</span>
                 </a>
             </li>
+            {% endif %}
             
+            {% if SANATORIO_MODULOS.eventos %}
             <!-- Eventos -->
             <li>
                 <a href="{% url 'gestion_eventos:lista_eventos' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and request.resolver_match.app_name == 'gestion_eventos' %}bg-blue-900 text-blue-400{% endif %}">
@@ -119,7 +126,9 @@
                     <span class="flex-1 ms-3 whitespace-nowrap">Eventos</span>
                 </a>
             </li>
+            {% endif %}
            
+            {% if SANATORIO_MODULOS.liquidacion and user.is_superuser %}
             <!-- Separador -->
             <li class="pt-4 mt-4 space-y-2 border-t border-gray-700"></li>
             
@@ -133,6 +142,7 @@
                     <span class="flex-1 ms-3 whitespace-nowrap">Carga Masiva</span>
                 </a>
             </li>
+            {% endif %}
             {% endif %}
             
             <!-- Admin Django (abre en nueva pestaña) -->

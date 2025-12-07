@@ -181,6 +181,7 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
         from gestion_eventos.models import EventoServicio
         from control_guardias.models import Guardia
         from liquidacion.models import RegistroEstudiosPorMedico
+        from equipos.models import EquipoImagen
         from django.db.models import Max
         from datetime import datetime
         import pytz
@@ -380,6 +381,23 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
         logger.info(f"Total médicos en tabla: {len(medicos_activos_data)}")
         logger.info(f"=== FIN DASHBOARD DEBUG ===")
         
+        # Estadísticas de Equipos de Imágenes
+        equipos_total = EquipoImagen.objects.count()
+        equipos_en_servicio = EquipoImagen.objects.filter(en_servicio=True).count()
+        equipos_fuera_servicio = EquipoImagen.objects.filter(en_servicio=False).count()
+        
+        # Equipos por área
+        from collections import Counter
+        equipos_por_area_raw = EquipoImagen.objects.filter(en_servicio=True).values_list('area', flat=True)
+        equipos_por_area_count = Counter(equipos_por_area_raw)
+        equipos_por_area = [
+            {'area': area, 'area_display': dict(EquipoImagen._meta.get_field('area').choices)[area], 'cantidad': count}
+            for area, count in equipos_por_area_count.items()
+        ]
+        
+        # Últimos 5 equipos agregados
+        equipos_recientes = EquipoImagen.objects.order_by('-fecha_creacion')[:5]
+        
         return {
             'cantidad_eventos_abiertos': eventos_abiertos.count(),
             'cantidad_eventos_en_revision': eventos_en_revision.count(),
@@ -405,6 +423,12 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
             ).values('medico').distinct().count(),
             'ultimos_medicos_activos': medicos_activos_data,
             'mes_actual': self._traducir_mes(hoy),  # Para mostrar "Diciembre 2025"
+            # Datos de equipos
+            'equipos_total': equipos_total,
+            'equipos_en_servicio': equipos_en_servicio,
+            'equipos_fuera_servicio': equipos_fuera_servicio,
+            'equipos_por_area': equipos_por_area,
+            'equipos_recientes': equipos_recientes,
         }
     
     def _traducir_mes(self, fecha):

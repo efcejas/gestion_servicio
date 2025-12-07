@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'liquidacion.apps.LiquidacionConfig',
     'gestion_eventos.apps.GestionEventosConfig',
     'dictado_informes.apps.DictadoInformesConfig',
+    'equipos.apps.EquiposConfig',
     
     # Tailwind CSS
     'tailwind',

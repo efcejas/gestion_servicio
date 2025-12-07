@@ -24,15 +24,22 @@
             {% include 'includes/breadcrumbs.html' %}
             
             <!-- Barra superior -->
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 gap-4">
                 <div>
                     <h1 class="text-2xl font-bold text-white">Dashboard</h1>
                     <p class="text-gray-300">Sistema de Gestión - Dr. Cejas</p>
                 </div>
+                {% if request.user.is_superuser %}
+                    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 border border-white/30 text-xs text-white backdrop-blur-sm">
+                        <i class="fa-solid fa-gear text-[0.8rem]"></i>
+                        {{ SANATORIO_MODO }}
+                    </span>
+                {% endif %}
             </div>
 
             <!-- Cards de estadísticas principales -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+                {% if SANATORIO_MODULOS.eventos %}
                 <!-- Card: Eventos del Servicio -->
                 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 cursor-pointer hover:bg-gray-750 transition-colors group" onclick="openEventsModal()">
                     <div class="flex items-center justify-between">
@@ -86,7 +93,9 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
+                {% if SANATORIO_MODULOS.guardias %}
                 <!-- Card: Médico de Guardia -->
                 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
                     <div class="flex items-start justify-between gap-3 md:gap-4">
@@ -119,7 +128,9 @@
                         </div>
                     {% endif %}
                 </div>
+                {% endif %}
 
+                {% if SANATORIO_MODULOS.liquidacion %}
                 <!-- Card: Regiones del Mes -->
                 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
                     <div class="flex items-center justify-between">
@@ -157,12 +168,14 @@
                         </div>
                     {% endif %}
                 </div>
+                {% endif %}
             </div>
 
             <!-- Navegación Rápida -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
                 <h3 class="text-xl font-semibold text-white mb-4">Acceso Rápido</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {% if SANATORIO_MODULOS.guardias %}
                     <a href="{% url 'control_guardias:portal_coberturas_semanal' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-6 h-6 text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +187,9 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                     
+                    {% if SANATORIO_MODULOS.eventos %}
                     <a href="{% url 'gestion_eventos:lista_eventos' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-6 h-6 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +201,9 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                     
+                    {% if SANATORIO_MODULOS.liquidacion %}
                     <a href="{% url 'liquidacion:informados_por_medico_por_mes' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-6 h-6 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -210,9 +227,116 @@
                             </div>
                         </div>
                     </a>
+                    {% endif %}
                 </div>
             </div>
 
+            {% if SANATORIO_MODULOS.equipos %}
+            <!-- Panel de Equipos de Imágenes -->
+            <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold text-white">Equipos de Imágenes</h3>
+                    <a href="{% url 'admin:equipos_equipoimagen_changelist' %}" target="_blank" 
+                       class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Gestionar
+                    </a>
+                </div>
+
+                <!-- Estadísticas generales -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400 mb-1">Total de Equipos</p>
+                                <p class="text-2xl font-bold text-white">{{ equipos_total|default:0 }}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400 mb-1">En Servicio</p>
+                                <p class="text-2xl font-bold text-green-400">{{ equipos_en_servicio|default:0 }}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-400 mb-1">Fuera de Servicio</p>
+                                <p class="text-2xl font-bold text-red-400">{{ equipos_fuera_servicio|default:0 }}</p>
+                            </div>
+                            <div class="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Equipos por área -->
+                {% if equipos_por_area %}
+                <div class="mb-6">
+                    <h4 class="text-base font-semibold text-white mb-3">Distribución por Área</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        {% for area_data in equipos_por_area %}
+                        <div class="bg-gray-700 rounded-lg p-3 text-center">
+                            <p class="text-xs text-gray-400 mb-1">{{ area_data.area_display }}</p>
+                            <p class="text-xl font-bold text-blue-400">{{ area_data.cantidad }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Últimos equipos agregados -->
+                {% if equipos_recientes %}
+                <div>
+                    <h4 class="text-base font-semibold text-white mb-3">Últimos Equipos Agregados</h4>
+                    <div class="space-y-2">
+                        {% for equipo in equipos_recientes %}
+                        <div class="bg-gray-700 rounded-lg p-3 flex items-center justify-between hover:bg-gray-600 transition-colors">
+                            <div class="flex items-center gap-3 flex-1 min-w-0">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 {% if equipo.en_servicio %}bg-green-500{% else %}bg-red-500{% endif %}">
+                                    <span class="text-white text-lg">{% if equipo.en_servicio %}✓{% else %}✗{% endif %}</span>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-white truncate">{{ equipo.nombre }}</p>
+                                    <p class="text-xs text-gray-400">
+                                        {{ equipo.get_area_display }}
+                                        {% if equipo.fabricante %} • {{ equipo.fabricante }}{% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="text-xs text-gray-500 flex-shrink-0">
+                                {{ equipo.fecha_creacion|date:"d/m/Y" }}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if SANATORIO_MODULOS.liquidacion %}
             <!-- Últimos médicos que registraron -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
                 <div class="flex items-center justify-between mb-4">
@@ -302,11 +426,13 @@
                     </div>
                 {% endif %}
             </div>
+            {% endif %}
 
         </div>
     </div>
 
     <!-- Modal de Eventos -->
+    {% if SANATORIO_MODULOS.eventos %}
     <div id="eventos-modal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
         <div class="relative p-4 w-full max-w-4xl max-h-full">
             <!-- Modal content -->
@@ -338,6 +464,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Flowbite JS local (no CDN) -->
     <script src="{% static 'js/flowbite.min.js' %}"></script>

@@ -74,7 +74,7 @@
                     </li>
                 {% endif %}
 
-            {% elif request.resolver_match.app_name == 'dictado_informes' %}
+            {% elif request.resolver_match.app_name == 'dictado_informes' and SANATORIO_MODULOS.dictado %}
                 <!-- Breadcrumb para Dictado de Informes IA -->
                 <li>
                     <div class="flex items-center">

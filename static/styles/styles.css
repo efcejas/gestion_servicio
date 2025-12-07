@@ -78,3 +78,59 @@ footer {
     width: 100%;
 }
 
+
+/* ============================================================================
+   SISTEMA DE THEMING POR SANATORIO
+   Variables CSS dinámicas aplicadas desde base_tailwind.html
+   ============================================================================ */
+
+/* Clases para aplicar color primario del sanatorio */
+.theme-accent-bg {
+    background-color: var(--color-primario) !important;
+}
+
+.theme-accent-text {
+    color: var(--color-primario) !important;
+}
+
+.theme-accent-border {
+    border-color: var(--color-primario) !important;
+}
+
+/* Clases para aplicar color secundario del sanatorio */
+.theme-secondary-bg {
+    background-color: var(--color-secundario) !important;
+}
+
+.theme-secondary-text {
+    color: var(--color-secundario) !important;
+}
+
+.theme-secondary-border {
+    border-color: var(--color-secundario) !important;
+}
+
+/* Clases para efectos hover con colores del sanatorio */
+.theme-hover-bg:hover {
+    background-color: var(--color-primario) !important;
+    opacity: 0.9;
+}
+
+.theme-hover-text:hover {
+    color: var(--color-primario) !important;
+}
+
+/* Gradiente usando ambos colores del sanatorio */
+.theme-gradient-bg {
+    background: linear-gradient(135deg, var(--color-primario) 0%, var(--color-secundario) 100%) !important;
+}
+
+/* Para badges y elementos pequeños con color del sanatorio */
+.theme-badge {
+    background-color: var(--color-primario) !important;
+    color: white !important;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}

@@ -38,7 +38,15 @@
                     <i class="fas fa-user-circle text-3xl"></i>
                 </div>
                 <div class="ml-4">
-                    <h2 class="text-2xl font-bold mb-2">¡Hola, {{ user.first_name }}!</h2>
+                    <div class="flex items-center gap-3 mb-2">
+                        <h2 class="text-2xl font-bold">¡Hola, {{ user.first_name }}!</h2>
+                        {% if user.is_superuser %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                                <i class="fas fa-cog mr-1.5"></i>
+                                {{ SANATORIO_MODO }}
+                            </span>
+                        {% endif %}
+                    </div>
                     {% if user.cargo == 'médico' %}
                         <p class="text-white/90 text-lg">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
                     {% elif user.cargo == 'médico residente' %}
