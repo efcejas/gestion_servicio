@@ -307,6 +307,10 @@
             renderizarEstudiosSeleccionados();
         };
 
+        // Variables para navegación por teclado
+        let currentFocusIndex = -1;
+        let dropdownItems = [];
+
         function filtrarYMostrarEstudios(query) {
             const tipoActual = tipoEstudioSelect.value;
             if (!tipoActual) return;
@@ -317,16 +321,22 @@
                 !estudiosActualesSeleccionados.includes(e.id)
             );
 
+            currentFocusIndex = -1;
+            dropdownItems = [];
+
             if (filtrados.length === 0) {
                 estudioDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500">No se encontraron estudios</div>';
             } else {
-                estudioDropdown.innerHTML = filtrados.map(est => `
-                    <div class="px-4 py-2 hover:bg-purple-50 cursor-pointer transition-colors" data-estudio-id="${est.id}">
+                estudioDropdown.innerHTML = filtrados.map((est, index) => `
+                    <div class="dropdown-item px-4 py-2 hover:bg-purple-50 cursor-pointer transition-colors" 
+                         data-estudio-id="${est.id}" 
+                         data-index="${index}">
                         <span class="text-gray-800 font-medium">${est.nombre}</span>
                     </div>
                 `).join('');
 
-                estudioDropdown.querySelectorAll('[data-estudio-id]').forEach(item => {
+                dropdownItems = Array.from(estudioDropdown.querySelectorAll('[data-estudio-id]'));
+                dropdownItems.forEach(item => {
                     item.addEventListener('click', function() {
                         const id = parseInt(this.dataset.estudioId);
                         if (!estudiosActualesSeleccionados.includes(id)) {
@@ -340,6 +350,22 @@
             }
 
             estudioDropdown.classList.remove('hidden');
+        }
+
+        function highlightItem(index) {
+            // Remover highlight de todos
+            dropdownItems.forEach(item => {
+                item.classList.remove('bg-purple-100', 'text-purple-700');
+                item.classList.add('text-gray-800');
+            });
+            
+            // Agregar highlight al actual
+            if (index >= 0 && index < dropdownItems.length) {
+                const item = dropdownItems[index];
+                item.classList.add('bg-purple-100', 'text-purple-700');
+                item.classList.remove('text-gray-800');
+                item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
         }
 
         function cargarEstudios(tipo) {
@@ -387,6 +413,47 @@
         estudioSearch.addEventListener('focus', function() {
             if (this.value.length > 0) {
                 filtrarYMostrarEstudios(this.value);
+            }
+        });
+
+        // Navegación por teclado en dropdown de estudios
+        estudioSearch.addEventListener('keydown', function(e) {
+            if (estudioDropdown.classList.contains('hidden') || dropdownItems.length === 0) {
+                return;
+            }
+
+            switch(e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    currentFocusIndex = (currentFocusIndex + 1) % dropdownItems.length;
+                    highlightItem(currentFocusIndex);
+                    break;
+                
+                case 'ArrowUp':
+                    e.preventDefault();
+                    currentFocusIndex = currentFocusIndex <= 0 ? dropdownItems.length - 1 : currentFocusIndex - 1;
+                    highlightItem(currentFocusIndex);
+                    break;
+                
+                case 'Enter':
+                    e.preventDefault();
+                    if (currentFocusIndex >= 0 && currentFocusIndex < dropdownItems.length) {
+                        const selectedItem = dropdownItems[currentFocusIndex];
+                        const id = parseInt(selectedItem.dataset.estudioId);
+                        if (!estudiosActualesSeleccionados.includes(id)) {
+                            estudiosActualesSeleccionados.push(id);
+                            renderizarEstudiosSeleccionados();
+                            estudioSearch.value = '';
+                            estudioDropdown.classList.add('hidden');
+                        }
+                    }
+                    break;
+                
+                case 'Escape':
+                case 'Tab':
+                    estudioDropdown.classList.add('hidden');
+                    currentFocusIndex = -1;
+                    break;
             }
         });
 
