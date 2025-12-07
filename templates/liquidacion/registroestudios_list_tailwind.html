@@ -95,8 +95,8 @@
             <i class="fas fa-chevron-down text-gray-400 transition-transform" id="filtros-icon"></i>
         </button>
 
-        <!-- Contenido de filtros -->
-        <div id="filtros-content" class="px-6 pb-6 border-t border-gray-100">
+        <!-- Contenido de filtros (colapsado por defecto) -->
+        <div id="filtros-content" class="hidden px-6 pb-6 border-t border-gray-100">
             <form method="get" class="mt-4">
                 {% csrf_token %}
                 
@@ -148,12 +148,12 @@
                 <!-- Filtros rápidos -->
                 <div class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                     <span class="text-sm font-medium text-gray-600 self-center mr-2">Acceso rápido:</span>
-                    <a href="?filtro_rapido=hoy" 
+                    <a href="?filtro_rapido=hoy&tipo_estudio={{ tipo_estudio_activo }}" 
                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                               {% if filtro_rapido == 'hoy' %}bg-blue-600 text-white shadow-md{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
                         <i class="fas fa-calendar-day mr-1.5"></i>Registros de hoy
                     </a>
-                    <a href="?mes={{ mes_num }}&año={{ año_num }}" 
+                    <a href="?mes={{ mes_num }}&año={{ año_num }}&tipo_estudio={{ tipo_estudio_activo }}" 
                        class="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
                         <i class="fas fa-sync-alt mr-1.5"></i>Restablecer filtros
                     </a>
@@ -172,14 +172,14 @@
         <div class="border-b border-gray-200">
             <nav class="flex gap-2" aria-label="Tabs">
                 <button type="button" id="tab-ecografias" 
-                        class="tab-button active px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
+                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2 {% if tipo_estudio_activo == 'ecografias' %}active border-blue-600 text-blue-600 bg-blue-50{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}"
                         onclick="cambiarTab('ecografias')">
                     <i class="fas fa-heartbeat mr-2"></i>
                     Ecografías
                     <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{{ registros_eco|length }}</span>
                 </button>
                 <button type="button" id="tab-otros" 
-                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2"
+                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2 {% if tipo_estudio_activo == 'otros' %}active border-teal-600 text-teal-600 bg-teal-50{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}"
                         onclick="cambiarTab('otros')">
                     <i class="fas fa-procedures mr-2"></i>
                     RAD / TOM / RES
@@ -192,7 +192,7 @@
     <!-- Contenedor de tablas con margen consistente -->
     <div class="mb-6">
         <!-- Tabla de Ecografías -->
-        <div id="tabla-ecografias" class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div id="tabla-ecografias" class="bg-white rounded-lg shadow-md overflow-hidden {% if tipo_estudio_activo != 'ecografias' %}hidden{% endif %}">
         <!-- Header -->
         <div class="bg-gradient-to-r from-blue-700 to-blue-600 text-white px-6 py-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -221,7 +221,7 @@
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <th scope="col" class="px-4 py-3 text-left">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}"
                                class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
                                 Paciente
                                 {% if orden == 'paciente_asc' %}
@@ -237,7 +237,7 @@
                             DNI
                         </th>
                         <th scope="col" class="px-4 py-3 text-center">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}"
                                class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
                                 Fecha del Informe
                                 {% if orden == 'fecha_asc' %}
@@ -262,7 +262,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     {% for registro in registros_eco %}
-                    <tr class="hover:bg-blue-50 transition-colors">
+                    <tr id="registro-{{ registro.pk }}" class="hover:bg-blue-50 transition-colors">
                         <td class="px-4 py-3 text-sm text-gray-900 font-medium">
                             {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
                         </td>
@@ -282,13 +282,14 @@
                             <div class="flex items-center justify-center gap-2">
                                 <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
-                                   title="Editar registro">
+                                   title="Editar registro"
+                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
                                     <i class="fas fa-edit text-sm"></i>
                                 </a>
                                 <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
                                    title="Eliminar registro"
-                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                     <i class="fas fa-trash-alt text-sm"></i>
                                 </a>
                             </div>
@@ -308,7 +309,7 @@
         </div>
 
         <!-- Tabla de Otros Estudios (RAD, TOM, RES) -->
-        <div id="tabla-otros" class="bg-white rounded-lg shadow-md overflow-hidden hidden">
+        <div id="tabla-otros" class="bg-white rounded-lg shadow-md overflow-hidden {% if tipo_estudio_activo != 'otros' %}hidden{% endif %}">
         <!-- Header -->
         <div class="bg-gradient-to-r from-teal-600 to-teal-500 text-white px-6 py-4">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between">
@@ -337,7 +338,7 @@
                 <thead class="bg-gray-50 border-b border-gray-200">
                     <tr>
                         <th scope="col" class="px-4 py-3 text-left">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}" 
                                class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
                                 Paciente
                                 {% if orden == 'paciente_asc' %}
@@ -353,7 +354,7 @@
                             DNI
                         </th>
                         <th scope="col" class="px-4 py-3 text-center">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}" 
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}" 
                                class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
                                 Fecha del Informe
                                 {% if orden == 'fecha_asc' %}
@@ -378,7 +379,7 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     {% for registro in registros_otros %}
-                    <tr class="hover:bg-teal-50 transition-colors">
+                    <tr id="registro-{{ registro.pk }}" class="hover:bg-teal-50 transition-colors">
                         <td class="px-4 py-3 text-sm text-gray-900 font-medium">
                             {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
                         </td>
@@ -398,13 +399,14 @@
                             <div class="flex items-center justify-center gap-2">
                                 <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
-                                   title="Editar registro">
+                                   title="Editar registro"
+                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
                                     <i class="fas fa-edit text-sm"></i>
                                 </a>
                                 <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
                                    class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
                                    title="Eliminar registro"
-                                   onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                     <i class="fas fa-trash-alt text-sm"></i>
                                 </a>
                             </div>
@@ -436,10 +438,55 @@
             field.classList.remove('form-control', 'form-control-sm', 'form-select', 'form-select-sm');
         });
 
-        // Toggle filtros colapsable
-        const toggleFiltros = document.getElementById('toggle-filtros');
+        // =============================================
+        // RESTAURAR ESTADO PREVIO (scroll y filtros)
+        // =============================================
         const filtrosContent = document.getElementById('filtros-content');
         const filtrosIcon = document.getElementById('filtros-icon');
+        
+        // Restaurar estado de filtros
+        const filtrosColapsados = sessionStorage.getItem('filtrosColapsados');
+        if (filtrosColapsados !== null) {
+            if (filtrosColapsados === 'true') {
+                filtrosContent.classList.add('hidden');
+                filtrosIcon.classList.remove('rotate-180');
+            } else {
+                filtrosContent.classList.remove('hidden');
+                filtrosIcon.classList.add('rotate-180');
+            }
+            sessionStorage.removeItem('filtrosColapsados');
+        } else {
+            // Si no hay estado previo, verificar si hay filtros activos
+            const hayBusqueda = '{{ busqueda }}' !== '';
+            const hayOrdenPersonalizado = '{{ orden }}' !== 'fecha_desc';
+            const hayFiltroRapido = '{{ filtro_rapido }}' !== '';
+            
+            if (hayBusqueda || hayOrdenPersonalizado || hayFiltroRapido) {
+                filtrosContent.classList.remove('hidden');
+                filtrosIcon.classList.add('rotate-180');
+            }
+        }
+        
+        // Restaurar scroll a registro específico
+        const scrollToRegistro = sessionStorage.getItem('scrollToRegistro');
+        if (scrollToRegistro) {
+            // Esperar a que el DOM esté completamente renderizado
+            setTimeout(() => {
+                const elemento = document.getElementById('registro-' + scrollToRegistro);
+                if (elemento) {
+                    elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Destacar brevemente el registro
+                    elemento.style.backgroundColor = '#fef3c7'; // amarillo suave
+                    setTimeout(() => {
+                        elemento.style.backgroundColor = '';
+                    }, 2000);
+                }
+                sessionStorage.removeItem('scrollToRegistro');
+            }, 100);
+        }
+
+        // Toggle filtros colapsable
+        const toggleFiltros = document.getElementById('toggle-filtros');
         
         toggleFiltros.addEventListener('click', function() {
             filtrosContent.classList.toggle('hidden');
@@ -513,6 +560,9 @@
             tablaEco.classList.add('hidden');
         }
     }
+
+    // Las tabs y tablas ya tienen las clases correctas desde el servidor (sin parpadeo)
+    // Solo se usa cambiarTab() cuando el usuario hace click en las tabs
 </script>
 
 <style>

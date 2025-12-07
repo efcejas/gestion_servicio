@@ -286,6 +286,9 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['total_regiones_eco'] = total_regiones_eco
         context['registros_otros'] = registros_otros
         context['total_regiones_otros'] = total_regiones_otros
+        
+        # Determinar qué solapa debe estar activa (por defecto 'ecografias')
+        context['tipo_estudio_activo'] = self.request.GET.get('tipo_estudio', 'ecografias')
 
         return context
 
@@ -329,7 +332,17 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         # Redirige a la lista con el mes y año del registro actualizado
         fecha = self.object.fecha_del_informe
-        query_string = urlencode({'mes': fecha.month, 'año': fecha.year})
+        
+        # Determinar el tipo de estudio para mantener la solapa activa
+        tipo_estudio = 'otros'  # Por defecto
+        if self.object.estudio.filter(tipo='ECO').exists():
+            tipo_estudio = 'ecografias'
+        
+        query_string = urlencode({
+            'mes': fecha.month, 
+            'año': fecha.year,
+            'tipo_estudio': tipo_estudio
+        })
         return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
 
 class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
