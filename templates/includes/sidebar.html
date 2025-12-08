@@ -127,12 +127,22 @@
                 </a>
             </li>
             {% endif %}
-           
+            
+            {% if SANATORIO_MODULOS.equipos %}
+            <!-- Equipos de Imágenes -->
+            <li>
+                <a href="{% url 'equipos:equipos_lista' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and request.resolver_match.app_name == 'equipos' %}bg-blue-900 text-blue-400{% endif %}">
+                    <svg class="w-5 h-5 {% if request.resolver_match and request.resolver_match.app_name == 'equipos' %}text-blue-400{% else %}text-gray-400{% endif %} transition duration-200 group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 16H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v1M9 12H4m8 8V9h8v11h-8Zm0 0H9m8-4a1 1 0 1 0-2 0 1 1 0 0 0 2 0Z"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap">Equipos de Imágenes</span>
+                </a>
+            </li>
+            {% endif %}
+            
             {% if SANATORIO_MODULOS.liquidacion and user.is_superuser %}
             <!-- Separador -->
-            <li class="pt-4 mt-4 space-y-2 border-t border-gray-700"></li>
-            
-            <!-- Carga Masiva (solo superuser/staff) -->
+            <li class="pt-4 mt-4 space-y-2 border-t border-gray-700"></li>            <!-- Carga Masiva (solo superuser/staff) -->
             {% if user.is_superuser or user.is_staff %}
             <li>
                 <a href="{% url 'liquidacion:carga-masiva' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-green-800 group">

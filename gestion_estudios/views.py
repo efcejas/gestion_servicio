@@ -8,6 +8,8 @@ from django.contrib.auth.views import LoginView, PasswordResetView
 from django.core.mail import send_mail
 from functools import wraps
 from django.db.models import Count, Max
+
+from agenda.models import AgendaItem, NotaPersonal
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -398,6 +400,35 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
         # Últimos 5 equipos agregados
         equipos_recientes = EquipoImagen.objects.order_by('-fecha_creacion')[:5]
         
+        # ========================================
+        # AGENDA Y NOTAS (para jefatura)
+        # ========================================
+        # Agenda del usuario actual
+        agenda_hoy = AgendaItem.objects.filter(
+            fecha=hoy,
+            creado_por=self.request.user
+        ).order_by('hora_inicio', 'titulo')
+        
+        # Próximos eventos (hoy + 7 días)
+        fecha_limite = hoy + timedelta(days=7)
+        agenda_proximos = AgendaItem.objects.filter(
+            fecha__gt=hoy,
+            fecha__lte=fecha_limite,
+            creado_por=self.request.user
+        ).order_by('fecha', 'hora_inicio')[:10]
+        
+        # Notas fijadas
+        notas_fijadas = NotaPersonal.objects.filter(
+            fijada=True,
+            creado_por=self.request.user
+        ).order_by('-actualizado_en')[:5]
+        
+        # Notas recientes (no fijadas)
+        notas_recientes = NotaPersonal.objects.filter(
+            fijada=False,
+            creado_por=self.request.user
+        ).order_by('-actualizado_en')[:5]
+        
         return {
             'cantidad_eventos_abiertos': eventos_abiertos.count(),
             'cantidad_eventos_en_revision': eventos_en_revision.count(),
@@ -429,6 +460,11 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
             'equipos_fuera_servicio': equipos_fuera_servicio,
             'equipos_por_area': equipos_por_area,
             'equipos_recientes': equipos_recientes,
+            # Agenda y notas
+            'agenda_hoy': agenda_hoy,
+            'agenda_proximos': agenda_proximos,
+            'notas_fijadas': notas_fijadas,
+            'notas_recientes': notas_recientes,
         }
     
     def _traducir_mes(self, fecha):

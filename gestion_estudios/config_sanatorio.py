@@ -22,6 +22,8 @@ CONFIG_DUPUYTREN = {
         'guardias': True,
         'liquidacion': True,
         'dictado': False,  # ❌ Desactivado por ahora
+        'agenda': True,
+        'notas': True,
     },
     'SERVICIOS_DISPONIBLES': [
         ('tomografia', 'Tomografía'),
@@ -48,6 +50,8 @@ CONFIG_COLEGIALES = {
         'guardias': False,     # ❌ Desactivado por ahora
         'liquidacion': False,  # ❌ Desactivado por ahora
         'dictado': False,      # ❌ Desactivado por ahora
+        'agenda': True,        # ✅ Activo - Agenda personal
+        'notas': True,         # ✅ Activo - Notas rápidas
     },
     'SERVICIOS_DISPONIBLES': [
         ('tomografia', 'Tomografía'),

@@ -1,0 +1,153 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+
+{% block title %}{% if object %}Editar Evento{% else %}Nuevo Evento{% endif %} - Agenda{% endblock %}
+
+{% block page_title %}
+    {% if object %}
+        <svg class="w-6 h-6 inline-block mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        Editar Evento de Agenda
+    {% else %}
+        <svg class="w-6 h-6 inline-block mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Nuevo Evento de Agenda
+    {% endif %}
+{% endblock %}
+
+{% block page_description %}Completá los datos del evento para tu agenda personal{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <!-- Card principal -->
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-6">
+
+        <!-- Formulario -->
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- Grid para campos del formulario -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Título -->
+                <div class="md:col-span-2">
+                    <label for="{{ form.titulo.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Título <span class="text-red-400">*</span>
+                    </label>
+                    <input type="text" name="{{ form.titulo.name }}" id="{{ form.titulo.id_for_label }}" 
+                           value="{{ form.titulo.value|default:'' }}"
+                           class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           required>
+                    {% if form.titulo.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.titulo.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Fecha -->
+                <div>
+                    <label for="{{ form.fecha.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Fecha <span class="text-red-400">*</span>
+                    </label>
+                    <input type="date" name="{{ form.fecha.name }}" id="{{ form.fecha.id_for_label }}" 
+                           value="{{ form.fecha.value|date:'Y-m-d'|default:'' }}"
+                           class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                           required>
+                    {% if form.fecha.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.fecha.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Tipo -->
+                <div>
+                    <label for="{{ form.tipo.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Tipo <span class="text-red-400">*</span>
+                    </label>
+                    <select name="{{ form.tipo.name }}" id="{{ form.tipo.id_for_label }}"
+                            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        {% for value, label in form.tipo.field.choices %}
+                            <option value="{{ value }}" {% if form.tipo.value == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if form.tipo.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.tipo.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Hora inicio -->
+                <div>
+                    <label for="{{ form.hora_inicio.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Hora de inicio
+                    </label>
+                    <input type="time" name="{{ form.hora_inicio.name }}" id="{{ form.hora_inicio.id_for_label }}" 
+                           value="{{ form.hora_inicio.value|time:'H:i'|default:'' }}"
+                           class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    {% if form.hora_inicio.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.hora_inicio.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Hora fin -->
+                <div>
+                    <label for="{{ form.hora_fin.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Hora de fin
+                    </label>
+                    <input type="time" name="{{ form.hora_fin.name }}" id="{{ form.hora_fin.id_for_label }}" 
+                           value="{{ form.hora_fin.value|time:'H:i'|default:'' }}"
+                           class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    {% if form.hora_fin.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.hora_fin.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Descripción -->
+                <div class="md:col-span-2">
+                    <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-medium text-gray-300 mb-2">
+                        Descripción
+                    </label>
+                    <textarea name="{{ form.descripcion.name }}" id="{{ form.descripcion.id_for_label }}" rows="4"
+                              class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="Detalles adicionales del evento...">{{ form.descripcion.value|default:'' }}</textarea>
+                    {% if form.descripcion.errors %}
+                        <p class="mt-1 text-sm text-red-400">{{ form.descripcion.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Checkboxes -->
+                <div class="md:col-span-2 flex gap-6">
+                    <!-- Es importante -->
+                    <div class="flex items-center">
+                        <input type="checkbox" name="{{ form.es_importante.name }}" id="{{ form.es_importante.id_for_label }}"
+                               {% if form.es_importante.value %}checked{% endif %}
+                               class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2">
+                        <label for="{{ form.es_importante.id_for_label }}" class="ml-2 text-sm font-medium text-gray-300">
+                            Marcar como importante ⭐
+                        </label>
+                    </div>
+
+                    <!-- Completado -->
+                    <div class="flex items-center">
+                        <input type="checkbox" name="{{ form.completado.name }}" id="{{ form.completado.id_for_label }}"
+                               {% if form.completado.value %}checked{% endif %}
+                               class="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500 focus:ring-2">
+                        <label for="{{ form.completado.id_for_label }}" class="ml-2 text-sm font-medium text-gray-300">
+                            Completado ✓
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-700">
+                <a href="{% url 'home' %}" 
+                   class="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit" 
+                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors">
+                    {{ boton_texto }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

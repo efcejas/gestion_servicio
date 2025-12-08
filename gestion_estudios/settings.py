@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'gestion_eventos.apps.GestionEventosConfig',
     'dictado_informes.apps.DictadoInformesConfig',
     'equipos.apps.EquiposConfig',
+    'agenda.apps.AgendaConfig',
     
     # Tailwind CSS
     'tailwind',
