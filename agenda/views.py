@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.shortcuts import render
-from django.urls import reverse_lazy
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse_lazy, reverse
+from django.views import View
 from django.views.generic import CreateView, UpdateView
 
 from .models import AgendaItem, NotaPersonal
@@ -88,3 +89,55 @@ class NotaPersonalUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView
         context['titulo_pagina'] = 'Editar nota'
         context['boton_texto'] = 'Guardar cambios'
         return context
+
+
+class AgendaItemToggleCompletoView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Vista para marcar/desmarcar un item de agenda como completado"""
+    
+    def test_func(self):
+        """Solo permite acceso a staff/superusuarios y debe ser el dueño"""
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            return False
+        obj = get_object_or_404(AgendaItem, pk=self.kwargs.get('pk'))
+        return obj.creado_por == self.request.user
+    
+    def post(self, request, *args, **kwargs):
+        """Toggle del estado completado"""
+        obj = get_object_or_404(AgendaItem, pk=kwargs.get('pk'))
+        
+        # Verificar permisos nuevamente por seguridad
+        if obj.creado_por != request.user:
+            return redirect('home')
+        
+        # Toggle del campo completado
+        obj.completado = not obj.completado
+        obj.save()
+        
+        # Redirigir al dashboard
+        return redirect(reverse('home'))
+
+
+class NotaPersonalToggleFijadaView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Vista para fijar/desfijar una nota personal"""
+    
+    def test_func(self):
+        """Solo permite acceso a staff/superusuarios y debe ser el dueño"""
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            return False
+        obj = get_object_or_404(NotaPersonal, pk=self.kwargs.get('pk'))
+        return obj.creado_por == self.request.user
+    
+    def post(self, request, *args, **kwargs):
+        """Toggle del estado fijada"""
+        obj = get_object_or_404(NotaPersonal, pk=kwargs.get('pk'))
+        
+        # Verificar permisos nuevamente por seguridad
+        if obj.creado_por != request.user:
+            return redirect('home')
+        
+        # Toggle del campo fijada
+        obj.fijada = not obj.fijada
+        obj.save()
+        
+        # Redirigir al dashboard
+        return redirect(reverse('home'))
