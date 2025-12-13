@@ -1,9 +1,9 @@
 <!-- 
-TEMPLATE: elegir_protocolo.html (global) v2
+TEMPLATE: elegir_protocolo.html (global) v3
 Ubicación: templates/protocolos/elegir_protocolo.html
 Fuente de verdad: Esta es la ubicación correcta (templates globales, NO en protocolos/templates/)
 NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correctamente aquí
-Última actualización: 2025-12-13 - Mejoras UX con filtros client-side y decision support
+Última actualización: 2025-12-13 - Recomendaciones de fases + filtro por nivel (mono/bi/tri/multi)
 -->
 {% extends 'layouts/base_tailwind.html' %}
 {% load static %}
@@ -107,6 +107,51 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
 
         <!-- Búsqueda y filtros rápidos -->
         <div class="mb-6">
+            <!-- Decision helper por nivel de fases -->
+            <div class="mb-4 bg-white rounded-lg shadow-md p-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <i class="fas fa-filter text-indigo-600"></i>
+                    <span class="text-sm font-semibold text-gray-700">Filtrar por número de fases:</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button 
+                        onclick="togglePhaseFilter('all')" 
+                        data-phase="all"
+                        class="phase-filter active px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                        <i class="fas fa-th mr-1"></i>
+                        Todas las fases
+                    </button>
+                    <button 
+                        onclick="togglePhaseFilter('MONOFASE')" 
+                        data-phase="MONOFASE"
+                        class="phase-filter px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors border border-gray-300">
+                        <i class="fas fa-circle mr-1"></i>
+                        Monofásico
+                    </button>
+                    <button 
+                        onclick="togglePhaseFilter('BIFASICO')" 
+                        data-phase="BIFASICO"
+                        class="phase-filter px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors border border-gray-300">
+                        <i class="fas fa-adjust mr-1"></i>
+                        Bifásico
+                    </button>
+                    <button 
+                        onclick="togglePhaseFilter('TRIFASICO')" 
+                        data-phase="TRIFASICO"
+                        class="phase-filter px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors border border-gray-300">
+                        <i class="fas fa-layer-group mr-1"></i>
+                        Trifásico
+                    </button>
+                    <button 
+                        onclick="togglePhaseFilter('MULTIFASICO')" 
+                        data-phase="MULTIFASICO"
+                        class="phase-filter px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors border border-gray-300">
+                        <i class="fas fa-ellipsis-h mr-1"></i>
+                        Multifásico (4+)
+                    </button>
+                </div>
+            </div>
+
             <!-- Búsqueda -->
             <div class="mb-4">
                 <div class="relative">
@@ -177,6 +222,7 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
             <div class="scenario-card bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden" 
                  data-key="{{ escenario.key }}"
                  data-tags="{{ escenario.quick_tags|join:',' }}"
+                 data-phase-level="{{ escenario.recommendation.level }}"
                  data-search="{{ escenario.titulo|lower }} {{ escenario.pregunta|lower }} {{ escenario.cuando|join:' '|lower }}">
                 
                 <!-- Header -->
@@ -222,6 +268,89 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
                             {% endfor %}
                         </ul>
                     </div>
+
+                    <!-- Recomendación de fases (NUEVO) -->
+                    {% if escenario.recommendation %}
+                    <div class="mb-3 border-t border-gray-200 pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                Recomendación de fases:
+                            </h4>
+                            <span class="inline-flex items-center px-2 py-1 text-xs font-bold rounded 
+                                {% if escenario.recommendation.level == 'MONOFASE' %}bg-green-100 text-green-800
+                                {% elif escenario.recommendation.level == 'BIFASICO' %}bg-blue-100 text-blue-800
+                                {% elif escenario.recommendation.level == 'TRIFASICO' %}bg-purple-100 text-purple-800
+                                {% else %}bg-orange-100 text-orange-800{% endif %}">
+                                {{ escenario.recommendation.level }}
+                            </span>
+                        </div>
+                        
+                        <!-- Red flags si existen -->
+                        {% if escenario.recommendation.red_flags %}
+                        <div class="mb-2 flex flex-wrap gap-1">
+                            {% for flag in escenario.recommendation.red_flags %}
+                            <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-red-100 text-red-700">
+                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ flag }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Phase template -->
+                        <p class="text-xs text-gray-700 mb-2 bg-gray-50 px-2 py-1 rounded">
+                            <i class="fas fa-clock mr-1 text-indigo-600"></i>
+                            <strong>Timing:</strong> {{ escenario.recommendation.phase_template }}
+                        </p>
+                        
+                        <!-- Rationale (collapsible) -->
+                        <details class="mb-2">
+                            <summary class="text-xs font-medium text-blue-700 cursor-pointer hover:text-blue-900">
+                                <i class="fas fa-lightbulb mr-1"></i>
+                                ¿Por qué estas fases? ({{ escenario.recommendation.rationale|length }} razones)
+                            </summary>
+                            <ul class="mt-2 text-xs text-gray-600 space-y-1 pl-4">
+                                {% for item in escenario.recommendation.rationale %}
+                                <li class="flex items-start">
+                                    <i class="fas fa-arrow-right text-blue-500 mr-2 mt-0.5 flex-shrink-0"></i>
+                                    <span>{{ item }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                        
+                        <!-- Must have (collapsible) -->
+                        <details class="mb-2">
+                            <summary class="text-xs font-medium text-green-700 cursor-pointer hover:text-green-900">
+                                <i class="fas fa-clipboard-check mr-1"></i>
+                                Prerequisitos ({{ escenario.recommendation.must_have|length }})
+                            </summary>
+                            <ul class="mt-2 text-xs text-gray-600 space-y-1 pl-4">
+                                {% for item in escenario.recommendation.must_have %}
+                                <li class="flex items-start">
+                                    <i class="fas fa-check-circle text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
+                                    <span>{{ item }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                        
+                        <!-- Avoid (collapsible, warning style) -->
+                        <details class="mb-2">
+                            <summary class="text-xs font-medium text-red-700 cursor-pointer hover:text-red-900">
+                                <i class="fas fa-ban mr-1"></i>
+                                Cuándo NO usarlo ({{ escenario.recommendation.avoid|length }})
+                            </summary>
+                            <ul class="mt-2 text-xs text-red-600 space-y-1 pl-4 bg-red-50 p-2 rounded">
+                                {% for item in escenario.recommendation.avoid %}
+                                <li class="flex items-start">
+                                    <i class="fas fa-times-circle text-red-500 mr-2 mt-0.5 flex-shrink-0"></i>
+                                    <span>{{ item }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    </div>
+                    {% endif %}
 
                     <!-- Botones de protocolo -->
                     <div class="border-t border-gray-200 pt-3">
@@ -296,6 +425,7 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
 <!-- JavaScript inline para filtros -->
 <script>
     let activeTagFilter = 'all';
+    let activePhaseFilter = 'all';
 
     // Toggle accordion
     function toggleAccordion(id) {
@@ -309,6 +439,25 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
             content.classList.add('hidden');
             icon.classList.remove('rotate-180');
         }
+    }
+
+    // Toggle phase filter (NUEVO)
+    function togglePhaseFilter(phase) {
+        activePhaseFilter = phase;
+        
+        // Update active state on phase buttons
+        document.querySelectorAll('.phase-filter').forEach(btn => {
+            if (btn.dataset.phase === phase) {
+                btn.classList.add('active');
+                btn.classList.remove('bg-gray-100', 'text-gray-700', 'border-gray-300');
+                btn.classList.add('bg-indigo-600', 'text-white');
+            } else {
+                btn.classList.remove('active', 'bg-indigo-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-700', 'border-gray-300');
+            }
+        });
+        
+        filterScenarios();
     }
 
     // Toggle tag filter
@@ -362,7 +511,7 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
         filterScenarios();
     }
 
-    // Filter scenarios by search and tag
+    // Filter scenarios by search, tag AND phase (ACTUALIZADO)
     function filterScenarios() {
         const searchTerm = document.getElementById('search-scenarios').value.toLowerCase();
         const cards = document.querySelectorAll('.scenario-card');
@@ -371,6 +520,7 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
         cards.forEach(card => {
             const searchData = card.dataset.search;
             const cardTags = card.dataset.tags.split(',');
+            const cardPhaseLevel = card.dataset.phaseLevel;
             
             // Check search match
             const matchesSearch = searchTerm === '' || searchData.includes(searchTerm);
@@ -378,7 +528,10 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
             // Check tag match
             const matchesTag = activeTagFilter === 'all' || cardTags.includes(activeTagFilter);
             
-            if (matchesSearch && matchesTag) {
+            // Check phase match (NUEVO)
+            const matchesPhase = activePhaseFilter === 'all' || cardPhaseLevel === activePhaseFilter;
+            
+            if (matchesSearch && matchesTag && matchesPhase) {
                 card.style.display = 'block';
                 visibleCount++;
             } else {
@@ -399,10 +552,11 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
         }
     }
 
-    // Clear all filters
+    // Clear all filters (ACTUALIZADO)
     function clearFilters() {
         document.getElementById('search-scenarios').value = '';
         toggleTagFilter('all');
+        togglePhaseFilter('all');
     }
 </script>
 {% endblock %}

@@ -578,6 +578,185 @@ El sistema está **listo para producción** con las correcciones ya aplicadas (d
 
 ---
 
+## 📚 Apéndice: Guía de Mantenimiento Rápido
+
+### 🔗 Documentos de Referencia
+
+1. **TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md** 
+   - Templates copiables para agregar/modificar escenarios
+   - Ejemplos completos con código listo para usar
+   - Comandos útiles de Django shell
+
+2. **MEJORAS_ELEGIR_PROTOCOLO_v3.md**
+   - Documentación completa de la versión 3
+   - Arquitectura del sistema de recomendaciones
+   - Guía de troubleshooting extendida
+
+### ⚡ Acciones Rápidas
+
+#### Agregar nuevo escenario clínico
+
+1. Abrir: `protocolos/views.py`
+2. Buscar: `escenarios = [`
+3. Copiar template desde `TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md`
+4. Modificar: key, titulo, pregunta, cuando, recommendation
+5. Verificar: `python manage.py check`
+6. Probar: `python manage.py runserver`
+
+#### Ver protocolos disponibles
+
+```bash
+cd c:\Dev\GitHub\gestion_servicio
+gestion_env\Scripts\activate
+python manage.py shell
+```
+
+```python
+from protocolos.models import Protocolo
+for p in Protocolo.objects.filter(es_activo=True):
+    print(f"'{p.nombre}' - {p.fases.count()} fases")
+```
+
+#### Modificar recomendación existente
+
+1. Abrir: `protocolos/views.py`
+2. Buscar: `'key': 'nombre-del-escenario'`
+3. Reemplazar solo bloque `'recommendation': {...}`
+4. Verificar: `python manage.py check`
+
+### 🎯 Estado Actual del Sistema
+
+**Escenarios configurados**: 10/10
+- Monofásico: 5 escenarios
+- Bifásico: 4 escenarios  
+- Trifásico: 1 escenario
+- Multifásico: 1 escenario
+
+**Protocolos en DB**: 17 activos
+**Fases totales**: 27
+**Cobertura**: 100% (todos los escenarios tienen protocolo)
+
+---
+
+## 🔧 ANEXO: Comandos de Gestión Django
+
+### Crear nuevo protocolo
+
+```python
+from protocolos.models import Protocolo, Modalidad, RegionAnatomica, FaseAdquisicion
+
+# Paso 1: Crear protocolo base
+protocolo = Protocolo.objects.create(
+    nombre='Nombre exacto del protocolo',
+    descripcion='Descripción detallada del uso clínico',
+    modalidad=Modalidad.objects.get(codigo='TC'),
+    region=RegionAnatomica.objects.get(nombre='Abdomen y pelvis'),
+    requiere_contraste_ev=True,
+    requiere_contraste_oral=False,
+    es_activo=True
+)
+
+# Paso 2: Agregar fases
+FaseAdquisicion.objects.create(
+    protocolo=protocolo,
+    nombre='Arterial',
+    orden=1,
+    delay_segundos=25,
+    region=RegionAnatomica.objects.get(nombre='Abdomen y pelvis')
+)
+
+FaseAdquisicion.objects.create(
+    protocolo=protocolo,
+    nombre='Portal',
+    orden=2,
+    delay_segundos=65,
+    region=RegionAnatomica.objects.get(nombre='Abdomen y pelvis')
+)
+
+print(f"✅ Protocolo creado: {protocolo.nombre} (ID: {protocolo.id})")
+```
+
+### Listar todos los protocolos con sus fases
+
+```python
+from protocolos.models import Protocolo
+
+for p in Protocolo.objects.filter(es_activo=True).prefetch_related('fases'):
+    print(f"\n{p.nombre} (ID: {p.id})")
+    print(f"  Modalidad: {p.modalidad.codigo}")
+    print(f"  Región: {p.region.nombre}")
+    print(f"  Contraste IV: {'Sí' if p.requiere_contraste_ev else 'No'}")
+    print(f"  Fases ({p.fases.count()}):")
+    for fase in p.fases.all().order_by('orden'):
+        print(f"    {fase.orden}. {fase.nombre} ({fase.delay_segundos}s)")
+```
+
+### Buscar protocolos por región
+
+```python
+from protocolos.models import Protocolo
+
+region = 'Abdomen y pelvis'  # Cambiar según necesidad
+protocolos = Protocolo.objects.filter(
+    region__nombre__icontains=region,
+    es_activo=True
+)
+
+for p in protocolos:
+    print(f"- {p.nombre} ({p.fases.count()} fases)")
+```
+
+### Eliminar protocolo duplicado
+
+```python
+from protocolos.models import Protocolo
+
+# CUIDADO: Esto es irreversible
+protocolo_id = 23  # Cambiar por ID del duplicado
+protocolo = Protocolo.objects.get(id=protocolo_id)
+print(f"Eliminando: {protocolo.nombre}")
+protocolo.delete()
+print("✅ Eliminado")
+```
+
+### Verificar integridad del sistema
+
+```bash
+# Desde terminal
+python manage.py check --deploy  # Verificación completa
+python manage.py makemigrations --dry-run  # Ver cambios pendientes
+python manage.py migrate --plan  # Ver migraciones pendientes
+```
+
+---
+
+## 📊 Métricas de Uso (para futuro tracking)
+
+### Campos útiles para analytics (si se implementan)
+
+```python
+# Agregar a modelo Protocolo (opcional):
+# - veces_consultado (IntegerField, default=0)
+# - ultima_consulta (DateTimeField, null=True)
+
+# Incrementar en vista:
+# protocolo.veces_consultado += 1
+# protocolo.ultima_consulta = timezone.now()
+# protocolo.save()
+
+# Query de protocolos más usados:
+# top_10 = Protocolo.objects.filter(es_activo=True).order_by('-veces_consultado')[:10]
+```
+
+---
+
+**Nota final**: Este reporte se mantiene como fuente de verdad del estado del sistema de protocolos. Actualizar después de cambios significativos.
+
+**Última auditoría**: 2025-12-13  
+**Próxima revisión recomendada**: Trimestral o después de agregar 5+ protocolos nuevos
+
+---
+
 **Auditoría realizada por:** GitHub Copilot (Claude Sonnet 4.5)  
 **Revisión técnica:** Completa  
 **Estado del sistema:** ✅ OPERATIVO Y SALUDABLE
