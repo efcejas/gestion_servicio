@@ -25,11 +25,11 @@ protocolos_esperados = [
     'TC Páncreas bifásico (fase pancreática + portal)',
     'Uro-TC hematuria (urograma CT)',
     'TC sangrado activo abdomen (arterial + portal)',
-    'TC abdomen-pelvis dolor agudo',
-    'Angio-TC para TEP',
+    'TC de abdomen y pelvis con contraste para dolor agudo',
+    'Angio-TC para descarte de TEP',
     'Angio-TC cerebral (stroke code)',
     'Angio-TC Aorta (síndrome aórtico agudo)',
-    'TC TAP oncológico',
+    'TC TAP con contraste EV para estadificación oncológica',
 ]
 
 print('Protocolos esperados por la vista elegir_protocolo:\n')

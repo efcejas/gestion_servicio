@@ -1,140 +1,408 @@
+<!-- 
+TEMPLATE: elegir_protocolo.html (global) v2
+Ubicación: templates/protocolos/elegir_protocolo.html
+Fuente de verdad: Esta es la ubicación correcta (templates globales, NO en protocolos/templates/)
+NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correctamente aquí
+Última actualización: 2025-12-13 - Mejoras UX con filtros client-side y decision support
+-->
 {% extends 'layouts/base_tailwind.html' %}
 {% load static %}
 
 {% block title %}¿Qué protocolo elegir? - Protocolos Radiológicos{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 py-8">
+<div class="min-h-screen bg-gray-50 py-6">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <!-- Encabezado -->
-        <div class="mb-8">
-            <div class="flex items-center justify-between mb-4">
-                <h1 class="text-3xl font-bold text-gray-900">
-                    <i class="fas fa-compass text-blue-600 mr-3"></i>
+        <!-- Header con mensaje principal -->
+        <div class="mb-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">
+                    <i class="fas fa-compass text-blue-600 mr-2"></i>
                     ¿Qué protocolo elegir?
                 </h1>
                 <a href="{% url 'protocolos:lista' %}" 
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                     <i class="fas fa-list mr-2"></i>
                     Ver todos los protocolos
                 </a>
             </div>
             
-            <!-- Mensaje explicativo -->
-            <div class="bg-blue-50 border-l-4 border-blue-600 p-4 mb-6">
-                <div class="flex">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-info-circle text-blue-600 text-xl"></i>
+            <!-- Mensaje principal -->
+            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 text-white mb-4">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-graduation-cap text-3xl mr-4"></i>
+                    <div>
+                        <h2 class="text-xl font-bold">Regla de oro</h2>
+                        <p class="text-blue-100">Elegí por pregunta clínica, no por cantidad de fases</p>
                     </div>
-                    <div class="ml-3">
-                        <p class="text-sm text-blue-800">
-                            <strong>Regla de oro:</strong> Elegí el protocolo por <strong>pregunta clínica</strong>, no por cantidad de fases.
-                        </p>
-                        <p class="text-sm text-blue-700 mt-1">
-                            Esta página te ayuda a seleccionar el protocolo correcto según el escenario clínico del paciente.
-                        </p>
+                </div>
+            </div>
+
+            <!-- Stats rápidos -->
+            <div class="flex items-center gap-4 text-sm text-gray-600 mb-4">
+                <span><i class="fas fa-check-circle text-green-600 mr-1"></i> {{ escenarios_vinculados }}/{{ total_escenarios }} protocolos disponibles</span>
+            </div>
+        </div>
+
+        <!-- Mapa de decisión rápida (acordeón colapsable) -->
+        <div class="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
+            <button 
+                onclick="toggleAccordion('decision-map')" 
+                class="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors">
+                <div class="flex items-center">
+                    <i class="fas fa-map-signs text-purple-600 mr-3"></i>
+                    <span class="font-semibold text-gray-900">Mapa rápido de decisiones</span>
+                    <span class="ml-3 text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Click para ver</span>
+                </div>
+                <i id="decision-map-icon" class="fas fa-chevron-down text-gray-400 transition-transform"></i>
+            </button>
+            <div id="decision-map" class="hidden px-6 pb-4 border-t border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-blue-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Lesión focal indeterminada:</strong> Caracterización
+                            <span class="text-gray-500">(Hígado trifásico / Riñón multifásico / Páncreas bifásico)</span>
+                        </div>
                     </div>
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-red-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Sangrado activo:</strong> Arterial + Portal
+                            <span class="text-gray-500">(Detecta extravasación de contraste)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-green-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Hematuria:</strong> Nefrográfica + Excretora
+                            <span class="text-gray-500">(Busca tumor urotelial)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-yellow-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Dolor agudo sin lesión focal:</strong> Portal única
+                            <span class="text-gray-500">(Suficiente para apendicitis, diverticulitis)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-purple-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Urgencias vasculares:</strong> Angio arterial
+                            <span class="text-gray-500">(TEP, Stroke, Aorta aguda)</span>
+                        </div>
+                    </div>
+                    <div class="flex items-start">
+                        <i class="fas fa-arrow-right text-pink-500 mr-2 mt-1"></i>
+                        <div class="text-sm">
+                            <strong>Seguimiento oncológico:</strong> Portal TAP
+                            <span class="text-gray-500">(Control de enfermedad conocida)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Búsqueda y filtros rápidos -->
+        <div class="mb-6">
+            <!-- Búsqueda -->
+            <div class="mb-4">
+                <div class="relative">
+                    <input 
+                        type="text" 
+                        id="search-scenarios"
+                        placeholder="Buscar por escenario clínico (ej: hígado, sangrado, TEP)..."
+                        class="w-full px-4 py-3 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onkeyup="filterScenarios()">
+                    <i class="fas fa-search absolute left-3 top-4 text-gray-400"></i>
+                </div>
+            </div>
+
+            <!-- Quick tags (chips) -->
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-sm font-medium text-gray-700">Filtros rápidos:</span>
+                <button 
+                    onclick="toggleTagFilter('all')" 
+                    data-tag="all"
+                    class="tag-filter active px-3 py-1 text-xs font-medium rounded-full bg-gray-800 text-white hover:bg-gray-700 transition-colors">
+                    Todos
+                </button>
+                <button 
+                    onclick="toggleTagFilter('Caracterización')" 
+                    data-tag="Caracterización"
+                    class="tag-filter px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors">
+                    Caracterización
+                </button>
+                <button 
+                    onclick="toggleTagFilter('Urgencia')" 
+                    data-tag="Urgencia"
+                    class="tag-filter px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 hover:bg-red-200 transition-colors">
+                    Urgencia
+                </button>
+                <button 
+                    onclick="toggleTagFilter('Vascular')" 
+                    data-tag="Vascular"
+                    class="tag-filter px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors">
+                    Vascular
+                </button>
+                <button 
+                    onclick="toggleTagFilter('Oncológico')" 
+                    data-tag="Oncológico"
+                    class="tag-filter px-3 py-1 text-xs font-medium rounded-full bg-pink-100 text-pink-800 hover:bg-pink-200 transition-colors">
+                    Oncológico
+                </button>
+            </div>
+        </div>
+
+        <!-- Callout de advertencia -->
+        <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+            <div class="flex items-start">
+                <i class="fas fa-exclamation-triangle text-yellow-600 mr-3 mt-1"></i>
+                <div>
+                    <h3 class="text-sm font-bold text-yellow-800 mb-1">⚠️ Evitar sobreestudio innecesario</h3>
+                    <ul class="text-sm text-yellow-700 space-y-1">
+                        <li>• <strong>No pedir trifásico</strong> para dolor abdominal típico sin lesión focal conocida</li>
+                        <li>• <strong>No usar protocolo TEP</strong> para evaluar mediastino o consolidaciones pulmonares</li>
+                        <li>• <strong>No pedir multifásico renal</strong> para cólico renal simple (usar Uro-TC sin contraste)</li>
+                    </ul>
                 </div>
             </div>
         </div>
 
         <!-- Grid de escenarios -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div id="scenarios-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {% for escenario in escenarios %}
-            <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                <!-- Header del card -->
-                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-                    <h3 class="text-lg font-semibold text-white">
+            <div class="scenario-card bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden" 
+                 data-key="{{ escenario.key }}"
+                 data-tags="{{ escenario.quick_tags|join:',' }}"
+                 data-search="{{ escenario.titulo|lower }} {{ escenario.pregunta|lower }} {{ escenario.cuando|join:' '|lower }}">
+                
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                    <h3 class="text-base font-semibold text-white mb-1">
                         {{ escenario.titulo }}
                     </h3>
-                </div>
-                
-                <!-- Descripción -->
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <p class="text-sm text-gray-600">
-                        {{ escenario.descripcion }}
+                    <p class="text-xs text-blue-100 italic">
+                        {{ escenario.pregunta }}
                     </p>
                 </div>
                 
-                <!-- Protocolos recomendados -->
-                <div class="px-6 py-4">
-                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                        Protocolo recomendado:
-                    </p>
-                    
-                    {% for item in escenario.protocolos_objetos %}
-                        {% if item.existe %}
-                            <!-- Protocolo cargado -->
-                            <a href="{{ item.url }}" 
-                               class="block w-full px-4 py-3 mb-2 bg-white border-2 border-green-500 text-green-700 rounded-md hover:bg-green-50 transition-colors duration-150 text-center font-medium">
-                                <i class="fas fa-check-circle mr-2"></i>
-                                {{ item.protocolo.modalidad.codigo }}
-                                {% if item.protocolo.requiere_contraste_ev %}
-                                    <i class="fas fa-syringe text-xs ml-1" title="Requiere contraste EV"></i>
-                                {% endif %}
-                            </a>
-                            
-                            <!-- Info adicional del protocolo -->
-                            <div class="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
-                                <div class="flex items-center mb-1">
-                                    <i class="fas fa-map-marker-alt mr-2 text-gray-400"></i>
-                                    <span>{{ item.protocolo.region.nombre }}</span>
+                <!-- Body -->
+                <div class="px-4 py-3">
+                    <!-- Badges de fase y tags -->
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-indigo-100 text-indigo-800">
+                            <i class="fas fa-layer-group mr-1"></i>
+                            {{ escenario.phase_summary }}
+                        </span>
+                        {% for tag in escenario.quick_tags %}
+                        <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded 
+                            {% if tag == 'Urgencia' %}bg-red-100 text-red-800
+                            {% elif tag == 'Vascular' %}bg-purple-100 text-purple-800
+                            {% elif tag == 'Oncológico' %}bg-pink-100 text-pink-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ tag }}
+                        </span>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Cuándo elegirlo -->
+                    <div class="mb-3">
+                        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+                            Cuándo elegirlo:
+                        </h4>
+                        <ul class="text-xs text-gray-600 space-y-1">
+                            {% for bullet in escenario.cuando %}
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-green-500 mr-2 mt-0.5 flex-shrink-0"></i>
+                                <span>{{ bullet }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+
+                    <!-- Botones de protocolo -->
+                    <div class="border-t border-gray-200 pt-3">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Protocolo:
+                        </p>
+                        
+                        {% for item in escenario.protocolos_objetos %}
+                            {% if item.existe %}
+                                <!-- Protocolo disponible -->
+                                <a href="{{ item.url }}" 
+                                   class="block w-full px-3 py-2 mb-2 bg-white border-2 border-green-500 text-green-700 rounded-md hover:bg-green-50 transition-colors duration-150 text-center text-sm font-medium">
+                                    <i class="fas fa-check-circle mr-1"></i>
+                                    {{ item.protocolo.modalidad.codigo }}
+                                    {% if item.protocolo.requiere_contraste_ev %}
+                                        <i class="fas fa-syringe text-xs ml-1" title="Requiere contraste EV"></i>
+                                    {% endif %}
+                                    <span class="text-xs text-gray-600 ml-1">({{ item.num_fases }} fase{{ item.num_fases|pluralize }})</span>
+                                </a>
+                                
+                                <!-- Info mínima del protocolo -->
+                                <div class="text-xs text-gray-500 mt-1 pl-2">
+                                    <i class="fas fa-map-marker-alt mr-1"></i>
+                                    {{ item.protocolo.region.nombre }}
                                 </div>
-                                {% if item.protocolo.tags.all %}
-                                <div class="flex items-center flex-wrap gap-1 mt-1">
-                                    <i class="fas fa-tags mr-1 text-gray-400"></i>
-                                    {% for tag in item.protocolo.tags.all|slice:":3" %}
-                                        <span class="inline-block px-2 py-0.5 bg-gray-200 text-gray-700 rounded text-xs">
-                                            {{ tag.nombre }}
-                                        </span>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                            </div>
-                        {% else %}
-                            <!-- Protocolo no cargado -->
-                            <button disabled
-                                    class="block w-full px-4 py-3 mb-2 bg-gray-100 border-2 border-gray-300 text-gray-500 rounded-md cursor-not-allowed text-center font-medium">
-                                <i class="fas fa-exclamation-circle mr-2"></i>
-                                No cargado aún
-                            </button>
-                            <p class="text-xs text-gray-500 italic mt-1">
-                                Pedí revisión al staff
-                            </p>
-                        {% endif %}
-                    {% endfor %}
+                            {% else %}
+                                <!-- Protocolo no disponible -->
+                                <button disabled
+                                        class="block w-full px-3 py-2 mb-2 bg-gray-100 border-2 border-gray-300 text-gray-500 rounded-md cursor-not-allowed text-center text-sm font-medium">
+                                    <i class="fas fa-exclamation-circle mr-1"></i>
+                                    No cargado aún
+                                </button>
+                                <p class="text-xs text-gray-500 italic mt-1">
+                                    Pedí revisión al staff
+                                </p>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Nota final -->
-        <div class="mt-8 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-lightbulb text-yellow-600 text-xl"></i>
-                </div>
-                <div class="ml-3">
-                    <p class="text-sm text-yellow-800">
+        <!-- Mensaje cuando no hay resultados -->
+        <div id="no-results" class="hidden text-center py-12">
+            <i class="fas fa-search text-gray-300 text-5xl mb-4"></i>
+            <p class="text-gray-500 text-lg">No se encontraron escenarios que coincidan con tu búsqueda</p>
+            <button onclick="clearFilters()" class="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                Limpiar filtros
+            </button>
+        </div>
+
+        <!-- Footer note -->
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+            <div class="flex items-start">
+                <i class="fas fa-lightbulb text-blue-600 mr-3 mt-1"></i>
+                <div>
+                    <p class="text-sm text-blue-800">
                         <strong>¿No encontrás el protocolo que necesitás?</strong>
                     </p>
-                    <p class="text-sm text-yellow-700 mt-1">
-                        Consultá con el staff de radiología o revisá la lista completa de protocolos disponibles.
+                    <p class="text-sm text-blue-700 mt-1">
+                        Consultá con el staff de radiología o revisá la 
+                        <a href="{% url 'protocolos:lista' %}" class="underline font-medium">lista completa de protocolos</a>.
                         Algunos protocolos especializados pueden requerir discusión previa.
                     </p>
                 </div>
             </div>
         </div>
-
-        <!-- Enlaces útiles -->
-        <div class="mt-6 flex justify-center space-x-4">
-            <a href="{% url 'protocolos:lista' %}" 
-               class="inline-flex items-center px-6 py-3 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors">
-                <i class="fas fa-list mr-2"></i>
-                Ver todos los protocolos
-            </a>
-        </div>
     </div>
 </div>
+
+<!-- JavaScript inline para filtros -->
+<script>
+    let activeTagFilter = 'all';
+
+    // Toggle accordion
+    function toggleAccordion(id) {
+        const content = document.getElementById(id);
+        const icon = document.getElementById(id + '-icon');
+        
+        if (content.classList.contains('hidden')) {
+            content.classList.remove('hidden');
+            icon.classList.add('rotate-180');
+        } else {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-180');
+        }
+    }
+
+    // Toggle tag filter
+    function toggleTagFilter(tag) {
+        activeTagFilter = tag;
+        
+        // Update active state on buttons
+        document.querySelectorAll('.tag-filter').forEach(btn => {
+            if (btn.dataset.tag === tag) {
+                btn.classList.add('active');
+                // Make active button darker
+                if (tag === 'all') {
+                    btn.classList.remove('bg-gray-100', 'text-gray-800');
+                    btn.classList.add('bg-gray-800', 'text-white');
+                } else if (tag === 'Caracterización') {
+                    btn.classList.remove('bg-blue-100', 'text-blue-800');
+                    btn.classList.add('bg-blue-600', 'text-white');
+                } else if (tag === 'Urgencia') {
+                    btn.classList.remove('bg-red-100', 'text-red-800');
+                    btn.classList.add('bg-red-600', 'text-white');
+                } else if (tag === 'Vascular') {
+                    btn.classList.remove('bg-purple-100', 'text-purple-800');
+                    btn.classList.add('bg-purple-600', 'text-white');
+                } else if (tag === 'Oncológico') {
+                    btn.classList.remove('bg-pink-100', 'text-pink-800');
+                    btn.classList.add('bg-pink-600', 'text-white');
+                }
+            } else {
+                btn.classList.remove('active');
+                // Restore original colors
+                const originalTag = btn.dataset.tag;
+                if (originalTag === 'all') {
+                    btn.classList.remove('bg-gray-800', 'text-white');
+                    btn.classList.add('bg-gray-100', 'text-gray-800');
+                } else if (originalTag === 'Caracterización') {
+                    btn.classList.remove('bg-blue-600', 'text-white');
+                    btn.classList.add('bg-blue-100', 'text-blue-800');
+                } else if (originalTag === 'Urgencia') {
+                    btn.classList.remove('bg-red-600', 'text-white');
+                    btn.classList.add('bg-red-100', 'text-red-800');
+                } else if (originalTag === 'Vascular') {
+                    btn.classList.remove('bg-purple-600', 'text-white');
+                    btn.classList.add('bg-purple-100', 'text-purple-800');
+                } else if (originalTag === 'Oncológico') {
+                    btn.classList.remove('bg-pink-600', 'text-white');
+                    btn.classList.add('bg-pink-100', 'text-pink-800');
+                }
+            }
+        });
+        
+        filterScenarios();
+    }
+
+    // Filter scenarios by search and tag
+    function filterScenarios() {
+        const searchTerm = document.getElementById('search-scenarios').value.toLowerCase();
+        const cards = document.querySelectorAll('.scenario-card');
+        let visibleCount = 0;
+        
+        cards.forEach(card => {
+            const searchData = card.dataset.search;
+            const cardTags = card.dataset.tags.split(',');
+            
+            // Check search match
+            const matchesSearch = searchTerm === '' || searchData.includes(searchTerm);
+            
+            // Check tag match
+            const matchesTag = activeTagFilter === 'all' || cardTags.includes(activeTagFilter);
+            
+            if (matchesSearch && matchesTag) {
+                card.style.display = 'block';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+        
+        // Show/hide no results message
+        const noResults = document.getElementById('no-results');
+        const grid = document.getElementById('scenarios-grid');
+        
+        if (visibleCount === 0) {
+            grid.style.display = 'none';
+            noResults.classList.remove('hidden');
+        } else {
+            grid.style.display = 'grid';
+            noResults.classList.add('hidden');
+        }
+    }
+
+    // Clear all filters
+    function clearFilters() {
+        document.getElementById('search-scenarios').value = '';
+        toggleTagFilter('all');
+    }
+</script>
 {% endblock %}

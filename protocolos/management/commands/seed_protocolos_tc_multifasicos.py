@@ -278,6 +278,19 @@ CLASIFICACIÓN BOSNIAK (quistes complejos):
         self.fases_eliminadas += deleted
 
         # ===== PROTOCOLO D: URO-TC HEMATURIA =====
+        # IMPORTANTE: Eliminar protocolo con nombre antiguo si existe
+        # (debido a cambio de nomenclatura: "urograma por TC" → "urograma CT")
+        protocolo_viejo_urotc = Protocolo.objects.filter(
+            nombre='Uro-TC hematuria (urograma por TC)',
+            modalidad=tc,
+            region=uro
+        ).first()
+        if protocolo_viejo_urotc:
+            self.stdout.write(self.style.WARNING(
+                f'   Eliminando protocolo obsoleto: {protocolo_viejo_urotc.nombre} (ID {protocolo_viejo_urotc.id})'
+            ))
+            protocolo_viejo_urotc.delete()
+        
         protocolo_urotc_hematuria = self.upsert_protocolo(
             tc=tc,
             nombre='Uro-TC hematuria (urograma CT)',

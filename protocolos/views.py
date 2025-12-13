@@ -83,78 +83,159 @@ class ProtocoloDetailView(DetailView):
 @login_required
 def elegir_protocolo(request):
     """
-    Página de decisión clínica: muestra escenarios comunes y enlaces a protocolos recomendados.
+    Página de decisión clínica mejorada: escenarios con metadata rica para soporte de decisiones.
     """
     
-    # Definir escenarios clínicos con protocolos asociados
+    # Definir escenarios clínicos con metadata completa
     escenarios = [
         {
+            'key': 'lesion-hepatica',
             'titulo': 'Lesión focal hepática indeterminada',
-            'descripcion': 'Lesión detectada incidentalmente en US/TC que requiere caracterización',
+            'pregunta': '¿Qué protocolo uso para caracterizar una lesión hepática?',
+            'cuando': [
+                'Lesión detectada en US/TC sin contraste',
+                'Paciente cirrótico con nódulo sospechoso',
+                'Metástasis hipervasculares a caracterizar',
+            ],
+            'phase_summary': 'Trifásico',
+            'quick_tags': ['Caracterización', 'Oncológico'],
             'protocolos': ['TC Hígado trifásico (caracterización de lesión focal)']
         },
         {
+            'key': 'masa-renal',
             'titulo': 'Masa renal indeterminada',
-            'descripcion': 'Masa renal detectada en US/TC que requiere caracterización (¿quiste vs tumor?)',
+            'pregunta': '¿Quiste o tumor renal?',
+            'cuando': [
+                'Masa renal en US sin caracterización',
+                'Quiste complejo (Bosniak ≥3)',
+                'Seguimiento de lesión renal sospechosa',
+            ],
+            'phase_summary': 'Multifásico (4 fases)',
+            'quick_tags': ['Caracterización', 'Oncológico'],
             'protocolos': ['TC Riñón multifásico (renal mass protocol)']
         },
         {
+            'key': 'masa-pancreatica',
             'titulo': 'Sospecha de masa pancreática',
-            'descripcion': 'Ictericia obstructiva, masa pancreática o estadificación de cáncer pancreático',
+            'pregunta': '¿Cómo estadifico un cáncer de páncreas?',
+            'cuando': [
+                'Ictericia obstructiva con masa pancreática',
+                'CA 19-9 elevado con sospecha clínica',
+                'Estadificación de adenocarcinoma pancreático',
+            ],
+            'phase_summary': 'Bifásico',
+            'quick_tags': ['Caracterización', 'Oncológico'],
             'protocolos': ['TC Páncreas bifásico (fase pancreática + portal)']
         },
         {
+            'key': 'hematuria',
             'titulo': 'Hematuria macroscópica',
-            'descripcion': 'Hematuria sin causa clara, sospecha de tumor urotelial',
+            'pregunta': '¿Dónde está el tumor urotelial?',
+            'cuando': [
+                'Hematuria macroscópica sin causa clara',
+                'Tabaquismo + edad >50 años',
+                'Antecedente de tumor urotelial resecado',
+            ],
+            'phase_summary': 'Bifásico (nefrográfica + excretora)',
+            'quick_tags': ['Caracterización', 'Oncológico'],
             'protocolos': ['Uro-TC hematuria (urograma CT)']
         },
         {
+            'key': 'sangrado-activo',
             'titulo': 'Sangrado activo abdominal',
-            'descripcion': 'Sospecha de sangrado intraabdominal activo (trauma, post-quirúrgico, anticoagulado)',
+            'pregunta': '¿Hay extravasación de contraste?',
+            'cuando': [
+                'Trauma abdominal con inestabilidad hemodinámica',
+                'Post-quirúrgico con sospecha de sangrado',
+                'Paciente anticoagulado con hematoma',
+            ],
+            'phase_summary': 'Bifásico (arterial + portal)',
+            'quick_tags': ['Urgencia', 'Vascular'],
             'protocolos': ['TC sangrado activo abdomen (arterial + portal)']
         },
         {
+            'key': 'dolor-abdominal',
             'titulo': 'Dolor abdominal agudo',
-            'descripcion': 'Sospecha de apendicitis, diverticulitis, perforación intestinal',
-            'protocolos': ['TC abdomen-pelvis dolor agudo']
+            'pregunta': '¿Apendicitis, diverticulitis o perforación?',
+            'cuando': [
+                'Dolor abdominal agudo sin diagnóstico claro',
+                'Sospecha de apendicitis o diverticulitis',
+                'Abdomen agudo con sospecha de perforación',
+            ],
+            'phase_summary': 'Portal única',
+            'quick_tags': ['Urgencia'],
+            'protocolos': ['TC de abdomen y pelvis con contraste para dolor agudo']
         },
         {
+            'key': 'tep',
             'titulo': 'Sospecha de TEP',
-            'descripcion': 'Tromboembolismo pulmonar (dolor torácico, disnea, taquicardia)',
-            'protocolos': ['Angio-TC para TEP']
+            'pregunta': '¿Hay trombo en las arterias pulmonares?',
+            'cuando': [
+                'Disnea + dolor torácico + taquicardia',
+                'Score de Wells alto para TEP',
+                'Dímero D elevado con alta sospecha clínica',
+            ],
+            'phase_summary': 'Angio arterial pulmonar',
+            'quick_tags': ['Urgencia', 'Vascular'],
+            'protocolos': ['Angio-TC para descarte de TEP']
         },
         {
+            'key': 'stroke',
             'titulo': 'Stroke code (ACV agudo)',
-            'descripcion': 'ACV isquémico agudo, evaluación de oclusión de grandes vasos',
+            'pregunta': '¿Hay oclusión de gran vaso?',
+            'cuando': [
+                'Déficit neurológico focal de inicio súbito',
+                'Candidato a trombectomía (ventana <6-24h)',
+                'TC basal sin hemorragia',
+            ],
+            'phase_summary': 'Angio arterial cerebral',
+            'quick_tags': ['Urgencia', 'Vascular'],
             'protocolos': ['Angio-TC cerebral (stroke code)']
         },
         {
+            'key': 'aorta',
             'titulo': 'Síndrome aórtico agudo',
-            'descripcion': 'Sospecha de disección aórtica, aneurisma roto, hematoma intramural',
+            'pregunta': '¿Disección, aneurisma roto o hematoma intramural?',
+            'cuando': [
+                'Dolor torácico transfixiante de inicio súbito',
+                'Asimetría de pulsos o PA entre brazos',
+                'Ensanchamiento mediastinal en RX tórax',
+            ],
+            'phase_summary': 'Angio arterial aórtico',
+            'quick_tags': ['Urgencia', 'Vascular'],
             'protocolos': ['Angio-TC Aorta (síndrome aórtico agudo)']
         },
         {
+            'key': 'oncologico',
             'titulo': 'Seguimiento oncológico',
-            'descripcion': 'Control de enfermedad oncológica (metástasis, respuesta a tratamiento)',
-            'protocolos': ['TC TAP oncológico']
+            'pregunta': '¿Cómo está la enfermedad oncológica?',
+            'cuando': [
+                'Control post-tratamiento de cáncer',
+                'Evaluación de respuesta a quimioterapia',
+                'Seguimiento de metástasis conocidas',
+            ],
+            'phase_summary': 'Portal única (TAP)',
+            'quick_tags': ['Oncológico'],
+            'protocolos': ['TC TAP con contraste EV para estadificación oncológica']
         },
     ]
     
-    # Recopilar todos los nombres de protocolos mencionados
+    # Recopilar todos los nombres de protocolos
     todos_nombres = []
     for escenario in escenarios:
         todos_nombres.extend(escenario['protocolos'])
     
-    # Query única a la base de datos
+    # Query única optimizada a la base de datos
     protocolos_dict = {
         p.nombre: p 
         for p in Protocolo.objects.filter(
             nombre__in=todos_nombres,
             es_activo=True
-        ).select_related('modalidad', 'region')
+        ).select_related('modalidad', 'region').prefetch_related('tags', 'fases')
     }
     
     # Enriquecer escenarios con objetos Protocolo
+    escenarios_vinculados = 0
     for escenario in escenarios:
         escenario['protocolos_objetos'] = []
         for nombre in escenario['protocolos']:
@@ -164,18 +245,23 @@ def elegir_protocolo(request):
                     'nombre': nombre,
                     'protocolo': protocolo,
                     'url': reverse('protocolos:detalle', kwargs={'pk': protocolo.pk}),
-                    'existe': True
+                    'existe': True,
+                    'num_fases': protocolo.fases.count()
                 })
+                escenarios_vinculados += 1
             else:
                 escenario['protocolos_objetos'].append({
                     'nombre': nombre,
                     'protocolo': None,
                     'url': None,
-                    'existe': False
+                    'existe': False,
+                    'num_fases': 0
                 })
     
     context = {
-        'escenarios': escenarios
+        'escenarios': escenarios,
+        'total_escenarios': len(escenarios),
+        'escenarios_vinculados': escenarios_vinculados,
     }
     
     return render(request, 'protocolos/elegir_protocolo.html', context)
