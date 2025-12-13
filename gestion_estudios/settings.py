@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'dictado_informes.apps.DictadoInformesConfig',
     'equipos.apps.EquiposConfig',
     'agenda.apps.AgendaConfig',
+    'protocolos.apps.ProtocolosConfig',
     
     # Tailwind CSS
     'tailwind',

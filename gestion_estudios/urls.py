@@ -47,6 +47,7 @@ urlpatterns = [
     path('dictado_informes/', include('dictado_informes.urls')),  # URLs para dictado de informes con IA
     path('gestion/equipos/', include('equipos.urls')),  # URLs para gestión de equipos de imágenes
     path('gestion/', include('agenda.urls')),  # URLs para agenda y notas personales
+    path('protocolos/', include('protocolos.urls')),  # URLs para protocolos radiológicos
     
     # Prueba temporal de toast
     path('test-toast/', test_toast, name='test_toast'),

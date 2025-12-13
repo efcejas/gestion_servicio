@@ -1,0 +1,266 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}{{ protocolo.nombre }}{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Breadcrumb y botón volver -->
+    <div class="mb-4 flex items-center justify-between">
+        <nav class="flex" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="{% url 'protocolos:lista' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-book-medical mr-2"></i>
+                        Protocolos
+                    </a>
+                </li>
+                <li>
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-sm font-medium text-gray-500">{{ protocolo.modalidad.codigo }} - {{ protocolo.region.nombre }}</span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        <a href="{% url 'protocolos:lista' %}" 
+           class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+            <i class="fas fa-arrow-left"></i>
+            Volver
+        </a>
+    </div>
+
+    <!-- Header del protocolo -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-sm font-semibold text-white backdrop-blur-sm">
+                            {{ protocolo.modalidad.codigo }}
+                        </span>
+                        <span class="inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-sm font-semibold text-white backdrop-blur-sm">
+                            {{ protocolo.region.nombre }}
+                        </span>
+                    </div>
+                    <h1 class="text-3xl font-bold text-white mb-2">{{ protocolo.nombre }}</h1>
+                    {% if protocolo.descripcion %}
+                        <p class="text-blue-100 text-lg">{{ protocolo.descripcion }}</p>
+                    {% endif %}
+                </div>
+                {% if perms.protocolos.change_protocolo %}
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'admin:protocolos_protocolo_change' protocolo.pk %}"
+                       class="inline-flex items-center px-6 py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-all shadow-lg">
+                        <i class="fas fa-edit mr-2"></i>Editar
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tags -->
+            {% if protocolo.tags.exists %}
+                <div class="mt-4 flex flex-wrap gap-2">
+                    {% for tag in protocolo.tags.all %}
+                        <span class="inline-flex items-center rounded-lg bg-white/10 backdrop-blur-sm px-3 py-1 text-sm text-white border border-white/20">
+                            <i class="fas fa-tag mr-1.5"></i>
+                            {{ tag.nombre }}
+                        </span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Grid de información -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <!-- Card: Requisitos -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Requisitos</h2>
+            </div>
+            <div class="space-y-3">
+                <div class="flex items-start gap-3">
+                    <i class="fas {% if protocolo.requiere_contraste_ev %}fa-check-circle text-green-500{% else %}fa-times-circle text-gray-300{% endif %} mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Contraste EV</p>
+                        <p class="text-xs text-gray-500">{% if protocolo.requiere_contraste_ev %}Requerido{% else %}No necesario{% endif %}</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <i class="fas {% if protocolo.requiere_contraste_oral %}fa-check-circle text-green-500{% else %}fa-times-circle text-gray-300{% endif %} mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Contraste Oral</p>
+                        <p class="text-xs text-gray-500">{% if protocolo.requiere_contraste_oral %}Requerido{% else %}No necesario{% endif %}</p>
+                    </div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <i class="fas {% if protocolo.requiere_ayuno %}fa-check-circle text-green-500{% else %}fa-times-circle text-gray-300{% endif %} mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">Ayuno</p>
+                        <p class="text-xs text-gray-500">{% if protocolo.requiere_ayuno %}Requerido{% else %}No necesario{% endif %}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card: Vía de acceso -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-syringe text-purple-600"></i>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Vía de Acceso</h2>
+            </div>
+            <div class="space-y-3">
+                {% if protocolo.calibre_via_minimo %}
+                    <div>
+                        <p class="text-xs text-gray-500 mb-1">Calibre mínimo</p>
+                        <p class="text-sm font-medium text-gray-900">{{ protocolo.calibre_via_minimo }}</p>
+                    </div>
+                {% endif %}
+                {% if protocolo.sitio_via_preferido %}
+                    <div>
+                        <p class="text-xs text-gray-500 mb-1">Sitio preferido</p>
+                        <p class="text-sm font-medium text-gray-900">{{ protocolo.sitio_via_preferido }}</p>
+                    </div>
+                {% endif %}
+                {% if not protocolo.calibre_via_minimo and not protocolo.sitio_via_preferido %}
+                    <p class="text-sm text-gray-500">No especificado</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Card: Cobertura -->
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-ruler-combined text-blue-600"></i>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Cobertura Global</h2>
+            </div>
+            {% if protocolo.cobertura_global %}
+                <p class="text-sm text-gray-700">{{ protocolo.cobertura_global|linebreaksbr }}</p>
+            {% else %}
+                <p class="text-sm text-gray-500">No especificada</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Preparación del paciente -->
+    {% if protocolo.preparacion_paciente %}
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-clipboard-check text-green-600"></i>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Preparación del Paciente</h2>
+            </div>
+            <div class="prose prose-sm max-w-none">
+                <p class="text-sm text-gray-700">{{ protocolo.preparacion_paciente|linebreaksbr }}</p>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Fases de adquisición -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-6">
+        <div class="flex items-center gap-3 mb-6">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <i class="fas fa-layer-group text-indigo-600"></i>
+            </div>
+            <h2 class="text-lg font-semibold text-gray-900">Fases de Adquisición</h2>
+        </div>
+
+        {% if protocolo.fases.exists %}
+            <div class="space-y-4">
+                {% for fase in protocolo.fases.all %}
+                    <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
+                        <!-- Header de la fase -->
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center gap-3">
+                                <span class="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                                    {{ fase.orden }}
+                                </span>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900">{{ fase.nombre }}</h3>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
+                                            {{ fase.get_tipo_fase_display }}
+                                        </span>
+                                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-800">
+                                            {{ fase.region.nombre }}
+                                        </span>
+                                        {% if fase.delay_segundos %}
+                                            <span class="inline-flex items-center rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800">
+                                                <i class="fas fa-clock mr-1"></i>
+                                                {{ fase.delay_segundos }}s
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Detalles de la fase -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3 pl-11">
+                            {% if fase.cobertura_desde or fase.cobertura_hasta %}
+                                <div>
+                                    <p class="text-xs font-medium text-gray-500 mb-1">Cobertura</p>
+                                    <p class="text-sm text-gray-700">
+                                        {% if fase.cobertura_desde %}Desde: {{ fase.cobertura_desde }}{% endif %}
+                                        {% if fase.cobertura_hasta %}<br>Hasta: {{ fase.cobertura_hasta }}{% endif %}
+                                    </p>
+                                </div>
+                            {% endif %}
+
+                            {% if fase.ventanas_recomendadas %}
+                                <div>
+                                    <p class="text-xs font-medium text-gray-500 mb-1">Ventanas recomendadas</p>
+                                    <p class="text-sm text-gray-700">{{ fase.ventanas_recomendadas|linebreaksbr }}</p>
+                                </div>
+                            {% endif %}
+
+                            {% if fase.detalles_tecnicos %}
+                                <div class="md:col-span-2">
+                                    <p class="text-xs font-medium text-gray-500 mb-1">Detalles técnicos</p>
+                                    <p class="text-sm text-gray-700">{{ fase.detalles_tecnicos|linebreaksbr }}</p>
+                                </div>
+                            {% endif %}
+
+                            {% if fase.notas_para_residente %}
+                                <div class="md:col-span-2 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                    <p class="text-xs font-medium text-yellow-800 mb-1">
+                                        <i class="fas fa-lightbulb mr-1"></i> Nota para residente
+                                    </p>
+                                    <p class="text-sm text-yellow-900">{{ fase.notas_para_residente|linebreaksbr }}</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-8">
+                <i class="fas fa-layer-group text-4xl text-gray-300 mb-2"></i>
+                <p class="text-sm text-gray-500">No hay fases de adquisición definidas</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Notas docentes -->
+    {% if protocolo.notas_docentes %}
+        <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-xl shadow-sm p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-graduation-cap text-amber-600"></i>
+                </div>
+                <h2 class="text-lg font-semibold text-gray-900">Notas Docentes</h2>
+            </div>
+            <div class="prose prose-sm max-w-none">
+                <p class="text-sm text-gray-700">{{ protocolo.notas_docentes|linebreaksbr }}</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

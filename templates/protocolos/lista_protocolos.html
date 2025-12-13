@@ -1,0 +1,263 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}Protocolos Radiológicos{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-book-medical text-2xl text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold text-white">Protocolos Radiológicos</h1>
+                            <p class="text-blue-100 mt-1">
+                                Consulta protocolos estandarizados por modalidad, región y patología
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                {% if perms.protocolos.add_protocolo %}
+                <div class="flex items-center gap-3">
+                    <a href="{% url 'admin:protocolos_protocolo_add' %}"
+                       class="inline-flex items-center px-6 py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        <i class="fas fa-plus-circle mr-2"></i>Nuevo Protocolo
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Stats en el header -->
+            <div class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-blue-100 text-sm font-medium">Total</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ protocolos|length }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-blue-100 text-sm font-medium">Modalidades</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ modalidades|length }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-blue-100 text-sm font-medium">Regiones</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ regiones|length }}</div>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
+                    <div class="text-blue-100 text-sm font-medium">Etiquetas</div>
+                    <div class="text-white text-2xl font-bold mt-1">{{ tags|length }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de filtros -->
+    <div class="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="p-6">
+            <form method="get" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Búsqueda de texto -->
+                    <div>
+                        <label for="q" class="block text-sm font-medium text-gray-700 mb-2">
+                            Buscar
+                        </label>
+                        <input type="text" 
+                               name="q" 
+                               id="q" 
+                               value="{{ filtros_activos.q }}"
+                               placeholder="Nombre o descripción..."
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+
+                    <!-- Modalidad -->
+                    <div>
+                        <label for="modalidad" class="block text-sm font-medium text-gray-700 mb-2">
+                            Modalidad
+                        </label>
+                        <select name="modalidad" 
+                                id="modalidad"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todas</option>
+                            {% for modalidad in modalidades %}
+                                <option value="{{ modalidad.id }}" {% if filtros_activos.modalidad == modalidad.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ modalidad.codigo }} - {{ modalidad.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Región -->
+                    <div>
+                        <label for="region" class="block text-sm font-medium text-gray-700 mb-2">
+                            Región
+                        </label>
+                        <select name="region" 
+                                id="region"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todas</option>
+                            {% for region in regiones %}
+                                <option value="{{ region.id }}" {% if filtros_activos.region == region.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ region.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tag -->
+                    <div>
+                        <label for="tag" class="block text-sm font-medium text-gray-700 mb-2">
+                            Etiqueta
+                        </label>
+                        <select name="tag" 
+                                id="tag"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Todas</option>
+                            {% for tag in tags %}
+                                <option value="{{ tag.slug }}" {% if filtros_activos.tag == tag.slug %}selected{% endif %}>
+                                    {{ tag.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Botones -->
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="submit" 
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm">
+                        <i class="fas fa-search"></i>
+                        Filtrar
+                    </button>
+                    <a href="{% url 'protocolos:lista' %}" 
+                       class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                        <i class="fas fa-times"></i>
+                        Limpiar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista de protocolos -->
+    {% if protocolos %}
+        <div class="mb-4 text-sm text-gray-600">
+            Se encontraron <span class="font-semibold text-gray-900">{{ protocolos|length }}</span> protocolo{{ protocolos|length|pluralize }}
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for protocolo in protocolos %}
+                <div class="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
+                    <!-- Modalidad y Región -->
+                    <div class="mb-3 flex items-center gap-2">
+                        <span class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800">
+                            {{ protocolo.modalidad.codigo }}
+                        </span>
+                        <span class="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-800">
+                            {{ protocolo.region.nombre }}
+                        </span>
+                    </div>
+
+                    <!-- Nombre del protocolo -->
+                    <h3 class="mb-2 text-lg font-semibold text-gray-900">
+                        {{ protocolo.nombre }}
+                    </h3>
+
+                    <!-- Descripción -->
+                    {% if protocolo.descripcion %}
+                        <p class="mb-3 line-clamp-2 text-sm text-gray-600">
+                            {{ protocolo.descripcion|truncatewords:20 }}
+                        </p>
+                    {% endif %}
+
+                    <!-- Etiquetas (Tags) -->
+                    {% if protocolo.tags.exists %}
+                        <div class="mb-3 flex flex-wrap gap-1">
+                            {% for tag in protocolo.tags.all %}
+                                <span class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700">
+                                    {{ tag.nombre }}
+                                </span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Indicadores -->
+                    <div class="mb-4 flex flex-wrap gap-2 text-xs text-gray-600">
+                        {% if protocolo.requiere_contraste_ev %}
+                            <span class="inline-flex items-center gap-1">
+                                <i class="fas fa-syringe text-red-500"></i>
+                                Contraste EV
+                            </span>
+                        {% endif %}
+                        {% if protocolo.requiere_contraste_oral %}
+                            <span class="inline-flex items-center gap-1">
+                                <i class="fas fa-glass-water text-orange-500"></i>
+                                Contraste oral
+                            </span>
+                        {% endif %}
+                        {% if protocolo.requiere_ayuno %}
+                            <span class="inline-flex items-center gap-1">
+                                <i class="fas fa-utensils-slash text-yellow-600"></i>
+                                Requiere ayuno
+                            </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Botón ver detalles -->
+                    <a href="{% url 'protocolos:detalle' protocolo.pk %}" 
+                       class="inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-blue-600 bg-white px-4 py-2 text-sm font-medium text-blue-600 transition-all hover:bg-blue-600 hover:text-white shadow-sm">
+                        Ver detalles
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Paginación (si existe) -->
+        {% if is_paginated %}
+            <div class="mt-6 flex justify-center">
+                <nav class="inline-flex rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}&q={{ filtros_activos.q }}&modalidad={{ filtros_activos.modalidad }}&region={{ filtros_activos.region }}&tag={{ filtros_activos.tag }}" 
+                           class="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            <i class="fas fa-chevron-left mr-1"></i> Anterior
+                        </a>
+                    {% endif %}
+                    
+                    <span class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 border-x border-gray-200">
+                        Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                    </span>
+                    
+                    {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}&q={{ filtros_activos.q }}&modalidad={{ filtros_activos.modalidad }}&region={{ filtros_activos.region }}&tag={{ filtros_activos.tag }}" 
+                           class="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                            Siguiente <i class="fas fa-chevron-right ml-1"></i>
+                        </a>
+                    {% endif %}
+                </nav>
+            </div>
+        {% endif %}
+
+    {% else %}
+        <!-- Estado vacío -->
+        <div class="bg-white rounded-xl border border-gray-200 p-12 text-center shadow-sm">
+            <div class="mx-auto mb-4 w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-book-medical text-3xl text-gray-400"></i>
+            </div>
+            <h3 class="mb-2 text-lg font-semibold text-gray-700">
+                No se encontraron protocolos
+            </h3>
+            <p class="mb-4 text-sm text-gray-600">
+                {% if filtros_activos.q or filtros_activos.modalidad or filtros_activos.region or filtros_activos.tag %}
+                    Intenta ajustar los filtros de búsqueda o 
+                    <a href="{% url 'protocolos:lista' %}" class="font-medium text-blue-600 hover:underline">
+                        limpiar todos los filtros
+                    </a>
+                {% else %}
+                    Aún no hay protocolos cargados en el sistema.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
