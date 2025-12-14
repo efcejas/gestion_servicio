@@ -118,6 +118,23 @@ def elegir_protocolo(request):
                     'NO solicitar si solo se busca metástasis conocidas (portal única)',
                     'NO indicado en cólico hepático o colecistitis aguda simple',
                 ],
+                'mnemonica': {
+                    'titulo': 'Mnemotecnia: Metástasis hipervasculares',
+                    'frase': 'MAMA CAFÉ PARA LA MESA TRES',
+                    'items': [
+                        ('MA', 'Melanoma'),
+                        ('MA', 'Mama'),
+                        ('CA', 'Carcinoide'),
+                        ('FE', 'Feocromocitoma'),
+                        ('PA', 'Páncreas (neuroendocrino)'),
+                        ('RA', 'Renal (células claras)'),
+                        ('LA', 'Leiomiosarcoma'),
+                        ('ME', 'Médula ósea (mieloma)'),
+                        ('SA', 'Sarcoma'),
+                        ('TRES', 'Tiroideo, Renal endocrino, Estroma GI'),
+                    ],
+                    'nota': 'Estas metástasis muestran wash-in arterial y pueden simular HCC',
+                },
             }
         },
         {

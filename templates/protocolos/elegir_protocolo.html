@@ -349,6 +349,36 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
                                 {% endfor %}
                             </ul>
                         </details>
+                        
+                        <!-- Mnemotecnia (collapsible) -->
+                        {% if escenario.recommendation.mnemonica %}
+                        <details class="mb-2">
+                            <summary class="text-xs font-medium text-purple-700 cursor-pointer hover:text-purple-900">
+                                <i class="fas fa-brain mr-1"></i>
+                                {{ escenario.recommendation.mnemonica.titulo }}
+                            </summary>
+                            <div class="mt-2 text-xs bg-purple-50 p-2 rounded">
+                                <p class="font-semibold text-purple-800 mb-2">
+                                    <i class="fas fa-quote-left mr-1"></i>
+                                    "{{ escenario.recommendation.mnemonica.frase }}"
+                                </p>
+                                <ul class="space-y-1 pl-2">
+                                    {% for abbr, label in escenario.recommendation.mnemonica.items %}
+                                    <li class="flex items-start text-gray-700">
+                                        <span class="font-bold text-purple-600 mr-2 min-w-[3rem]">{{ abbr }}:</span>
+                                        <span>{{ label }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                {% if escenario.recommendation.mnemonica.nota %}
+                                <p class="mt-2 pt-2 border-t border-purple-200 text-purple-700 italic">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    {{ escenario.recommendation.mnemonica.nota }}
+                                </p>
+                                {% endif %}
+                            </div>
+                        </details>
+                        {% endif %}
                     </div>
                     {% endif %}
 
