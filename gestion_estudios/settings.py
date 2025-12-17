@@ -193,9 +193,9 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("GMAIL_USER")  # Tu dirección de correo de Gmail
-EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD")  # Contraseña o App Password de Gmail
-DEFAULT_FROM_EMAIL = config("GMAIL_USER")
+EMAIL_HOST_USER = config("GMAIL_USER", default="noreply@example.com")  # Tu dirección de correo de Gmail
+EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD", default="")  # Contraseña o App Password de Gmail
+DEFAULT_FROM_EMAIL = config("GMAIL_USER", default="noreply@example.com")
 
 # -----------------------------------------------------------------------------
 # LOGGING: Forzar que los errores del middleware personalizado aparezcan siempre.
