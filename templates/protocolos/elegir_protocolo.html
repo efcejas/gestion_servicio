@@ -14,6 +14,27 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
 <div class="min-h-screen bg-gray-50 py-6">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
+        <!-- Breadcrumb -->
+        <nav class="flex mb-4" aria-label="Breadcrumb">
+            <ol class="inline-flex items-center space-x-1 md:space-x-3">
+                <li class="inline-flex items-center">
+                    <a href="{% url 'home' %}" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-home mr-2"></i>
+                        Inicio
+                    </a>
+                </li>
+                <li aria-current="page">
+                    <div class="flex items-center">
+                        <i class="fas fa-chevron-right text-gray-400 mx-2"></i>
+                        <span class="text-sm font-medium text-blue-600">
+                            <i class="fas fa-compass mr-1"></i>
+                            Elegir Protocolo
+                        </span>
+                    </div>
+                </li>
+            </ol>
+        </nav>
+        
         <!-- Header con mensaje principal -->
         <div class="mb-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -21,11 +42,13 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
                     <i class="fas fa-compass text-blue-600 mr-2"></i>
                     ¿Qué protocolo elegir?
                 </h1>
+                {% if user.is_superuser %}
                 <a href="{% url 'protocolos:lista' %}" 
-                   class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                    <i class="fas fa-list mr-2"></i>
-                    Ver todos los protocolos
+                   class="inline-flex items-center justify-center px-4 py-2 border border-blue-600 bg-blue-600 text-white rounded-md shadow-sm text-sm font-medium hover:bg-blue-700">
+                    <i class="fas fa-cog mr-2"></i>
+                    Gestionar Protocolos
                 </a>
+                {% endif %}
             </div>
             
             <!-- Mensaje principal -->

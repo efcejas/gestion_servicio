@@ -24,7 +24,7 @@ class RegistroEstudiosPorMedico(models.Model):
     medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')
     nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
-    dni_paciente = models.CharField(verbose_name='DNI del paciente')
+    dni_paciente = models.CharField(max_length=20, verbose_name='DNI del paciente')
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
     fecha_del_informe = models.DateField(verbose_name='Fecha del informe')
     estudio = models.ManyToManyField(Estudios, verbose_name='Estudios')

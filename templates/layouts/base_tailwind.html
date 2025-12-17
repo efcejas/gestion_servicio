@@ -50,19 +50,20 @@
 
                 <!-- User Info & Actions -->
                 <div class="flex items-center space-x-4">
-                    <!-- User Info (hidden on mobile) -->
-                    <div class="hidden md:block text-right">
-                        <div class="text-sm font-semibold text-white drop-shadow-sm">{{ user.get_full_name }}</div>
-                        <div class="text-xs text-white/80">{{ user.email }}</div>
-                        {% if user.cargo %}
-                        <div class="text-xs text-white/90 font-medium">
-                            <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                    <!-- User Info & Dropdown -->
+                    <div class="relative flex items-center space-x-3">
+                        <!-- User Info - Visible en pantallas medianas a grandes -->
+                        <div class="hidden md:block text-right mr-2">
+                            <div class="font-semibold text-white text-sm drop-shadow-sm">{{ user.get_full_name }}</div>
+                            <div class="text-xs text-white/80">{{ user.email }}</div>
+                            {% if user.rol %}
+                            <div class="text-xs text-white/90 font-medium">
+                                <i class="fas fa-user-md mr-1"></i>{{ user.get_rol_display }}
+                            </div>
+                            {% endif %}
                         </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- User Dropdown -->
-                    <div class="relative">
+                        
+                        <!-- User Dropdown Button -->
                         <button type="button" id="user-menu-button" 
                                 class="flex items-center space-x-2 text-sm bg-white/20 backdrop-blur-sm rounded-xl p-3 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 shadow-lg"
                                 data-dropdown-toggle="user-dropdown">
@@ -76,14 +77,20 @@
 
                         <!-- Dropdown menu -->
                         <div id="user-dropdown" 
-                             class="hidden absolute right-0 z-50 mt-3 w-56 bg-white rounded-xl shadow-2xl ring-1 ring-gray-200 focus:outline-none backdrop-blur-sm">
+                             class="hidden absolute right-0 z-50 mt-3 w-64 bg-white rounded-xl shadow-2xl ring-1 ring-gray-200 focus:outline-none backdrop-blur-sm">
                             <div class="py-2">
-                                <div class="px-4 py-3 text-sm text-gray-700 border-b border-gray-100 md:hidden bg-gradient-to-r from-medical-primary/5 to-medical-secondary/5">
+                                <!-- User Info - Solo visible en móviles -->
+                                <div class="md:hidden px-4 py-3 text-sm text-gray-700 border-b border-gray-100 bg-gradient-to-r from-medical-primary/5 to-medical-secondary/5">
                                     <div class="font-semibold text-medical-primary">{{ user.get_full_name }}</div>
-                                    <div class="text-xs text-gray-500">{{ user.email }}</div>
+                                    <div class="text-xs text-gray-500 mt-1">{{ user.email }}</div>
+                                    {% if user.rol %}
+                                    <div class="text-xs text-medical-secondary font-medium mt-2 flex items-center">
+                                        <i class="fas fa-user-md mr-1"></i>{{ user.get_rol_display }}
+                                    </div>
+                                    {% endif %}
                                     {% if user.cargo %}
-                                    <div class="text-xs text-medical-secondary font-medium mt-1">
-                                        <i class="fas fa-user-md mr-1"></i>{{ user.get_cargo_display }}
+                                    <div class="text-xs text-gray-600 mt-1 flex items-center">
+                                        <i class="fas fa-briefcase mr-1"></i>{{ user.cargo }}
                                     </div>
                                     {% endif %}
                                 </div>
@@ -94,6 +101,16 @@
                                        class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
                                         <i class="fas fa-home w-5 mr-3 text-medical-primary group-hover:scale-110 transition-transform"></i>
                                         <span class="font-medium">Inicio</span>
+                                    </a>
+                                </div>
+                                {% endif %}
+                                {% url 'accounts:editar_perfil' as editar_perfil_url %}
+                                {% if editar_perfil_url %}
+                                <div class="px-2">
+                                    <a href="{{ editar_perfil_url }}" 
+                                       class="group flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 transition-all duration-200 rounded-lg">
+                                        <i class="fas fa-user-edit w-5 mr-3 text-green-600 group-hover:scale-110 transition-transform"></i>
+                                        <span class="font-medium">Editar Perfil</span>
                                     </a>
                                 </div>
                                 {% endif %}
@@ -142,6 +159,20 @@
                     <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                     {% endif %}
                 </a>
+                {% endif %}
+
+                <!-- Protocolos - Para usuarios con acceso (residentes, médicos, técnicos) -->
+                {% if user.puede_acceder_protocolos %}
+                {% url 'protocolos:elegir' as protocolos_url %}
+                {% if protocolos_url %}
+                <a href="{{ protocolos_url }}" 
+                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'protocolos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                    <i class="fas fa-book-medical mr-2 group-hover:scale-110 transition-transform"></i>Protocolos
+                    {% if 'protocolos' in request.resolver_match.namespace|default:'' %}
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                    {% endif %}
+                </a>
+                {% endif %}
                 {% endif %}
 
                 <!-- ========== NAVEGACIÓN POR SUPERUSUARIO ========== -->
@@ -339,7 +370,7 @@
                         <i class="fas fa-sign-in mr-2"></i>Iniciar Sesión
                     </a>
                     {% endif %}
-                    {% url 'register' as register_url %}
+                    {% url 'accounts:register' as register_url %}
                     {% if register_url %}
                     <a href="{{ register_url }}" 
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200">

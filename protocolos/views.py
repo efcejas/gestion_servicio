@@ -1,16 +1,22 @@
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView
 from django.db.models import Q
-from django.contrib.auth.decorators import login_required
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.mixins import UserPassesTestMixin
+from accounts.decorators import protocolos_access_required
 from django.urls import reverse
 from .models import Protocolo, Modalidad, RegionAnatomica, Tag
 
 
-class ProtocoloListView(ListView):
+class ProtocoloListView(UserPassesTestMixin, ListView):
     model = Protocolo
     template_name = 'protocolos/lista_protocolos.html'
     context_object_name = 'protocolos'
     paginate_by = 20
+    
+    def test_func(self):
+        """Solo superusuarios pueden ver/editar la lista de protocolos"""
+        return self.request.user.is_superuser
     
     def get_queryset(self):
         queryset = Protocolo.objects.filter(
@@ -63,10 +69,14 @@ class ProtocoloListView(ListView):
         return context
 
 
-class ProtocoloDetailView(DetailView):
+class ProtocoloDetailView(UserPassesTestMixin, DetailView):
     model = Protocolo
     template_name = 'protocolos/detalle_protocolo.html'
     context_object_name = 'protocolo'
+    
+    def test_func(self):
+        """Solo superusuarios pueden ver/editar detalles de protocolos"""
+        return self.request.user.is_superuser
     
     def get_queryset(self):
         return Protocolo.objects.filter(
@@ -80,10 +90,17 @@ class ProtocoloDetailView(DetailView):
         )
 
 
-@login_required
+@protocolos_access_required
 def elegir_protocolo(request):
     """
     Página de decisión clínica mejorada: escenarios con metadata rica para soporte de decisiones.
+    
+    Acceso permitido para:
+    - Médicos staff
+    - Médicos residentes
+    - Jefes de servicio
+    - Técnicos radiólogos
+    - Superusuarios
     """
     
     # Definir escenarios clínicos con metadata completa

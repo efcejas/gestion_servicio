@@ -67,6 +67,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'accounts.middleware.ProfileRequiredMiddleware',  # Verificar perfil completo
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -99,8 +100,7 @@ WSGI_APPLICATION = 'gestion_estudios.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default=config(
-            'DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+        default=config('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
     )
 }
 
@@ -197,13 +197,13 @@ if DEBUG:
 # Configuración del navegador para desarrollo (opcional)
 NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"  # Ruta al binario de npm
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("GMAIL_USER")  # Tu dirección de correo de Gmail
-EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD")  # Contraseña o App Password de Gmail
-DEFAULT_FROM_EMAIL = config("GMAIL_USER")
+EMAIL_HOST_USER = config("GMAIL_USER", default="noreply@example.com")
+EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = config("GMAIL_USER", default="noreply@example.com")
 
 # -----------------------------------------------------------------------------
 # LOGGING: Forzar que los errores del middleware personalizado aparezcan siempre.

@@ -1,0 +1,222 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Completar Perfil - Sistema de Gestión{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl mx-auto">
+        
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="mx-auto h-16 w-16 bg-blue-600 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-user-edit text-white text-2xl"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold text-gray-900 mb-2">
+                ¡Bienvenido/a, {{ user.first_name }}!
+            </h1>
+            <p class="text-lg text-gray-600">
+                Para comenzar a usar el sistema, necesitamos conocer un poco más sobre tu rol
+            </p>
+        </div>
+
+        <!-- Card del formulario -->
+        <div class="bg-white rounded-lg shadow-xl overflow-hidden">
+            
+            <!-- Progress bar -->
+            <div class="bg-blue-600 h-2">
+                <div class="bg-blue-400 h-full w-1/2 transition-all duration-300"></div>
+            </div>
+            
+            <!-- Formulario -->
+            <div class="p-8">
+                
+                <!-- Alert informativo -->
+                <div class="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-blue-400 text-xl"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-blue-700">
+                                Esta información nos ayuda a personalizar tu experiencia y darte acceso 
+                                a las herramientas adecuadas según tu rol en el servicio.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                    <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-exclamation-circle text-red-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-red-700">
+                                    {{ form.non_field_errors }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Campo ROL (obligatorio) -->
+                    <div class="mb-6">
+                        <label for="{{ form.rol.id_for_label }}" class="block text-sm font-bold text-gray-700 mb-2">
+                            {{ form.rol.label }}
+                        </label>
+                        {{ form.rol }}
+                        {% if form.rol.help_text %}
+                        <p class="mt-1 text-xs text-gray-500">
+                            <i class="fas fa-question-circle mr-1"></i>{{ form.rol.help_text }}
+                        </p>
+                        {% endif %}
+                        {% if form.rol.errors %}
+                        <p class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.rol.errors.0 }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo CARGO (opcional) -->
+                    <div class="mb-6">
+                        <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            {{ form.cargo.label }}
+                        </label>
+                        {{ form.cargo }}
+                        {% if form.cargo.help_text %}
+                        <p class="mt-1 text-xs text-gray-500">
+                            <i class="fas fa-question-circle mr-1"></i>{{ form.cargo.help_text }}
+                        </p>
+                        {% endif %}
+                        {% if form.cargo.errors %}
+                        <p class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.cargo.errors.0 }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo TELEFONO -->
+                    <div class="mb-6">
+                        <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            {{ form.telefono.label }}
+                        </label>
+                        {{ form.telefono }}
+                        {% if form.telefono.help_text %}
+                        <p class="mt-1 text-xs text-gray-500">
+                            <i class="fas fa-question-circle mr-1"></i>{{ form.telefono.help_text }}
+                        </p>
+                        {% endif %}
+                        {% if form.telefono.errors %}
+                        <p class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.telefono.errors.0 }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Campo NOTIFICACIONES -->
+                    <div class="mb-8">
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                {{ form.recibir_notificaciones }}
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="{{ form.recibir_notificaciones.id_for_label }}" class="font-medium text-gray-700">
+                                    {{ form.recibir_notificaciones.label }}
+                                </label>
+                                {% if form.recibir_notificaciones.help_text %}
+                                <p class="text-gray-500">{{ form.recibir_notificaciones.help_text }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if form.recibir_notificaciones.errors %}
+                        <p class="mt-1 text-xs text-red-600">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.recibir_notificaciones.errors.0 }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="flex items-center justify-between pt-6 border-t border-gray-200">
+                        <a href="{% url 'logout' %}" class="text-sm text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-sign-out-alt mr-1"></i>
+                            Cerrar sesión
+                        </a>
+                        <button type="submit" 
+                                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            Completar perfil
+                            <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Footer -->
+            <div class="bg-gray-50 px-8 py-4 border-t border-gray-200">
+                <p class="text-xs text-gray-500 text-center">
+                    <i class="fas fa-lock mr-1"></i>
+                    Tu información es privada y solo se usa para personalizar tu experiencia
+                </p>
+            </div>
+        </div>
+
+        <!-- Información sobre roles -->
+        <div class="mt-8 bg-white rounded-lg shadow p-6">
+            <h3 class="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                <i class="fas fa-users text-blue-600 mr-2"></i>
+                ¿Qué acceso tengo según mi rol?
+            </h3>
+            <div class="space-y-2 text-xs text-gray-600">
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle text-green-500 mr-2 mt-0.5"></i>
+                    <p><strong>Médicos Staff/Residentes:</strong> Acceso a protocolos, dictado de informes, agenda</p>
+                </div>
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle text-green-500 mr-2 mt-0.5"></i>
+                    <p><strong>Técnicos:</strong> Acceso a protocolos de adquisición, equipos, control de guardias</p>
+                </div>
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle text-green-500 mr-2 mt-0.5"></i>
+                    <p><strong>Administrativos:</strong> Gestión de agenda, registros, liquidaciones</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    /* Estilos adicionales para el formulario */
+    .form-control, .form-select {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        font-size: 0.875rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.375rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .form-check-input {
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 1px solid #d1d5db;
+        border-radius: 0.25rem;
+        cursor: pointer;
+    }
+    
+    .form-check-input:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+    }
+</style>
+{% endblock %}
