@@ -60,7 +60,7 @@ class CustomPasswordResetView(PasswordResetView):
 
 # Vista personalizada para la página de login
 class CustomLoginView(LoginView):
-    template_name = 'registration/login.html'
+    template_name = 'registration/login_tailwind.html'
     redirect_authenticated_user = True  # Si el usuario ya está autenticado, redirigir a la página de inicio
 
     def get_context_data(self, **kwargs):
@@ -158,7 +158,7 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
     """
     Dashboard principal - personalizado según tipo de usuario
     Superusuarios ven admin_dashboard.html con sidebar, calendario y carga masiva
-    Otros usuarios ven home.html con sus secciones específicas
+    Otros usuarios ven home_tailwind.html con dashboard personalizado por rol
     """
     login_url = 'login'
 
@@ -166,7 +166,7 @@ class HomeTailwindView(LoginRequiredMixin, TemplateView):
         """Retorna template diferente para superusuarios"""
         if self.request.user.is_superuser:
             return ['admin_dashboard.html']  # Dashboard con sidebar
-        return ['home.html']  # Dashboard normal
+        return ['home_tailwind.html']  # Dashboard personalizado por rol
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -1,0 +1,43 @@
+{% comment %}
+ALERT MESSAGE COMPONENT
+Mensajes de alerta consistentes (success/error/info/warning)
+Uso: {% include 'components/alert_message.html' with type='error' message='Texto del mensaje' %}
+{% endcomment %}
+
+{% if type == 'error' %}
+    <div class="mb-6 bg-red-50 border-l-4 border-red-600 p-4 rounded-r-lg">
+        <div class="flex items-start">
+            <i class="fas fa-exclamation-circle text-red-600 mr-3 mt-0.5 flex-shrink-0"></i>
+            <div class="text-sm text-red-700">
+                {{ message|safe }}
+            </div>
+        </div>
+    </div>
+{% elif type == 'success' %}
+    <div class="mb-6 bg-green-50 border-l-4 border-green-600 p-4 rounded-r-lg">
+        <div class="flex items-start">
+            <i class="fas fa-check-circle text-green-600 mr-3 mt-0.5 flex-shrink-0"></i>
+            <div class="text-sm text-green-700">
+                {{ message|safe }}
+            </div>
+        </div>
+    </div>
+{% elif type == 'warning' %}
+    <div class="mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg">
+        <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-amber-500 mr-3 mt-0.5 flex-shrink-0"></i>
+            <div class="text-sm text-amber-700">
+                {{ message|safe }}
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="mb-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded-r-lg">
+        <div class="flex items-start">
+            <i class="fas fa-info-circle text-blue-600 mr-3 mt-0.5 flex-shrink-0"></i>
+            <div class="text-sm text-blue-700">
+                {{ message|safe }}
+            </div>
+        </div>
+    </div>
+{% endif %}

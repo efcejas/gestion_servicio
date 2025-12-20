@@ -4,7 +4,7 @@
 {% block title %}Editar Perfil - Sistema de Gestión{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-3xl mx-auto">
         
         <!-- Header -->
@@ -19,11 +19,11 @@
         </div>
 
         <!-- Card principal -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
             
-            <!-- Información actual -->
-            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
-                <div class="flex items-center space-x-4">
+            <!-- Usuario info header -->
+            <div class="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-5 border-b border-gray-200">
+                <div class="flex items-center gap-4">
                     <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                         {{ user.get_full_name|first|upper }}
                     </div>
@@ -45,23 +45,12 @@
                 {% csrf_token %}
                 
                 {% if form.non_field_errors %}
-                <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4 rounded">
-                    <div class="flex">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-exclamation-circle text-red-400"></i>
-                        </div>
-                        <div class="ml-3">
-                            <p class="text-sm text-red-700">
-                                {{ form.non_field_errors }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                    {% include 'components/alert_message.html' with type='error' message=form.non_field_errors|join:", " %}
                 {% endif %}
 
                 <!-- Información Personal -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
+                <div class="mb-8">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
                         <i class="fas fa-id-card text-blue-600 mr-2"></i>
                         Información Personal
                     </h3>
@@ -69,114 +58,184 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Username -->
                         <div>
-                            <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.username.label }}
+                            <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Nombre de usuario
                             </label>
                             {{ form.username }}
                             {% if form.username.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.username.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.username.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
 
                         <!-- Email -->
                         <div>
-                            <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.email.label }}
+                            <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Email
                             </label>
                             {{ form.email }}
                             {% if form.email.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.email.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.email.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
 
                         <!-- Nombre -->
                         <div>
-                            <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.first_name.label }}
+                            <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Nombre
                             </label>
                             {{ form.first_name }}
                             {% if form.first_name.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.first_name.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.first_name.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
 
                         <!-- Apellido -->
                         <div>
-                            <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.last_name.label }}
+                            <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Apellido
                             </label>
                             {{ form.last_name }}
                             {% if form.last_name.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.last_name.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.last_name.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
 
                 <!-- Información Profesional -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                        <i class="fas fa-user-md text-blue-600 mr-2"></i>
+                <div class="mb-8">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                        <i class="fas fa-user-md text-green-600 mr-2"></i>
                         Información Profesional
                     </h3>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <!-- Rol -->
                         <div>
-                            <label for="{{ form.rol.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.rol.label }}
+                            <label for="{{ form.rol.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Rol
                             </label>
                             {{ form.rol }}
                             {% if form.rol.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.rol.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.rol.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
 
                         <!-- Cargo -->
                         <div>
-                            <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.cargo.label }}
+                            <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Cargo
                             </label>
                             {{ form.cargo }}
-                            <p class="mt-1 text-xs text-gray-500">
-                                Ej: Residente R3, Especialista en TC
-                            </p>
                             {% if form.cargo.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.cargo.errors.0 }}
-                            </p>
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.cargo.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
 
-                        <!-- Teléfono -->
-                        <div>
-                            <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                                {{ form.telefono.label }}
+                        <!-- Fecha ingreso residencia (solo para residentes) -->
+                        <div id="fecha-ingreso-container-edit">
+                            <label for="{{ form.fecha_ingreso_residencia.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Fecha de ingreso a residencia
                             </label>
-                            {{ form.telefono }}
-                            {% if form.telefono.errors %}
-                            <p class="mt-1 text-xs text-red-600">
-                                <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.telefono.errors.0 }}
+                            {{ form.fecha_ingreso_residencia }}
+                            {% if form.fecha_ingreso_residencia.errors %}
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.fecha_ingreso_residencia.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Año de residencia (solo para residentes) -->
+                        <div id="anio-residencia-container-edit">
+                            <label for="{{ form.anio_residencia.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                                Año de residencia
+                            </label>
+                            {{ form.anio_residencia }}
+                            <p class="mt-1 text-xs text-gray-500 flex items-start">
+                                <i class="fas fa-info-circle mr-1 mt-0.5"></i>
+                                <span>Se calcula automáticamente desde la fecha de ingreso</span>
                             </p>
+                            {% if form.anio_residencia.errors %}
+                            <div class="mt-1 text-xs text-red-600">
+                                {% for error in form.anio_residencia.errors %}
+                                <p class="flex items-start">
+                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                                </p>
+                                {% endfor %}
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
 
+                <!-- Contacto -->
+                <div class="mb-8">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                        <i class="fas fa-phone text-purple-600 mr-2"></i>
+                        Contacto
+                    </h3>
+                    
+                    <div>
+                        <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            Teléfono
+                        </label>
+                        {{ form.telefono }}
+                        {% if form.telefono.errors %}
+                        <div class="mt-1 text-xs text-red-600">
+                            {% for error in form.telefono.errors %}
+                            <p class="flex items-start">
+                                <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                            </p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
                 <!-- Preferencias -->
-                <div class="mb-6">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200">
-                        <i class="fas fa-cog text-blue-600 mr-2"></i>
+                <div class="mb-8">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                        <i class="fas fa-cog text-indigo-600 mr-2"></i>
                         Preferencias
                     </h3>
                     
@@ -184,80 +243,87 @@
                         <div class="flex items-center h-5">
                             {{ form.recibir_notificaciones }}
                         </div>
-                        <div class="ml-3 text-sm">
-                            <label for="{{ form.recibir_notificaciones.id_for_label }}" class="font-medium text-gray-700">
+                        <div class="ml-3">
+                            <label for="{{ form.recibir_notificaciones.id_for_label }}" class="text-sm font-medium text-gray-700">
                                 {{ form.recibir_notificaciones.label }}
                             </label>
-                            <p class="text-gray-500">Recibirás actualizaciones importantes del sistema</p>
+                            <p class="text-xs text-gray-500 mt-1">Recibirás actualizaciones importantes del sistema</p>
                         </div>
                     </div>
                     {% if form.recibir_notificaciones.errors %}
-                    <p class="mt-1 text-xs text-red-600">
-                        <i class="fas fa-exclamation-triangle mr-1"></i>{{ form.recibir_notificaciones.errors.0 }}
-                    </p>
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.recibir_notificaciones.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
                     {% endif %}
                 </div>
 
                 <!-- Botones -->
                 <div class="flex items-center justify-between pt-6 border-t border-gray-200">
                     <a href="{% url 'home' %}" 
-                       class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <i class="fas fa-arrow-left mr-2"></i>
+                       class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <i class="fas fa-arrow-left"></i>
                         Volver
                     </a>
                     <button type="submit" 
-                            class="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <i class="fas fa-save mr-2"></i>
+                            class="inline-flex items-center gap-2 px-6 py-2.5 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm">
+                        <i class="fas fa-save"></i>
                         Guardar Cambios
                     </button>
                 </div>
             </form>
         </div>
 
-        <!-- Información adicional -->
-        <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-info-circle text-blue-600 text-xl"></i>
-                </div>
-                <div class="ml-3 text-sm text-blue-700">
-                    <p class="font-medium mb-1">¿Necesitas cambiar tu contraseña?</p>
-                    <p>Puedes hacerlo desde el menú de usuario en la esquina superior derecha.</p>
-                </div>
-            </div>
+        <!-- Info cambio de contraseña -->
+        <div class="mt-6">
+            {% include 'components/alert_message.html' with type='info' message='<strong>¿Necesitas cambiar tu contraseña?</strong><br>Puedes hacerlo desde el menú de usuario en la esquina superior derecha.' %}
         </div>
 
     </div>
 </div>
+{% endblock %}
 
-<style>
-    /* Estilos para los campos del formulario */
-    .form-control, .form-select {
-        width: 100%;
-        padding: 0.625rem 0.75rem;
-        font-size: 0.875rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.375rem;
-        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    }
+{% block extra_js %}
+<script>
+// Mostrar/ocultar campos específicos de residentes
+function toggleFechaIngresoEdit() {
+    const rolSelect = document.querySelector('select[name="rol"]');
+    const fechaIngresoContainer = document.getElementById('fecha-ingreso-container-edit');
+    const anioResidenciaContainer = document.getElementById('anio-residencia-container-edit');
     
-    .form-control:focus, .form-select:focus {
-        outline: none;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    if (rolSelect && fechaIngresoContainer && anioResidenciaContainer) {
+        if (rolSelect.value === 'medico_residente') {
+            fechaIngresoContainer.style.display = 'block';
+            anioResidenciaContainer.style.display = 'block';
+        } else {
+            fechaIngresoContainer.style.display = 'none';
+            anioResidenciaContainer.style.display = 'none';
+        }
     }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    toggleFechaIngresoEdit();
     
-    .form-check-input {
-        width: 1.25rem;
-        height: 1.25rem;
-        border: 1px solid #d1d5db;
-        border-radius: 0.25rem;
-        cursor: pointer;
-    }
+    // Aplicar estilos Tailwind a campos del formulario
+    const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="date"], input[type="tel"], input[type="number"], select');
+    inputs.forEach(input => {
+        input.className = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors';
+        
+        const errorDiv = input.parentElement.querySelector('.text-red-600');
+        if (errorDiv) {
+            input.classList.add('border-red-300', 'focus:ring-red-500', 'focus:border-red-500');
+        }
+    });
     
-    .form-check-input:checked {
-        background-color: #3b82f6;
-        border-color: #3b82f6;
+    // Estilo para checkbox
+    const checkbox = document.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+        checkbox.className = 'w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer';
     }
-</style>
+});
+</script>
 {% endblock %}

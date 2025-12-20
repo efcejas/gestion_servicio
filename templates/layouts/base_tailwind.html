@@ -224,6 +224,40 @@
                 <!-- ========== NAVEGACIÓN PARA USUARIOS NO SUPERUSER ========== -->
                 {% elif user.is_authenticated and not user.is_superuser %}
 
+                    <!-- ========== NAVEGACIÓN POR ROL (NUEVO SISTEMA) ========== -->
+                    
+                    <!-- MÉDICOS (Residentes, Staff, Jefes, Instructores) -->
+                    {% if user.es_medico %}
+                        <!-- Novedades -->
+                        {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                        {% if eventos_url %}
+                        <a href="{{ eventos_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                            {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+                    
+                    <!-- TÉCNICOS -->
+                    {% elif user.rol == 'tecnico' %}
+                        <!-- Novedades -->
+                        {% url 'gestion_eventos:lista_eventos' as eventos_url %}
+                        {% if eventos_url %}
+                        <a href="{{ eventos_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
+                            {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+                    
+                    {% endif %}  <!-- Cierre del bloque if user.es_medico / elif user.rol == 'tecnico' -->
+
+                    <!-- ========== NAVEGACIÓN POR GRUPOS (SISTEMA ANTIGUO - FALLBACK) ========== -->
+
                     <!-- ========== ADMINISTRATIVO - SANATORIO (PEDIDOS) ========== -->
                     {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
                         <!-- Reportes -->

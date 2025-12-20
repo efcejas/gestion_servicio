@@ -42,13 +42,11 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
                     <i class="fas fa-compass text-blue-600 mr-2"></i>
                     ¿Qué protocolo elegir?
                 </h1>
-                {% if user.is_superuser %}
                 <a href="{% url 'protocolos:lista' %}" 
                    class="inline-flex items-center justify-center px-4 py-2 border border-blue-600 bg-blue-600 text-white rounded-md shadow-sm text-sm font-medium hover:bg-blue-700">
-                    <i class="fas fa-cog mr-2"></i>
-                    Gestionar Protocolos
+                    <i class="fas fa-list mr-2"></i>
+                    Ver Todos los Protocolos
                 </a>
-                {% endif %}
             </div>
             
             <!-- Mensaje principal -->

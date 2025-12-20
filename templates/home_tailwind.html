@@ -32,7 +32,7 @@
 
     {% else %}
         <!-- ========== CARTEL DE BIENVENIDA PARA TODOS LOS DEMÁS USUARIOS ========== -->
-        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary rounded-2xl p-8 text-white mb-2">
+        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary rounded-2xl p-8 text-white mb-6">
             <div class="flex items-center">
                 <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mr-6">
                     <i class="fas fa-user-circle text-3xl"></i>
@@ -46,25 +46,238 @@
                                 {{ SANATORIO_MODO }}
                             </span>
                         {% endif %}
+                        {% if user.anio_residencia %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
+                                <i class="fas fa-graduation-cap mr-1.5"></i>
+                                {{ user.anio_residencia }}
+                            </span>
+                        {% endif %}
                     </div>
-                    {% if user.cargo == 'médico' %}
-                        <p class="text-white/90 text-lg">Aquí podrás gestionar tus estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
-                    {% elif user.cargo == 'médico residente' %}
-                        <p class="text-white/90 text-lg">Aquí podrás registrar nuevos estudios y procedimientos. ¡Gracias por estar con nosotros!</p>
+                    {% if user.es_medico %}
+                        {% if user.rol == 'medico_residente' %}
+                            <p class="text-white/90 text-lg">Bienvenido a tu espacio de formación. Accede a protocolos, novedades y más. ¡Éxitos en tu aprendizaje!</p>
+                        {% elif user.rol == 'jefe_residentes' %}
+                            <p class="text-white/90 text-lg">Como jefe de residentes, coordina la formación y accede a los recursos del servicio. ¡Gracias por tu liderazgo!</p>
+                        {% elif user.rol == 'instructor_residentes' %}
+                            <p class="text-white/90 text-lg">Guía la formación de los residentes con las herramientas del servicio. ¡Gracias por tu dedicación!</p>
+                        {% else %}
+                            <p class="text-white/90 text-lg">Gestiona tus estudios, procedimientos y accede a los protocolos del servicio. ¡Gracias por tu compromiso!</p>
+                        {% endif %}
+                    {% elif user.rol == 'tecnico' %}
+                        <p class="text-white/90 text-lg">Accede a protocolos técnicos y novedades del servicio de imágenes. ¡Gracias por tu trabajo!</p>
                     {% else %}
-                        <p class="text-white/90 text-lg">Esta es la plataforma interna del servicio de imágenes donde contaremos con la comunicación de las novedades. ¡Gracias por estar con nosotros!</p>
+                        <p class="text-white/90 text-lg">Bienvenido a la plataforma del servicio de imágenes. Aquí encontrarás todo lo necesario para tu gestión diaria.</p>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- ========== CARDS SEGÚN EL CARGO DEL USUARIO ========== -->
+        <!-- ========== CARDS SEGÚN EL ROL DEL USUARIO ========== -->
         
-        <!-- ADMINISTRATIVOS / JEFE ADMINISTRATIVO -->
-        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
+        <!-- RESIDENTES (médico_residente, jefe_residentes, instructor_residentes) -->
+        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+        <div class="container mx-auto mt-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Protocolos Radiológicos -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-book-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Protocolos</h5>
+                    <p class="text-gray-600 mb-4">Consulta protocolos estandarizados por escenario clínico y modalidad.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'protocolos:elegir' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Ver protocolos
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Novedades -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
+                        <i class="fas fa-bell text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
+                    <p class="text-gray-600 mb-4">Mantente al día con las novedades y avisos del servicio.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                            Ver novedades
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mi Perfil -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl mb-4">
+                        <i class="fas fa-user-graduate text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mi Perfil</h5>
+                    <p class="text-gray-600 mb-4">Actualiza tus datos y revisa tu progreso en la residencia.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'accounts:editar_perfil' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                            Ver perfil
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TÉCNICOS -->
+        {% elif user.rol == 'tecnico' %}
+        <div class="container mx-auto mt-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 justify-center">
+                <!-- Protocolos -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-book-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Protocolos Técnicos</h5>
+                    <p class="text-gray-600 mb-4">Consulta protocolos de adquisición y parámetros técnicos.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'protocolos:elegir' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Ver protocolos
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Novedades -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
+                        <i class="fas fa-bell text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
+                    <p class="text-gray-600 mb-4">Consulta avisos sobre equipos, mantenimientos y procedimientos.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                            Ver novedades
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MÉDICOS DE STAFF (medico_staff, jefe_servicio) -->
+        {% elif user.rol == 'medico_staff' or user.rol == 'jefe_servicio' %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <!-- Novedades Recientes -->
+                <!-- Protocolos -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-book-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Protocolos</h5>
+                    <p class="text-gray-600 mb-4">Accede a la biblioteca de protocolos del servicio.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'protocolos:elegir' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Ver protocolos
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Registrar Estudios -->
+                {% if user|has_group:"Médicos de staff - informes" %}
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl mb-4">
+                        <i class="fas fa-plus-circle text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar Estudios</h5>
+                    <p class="text-gray-600 mb-4">Registra los estudios realizados para liquidación.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_nuevo' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">
+                            Registrar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mis Estudios -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl mb-4">
+                        <i class="fas fa-list text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Estudios</h5>
+                    <p class="text-gray-600 mb-4">Consulta tus estudios registrados.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_list' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
+                            Ver lista
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mis Guardias -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
+                        <i class="fas fa-calendar-alt text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Guardias</h5>
+                    <p class="text-gray-600 mb-4">Revisa tu calendario de guardias.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'control_guardias:mis_guardias' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                            Ver guardias
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Registrar Procedimientos -->
+                {% if user|has_group:"Médicos de staff" %}
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4">
+                        <i class="fas fa-syringe text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Procedimientos</h5>
+                    <p class="text-gray-600 mb-4">Registra procedimientos intervencionistas.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:procedimientos_intervensionismo' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
+                            Registrar
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Mis Procedimientos -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl mb-4">
+                        <i class="fas fa-file-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Procedimientos</h5>
+                    <p class="text-gray-600 mb-4">Consulta tus procedimientos registrados.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:mis_procedimientos' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors">
+                            Ver lista
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Novedades -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mb-4">
+                        <i class="fas fa-bell text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
+                    <p class="text-gray-600 mb-4">Mantente informado sobre el servicio.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+                            Ver novedades
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMINISTRATIVOS (cargo legacy - mantener compatibilidad) -->
+        {% elif user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' or user.rol == 'administrativo' %}
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                     <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
                         <i class="fas fa-bell text-2xl text-white"></i>
@@ -111,193 +324,24 @@
             </div>
         </div>
 
-        <!-- TÉCNICO RADIÓLOGO / JEFE TÉCNICO -->
-        {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
-        <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 justify-center">
-                <!-- Novedades -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
-                        <i class="fas fa-bell text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
-                    <p class="text-gray-600 mb-4">Consulta las últimas novedades del servicio registradas en el sistema.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:lista_eventos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                            Ver novedades
-                        </a>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- MÉDICOS DE STAFF - INFORMES -->
-        {% elif user|has_group:"Médicos de staff - informes" %}
-        <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <!-- Registrar Estudios -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl mb-4">
-                        <i class="fas fa-plus-circle text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar estudios</h5>
-                    <p class="text-gray-600 mb-4">Accede al formulario para registrar los estudios realizados.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'liquidacion:registroestudios_nuevo' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">
-                            Registrar estudio
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Estudios Registrados -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-gray-500 to-gray-600 rounded-2xl mb-4">
-                        <i class="fas fa-list text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Estudios registrados</h5>
-                    <p class="text-gray-600 mb-4">Consulta todos los estudios que has registrado.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'liquidacion:registroestudios_list' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors">
-                            Ver lista
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Mis Guardias -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
-                        <i class="fas fa-calendar-alt text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis guardias</h5>
-                    <p class="text-gray-600 mb-4">Accede rápidamente a tu calendario de guardias.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'control_guardias:mis_guardias' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-                            Ver mis guardias
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Novedades -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
-                        <i class="fas fa-bell text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
-                    <p class="text-gray-600 mb-4">Consulta las últimas novedades del servicio registradas en el sistema.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:lista_eventos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                            Ver novedades
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        <!-- OTROS ROLES / FALLBACK -->
         {% else %}
-        <!-- MÉDICOS EN EL GRUPO "MÉDICOS DE STAFF" (SOLO PROCEDIMIENTOS) -->
-        {% if user|has_group:"Médicos de staff" and user.cargo == 'médico' %}
-        <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Registrar Procedimientos -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-2xl mb-4">
-                        <i class="fas fa-plus-circle text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar Procedimiento</h5>
-                    <p class="text-gray-600 mb-4">Accede al formulario para registrar un nuevo procedimiento.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'liquidacion:procedimientos_intervensionismo' %}"
-                           class="inline-flex items-center px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors">
-                            Registrar procedimiento
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Mis procedimientos registrados -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl mb-4">
-                        <i class="fas fa-file-medical text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis procedimientos registrados</h5>
-                    <p class="text-gray-600 mb-4">Accede a la lista de procedimientos que has registrado.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'liquidacion:mis_procedimientos' %}"
-                           class="inline-flex items-center px-4 py-2 bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors">
-                            Ver mis procedimientos
-                        </a>
-                    </div>
-                </div>
-                
-                <!-- Novedades -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
-                        <i class="fas fa-bell text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
-                    <p class="text-gray-600 mb-4">Consulta las últimas novedades del servicio registradas en el sistema.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:lista_eventos' %}"
-                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                            Ver novedades
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MÉDICOS SIN GRUPOS ESPECÍFICOS (MENSAJE DE ESPERA) -->
-        {% elif user.cargo == 'médico' or user.cargo == 'médico residente' %}
-        <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 justify-center">
-                <!-- Novedades -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
-                        <i class="fas fa-bell text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
-                    <p class="text-gray-600 mb-4">Consulta las últimas novedades del servicio registradas en el sistema.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:lista_eventos' %}"
-                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                            Ver novedades
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Mensaje de Espera -->
-                <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl shadow-lg border border-amber-200 p-6">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl mb-4">
-                        <i class="fas fa-clock text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Funcionalidades en Proceso</h5>
-                    <p class="text-gray-600 mb-4">Aguarda la asignación de nuevas funcionalidades. El administrador del sistema te asignará permisos específicos pronto.</p>
-                    <div class="bg-amber-100 border border-amber-300 rounded-lg p-3">
-                        <p class="text-amber-800 text-sm font-medium">
-                            <i class="fas fa-info-circle mr-2"></i>
-                            Contacte al administrador si tiene alguna pregunta.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        
-        {% else %}
-        <!-- MENSAJE GENÉRICO PARA OTROS TIPOS DE USUARIOS -->
         <div class="container mx-auto mt-6 mb-6">
             <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
                 <div class="w-20 h-20 bg-medical-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-info-circle text-3xl text-medical-primary"></i>
                 </div>
-                <h3 class="text-xl font-bold text-gray-900 mb-2">Dashboard en Construcción</h3>
-                <p class="text-gray-600">Tu perfil de usuario está siendo configurado. Pronto tendrás acceso a todas las funcionalidades correspondientes a tu rol.</p>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Dashboard Personalizado</h3>
+                <p class="text-gray-600 mb-4">Tu dashboard se está configurando. Pronto verás accesos directos personalizados según tu rol.</p>
+                <div class="mt-6">
+                    <a href="{% url 'accounts:editar_perfil' %}" 
+                       class="inline-flex items-center px-6 py-3 bg-medical-primary text-white rounded-lg hover:bg-medical-secondary transition-colors">
+                        <i class="fas fa-user-edit mr-2"></i>
+                        Completar mi perfil
+                    </a>
+                </div>
             </div>
         </div>
-        {% endif %}
         {% endif %}
 
     {% endif %}

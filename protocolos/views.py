@@ -15,8 +15,8 @@ class ProtocoloListView(UserPassesTestMixin, ListView):
     paginate_by = 20
     
     def test_func(self):
-        """Solo superusuarios pueden ver/editar la lista de protocolos"""
-        return self.request.user.is_superuser
+        """Permite acceso a superusuarios y personal médico/técnico. Solo superusuarios pueden editar."""
+        return self.request.user.is_superuser or self.request.user.puede_acceder_protocolos()
     
     def get_queryset(self):
         queryset = Protocolo.objects.filter(
@@ -75,8 +75,8 @@ class ProtocoloDetailView(UserPassesTestMixin, DetailView):
     context_object_name = 'protocolo'
     
     def test_func(self):
-        """Solo superusuarios pueden ver/editar detalles de protocolos"""
-        return self.request.user.is_superuser
+        """Permite acceso a superusuarios y personal médico/técnico"""
+        return self.request.user.is_superuser or self.request.user.puede_acceder_protocolos()
     
     def get_queryset(self):
         return Protocolo.objects.filter(

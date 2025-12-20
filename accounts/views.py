@@ -10,7 +10,7 @@ from django.contrib import messages
 class UserRegisterView(SuccessMessageMixin, CreateView):
     """Vista de registro simplificada - solo datos básicos."""
     form_class = CustomUserCreationForm
-    template_name = 'registration/register.html'
+    template_name = 'registration/register_tailwind.html'
     success_url = reverse_lazy('login')
     success_message = "Tu cuenta ha sido creada exitosamente. Ahora puedes iniciar sesión."
 
