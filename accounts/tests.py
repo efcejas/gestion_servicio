@@ -105,7 +105,7 @@ class UserRegisterViewTest(TestCase):
         """Verifica que la página de registro se carga correctamente"""
         response = self.client.get(self.register_url)
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'registration/register.html')
+        self.assertTemplateUsed(response, 'registration/register_tailwind.html')
         self.assertContains(response, 'username')
 
     def test_registro_post_valido(self):

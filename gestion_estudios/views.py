@@ -5,6 +5,13 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.views import LoginView, PasswordResetView
+from django.contrib.auth.views import (
+    PasswordResetDoneView,
+    PasswordResetConfirmView, 
+    PasswordResetCompleteView,
+    PasswordChangeView,
+    PasswordChangeDoneView
+)
 from django.core.mail import send_mail
 from functools import wraps
 from django.db.models import Count, Max
@@ -53,9 +60,50 @@ class CustomPasswordResetView(PasswordResetView):
     html_email_template_name = 'registration/password_reset_email.html'  # Plantilla HTML
     subject_template_name = 'registration/password_reset_subject.txt'  # Plantilla para el asunto del correo
 
+    def get_context_data(self, **kwargs):
+        """ Agrega la lógica para ocultar la barra de navegación """
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True  # Ocultar la barra de navegación en la página de reset
+        return context
+
+
+class CustomPasswordResetDoneView(PasswordResetDoneView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True
+        return context
+
+
+class CustomPasswordResetConfirmView(PasswordResetConfirmView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True
+        return context
+
+
+class CustomPasswordResetCompleteView(PasswordResetCompleteView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True
+        return context
+
+
+class CustomPasswordChangeView(PasswordChangeView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True
+        return context
+
+
+class CustomPasswordChangeDoneView(PasswordChangeDoneView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['hide_navbar'] = True
+        return context
+
 # Vista personalizada para la página de login
 class CustomLoginView(LoginView):
-    template_name = 'registration/login.html'
+    template_name = 'registration/login_tailwind.html'
     redirect_authenticated_user = True  # Si el usuario ya está autenticado, redirigir a la página de inicio
 
     def get_context_data(self, **kwargs):

@@ -22,7 +22,20 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from accounts import views
-from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento
+from .views import (
+    CustomLoginView, 
+    CustomPasswordResetView,
+    CustomPasswordResetDoneView,
+    CustomPasswordResetConfirmView,
+    CustomPasswordResetCompleteView,
+    CustomPasswordChangeView,
+    CustomPasswordChangeDoneView,
+    HomeView, 
+    send_test_email, 
+    AdminDashboardView, 
+    eventos_modal, 
+    cambiar_estado_evento
+)
 
 urlpatterns = [
     # Administración
@@ -43,15 +56,15 @@ urlpatterns = [
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
-    path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
+    # path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios (módulo no existe)
 
     # Restablecimiento de contraseñas
-    path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
-    path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(), name='password_change_done'),
+    path('password_change/', CustomPasswordChangeView.as_view(), name='password_change'),
+    path('password_change/done/', CustomPasswordChangeDoneView.as_view(), name='password_change_done'),
     path('password_reset/', CustomPasswordResetView.as_view(), name='password_reset'),
-    path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
-    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
-    path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path('password_reset/done/', CustomPasswordResetDoneView.as_view(), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', CustomPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    path('reset/done/', CustomPasswordResetCompleteView.as_view(), name='password_reset_complete'),
 
     # Prueba de envío de correos
     path('send-test-email/', send_test_email, name='send_test_email'),
