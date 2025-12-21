@@ -22,18 +22,17 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from accounts import views
-from .views import CustomLoginView, CustomPasswordResetView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento, HomeTailwindView
-from test_toast_view import test_toast
+from .views import CustomLoginView, CustomPasswordResetView, HomeView, send_test_email, AdminDashboardView, eventos_modal, cambiar_estado_evento
 
 urlpatterns = [
     # Administración
     path('admin/', admin.site.urls, name='admin'),
 
     # Página principal
-    path('', HomeTailwindView.as_view(), name='home'),
+    path('', HomeView.as_view(), name='home'),
 
-    # Dashboard antiguo (redirige a home)
-    path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),
+    # Tablero de administración
+    path('admin-dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),  # Nueva URL más descriptiva
 
     # Autenticación y cuentas
     path('accounts/login/', CustomLoginView.as_view(), name='login'),  # Vista personalizada de inicio de sesión
@@ -44,13 +43,7 @@ urlpatterns = [
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
-    path('dictado_informes/', include('dictado_informes.urls')),  # URLs para dictado de informes con IA
-    path('gestion/equipos/', include('equipos.urls')),  # URLs para gestión de equipos de imágenes
-    path('gestion/', include('agenda.urls')),  # URLs para agenda y notas personales
-    path('protocolos/', include('protocolos.urls')),  # URLs para protocolos radiológicos
-    
-    # Prueba temporal de toast
-    path('test-toast/', test_toast, name='test_toast'),
+    path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios
 
     # Restablecimiento de contraseñas
     path('password_change/', auth_views.PasswordChangeView.as_view(), name='password_change'),
@@ -66,7 +59,6 @@ urlpatterns = [
     # URL para el modal de eventos del dashboard
     path('dashboard/eventos/modal/', eventos_modal, name='eventos_modal'),
     path('dashboard/eventos/<int:evento_id>/cambiar-estado/', cambiar_estado_evento, name='cambiar_estado_evento'),
-
 ]
 
 # Servir archivos subidos por usuarios (MEDIA) en desarrollo
