@@ -137,9 +137,10 @@ class CustomUserChangeForm(UserChangeForm):
         if 'password' in self.fields:
             del self.fields['password']
         
-        # Hacer que anio_residencia sea de solo lectura
-        self.fields['anio_residencia'].disabled = True
-        self.fields['anio_residencia'].help_text = 'Este campo se calcula automáticamente'
+        # Hacer que anio_residencia sea de solo lectura (si está presente)
+        if 'anio_residencia' in self.fields:
+            self.fields['anio_residencia'].disabled = True
+            self.fields['anio_residencia'].help_text = 'Este campo se calcula automáticamente'
     
     def save(self, commit=True):
         user = super().save(commit=False)
