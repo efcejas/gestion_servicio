@@ -56,6 +56,7 @@ urlpatterns = [
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
+    path('protocolos/', include('protocolos.urls')),  # URLs para protocolos
     # path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios (módulo no existe)
 
     # Restablecimiento de contraseñas

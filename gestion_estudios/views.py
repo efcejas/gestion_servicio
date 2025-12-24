@@ -113,7 +113,7 @@ class CustomLoginView(LoginView):
         return context
 
 class HomeView(LoginRequiredMixin, TemplateView):
-    template_name = 'home.html'
+    template_name = 'home_tailwind.html'
     login_url = 'login'
 
     def dispatch(self, request, *args, **kwargs):
