@@ -23,6 +23,7 @@ from django.views.generic import TemplateView
 from control_guardias.models import Guardia, MedicoGuardia
 from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
+from agenda.models import AgendaItem, NotaPersonal
 
 
 def superuser_required(view_func):
@@ -207,6 +208,18 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'fecha_proxima_guardia': "",
             })
 
+        try:
+            context.update(self.get_agenda_notas_context(hoy))
+        except Exception as e:
+            print(f"❌ Error en agenda y notas: {e}")
+            context.update({
+                'agenda_hoy': [],
+                'agenda_proximos': [],
+                'notas_fijadas': [],
+                'notas_recientes': [],
+                'fecha_actual': hoy,
+            })
+
         return context
 
     # ------------------------ EVENTOS ------------------------
@@ -368,6 +381,46 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         # Fallback
         else:
             return f"Dr. {str(medico_obj)}"
+
+    # ------------------------ AGENDA Y NOTAS ------------------------
+
+    def get_agenda_notas_context(self, fecha_hoy):
+        """Obtiene el contexto de agenda y notas para el dashboard"""
+        from datetime import timedelta
+        
+        # Agenda de hoy
+        agenda_hoy = AgendaItem.objects.filter(
+            fecha=fecha_hoy,
+            creado_por=self.request.user
+        ).order_by('hora_inicio', 'titulo')
+        
+        # Agenda de los próximos 7 días (excluyendo hoy)
+        fecha_fin = fecha_hoy + timedelta(days=7)
+        agenda_proximos = AgendaItem.objects.filter(
+            fecha__gt=fecha_hoy,
+            fecha__lte=fecha_fin,
+            creado_por=self.request.user
+        ).order_by('fecha', 'hora_inicio')[:10]  # Limitar a 10 items
+        
+        # Notas fijadas
+        notas_fijadas = NotaPersonal.objects.filter(
+            fijada=True,
+            creado_por=self.request.user
+        ).order_by('-actualizado_en')[:5]  # Máximo 5 notas fijadas
+        
+        # Notas recientes (no fijadas)
+        notas_recientes = NotaPersonal.objects.filter(
+            fijada=False,
+            creado_por=self.request.user
+        ).order_by('-actualizado_en')[:5]  # Máximo 5 notas recientes
+        
+        return {
+            'agenda_hoy': agenda_hoy,
+            'agenda_proximos': agenda_proximos,
+            'notas_fijadas': notas_fijadas,
+            'notas_recientes': notas_recientes,
+            'fecha_actual': fecha_hoy,
+        }
 
 @superuser_required
 def eventos_modal(request):
