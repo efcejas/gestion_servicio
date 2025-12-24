@@ -1,0 +1,214 @@
+{% extends 'base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} Clase{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-4xl">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+            <i class="fas fa-{% if form.instance.pk %}edit{% else %}plus{% endif %} mr-3 text-blue-600"></i>
+            {% if form.instance.pk %}Editar Clase{% else %}Nueva Clase{% endif %}
+        </h1>
+        <p class="text-gray-600 dark:text-gray-400 mt-1">
+            Completa los datos para {% if form.instance.pk %}actualizar{% else %}publicar{% endif %} la clase
+        </p>
+    </div>
+
+    <!-- Formulario -->
+    <form method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+        <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <div>
+                    {{ form.non_field_errors }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="space-y-6">
+            <!-- Título -->
+            <div>
+                <label for="{{ form.titulo.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Título de la Clase *
+                </label>
+                {{ form.titulo }}
+                {% if form.titulo.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.titulo.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Un título claro y descriptivo</p>
+            </div>
+
+            <!-- Descripción -->
+            <div>
+                <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Descripción *
+                </label>
+                {{ form.descripcion }}
+                {% if form.descripcion.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.descripcion.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Describe el contenido, objetivos y temas clave</p>
+            </div>
+
+            <!-- Grid de 2 columnas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Categoría -->
+                <div>
+                    <label for="{{ form.categoria.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Categoría *
+                    </label>
+                    {{ form.categoria }}
+                    {% if form.categoria.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.categoria.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Fecha de la clase -->
+                <div>
+                    <label for="{{ form.fecha_clase.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Fecha de la Clase *
+                    </label>
+                    {{ form.fecha_clase }}
+                    {% if form.fecha_clase.errors %}
+                        <p class="text-red-500 text-sm mt-1">{{ form.fecha_clase.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Años dirigidos -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Dirigida a (Años de Residencia) *
+                </label>
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    {{ form.anios_dirigidos }}
+                </div>
+                {% if form.anios_dirigidos.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.anios_dirigidos.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Selecciona uno o más años</p>
+            </div>
+
+            <!-- Archivo -->
+            <div>
+                <label for="{{ form.archivo.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Archivo (PPT, PDF) {% if not form.instance.pk %}*{% endif %}
+                </label>
+                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition">
+                    {{ form.archivo }}
+                    {% if form.instance.archivo %}
+                        <p class="text-sm text-green-600 dark:text-green-400 mt-2">
+                            <i class="fas fa-check-circle mr-1"></i>
+                            Archivo actual: {{ form.instance.archivo.url|slice:"-50:" }}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">Sube un nuevo archivo para reemplazarlo</p>
+                    {% else %}
+                        <p class="text-gray-500 dark:text-gray-400 mt-2">
+                            <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i><br>
+                            Haz clic o arrastra el archivo aquí
+                        </p>
+                    {% endif %}
+                </div>
+                {% if form.archivo.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.archivo.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formatos: PPT, PPTX, PDF (máx. 50MB)</p>
+            </div>
+
+            <!-- Thumbnail (opcional) -->
+            {% if not form.instance.pk %}
+            <div>
+                <label for="{{ form.thumbnail.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Imagen de Portada (opcional)
+                </label>
+                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition">
+                    {{ form.thumbnail }}
+                    <p class="text-gray-500 dark:text-gray-400 mt-2">
+                        <i class="fas fa-image text-3xl mb-2"></i><br>
+                        Imagen representativa de la clase
+                    </p>
+                </div>
+                {% if form.thumbnail.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.thumbnail.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">JPG, PNG (recomendado: 16:9)</p>
+            </div>
+            {% endif %}
+
+            <!-- Tags -->
+            <div>
+                <label for="{{ form.tags.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Tags (opcional)
+                </label>
+                {{ form.tags }}
+                {% if form.tags.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.tags.errors.0 }}</p>
+                {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Palabras clave separadas por comas (ej: cardiología, urgencias, pediatría)</p>
+            </div>
+
+            <!-- Checkboxes -->
+            {% if user.is_staff or user.profile.rol in 'JI' %}
+            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        {{ form.es_destacada }}
+                        <label for="{{ form.es_destacada.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Marcar como clase destacada
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        {{ form.activa }}
+                        <label for="{{ form.activa.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Clase activa (visible para todos)
+                        </label>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Botones -->
+        <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <a href="{% url 'clases_residentes:lista' %}" 
+               class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-2.5 px-6 rounded-lg transition duration-200">
+                <i class="fas fa-times mr-2"></i>Cancelar
+            </a>
+            <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-lg transition duration-200">
+                <i class="fas fa-{% if form.instance.pk %}save{% else %}upload{% endif %} mr-2"></i>
+                {% if form.instance.pk %}Guardar Cambios{% else %}Publicar Clase{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Preview de archivo
+    const inputArchivo = document.getElementById('{{ form.archivo.id_for_label }}');
+    if (inputArchivo) {
+        inputArchivo.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                const fileName = this.files[0].name;
+                const fileSize = (this.files[0].size / (1024*1024)).toFixed(2);
+                console.log(`Archivo seleccionado: ${fileName} (${fileSize} MB)`);
+            }
+        });
+    }
+
+    // Fecha por defecto (hoy)
+    const inputFecha = document.getElementById('{{ form.fecha_clase.id_for_label }}');
+    if (inputFecha && !inputFecha.value) {
+        const hoy = new Date().toISOString().split('T')[0];
+        inputFecha.value = hoy;
+    }
+});
+</script>
+{% endblock %}

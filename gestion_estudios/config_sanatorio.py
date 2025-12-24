@@ -23,6 +23,7 @@ CONFIG_DUPUYTREN = {
         'liquidacion': True,
         'dictado': False,  # ❌ Desactivado por ahora
         'protocolos': True,  # ✅ Activo - Protocolos radiológicos
+        'clases': True,  # ✅ Activo - Clases de residentes
         'agenda': True,
         'notas': True,
     },
@@ -52,6 +53,7 @@ CONFIG_COLEGIALES = {
         'liquidacion': False,  # ❌ Desactivado por ahora
         'dictado': False,      # ❌ Desactivado por ahora
         'protocolos': True,    # ✅ Activo - Protocolos radiológicos
+        'clases': True,        # ✅ Activo - Clases de residentes
         'agenda': True,        # ✅ Activo - Agenda personal
         'notas': True,         # ✅ Activo - Notas rápidas
     },

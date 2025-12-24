@@ -61,6 +61,7 @@ class ClaseListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['form_busqueda'] = BuscarClaseForm(self.request.GET)
         context['total_clases'] = self.get_queryset().count()
+        context['categorias'] = ClaseResidente.CATEGORIAS
         
         # Estadísticas adicionales
         if self.request.user.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio']:
@@ -235,13 +236,16 @@ def mis_clases(request):
     clases = ClaseResidente.objects.filter(
         autor=request.user
     ).annotate(
-        num_comentarios=Count('comentarios')
+        num_comentarios=Count('comentarios'),
+        num_favoritos=Count('favoritos')
     ).order_by('-fecha_creacion')
     
     context = {
         'clases': clases,
         'total_clases': clases.count(),
         'total_visitas': sum(c.visitas for c in clases),
+        'total_comentarios': sum(c.num_comentarios for c in clases),
+        'total_favoritos': sum(c.num_favoritos for c in clases),
     }
     
     return render(request, 'clases_residentes/mis_clases.html', context)
@@ -256,7 +260,10 @@ def favoritos(request):
         usuario=request.user
     ).select_related('clase__autor')
     
+    clases = [f.clase for f in favoritos]
+    
     context = {
+        'clases': clases,
         'favoritos': favoritos,
     }
     
@@ -287,11 +294,13 @@ def gestionar_clases(request):
     
     context = {
         'clases': clases,
+        'categorias': ClaseResidente.CATEGORIAS,
         'filtro': filtro,
         'total_clases': ClaseResidente.objects.count(),
         'activas': ClaseResidente.objects.filter(activa=True).count(),
         'inactivas': ClaseResidente.objects.filter(activa=False).count(),
         'destacadas': ClaseResidente.objects.filter(es_destacada=True).count(),
+        'total_visitas': sum(c.visitas for c in ClaseResidente.objects.all()),
     }
     
     return render(request, 'clases_residentes/gestionar_clases.html', context)

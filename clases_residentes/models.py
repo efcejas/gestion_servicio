@@ -127,6 +127,12 @@ class ClaseResidente(models.Model):
             return "Todos los años"
         return ", ".join(self.anios_dirigidos)
     
+    def get_anios_list(self):
+        """Retorna lista de años dirigidos para usar en templates"""
+        if not self.anios_dirigidos:
+            return []
+        return self.anios_dirigidos if isinstance(self.anios_dirigidos, list) else []
+    
     def puede_ver(self, usuario):
         """
         Verifica si un usuario puede ver esta clase.

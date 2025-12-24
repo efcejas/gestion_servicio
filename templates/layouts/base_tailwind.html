@@ -228,6 +228,18 @@
                     
                     <!-- MÉDICOS (Residentes, Staff, Jefes, Instructores) -->
                     {% if user.es_medico %}
+                        <!-- Clases de Residentes -->
+                        {% url 'clases_residentes:lista' as clases_url %}
+                        {% if clases_url %}
+                        <a href="{{ clases_url }}" 
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'clases_residentes' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-graduation-cap mr-2 group-hover:scale-110 transition-transform"></i>Clases
+                            {% if 'clases_residentes' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+                        
                         <!-- Novedades -->
                         {% url 'gestion_eventos:lista_eventos' as eventos_url %}
                         {% if eventos_url %}

@@ -44,6 +44,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    # Cloudinary (para almacenamiento de archivos)
+    'cloudinary_storage',
+    'cloudinary',
+    
     # Apps principales del proyecto
     'accounts.apps.AccountsConfig',
     'control_guardias.apps.ControlGuardiasConfig',
@@ -53,6 +57,7 @@ INSTALLED_APPS = [
     'equipos.apps.EquiposConfig',
     'agenda.apps.AgendaConfig',
     'protocolos.apps.ProtocolosConfig',
+    'clases_residentes.apps.ClasesResidentesConfig',
     
     # Tailwind CSS
     'tailwind',
@@ -260,3 +265,29 @@ LOGGING = {
         },
     },
 }
+
+# ============================================================================
+# CLOUDINARY CONFIGURATION
+# ============================================================================
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default='')
+}
+
+# Solo usar Cloudinary si está configurado
+if all([CLOUDINARY_STORAGE['CLOUD_NAME'], CLOUDINARY_STORAGE['API_KEY'], CLOUDINARY_STORAGE['API_SECRET']]):
+    cloudinary.config(
+        cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
+        api_key=CLOUDINARY_STORAGE['API_KEY'],
+        api_secret=CLOUDINARY_STORAGE['API_SECRET'],
+        secure=True
+    )
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    print("✓ Cloudinary configurado correctamente")
+else:
+    print("⚠ Cloudinary NO configurado - usando almacenamiento local")

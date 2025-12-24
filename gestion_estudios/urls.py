@@ -60,6 +60,7 @@ urlpatterns = [
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('protocolos/', include('protocolos.urls')),  # URLs para protocolos
     path('equipos/', include('equipos.urls')),  # URLs para equipos
+    path('clases/', include('clases_residentes.urls')),  # URLs para clases de residentes
     # path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios (módulo no existe)
 
     # Restablecimiento de contraseñas
