@@ -98,6 +98,8 @@ def elegir_protocolo(request):
     Acceso permitido para:
     - Médicos staff
     - Médicos residentes
+    - Jefes de residentes
+    - Instructores de residentes
     - Jefes de servicio
     - Técnicos radiólogos
     - Superusuarios

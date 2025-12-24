@@ -79,7 +79,7 @@ def role_required(*allowed_roles):
 def medical_staff_required(view_func):
     """
     Decorador que requiere que el usuario sea personal médico.
-    Incluye: médicos staff, residentes y jefes de servicio.
+    Incluye: médicos staff, residentes, jefes de residentes, instructores y jefes de servicio.
     """
     @wraps(view_func)
     @profile_required
@@ -99,7 +99,7 @@ def medical_staff_required(view_func):
 def protocolos_access_required(view_func):
     """
     Decorador específico para acceso a protocolos radiológicos.
-    Permite: médicos staff, residentes, jefes de servicio y técnicos.
+    Permite: médicos staff, residentes, jefes de residentes, instructores, jefes de servicio y técnicos.
     """
     @wraps(view_func)
     @profile_required

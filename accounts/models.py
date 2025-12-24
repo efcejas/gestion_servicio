@@ -118,12 +118,12 @@ class CustomUser(AbstractUser):
     
     def puede_acceder_protocolos(self):
         """Verifica si el usuario puede acceder a protocolos radiológicos."""
-        roles_permitidos = ['medico_staff', 'medico_residente', 'jefe_servicio', 'tecnico']
+        roles_permitidos = ['medico_staff', 'medico_residente', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio', 'tecnico']
         return self.rol in roles_permitidos or self.is_superuser
     
     def es_medico(self):
-        """Verifica si el usuario es médico (staff o residente)."""
-        return self.rol in ['medico_staff', 'medico_residente', 'jefe_servicio']
+        """Verifica si el usuario es médico (staff, residente, jefe de residentes, instructor o jefe de servicio)."""
+        return self.rol in ['medico_staff', 'medico_residente', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
     
     def es_residente(self):
         """Verifica si el usuario es residente."""
