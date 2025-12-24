@@ -197,13 +197,27 @@ if DEBUG:
 # Configuración del navegador para desarrollo (opcional)
 NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"  # Ruta al binario de npm
 
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("GMAIL_USER", default="noreply@example.com")
-EMAIL_HOST_PASSWORD = config("GMAIL_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = config("GMAIL_USER", default="noreply@example.com")
+# =============================================================================
+# CONFIGURACIÓN DE EMAIL - Paso a Paso
+# =============================================================================
+# 
+# BACKEND: El "motor" que envía emails
+# - console → muestra en terminal (para practicar) ✅
+# - smtp → envía emails reales (para producción)
+# - filebased → guarda en archivos (para testing)
+
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND', 
+    default='django.core.mail.backends.console.EmailBackend'  # ← Console por defecto para practicar
+)
+
+# Configuración SMTP (solo se usa si EMAIL_BACKEND = smtp)
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="noreply@example.com")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 
 # -----------------------------------------------------------------------------
 # LOGGING: Forzar que los errores del middleware personalizado aparezcan siempre.
