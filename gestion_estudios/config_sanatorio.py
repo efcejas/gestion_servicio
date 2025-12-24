@@ -22,6 +22,7 @@ CONFIG_DUPUYTREN = {
         'guardias': True,
         'liquidacion': True,
         'dictado': False,  # ❌ Desactivado por ahora
+        'protocolos': True,  # ✅ Activo - Protocolos radiológicos
         'agenda': True,
         'notas': True,
     },
@@ -50,6 +51,7 @@ CONFIG_COLEGIALES = {
         'guardias': False,     # ❌ Desactivado por ahora
         'liquidacion': False,  # ❌ Desactivado por ahora
         'dictado': False,      # ❌ Desactivado por ahora
+        'protocolos': True,    # ✅ Activo - Protocolos radiológicos
         'agenda': True,        # ✅ Activo - Agenda personal
         'notas': True,         # ✅ Activo - Notas rápidas
     },
