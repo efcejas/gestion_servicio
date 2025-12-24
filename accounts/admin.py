@@ -9,6 +9,9 @@ class CustomUserAdmin(UserAdmin):
     model = CustomUser
     list_display = ['username', 'first_name', 'last_name', 'email', 'rol', 'perfil_completo', 'is_staff']
     list_filter = ['rol', 'perfil_completo', 'date_joined', 'is_staff']
+    
+    # Campos de solo lectura (calculados automáticamente)
+    readonly_fields = ['anio_residencia', 'fecha_perfil_completado', 'last_login', 'date_joined']
 
     # Configuración de los campos en la vista de cambio de usuario
     fieldsets = (

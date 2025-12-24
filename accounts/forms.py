@@ -144,13 +144,19 @@ class CustomUserChangeForm(UserChangeForm):
     
     def save(self, commit=True):
         user = super().save(commit=False)
+        
+        # Roles que pueden tener fecha de ingreso a residencia
+        roles_con_residencia = ['medico_residente', 'jefe_residentes', 'instructor_residentes']
+        
         # Actualizar año de residencia si cambió la fecha o el rol
         if user.rol == 'medico_residente' and user.fecha_ingreso_residencia:
             user.anio_residencia = user.calcular_anio_residencia()
-        elif user.rol != 'medico_residente':
+        elif user.rol not in roles_con_residencia:
+            # Solo limpiar campos de residencia para roles que NO son relacionados con residencia
             user.anio_residencia = None
             user.fecha_ingreso_residencia = None
         
         if commit:
             user.save()
+        return user
         return user
