@@ -156,7 +156,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
         return context
 
 class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    template_name = 'dashboard_simple.html'
+    template_name = 'admin_dashboard.html'
     login_url = 'login'  # Redirigir a login si no está autenticado
     
     def test_func(self):
