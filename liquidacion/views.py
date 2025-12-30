@@ -968,7 +968,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     template_name = 'liquidacion/carga_formulario.html'
     form_class = CargaExcelForm
-    success_url = reverse_lazy('carga-masiva')
+    success_url = reverse_lazy('liquidacion:carga-masiva')
 
     def test_func(self):
         return self.request.user.is_superuser or self.request.user.is_staff
@@ -1036,10 +1036,16 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
     def confirmar_carga(self, request):
         try:
+            from django.utils import timezone
+            from datetime import timedelta
+            
             registros_json = request.POST.get('datos_serializados')
             registros = json.loads(registros_json)
             cargados = 0
             errores = 0
+            duplicados = 0
+            hace_5_minutos = timezone.now() - timedelta(minutes=5)
+            
             for item in registros:
                 try:
                     medico = User.objects.filter(
@@ -1047,13 +1053,33 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                         last_name__in=item['medico'].split()
                     ).first()
                     if not medico:
+                        errores += 1
                         continue
+                    
                     estudio = Estudios.objects.filter(
                         tipo=item['estudio_tipo'],
                         nombre__iexact=item['estudio_base']
                     ).first()
                     if not estudio:
+                        errores += 1
                         continue
+                    
+                    # Verificar si ya existe un registro duplicado reciente (últimos 5 minutos)
+                    # para prevenir doble envío accidental
+                    registro_existente = RegistroEstudiosPorMedico.objects.filter(
+                        medico=medico,
+                        dni_paciente=item['dni'],
+                        fecha_del_informe=item['fecha'],
+                        fecha_registro__gte=hace_5_minutos
+                    ).filter(
+                        estudio=estudio
+                    ).exists()
+                    
+                    if registro_existente:
+                        duplicados += 1
+                        continue
+                    
+                    # Crear el registro
                     registro = RegistroEstudiosPorMedico.objects.create(
                         medico=medico,
                         nombre_paciente=item['nombre'],
@@ -1064,10 +1090,20 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                     )
                     registro.estudio.add(estudio)
                     cargados += 1
-                except Exception:
+                    
+                except Exception as e:
                     errores += 1
                     continue
-            messages.success(request, f"✅ Se cargaron correctamente {cargados} registros. Errores: {errores}")
+            
+            # Mensajes informativos
+            if cargados > 0:
+                messages.success(request, f"✅ Se cargaron correctamente {cargados} registros.")
+            if duplicados > 0:
+                messages.warning(request, f"⚠️ Se omitieron {duplicados} registros duplicados (ya cargados en los últimos 5 minutos).")
+            if errores > 0:
+                messages.error(request, f"❌ {errores} registros con errores no se pudieron cargar.")
+                
         except Exception as e:
             messages.error(request, f"❌ Error procesando la carga: {str(e)}")
-        return redirect('carga-masiva')
+        
+        return redirect('liquidacion:carga-masiva')
