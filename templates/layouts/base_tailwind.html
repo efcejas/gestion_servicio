@@ -228,6 +228,7 @@
                     
                     <!-- MÉDICOS (Residentes, Staff, Jefes, Instructores) -->
                     {% if user.es_medico %}
+                        {% comment "Clases temporalmente deshabilitadas para deploy" %}
                         <!-- Clases de Residentes -->
                         {% url 'clases_residentes:lista' as clases_url %}
                         {% if clases_url %}
@@ -239,6 +240,7 @@
                             {% endif %}
                         </a>
                         {% endif %}
+                        {% endcomment %}
                         
                         <!-- Novedades -->
                         {% url 'gestion_eventos:lista_eventos' as eventos_url %}

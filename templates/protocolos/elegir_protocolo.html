@@ -11,8 +11,8 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
 {% block title %}¿Qué protocolo elegir? - Protocolos Radiológicos{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen bg-gray-50 py-0">
+    <div class="max-w-7xl mx-auto px-4">
         
         <!-- Breadcrumb -->
         <nav class="flex mb-4" aria-label="Breadcrumb">
@@ -36,33 +36,22 @@ NO duplicar este archivo en protocolos/templates/ - Django lo encuentra correcta
         </nav>
         
         <!-- Header con mensaje principal -->
-        <div class="mb-6">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">
-                    <i class="fas fa-compass text-blue-600 mr-2"></i>
-                    ¿Qué protocolo elegir?
-                </h1>
-                <a href="{% url 'protocolos:lista' %}" 
-                   class="inline-flex items-center justify-center px-4 py-2 border border-blue-600 bg-blue-600 text-white rounded-md shadow-sm text-sm font-medium hover:bg-blue-700">
-                    <i class="fas fa-list mr-2"></i>
-                    Ver Todos los Protocolos
-                </a>
-            </div>
-            
-            <!-- Mensaje principal -->
-            <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 text-white mb-4">
-                <div class="flex items-center mb-2">
-                    <i class="fas fa-graduation-cap text-3xl mr-4"></i>
-                    <div>
-                        <h2 class="text-xl font-bold">Regla de oro</h2>
-                        <p class="text-blue-100">Elegí por pregunta clínica, no por cantidad de fases</p>
-                    </div>
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl shadow-lg mb-6 overflow-hidden">
+            <div class="px-8 py-6">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
+                    <h1 class="text-3xl font-bold text-white flex items-center">
+                        <i class="fas fa-compass mr-3"></i>
+                        ¿Qué protocolo radiológico elegir?
+                    </h1>
+                    <a href="{% url 'protocolos:lista' %}"
+                        class="inline-flex items-center justify-center px-4 py-2 border border-blue-600 bg-white text-blue-600 rounded-md shadow-sm text-sm font-medium hover:bg-blue-100">
+                        <i class="fas fa-list mr-2"></i>
+                        Ver Todos los Protocolos
+                    </a>
                 </div>
-            </div>
-
-            <!-- Stats rápidos -->
-            <div class="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                <span><i class="fas fa-check-circle text-green-600 mr-1"></i> {{ escenarios_vinculados }}/{{ total_escenarios }} protocolos disponibles</span>
+                <p class="text-blue-100">
+                    Usa este asistente para seleccionar el protocolo adecuado según la pregunta clínica y las fases recomendadas.
+                </p>
             </div>
         </div>
 

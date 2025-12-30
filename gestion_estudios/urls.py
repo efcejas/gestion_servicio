@@ -60,7 +60,8 @@ urlpatterns = [
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('protocolos/', include('protocolos.urls')),  # URLs para protocolos
     path('equipos/', include('equipos.urls')),  # URLs para equipos
-    path('clases/', include('clases_residentes.urls')),  # URLs para clases de residentes
+    # path('clases/', include('clases_residentes.urls')),  # URLs para clases de residentes - DESHABILITADO TEMPORALMENTE
+    path('eges/', include('eges_import.urls')),  # URLs para importación EGES
     # path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios (módulo no existe)
 
     # Restablecimiento de contraseñas

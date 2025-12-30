@@ -54,9 +54,11 @@ class ClaseResidente(models.Model):
     # Archivos (usando Cloudinary)
     archivo = CloudinaryField(
         'archivo',
+        blank=True,
+        null=True,
         resource_type='auto',
         folder='clases_residentes',
-        help_text='Archivo de la presentación (PPT, PDF, etc.)'
+        help_text='Archivo de la presentación (PPT, PDF, etc.) - OPCIONAL'
     )
     archivo_thumbnail = CloudinaryField(
         'thumbnail',
@@ -177,6 +179,26 @@ class ClaseResidente(models.Model):
         if not self.tags:
             return []
         return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+    
+    def get_archivo_url_publico(self):
+        """
+        Obtiene la URL pública del archivo optimizada para visualización.
+        Asegura que sea accesible por visualizadores externos como Office Online.
+        """
+        if not self.archivo:
+            return None
+        
+        try:
+            if hasattr(self.archivo, 'url'):
+                url = str(self.archivo.url)
+                # Forzar HTTPS
+                if url.startswith('http://'):
+                    url = url.replace('http://', 'https://')
+                return url
+        except Exception:
+            pass
+        
+        return None
 
 
 class ComentarioClase(models.Model):

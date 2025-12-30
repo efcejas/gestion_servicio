@@ -1,4 +1,4 @@
-{% extends 'base_tailwind.html' %}
+{% extends 'layouts/base_tailwind.html' %}
 {% load static %}
 
 {% block title %}{{ object.titulo }} - Clases Residentes{% endblock %}
@@ -7,10 +7,10 @@
 <div class="container mx-auto px-4 py-6">
     <!-- Breadcrumb -->
     <nav class="mb-6 text-sm">
-        <ol class="flex items-center space-x-2 text-gray-600 dark:text-gray-400">
+        <ol class="flex items-center space-x-2 text-gray-600">
             <li><a href="{% url 'clases_residentes:lista' %}" class="hover:text-blue-600"><i class="fas fa-graduation-cap mr-1"></i>Clases</a></li>
             <li><i class="fas fa-chevron-right text-xs"></i></li>
-            <li class="text-gray-900 dark:text-white font-semibold">{{ object.titulo|truncatewords:5 }}</li>
+            <li class="text-gray-900 font-semibold">{{ object.titulo|truncatewords:5 }}</li>
         </ol>
     </nav>
 
@@ -18,11 +18,11 @@
         <!-- Contenido principal -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Card principal -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            <div class="bg-white rounded-lg shadow-lg overflow-hidden">
                 <!-- Header con imagen -->
                 <div class="h-64 bg-gradient-to-br from-blue-400 to-blue-600 relative">
-                    {% if object.thumbnail %}
-                        <img src="{{ object.thumbnail.url }}" alt="{{ object.titulo }}" class="w-full h-full object-cover">
+                    {% if object.archivo_thumbnail %}
+                        <img src="{{ object.archivo_thumbnail.url }}" alt="{{ object.titulo }}" class="w-full h-full object-cover">
                     {% else %}
                         <div class="flex items-center justify-center h-full">
                             <i class="fas fa-file-powerpoint text-8xl text-white opacity-50"></i>
@@ -40,11 +40,11 @@
 
                 <!-- Contenido -->
                 <div class="p-6">
-                    <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                    <h1 class="text-3xl font-bold text-gray-900 mb-4">
                         {{ object.titulo }}
                     </h1>
 
-                    <div class="flex flex-wrap items-center gap-4 mb-6 text-sm text-gray-600 dark:text-gray-400">
+                    <div class="flex flex-wrap items-center gap-4 mb-6 text-sm text-gray-600">
                         <div class="flex items-center">
                             <i class="fas fa-user-circle mr-2 text-blue-600"></i>
                             <span>{{ object.autor.get_full_name }}</span>
@@ -65,10 +65,10 @@
 
                     <!-- Años dirigidos -->
                     <div class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Dirigida a:</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Dirigida a:</h3>
                         <div class="flex flex-wrap gap-2">
                             {% for anio in object.get_anios_list %}
-                                <span class="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 font-medium px-3 py-1 rounded-full">
+                                <span class="bg-blue-100 text-blue-800 font-medium px-3 py-1 rounded-full">
                                     {{ anio }}
                                 </span>
                             {% endfor %}
@@ -76,18 +76,18 @@
                     </div>
 
                     <!-- Descripción -->
-                    <div class="prose dark:prose-invert max-w-none mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">Descripción</h3>
-                        <p class="text-gray-700 dark:text-gray-300 whitespace-pre-line">{{ object.descripcion }}</p>
+                    <div class="prose max-w-none mb-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Descripción</h3>
+                        <p class="text-gray-700 whitespace-pre-line">{{ object.descripcion }}</p>
                     </div>
 
                     <!-- Tags -->
                     {% if object.tags %}
                     <div class="mb-6">
-                        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tags:</h3>
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Tags:</h3>
                         <div class="flex flex-wrap gap-2">
                             {% for tag in object.get_tags_list %}
-                                <span class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1 rounded-full">
+                                <span class="bg-gray-200 text-gray-700 text-sm px-3 py-1 rounded-full">
                                     #{{ tag }}
                                 </span>
                             {% endfor %}
@@ -95,21 +95,103 @@
                     </div>
                     {% endif %}
 
-                    <!-- Botón descargar -->
+                    <!-- Material de la clase -->
                     {% if object.archivo %}
-                    <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
-                        <a href="{{ object.archivo.url }}" target="_blank" download
-                           class="w-full block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition duration-200 text-center">
-                            <i class="fas fa-download mr-2"></i>Descargar Material ({{ object.archivo.url|slice:"-3:" }}
-                        </a>
+                    <div class="border-t border-gray-200 pt-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                            <i class="fas fa-file-alt mr-2 text-blue-600"></i>Material de la Clase
+                        </h3>
+                        
+                        <!-- Visor de archivo -->
+                        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                            <div class="aspect-video w-full bg-white rounded-lg overflow-hidden shadow-lg border border-gray-200">
+                                <!-- Microsoft Office Online Viewer - Soporta Word, Excel, PowerPoint, PDF -->
+                                <iframe 
+                                    src="https://view.officeapps.live.com/op/embed.aspx?src={{ object.get_archivo_url_publico|urlencode }}" 
+                                    class="w-full h-full border-0"
+                                    frameborder="0"
+                                    title="Visualizador de documentos">
+                                </iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2 text-center">
+                                <i class="fas fa-spinner fa-spin mr-1"></i>
+                                Cargando visualizador... Si no aparece en 10 segundos, usa los botones de abajo
+                            </p>
+                        </div>
+
+                        <!-- Información del archivo -->
+                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
+                                <p class="text-sm text-blue-800">
+                                    <strong>Archivo:</strong> {{ object.archivo.url|slice:"-40:" }} | 
+                                    <strong>Tipo:</strong> 
+                                    {% if ".pdf" in object.archivo.url|lower %}PDF
+                                    {% elif ".doc" in object.archivo.url|lower %}Word
+                                    {% elif ".ppt" in object.archivo.url|lower %}PowerPoint
+                                    {% elif ".xls" in object.archivo.url|lower %}Excel
+                                    {% else %}Documento{% endif %}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Botones de acción -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Botón 1: Visualizador alternativo -->
+                            <button onclick="abrirVisualizadorAlternativo('{{ object.get_archivo_url_publico|urlencode }}')"
+                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
+                                <i class="fas fa-eye mr-2"></i>Visor alternativo
+                            </button>
+                            
+                            <!-- Botón 2: Abrir en nueva ventana -->
+                            <a href="{{ object.get_archivo_url_publico }}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
+                                <i class="fas fa-external-link-alt mr-2"></i>Abrir archivo
+                            </a>
+                            
+                            <!-- Botón 3: Descargar -->
+                            <a href="{{ object.get_archivo_url_publico }}" 
+                               download="{{ object.titulo }}"
+                               class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
+                                <i class="fas fa-download mr-2"></i>Descargar
+                            </a>
+                        </div>
+                        
+                        <!-- Ayuda -->
+                        <details class="mt-4">
+                            <summary class="text-sm text-gray-600 cursor-pointer hover:text-gray-800">
+                                <i class="fas fa-question-circle mr-1"></i>¿Problemas para ver el archivo?
+                            </summary>
+                            <div class="bg-gray-50 p-3 mt-2 rounded text-sm text-gray-700 space-y-2">
+                                <p>✓ <strong>Opción 1:</strong> Usa el botón "Visor alternativo" (abre con Google Docs)</p>
+                                <p>✓ <strong>Opción 2:</strong> Usa el botón "Abrir archivo" (abre en tu navegador)</p>
+                                <p>✓ <strong>Opción 3:</strong> Descarga el archivo y ábrelo localmente</p>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    <i class="fas fa-lightbulb mr-1"></i>
+                                    El visualizador integrado funciona mejor con PowerPoint y Word. Los PDFs pueden tardar más en cargar.
+                                </p>
+                            </div>
+                        </details>
                     </div>
+
+                    <script>
+                    function abrirVisualizadorAlternativo(url) {
+                        // Decodificar URL primero
+                        const urlDecodificada = decodeURIComponent(url);
+                        // Google Docs Viewer como alternativa
+                        const googleViewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(urlDecodificada) + '&embedded=true';
+                        window.open(googleViewerUrl, '_blank', 'width=1200,height=800');
+                    }
+                    </script>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Comentarios -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h3 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 flex items-center">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-2xl font-bold text-gray-900 mb-6 flex items-center">
                     <i class="fas fa-comments mr-3 text-blue-600"></i>
                     Comentarios ({{ object.comentarios.count }})
                 </h3>
@@ -120,7 +202,7 @@
                     <textarea name="contenido" 
                               rows="3" 
                               placeholder="Escribe un comentario..."
-                              class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none"
+                              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
                               required></textarea>
                     <div class="flex justify-end mt-3">
                         <button type="submit" 
@@ -133,17 +215,17 @@
                 <!-- Lista de comentarios -->
                 <div id="lista-comentarios" class="space-y-4">
                     {% for comentario in object.comentarios.all %}
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
                         <div class="flex items-start justify-between mb-2">
                             <div class="flex items-center">
                                 <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold mr-3">
                                     {{ comentario.autor.first_name.0 }}{{ comentario.autor.last_name.0 }}
                                 </div>
                                 <div>
-                                    <p class="font-semibold text-gray-900 dark:text-white">
+                                    <p class="font-semibold text-gray-900">
                                         {{ comentario.autor.get_full_name }}
                                     </p>
-                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    <p class="text-xs text-gray-500">
                                         {{ comentario.fecha_creacion|date:"d/m/Y H:i" }}
                                     </p>
                                 </div>
@@ -154,10 +236,10 @@
                             </button>
                             {% endif %}
                         </div>
-                        <p class="text-gray-700 dark:text-gray-300 ml-13">{{ comentario.contenido }}</p>
+                        <p class="text-gray-700 ml-13">{{ comentario.contenido }}</p>
                     </div>
                     {% empty %}
-                    <p class="text-center text-gray-500 dark:text-gray-400 py-8">
+                    <p class="text-center text-gray-500 py-8">
                         No hay comentarios aún. ¡Sé el primero en comentar!
                     </p>
                     {% endfor %}
@@ -168,20 +250,20 @@
         <!-- Sidebar -->
         <div class="space-y-6">
             <!-- Acciones -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Acciones</h3>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Acciones</h3>
                 <div class="space-y-3">
                     <!-- Favorito -->
                     <button id="btn-favorito" 
                             data-clase-id="{{ object.pk }}"
                             data-es-favorito="{% if es_favorito %}true{% else %}false{% endif %}"
                             class="w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center
-                                   {% if es_favorito %}bg-yellow-500 hover:bg-yellow-600 text-white{% else %}bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300{% endif %}">
+                                   {% if es_favorito %}bg-yellow-500 hover:bg-yellow-600 text-white{% else %}bg-gray-200 hover:bg-gray-300 text-gray-700{% endif %}">
                         <i class="fas fa-star mr-2"></i>
                         <span id="texto-favorito">{% if es_favorito %}Quitar de Favoritos{% else %}Agregar a Favoritos{% endif %}</span>
                     </button>
 
-                    {% if object.puede_editar user %}
+                    {% if user == object.autor or user.is_staff or user.profile.rol == 'JI' %}
                     <a href="{% url 'clases_residentes:editar' object.pk %}" 
                        class="w-full block bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition duration-200 text-center">
                         <i class="fas fa-edit mr-2"></i>Editar Clase
@@ -196,24 +278,24 @@
             </div>
 
             <!-- Estadísticas -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Estadísticas</h3>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-lg font-bold text-gray-900 mb-4">Estadísticas</h3>
                 <div class="space-y-3">
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400"><i class="fas fa-eye mr-2"></i>Visitas</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ object.visitas }}</span>
+                        <span class="text-gray-600"><i class="fas fa-eye mr-2"></i>Visitas</span>
+                        <span class="font-semibold text-gray-900">{{ object.visitas }}</span>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400"><i class="fas fa-comments mr-2"></i>Comentarios</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ object.comentarios.count }}</span>
+                        <span class="text-gray-600"><i class="fas fa-comments mr-2"></i>Comentarios</span>
+                        <span class="font-semibold text-gray-900">{{ object.comentarios.count }}</span>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400"><i class="fas fa-star mr-2"></i>Favoritos</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ object.favoritos.count }}</span>
+                        <span class="text-gray-600"><i class="fas fa-star mr-2"></i>Favoritos</span>
+                        <span class="font-semibold text-gray-900">{{ object.favoritos.count }}</span>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-600 dark:text-gray-400"><i class="fas fa-calendar-plus mr-2"></i>Publicada</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ object.fecha_creacion|date:"d/m/Y" }}</span>
+                        <span class="text-gray-600"><i class="fas fa-calendar-plus mr-2"></i>Publicada</span>
+                        <span class="font-semibold text-gray-900">{{ object.fecha_creacion|date:"d/m/Y" }}</span>
                     </div>
                 </div>
             </div>
@@ -245,7 +327,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.className = 'w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 text-white';
                     textoFavorito.textContent = 'Quitar de Favoritos';
                 } else {
-                    this.className = 'w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300';
+                    this.className = 'w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700';
                     textoFavorito.textContent = 'Agregar a Favoritos';
                 }
             }

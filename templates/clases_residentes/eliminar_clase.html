@@ -1,40 +1,40 @@
-{% extends 'base_tailwind.html' %}
+{% extends 'layouts/base_tailwind.html' %}
 {% load static %}
 
 {% block title %}Eliminar Clase{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6 max-w-2xl">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8">
+    <div class="bg-white rounded-lg shadow-lg p-8">
         <!-- Ícono de advertencia -->
         <div class="flex justify-center mb-6">
-            <div class="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                <i class="fas fa-exclamation-triangle text-4xl text-red-600 dark:text-red-400"></i>
+            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+                <i class="fas fa-exclamation-triangle text-4xl text-red-600"></i>
             </div>
         </div>
 
         <!-- Título -->
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white text-center mb-4">
+        <h1 class="text-2xl font-bold text-gray-900 text-center mb-4">
             ¿Confirmar Eliminación?
         </h1>
 
         <!-- Mensaje -->
-        <div class="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 mb-6 rounded">
-            <p class="text-red-800 dark:text-red-200 text-center">
+        <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded">
+            <p class="text-red-800 text-center">
                 Estás a punto de eliminar permanentemente la clase:
             </p>
-            <p class="font-bold text-red-900 dark:text-red-100 text-center mt-2 text-lg">
+            <p class="font-bold text-red-900 text-center mt-2 text-lg">
                 "{{ object.titulo }}"
             </p>
         </div>
 
         <!-- Información adicional -->
-        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6 space-y-2 text-sm">
-            <p class="text-gray-700 dark:text-gray-300">
+        <div class="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
+            <p class="text-gray-700">
                 <i class="fas fa-info-circle mr-2 text-blue-600"></i>
                 <strong>Esta acción:</strong>
             </p>
-            <ul class="ml-8 space-y-1 text-gray-600 dark:text-gray-400">
+            <ul class="ml-8 space-y-1 text-gray-600">
                 <li>• Eliminará el archivo subido</li>
                 <li>• Eliminará todos los comentarios ({{ object.comentarios.count }})</li>
                 <li>• Eliminará todos los favoritos ({{ object.favoritos.count }})</li>
@@ -48,7 +48,7 @@
             
             <div class="flex justify-center space-x-4">
                 <a href="{% url 'clases_residentes:detalle' object.pk %}" 
-                   class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-3 px-8 rounded-lg transition duration-200 flex items-center">
+                   class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-3 px-8 rounded-lg transition duration-200 flex items-center">
                     <i class="fas fa-arrow-left mr-2"></i>
                     Cancelar
                 </a>
@@ -61,7 +61,7 @@
         </form>
 
         <!-- Nota adicional -->
-        <p class="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
+        <p class="text-center text-xs text-gray-500 mt-6">
             Si solo deseas ocultar la clase temporalmente, puedes desactivarla desde la opción "Editar"
         </p>
     </div>

@@ -58,6 +58,7 @@ INSTALLED_APPS = [
     'agenda.apps.AgendaConfig',
     'protocolos.apps.ProtocolosConfig',
     'clases_residentes.apps.ClasesResidentesConfig',
+    'eges_import.apps.EgesImportConfig',
     
     # Tailwind CSS
     'tailwind',

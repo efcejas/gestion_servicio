@@ -1,4 +1,4 @@
-{% extends 'base_tailwind.html' %}
+{% extends 'layouts/base_tailwind.html' %}
 {% load static %}
 
 {% block title %}{% if form.instance.pk %}Editar{% else %}Nueva{% endif %} Clase{% endblock %}
@@ -7,17 +7,17 @@
 <div class="container mx-auto px-4 py-6 max-w-4xl">
     <!-- Header -->
     <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center">
+        <h1 class="text-3xl font-bold text-gray-900 flex items-center">
             <i class="fas fa-{% if form.instance.pk %}edit{% else %}plus{% endif %} mr-3 text-blue-600"></i>
             {% if form.instance.pk %}Editar Clase{% else %}Nueva Clase{% endif %}
         </h1>
-        <p class="text-gray-600 dark:text-gray-400 mt-1">
+        <p class="text-gray-600 mt-1">
             Completa los datos para {% if form.instance.pk %}actualizar{% else %}publicar{% endif %} la clase
         </p>
     </div>
 
     <!-- Formulario -->
-    <form method="post" enctype="multipart/form-data" class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+    <form method="post" enctype="multipart/form-data" class="bg-white rounded-lg shadow-lg p-6">
         {% csrf_token %}
         
         {% if form.non_field_errors %}
@@ -34,33 +34,33 @@
         <div class="space-y-6">
             <!-- Título -->
             <div>
-                <label for="{{ form.titulo.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label for="{{ form.titulo.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                     Título de la Clase *
                 </label>
                 {{ form.titulo }}
                 {% if form.titulo.errors %}
                     <p class="text-red-500 text-sm mt-1">{{ form.titulo.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Un título claro y descriptivo</p>
+                <p class="text-xs text-gray-500 mt-1">Un título claro y descriptivo</p>
             </div>
 
             <!-- Descripción -->
             <div>
-                <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label for="{{ form.descripcion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                     Descripción *
                 </label>
                 {{ form.descripcion }}
                 {% if form.descripcion.errors %}
                     <p class="text-red-500 text-sm mt-1">{{ form.descripcion.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Describe el contenido, objetivos y temas clave</p>
+                <p class="text-xs text-gray-500 mt-1">Describe el contenido, objetivos y temas clave</p>
             </div>
 
             <!-- Grid de 2 columnas -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Categoría -->
                 <div>
-                    <label for="{{ form.categoria.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label for="{{ form.categoria.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                         Categoría *
                     </label>
                     {{ form.categoria }}
@@ -71,7 +71,7 @@
 
                 <!-- Fecha de la clase -->
                 <div>
-                    <label for="{{ form.fecha_clase.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label for="{{ form.fecha_clase.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                         Fecha de la Clase *
                     </label>
                     {{ form.fecha_clase }}
@@ -83,33 +83,42 @@
 
             <!-- Años dirigidos -->
             <div>
-                <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-3">
                     Dirigida a (Años de Residencia) *
                 </label>
-                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    {{ form.anios_dirigidos }}
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="grid grid-cols-5 gap-3">
+                        {% for value, label in form.fields.anios_dirigidos.choices %}
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" name="anios_dirigidos" value="{{ value }}" 
+                                   class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                   {% if value in form.anios_dirigidos.value %}checked{% endif %}>
+                            <span class="text-sm text-gray-700">{{ value }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% if form.anios_dirigidos.errors %}
                     <p class="text-red-500 text-sm mt-1">{{ form.anios_dirigidos.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Selecciona uno o más años</p>
+                <p class="text-xs text-gray-500 mt-1">Selecciona uno o más años (puedes dejar vacío para "Todos")</p>
             </div>
 
             <!-- Archivo -->
             <div>
-                <label for="{{ form.archivo.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Archivo (PPT, PDF) {% if not form.instance.pk %}*{% endif %}
+                <label for="{{ form.archivo.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Archivo (PPT, PDF) - OPCIONAL
                 </label>
-                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition">
                     {{ form.archivo }}
                     {% if form.instance.archivo %}
-                        <p class="text-sm text-green-600 dark:text-green-400 mt-2">
+                        <p class="text-sm text-green-600 mt-2">
                             <i class="fas fa-check-circle mr-1"></i>
                             Archivo actual: {{ form.instance.archivo.url|slice:"-50:" }}
                         </p>
                         <p class="text-xs text-gray-500 mt-1">Sube un nuevo archivo para reemplazarlo</p>
                     {% else %}
-                        <p class="text-gray-500 dark:text-gray-400 mt-2">
+                        <p class="text-gray-500 mt-2">
                             <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i><br>
                             Haz clic o arrastra el archivo aquí
                         </p>
@@ -118,54 +127,84 @@
                 {% if form.archivo.errors %}
                     <p class="text-red-500 text-sm mt-1">{{ form.archivo.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Formatos: PPT, PPTX, PDF (máx. 50MB)</p>
+                <p class="text-xs text-gray-500 mt-1">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Formatos: PPT, PPTX, PDF (máx. <strong>20 MB</strong>) - Si tu archivo es más grande, comprímelo primero
+                </p>
+                
+                <!-- Ayuda para archivos grandes -->
+                <details class="mt-2">
+                    <summary class="text-xs text-blue-600 cursor-pointer hover:text-blue-800">
+                        <i class="fas fa-question-circle mr-1"></i>¿Tu archivo es mayor a 20 MB?
+                    </summary>
+                    <div class="bg-blue-50 p-3 mt-2 rounded text-xs text-gray-700 space-y-1">
+                        <p><strong>Para PowerPoint:</strong></p>
+                        <ul class="list-disc ml-5 space-y-1">
+                            <li>Abre el PPT → Archivo → Guardar como → Herramientas → Comprimir imágenes</li>
+                            <li>Reduce la resolución de las imágenes a 150 ppp</li>
+                            <li>Elimina información de edición de imágenes</li>
+                        </ul>
+                        <p class="mt-2"><strong>Para PDF:</strong></p>
+                        <ul class="list-disc ml-5 space-y-1">
+                            <li>Usa <a href="https://www.ilovepdf.com/es/comprimir_pdf" target="_blank" class="text-blue-600 hover:underline">iLovePDF</a> (gratis)</li>
+                            <li>O Adobe Acrobat: Archivo → Reducir tamaño del archivo</li>
+                        </ul>
+                    </div>
+                </details>
             </div>
 
             <!-- Thumbnail (opcional) -->
-            {% if not form.instance.pk %}
             <div>
-                <label for="{{ form.thumbnail.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label for="{{ form.archivo_thumbnail.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                     Imagen de Portada (opcional)
                 </label>
-                <div class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center hover:border-blue-500 transition">
-                    {{ form.thumbnail }}
-                    <p class="text-gray-500 dark:text-gray-400 mt-2">
-                        <i class="fas fa-image text-3xl mb-2"></i><br>
-                        Imagen representativa de la clase
-                    </p>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition">
+                    {{ form.archivo_thumbnail }}
+                    {% if form.instance.archivo_thumbnail %}
+                        <div class="mt-3">
+                            <img src="{{ form.instance.archivo_thumbnail.url }}" alt="Portada actual" class="max-h-32 mx-auto rounded">
+                            <p class="text-xs text-green-600 mt-2">
+                                <i class="fas fa-check-circle mr-1"></i>Portada actual
+                            </p>
+                        </div>
+                    {% else %}
+                        <p class="text-gray-500 mt-2">
+                            <i class="fas fa-image text-3xl mb-2"></i><br>
+                            Imagen representativa de la clase
+                        </p>
+                    {% endif %}
                 </div>
-                {% if form.thumbnail.errors %}
-                    <p class="text-red-500 text-sm mt-1">{{ form.thumbnail.errors.0 }}</p>
+                {% if form.archivo_thumbnail.errors %}
+                    <p class="text-red-500 text-sm mt-1">{{ form.archivo_thumbnail.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">JPG, PNG (recomendado: 16:9)</p>
+                <p class="text-xs text-gray-500 mt-1">JPG, PNG, GIF (recomendado: 16:9, máx 5MB)</p>
             </div>
-            {% endif %}
 
             <!-- Tags -->
             <div>
-                <label for="{{ form.tags.id_for_label }}" class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <label for="{{ form.tags.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
                     Tags (opcional)
                 </label>
                 {{ form.tags }}
                 {% if form.tags.errors %}
                     <p class="text-red-500 text-sm mt-1">{{ form.tags.errors.0 }}</p>
                 {% endif %}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Palabras clave separadas por comas (ej: cardiología, urgencias, pediatría)</p>
+                <p class="text-xs text-gray-500 mt-1">Palabras clave separadas por comas (ej: cardiología, urgencias, pediatría)</p>
             </div>
 
             <!-- Checkboxes -->
             {% if user.is_staff or user.profile.rol in 'JI' %}
-            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+            <div class="bg-blue-50 rounded-lg p-4">
                 <div class="space-y-3">
                     <div class="flex items-center">
                         {{ form.es_destacada }}
-                        <label for="{{ form.es_destacada.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label for="{{ form.es_destacada.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
                             Marcar como clase destacada
                         </label>
                     </div>
                     <div class="flex items-center">
                         {{ form.activa }}
-                        <label for="{{ form.activa.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <label for="{{ form.activa.id_for_label }}" class="ml-2 text-sm font-medium text-gray-700">
                             Clase activa (visible para todos)
                         </label>
                     </div>
@@ -175,9 +214,9 @@
         </div>
 
         <!-- Botones -->
-        <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+        <div class="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200">
             <a href="{% url 'clases_residentes:lista' %}" 
-               class="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold py-2.5 px-6 rounded-lg transition duration-200">
+               class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 px-6 rounded-lg transition duration-200">
                 <i class="fas fa-times mr-2"></i>Cancelar
             </a>
             <button type="submit" 

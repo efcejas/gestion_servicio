@@ -56,6 +56,7 @@ CONFIG_COLEGIALES = {
         'clases': True,        # ✅ Activo - Clases de residentes
         'agenda': True,        # ✅ Activo - Agenda personal
         'notas': True,         # ✅ Activo - Notas rápidas
+        'eges_import': True,   # ✅ Activo - Importación EGES
     },
     'SERVICIOS_DISPONIBLES': [
         ('tomografia', 'Tomografía'),

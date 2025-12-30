@@ -61,7 +61,7 @@ class ClaseListView(LoginRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['form_busqueda'] = BuscarClaseForm(self.request.GET)
         context['total_clases'] = self.get_queryset().count()
-        context['categorias'] = ClaseResidente.CATEGORIAS
+        context['categorias'] = ClaseResidente.CATEGORIA_CHOICES
         
         # Estadísticas adicionales
         if self.request.user.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio']:
@@ -294,7 +294,7 @@ def gestionar_clases(request):
     
     context = {
         'clases': clases,
-        'categorias': ClaseResidente.CATEGORIAS,
+        'categorias': ClaseResidente.CATEGORIA_CHOICES,
         'filtro': filtro,
         'total_clases': ClaseResidente.objects.count(),
         'activas': ClaseResidente.objects.filter(activa=True).count(),
