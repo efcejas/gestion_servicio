@@ -279,7 +279,7 @@ let mediaRecorder;
 let audioChunks = [];
 let tiempoInicio;
 let intervaloTiempo;
-const DURACION_MINIMA_MS = 300; // Mínimo 0.3 segundos (reducido para mayor sensibilidad)
+const DURACION_MINIMA_MS = 150; // Mínimo 0.15 segundos (Whisper requiere 0.1s mínimo)
 
 const btnGrabar = document.getElementById('btnGrabar');
 const iconGrabar = document.getElementById('iconGrabar');
@@ -328,12 +328,16 @@ async function iniciarGrabacion(e) {
         audioChunks = [];
         
         mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
+            console.log('🎤 Chunk de audio recibido:', event.data.size, 'bytes');
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
         };
         
         mediaRecorder.onstop = procesarAudio;
         
-        mediaRecorder.start();
+        // Usar timeslice para generar chunks regulares
+        mediaRecorder.start(100); // Genera chunks cada 100ms
         tiempoInicio = Date.now();
         
         // UI grabando
@@ -382,6 +386,7 @@ function detenerGrabacion() {
         
         // Validar duración mínima
         if (duracion < DURACION_MINIMA_MS) {
+            console.warn(`⚠️ Grabación muy corta: ${duracion}ms (mínimo: ${DURACION_MINIMA_MS}ms)`);
             estadoGrabacion.textContent = `⚠️ Muy corto (${Math.round(duracion)}ms). Mantén presionado mínimo 0.5 segundos`;
             estadoGrabacion.classList.remove('text-red-400', 'font-bold');
             estadoGrabacion.classList.add('text-yellow-400');
@@ -408,7 +413,27 @@ function detenerGrabacion() {
 }
 
 async function procesarAudio() {
+    console.log('🎵 Procesando audio:', audioChunks.length, 'chunks');
+    
+    // Validar que hay chunks de audio
+    if (audioChunks.length === 0) {
+        console.error('❌ No hay chunks de audio para procesar');
+        estadoGrabacion.textContent = '❌ Error: No se grabó audio';
+        estadoGrabacion.classList.add('text-red-400');
+        return;
+    }
+    
     const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    console.log('📁 Blob creado:', audioBlob.size, 'bytes, tipo:', audioBlob.type);
+    
+    // Validar tamaño mínimo del blob (aprox. 1KB para 0.1s de audio)
+    if (audioBlob.size < 500) {
+        console.error(`❌ Blob muy pequeño: ${audioBlob.size} bytes`);
+        estadoGrabacion.textContent = `❌ Audio muy corto (${audioBlob.size} bytes)`;
+        estadoGrabacion.classList.remove('text-gray-300');
+        estadoGrabacion.classList.add('text-red-400');
+        return;
+    }
     
     // Convertir a base64
     const reader = new FileReader();
@@ -503,12 +528,33 @@ async function procesarAudio() {
             guardarEnHistorial(textoOriginalGlobal, dataMejora.texto_mejorado);
             
         } catch (error) {
-            console.error('Error:', error);
-            alert('❌ Error: ' + error.message);
+            console.error('🚨 Error procesando audio:', error);
+            
+            // Manejar errores específicos de audio
+            let mensajeError = error.message;
+            if (mensajeError.includes('audio_too_short')) {
+                mensajeError = '⚠️ Audio demasiado corto. Mantén presionado el botón por más tiempo (mínimo 0.5 segundos)';
+            } else if (mensajeError.includes('Audio file is too short')) {
+                mensajeError = '⚠️ Grabación muy corta. Intenta hablar más tiempo';
+            } else if (mensajeError.includes('insufficient_quota')) {
+                mensajeError = '💳 Se agotaron los créditos de transcripción. Contacta al administrador';
+            } else if (mensajeError.includes('model_not_found')) {
+                mensajeError = '🔑 Error de configuración de API. Contacta al administrador';
+            }
+            
+            // Mostrar error en la UI
+            estadoGrabacion.textContent = 'Error. Intenta de nuevo';
+            estadoGrabacion.classList.remove('text-blue-400', 'text-green-400');
+            estadoGrabacion.classList.add('text-red-400');
+            
+            // Ocultar loading y mostrar estado inicial
             document.getElementById('procesando').classList.add('hidden');
             document.getElementById('estadoInicial').classList.remove('hidden');
-            estadoGrabacion.textContent = 'Error. Intenta de nuevo';
-            estadoGrabacion.classList.add('text-red-400');
+            
+            // Mostrar toast de error
+            mostrarToast(mensajeError, 'error');
+            
+            console.error('❌ Detalles del error:', error);
         }
     };
 }

@@ -307,6 +307,16 @@ def procesar_audio_dictado(request):
             logger.error(f"Error al decodificar audio: {str(e)}")
             return JsonResponse({'error': f'Error al decodificar audio: {str(e)}'}, status=400)
         
+        # Validar tamaño mínimo del audio
+        MIN_AUDIO_SIZE = 500  # Mínimo 500 bytes (~0.1 segundos de audio WebM)
+        if len(audio_data) < MIN_AUDIO_SIZE:
+            logger.warning(f"Audio muy pequeño: {len(audio_data)} bytes (mínimo: {MIN_AUDIO_SIZE})")
+            return JsonResponse({
+                'success': False,
+                'error': f'Audio demasiado corto ({len(audio_data)} bytes). Mantén presionado el botón por más tiempo.',
+                'texto_original': ''
+            })
+        
         # Crear archivo temporal
         logger.info("Creando archivo temporal...")
         audio_file = ContentFile(audio_data, name='dictado.webm')
@@ -379,9 +389,19 @@ def transcribir_audio_whisper(request):
         # Decodificar audio base64
         try:
             audio_data = base64.b64decode(audio_base64.split(',')[1] if ',' in audio_base64 else audio_base64)
+            logger.info(f"Audio decodificado: {len(audio_data)} bytes")
         except Exception as e:
             logger.error(f"Error decodificando base64: {str(e)}")
             return JsonResponse({'error': 'Audio inválido'}, status=400)
+        
+        # Validar tamaño mínimo del audio
+        MIN_AUDIO_SIZE = 500  # Mínimo 500 bytes (~0.1 segundos de audio WebM)
+        if len(audio_data) < MIN_AUDIO_SIZE:
+            logger.warning(f"Audio muy pequeño: {len(audio_data)} bytes (mínimo: {MIN_AUDIO_SIZE})")
+            return JsonResponse({
+                'success': False,
+                'error': f'Audio demasiado corto ({len(audio_data)} bytes). Mantén presionado el botón por más tiempo.'
+            }, status=400)
         
         # Crear archivo temporal
         audio_file = ContentFile(audio_data, name='dictado.webm')
@@ -437,12 +457,13 @@ def mejorar_texto_ia(request):
         tipo_estudio = data.get('tipo_estudio', 'OTR')
         modo = data.get('modo', 'LIBRE')
         plantilla = data.get('plantilla', None)
+        field_name = data.get('field_name', None)  # Campo específico para contexto
         
         if not texto or texto.strip() == '':
             logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
             return JsonResponse({'error': 'No se recibió texto para mejorar'}, status=400)
         
-        logger.info(f"📝 Mejorando texto ({len(texto)} caracteres) en modo {modo}")
+        logger.info(f"📝 Mejorando texto ({len(texto)} caracteres) en modo {modo} para campo '{field_name}'")
         
         # 1. APLICAR CORRECCIONES DEL DICCIONARIO MÉDICO
         texto_corregido, correcciones = TerminoMedico.aplicar_correcciones(texto)
@@ -454,9 +475,10 @@ def mejorar_texto_ia(request):
         # 2. NO procesar comandos de voz aquí (ya vienen procesados de Whisper)
         texto_procesado = texto_corregido
         
-        # Construir contexto con modo (FIEL por defecto para dictado rápido)
+        # Construir contexto con modo y campo específico
         contexto = {
-            'modo': modo  # 'FIEL' = solo corregir, 'ESTRUCTURADO' = crear secciones
+            'modo': modo,  # 'FIEL' = solo corregir, 'AUTO' = detectar, 'ESTRUCTURADO' = crear secciones
+            'field_name': field_name  # Para mejor contexto del campo específico
         }
         if plantilla:
             contexto['plantilla'] = plantilla
@@ -470,13 +492,15 @@ def mejorar_texto_ia(request):
             usuario=request.user if request.user.is_authenticated else None
         )
         
+        logger.info(f"✅ Texto mejorado en modo final: {result.get('modo', modo)}")
+        
         return JsonResponse({
             'success': True,
             'texto_mejorado': result.get('texto_mejorado', texto_procesado),
             'confianza': result.get('confianza', 0.0),
             'sugerencias': result.get('sugerencias', []),
             'correcciones_aplicadas': correcciones,  # Enviar correcciones al frontend
-            'modo': result.get('modo', modo)
+            'modo': result.get('modo', modo)  # Retornar modo usado por la IA
         })
     
     except json.JSONDecodeError as e:
