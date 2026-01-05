@@ -303,6 +303,11 @@ def procesar_excel_eges(archivo, batch):
             )
             
             if created:
+                # IMPORTANTE: Clasificar modalidad e insumo después de crear
+                # porque get_or_create no ejecuta el método save() personalizado
+                fila.es_insumo = fila.clasificar_insumo()
+                fila.modalidad = fila.clasificar_modalidad()
+                fila.save(update_fields=['es_insumo', 'modalidad'])
                 filas_creadas += 1
             else:
                 filas_duplicadas += 1

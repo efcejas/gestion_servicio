@@ -178,8 +178,15 @@ class EgesRow(models.Model):
     def save(self, *args, **kwargs):
         """
         Al guardar, clasificamos automáticamente modalidad e insumo.
+        Solo clasifica en creación o si no se especifica update_fields.
         """
-        if not self.pk:  # Solo en creación
-            self.es_insumo = self.clasificar_insumo()
-            self.modalidad = self.clasificar_modalidad()
+        update_fields = kwargs.get('update_fields', None)
+        
+        # Si es creación O no se está haciendo una actualización parcial
+        if not self.pk or update_fields is None:
+            # Solo reclasificar si no estamos actualizando campos específicos
+            if update_fields is None:
+                self.es_insumo = self.clasificar_insumo()
+                self.modalidad = self.clasificar_modalidad()
+        
         super().save(*args, **kwargs)
