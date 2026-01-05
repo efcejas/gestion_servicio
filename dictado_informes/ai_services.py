@@ -115,8 +115,42 @@ class AIService:
                 with audio_file.open('rb') as audio:
                     audio_content = audio.read()
             
-            # Crear una tupla con el formato esperado
-            file_tuple = ("audio.webm", audio_content, "audio/webm")
+            logger.info(f"📁 Audio content size: {len(audio_content)} bytes")
+            
+            # Validar que tenemos contenido de audio
+            if len(audio_content) < 100:  # Un archivo de audio válido debe tener al menos 100 bytes
+                logger.error("❌ Audio content too small, probably invalid")
+                return {
+                    'text': '',
+                    'confidence': 0.0,
+                    'error': 'Archivo de audio demasiado pequeño o inválido'
+                }
+            
+            # Detectar el tipo de archivo basado en los primeros bytes (magic numbers)
+            # WebM: starts with 0x1A, 0x45, 0xDF, 0xA3
+            # WAV: starts with "RIFF"
+            # OGG: starts with "OggS"
+            magic_bytes = audio_content[:4]
+            
+            if magic_bytes.startswith(b'\x1a\x45\xdf\xa3'):
+                file_extension = "webm"
+                mime_type = "audio/webm"
+            elif magic_bytes.startswith(b'RIFF'):
+                file_extension = "wav"
+                mime_type = "audio/wav"
+            elif magic_bytes.startswith(b'OggS'):
+                file_extension = "ogg"
+                mime_type = "audio/ogg"
+            else:
+                # Default to webm if can't detect
+                file_extension = "webm"
+                mime_type = "audio/webm"
+                logger.warning(f"⚠️ Unknown audio format, magic bytes: {magic_bytes.hex()}")
+            
+            logger.info(f"🎵 Detected audio format: {file_extension}")
+            
+            # Crear una tupla con el formato esperado por OpenAI
+            file_tuple = (f"audio.{file_extension}", audio_content, mime_type)
             
             # Prompt para guiar a Whisper en contexto médico
             # Optimizado para informes radiológicos con separación automática de conceptos
@@ -319,55 +353,124 @@ CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
                     prompt = prompt_base
 
             else:
-                # MODO ESTRUCTURADO: Crear informe completo con secciones
-                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado de un informe de {tipo_nombre} y estructura la información en 4 secciones.
+                # MODO ESTRUCTURADO: Crear informe con plantilla específica según tipo
+                tipo_plantilla = contexto.get('tipo_plantilla', 'RODILLA') if contexto else 'RODILLA'
+                logger.info(f"📋 Generando plantilla tipo: {tipo_plantilla}")
+                
+                # Definir plantillas según tipo
+                plantillas = {
+                    'RODILLA': {
+                        'titulo': 'RM DE RODILLA [<DERECHA/IZQUIERDA>]',
+                        'seccion_tecnica': 'Se exploró la rodilla [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Meniscos de altura y señal normales.>]',
+                            '[<Ligamentos cruzados de trayecto y morfología conservados.>]',
+                            '[<Resto de tendones y ligamentos de la rodilla sin alteraciones.>]',
+                            '[<Rótula centrada, sin lesión visible.>]',
+                            '[<No se observa aumento del líquido articular.>]',
+                            '[<No se visualizan lesiones óseas.>]'
+                        ]
+                    },
+                    'HOMBRO': {
+                        'titulo': 'RM DE HOMBRO [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el hombro [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Manguito rotador de grosor y señal conservados.>]',
+                            '[<Tendón del bíceps de trayecto y grosor normal.>]',
+                            '[<Labrum glenoideo de morfología conservada.>]',
+                            '[<Articulación acromioclavicular sin alteraciones.>]',
+                            '[<No se observa aumento del líquido articular.>]',
+                            '[<Estructuras óseas sin lesiones evidentes.>]'
+                        ]
+                    },
+                    'CODO': {
+                        'titulo': 'RM DE CODO [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el codo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Tendón del bíceps distal de grosor y señal normales.>]',
+                            '[<Tendón del tríceps de morfología conservada.>]',
+                            '[<Ligamentos colaterales sin alteraciones.>]',
+                            '[<Epicóndilos sin signos de epicondilitis.>]',
+                            '[<Articulación radiocubital proximal conservada.>]',
+                            '[<No se observa aumento del líquido articular.>]'
+                        ]
+                    },
+                    'TOBILLO': {
+                        'titulo': 'RM DE TOBILLO [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el tobillo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Tendón de Aquiles de grosor y señal normales.>]',
+                            '[<Tendones peroneos de trayecto conservado.>]',
+                            '[<Ligamentos laterales sin alteraciones.>]',
+                            '[<Ligamento deltoideo íntegro.>]',
+                            '[<Tendón tibial posterior conservado.>]',
+                            '[<No se observa aumento del líquido articular.>]'
+                        ]
+                    },
+                    'MANO': {
+                        'titulo': 'RM DE MANO [<DERECHA/IZQUIERDA>]',
+                        'seccion_tecnica': 'Se exploró la mano [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Tendones flexores y extensores de grosor y señal conservados.>]',
+                            '[<Ligamentos intercarpianos sin alteraciones.>]',
+                            '[<Túnel carpiano de calibre normal.>]',
+                            '[<Nervio mediano sin compresión.>]',
+                            '[<Articulaciones metacarpofalángicas conservadas.>]',
+                            '[<No se observa aumento del líquido articular.>]'
+                        ]
+                    },
+                    'MUÑECA': {
+                        'titulo': 'RM DE MUÑECA [<DERECHA/IZQUIERDA>]',
+                        'seccion_tecnica': 'Se exploró la muñeca [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            '[<Fibrocartílago triangular íntegro.>]',
+                            '[<Tendones flexores y extensores conservados.>]',
+                            '[<Ligamentos escafo-lunares sin alteraciones.>]',
+                            '[<Túnel carpiano de calibre normal.>]',
+                            '[<Articulación radio-carpiana conservada.>]',
+                            '[<No se observa aumento del líquido articular.>]'
+                        ]
+                    }
+                }
+                
+                plantilla_actual = plantillas.get(tipo_plantilla, plantillas['RODILLA'])
+                comentarios_str = '\n'.join(plantilla_actual['comentarios'])
+                
+                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado y estructura la información usando la plantilla solicitada.
 
 TEXTO DICTADO:
 {texto_original}
 
-INSTRUCCIONES ESPECÍFICAS:
+INSTRUCCIONES: Usa EXACTAMENTE esta plantilla y completa los campos entre [<>] con la información del dictado:
 
-1. INDICACIÓN CLÍNICA:
-   - Extrae del texto la razón del estudio (síntomas, región anatómica, patología sospechada)
-   - Ejemplos: "Gonalgia derecha", "Trauma de rodilla", "Control post-quirúrgico"
-   - Si no está explícita, infiere de los hallazgos la indicación probable
-   - Usa terminología médica concisa
+{plantilla_actual['titulo']}
 
-2. TÉCNICA:
-   - Usa EXACTAMENTE este texto (adaptado al estudio):
-   "{template_tecnica}"
-   - NO inventes detalles técnicos
-   - Mantén la descripción estándar
+INFORMACIÓN CLÍNICA
+[<extraer indicación del dictado o poner "A determinar">]
 
-3. HALLAZGOS:
-   - Describe detalladamente lo observado
-   - Usa terminología médica precisa
-   - Corrige errores de transcripción
-   - Mantén la información original sin inventar
+TÉCNICA
+{plantilla_actual['seccion_tecnica']}
 
-4. CONCLUSIÓN:
-   - Resume los hallazgos principales
-   - Usa lenguaje clínico profesional
-   - Sé conciso y claro
+COMENTARIO
+{comentarios_str}
 
-FORMATO DE RESPUESTA (USA EXACTAMENTE ESTE FORMATO):
+CONCLUSIÓN
+[<resumir hallazgos principales del dictado>]
 
-INDICACIÓN CLÍNICA:
-[Indicación extraída o inferida del texto]
+REGLAS IMPORTANTES:
+- Mantén EXACTAMENTE la estructura de secciones
+- Los campos entre [<>] deben completarse con información del dictado
+- En el TÍTULO: usa MAYÚSCULAS para el lado: DERECHO/IZQUIERDO, DERECHA/IZQUIERDA
+- En la TÉCNICA: reemplaza [<lado>] con "derecho" o "izquierdo" en minúsculas (texto corrido, sin corchetes)
+- Respeta la concordancia de género: el hombro, la rodilla, el codo, la muñeca, etc.
+- Si el dictado menciona alteraciones, reemplaza las frases normales correspondientes
+- Si no hay información específica, mantén los valores por defecto
+- Preserva el formato con [<>] solo en comentarios para que sea fácil de editar después
+- Si el dictado menciona patología, modifica solo la línea correspondiente del COMENTARIO
 
-TÉCNICA:
-{template_tecnica}
-
-HALLAZGOS:
-[Descripción detallada]
-
-CONCLUSIÓN:
-[Resumen clínico]
-
-IMPORTANTE: 
-- NO incluyas títulos generales como "Informe Radiológico"
-- USA MAYÚSCULAS para los nombres de secciones
-- Cada sección debe terminar con una línea en blanco"""
+EJEMPLO DE FORMATO CORRECTO:
+- Título: "RM DE HOMBRO [<DERECHO>]" (lado en MAYÚSCULAS)
+- Técnica: "Se exploró el hombro izquierdo con secuencias..." (texto corrido, sin corchetes)"""
 
         try:
             response = self.client.chat.completions.create(

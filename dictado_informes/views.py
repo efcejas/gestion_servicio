@@ -456,6 +456,7 @@ def mejorar_texto_ia(request):
         texto = data.get('texto_original') or data.get('texto', '')
         tipo_estudio = data.get('tipo_estudio', 'OTR')
         modo = data.get('modo', 'LIBRE')
+        tipo_plantilla = data.get('tipo_plantilla', 'RODILLA')  # Nuevo campo
         plantilla = data.get('plantilla', None)
         field_name = data.get('field_name', None)  # Campo específico para contexto
         
@@ -478,11 +479,14 @@ def mejorar_texto_ia(request):
         # Construir contexto con modo y campo específico
         contexto = {
             'modo': modo,  # 'FIEL' = solo corregir, 'AUTO' = detectar, 'ESTRUCTURADO' = crear secciones
-            'field_name': field_name  # Para mejor contexto del campo específico
+            'field_name': field_name,  # Para mejor contexto del campo específico
+            'tipo_plantilla': tipo_plantilla  # Tipo de plantilla seleccionado
         }
         if plantilla:
             contexto['plantilla'] = plantilla
             logger.info(f"🎯 Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
+        
+        logger.info(f"📋 Tipo de plantilla: {tipo_plantilla}")
         
         # 3. MEJORAR CON IA
         result = ai_service.improve_medical_text(

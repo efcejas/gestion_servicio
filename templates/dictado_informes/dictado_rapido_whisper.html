@@ -79,10 +79,26 @@
                         <input type="radio" name="modoIA" value="ESTRUCTURADO" 
                                class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
                         <div class="ml-3">
-                            <p class="text-sm font-bold text-white">📋 Informe Estructurado</p>
-                            <p class="text-xs text-gray-400">Crea secciones: Indicación, Técnica, Hallazgos, Conclusión</p>
+                            <p class="text-sm font-bold text-white">📋 Plantilla Estructurada</p>
+                            <p class="text-xs text-gray-400">Usa plantilla según tipo de estudio seleccionado</p>
                         </div>
                     </label>
+                </div>
+                
+                <!-- Selector de Tipo de Plantilla (solo visible si se selecciona modo estructurado) -->
+                <div id="selectorPlantilla" class="mt-3 hidden">
+                    <label class="block text-xs font-bold text-gray-400 mb-2">
+                        <i class="fas fa-file-medical text-green-400 mr-1"></i>
+                        Tipo de Estudio
+                    </label>
+                    <select id="tipoPlantilla" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none">
+                        <option value="RODILLA">🦵 RM de Rodilla</option>
+                        <option value="HOMBRO">🤲 RM de Hombro</option>
+                        <option value="CODO">💪 RM de Codo</option>
+                        <option value="TOBILLO">🦶 RM de Tobillo</option>
+                        <option value="MANO">🤚 RM de Mano</option>
+                        <option value="MUÑECA">⌚ RM de Muñeca</option>
+                    </select>
                 </div>
             </div>
 
@@ -289,6 +305,22 @@ const tiempoGrabacion = document.getElementById('tiempoGrabacion');
 // Cargar información de aprendizaje al inicio
 cargarInfoAprendizaje();
 
+// Manejar visibilidad del selector de plantilla
+document.addEventListener('DOMContentLoaded', () => {
+    const modoRadios = document.querySelectorAll('input[name="modoIA"]');
+    const selectorPlantilla = document.getElementById('selectorPlantilla');
+    
+    modoRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'ESTRUCTURADO' && radio.checked) {
+                selectorPlantilla.classList.remove('hidden');
+            } else {
+                selectorPlantilla.classList.add('hidden');
+            }
+        });
+    });
+});
+
 async function cargarInfoAprendizaje() {
     try {
         const response = await fetch('/dictado_informes/api/info-aprendizaje/');
@@ -322,9 +354,33 @@ async function iniciarGrabacion(e) {
     e.preventDefault();
     
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+                channelCount: 1, // Mono
+                sampleRate: 16000, // Reducir sample rate para mejor compatibilidad
+                echoCancellation: true,
+                noiseSuppression: true
+            }
+        });
         
-        mediaRecorder = new MediaRecorder(stream);
+        // Detectar el mejor formato soportado
+        let mimeType = 'audio/webm;codecs=opus';
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/webm';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/ogg;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) {
+                    mimeType = 'audio/wav';
+                    if (!MediaRecorder.isTypeSupported(mimeType)) {
+                        mimeType = ''; // Usar formato por defecto
+                    }
+                }
+            }
+        }
+        
+        console.log('🎵 Formato de audio seleccionado:', mimeType || 'default');
+        
+        mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
         audioChunks = [];
         
         mediaRecorder.ondataavailable = (event) => {
@@ -423,7 +479,11 @@ async function procesarAudio() {
         return;
     }
     
-    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    // Obtener el tipo MIME del MediaRecorder usado
+    const mimeType = mediaRecorder.mimeType || 'audio/webm';
+    console.log('🎵 Tipo MIME detectado:', mimeType);
+    
+    const audioBlob = new Blob(audioChunks, { type: mimeType });
     console.log('📁 Blob creado:', audioBlob.size, 'bytes, tipo:', audioBlob.type);
     
     // Validar tamaño mínimo del blob (aprox. 1KB para 0.1s de audio)
@@ -478,6 +538,7 @@ async function procesarAudio() {
             
             // 2. Mejorar con IA según modo seleccionado
             const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
+            const tipoPlantilla = document.getElementById('tipoPlantilla').value;
             
             const responseMejora = await fetch('{% url "dictado_informes:mejorar_texto" %}', {
                 method: 'POST',
@@ -487,7 +548,8 @@ async function procesarAudio() {
                 },
                 body: JSON.stringify({
                     texto_original: textoTranscrito,
-                    modo: modoIA
+                    modo: modoIA,
+                    tipo_plantilla: tipoPlantilla
                 })
             });
             
@@ -561,7 +623,11 @@ async function procesarAudio() {
 
 // Copiar texto
 document.getElementById('btnCopiar').addEventListener('click', async () => {
-    const texto = document.getElementById('textoMejorado').textContent;
+    let texto = document.getElementById('textoMejorado').textContent;
+    
+    // Limpiar corchetes [<contenido>] del texto para copiado limpio
+    texto = limpiarCorchetes(texto);
+    
     try {
         await navigator.clipboard.writeText(texto);
         const btn = document.getElementById('btnCopiar');
@@ -578,6 +644,12 @@ document.getElementById('btnCopiar').addEventListener('click', async () => {
         alert('❌ Error al copiar');
     }
 });
+
+// Función para limpiar corchetes del texto
+function limpiarCorchetes(texto) {
+    // Reemplazar [<contenido>] por solo el contenido
+    return texto.replace(/\[<([^>]*)>\]/g, '$1');
+}
 
 // Variables globales para guardar aprendizaje
 let textoOriginalGlobal = '';
