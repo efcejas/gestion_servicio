@@ -647,8 +647,16 @@ document.getElementById('btnCopiar').addEventListener('click', async () => {
 
 // Función para limpiar corchetes del texto
 function limpiarCorchetes(texto) {
-    // Reemplazar [<contenido>] por solo el contenido
-    return texto.replace(/\[<([^>]*)>\]/g, '$1');
+    // Reemplazar [<contenido>] por solo el contenido (eliminar [< y >])
+    let textoLimpio = texto.replace(/\[<([^>]*)>\]/g, '$1');
+    
+    // También eliminar corchetes simples [contenido] por si acaso
+    textoLimpio = textoLimpio.replace(/\[([^\]]*)\]/g, '$1');
+    
+    console.log('🧹 Texto antes de limpiar:', texto.substring(0, 100) + '...');
+    console.log('✨ Texto después de limpiar:', textoLimpio.substring(0, 100) + '...');
+    
+    return textoLimpio;
 }
 
 // Variables globales para guardar aprendizaje
