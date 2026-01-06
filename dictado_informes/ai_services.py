@@ -363,72 +363,72 @@ CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
                         'titulo': 'RM DE RODILLA [<DERECHA/IZQUIERDA>]',
                         'seccion_tecnica': 'Se exploró la rodilla [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Meniscos de altura y señal normales.>]',
-                            '[<Ligamentos cruzados de trayecto y morfología conservados.>]',
-                            '[<Resto de tendones y ligamentos de la rodilla sin alteraciones.>]',
-                            '[<Rótula centrada, sin lesión visible.>]',
-                            '[<No se observa aumento del líquido articular.>]',
-                            '[<No se visualizan lesiones óseas.>]'
+                            'Meniscos de altura y señal normales.',
+                            'Ligamentos cruzados de trayecto y morfología conservados.',
+                            'Resto de tendones y ligamentos de la rodilla sin alteraciones.',
+                            'Rótula centrada, sin lesión visible.',
+                            'No se observa aumento del líquido articular.',
+                            'No se visualizan lesiones óseas.'
                         ]
                     },
                     'HOMBRO': {
                         'titulo': 'RM DE HOMBRO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el hombro [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Manguito rotador de grosor y señal conservados.>]',
-                            '[<Tendón del bíceps de trayecto y grosor normal.>]',
-                            '[<Labrum glenoideo de morfología conservada.>]',
-                            '[<Articulación acromioclavicular sin alteraciones.>]',
-                            '[<No se observa aumento del líquido articular.>]',
-                            '[<Estructuras óseas sin lesiones evidentes.>]'
+                            'Manguito rotador de grosor y señal conservados.',
+                            'Tendón del bíceps de trayecto y grosor normal.',
+                            'Labrum glenoideo de morfología conservada.',
+                            'Articulación acromioclavicular sin alteraciones.',
+                            'No se observa aumento del líquido articular.',
+                            'Estructuras óseas sin lesiones evidentes.'
                         ]
                     },
                     'CODO': {
                         'titulo': 'RM DE CODO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el codo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Tendón del bíceps distal de grosor y señal normales.>]',
-                            '[<Tendón del tríceps de morfología conservada.>]',
-                            '[<Ligamentos colaterales sin alteraciones.>]',
-                            '[<Epicóndilos sin signos de epicondilitis.>]',
-                            '[<Articulación radiocubital proximal conservada.>]',
-                            '[<No se observa aumento del líquido articular.>]'
+                            'Tendón del bíceps distal de grosor y señal normales.',
+                            'Tendón del tríceps de morfología conservada.',
+                            'Ligamentos colaterales sin alteraciones.',
+                            'Epicóndilos sin signos de epicondilitis.',
+                            'Articulación radiocubital proximal conservada.',
+                            'No se observa aumento del líquido articular.'
                         ]
                     },
                     'TOBILLO': {
                         'titulo': 'RM DE TOBILLO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el tobillo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Tendón de Aquiles de grosor y señal normales.>]',
-                            '[<Tendones peroneos de trayecto conservado.>]',
-                            '[<Ligamentos laterales sin alteraciones.>]',
-                            '[<Ligamento deltoideo íntegro.>]',
-                            '[<Tendón tibial posterior conservado.>]',
-                            '[<No se observa aumento del líquido articular.>]'
+                            'Tendón de Aquiles de grosor y señal normales.',
+                            'Tendones peroneos de trayecto conservado.',
+                            'Ligamentos laterales sin alteraciones.',
+                            'Ligamento deltoideo íntegro.',
+                            'Tendón tibial posterior conservado.',
+                            'No se observa aumento del líquido articular.'
                         ]
                     },
                     'MANO': {
                         'titulo': 'RM DE MANO [<DERECHA/IZQUIERDA>]',
                         'seccion_tecnica': 'Se exploró la mano [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Tendones flexores y extensores de grosor y señal conservados.>]',
-                            '[<Ligamentos intercarpianos sin alteraciones.>]',
-                            '[<Túnel carpiano de calibre normal.>]',
-                            '[<Nervio mediano sin compresión.>]',
-                            '[<Articulaciones metacarpofalángicas conservadas.>]',
-                            '[<No se observa aumento del líquido articular.>]'
+                            'Tendones flexores y extensores de grosor y señal conservados.',
+                            'Ligamentos intercarpianos sin alteraciones.',
+                            'Túnel carpiano de calibre normal.',
+                            'Nervio mediano sin compresión.',
+                            'Articulaciones metacarpofalángicas conservadas.',
+                            'No se observa aumento del líquido articular.'
                         ]
                     },
                     'MUÑECA': {
                         'titulo': 'RM DE MUÑECA [<DERECHA/IZQUIERDA>]',
                         'seccion_tecnica': 'Se exploró la muñeca [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            '[<Fibrocartílago triangular íntegro.>]',
-                            '[<Tendones flexores y extensores conservados.>]',
-                            '[<Ligamentos escafo-lunares sin alteraciones.>]',
-                            '[<Túnel carpiano de calibre normal.>]',
-                            '[<Articulación radio-carpiana conservada.>]',
-                            '[<No se observa aumento del líquido articular.>]'
+                            'Fibrocartílago triangular íntegro.',
+                            'Tendones flexores y extensores conservados.',
+                            'Ligamentos escafo-lunares sin alteraciones.',
+                            'Túnel carpiano de calibre normal.',
+                            'Articulación radio-carpiana conservada.',
+                            'No se observa aumento del líquido articular.'
                         ]
                     }
                 }
@@ -459,18 +459,33 @@ CONCLUSIÓN
 
 REGLAS IMPORTANTES:
 - Mantén EXACTAMENTE la estructura de secciones
-- Los campos entre [<>] deben completarse con información del dictado
-- En el TÍTULO: usa MAYÚSCULAS para el lado: DERECHO/IZQUIERDO, DERECHA/IZQUIERDA
-- En la TÉCNICA: reemplaza [<lado>] con "derecho" o "izquierdo" en minúsculas (texto corrido, sin corchetes)
+- En el TÍTULO: completa [<LADO>] con DERECHO/IZQUIERDO en MAYÚSCULAS
+- En la TÉCNICA: completa [<lado>] con "derecho" o "izquierdo" en minúsculas
+- En COMENTARIO: Revisa LÍNEA POR LÍNEA cada estructura anatómica:
+  * Si el dictado NO menciona alteraciones en esa estructura → MANTÉN la línea normal tal como está
+  * Si el dictado menciona patología en esa estructura → REEMPLAZA COMPLETAMENTE esa línea (NO agregues líneas adicionales)
+- NUNCA tengas líneas contradictorias (ej: "normal" y "roto" para la misma estructura)
 - Respeta la concordancia de género: el hombro, la rodilla, el codo, la muñeca, etc.
-- Si el dictado menciona alteraciones, reemplaza las frases normales correspondientes
-- Si no hay información específica, mantén los valores por defecto
-- Preserva el formato con [<>] solo en comentarios para que sea fácil de editar después
-- Si el dictado menciona patología, modifica solo la línea correspondiente del COMENTARIO
+- NO agregues corchetes [], paréntesis () ni símbolos especiales
+- Cada línea del comentario debe ser texto directo y limpio
+- MANTÉN el mismo número de líneas en el comentario
 
-EJEMPLO DE FORMATO CORRECTO:
-- Título: "RM DE HOMBRO [<DERECHO>]" (lado en MAYÚSCULAS)
-- Técnica: "Se exploró el hombro izquierdo con secuencias..." (texto corrido, sin corchetes)"""
+EJEMPLO CORRECTO de análisis:
+DICTADO: "Rodilla derecha con desgarro del menisco interno"
+
+COMENTARIO RESULTANTE (6 líneas como la plantilla):
+Desgarro del menisco interno, menisco externo conservado.
+Ligamentos cruzados de trayecto y morfología conservados.
+Resto de tendones y ligamentos de la rodilla sin alteraciones.
+Rótula centrada, sin lesión visible.
+No se observa aumento del líquido articular.
+No se visualizan lesiones óseas.
+
+EJEMPLO INCORRECTO (contradictorio):
+❌ Meniscos de altura y señal normales.
+❌ Desgarro compuesto en el cuerno posterior del menisco interno.
+
+IMPORTANTE: Una estructura NO puede estar normal Y alterada al mismo tiempo. REEMPLAZA la línea completa."""
 
         try:
             response = self.client.chat.completions.create(

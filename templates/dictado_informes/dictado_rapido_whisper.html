@@ -645,18 +645,22 @@ document.getElementById('btnCopiar').addEventListener('click', async () => {
     }
 });
 
-// Función para limpiar corchetes del texto
+// Función para limpiar corchetes del texto (ahora solo limpia [<LADO>] del título)
 function limpiarCorchetes(texto) {
-    // Reemplazar [<contenido>] por solo el contenido (eliminar [< y >])
-    let textoLimpio = texto.replace(/\[<([^>]*)>\]/g, '$1');
+    console.log('🧹 Texto original:', texto);
     
-    // También eliminar corchetes simples [contenido] por si acaso
-    textoLimpio = textoLimpio.replace(/\[([^\]]*)\]/g, '$1');
+    let textoLimpio = texto;
     
-    console.log('🧹 Texto antes de limpiar:', texto.substring(0, 100) + '...');
-    console.log('✨ Texto después de limpiar:', textoLimpio.substring(0, 100) + '...');
+    // Solo limpiar los corchetes del título [<LADO>]
+    textoLimpio = textoLimpio.replace(/\[<([^>]*)>\]/g, '$1');
     
-    return textoLimpio;
+    // Limpiar espacios múltiples y líneas vacías
+    textoLimpio = textoLimpio.replace(/\s+/g, ' ');
+    textoLimpio = textoLimpio.replace(/\n\s*\n\s*\n/g, '\n\n');
+    
+    console.log('✨ Texto limpio final:', textoLimpio);
+    
+    return textoLimpio.trim();
 }
 
 // Variables globales para guardar aprendizaje
