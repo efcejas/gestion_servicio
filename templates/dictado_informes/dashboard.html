@@ -1,31 +1,30 @@
 {% extends "layouts/base_with_sidebar.html" %}
 {% load static %}
 
-{% block title %}Dictado de Informes con IA{% endblock %}
+{% block title %}Dashboard - Dictado de Informes con IA - Dr. Cejas{% endblock %}
+
+{% block page_title %}Dashboard de Dictado con IA{% endblock %}
+{% block page_description %}Sistema inteligente para dictado, transcripción y mejora automática de informes médicos{% endblock %}
 
 {% block content %}
-<div class="p-6">
-    <div class="w-full">
-        
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl shadow-xl p-8 mb-6 text-white">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h1 class="text-3xl font-bold mb-2">
-                        <i class="fas fa-microphone-alt mr-3"></i>
-                        Dictado de Informes con IA
-                    </h1>
-                    <p class="text-indigo-100 text-lg">
-                        Sistema inteligente para dictado, transcripción y mejora automática de informes médicos
-                    </p>
-                </div>
-                <div class="hidden lg:block">
-                    <div class="w-32 h-32 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                        <i class="fas fa-brain text-6xl text-white"></i>
-                    </div>
-                </div>
+<div class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-xl shadow-xl p-6 mb-6 text-white">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center">
+            <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm mr-4">
+                <i class="fas fa-microphone-alt text-2xl text-white"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold mb-1">Bienvenido al Sistema de Dictado IA</h2>
+                <p class="text-indigo-100">Powered by Whisper AI + Groq</p>
             </div>
         </div>
+        <div class="hidden lg:block">
+            <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <i class="fas fa-brain text-3xl text-white"></i>
+            </div>
+        </div>
+    </div>
+</div>
 
         <!-- Estadísticas -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
@@ -286,6 +285,4 @@
             </div>
         </div>
 
-    </div>
-</div>
 {% endblock %}

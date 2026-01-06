@@ -44,6 +44,36 @@
                     </div>
                 </li>
 
+            {% elif request.resolver_match.app_name == 'dictado_informes' %}
+                <!-- Breadcrumb para Dictado de Informes -->
+                <li>
+                    <div class="flex items-center">
+                        <svg class="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        <a href="{% url 'dictado_informes:dashboard' %}" class="ml-1 text-sm font-medium text-gray-300 hover:text-white md:ml-2">Dictado de Informes</a>
+                    </div>
+                </li>
+                {% if request.resolver_match.url_name == 'dictado_rapido' %}
+                    <li aria-current="page">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="ml-1 text-sm font-medium text-white md:ml-2">Dictado Rápido</span>
+                        </div>
+                    </li>
+                {% elif 'termino' in request.resolver_match.url_name %}
+                    <li aria-current="page">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="ml-1 text-sm font-medium text-white md:ml-2">Diccionario Médico</span>
+                        </div>
+                    </li>
+                {% endif %}
+
             {% elif request.resolver_match.app_name == 'gestion_eventos' %}
                 <!-- Breadcrumb para Eventos -->
                 <li>

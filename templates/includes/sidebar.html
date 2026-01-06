@@ -57,7 +57,7 @@
                 </a>
             </li>
             
-            {% if SANATORIO_MODULOS.dictado %}
+            {% if SANATORIO_MODULOS.dictado or user.is_superuser %}
             <!-- DICTADO DE INFORMES IA - Feature principal con gradiente y badge -->
             <li>
                 <a href="{% url 'dictado_informes:dashboard' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-indigo-700 hover:to-purple-700 group {% if request.resolver_match and request.resolver_match.app_name == 'dictado_informes' and request.resolver_match.url_name == 'dashboard' %}bg-gradient-to-r from-indigo-600 to-purple-600{% endif %}">
@@ -69,6 +69,19 @@
                     <span class="flex-1 ms-3 whitespace-nowrap">Dictado de Informes</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-900 text-purple-200">
                         IA
+                    </span>
+                </a>
+            </li>
+            
+            <!-- Dictado Rápido - Funcionalidad principal -->
+            <li>
+                <a href="{% url 'dictado_informes:dictado_rapido' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gradient-to-r hover:from-purple-700 hover:to-pink-700 group {% if request.resolver_match and request.resolver_match.url_name == 'dictado_rapido' %}bg-gradient-to-r from-purple-600 to-pink-600{% endif %} ml-4">
+                    <svg class="w-5 h-5 {% if request.resolver_match and request.resolver_match.url_name == 'dictado_rapido' %}text-white{% else %}text-purple-400{% endif %} transition duration-200 group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 0C4.477 0 0 4.477 0 10s4.477 10 10 10 10-4.477 10-10S15.523 0 10 0ZM8 15l-3-3 1.41-1.41L8 12.17l5.59-5.59L15 8l-7 7Z"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap text-sm">Dictado Rápido</span>
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-900 text-green-200">
+                        NUEVO
                     </span>
                 </a>
             </li>
