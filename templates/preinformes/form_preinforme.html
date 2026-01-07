@@ -1,0 +1,545 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4">
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-file-medical text-white text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h1 class="text-2xl font-bold text-white">{{ title }}</h1>
+                    <p class="text-blue-100 mt-1">Complete todos los campos del preinforme</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Información del Estudio -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-3"></i>
+                    Información del Estudio
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="{{ form.numero_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Número de Estudio *
+                        </label>
+                        {{ form.numero_estudio }}
+                        {% if form.numero_estudio.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.numero_estudio.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.tipo_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Tipo de Estudio *
+                        </label>
+                        {{ form.tipo_estudio }}
+                        {% if form.tipo_estudio.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.tipo_estudio.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.region.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Región *
+                        </label>
+                        {{ form.region }}
+                        {% if form.region.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.region.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Plantilla (Opcional)
+                        </label>
+                        {{ form.plantilla_utilizada }}
+                        {% if form.plantilla_utilizada.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.plantilla_utilizada.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información del Paciente -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-user text-green-600 mr-3"></i>
+                    Información del Paciente
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Apellido *
+                        </label>
+                        {{ form.apellido_paciente }}
+                        {% if form.apellido_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.apellido_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Nombre *
+                        </label>
+                        {{ form.nombre_paciente }}
+                        {% if form.nombre_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.nombre_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.dni_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            DNI *
+                        </label>
+                        {{ form.dni_paciente }}
+                        {% if form.dni_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.dni_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.edad_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Edad *
+                        </label>
+                        {{ form.edad_paciente }}
+                        {% if form.edad_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.edad_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.sexo_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Sexo *
+                        </label>
+                        {{ form.sexo_paciente }}
+                        {% if form.sexo_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.sexo_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido del Preinforme -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
+                        Contenido del Preinforme
+                    </h2>
+                    {% if preinforme.pk %}
+                    <div id="autosave-indicator" class="text-sm text-gray-500">
+                        <i class="fas fa-circle text-gray-400 mr-1"></i>
+                        <span id="autosave-status">Listo</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.tecnica.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Técnica *
+                        </label>
+                        {{ form.tecnica }}
+                        {% if form.tecnica.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.tecnica.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.hallazgos.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Hallazgos *
+                        </label>
+                        {{ form.hallazgos }}
+                        {% if form.hallazgos.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.hallazgos.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.conclusion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Conclusión *
+                        </label>
+                        {{ form.conclusion }}
+                        {% if form.conclusion.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.conclusion.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <div class="flex flex-col sm:flex-row gap-4 justify-end">
+                <a href="{% url 'preinformes:dashboard_residente' %}" 
+                   class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-times mr-2"></i>
+                    Cancelar
+                </a>
+                
+                <button type="submit" name="guardar_y_continuar"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-save mr-2"></i>
+                    Guardar y Continuar
+                </button>
+                
+                <button type="submit" name="guardar_y_enviar"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200"
+                        onclick="return confirm('¿Está seguro de enviar el preinforme para revisión? No podrá modificarlo después.')">
+                    <i class="fas fa-paper-plane mr-2"></i>
+                    Enviar para Revisión
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- CKEditor 5 Media (JS/CSS) -->
+    {{ form.media }}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+    const regionSelect = document.getElementById('id_region');
+    const plantillaSelect = document.getElementById('id_plantilla');
+    
+    // Registry global para las instancias de CKEditor 5
+    window.ckeditorInstances = {};
+    
+    // Función para inicializar editores si no existen
+    function initializeEditorIfNeeded(fieldId) {
+        if (!window.ckeditorInstances[fieldId]) {
+            const textarea = document.getElementById(fieldId);
+            if (textarea && textarea.style.display === 'none') {
+                // Buscar el contenedor del editor CKEditor 5
+                const ckEditorContainer = textarea.nextElementSibling;
+                if (ckEditorContainer && ckEditorContainer.classList.contains('ck-editor')) {
+                    // El editor ya está inicializado por Django CKEditor 5
+                    // Intentar acceder a la instancia
+                    try {
+                        const editorElement = ckEditorContainer.querySelector('.ck-content');
+                        if (editorElement && editorElement.ckeditorInstance) {
+                            window.ckeditorInstances[fieldId] = editorElement.ckeditorInstance;
+                            console.log(`Editor ${fieldId} encontrado y registrado`);
+                        }
+                    } catch (error) {
+                        console.warn(`No se pudo acceder a la instancia del editor ${fieldId}:`, error);
+                    }
+                }
+            }
+        }
+        return window.ckeditorInstances[fieldId];
+    }
+    
+    // Función para establecer contenido de forma segura
+    function setEditorContent(fieldId, content, skipIfNotEmpty = true) {
+        // Solo aplicar si el campo está vacío (comportamiento seguro)
+        const textarea = document.getElementById(fieldId);
+        if (skipIfNotEmpty && textarea.value.trim() !== '') {
+            console.log(`Campo ${fieldId} no está vacío, omitiendo autocompletado`);
+            return;
+        }
+        
+        // Intentar obtener la instancia del editor
+        const editor = initializeEditorIfNeeded(fieldId);
+        
+        if (editor && typeof editor.setData === 'function') {
+            // Usar API de CKEditor 5
+            try {
+                editor.setData(content);
+                console.log(`Contenido aplicado via CKEditor API para ${fieldId}`);
+            } catch (error) {
+                console.warn(`Error usando CKEditor API para ${fieldId}:`, error);
+                // Fallback a textarea
+                textarea.value = content;
+            }
+        } else {
+            // Fallback: establecer en textarea y disparar evento
+            textarea.value = content;
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+            console.log(`Contenido aplicado via textarea fallback para ${fieldId}`);
+        }
+    }
+
+    function cargarPlantillas() {
+        const tipoEstudioId = tipoEstudioSelect.value;
+        const regionId = regionSelect.value;
+
+        if (tipoEstudioId && regionId) {
+            fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Limpiar opciones existentes
+                    plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+                    
+                    // Agregar nuevas opciones
+                    data.plantillas.forEach(plantilla => {
+                        const option = document.createElement('option');
+                        option.value = plantilla.id;
+                        option.textContent = plantilla.nombre;
+                        plantillaSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error cargando plantillas:', error);
+                });
+        } else {
+            plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+        }
+    }
+
+    function aplicarPlantilla() {
+        const plantillaId = plantillaSelect.value;
+        if (!plantillaId) return;
+        
+        console.log('Aplicando plantilla ID:', plantillaId);
+        
+        // Usar el nuevo endpoint JSON
+        fetch(`{% url 'preinformes:plantilla_json' pk=0 %}`.replace('0', plantillaId))
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error al cargar plantilla');
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Datos de plantilla recibidos:', data);
+                
+                // Dar tiempo a CKEditor 5 para inicializar completamente
+                setTimeout(() => {
+                    try {
+                        // Aplicar contenido a cada campo
+                        if (data.tecnica) {
+                            setEditorContent('id_tecnica', data.tecnica);
+                        }
+                        if (data.hallazgos) {
+                            setEditorContent('id_hallazgos', data.hallazgos);
+                        }
+                        if (data.conclusion) {
+                            setEditorContent('id_conclusion', data.conclusion);
+                        }
+                        
+                        console.log('Plantilla aplicada exitosamente');
+                        
+                        // Foco en el primer campo con contenido o el primero disponible
+                        const firstEmptyField = document.getElementById('id_tecnica').value.trim() === '' ? 'id_tecnica' :
+                                              document.getElementById('id_hallazgos').value.trim() === '' ? 'id_hallazgos' : 
+                                              'id_conclusion';
+                        
+                        const editor = initializeEditorIfNeeded(firstEmptyField);
+                        if (editor && typeof editor.editing.view.focus === 'function') {
+                            editor.editing.view.focus();
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error aplicando plantilla:', error);
+                    }
+                }, 1500); // Tiempo generoso para inicialización
+            })
+            .catch(error => {
+                console.error('Error cargando datos de plantilla:', error);
+                alert('Error al cargar la plantilla. Intente nuevamente.');
+            });
+    }
+    
+    // Intentar inicializar editores después de un delay
+    setTimeout(() => {
+        ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
+            initializeEditorIfNeeded(fieldId);
+        });
+    }, 2000);
+
+    // Event listeners
+    tipoEstudioSelect.addEventListener('change', cargarPlantillas);
+    regionSelect.addEventListener('change', cargarPlantillas);
+    plantillaSelect.addEventListener('change', aplicarPlantilla);
+
+    // Cargar plantillas al inicio si hay valores seleccionados
+    if (tipoEstudioSelect.value && regionSelect.value) {
+        cargarPlantillas();
+    }
+
+    // === SISTEMA DE AUTOGUARDADO ===
+    {% if preinforme.pk and preinforme.estado == 'borrador' %}
+    
+    const AUTOSAVE_INTERVAL = 30000; // 30 segundos
+    const preinformeId = {{ preinforme.pk }};
+    let autosaveTimer = null;
+    let lastSaveData = {};
+    let isSaving = false;
+
+    // Elementos del indicador
+    const autosaveIndicator = document.getElementById('autosave-indicator');
+    const autosaveStatus = document.getElementById('autosave-status');
+    const autosaveIcon = autosaveIndicator.querySelector('i');
+
+    function updateAutosaveIndicator(status, message) {
+        autosaveStatus.textContent = message;
+        autosaveIcon.className = 'fas fa-circle mr-1';
+        
+        switch(status) {
+            case 'saving':
+                autosaveIcon.className = 'fas fa-spinner fa-spin mr-1';
+                autosaveIcon.style.color = '#3B82F6'; // blue
+                break;
+            case 'saved':
+                autosaveIcon.style.color = '#10B981'; // green
+                break;
+            case 'error':
+                autosaveIcon.style.color = '#EF4444'; // red
+                break;
+            default:
+                autosaveIcon.style.color = '#6B7280'; // gray
+        }
+    }
+
+    function getCurrentContent() {
+        return {
+            tecnica: window.ckeditorInstances['id_tecnica']?.getData() || document.getElementById('id_tecnica').value || '',
+            hallazgos: window.ckeditorInstances['id_hallazgos']?.getData() || document.getElementById('id_hallazgos').value || '',
+            conclusion: window.ckeditorInstances['id_conclusion']?.getData() || document.getElementById('id_conclusion').value || ''
+        };
+    }
+
+    function hasContentChanged() {
+        const current = getCurrentContent();
+        return JSON.stringify(current) !== JSON.stringify(lastSaveData);
+    }
+
+    function performAutosave() {
+        if (isSaving || !hasContentChanged()) {
+            return;
+        }
+
+        const currentContent = getCurrentContent();
+        isSaving = true;
+        updateAutosaveIndicator('saving', 'Guardando...');
+
+        // Preparar datos para envío
+        const formData = new FormData();
+        formData.append('tecnica', currentContent.tecnica);
+        formData.append('hallazgos', currentContent.hallazgos);
+        formData.append('conclusion', currentContent.conclusion);
+
+        // Agregar CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        formData.append('csrfmiddlewaretoken', csrfToken);
+
+        fetch(`{% url 'preinformes:autosave_preinforme' pk=0 %}`.replace('0', preinformeId), {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                lastSaveData = currentContent;
+                updateAutosaveIndicator('saved', `Guardado ${data.timestamp}`);
+                
+                // Volver a estado normal después de 3 segundos
+                setTimeout(() => {
+                    if (autosaveStatus.textContent.includes('Guardado')) {
+                        updateAutosaveIndicator('ready', 'Listo');
+                    }
+                }, 3000);
+            } else {
+                throw new Error(data.message || 'Error al guardar');
+            }
+        })
+        .catch(error => {
+            console.error('Error en autoguardado:', error);
+            updateAutosaveIndicator('error', 'Error al guardar');
+            
+            // Volver a estado normal después de 5 segundos
+            setTimeout(() => {
+                updateAutosaveIndicator('ready', 'Listo');
+            }, 5000);
+        })
+        .finally(() => {
+            isSaving = false;
+        });
+    }
+
+    function scheduleAutosave() {
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            performAutosave();
+            scheduleAutosave(); // Reprogramar para el siguiente ciclo
+        }, AUTOSAVE_INTERVAL);
+    }
+
+    // Detectar cambios en los editores
+    function setupChangeDetection() {
+        // Detectar cambios en CKEditor 5
+        setTimeout(() => {
+            ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
+                const editor = window.ckeditorInstances[fieldId];
+                if (editor) {
+                    editor.model.document.on('change:data', () => {
+                        scheduleAutosave();
+                    });
+                }
+            });
+        }, 3000); // Dar tiempo para inicialización completa
+        
+        // Fallback: detectar cambios en textareas
+        ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
+            const textarea = document.getElementById(fieldId);
+            if (textarea) {
+                textarea.addEventListener('input', () => {
+                    scheduleAutosave();
+                });
+            }
+        });
+    }
+
+    // Inicializar autoguardado
+    setTimeout(() => {
+        lastSaveData = getCurrentContent();
+        setupChangeDetection();
+        scheduleAutosave();
+        console.log('✅ Sistema de autoguardado iniciado');
+    }, 4000);
+
+    // Limpiar timer al salir
+    window.addEventListener('beforeunload', () => {
+        clearTimeout(autosaveTimer);
+    });
+
+    {% endif %}
+});
+</script>
+{% endblock %}

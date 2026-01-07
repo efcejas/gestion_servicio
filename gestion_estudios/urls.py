@@ -62,7 +62,11 @@ urlpatterns = [
     path('equipos/', include('equipos.urls')),  # URLs para equipos
     # path('clases/', include('clases_residentes.urls')),  # URLs para clases de residentes - DESHABILITADO TEMPORALMENTE
     path('eges/', include('eges_import.urls')),  # URLs para importación EGES
+    path('preinformes/', include('preinformes.urls')),  # URLs para preinformes
     # path('pedidos_estudios/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios (módulo no existe)
+
+    # CKEditor 5
+    path("ckeditor5/", include('django_ckeditor_5.urls')),
 
     # Restablecimiento de contraseñas
     path('password_change/', CustomPasswordChangeView.as_view(), name='password_change'),

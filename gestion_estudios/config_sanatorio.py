@@ -24,6 +24,7 @@ CONFIG_DUPUYTREN = {
         'dictado': False,  # ❌ Desactivado por ahora
         'protocolos': True,  # ✅ Activo - Protocolos radiológicos
         'clases': True,  # ✅ Activo - Clases de residentes
+        'preinformes': True,  # ✅ Activo - Preinformes de residentes
         'agenda': True,
         'notas': True,
     },
@@ -54,6 +55,7 @@ CONFIG_COLEGIALES = {
         'dictado': False,      # ❌ Desactivado por ahora
         'protocolos': True,    # ✅ Activo - Protocolos radiológicos
         'clases': True,        # ✅ Activo - Clases de residentes
+        'preinformes': True,   # ✅ Activo - Preinformes de residentes
         'agenda': True,        # ✅ Activo - Agenda personal
         'notas': True,         # ✅ Activo - Notas rápidas
         'eges_import': True,   # ✅ Activo - Importación EGES

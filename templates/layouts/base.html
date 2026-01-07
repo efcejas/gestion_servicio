@@ -111,6 +111,7 @@
                         <li class="nav-item">
                             <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Inicio</a>
                         </li>
+                        
                         {% if not user|has_group:"Administrativo - Sanatorio (pedidos)" %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'gestion_eventos:lista_eventos' %}">Lista de novedades</a>

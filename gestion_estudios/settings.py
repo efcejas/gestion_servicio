@@ -48,6 +48,9 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'cloudinary',
     
+    # CKEditor 5 para texto enriquecido
+    'django_ckeditor_5',
+    
     # Apps principales del proyecto
     'accounts.apps.AccountsConfig',
     'control_guardias.apps.ControlGuardiasConfig',
@@ -59,6 +62,7 @@ INSTALLED_APPS = [
     'protocolos.apps.ProtocolosConfig',
     'clases_residentes.apps.ClasesResidentesConfig',
     'eges_import.apps.EgesImportConfig',
+    'preinformes.apps.PreinformesConfig',
     
     # Tailwind CSS
     'tailwind',
@@ -181,6 +185,73 @@ WHITENOISE_MAX_AGE = 0 if DEBUG else 31536000  # 1 año en producción
 # Archivos subidos por usuarios (imágenes, documentos, etc.)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Paleta de colores personalizada para CKEditor 5
+customColorPalette = [
+    {
+        'color': 'hsl(4, 90%, 58%)',
+        'label': 'Red'
+    },
+    {
+        'color': 'hsl(340, 82%, 52%)',
+        'label': 'Pink'
+    },
+    {
+        'color': 'hsl(291, 64%, 42%)',
+        'label': 'Purple'
+    },
+    {
+        'color': 'hsl(262, 52%, 47%)',
+        'label': 'Deep Purple'
+    },
+    {
+        'color': 'hsl(231, 48%, 48%)',
+        'label': 'Indigo'
+    },
+    {
+        'color': 'hsl(207, 90%, 54%)',
+        'label': 'Blue'
+    },
+]
+
+# Configuración de CKEditor 5 (simplificada para preinformes médicos)
+CKEDITOR_5_CONFIGS = {
+    'default': {
+        'toolbar': [
+            'heading', '|', 
+            'bold', 'italic', 'underline', '|',
+            'bulletedList', 'numberedList', '|',
+            'outdent', 'indent', '|',
+            'fontSize', 'fontColor', '|',
+            'subscript', 'superscript', '|',
+            'removeFormat'
+        ],
+        'heading': {
+            'options': [
+                { 'model': 'paragraph', 'title': 'Paragraph' },
+                { 'model': 'heading4', 'view': 'h4', 'title': 'Heading 4' },
+                { 'model': 'heading5', 'view': 'h5', 'title': 'Heading 5' },
+                { 'model': 'heading6', 'view': 'h6', 'title': 'Heading 6' }
+            ]
+        },
+        'fontSize': {
+            'options': [
+                '12', '14', '16', '18', '20', '24'
+            ]
+        },
+        'fontColor': {
+            'colors': [
+                { 'color': '#000000', 'label': 'Negro' },
+                { 'color': '#d32f2f', 'label': 'Rojo (Hallazgos importantes)' },
+                { 'color': '#1976d2', 'label': 'Azul (Conclusiones)' },
+                { 'color': '#388e3c', 'label': 'Verde' },
+                { 'color': '#f57c00', 'label': 'Naranja' }
+            ]
+        }
+    }
+}
+
+CKEDITOR_5_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 # Tipo de campo de clave principal predeterminado
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

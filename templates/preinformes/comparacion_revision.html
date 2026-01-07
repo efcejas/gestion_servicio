@@ -1,0 +1,264 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_description %}Comparación entre versión original y revisada{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="bg-gradient-to-r from-purple-600 to-purple-800 rounded-2xl shadow-lg overflow-hidden">
+            <div class="px-6 py-8">
+                <div class="flex items-center">
+                    <i class="fas fa-eye text-white text-3xl mr-4"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-white">Comparación de Revisión</h1>
+                        <p class="text-purple-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Estudio -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Información del Estudio</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <span class="text-sm font-medium text-gray-500">Número de Estudio</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.numero_estudio }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Residente</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Revisor</span>
+                <p class="mt-1 text-sm text-gray-900">{{ revision.revisor.first_name }} {{ revision.revisor.last_name }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Fecha de Revisión</span>
+                <p class="mt-1 text-sm text-gray-900">{{ revision.fecha_creacion|date:"d/m/Y H:i" }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Estado</span>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 bg-green-100 text-green-800">
+                    {{ preinforme.get_estado_display }}
+                </span>
+            </div>
+            {% if revision.puntuacion %}
+            <div>
+                <span class="text-sm font-medium text-gray-500">Puntuación</span>
+                <p class="mt-1 text-sm text-gray-900">{{ revision.puntuacion }}/10</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Comparación Lado a Lado -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        <!-- Versión Original del Residente -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-user-graduate text-blue-600 mr-3"></i>
+                Tu Versión Original
+                <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Snapshot</span>
+            </h2>
+            
+            <div class="prose prose-blue prose-sm max-w-none bg-blue-50 p-4 rounded-lg border border-blue-200">
+                {% if revision.informe_residente_snapshot %}
+                    {{ revision.informe_residente_snapshot|safe }}
+                {% else %}
+                    <h3>TÉCNICA</h3>
+                    <div class="mb-4">{{ preinforme.tecnica|safe }}</div>
+                    
+                    <h3>HALLAZGOS</h3>
+                    <div class="mb-4">{{ preinforme.hallazgos|safe }}</div>
+                    
+                    <h3>CONCLUSIÓN</h3>
+                    <div>{{ preinforme.conclusion|safe }}</div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Versión Final del Staff -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-user-md text-green-600 mr-3"></i>
+                Versión Corregida del Staff
+                <span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Final</span>
+            </h2>
+            
+            <div class="prose prose-green prose-sm max-w-none bg-green-50 p-4 rounded-lg border border-green-200">
+                {% if revision.informe_final_html %}
+                    {{ revision.informe_final_html|safe }}
+                {% else %}
+                    <p class="text-gray-500 italic">El staff aún no ha finalizado la edición.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Comentarios del Revisor -->
+    {% if revision.comentarios_generales %}
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-comments text-orange-600 mr-3"></i>
+            Comentarios del Revisor
+        </h2>
+        
+        <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
+            <p class="text-gray-700 whitespace-pre-line">{{ revision.comentarios_generales }}</p>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Informe Final para EGES -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-file-export text-purple-600 mr-3"></i>
+            Informe Final para EGES
+            <button type="button" onclick="copiarInformeFinal()" 
+                    class="ml-4 inline-flex items-center px-3 py-1 border border-blue-300 rounded-md shadow-sm bg-blue-50 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                <i class="fas fa-copy mr-1"></i>
+                Copiar
+            </button>
+        </h2>
+        
+        <div id="informe-final-eges" class="prose prose-gray max-w-none bg-gray-50 p-6 rounded-lg border">
+            {{ revision.informe_final_html|safe }}
+        </div>
+    </div>
+
+    <!-- Botones de Navegación -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex flex-col sm:flex-row gap-4 justify-between">
+            <a href="{% url 'preinformes:mis_preinformes' %}" 
+               class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Mis Preinformes
+            </a>
+            
+            <a href="{% url 'preinformes:ver_preinforme' pk=preinforme.pk %}" 
+               class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                <i class="fas fa-eye mr-2"></i>
+                Ver Preinforme Completo
+            </a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+/**
+ * Copia el informe final con formato HTML enriquecido
+ * Soporta pegado en Word, Google Docs, etc. manteniendo formato
+ */
+function copiarInformeFinal() {
+    const previewElement = document.querySelector('#informe-final-eges');
+    if (!previewElement) {
+        mostrarNotificacion('No se encontró el informe para copiar', 'error');
+        return;
+    }
+    
+    let htmlContent = previewElement.innerHTML;
+    const htmlWithStyles = `
+        <div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">
+            ${htmlContent}
+        </div>
+    `;
+    const plainText = previewElement.innerText || previewElement.textContent;
+    
+    if (navigator.clipboard && window.ClipboardItem) {
+        try {
+            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+            const textBlob = new Blob([plainText], { type: 'text/plain' });
+            const clipboardItem = new ClipboardItem({
+                'text/html': htmlBlob,
+                'text/plain': textBlob
+            });
+            
+            navigator.clipboard.write([clipboardItem])
+                .then(() => mostrarNotificacion('¡Informe copiado con formato!', 'success'))
+                .catch(err => {
+                    console.error('Error con ClipboardItem:', err);
+                    copiarConFallbackHTML(htmlWithStyles, plainText);
+                });
+        } catch (err) {
+            console.error('Error creando ClipboardItem:', err);
+            copiarConFallbackHTML(htmlWithStyles, plainText);
+        }
+    } else {
+        copiarConFallbackHTML(htmlWithStyles, plainText);
+    }
+}
+
+function copiarConFallbackHTML(htmlContent, plainText) {
+    const tempDiv = document.createElement('div');
+    tempDiv.contentEditable = 'true';
+    tempDiv.style.position = 'fixed';
+    tempDiv.style.left = '-9999px';
+    tempDiv.innerHTML = htmlContent;
+    document.body.appendChild(tempDiv);
+    
+    try {
+        const range = document.createRange();
+        range.selectNodeContents(tempDiv);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        if (document.execCommand('copy')) {
+            mostrarNotificacion('¡Informe copiado con formato!', 'success');
+        } else {
+            throw new Error('execCommand falló');
+        }
+    } catch (err) {
+        console.error('Error con fallback HTML:', err);
+        copiarTextoPlano(plainText);
+    } finally {
+        document.body.removeChild(tempDiv);
+        window.getSelection().removeAllRanges();
+    }
+}
+
+function copiarTextoPlano(texto) {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        mostrarNotificacion('Informe copiado (texto plano)', 'success');
+    } catch (err) {
+        mostrarNotificacion('Error al copiar al portapapeles', 'error');
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
+
+function mostrarNotificacion(mensaje, tipo) {
+    const notification = document.createElement('div');
+    notification.textContent = mensaje;
+    notification.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
+        tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+        }
+    }, 3000);
+}
+</script>
+
+{% endblock %}

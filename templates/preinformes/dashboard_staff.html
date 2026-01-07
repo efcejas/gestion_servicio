@@ -1,0 +1,191 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Dashboard Staff - Preinformes{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    .stats-card-warning {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        color: white;
+    }
+    .stats-card-info {
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        color: #2d3748;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <!-- Header -->
+    <div class="mb-6">
+        <h1 class="text-3xl font-bold text-gray-900">Dashboard Staff - Preinformes</h1>
+        <p class="text-gray-600 mt-2">Revisión y corrección de preinformes de residentes</p>
+    </div>
+
+    <!-- Estadísticas rápidas -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="bg-red-500 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white opacity-90">Pendientes de Revisión</p>
+                    <p class="text-3xl font-bold">{{ pendientes_revision }}</p>
+                </div>
+                <div class="p-3 bg-white bg-opacity-20 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-card-warning rounded-lg shadow-lg p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white opacity-90">En Mi Revisión</p>
+                    <p class="text-3xl font-bold">{{ en_revision }}</p>
+                </div>
+                <div class="p-3 bg-white bg-opacity-20 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-card-info rounded-lg shadow-lg p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium opacity-90">Este Mes</p>
+                    <p class="text-3xl font-bold">{{ total_preinformes_mes }}</p>
+                </div>
+                <div class="p-3 bg-white bg-opacity-20 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-card rounded-lg shadow-lg p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white opacity-90">Estadísticas</p>
+                    <a href="{% url 'preinformes:estadisticas' %}" class="text-xl font-bold hover:underline">
+                        Ver más →
+                    </a>
+                </div>
+                <div class="p-3 bg-white bg-opacity-20 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido principal -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Acciones rápidas -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Acciones de Revisión</h2>
+            <div class="space-y-4">
+                <a href="{% url 'preinformes:lista_revision' %}" 
+                   class="flex items-center p-4 bg-red-50 hover:bg-red-100 rounded-lg transition-colors group">
+                    <div class="p-2 bg-red-500 text-white rounded-lg mr-4">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-medium text-gray-900">Revisar Preinformes</h3>
+                        <p class="text-sm text-gray-600">
+                            {% if pendientes_revision > 0 %}
+                                {{ pendientes_revision }} preinforme(s) esperando revisión
+                            {% else %}
+                                No hay preinformes pendientes
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% if pendientes_revision > 0 %}
+                    <div class="ml-4">
+                        <span class="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                            {{ pendientes_revision }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </a>
+
+                {% if user.rol in 'jefe_residentes,instructor_residentes,jefe_servicio' %}
+                <a href="{% url 'preinformes:estadisticas' %}" 
+                   class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
+                    <div class="p-2 bg-blue-500 text-white rounded-lg mr-4">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-medium text-gray-900">Ver Estadísticas</h3>
+                        <p class="text-sm text-gray-600">Estadísticas generales del sistema</p>
+                    </div>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Últimos preinformes pendientes -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4">Últimos Pendientes</h2>
+            {% if ultimos_pendientes %}
+                <div class="space-y-3">
+                    {% for preinforme in ultimos_pendientes %}
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex-1">
+                            <h4 class="font-medium text-gray-900">{{ preinforme.numero_estudio }}</h4>
+                            <p class="text-sm text-gray-600">
+                                {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                Por {{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ preinforme.tipo_estudio.nombre }} - {{ preinforme.region.nombre }}
+                            </p>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <span class="text-xs text-gray-500">
+                                {{ preinforme.fecha_envio_revision|date:"d/m/Y H:i" }}
+                            </span>
+                            <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}" 
+                               class="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1">
+                                Revisar →
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-4">
+                    <a href="{% url 'preinformes:lista_revision' %}" 
+                       class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        Ver todos →
+                    </a>
+                </div>
+            {% else %}
+                <div class="text-center py-8">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No hay preinformes pendientes</h3>
+                    <p class="mt-1 text-sm text-gray-500">Todos los preinformes han sido revisados.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

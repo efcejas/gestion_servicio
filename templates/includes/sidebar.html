@@ -181,6 +181,12 @@
             {% endif %}
             {% endcomment %}
             
+            <!-- PREINFORMES DE RESIDENTES - MOVIDO AL NAVBAR PRINCIPAL -->
+            {% comment %}
+            Los preinformes ahora están disponibles en el navbar principal para usuarios normales,
+            no en el sidebar de admin
+            {% endcomment %}
+            
             {% if SANATORIO_MODULOS.eges_import and user.is_superuser %}
             <!-- Importación EGES (solo superuser) -->
             <li>

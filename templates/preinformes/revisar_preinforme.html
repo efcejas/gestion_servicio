@@ -1,0 +1,370 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block page_title %}{{ title }}{% endblock %}
+{% block page_description %}Revisión de preinforme de {{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-lg overflow-hidden">
+            <div class="px-6 py-8">
+                <div class="flex items-center">
+                    <i class="fas fa-user-md text-white text-3xl mr-4"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold text-white">Revisión de Preinforme</h1>
+                        <p class="text-blue-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Estudio -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Información del Estudio</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <span class="text-sm font-medium text-gray-500">Número de Estudio</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.numero_estudio }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Tipo de Estudio</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Región</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.region.nombre }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Residente</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Fecha de Creación</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.fecha_creacion|date:"d/m/Y H:i" }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Estado</span>
+                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1
+                    {% if preinforme.estado == 'en_revision' %}bg-orange-100 text-orange-800{% endif %}
+                    {% if preinforme.estado == 'pendiente_revision' %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ preinforme.get_estado_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Información del Paciente -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">Información del Paciente</h2>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div>
+                <span class="text-sm font-medium text-gray-500">Apellido</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.apellido_paciente }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Nombre</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.nombre_paciente }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">DNI</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.dni_paciente }}</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Edad</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.edad_paciente }} años</p>
+            </div>
+            <div>
+                <span class="text-sm font-medium text-gray-500">Sexo</span>
+                <p class="mt-1 text-sm text-gray-900">{{ preinforme.get_sexo_paciente_display }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preinforme Original del Residente (Solo Lectura) -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-user-graduate text-blue-600 mr-3"></i>
+            Preinforme Original del Residente
+            <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Solo Lectura</span>
+        </h2>
+        
+        <div class="prose prose-gray max-w-none bg-gray-50 p-6 rounded-lg border">
+            <h3>TÉCNICA</h3>
+            <div class="mb-6">{{ preinforme.tecnica|safe }}</div>
+            
+            <h3>HALLAZGOS</h3>
+            <div class="mb-6">{{ preinforme.hallazgos|safe }}</div>
+            
+            <h3>CONCLUSIÓN</h3>
+            <div>{{ preinforme.conclusion|safe }}</div>
+        </div>
+    </div>
+
+    <!-- Formulario de Revisión del Staff -->
+    <form method="post">
+        {% csrf_token %}
+        
+        <!-- Editor del Staff -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-edit text-green-600 mr-3"></i>
+                Edición del Staff
+                <span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Modifique solo lo necesario</span>
+            </h2>
+            
+            <div class="mb-4">
+                <p class="text-sm text-gray-600 mb-4">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    El editor está pre-cargado con el contenido del residente. Modifique solo las palabras, frases o secciones que necesiten corrección.
+                </p>
+                
+                <label for="{{ form.informe_final_html.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Informe Final para EGES
+                </label>
+                {{ form.informe_final_html }}
+                {% if form.informe_final_html.errors %}
+                    <div class="text-red-600 text-sm mt-1">{{ form.informe_final_html.errors.0 }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Feedback para el Residente -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-comments text-orange-600 mr-3"></i>
+                Feedback para el Residente
+            </h2>
+            
+            <div class="space-y-6">
+                <div>
+                    <label for="{{ form.comentarios_generales.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Comentarios Generales
+                    </label>
+                    {{ form.comentarios_generales }}
+                    {% if form.comentarios_generales.errors %}
+                        <div class="text-red-600 text-sm mt-1">{{ form.comentarios_generales.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="{{ form.puntuacion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Puntuación (1-10)
+                        </label>
+                        {{ form.puntuacion }}
+                        {% if form.puntuacion.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.puntuacion.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista Previa del Informe Final -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-file-export text-purple-600 mr-3"></i>
+                Vista Previa para Copiar a EGES
+                <button type="button" onclick="copiarInformeFinal()" 
+                        class="ml-4 inline-flex items-center px-3 py-1 border border-blue-300 rounded-md shadow-sm bg-blue-50 text-xs font-medium text-blue-700 hover:bg-blue-100">
+                    <i class="fas fa-copy mr-1"></i>
+                    Copiar
+                </button>
+            </h2>
+            
+            <div id="informe-preview" class="prose prose-gray max-w-none bg-gray-50 p-6 rounded-lg border">
+                {% if revision.informe_final_html %}
+                    {{ revision.informe_final_html|safe }}
+                {% else %}
+                    <p class="text-gray-500 italic">La vista previa se actualizará al modificar el editor arriba.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex flex-col sm:flex-row gap-4 justify-end">
+                <a href="{% url 'preinformes:lista_revision' %}" 
+                   class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-times mr-2"></i>
+                    Cancelar
+                </a>
+                
+                <button type="submit" name="guardar_y_continuar"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-save mr-2"></i>
+                    Guardar y Continuar
+                </button>
+                
+                <button type="submit" name="finalizar_revision"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200"
+                        onclick="return confirm('¿Está seguro de finalizar la revisión? Esta acción no se puede deshacer.')">
+                    <i class="fas fa-check mr-2"></i>
+                    Finalizar Revisión
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <!-- CKEditor 5 Media (JS/CSS) -->
+    {{ form.media }}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Actualizar vista previa en tiempo real (si CKEditor está disponible)
+    // Esto dependerá de la implementación específica de django-ckeditor-5
+    const previewDiv = document.getElementById('informe-preview');
+    
+    // Función para actualizar vista previa
+    function actualizarVistaPrevia(content) {
+        if (content) {
+            previewDiv.innerHTML = content;
+        }
+    }
+    
+    // Escuchar cambios en CKEditor si está disponible
+    // Esto se conectará cuando CKEditor esté listo
+    if (window.CKEDITOR) {
+        // Implementar listener de CKEditor aquí
+        // La implementación específica dependerá de django-ckeditor-5
+    }
+});
+
+/**
+ * Copia el informe final con formato HTML enriquecido
+ * Soporta pegado en Word, Google Docs, etc. manteniendo formato
+ */
+function copiarInformeFinal() {
+    // Obtener HTML del editor/preview
+    const previewElement = document.querySelector('#informe-preview');
+    if (!previewElement) {
+        mostrarNotificacion('No se encontró el informe para copiar', 'error');
+        return;
+    }
+    
+    // Obtener HTML limpio
+    let htmlContent = previewElement.innerHTML;
+    
+    // Wrapper con estilos básicos inline para mejor compatibilidad con Word
+    const htmlWithStyles = `
+        <div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">
+            ${htmlContent}
+        </div>
+    `;
+    
+    // Generar versión texto plano (fallback)
+    const plainText = previewElement.innerText || previewElement.textContent;
+    
+    // Intentar copiar con ClipboardItem (soporta múltiples MIME types)
+    if (navigator.clipboard && window.ClipboardItem) {
+        try {
+            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+            const textBlob = new Blob([plainText], { type: 'text/plain' });
+            
+            const clipboardItem = new ClipboardItem({
+                'text/html': htmlBlob,
+                'text/plain': textBlob
+            });
+            
+            navigator.clipboard.write([clipboardItem])
+                .then(() => {
+                    mostrarNotificacion('¡Informe copiado con formato!', 'success');
+                })
+                .catch(err => {
+                    console.error('Error con ClipboardItem:', err);
+                    copiarConFallbackHTML(htmlWithStyles, plainText);
+                });
+        } catch (err) {
+            console.error('Error creando ClipboardItem:', err);
+            copiarConFallbackHTML(htmlWithStyles, plainText);
+        }
+    } else {
+        // Fallback para navegadores sin ClipboardItem
+        copiarConFallbackHTML(htmlWithStyles, plainText);
+    }
+}
+
+/**
+ * Fallback: Copia HTML usando contentEditable y execCommand
+ */
+function copiarConFallbackHTML(htmlContent, plainText) {
+    // Crear elemento temporal contentEditable
+    const tempDiv = document.createElement('div');
+    tempDiv.contentEditable = 'true';
+    tempDiv.style.position = 'fixed';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '0';
+    tempDiv.innerHTML = htmlContent;
+    document.body.appendChild(tempDiv);
+    
+    try {
+        // Seleccionar todo el contenido
+        const range = document.createRange();
+        range.selectNodeContents(tempDiv);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        // Copiar con execCommand (incluye formato)
+        const success = document.execCommand('copy');
+        
+        if (success) {
+            mostrarNotificacion('¡Informe copiado con formato!', 'success');
+        } else {
+            throw new Error('execCommand falló');
+        }
+    } catch (err) {
+        console.error('Error con fallback HTML:', err);
+        // Último recurso: copiar solo texto plano
+        copiarTextoPlano(plainText);
+    } finally {
+        document.body.removeChild(tempDiv);
+        window.getSelection().removeAllRanges();
+    }
+}
+
+/**
+ * Último recurso: Copiar solo texto plano
+ */
+function copiarTextoPlano(texto) {
+    const textarea = document.createElement('textarea');
+    textarea.value = texto;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        mostrarNotificacion('Informe copiado (texto plano)', 'success');
+    } catch (err) {
+        mostrarNotificacion('Error al copiar al portapapeles', 'error');
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
+
+function mostrarNotificacion(mensaje, tipo) {
+    const notification = document.createElement('div');
+    notification.textContent = mensaje;
+    notification.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
+        tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+    }`;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+        }
+    }, 3000);
+}
+</script>
+
+{% endblock %}

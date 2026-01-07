@@ -1,0 +1,312 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-section {
+        background: white;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4">
+    <!-- Header Card -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-file-medical text-white text-3xl"></i>
+                </div>
+                <div class="ml-4">
+                    <h1 class="text-2xl font-bold text-white">{{ title }}</h1>
+                    <p class="text-blue-100 mt-1">Complete todos los campos del preinforme</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Información del Estudio -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-3"></i>
+                    Información del Estudio
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="{{ form.numero_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Número de Estudio *
+                        </label>
+                        {{ form.numero_estudio }}
+                        {% if form.numero_estudio.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.numero_estudio.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.tipo_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Tipo de Estudio *
+                        </label>
+                        {{ form.tipo_estudio }}
+                        {% if form.tipo_estudio.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.tipo_estudio.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.region.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Región *
+                        </label>
+                        {{ form.region }}
+                        {% if form.region.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.region.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Plantilla (Opcional)
+                        </label>
+                        {{ form.plantilla_utilizada }}
+                        {% if form.plantilla_utilizada.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.plantilla_utilizada.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Información del Paciente -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-user text-green-600 mr-3"></i>
+                    Información del Paciente
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Apellido *
+                        </label>
+                        {{ form.apellido_paciente }}
+                        {% if form.apellido_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.apellido_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Nombre *
+                        </label>
+                        {{ form.nombre_paciente }}
+                        {% if form.nombre_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.nombre_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.dni_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            DNI *
+                        </label>
+                        {{ form.dni_paciente }}
+                        {% if form.dni_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.dni_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.edad_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Edad *
+                        </label>
+                        {{ form.edad_paciente }}
+                        {% if form.edad_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.edad_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.sexo_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Sexo *
+                        </label>
+                        {{ form.sexo_paciente }}
+                        {% if form.sexo_paciente.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.sexo_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido del Preinforme -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
+                    Contenido del Preinforme
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label for="{{ form.tecnica.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Técnica *
+                        </label>
+                        {{ form.tecnica }}
+                        {% if form.tecnica.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.tecnica.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.hallazgos.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Hallazgos *
+                        </label>
+                        {{ form.hallazgos }}
+                        {% if form.hallazgos.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.hallazgos.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.conclusion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Conclusión *
+                        </label>
+                        {{ form.conclusion }}
+                        {% if form.conclusion.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.conclusion.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+            <div class="flex flex-col sm:flex-row gap-4 justify-end">
+                <a href="{% url 'preinformes:dashboard_residente' %}" 
+                   class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-times mr-2"></i>
+                    Cancelar
+                </a>
+                
+                <button type="submit" name="guardar_y_continuar"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
+                    <i class="fas fa-save mr-2"></i>
+                    Guardar y Continuar
+                </button>
+                
+                <button type="submit" name="guardar_y_enviar"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200"
+                        onclick="return confirm('¿Está seguro de enviar el preinforme para revisión? No podrá modificarlo después.')">
+                    <i class="fas fa-paper-plane mr-2"></i>
+                    Enviar para Revisión
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+    const regionSelect = document.getElementById('id_region');
+    const plantillaSelect = document.getElementById('id_plantilla');
+
+    function cargarPlantillas() {
+        const tipoEstudioId = tipoEstudioSelect.value;
+        const regionId = regionSelect.value;
+
+        if (tipoEstudioId && regionId) {
+            fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Limpiar opciones existentes
+                    plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+                    
+                    // Agregar nuevas opciones
+                    data.plantillas.forEach(plantilla => {
+                        const option = document.createElement('option');
+                        option.value = plantilla.id;
+                        option.textContent = plantilla.nombre;
+                        option.dataset.contenido = plantilla.contenido;
+                        plantillaSelect.appendChild(option);
+                    });
+                });
+        } else {
+            plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+        }
+    }
+
+    function aplicarPlantilla() {
+        const selectedOption = plantillaSelect.options[plantillaSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.contenido) {
+            const contenido = selectedOption.dataset.contenido;
+            
+            // Verificar si CKEditor está disponible e inicializado
+            if (typeof CKEDITOR !== 'undefined') {
+                // Si hay marcador {HALLAZGOS}, dividir el contenido
+                if (contenido.includes('{HALLAZGOS}')) {
+                    const partes = contenido.split('{HALLAZGOS}');
+                    
+                    // Usar CKEditor API para establecer contenido
+                    if (CKEDITOR.instances['id_tecnica']) {
+                        CKEDITOR.instances['id_tecnica'].setData(partes[0].trim());
+                    }
+                    if (partes.length > 1 && CKEDITOR.instances['id_conclusion']) {
+                        CKEDITOR.instances['id_conclusion'].setData(partes[1].trim());
+                    }
+                    // Enfocar en el editor de hallazgos
+                    if (CKEDITOR.instances['id_hallazgos']) {
+                        CKEDITOR.instances['id_hallazgos'].focus();
+                    }
+                } else {
+                    // Si no hay marcador, poner todo en técnica
+                    if (CKEDITOR.instances['id_tecnica']) {
+                        CKEDITOR.instances['id_tecnica'].setData(contenido);
+                    }
+                }
+            } else {
+                // Fallback para textareas normales
+                const tecnicaTextarea = document.getElementById('id_tecnica');
+                const hallazgosTextarea = document.getElementById('id_hallazgos');
+                const conclusionTextarea = document.getElementById('id_conclusion');
+                
+                if (contenido.includes('{HALLAZGOS}')) {
+                    const partes = contenido.split('{HALLAZGOS}');
+                    tecnicaTextarea.value = partes[0].trim();
+                    if (partes.length > 1) {
+                        conclusionTextarea.value = partes[1].trim();
+                    }
+                    hallazgosTextarea.focus();
+                } else {
+                    tecnicaTextarea.value = contenido;
+                }
+            }
+        }
+    }
+
+    tipoEstudioSelect.addEventListener('change', cargarPlantillas);
+    regionSelect.addEventListener('change', cargarPlantillas);
+    plantillaSelect.addEventListener('change', aplicarPlantilla);
+
+    // Cargar plantillas al inicio si hay valores seleccionados
+    if (tipoEstudioSelect.value && regionSelect.value) {
+        cargarPlantillas();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test UI Preinforme</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <h1 class="text-3xl font-bold text-gray-900 mb-8">Test UI - Formulario de Preinforme</h1>
+        
+        <!-- Test del Editor TinyMCE -->
+        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
+                    Test del Editor de Texto Enriquecido
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Técnica *
+                        </label>
+                        <textarea id="tecnica" name="tecnica" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900">Técnica utilizada para el estudio...</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Hallazgos *
+                        </label>
+                        <textarea id="hallazgos" name="hallazgos" rows="6" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900">Descripción de los hallazgos encontrados...</textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            Conclusión *
+                        </label>
+                        <textarea id="conclusion" name="conclusion" rows="4" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900">Conclusión del estudio...</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Inicializar TinyMCE con la misma configuración
+        tinymce.init({
+            selector: '#tecnica, #hallazgos, #conclusion',
+            height: 200,
+            menubar: false,
+            plugins: [
+                'advlist', 'autolink', 'lists', 'link', 'charmap', 'preview',
+                'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                'insertdatetime', 'table', 'wordcount', 'autosave'
+            ],
+            toolbar: 'undo redo | formatselect | bold italic underline | \
+                      alignleft aligncenter alignright alignjustify | \
+                      bullist numlist outdent indent | removeformat | code | \
+                      forecolor backcolor | subscript superscript',
+            formats: {
+                alignleft: { selector: 'p,h1,h2,h3,h4,h5,h6,td,th,div,ul,ol,li,table,img', styles: { textAlign: 'left' } },
+                aligncenter: { selector: 'p,h1,h2,h3,h4,h5,h6,td,th,div,ul,ol,li,table,img', styles: { textAlign: 'center' } },
+                alignright: { selector: 'p,h1,h2,h3,h4,h5,h6,td,th,div,ul,ol,li,table,img', styles: { textAlign: 'right' } },
+                alignjustify: { selector: 'p,h1,h2,h3,h4,h5,h6,td,th,div,ul,ol,li,table,img', styles: { textAlign: 'justify' } }
+            },
+            branding: false,
+            resize: true,
+            content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.4; }',
+            setup: function (editor) {
+                editor.on('change', function () {
+                    console.log('Editor content changed');
+                    editor.save();
+                });
+            }
+        });
+    </script>
+</body>
+</html>

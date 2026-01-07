@@ -1,0 +1,95 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Test TinyMCE{% endblock %}
+
+{% block extra_css %}
+<!-- TinyMCE -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tinymce/6.8.3/tinymce.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">Test TinyMCE - Preinformes</h1>
+    
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <form method="post">
+            <div class="space-y-6">
+                <div>
+                    <label for="tecnica" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Técnica *
+                    </label>
+                    <textarea id="tecnica" name="tecnica" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        Escriba aquí la técnica utilizada...
+                    </textarea>
+                </div>
+
+                <div>
+                    <label for="hallazgos" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Hallazgos *
+                    </label>
+                    <textarea id="hallazgos" name="hallazgos" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        Escriba aquí los hallazgos encontrados...
+                    </textarea>
+                </div>
+
+                <div>
+                    <label for="conclusion" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Conclusión *
+                    </label>
+                    <textarea id="conclusion" name="conclusion" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        Escriba aquí la conclusión del estudio...
+                    </textarea>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button type="button" onclick="getContent()" class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Test: Obtener Contenido
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inicializando TinyMCE...');
+    
+    tinymce.init({
+        selector: '#tecnica, #hallazgos, #conclusion',
+        height: 300,
+        menubar: false,
+        statusbar: true,
+        plugins: [
+            'advlist', 'autolink', 'lists', 'link', 'charmap',
+            'searchreplace', 'visualblocks', 'code',
+            'insertdatetime', 'table', 'wordcount'
+        ],
+        toolbar: 'undo redo | formatselect | bold italic underline | ' +
+                 'alignleft aligncenter alignright alignjustify | ' +
+                 'bullist numlist | outdent indent | ' +
+                 'forecolor backcolor | subscript superscript | ' +
+                 'removeformat code',
+        branding: false,
+        resize: true,
+        content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6; padding: 10px; }',
+        init_instance_callback: function (editor) {
+            console.log('TinyMCE editor inicializado: ' + editor.id);
+        },
+        setup: function (editor) {
+            editor.on('change', function () {
+                console.log('Contenido cambiado en editor: ' + editor.id);
+                editor.save();
+            });
+        }
+    });
+});
+
+function getContent() {
+    console.log('Técnica:', tinymce.get('tecnica').getContent());
+    console.log('Hallazgos:', tinymce.get('hallazgos').getContent());
+    console.log('Conclusión:', tinymce.get('conclusion').getContent());
+    alert('Revisa la consola para ver el contenido');
+}
+</script>
+{% endblock %}
