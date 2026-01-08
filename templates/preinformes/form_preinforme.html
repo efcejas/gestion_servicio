@@ -76,13 +76,35 @@
                     </div>
 
                     <div>
-                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Plantilla (Opcional)
+                        <label for="{{ form.sistema_destino.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Sistema Destino *
+                        </label>
+                        {{ form.sistema_destino }}
+                        {% if form.sistema_destino.errors %}
+                            <div class="text-red-600 text-sm mt-1">{{ form.sistema_destino.errors.0 }}</div>
+                        {% endif %}
+                        <p class="text-xs text-gray-500 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <strong>EGES:</strong> Permite acentos y ñ | 
+                            <strong>Netterm:</strong> Sin acentos ni ñ
+                        </p>
+                    </div>
+
+                    <div>
+                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2 flex items-center justify-between">
+                            <span>Plantilla (Opcional)</span>
+                            <button type="button" 
+                                    id="btnNuevaPlantilla"
+                                    class="inline-flex items-center px-3 py-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-medium rounded-lg transition-all shadow-sm">
+                                <i class="fas fa-plus mr-1"></i>
+                                Nueva Plantilla
+                            </button>
                         </label>
                         {{ form.plantilla_utilizada }}
                         {% if form.plantilla_utilizada.errors %}
                             <div class="text-red-600 text-sm mt-1">{{ form.plantilla_utilizada.errors.0 }}</div>
                         {% endif %}
+                        <p class="text-xs text-gray-500 mt-1">Las plantillas se filtran según el sistema destino, tipo de estudio y región</p>
                     </div>
                 </div>
             </div>
@@ -298,21 +320,24 @@ document.addEventListener('DOMContentLoaded', function() {
     function cargarPlantillas() {
         const tipoEstudioId = tipoEstudioSelect.value;
         const regionId = regionSelect.value;
+        const sistemaDestino = document.getElementById('id_sistema_destino')?.value || 'eges';
 
         if (tipoEstudioId && regionId) {
-            fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}`)
+            fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
                 .then(response => response.json())
                 .then(data => {
                     // Limpiar opciones existentes
                     plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
                     
-                    // Agregar nuevas opciones
+                    // Agregar nuevas opciones con badge de sistema
                     data.plantillas.forEach(plantilla => {
                         const option = document.createElement('option');
                         option.value = plantilla.id;
-                        option.textContent = plantilla.nombre;
+                        option.textContent = plantilla.nombre + (plantilla.sistema_destino ? ` [${plantilla.sistema_destino}]` : '');
                         plantillaSelect.appendChild(option);
                     });
+                    
+                    console.log(`✅ ${data.plantillas.length} plantillas cargadas para sistema: ${sistemaDestino}`);
                 })
                 .catch(error => {
                     console.error('Error cargando plantillas:', error);
@@ -387,6 +412,12 @@ document.addEventListener('DOMContentLoaded', function() {
     tipoEstudioSelect.addEventListener('change', cargarPlantillas);
     regionSelect.addEventListener('change', cargarPlantillas);
     plantillaSelect.addEventListener('change', aplicarPlantilla);
+    
+    // Listener para sistema_destino: recargar plantillas cuando cambia
+    const sistemaDestinoField = document.getElementById('id_sistema_destino');
+    if (sistemaDestinoField) {
+        sistemaDestinoField.addEventListener('change', cargarPlantillas);
+    }
 
     // Cargar plantillas al inicio si hay valores seleccionados
     if (tipoEstudioSelect.value && regionSelect.value) {
@@ -540,6 +571,278 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     {% endif %}
+    
+    // Control del aviso de Netterm en el modal
+    const sistemaDestinoModal = document.getElementById('id_sistema_destino_modal');
+    const avisoNetterm = document.getElementById('avisoNetterm');
+    
+    if (sistemaDestinoModal && avisoNetterm) {
+        sistemaDestinoModal.addEventListener('change', function() {
+            if (this.value === 'netterm') {
+                avisoNetterm.classList.remove('hidden');
+            } else {
+                avisoNetterm.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Gestión del modal de nueva plantilla
+    const modal = document.getElementById('modalNuevaPlantilla');
+    const btnAbrir = document.getElementById('btnNuevaPlantilla');
+    const btnCerrar = document.getElementById('btnCerrarModal');
+    const btnCancelar = document.getElementById('btnCancelarPlantilla');
+    const formPlantilla = document.getElementById('formNuevaPlantilla');
+    const errorDiv = document.getElementById('errorPlantilla');
+    
+    console.log('🔍 Modal elements:', { modal, btnAbrir, btnCerrar, formPlantilla, errorDiv });
+    
+    // Abrir modal
+    if (btnAbrir) {
+        btnAbrir.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🖱️ Click en Nueva Plantilla');
+            
+            // Verificar que hay tipo de estudio y región seleccionados
+            const tipoEstudio = document.getElementById('id_tipo_estudio').value;
+            const region = document.getElementById('id_region').value;
+            
+            console.log('📋 Tipo:', tipoEstudio, 'Región:', region);
+            
+            if (!tipoEstudio || !region) {
+                alert('Por favor, selecciona primero el Tipo de Estudio y la Región antes de crear una plantilla.');
+                return;
+            }
+            
+            console.log('✅ Abriendo modal...');
+            modal.style.display = 'flex';
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        });
+    } else {
+        console.error('❌ No se encontró el botón btnNuevaPlantilla');
+    }
+    
+    // Cerrar modal
+    function cerrarModal() {
+        if (modal) {
+            modal.style.display = 'none';
+            modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+        if (formPlantilla) {
+            formPlantilla.reset();
+            // Ocultar aviso de Netterm al cerrar
+            if (avisoNetterm) {
+                avisoNetterm.classList.add('hidden');
+            }
+        }
+        if (errorDiv) {
+            errorDiv.classList.add('hidden');
+        }
+    }
+    
+    if (btnCerrar) {
+        btnCerrar.addEventListener('click', cerrarModal);
+    }
+    
+    if (btnCancelar) {
+        btnCancelar.addEventListener('click', cerrarModal);
+    }
+    
+    // Cerrar al hacer clic fuera del modal
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                cerrarModal();
+            }
+        });
+    }
+    
+    // Enviar formulario
+    if (formPlantilla) {
+        formPlantilla.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btnGuardar = document.getElementById('btnGuardarPlantilla');
+            btnGuardar.disabled = true;
+            btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Guardando...';
+            
+            const formData = new FormData(formPlantilla);
+            formData.append('tipo_estudio', document.getElementById('id_tipo_estudio').value);
+            formData.append('region', document.getElementById('id_region').value);
+            
+            try {
+                const response = await fetch('{% url "preinformes:crear_plantilla_residente" %}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Recargar las plantillas
+                    cargarPlantillas();
+                    
+                    // Mostrar mensaje de éxito
+                    alert(data.message);
+                    
+                    // Cerrar modal
+                    cerrarModal();
+                } else {
+                    // Mostrar error
+                    errorDiv.classList.remove('hidden');
+                    errorDiv.querySelector('p').textContent = data.error || 'Ocurrió un error al guardar la plantilla.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorDiv.classList.remove('hidden');
+                errorDiv.querySelector('p').textContent = 'Error de conexión. Por favor, intenta nuevamente.';
+            } finally {
+                btnGuardar.disabled = false;
+                btnGuardar.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar Plantilla';
+            }
+        });
+    }
 });
 </script>
+
+<!-- Modal para crear nueva plantilla -->
+<div id="modalNuevaPlantilla" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 overflow-y-auto" style="display: none;">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-4 flex flex-col overflow-hidden" style="max-height: calc(100vh - 4rem);">
+            <!-- Header del modal (fijo) -->
+            <div class="bg-gradient-to-r from-teal-600 to-cyan-600 px-5 py-3 rounded-t-2xl flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white flex items-center">
+                        <i class="fas fa-file-medical mr-2"></i>
+                        Crear Nueva Plantilla
+                    </h3>
+                    <button type="button" id="btnCerrarModal" class="text-white hover:text-gray-200 transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Contenido del modal (scrollable) -->
+            <form id="formNuevaPlantilla" class="flex-1 overflow-y-auto">
+                <div class="p-5 space-y-3">
+                    {% csrf_token %}
+                    
+                    <!-- Info -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p class="text-xs text-blue-800 flex items-start">
+                            <i class="fas fa-info-circle mt-0.5 mr-2 flex-shrink-0"></i>
+                            <span>Esta plantilla se asociará al <strong>tipo de estudio</strong> y <strong>región</strong> seleccionados.</span>
+                        </p>
+                    </div>
+                    
+                    <!-- Nombre de la plantilla -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Nombre de la Plantilla *
+                        </label>
+                        <input type="text" 
+                               name="nombre" 
+                               id="nombre_plantilla"
+                               required
+                               placeholder="Ej: TC Tórax Normal, RX Rodilla con Fractura..."
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                        <p class="text-xs text-gray-500 mt-0.5">Usa un nombre descriptivo y único</p>
+                    </div>
+                    
+                    <!-- Sistema Destino -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Sistema Destino *
+                        </label>
+                        <select name="sistema_destino" 
+                                id="id_sistema_destino_modal"
+                                required
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
+                            <option value="universal">Universal (ambos sistemas)</option>
+                            <option value="eges">EGES (con acentos y ñ)</option>
+                            <option value="netterm">Netterm (sin acentos ni ñ)</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Aviso Netterm -->
+                    <div id="avisoNetterm" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <p class="text-xs text-yellow-800 flex items-start">
+                            <i class="fas fa-exclamation-triangle mt-0.5 mr-2 flex-shrink-0 text-yellow-600"></i>
+                            <span><strong>¡Importante!</strong> Netterm no soporta tildes ni ñ. Escribe el texto sin estos caracteres (ej: "años" → "anos", "lesión" → "lesion").</span>
+                        </p>
+                    </div>
+                    
+                    <!-- Técnica -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Técnica (Opcional)
+                        </label>
+                        <textarea name="tecnica_template" 
+                                  rows="2"
+                                  placeholder="Describe la técnica utilizada..."
+                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
+                    </div>
+                    
+                    <!-- Hallazgos -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Hallazgos (Opcional)
+                        </label>
+                        <textarea name="hallazgos_template" 
+                                  rows="3"
+                                  placeholder="Describe los hallazgos principales..."
+                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
+                    </div>
+                    
+                    <!-- Conclusión -->
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">
+                            Conclusión (Opcional)
+                        </label>
+                        <textarea name="conclusion_template" 
+                                  rows="2"
+                                  placeholder="Escribe la conclusión o impresión diagnóstica..."
+                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
+                    </div>
+                    
+                    <!-- Compartir -->
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <label class="flex items-start cursor-pointer">
+                            <input type="checkbox" 
+                                   name="compartir" 
+                                   class="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500 mt-0.5">
+                            <span class="ml-2">
+                                <span class="text-sm font-medium text-gray-900 block">Compartir con todos</span>
+                                <span class="text-xs text-gray-600">Si no lo marcas, solo tú la verás</span>
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <!-- Mensaje de error -->
+                    <div id="errorPlantilla" class="hidden bg-red-50 border border-red-200 rounded-lg p-2">
+                        <p class="text-xs text-red-800"></p>
+                    </div>
+                </div>
+                
+                <!-- Botones (fijos en el footer) -->
+                <div class="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex-shrink-0">
+                    <button type="button" 
+                            id="btnCancelarPlantilla"
+                            class="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors">
+                        Cancelar
+                    </button>
+                    <button type="submit" 
+                            id="btnGuardarPlantilla"
+                            class="px-4 py-2 text-sm bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-medium rounded-lg transition-all shadow-lg">
+                        <i class="fas fa-save mr-1"></i>
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+</div>
+
 {% endblock %}

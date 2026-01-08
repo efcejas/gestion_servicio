@@ -16,7 +16,8 @@ from .models import (
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
-    RevisionPreinformeForm, PlantillaPreinformeForm
+    RevisionPreinformeForm, PlantillaPreinformeForm,
+    NuevaPlantillaResidenteForm
 )
 
 User = get_user_model()
@@ -340,23 +341,44 @@ def revisar_preinforme(request, pk):
 
 @login_required
 def cargar_plantillas(request):
-    """Cargar plantillas según tipo de estudio y región"""
+    """Cargar plantillas según tipo de estudio, región y sistema destino"""
     tipo_estudio_id = request.GET.get('tipo_estudio_id')
     region_id = request.GET.get('region_id')
+    sistema_destino = request.GET.get('sistema_destino', 'eges')
     
+    # Filtrar plantillas activas
     plantillas = PlantillaPreinforme.objects.filter(activa=True)
     
+    # Filtrar por tipo y región si se proporcionan
     if tipo_estudio_id:
         plantillas = plantillas.filter(tipo_estudio_id=tipo_estudio_id)
     
     if region_id:
         plantillas = plantillas.filter(region_id=region_id)
     
+    # Filtrar por sistema: mostrar plantillas del sistema específico o universales
+    plantillas = plantillas.filter(
+        Q(sistema_destino=sistema_destino) | Q(sistema_destino='universal')
+    )
+    
+    # Filtrar según permisos:
+    # - Plantillas públicas: todos las ven
+    # - Plantillas borrador: solo el creador las ve
+    if request.user.is_authenticated:
+        plantillas = plantillas.filter(
+            Q(estado='publica') | Q(creada_por=request.user)
+        )
+    else:
+        plantillas = plantillas.filter(estado='publica')
+    
     plantillas_data = [
         {
             'id': p.id, 
             'nombre': p.nombre,
-            'contenido': p.contenido
+            'contenido': p.contenido,
+            'es_propia': p.creada_por == request.user if request.user.is_authenticated else False,
+            'estado': p.estado,
+            'sistema_destino': p.get_sistema_destino_display()
         } 
         for p in plantillas
     ]
@@ -370,6 +392,10 @@ def plantilla_json(request, pk):
     try:
         plantilla = PlantillaPreinforme.objects.get(pk=pk, activa=True)
         
+        # Verificar permisos: pública o creada por el usuario
+        if plantilla.estado != 'publica' and plantilla.creada_por != request.user:
+            return JsonResponse({'error': 'No tienes permiso para acceder a esta plantilla'}, status=403)
+        
         data = {
             'tecnica': plantilla.tecnica_template or '',
             'hallazgos': plantilla.hallazgos_template or '',
@@ -382,6 +408,76 @@ def plantilla_json(request, pk):
     except PlantillaPreinforme.DoesNotExist:
         return JsonResponse({'error': 'Plantilla no encontrada'}, status=404)
 
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes')
+def crear_plantilla_residente(request):
+    """Vista AJAX para que residentes creen nuevas plantillas"""
+    if request.method == 'POST':
+        tipo_estudio_id = request.POST.get('tipo_estudio')
+        region_id = request.POST.get('region')
+        
+        try:
+            tipo_estudio = TipoEstudio.objects.get(id=tipo_estudio_id)
+            region = Region.objects.get(id=region_id)
+        except (TipoEstudio.DoesNotExist, Region.DoesNotExist):
+            return JsonResponse({
+                'success': False,
+                'error': 'Tipo de estudio o región no válidos'
+            }, status=400)
+        
+        form = NuevaPlantillaResidenteForm(
+            request.POST,
+            tipo_estudio=tipo_estudio,
+            region=region
+        )
+        
+        if form.is_valid():
+            # Verificar que no exista una plantilla con el mismo nombre para ese tipo/región
+            nombre = form.cleaned_data['nombre']
+            existe = PlantillaPreinforme.objects.filter(
+                nombre__iexact=nombre,
+                tipo_estudio=tipo_estudio,
+                region=region
+            ).exists()
+            
+            if existe:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Ya existe una plantilla con el nombre "{nombre}" para {tipo_estudio.nombre} - {region.nombre}'
+                }, status=400)
+            
+            plantilla = form.save(commit=False)
+            plantilla.tipo_estudio = tipo_estudio
+            plantilla.region = region
+            plantilla.creada_por = request.user
+            plantilla.activa = True
+            
+            # Definir estado según checkbox de compartir
+            compartir = form.cleaned_data.get('compartir', False)
+            plantilla.estado = 'publica' if compartir else 'borrador'
+            
+            plantilla.save()
+            
+            return JsonResponse({
+                'success': True,
+                'plantilla': {
+                    'id': plantilla.id,
+                    'nombre': plantilla.nombre,
+                    'estado': plantilla.get_estado_display(),
+                    'es_publica': plantilla.estado == 'publica'
+                },
+                'message': f'Plantilla "{plantilla.nombre}" creada exitosamente. ' + 
+                          ('Visible para todos.' if compartir else 'Solo visible para ti.')
+            })
+        else:
+            errors = form.errors.as_json()
+            return JsonResponse({
+                'success': False,
+                'errors': errors
+            }, status=400)
+    
+    return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 @login_required
 def autosave_preinforme(request, pk):
@@ -554,11 +650,6 @@ def estadisticas(request):
     }
     
     return render(request, 'preinformes/estadisticas.html', context)
-
-
-def test_tinymce(request):
-    """Vista de prueba para TinyMCE"""
-    return render(request, 'preinformes/test_tinymce.html')
 
 
 @login_required

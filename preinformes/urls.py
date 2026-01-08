@@ -22,6 +22,7 @@ urlpatterns = [
     # AJAX
     path('cargar-plantillas/', views.cargar_plantillas, name='cargar_plantillas'),
     path('plantillas/<int:pk>/json/', views.plantilla_json, name='plantilla_json'),
+    path('plantillas/crear/', views.crear_plantilla_residente, name='crear_plantilla_residente'),
     path('<int:pk>/autosave/', views.autosave_preinforme, name='autosave_preinforme'),
     path('<int:pk>/generar-informe/', views.generar_informe_final, name='generar_informe_final'),
     path('copiar-informe/<int:pk>/', views.copiar_informe_final, name='copiar_informe_final'),
@@ -29,6 +30,4 @@ urlpatterns = [
     # Estadísticas
     path('estadisticas/', views.estadisticas, name='estadisticas'),
     
-    # Test TinyMCE
-    path('test-tinymce/', views.test_tinymce, name='test_tinymce'),
 ]

@@ -39,9 +39,28 @@ class Region(models.Model):
 
 class PlantillaPreinforme(models.Model):
     """Plantillas precargadas para preinformes"""
+    ESTADO_CHOICES = [
+        ('borrador', 'Borrador (Solo yo)'),
+        ('publica', 'Pública (Todos)'),
+    ]
+    
+    SISTEMA_CHOICES = [
+        ('eges', 'EGES (con acentos y ñ)'),
+        ('netterm', 'Netterm (sin acentos ni ñ)'),
+        ('universal', 'Universal (ambos sistemas)'),
+    ]
+    
     nombre = models.CharField(max_length=200)
     tipo_estudio = models.ForeignKey(TipoEstudio, on_delete=models.CASCADE)
     region = models.ForeignKey(Region, on_delete=models.CASCADE)
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='borrador')
+    sistema_destino = models.CharField(
+        max_length=20, 
+        choices=SISTEMA_CHOICES, 
+        default='universal',
+        verbose_name="Sistema destino",
+        help_text="Sistema para el que está diseñada esta plantilla"
+    )
     
     # Campos separados para cada sección
     tecnica_template = CKEditor5Field(
@@ -95,6 +114,11 @@ class Preinforme(models.Model):
         ('finalizado', 'Finalizado'),
     ]
     
+    SISTEMA_CHOICES = [
+        ('eges', 'EGES'),
+        ('netterm', 'Netterm'),
+    ]
+    
     # Identificación del estudio
     residente = models.ForeignKey(
         User, 
@@ -107,6 +131,13 @@ class Preinforme(models.Model):
     )
     tipo_estudio = models.ForeignKey(TipoEstudio, on_delete=models.CASCADE)
     region = models.ForeignKey(Region, on_delete=models.CASCADE)
+    sistema_destino = models.CharField(
+        max_length=20,
+        choices=SISTEMA_CHOICES,
+        default='eges',
+        verbose_name="Sistema destino",
+        help_text="Sistema donde se cargará este informe"
+    )
     plantilla_utilizada = models.ForeignKey(
         PlantillaPreinforme, 
         on_delete=models.SET_NULL, 

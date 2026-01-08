@@ -14,6 +14,7 @@ class PreinformeForm(forms.ModelForm):
             'numero_estudio',
             'tipo_estudio', 
             'region',
+            'sistema_destino',
             'plantilla_utilizada',
             'apellido_paciente',
             'nombre_paciente',
@@ -58,6 +59,10 @@ class PreinformeForm(forms.ModelForm):
             'region': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
                 'id': 'id_region'
+            }),
+            'sistema_destino': forms.Select(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
+                'id': 'id_sistema_destino'
             }),
             'plantilla_utilizada': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
@@ -210,3 +215,69 @@ class PlantillaPreinformeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['tipo_estudio'].queryset = TipoEstudio.objects.filter(activo=True)
         self.fields['region'].queryset = Region.objects.filter(activo=True)
+
+
+class NuevaPlantillaResidenteForm(forms.ModelForm):
+    """Formulario simplificado para que residentes creen plantillas"""
+    compartir = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Compartir con todos los residentes",
+        help_text="Si no se marca, solo tú podrás ver esta plantilla",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500'
+        })
+    )
+    
+    class Meta:
+        model = PlantillaPreinforme
+        fields = ['nombre', 'sistema_destino', 'tecnica_template', 'hallazgos_template', 'conclusion_template']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500',
+                'placeholder': 'Ej: TC Tórax Normal, RX Rodilla con Fractura...'
+            }),
+            'sistema_destino': forms.Select(attrs={
+                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500',
+                'id': 'id_sistema_destino_plantilla'
+            }),
+            'tecnica_template': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
+                'rows': 2,
+                'placeholder': 'Describe la técnica utilizada...'
+            }),
+            'hallazgos_template': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
+                'rows': 3,
+                'placeholder': 'Describe los hallazgos principales...'
+            }),
+            'conclusion_template': forms.Textarea(attrs={
+                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
+                'rows': 2,
+                'placeholder': 'Escribe la conclusión o impresión diagnóstica...'
+            }),
+        }
+    
+    def __init__(self, *args, tipo_estudio=None, region=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.tipo_estudio = tipo_estudio
+        self.region = region
+        
+        # Hacer que al menos un campo de contenido sea requerido
+        self.fields['tecnica_template'].required = False
+        self.fields['hallazgos_template'].required = False
+        self.fields['conclusion_template'].required = False
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        tecnica = cleaned_data.get('tecnica_template')
+        hallazgos = cleaned_data.get('hallazgos_template')
+        conclusion = cleaned_data.get('conclusion_template')
+        
+        # Al menos uno debe tener contenido
+        if not any([tecnica, hallazgos, conclusion]):
+            raise forms.ValidationError(
+                "Debe completar al menos una sección (Técnica, Hallazgos o Conclusión)"
+            )
+        
+        return cleaned_data
