@@ -17,6 +17,7 @@ urlpatterns = [
     # Revisión - Staff
     path('revision/', views.lista_revision, name='lista_revision'),
     path('revisar/<int:pk>/', views.revisar_preinforme, name='revisar_preinforme'),
+    path('revision/<int:pk>/autosave/', views.autosave_revision, name='autosave_revision'),
     path('comparacion/<int:pk>/', views.ver_comparacion_revision, name='comparacion_revision'),
     
     # AJAX

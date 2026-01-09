@@ -15,7 +15,7 @@
                             <i class="fas fa-file-medical text-2xl text-white"></i>
                         </div>
                         <div>
-                            <h1 class="text-3xl font-bold text-white">Dashboard de Preinformes</h1>
+                            <h1 class="text-3xl font-bold text-white">Panel de control de preinformes</h1>
                             <p class="text-teal-100 mt-1">Gestión de preinformes radiológicos para residentes</p>
                         </div>
                     </div>
@@ -72,15 +72,30 @@
             </div>
         </div>
 
-        <!-- Promedio Calificación -->
+        <!-- Nivel de Desempeño -->
         <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
             <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-purple-100 text-sm font-semibold">Promedio Calificación</p>
-                    <p class="text-3xl font-bold mt-1">{{ historial.promedio_calificacion|floatformat:1 }}%</p>
+                <div class="flex-1">
+                    <p class="text-purple-100 text-xs font-semibold mb-1">Tu Progreso</p>
+                    {% if historial.promedio_calificacion >= 90 %}
+                        <p class="text-lg font-bold">¡Crack total! 🌟</p>
+                        <p class="text-purple-100 text-xs mt-0.5">Rendimiento de primera</p>
+                    {% elif historial.promedio_calificacion >= 80 %}
+                        <p class="text-lg font-bold">¡La estás rompiendo! 💪</p>
+                        <p class="text-purple-100 text-xs mt-0.5">Vas re bien</p>
+                    {% elif historial.promedio_calificacion >= 70 %}
+                        <p class="text-lg font-bold">¡Dale que vas! 📈</p>
+                        <p class="text-purple-100 text-xs mt-0.5">Seguí así nomás</p>
+                    {% elif historial.promedio_calificacion >= 60 %}
+                        <p class="text-lg font-bold">¡Vamos arriba! 🚀</p>
+                        <p class="text-purple-100 text-xs mt-0.5">Cada día mejor</p>
+                    {% else %}
+                        <p class="text-lg font-bold">¡Dale para adelante! 💫</p>
+                        <p class="text-purple-100 text-xs mt-0.5">El esfuerzo vale la pena</p>
+                    {% endif %}
                 </div>
-                <div class="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-percentage text-2xl"></i>
+                <div class="text-right">
+                    <div class="text-3xl font-bold">{{ historial.promedio_calificacion|floatformat:0 }}</div>
                 </div>
             </div>
         </div>
@@ -174,7 +189,7 @@
             
             <div class="text-center">
                 <a href="{% url 'preinformes:mis_preinformes' %}" 
-                   class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg">
+                   class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:shadow-xl hover:scale-105 transition-all shadow-lg">
                     <i class="fas fa-list mr-2"></i>
                     Ver Todos los Preinformes
                 </a>
@@ -188,7 +203,7 @@
             <h3 class="text-lg font-semibold text-gray-900 mb-2">No hay preinformes aún</h3>
             <p class="text-gray-600 mb-6">¡Comienza creando tu primer preinforme!</p>
             <a href="{% url 'preinformes:crear_preinforme' %}" 
-               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg">
+               class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium rounded-xl hover:shadow-xl hover:scale-105 transition-all shadow-lg">
                 <i class="fas fa-plus mr-2"></i>
                 Crear mi Primer Preinforme
             </a>

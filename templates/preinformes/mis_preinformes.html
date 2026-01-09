@@ -3,20 +3,8 @@
 
 {% block title %}Mis Preinformes{% endblock %}
 
-{% block extra_css %}
-<style>
-    .filter-section {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
     <!-- Header Card con Gradiente -->
     <div class="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg mb-6 overflow-hidden">
         <div class="px-8 py-6">
@@ -33,6 +21,11 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
+                    <a href="{% url 'preinformes:dashboard_residente' %}" 
+                       class="inline-flex items-center px-4 py-3 bg-white/10 text-white border-2 border-white/30 font-medium rounded-xl hover:bg-white/20 transition-all">
+                        <i class="fas fa-arrow-left mr-2"></i>
+                        Volver al Dashboard
+                    </a>
                     <a href="{% url 'preinformes:crear_preinforme' %}" 
                        class="inline-flex items-center px-4 py-3 bg-white text-teal-600 font-medium rounded-xl hover:bg-teal-50 transition-all shadow-lg">
                         <i class="fas fa-plus mr-2"></i>
@@ -92,7 +85,7 @@
         {% if page_obj.object_list %}
             <div class="overflow-x-auto">
                 <table class="w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                    <thead class="bg-gray-100">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Estudio
@@ -135,7 +128,7 @@
                                 <div class="text-sm text-gray-500">{{ preinforme.region.nombre }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
                                     {% if preinforme.estado == 'borrador' %}bg-gradient-to-r from-gray-400 to-gray-500 text-white
                                     {% elif preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
                                     {% elif preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white

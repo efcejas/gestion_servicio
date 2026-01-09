@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.core.paginator import Paginator
 from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
+from django.views.decorators.http import require_http_methods
 
 from accounts.decorators import role_required
 from .models import (
@@ -300,7 +301,9 @@ def revisar_preinforme(request, pk):
     # CRÍTICO: Pre-cargar informe_final_html si está vacío
     # Esto debe hacerse ANTES de crear el form para que aparezca en el editor
     if not revision.informe_final_html:
-        revision.informe_final_html = revision.informe_residente_snapshot or revision.generar_informe_original_residente()
+        contenido_base = revision.informe_residente_snapshot or revision.generar_informe_original_residente()
+        # Cargar TAL CUAL sin modificaciones
+        revision.informe_final_html = contenido_base
         revision.save()
     
     if request.method == 'POST':
@@ -335,6 +338,43 @@ def revisar_preinforme(request, pk):
     }
     
     return render(request, 'preinformes/revisar_preinforme.html', context)
+
+
+# === AUTOSAVE ===
+
+@login_required
+@require_http_methods(["POST"])
+def autosave_revision(request, pk):
+    """Guarda automáticamente el informe_final_html sin recargar la página"""
+    try:
+        revision = get_object_or_404(
+            RevisionPreinforme,
+            pk=pk,
+            revisor=request.user
+        )
+        
+        import json
+        data = json.loads(request.body)
+        informe_html = data.get('informe_final_html', '')
+        
+        if not informe_html:
+            return JsonResponse({'success': False, 'error': 'Contenido vacío'}, status=400)
+        
+        # Guardar sin validaciones complejas
+        revision.informe_final_html = informe_html
+        revision.save(update_fields=['informe_final_html', 'fecha_modificacion'])
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Guardado automático exitoso',
+            'timestamp': revision.fecha_modificacion.isoformat()
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
 # === VISTAS AJAX ===

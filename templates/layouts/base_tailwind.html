@@ -259,9 +259,9 @@
                         {% url 'preinformes:dashboard_residente' as preinformes_url %}
                         {% if preinformes_url %}
                         <a href="{{ preinformes_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                             <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Preinformes
-                            {% if 'preinformes' in request.resolver_match.namespace|default:'' %}
+                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' %}
                             <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                             {% endif %}
                         </a>
@@ -273,9 +273,9 @@
                         {% url 'preinformes:dashboard_staff' as revision_url %}
                         {% if revision_url %}
                         <a href="{{ revision_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                             <i class="fas fa-user-md mr-2 group-hover:scale-110 transition-transform"></i>Revisión
-                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' %}
+                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}
                             <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                             {% endif %}
                         </a>

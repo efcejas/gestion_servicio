@@ -213,7 +213,7 @@
 
                     <div>
                         <label for="{{ form.conclusion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Conclusión *
+                            Conclusión 
                         </label>
                         {{ form.conclusion }}
                         {% if form.conclusion.errors %}
@@ -296,24 +296,30 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Convertir saltos de línea en párrafos HTML si el contenido no tiene HTML
+        if (content && !content.includes('<p>') && !content.includes('<br>')) {
+            // Dividir por saltos de línea y envolver cada línea en <p>
+            const lines = content.split('\n').filter(line => line.trim() !== '');
+            content = lines.map(line => `<p>${line.trim()}</p>`).join('');
+        }
+        
         // Intentar obtener la instancia del editor
         const editor = initializeEditorIfNeeded(fieldId);
         
         if (editor && typeof editor.setData === 'function') {
-            // Usar API de CKEditor 5
+            // Usar API de CKEditor 5 - setData espera HTML ya formateado
             try {
                 editor.setData(content);
-                console.log(`Contenido aplicado via CKEditor API para ${fieldId}`);
             } catch (error) {
-                console.warn(`Error usando CKEditor API para ${fieldId}:`, error);
+                console.warn(`Error aplicando contenido en ${fieldId}:`, error);
                 // Fallback a textarea
                 textarea.value = content;
             }
         } else {
-            // Fallback: establecer en textarea y disparar evento
+            // Fallback: establecer en textarea directamente (Django CKEditor lo procesará)
             textarea.value = content;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            console.log(`Contenido aplicado via textarea fallback para ${fieldId}`);
+            // Disparar evento para que Django CKEditor actualice su vista
+            textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
 
@@ -336,8 +342,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         option.textContent = plantilla.nombre + (plantilla.sistema_destino ? ` [${plantilla.sistema_destino}]` : '');
                         plantillaSelect.appendChild(option);
                     });
-                    
-                    console.log(`✅ ${data.plantillas.length} plantillas cargadas para sistema: ${sistemaDestino}`);
                 })
                 .catch(error => {
                     console.error('Error cargando plantillas:', error);
@@ -353,6 +357,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Aplicando plantilla ID:', plantillaId);
         
+        // Actualizar el campo hidden plantilla_utilizada
+        const plantillaUtilizadaField = document.getElementById('id_plantilla_utilizada');
+        if (plantillaUtilizadaField) {
+            plantillaUtilizadaField.value = plantillaId;
+        }
+        
         // Usar el nuevo endpoint JSON
         fetch(`{% url 'preinformes:plantilla_json' pk=0 %}`.replace('0', plantillaId))
             .then(response => {
@@ -362,8 +372,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
-                console.log('Datos de plantilla recibidos:', data);
-                
                 // Dar tiempo a CKEditor 5 para inicializar completamente
                 setTimeout(() => {
                     try {
@@ -377,8 +385,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (data.conclusion) {
                             setEditorContent('id_conclusion', data.conclusion);
                         }
-                        
-                        console.log('Plantilla aplicada exitosamente');
                         
                         // Foco en el primer campo con contenido o el primero disponible
                         const firstEmptyField = document.getElementById('id_tecnica').value.trim() === '' ? 'id_tecnica' :
@@ -404,7 +410,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Intentar inicializar editores después de un delay
     setTimeout(() => {
         ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
-            initializeEditorIfNeeded(fieldId);
+            const editor = initializeEditorIfNeeded(fieldId);
+            // Debug: Ver contenido actual del editor
+            if (editor && typeof editor.getData === 'function') {
+                const currentData = editor.getData();
+                if (currentData) {
+                    console.log(`📄 Contenido cargado en ${fieldId}:`, currentData);
+                }
+            }
         });
     }, 2000);
 

@@ -126,11 +126,11 @@
                             <div class="text-sm text-gray-500">{{ preinforme.region.nombre }}</div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
+                            <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
                                 {% if preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
                                 {% elif preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white
                                 {% endif %}">
-                                <i class="fas fa-circle text-xs mr-1"></i>
+                                <i class="fas fa-circle text-xs mr-1.5"></i>
                                 {{ preinforme.get_estado_display }}
                                 {% if preinforme.estado == 'en_revision' and preinforme.revisor %}
                                     ({{ preinforme.revisor.username }})

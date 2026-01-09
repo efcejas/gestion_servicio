@@ -3,8 +3,125 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django_ckeditor_5.fields import CKEditor5Field
+import re
+import html
 
 User = get_user_model()
+
+
+def has_real_text(html_content):
+    """
+    Detecta si hay texto real en el contenido HTML.
+    Considera vacío: <p>&nbsp;</p>, <p><br></p>, <p></p>, <p> </p>
+    """
+    if not html_content:
+        return False
+    
+    # Convertir entidades HTML
+    text = html.unescape(html_content)
+    
+    # Remover tags HTML
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Convertir &nbsp; a espacios
+    text = text.replace('&nbsp;', ' ')
+    text = text.replace('\xa0', ' ')  # non-breaking space
+    
+    # Remover espacios y saltos de línea
+    text = text.strip()
+    
+    return len(text) > 0
+
+
+def sanitize_center_alignment(html_content):
+    """
+    Elimina alineación centrada del HTML.
+    - Remueve <center> tags
+    - Remueve style="text-align:center"
+    - Remueve class="text-center" o similares
+    """
+    if not html_content:
+        return html_content
+    
+    # Remover tags <center>
+    html_content = re.sub(r'<center[^>]*>', '', html_content, flags=re.IGNORECASE)
+    html_content = re.sub(r'</center>', '', html_content, flags=re.IGNORECASE)
+    
+    # Remover style="text-align:center" y variantes
+    html_content = re.sub(r'style\s*=\s*["\']([^"\']*?)text-align\s*:\s*center\s*;?([^"\']*?)["\']', 
+                          r'style="\1\2"', html_content, flags=re.IGNORECASE)
+    
+    # Limpiar styles vacíos resultantes
+    html_content = re.sub(r'style\s*=\s*["\']["\']', '', html_content)
+    html_content = re.sub(r'style\s*=\s*["\']\s*["\']', '', html_content)
+    
+    # Remover classes que contengan text-center
+    html_content = re.sub(r'class\s*=\s*["\']([^"\']*?)text-center([^"\']*?)["\']',
+                          r'class="\1\2"', html_content, flags=re.IGNORECASE)
+    
+    return html_content
+
+
+def normalize_html_content(content):
+    """
+    Normaliza contenido para asegurar que tenga formato HTML con párrafos separados.
+    - Convierte <br> y <br/> a separadores de párrafos
+    - Convierte \n a separadores de párrafos
+    - Elimina párrafos vacíos (<p>&nbsp;</p>, <p></p>, etc.)
+    - Extrae contenido de <p> único con breaks y crea múltiples <p>
+    """
+    if not content:
+        return ''
+    
+    content = content.strip()
+    
+    # Paso 1: Si tiene <br> tags, convertirlos a saltos de línea temporales
+    # Esto incluye <br>, <br/>, <br />, <BR>, etc.
+    content = re.sub(r'<br\s*/?>', '\n', content, flags=re.IGNORECASE)
+    
+    # Paso 2: Eliminar párrafos vacíos ANTES de procesar
+    # Esto incluye <p>&nbsp;</p>, <p> </p>, <p></p>, <p><br></p>
+    content = re.sub(r'<p[^>]*>(\s|&nbsp;|<br\s*/?>)*</p>', '', content, flags=re.IGNORECASE)
+    
+    # Paso 3: Contar párrafos existentes
+    p_count = content.count('<p>') + content.count('<p ')
+    
+    # Paso 4: Si tiene un párrafo con saltos de línea, convertir a múltiples párrafos
+    if p_count >= 1 and '\n' in content:
+        # Extraer todo el contenido de los párrafos
+        # Puede haber múltiples <p> con \n dentro
+        def process_p_tag(match):
+            inner = match.group(1)
+            # Dividir por saltos de línea y crear párrafos individuales
+            lines = [line.strip() for line in inner.split('\n') if line.strip()]
+            return ''.join(f'<p>{line}</p>' for line in lines)
+        
+        # Procesar todos los tags <p>
+        content = re.sub(r'<p[^>]*>(.*?)</p>', process_p_tag, content, flags=re.DOTALL)
+        return content
+    
+    # Paso 5: Si ya tiene múltiples párrafos sin \n, devolver tal cual
+    if p_count > 1:
+        return content
+    
+    # Paso 6: Si tiene saltos de línea pero no tags <p>
+    if '\n' in content:
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        if lines:
+            return ''.join(f'<p>{line}</p>' for line in lines)
+    
+    # Paso 7: Si es un solo párrafo sin problemas o texto plano, envolverlo
+    if not content.startswith('<p'):
+        return f'<p>{content}</p>'
+    
+    return content
+
+
+def strip_html_tags(text):
+    """Remueve tags HTML y devuelve solo el texto"""
+    if not text:
+        return ''
+    return re.sub(r'<[^>]+>', '', text).strip()
 
 
 class TipoEstudio(models.Model):
@@ -172,7 +289,8 @@ class Preinforme(models.Model):
     )
     conclusion = CKEditor5Field(
         config_name='default',
-        help_text="Conclusión del residente"
+        help_text="Conclusión del residente",
+        blank=True
     )
     
     # Estado y revisión
@@ -272,18 +390,48 @@ class RevisionPreinforme(models.Model):
         return f"Revisión de {self.preinforme.numero_estudio} por {self.revisor.username}"
     
     def generar_informe_original_residente(self):
-        """Genera el informe completo del residente con títulos HTML"""
-        informe_html = f"""
-<h3>TÉCNICA</h3>
-{self.preinforme.tecnica}
-
-<h3>HALLAZGOS</h3>
-{self.preinforme.hallazgos}
-
-<h3>CONCLUSIÓN</h3>
-{self.preinforme.conclusion}
         """
-        return informe_html.strip()
+        Genera el informe completo del residente con formato médico estándar.
+        - Título SIN centrado (alineado a la izquierda)
+        - Párrafos correctamente separados
+        - Conclusión SOLO si hay texto real
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Obtener el nombre de la plantilla utilizada, o el tipo de estudio como fallback
+        if self.preinforme.plantilla_utilizada:
+            titulo = self.preinforme.plantilla_utilizada.nombre
+        else:
+            titulo = self.preinforme.tipo_estudio.nombre
+        
+        # Título SIN alineación centrada
+        informe_html = f'<p><strong>{titulo.upper()}</strong></p>'
+        
+        # Normalizar técnica
+        tecnica_normalizada = normalize_html_content(self.preinforme.tecnica)
+        informe_html += tecnica_normalizada
+        
+        # Normalizar hallazgos
+        hallazgos_normalizados = normalize_html_content(self.preinforme.hallazgos)
+        informe_html += hallazgos_normalizados
+        
+        # CONCLUSIÓN: Solo si tiene texto real
+        if has_real_text(self.preinforme.conclusion):
+            informe_html += '<p><strong>CONCLUSIÓN</strong></p>'
+            conclusion_normalizada = normalize_html_content(self.preinforme.conclusion)
+            informe_html += conclusion_normalizada
+            logger.info(f"✅ Conclusión incluida para preinforme {self.preinforme.numero_estudio}")
+        else:
+            logger.info(f"⏭️  Conclusión omitida (vacía) para preinforme {self.preinforme.numero_estudio}")
+        
+        # Sanitizar cualquier alineación centrada que pudiera existir
+        informe_html = sanitize_center_alignment(informe_html)
+        
+        # DEBUG: Mostrar HTML generado (primeros 500 caracteres)
+        logger.debug(f"\n{'='*60}\n📄 HTML generado para {self.preinforme.numero_estudio}:\n{informe_html[:500]}...\n{'='*60}\n")
+        
+        return informe_html
     
     def crear_snapshot_residente(self):
         """Crea un snapshot del informe original del residente"""
@@ -295,7 +443,9 @@ class RevisionPreinforme(models.Model):
         """Inicializa el informe final del staff con el contenido del residente"""
         if not self.informe_final_html:
             # Preferir snapshot si existe, sino generar
-            self.informe_final_html = self.informe_residente_snapshot or self.generar_informe_original_residente()
+            contenido_base = self.informe_residente_snapshot or self.generar_informe_original_residente()
+            # IMPORTANTE: Normalizar el HTML para que CKEditor muestre párrafos separados
+            self.informe_final_html = normalize_html_content(contenido_base)
             if save:
                 self.save()
     
