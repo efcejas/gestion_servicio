@@ -101,6 +101,77 @@
         </div>
     </div>
 
+    <!-- Card Informativa: Preinformes en Edición -->
+    {% if preinformes_en_edicion %}
+    <div class="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl shadow-lg p-6 mb-8 border border-amber-200">
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0">
+                <div class="w-12 h-12 bg-amber-500 rounded-xl flex items-center justify-center">
+                    <i class="fas fa-users-cog text-white text-xl"></i>
+                </div>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                    <i class="fas fa-info-circle text-amber-600 mr-2"></i>
+                    Preinformes en Trabajo Ahora
+                </h3>
+                <p class="text-sm text-gray-700 mt-1 mb-3">
+                    Estos estudios están siendo trabajados por otros residentes o en revisión por el staff:
+                </p>
+                <div class="space-y-2">
+                    {% for preinforme in preinformes_en_edicion %}
+                    <div class="bg-white rounded-lg p-3 border border-amber-200 flex items-center justify-between">
+                        <div class="flex items-center gap-3 flex-1">
+                            <div class="w-8 h-8 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                                <i class="fas fa-pen"></i>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <p class="text-sm font-medium text-gray-900">
+                                        <span class="font-bold text-amber-700">{{ preinforme.numero_estudio }}</span> - {{ preinforme.tipo_estudio.nombre }}
+                                    </p>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
+                                        {% if preinforme.estado == 'borrador' %}bg-gray-400 text-white
+                                        {% elif preinforme.estado == 'pendiente_revision' %}bg-yellow-400 text-white
+                                        {% elif preinforme.estado == 'en_revision' %}bg-orange-500 text-white
+                                        {% endif %}">
+                                        {{ preinforme.get_estado_display }}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-gray-600">
+                                    <span class="font-medium">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</span>
+                                    <span class="mx-1">•</span>
+                                    <span>DNI: {{ preinforme.dni_paciente|default:"S/D" }}</span>
+                                    <span class="mx-1">•</span>
+                                    <span>{{ preinforme.edad_paciente }} años</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right flex-shrink-0 ml-3">
+                            <p class="text-sm font-semibold text-amber-700">
+                                {{ preinforme.en_edicion_por.first_name }} {{ preinforme.en_edicion_por.last_name }}
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                {{ preinforme.ultima_actividad_edicion|timesince }} atrás
+                            </p>
+                            {% if preinforme.estado == 'en_revision' and preinforme.revisor %}
+                                <p class="text-xs text-orange-600 font-medium mt-0.5">
+                                    <i class="fas fa-user-md mr-1"></i>{{ preinforme.revisor.first_name }} {{ preinforme.revisor.last_name }}
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <p class="text-xs text-gray-600 mt-3 italic">
+                    <i class="fas fa-lightbulb text-amber-500 mr-1"></i>
+                    Evita trabajar en estos estudios para no duplicar esfuerzos
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Acciones Rápidas -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <!-- Nuevo Preinforme -->

@@ -225,6 +225,43 @@
 
     <!-- CKEditor 5 Media (JS/CSS) -->
     {{ form.media }}
+    
+    <!-- Modal de Alerta de Duplicados -->
+    <div id="modal-duplicados" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-2xl bg-white">
+            <div class="flex items-start justify-between mb-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-exclamation-triangle text-2xl text-red-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">⚠️ Posible Preinforme Duplicado</h3>
+                        <p class="text-sm text-gray-600 mt-1">Se encontró un preinforme existente similar</p>
+                    </div>
+                </div>
+                <button onclick="cerrarModalDuplicados()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div id="contenido-duplicados" class="mb-6">
+                <!-- Se llena dinámicamente -->
+            </div>
+            
+            <div class="flex gap-3 justify-end pt-4 border-t border-gray-200">
+                <button onclick="cerrarModalDuplicados()" 
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-check mr-2"></i>
+                    Entendido, continuar
+                </button>
+                <a id="btn-ver-duplicado" href="#" target="_blank"
+                   class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-eye mr-2"></i>
+                    Ver preinforme existente
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -714,6 +751,123 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = `{% url 'preinformes:crear_plantilla_residente' %}?tipo_estudio=${tipoEstudio}&region=${region}`;
         });
     } // Fin del else if (btnAbrir)
+    
+    // === SISTEMA DE DETECCIÓN DE DUPLICADOS ===
+    
+    const numeroEstudioInput = document.getElementById('id_numero_estudio');
+    const dniPacienteInput = document.getElementById('id_dni_paciente');
+    const tipoEstudioInput = document.getElementById('id_tipo_estudio');
+    let timeoutVerificacion = null;
+    
+    function verificarDuplicados() {
+        clearTimeout(timeoutVerificacion);
+        
+        timeoutVerificacion = setTimeout(() => {
+            const numeroEstudio = numeroEstudioInput?.value.trim();
+            const dniPaciente = dniPacienteInput?.value.trim();
+            const tipoEstudio = tipoEstudioInput?.value;
+            const preinformeId = {{ preinforme.pk|default:'null' }};
+            
+            if (!numeroEstudio && !dniPaciente) {
+                return;
+            }
+            
+            const params = new URLSearchParams();
+            if (numeroEstudio) params.append('numero_estudio', numeroEstudio);
+            if (dniPaciente) params.append('dni_paciente', dniPaciente);
+            if (tipoEstudio) params.append('tipo_estudio', tipoEstudio);
+            if (preinformeId) params.append('preinforme_id', preinformeId);
+            
+            fetch(`/preinformes/verificar-duplicado/?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.duplicados && data.duplicados.length > 0) {
+                        mostrarModalDuplicados(data.duplicados);
+                    }
+                })
+                .catch(error => console.error('Error verificando duplicados:', error));
+        }, 800); // Esperar 800ms después de que el usuario deje de escribir
+    }
+    
+    function mostrarModalDuplicados(duplicados) {
+        const modal = document.getElementById('modal-duplicados');
+        const contenido = document.getElementById('contenido-duplicados');
+        const btnVer = document.getElementById('btn-ver-duplicado');
+        
+        let html = '<div class="space-y-3">';
+        
+        duplicados.forEach(dup => {
+            const estadoColor = {
+                'borrador': 'bg-gray-400',
+                'pendiente_revision': 'bg-yellow-400',
+                'en_revision': 'bg-orange-500',
+                'finalizado': 'bg-green-500'
+            }[dup.estado_code] || 'bg-gray-400';
+            
+            const criterioTexto = dup.criterio === 'numero_estudio' 
+                ? '<strong>Mismo número de estudio</strong>' 
+                : 'Mismo DNI y tipo de estudio';
+            
+            html += `
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="text-sm font-bold text-gray-900">
+                                ${dup.numero_estudio} - ${dup.tipo_estudio}
+                            </p>
+                            <p class="text-xs text-gray-600 mt-0.5">${criterioTexto}</p>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-semibold text-white ${estadoColor}">
+                            ${dup.estado}
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-700 mt-2">
+                        <p><strong>Paciente:</strong> ${dup.paciente}</p>
+                        <p><strong>DNI:</strong> ${dup.dni}</p>
+                        <p><strong>Región:</strong> ${dup.region}</p>
+                        <p class="text-xs text-gray-600 mt-2">
+                            <i class="fas fa-user mr-1"></i>Realizado por: ${dup.residente}
+                            <span class="mx-1">•</span>
+                            <i class="fas fa-calendar mr-1"></i>${dup.fecha}
+                        </p>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+        html += '<p class="mt-4 text-sm text-gray-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3">';
+        html += '<i class="fas fa-lightbulb text-yellow-600 mr-2"></i>';
+        html += '<strong>Recomendación:</strong> Verifica si este estudio ya fue preinformado antes de continuar. ';
+        html += 'Si es el mismo caso, evita duplicar el trabajo.';
+        html += '</p>';
+        
+        contenido.innerHTML = html;
+        btnVer.href = `/preinformes/ver/${duplicados[0].id}/`;
+        modal.classList.remove('hidden');
+    }
+    
+    function cerrarModalDuplicados() {
+        const modal = document.getElementById('modal-duplicados');
+        modal.classList.add('hidden');
+    }
+    
+    // Eventos de verificación
+    if (numeroEstudioInput) {
+        numeroEstudioInput.addEventListener('blur', verificarDuplicados);
+        numeroEstudioInput.addEventListener('input', verificarDuplicados);
+    }
+    
+    if (dniPacienteInput) {
+        dniPacienteInput.addEventListener('blur', verificarDuplicados);
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-duplicados')?.addEventListener('click', function(e) {
+        if (e.target === this) {
+            cerrarModalDuplicados();
+        }
+    });
 });
 </script>
 

@@ -14,7 +14,7 @@ import json
 from accounts.decorators import role_required
 from .models import (
     Preinforme, TipoEstudio, Region, PlantillaPreinforme, 
-    RevisionPreinforme, HistorialEstudios
+    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
@@ -52,11 +52,22 @@ def dashboard_residente(request):
         residente=request.user
     ).order_by('-fecha_creacion')[:5]
     
+    # Preinformes en edición activa (por cualquier residente)
+    tiempo_limite = timezone.now() - timezone.timedelta(minutes=15)
+    preinformes_en_edicion = Preinforme.objects.filter(
+        en_edicion_por__isnull=False,
+        ultima_actividad_edicion__gt=tiempo_limite,
+        estado__in=['borrador', 'pendiente_revision', 'en_revision']  # Incluir más estados
+    ).exclude(
+        en_edicion_por=request.user  # Excluir los propios del usuario
+    ).select_related('en_edicion_por', 'tipo_estudio', 'revisor').order_by('-ultima_actividad_edicion')
+    
     context = {
         'historial': historial,
         'preinformes_pendientes': preinformes_pendientes,
         'preinformes_en_revision': preinformes_en_revision,
         'ultimos_preinformes': ultimos_preinformes,
+        'preinformes_en_edicion': preinformes_en_edicion,
     }
     
     return render(request, 'preinformes/dashboard_residente.html', context)
@@ -109,6 +120,10 @@ def editar_preinforme(request, pk):
         estado='borrador'
     )
     
+    # Marcar como en edición al abrir el formulario
+    if request.method == 'GET':
+        preinforme.marcar_en_edicion(request.user)
+    
     if request.method == 'POST':
         form = PreinformeForm(request.POST, instance=preinforme)
         if form.is_valid():
@@ -116,12 +131,16 @@ def editar_preinforme(request, pk):
             messages.success(request, 'Preinforme actualizado exitosamente.')
             
             if 'guardar_y_continuar' in request.POST:
+                # Renovar marca de edición
+                preinforme.marcar_en_edicion(request.user)
                 return redirect('preinformes:editar_preinforme', pk=preinforme.pk)
             elif 'guardar_y_enviar' in request.POST:
                 preinforme.enviar_a_revision()
+                preinforme.liberar_edicion()
                 messages.success(request, 'Preinforme enviado para revisión.')
                 return redirect('preinformes:dashboard_residente')
             else:
+                preinforme.liberar_edicion()
                 return redirect('preinformes:dashboard_residente')
     else:
         form = PreinformeForm(instance=preinforme)
@@ -157,6 +176,11 @@ def mis_preinformes(request):
         if form.cleaned_data['numero_estudio']:
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
     
+    # Filtro por etiquetas (parámetro GET)
+    etiquetas_ids = request.GET.getlist('etiquetas')
+    if etiquetas_ids:
+        preinformes = preinformes.filter(etiquetas__id__in=etiquetas_ids).distinct()
+    
     preinformes = preinformes.order_by('-fecha_creacion')
     
     # Paginación
@@ -164,9 +188,18 @@ def mis_preinformes(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
+    # Etiquetas disponibles para filtrar
+    etiquetas_disponibles = EtiquetaPreinforme.objects.filter(
+        preinformes__residente=request.user
+    ).distinct().annotate(
+        total=Count('preinformes')
+    ).order_by('-total', 'nombre')
+    
     context = {
         'page_obj': page_obj,
         'form': form,
+        'etiquetas_disponibles': etiquetas_disponibles,
+        'etiquetas_seleccionadas': [int(id) for id in etiquetas_ids],
         'title': 'Mis Preinformes'
     }
     
@@ -485,52 +518,77 @@ def crear_plantilla_residente(request):
         )
         
         if form.is_valid():
-            # Verificar que no exista una plantilla con el mismo nombre
             nombre = form.cleaned_data['nombre']
-            existe = PlantillaPreinforme.objects.filter(
+            compartir = form.cleaned_data.get('compartir', False)
+            sistema_destino = form.cleaned_data['sistema_destino']
+            
+            # Buscar plantillas similares (mismo nombre, tipo, región)
+            plantillas_similares = PlantillaPreinforme.objects.filter(
                 nombre__iexact=nombre,
                 tipo_estudio=tipo_estudio,
                 region=region
-            ).exists()
+            )
             
-            if existe:
-                messages.error(
-                    request, 
-                    f'Ya existe una plantilla con el nombre "{nombre}" para {tipo_estudio.nombre} - {region.nombre}'
-                )
-            else:
-                plantilla = form.save(commit=False)
-                plantilla.tipo_estudio = tipo_estudio
-                plantilla.region = region
-                plantilla.creada_por = request.user
-                plantilla.activa = True
+            # Si va a ser pública, verificar restricción única
+            if compartir:
+                duplicada_publica = plantillas_similares.filter(
+                    estado='publica',
+                    sistema_destino=sistema_destino
+                ).first()
                 
-                # Convertir saltos de línea a HTML si es necesario
-                if plantilla.contenido:
-                    # Si no tiene tags HTML, convertir saltos de línea a párrafos
-                    if not ('<p>' in plantilla.contenido or '<br>' in plantilla.contenido):
-                        lines = plantilla.contenido.split('\n')
-                        html_lines = []
-                        for line in lines:
-                            line = line.strip()
-                            if line:
-                                html_lines.append(f'<p>{line}</p>')
-                        plantilla.contenido = ''.join(html_lines)
-                
-                # Definir estado según checkbox
-                compartir = form.cleaned_data.get('compartir', False)
-                plantilla.estado = 'publica' if compartir else 'borrador'
-                
-                plantilla.save()
-                
-                messages.success(
+                if duplicada_publica:
+                    messages.error(
+                        request,
+                        f'Ya existe una plantilla pública con el nombre "{nombre}" '
+                        f'para {tipo_estudio.nombre} - {region.nombre} - {sistema_destino}. '
+                        f'Puedes usarla directamente o crear una versión privada con otro nombre.'
+                    )
+                    # Mostrar contexto de la plantilla existente
+                    context = {
+                        'form': form,
+                        'tipo_estudio': tipo_estudio,
+                        'region': region,
+                        'plantilla_existente': duplicada_publica
+                    }
+                    return render(request, 'preinformes/crear_plantilla.html', context)
+            
+            # Si hay similares privadas, informar pero permitir
+            if plantillas_similares.filter(estado='borrador').exists():
+                messages.info(
                     request,
-                    f'Plantilla "{plantilla.nombre}" creada exitosamente. ' +
-                    ('Visible para todos.' if compartir else 'Solo visible para ti.')
+                    f'Nota: Ya existen plantillas privadas con nombre similar. '
+                    f'Si necesitas acceso a una plantilla de otro residente, solicítale que la comparta.'
                 )
-                
-                # Redirigir al formulario de preinforme con la plantilla seleccionada
-                return redirect(f"{reverse('preinformes:crear_preinforme')}?plantilla_id={plantilla.id}")
+            
+            # Crear la plantilla
+            plantilla = form.save(commit=False)
+            plantilla.tipo_estudio = tipo_estudio
+            plantilla.region = region
+            plantilla.creada_por = request.user
+            plantilla.activa = True
+            plantilla.estado = 'publica' if compartir else 'borrador'
+            
+            # Convertir saltos de línea a HTML si es necesario
+            if plantilla.contenido:
+                if not ('<p>' in plantilla.contenido or '<br>' in plantilla.contenido):
+                    lines = plantilla.contenido.split('\n')
+                    html_lines = []
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            html_lines.append(f'<p>{line}</p>')
+                    plantilla.contenido = ''.join(html_lines)
+            
+            plantilla.save()
+            
+            messages.success(
+                request,
+                f'Plantilla "{plantilla.nombre}" creada exitosamente. ' +
+                ('Visible para todos.' if compartir else 'Solo visible para ti.')
+            )
+            
+            # Redirigir al formulario de preinforme con la plantilla seleccionada
+            return redirect(f"{reverse('preinformes:crear_preinforme')}?plantilla_id={plantilla.id}")
     else:
         form = NuevaPlantillaResidenteForm(
             tipo_estudio=tipo_estudio,
@@ -558,6 +616,9 @@ def autosave_preinforme(request, pk):
             residente=request.user,
             estado='borrador'
         )
+        
+        # Renovar marca de edición
+        preinforme.marcar_en_edicion(request.user)
         
         # Obtener contenido del POST
         informe_html = request.POST.get('informe_html', '')
@@ -716,3 +777,140 @@ def ver_comparacion_revision(request, pk):
     }
     
     return render(request, 'preinformes/comparacion_revision.html', context)
+
+
+# === VISTAS PARA ETIQUETAS ===
+
+@login_required
+@require_http_methods(["POST"])
+def agregar_etiquetas(request, pk):
+    """Agregar etiquetas a un preinforme (AJAX)"""
+    preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
+    
+    try:
+        data = json.loads(request.body)
+        etiquetas_nombres = data.get('etiquetas', [])
+        
+        if not isinstance(etiquetas_nombres, list):
+            return JsonResponse({'success': False, 'error': 'Formato inválido'}, status=400)
+        
+        # Limpiar etiquetas existentes
+        preinforme.etiquetas.clear()
+        
+        # Agregar las nuevas
+        for nombre in etiquetas_nombres:
+            nombre = nombre.strip()
+            if nombre:
+                # Obtener o crear etiqueta
+                etiqueta, created = EtiquetaPreinforme.objects.get_or_create(
+                    nombre__iexact=nombre,
+                    defaults={
+                        'nombre': nombre,
+                        'creada_por': request.user
+                    }
+                )
+                preinforme.etiquetas.add(etiqueta)
+        
+        # Devolver las etiquetas actualizadas
+        etiquetas_actuales = list(preinforme.etiquetas.values('id', 'nombre', 'color'))
+        
+        return JsonResponse({
+            'success': True,
+            'etiquetas': etiquetas_actuales
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@login_required
+def buscar_etiquetas(request):
+    """Buscar etiquetas para autocomplete (AJAX)"""
+    query = request.GET.get('q', '').strip()
+    
+    if not query:
+        # Devolver las más usadas
+        etiquetas = EtiquetaPreinforme.objects.annotate(
+            num_usos=Count('preinformes')
+        ).order_by('-num_usos')[:10]
+    else:
+        # Buscar por nombre
+        etiquetas = EtiquetaPreinforme.objects.filter(
+            nombre__icontains=query
+        ).order_by('nombre')[:10]
+    
+    resultados = [
+        {'id': e.id, 'nombre': e.nombre, 'color': e.color}
+        for e in etiquetas
+    ]
+    
+    return JsonResponse({'etiquetas': resultados})
+
+
+@login_required
+def verificar_duplicado_preinforme(request):
+    """Verificar si existe un preinforme duplicado (AJAX)"""
+    numero_estudio = request.GET.get('numero_estudio', '').strip()
+    dni_paciente = request.GET.get('dni_paciente', '').strip()
+    tipo_estudio_id = request.GET.get('tipo_estudio')
+    preinforme_actual_id = request.GET.get('preinforme_id')  # Para excluir en edición
+    
+    duplicados = []
+    
+    # Buscar por número de estudio (más preciso)
+    if numero_estudio:
+        query = Preinforme.objects.filter(numero_estudio__iexact=numero_estudio)
+        
+        # Excluir el preinforme actual si estamos editando
+        if preinforme_actual_id:
+            query = query.exclude(pk=preinforme_actual_id)
+        
+        for p in query.select_related('residente', 'tipo_estudio', 'region')[:5]:
+            duplicados.append({
+                'id': p.pk,
+                'numero_estudio': p.numero_estudio,
+                'paciente': f"{p.apellido_paciente}, {p.nombre_paciente}",
+                'dni': p.dni_paciente,
+                'tipo_estudio': p.tipo_estudio.nombre,
+                'region': p.region.nombre,
+                'estado': p.get_estado_display(),
+                'estado_code': p.estado,
+                'residente': f"{p.residente.first_name} {p.residente.last_name}",
+                'fecha': p.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                'criterio': 'numero_estudio'
+            })
+    
+    # Buscar por DNI + tipo de estudio similar (menos preciso pero útil)
+    if dni_paciente and tipo_estudio_id and not duplicados:
+        try:
+            query = Preinforme.objects.filter(
+                dni_paciente__iexact=dni_paciente,
+                tipo_estudio_id=tipo_estudio_id
+            )
+            
+            if preinforme_actual_id:
+                query = query.exclude(pk=preinforme_actual_id)
+            
+            for p in query.select_related('residente', 'tipo_estudio', 'region')[:3]:
+                duplicados.append({
+                    'id': p.pk,
+                    'numero_estudio': p.numero_estudio,
+                    'paciente': f"{p.apellido_paciente}, {p.nombre_paciente}",
+                    'dni': p.dni_paciente,
+                    'tipo_estudio': p.tipo_estudio.nombre,
+                    'region': p.region.nombre,
+                    'estado': p.get_estado_display(),
+                    'estado_code': p.estado,
+                    'residente': f"{p.residente.first_name} {p.residente.last_name}",
+                    'fecha': p.fecha_creacion.strftime('%d/%m/%Y %H:%M'),
+                    'criterio': 'dni_tipo'
+                })
+        except (ValueError, TypeError):
+            pass
+    
+    return JsonResponse({
+        'duplicados': duplicados,
+        'total': len(duplicados)
+    })

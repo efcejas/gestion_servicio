@@ -28,6 +28,13 @@ urlpatterns = [
     path('<int:pk>/generar-informe/', views.generar_informe_final, name='generar_informe_final'),
     path('copiar-informe/<int:pk>/', views.copiar_informe_final, name='copiar_informe_final'),
     
+    # Etiquetas
+    path('<int:pk>/etiquetas/', views.agregar_etiquetas, name='agregar_etiquetas'),
+    path('etiquetas/buscar/', views.buscar_etiquetas, name='buscar_etiquetas'),
+    
+    # Verificación de duplicados
+    path('verificar-duplicado/', views.verificar_duplicado_preinforme, name='verificar_duplicado'),
+    
     # Estadísticas
     path('estadisticas/', views.estadisticas, name='estadisticas'),
     

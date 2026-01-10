@@ -1,5 +1,21 @@
 from django.contrib import admin
-from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios
+from .models import (
+    TipoEstudio, Region, PlantillaPreinforme, Preinforme, 
+    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme
+)
+
+
+@admin.register(EtiquetaPreinforme)
+class EtiquetaPreinformeAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'color', 'creada_por', 'fecha_creacion', 'total_usos']
+    list_filter = ['creada_por', 'fecha_creacion']
+    search_fields = ['nombre']
+    readonly_fields = ['fecha_creacion']
+    
+    def total_usos(self, obj):
+        """Muestra cuántos preinformes usan esta etiqueta"""
+        return obj.preinformes.count()
+    total_usos.short_description = 'Usos'
 
 
 @admin.register(TipoEstudio)

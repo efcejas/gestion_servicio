@@ -80,6 +80,39 @@
         </form>
     </div>
 
+    <!-- Filtro de Etiquetas -->
+    {% if etiquetas_disponibles %}
+    <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-2xl shadow-lg p-6 mb-6 border border-teal-100">
+        <h3 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+            <i class="fas fa-tags text-teal-600 mr-2"></i>
+            Filtrar por Etiquetas Clínicas
+        </h3>
+        <div class="flex flex-wrap gap-2">
+            {% for etiqueta in etiquetas_disponibles %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'etiquetas' %}{{ key }}={{ value }}&{% endif %}{% endfor %}etiquetas={{ etiqueta.id }}"
+                   class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all shadow-sm
+                          {% if etiqueta.id in etiquetas_seleccionadas %}
+                          text-white ring-2 ring-white ring-offset-2
+                          {% else %}
+                          bg-white text-gray-700 hover:shadow-md
+                          {% endif %}"
+                   style="{% if etiqueta.id in etiquetas_seleccionadas %}background-color: {{ etiqueta.color }};{% endif %}">
+                    <i class="fas fa-tag mr-1.5 text-xs"></i>
+                    {{ etiqueta.nombre }}
+                    <span class="ml-1.5 text-xs opacity-75">({{ etiqueta.total }})</span>
+                </a>
+            {% endfor %}
+            {% if etiquetas_seleccionadas %}
+                <a href="?{% for key, value in request.GET.items %}{% if key != 'etiquetas' %}{{ key }}={{ value }}&{% endif %}{% endfor %}"
+                   class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-all shadow-sm">
+                    <i class="fas fa-times mr-1.5"></i>
+                    Limpiar etiquetas
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Lista de preinformes -->
     <div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
         {% if page_obj.object_list %}
@@ -126,6 +159,22 @@
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</div>
                                 <div class="text-sm text-gray-500">{{ preinforme.region.nombre }}</div>
+                                {% if preinforme.etiquetas.exists %}
+                                    <div class="flex flex-wrap gap-1 mt-1">
+                                        {% for etiqueta in preinforme.etiquetas.all|slice:":3" %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                                                  style="background-color: {{ etiqueta.color }};">
+                                                <i class="fas fa-tag mr-1" style="font-size: 0.6rem;"></i>
+                                                {{ etiqueta.nombre }}
+                                            </span>
+                                        {% endfor %}
+                                        {% if preinforme.etiquetas.count > 3 %}
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-300 text-gray-700">
+                                                +{{ preinforme.etiquetas.count|add:"-3" }}
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm

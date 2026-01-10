@@ -124,6 +124,31 @@ def strip_html_tags(text):
     return re.sub(r'<[^>]+>', '', text).strip()
 
 
+class EtiquetaPreinforme(models.Model):
+    """Etiquetas clínicas para clasificar preinformes (ej: Apendicitis, Dolor abdominal)"""
+    nombre = models.CharField(max_length=100, unique=True)
+    color = models.CharField(
+        max_length=7, 
+        default='#3B82F6',
+        help_text="Color en formato hexadecimal (ej: #3B82F6)"
+    )
+    creada_por = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        related_name='etiquetas_creadas'
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Etiqueta de Preinforme"
+        verbose_name_plural = "Etiquetas de Preinformes"
+        ordering = ['nombre']
+    
+    def __str__(self):
+        return self.nombre
+
+
 class TipoEstudio(models.Model):
     """Tipo de estudio radiológico (RX, TC, RM, ECO, etc.)"""
     nombre = models.CharField(max_length=100, unique=True)
@@ -215,11 +240,24 @@ class PlantillaPreinforme(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
     
+    # Nueva propiedad para determinar si es compartida
+    @property
+    def compartida(self):
+        """Retorna True si la plantilla es pública"""
+        return self.estado == 'publica'
+    
     class Meta:
         verbose_name = "Plantilla de Preinforme"
         verbose_name_plural = "Plantillas de Preinformes"
         unique_together = ['nombre', 'tipo_estudio', 'region']
         ordering = ['tipo_estudio__nombre', 'region__nombre', 'nombre']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nombre', 'tipo_estudio', 'region', 'sistema_destino'],
+                condition=models.Q(estado='publica'),
+                name='unique_plantilla_publica'
+            )
+        ]
     
     def __str__(self):
         return f"{self.tipo_estudio.nombre} - {self.region.nombre} - {self.nombre}"
@@ -325,6 +363,29 @@ class Preinforme(models.Model):
         related_name='preinformes_revisados'
     )
     
+    # Etiquetas clínicas para clasificación y búsqueda
+    etiquetas = models.ManyToManyField(
+        EtiquetaPreinforme,
+        blank=True,
+        related_name='preinformes',
+        verbose_name="Etiquetas clínicas"
+    )
+    
+    # Sistema de bloqueo/coordinación para evitar ediciones simultáneas
+    en_edicion_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preinformes_editando',
+        verbose_name="En edición por"
+    )
+    ultima_actividad_edicion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Última actividad de edición"
+    )
+    
     # Timestamps
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
@@ -388,6 +449,36 @@ class Preinforme(models.Model):
         self.estado = 'finalizado'
         self.fecha_finalizacion = timezone.now()
         self.save()
+    
+    def marcar_en_edicion(self, usuario):
+        """Marca el preinforme como en edición por un usuario"""
+        self.en_edicion_por = usuario
+        self.ultima_actividad_edicion = timezone.now()
+        self.save(update_fields=['en_edicion_por', 'ultima_actividad_edicion'])
+    
+    def liberar_edicion(self):
+        """Libera el preinforme de edición"""
+        self.en_edicion_por = None
+        self.ultima_actividad_edicion = None
+        self.save(update_fields=['en_edicion_por', 'ultima_actividad_edicion'])
+    
+    def esta_siendo_editado(self):
+        """Verifica si el preinforme está siendo editado actualmente"""
+        if not self.en_edicion_por or not self.ultima_actividad_edicion:
+            return False
+        
+        # Considerar abandonado después de 15 minutos sin actividad
+        tiempo_limite = timezone.now() - timezone.timedelta(minutes=15)
+        return self.ultima_actividad_edicion > tiempo_limite
+    
+    def puede_editar(self, usuario):
+        """Verifica si un usuario puede editar el preinforme"""
+        # Si nadie lo está editando, puede editar
+        if not self.esta_siendo_editado():
+            return True
+        
+        # Si el mismo usuario lo está editando, puede continuar
+        return self.en_edicion_por == usuario
 
 
 class RevisionPreinforme(models.Model):
