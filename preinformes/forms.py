@@ -21,9 +21,7 @@ class PreinformeForm(forms.ModelForm):
             'dni_paciente',
             'edad_paciente',
             'sexo_paciente',
-            'tecnica',
-            'hallazgos',
-            'conclusion'
+            'informe_html'  # Campo único simplificado
         ]
         widgets = {
             'numero_estudio': forms.TextInput(attrs={
@@ -68,8 +66,7 @@ class PreinformeForm(forms.ModelForm):
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
                 'id': 'id_plantilla'
             }),
-            # tecnica, hallazgos y conclusion usan CKEditor5Field del modelo
-            # NO necesitan widgets aquí
+            # informe_html usa CKEditor5Field del modelo - NO necesita widget aquí
         }
     
     def __init__(self, *args, **kwargs):
@@ -231,7 +228,7 @@ class NuevaPlantillaResidenteForm(forms.ModelForm):
     
     class Meta:
         model = PlantillaPreinforme
-        fields = ['nombre', 'sistema_destino', 'tecnica_template', 'hallazgos_template', 'conclusion_template']
+        fields = ['nombre', 'sistema_destino', 'contenido']
         widgets = {
             'nombre': forms.TextInput(attrs={
                 'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500',
@@ -241,21 +238,7 @@ class NuevaPlantillaResidenteForm(forms.ModelForm):
                 'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500',
                 'id': 'id_sistema_destino_plantilla'
             }),
-            'tecnica_template': forms.Textarea(attrs={
-                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
-                'rows': 2,
-                'placeholder': 'Describe la técnica utilizada...'
-            }),
-            'hallazgos_template': forms.Textarea(attrs={
-                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
-                'rows': 3,
-                'placeholder': 'Describe los hallazgos principales...'
-            }),
-            'conclusion_template': forms.Textarea(attrs={
-                'class': 'w-full px-3 py-2 text-sm border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none',
-                'rows': 2,
-                'placeholder': 'Escribe la conclusión o impresión diagnóstica...'
-            }),
+            # contenido usa CKEditor5Field del modelo - NO necesita widget aquí (se renderiza automáticamente)
         }
     
     def __init__(self, *args, tipo_estudio=None, region=None, **kwargs):
@@ -264,20 +247,16 @@ class NuevaPlantillaResidenteForm(forms.ModelForm):
         self.region = region
         
         # Hacer que al menos un campo de contenido sea requerido
-        self.fields['tecnica_template'].required = False
-        self.fields['hallazgos_template'].required = False
-        self.fields['conclusion_template'].required = False
+        self.fields['contenido'].required = True
     
     def clean(self):
         cleaned_data = super().clean()
-        tecnica = cleaned_data.get('tecnica_template')
-        hallazgos = cleaned_data.get('hallazgos_template')
-        conclusion = cleaned_data.get('conclusion_template')
+        contenido = cleaned_data.get('contenido')
         
-        # Al menos uno debe tener contenido
-        if not any([tecnica, hallazgos, conclusion]):
+        # Validar que tenga contenido
+        if not contenido or not contenido.strip():
             raise forms.ValidationError(
-                "Debe completar al menos una sección (Técnica, Hallazgos o Conclusión)"
+                "Debe ingresar el contenido de la plantilla"
             )
         
         return cleaned_data

@@ -3,18 +3,6 @@
 
 {% block title %}{{ title }}{% endblock %}
 
-{% block extra_css %}
-<style>
-    .form-section {
-        background: white;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-    }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="max-w-6xl mx-auto px-4">
     <!-- Header Card -->
@@ -35,138 +23,141 @@
     <form method="post" class="space-y-6">
         {% csrf_token %}
 
-        <!-- Información del Estudio -->
-        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
-                    <i class="fas fa-info-circle text-blue-600 mr-3"></i>
-                    Información del Estudio
+        <!-- Información del Estudio y Paciente - Ultra Compacto -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2 border-b border-gray-200">
+                <h2 class="text-sm font-semibold text-gray-800 flex items-center">
+                    <i class="fas fa-info-circle text-blue-600 mr-1.5 text-xs"></i>
+                    Datos del Estudio y Paciente
                 </h2>
             </div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="{{ form.numero_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Número de Estudio *
+            <div class="p-3">
+                <!-- Grid ultra-compacto: 12 columnas en desktop -->
+                <div class="grid grid-cols-2 md:grid-cols-12 gap-2">
+                    <!-- Fila 1: Datos del Estudio -->
+                    <div class="col-span-2 md:col-span-2">
+                        <label for="{{ form.numero_estudio.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
+                            N° Estudio *
                         </label>
                         {{ form.numero_estudio }}
                         {% if form.numero_estudio.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.numero_estudio.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.numero_estudio.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.tipo_estudio.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Tipo de Estudio *
+                    <div class="col-span-2 md:col-span-3">
+                        <label for="{{ form.tipo_estudio.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
+                            Tipo *
                         </label>
                         {{ form.tipo_estudio }}
                         {% if form.tipo_estudio.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.tipo_estudio.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.tipo_estudio.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.region.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <div class="col-span-1 md:col-span-2">
+                        <label for="{{ form.region.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Región *
                         </label>
                         {{ form.region }}
                         {% if form.region.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.region.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.region.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.sistema_destino.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Sistema Destino *
+                    <div class="col-span-1 md:col-span-2">
+                        <label for="{{ form.sistema_destino.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
+                            Sistema *
                         </label>
                         {{ form.sistema_destino }}
                         {% if form.sistema_destino.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.sistema_destino.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.sistema_destino.errors.0 }}</div>
                         {% endif %}
-                        <p class="text-xs text-gray-500 mt-1">
-                            <i class="fas fa-info-circle mr-1"></i>
-                            <strong>EGES:</strong> Permite acentos y ñ | 
-                            <strong>Netterm:</strong> Sin acentos ni ñ
-                        </p>
                     </div>
 
-                    <div>
-                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2 flex items-center justify-between">
-                            <span>Plantilla (Opcional)</span>
-                            <button type="button" 
-                                    id="btnNuevaPlantilla"
-                                    class="inline-flex items-center px-3 py-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-medium rounded-lg transition-all shadow-sm">
-                                <i class="fas fa-plus mr-1"></i>
-                                Nueva Plantilla
-                            </button>
+                    <div class="col-span-2 md:col-span-3">
+                        <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
+                            Plantilla {% if preinforme.pk %}<span class="text-gray-500">(no modificable)</span>{% endif %}
                         </label>
-                        {{ form.plantilla_utilizada }}
-                        {% if form.plantilla_utilizada.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.plantilla_utilizada.errors.0 }}</div>
+                        <div class="flex gap-1">
+                            {% if preinforme.pk %}
+                                <!-- En edición: campo deshabilitado -->
+                                <select disabled class="block w-full px-3 py-2 text-sm text-gray-500 bg-gray-100 border border-gray-300 rounded-md cursor-not-allowed">
+                                    <option>{% if preinforme.plantilla_utilizada %}{{ preinforme.plantilla_utilizada.nombre }}{% else %}Sin plantilla{% endif %}</option>
+                                </select>
+                                <input type="hidden" name="plantilla_utilizada" value="{{ preinforme.plantilla_utilizada.id|default:'' }}">
+                            {% else %}
+                                <!-- En creación: campo normal -->
+                                {{ form.plantilla_utilizada }}
+                                <button type="button" 
+                                        id="btnNuevaPlantilla"
+                                        disabled
+                                        class="flex-shrink-0 inline-flex items-center px-2 py-1.5 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-medium rounded transition shadow-sm"
+                                        title="Selecciona tipo de estudio y región primero">
+                                    <i class="fas fa-plus mr-1"></i>
+                                    <span class="hidden sm:inline">Nueva</span>
+                                </button>
+                            {% endif %}
+                        </div>
+                        {% if preinforme.pk %}
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                <i class="fas fa-lock mr-1"></i>
+                                La plantilla no puede cambiarse durante la edición
+                            </p>
                         {% endif %}
-                        <p class="text-xs text-gray-500 mt-1">Las plantillas se filtran según el sistema destino, tipo de estudio y región</p>
+                        {% if form.plantilla_utilizada.errors %}
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.plantilla_utilizada.errors.0 }}</div>
+                        {% endif %}
                     </div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Información del Paciente -->
-        <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
-                <h2 class="text-xl font-semibold text-gray-900 flex items-center">
-                    <i class="fas fa-user text-green-600 mr-3"></i>
-                    Información del Paciente
-                </h2>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <!-- Fila 2: Datos del Paciente -->
+                    <div class="col-span-2 md:col-span-3">
+                        <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Apellido *
                         </label>
                         {{ form.apellido_paciente }}
                         {% if form.apellido_paciente.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.apellido_paciente.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.apellido_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <div class="col-span-2 md:col-span-3">
+                        <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Nombre *
                         </label>
                         {{ form.nombre_paciente }}
                         {% if form.nombre_paciente.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.nombre_paciente.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.nombre_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.dni_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <div class="col-span-1 md:col-span-2">
+                        <label for="{{ form.dni_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             DNI *
                         </label>
                         {{ form.dni_paciente }}
                         {% if form.dni_paciente.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.dni_paciente.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.dni_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.edad_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <div class="col-span-1 md:col-span-2">
+                        <label for="{{ form.edad_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Edad *
                         </label>
                         {{ form.edad_paciente }}
                         {% if form.edad_paciente.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.edad_paciente.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.edad_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <div>
-                        <label for="{{ form.sexo_paciente.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <div class="col-span-2 md:col-span-2">
+                        <label for="{{ form.sexo_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Sexo *
                         </label>
                         {{ form.sexo_paciente }}
                         {% if form.sexo_paciente.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.sexo_paciente.errors.0 }}</div>
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.sexo_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -181,45 +172,28 @@
                         <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
                         Contenido del Preinforme
                     </h2>
-                    {% if preinforme.pk %}
-                    <div id="autosave-indicator" class="text-sm text-gray-500">
-                        <i class="fas fa-circle text-gray-400 mr-1"></i>
+                    {% if preinforme.pk and preinforme.estado == 'borrador' %}
+                    <div id="autosave-indicator" class="text-sm text-gray-500 flex items-center">
+                        <i class="fas fa-circle text-gray-400 mr-1" id="autosave-icon"></i>
                         <span id="autosave-status">Listo</span>
                     </div>
                     {% endif %}
                 </div>
             </div>
             <div class="p-6">
-                <div class="space-y-6">
-                    <div>
-                        <label for="{{ form.tecnica.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Técnica *
-                        </label>
-                        {{ form.tecnica }}
-                        {% if form.tecnica.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.tecnica.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div>
-                        <label for="{{ form.hallazgos.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Hallazgos *
-                        </label>
-                        {{ form.hallazgos }}
-                        {% if form.hallazgos.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.hallazgos.errors.0 }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div>
-                        <label for="{{ form.conclusion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Conclusión 
-                        </label>
-                        {{ form.conclusion }}
-                        {% if form.conclusion.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.conclusion.errors.0 }}</div>
-                        {% endif %}
-                    </div>
+                <div>
+                    <label for="{{ form.informe_html.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Contenido del Informe *
+                    </label>
+                    <p class="text-xs text-gray-600 mb-3">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Pega directamente desde Word o escribe tu informe completo aquí. 
+                        Incluye técnica, hallazgos y conclusión con el formato que prefieras.
+                    </p>
+                    {{ form.informe_html }}
+                    {% if form.informe_html.errors %}
+                        <div class="text-red-600 text-sm mt-1">{{ form.informe_html.errors.0 }}</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -259,66 +233,55 @@ document.addEventListener('DOMContentLoaded', function() {
     const regionSelect = document.getElementById('id_region');
     const plantillaSelect = document.getElementById('id_plantilla');
     
-    // Registry global para las instancias de CKEditor 5
-    window.ckeditorInstances = {};
+    // Registry global para la instancia de CKEditor 5
+    window.ckeditorInstance = null;
     
-    // Función para inicializar editores si no existen
-    function initializeEditorIfNeeded(fieldId) {
-        if (!window.ckeditorInstances[fieldId]) {
-            const textarea = document.getElementById(fieldId);
+    // Función para inicializar editor si no existe
+    function initializeEditorIfNeeded() {
+        if (!window.ckeditorInstance) {
+            const textarea = document.getElementById('id_informe_html');
             if (textarea && textarea.style.display === 'none') {
                 // Buscar el contenedor del editor CKEditor 5
                 const ckEditorContainer = textarea.nextElementSibling;
                 if (ckEditorContainer && ckEditorContainer.classList.contains('ck-editor')) {
-                    // El editor ya está inicializado por Django CKEditor 5
-                    // Intentar acceder a la instancia
                     try {
                         const editorElement = ckEditorContainer.querySelector('.ck-content');
                         if (editorElement && editorElement.ckeditorInstance) {
-                            window.ckeditorInstances[fieldId] = editorElement.ckeditorInstance;
-                            console.log(`Editor ${fieldId} encontrado y registrado`);
+                            window.ckeditorInstance = editorElement.ckeditorInstance;
+                            console.log('✅ Editor CKEditor5 encontrado y registrado');
                         }
                     } catch (error) {
-                        console.warn(`No se pudo acceder a la instancia del editor ${fieldId}:`, error);
+                        console.warn('⚠️ No se pudo acceder a la instancia del editor:', error);
                     }
                 }
             }
         }
-        return window.ckeditorInstances[fieldId];
+        return window.ckeditorInstance;
     }
     
-    // Función para establecer contenido de forma segura
-    function setEditorContent(fieldId, content, skipIfNotEmpty = true) {
+    // Función para establecer contenido en el editor
+    function setEditorContent(content, skipIfNotEmpty = true) {
+        const textarea = document.getElementById('id_informe_html');
+        
         // Solo aplicar si el campo está vacío (comportamiento seguro)
-        const textarea = document.getElementById(fieldId);
         if (skipIfNotEmpty && textarea.value.trim() !== '') {
-            console.log(`Campo ${fieldId} no está vacío, omitiendo autocompletado`);
+            console.log('📄 Campo ya tiene contenido, omitiendo autocompletado');
             return;
         }
         
-        // Convertir saltos de línea en párrafos HTML si el contenido no tiene HTML
-        if (content && !content.includes('<p>') && !content.includes('<br>')) {
-            // Dividir por saltos de línea y envolver cada línea en <p>
-            const lines = content.split('\n').filter(line => line.trim() !== '');
-            content = lines.map(line => `<p>${line.trim()}</p>`).join('');
-        }
-        
-        // Intentar obtener la instancia del editor
-        const editor = initializeEditorIfNeeded(fieldId);
+        const editor = initializeEditorIfNeeded();
         
         if (editor && typeof editor.setData === 'function') {
-            // Usar API de CKEditor 5 - setData espera HTML ya formateado
             try {
                 editor.setData(content);
+                console.log('✅ Contenido aplicado al editor');
             } catch (error) {
-                console.warn(`Error aplicando contenido en ${fieldId}:`, error);
-                // Fallback a textarea
+                console.warn('⚠️ Error aplicando contenido:', error);
                 textarea.value = content;
             }
         } else {
-            // Fallback: establecer en textarea directamente (Django CKEditor lo procesará)
+            // Fallback a textarea
             textarea.value = content;
-            // Disparar evento para que Django CKEditor actualice su vista
             textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
@@ -329,9 +292,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const sistemaDestino = document.getElementById('id_sistema_destino')?.value || 'eges';
 
         if (tipoEstudioId && regionId) {
-            fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
+            return fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
                 .then(response => response.json())
                 .then(data => {
+                    // Guardar plantilla seleccionada actual
+                    const plantillaActual = plantillaSelect.value;
+                    
                     // Limpiar opciones existentes
                     plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
                     
@@ -342,12 +308,30 @@ document.addEventListener('DOMContentLoaded', function() {
                         option.textContent = plantilla.nombre + (plantilla.sistema_destino ? ` [${plantilla.sistema_destino}]` : '');
                         plantillaSelect.appendChild(option);
                     });
+                    
+                    // Restaurar selección si todavía existe
+                    if (plantillaActual) {
+                        const optionExists = Array.from(plantillaSelect.options).some(opt => opt.value === plantillaActual);
+                        if (optionExists) {
+                            plantillaSelect.value = plantillaActual;
+                        }
+                    }
+        
+        // Si no hay plantilla seleccionada, limpiar el editor
+        if (!plantillaId) {
+            console.log('🧹 Limpiando contenido del editor');
+            setEditorContent('');
+            return;
+        }
+                    return data;
                 })
                 .catch(error => {
                     console.error('Error cargando plantillas:', error);
+                    throw error;
                 });
         } else {
             plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+            return Promise.resolve();
         }
     }
 
@@ -355,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const plantillaId = plantillaSelect.value;
         if (!plantillaId) return;
         
-        console.log('Aplicando plantilla ID:', plantillaId);
+        console.log('📋 Aplicando plantilla ID:', plantillaId);
         
         // Actualizar el campo hidden plantilla_utilizada
         const plantillaUtilizadaField = document.getElementById('id_plantilla_utilizada');
@@ -375,50 +359,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Dar tiempo a CKEditor 5 para inicializar completamente
                 setTimeout(() => {
                     try {
-                        // Aplicar contenido a cada campo
-                        if (data.tecnica) {
-                            setEditorContent('id_tecnica', data.tecnica);
-                        }
-                        if (data.hallazgos) {
-                            setEditorContent('id_hallazgos', data.hallazgos);
-                        }
-                        if (data.conclusion) {
-                            setEditorContent('id_conclusion', data.conclusion);
+                        // Aplicar contenido único
+                        if (data.contenido) {
+                            setEditorContent(data.contenido);
+                            console.log('✅ Plantilla aplicada correctamente');
+                        } else {
+                            console.warn('⚠️ La plantilla no tiene contenido');
                         }
                         
-                        // Foco en el primer campo con contenido o el primero disponible
-                        const firstEmptyField = document.getElementById('id_tecnica').value.trim() === '' ? 'id_tecnica' :
-                                              document.getElementById('id_hallazgos').value.trim() === '' ? 'id_hallazgos' : 
-                                              'id_conclusion';
-                        
-                        const editor = initializeEditorIfNeeded(firstEmptyField);
+                        // Dar foco al editor
+                        const editor = initializeEditorIfNeeded();
                         if (editor && typeof editor.editing.view.focus === 'function') {
                             editor.editing.view.focus();
                         }
                         
                     } catch (error) {
-                        console.error('Error aplicando plantilla:', error);
+                        console.error('❌ Error aplicando plantilla:', error);
                     }
                 }, 1500); // Tiempo generoso para inicialización
             })
             .catch(error => {
-                console.error('Error cargando datos de plantilla:', error);
+                console.error('❌ Error cargando datos de plantilla:', error);
                 alert('Error al cargar la plantilla. Intente nuevamente.');
             });
     }
     
-    // Intentar inicializar editores después de un delay
+    // Intentar inicializar editor después de un delay
     setTimeout(() => {
-        ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
-            const editor = initializeEditorIfNeeded(fieldId);
-            // Debug: Ver contenido actual del editor
-            if (editor && typeof editor.getData === 'function') {
-                const currentData = editor.getData();
-                if (currentData) {
-                    console.log(`📄 Contenido cargado en ${fieldId}:`, currentData);
-                }
+        const editor = initializeEditorIfNeeded();
+        if (editor && typeof editor.getData === 'function') {
+            const currentData = editor.getData();
+            if (currentData) {
+                console.log('📄 Contenido inicial del editor:', currentData.substring(0, 100) + '...');
             }
-        });
+        }
     }, 2000);
 
     // Event listeners
@@ -436,6 +410,40 @@ document.addEventListener('DOMContentLoaded', function() {
     if (tipoEstudioSelect.value && regionSelect.value) {
         cargarPlantillas();
     }
+    
+    // Detectar si viene de crear plantilla (con plantilla_id en URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const plantillaIdParam = urlParams.get('plantilla_id');
+    
+    if (plantillaIdParam) {
+        console.log('🔄 Detectada plantilla recién creada:', plantillaIdParam);
+        
+        // Esperar a que las plantillas se carguen y luego seleccionar
+        setTimeout(() => {
+            const optionExists = Array.from(plantillaSelect.options).some(opt => opt.value === plantillaIdParam);
+            
+            if (optionExists) {
+                plantillaSelect.value = plantillaIdParam;
+                console.log('✅ Plantilla preseleccionada');
+                
+                // Aplicar contenido automáticamente
+                setTimeout(() => {
+                    aplicarPlantilla();
+                }, 500);
+            } else {
+                console.warn('⚠️ Plantilla no encontrada en el listado, recargando...');
+                cargarPlantillas().then(() => {
+                    setTimeout(() => {
+                        plantillaSelect.value = plantillaIdParam;
+                        aplicarPlantilla();
+                    }, 500);
+                });
+            }
+        }, 1000);
+        
+        // Limpiar URL sin recargar página
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 
     // === SISTEMA DE AUTOGUARDADO ===
     {% if preinforme.pk and preinforme.estado == 'borrador' %}
@@ -445,47 +453,81 @@ document.addEventListener('DOMContentLoaded', function() {
     let autosaveTimer = null;
     let lastSaveData = {};
     let isSaving = false;
+    let isEditing = false;
+    let editorReady = false;
 
     // Elementos del indicador
     const autosaveIndicator = document.getElementById('autosave-indicator');
     const autosaveStatus = document.getElementById('autosave-status');
-    const autosaveIcon = autosaveIndicator.querySelector('i');
+    const autosaveIcon = document.getElementById('autosave-icon');
+
+    if (!autosaveIndicator || !autosaveStatus || !autosaveIcon) {
+        console.error('❌ Elementos del indicador de autoguardado no encontrados');
+    } else {
+        console.log('✅ Elementos del indicador encontrados');
+    }
 
     function updateAutosaveIndicator(status, message) {
+        if (!autosaveStatus || !autosaveIcon) {
+            console.warn('⚠️ No se pueden actualizar indicadores');
+            return;
+        }
+        
+        console.log(`🔄 Actualizando indicador: ${status} - ${message}`);
         autosaveStatus.textContent = message;
-        autosaveIcon.className = 'fas fa-circle mr-1';
+        
+        // Remover todas las clases de icono
+        autosaveIcon.className = '';
         
         switch(status) {
+            case 'editing':
+                autosaveIcon.className = 'fas fa-pen mr-1 text-amber-500';
+                break;
             case 'saving':
-                autosaveIcon.className = 'fas fa-spinner fa-spin mr-1';
-                autosaveIcon.style.color = '#3B82F6'; // blue
+                autosaveIcon.className = 'fas fa-spinner fa-spin mr-1 text-blue-500';
                 break;
             case 'saved':
-                autosaveIcon.style.color = '#10B981'; // green
+                autosaveIcon.className = 'fas fa-check-circle mr-1 text-green-500';
                 break;
             case 'error':
-                autosaveIcon.style.color = '#EF4444'; // red
+                autosaveIcon.className = 'fas fa-exclamation-circle mr-1 text-red-500';
                 break;
             default:
-                autosaveIcon.style.color = '#6B7280'; // gray
+                autosaveIcon.className = 'fas fa-circle mr-1 text-gray-400';
         }
     }
 
     function getCurrentContent() {
-        return {
-            tecnica: window.ckeditorInstances['id_tecnica']?.getData() || document.getElementById('id_tecnica').value || '',
-            hallazgos: window.ckeditorInstances['id_hallazgos']?.getData() || document.getElementById('id_hallazgos').value || '',
-            conclusion: window.ckeditorInstances['id_conclusion']?.getData() || document.getElementById('id_conclusion').value || ''
-        };
+        const editor = window.ckeditorInstance;
+        let content = '';
+        
+        if (editor && typeof editor.getData === 'function') {
+            content = editor.getData() || '';
+        } else {
+            const textarea = document.getElementById('id_informe_html');
+            content = textarea ? textarea.value : '';
+        }
+        
+        return { informe_html: content };
     }
 
     function hasContentChanged() {
         const current = getCurrentContent();
-        return JSON.stringify(current) !== JSON.stringify(lastSaveData);
+        const changed = JSON.stringify(current) !== JSON.stringify(lastSaveData);
+        if (changed) {
+            console.log('📝 Contenido ha cambiado');
+        }
+        return changed;
     }
 
     function performAutosave() {
-        if (isSaving || !hasContentChanged()) {
+        if (isSaving) {
+            console.log('⏳ Ya hay un guardado en proceso');
+            return;
+        }
+        
+        if (!hasContentChanged()) {
+            console.log('✓ Sin cambios para guardar');
             return;
         }
 
@@ -495,13 +537,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Preparar datos para envío
         const formData = new FormData();
-        formData.append('tecnica', currentContent.tecnica);
-        formData.append('hallazgos', currentContent.hallazgos);
-        formData.append('conclusion', currentContent.conclusion);
+        formData.append('informe_html', currentContent.informe_html);
 
         // Agregar CSRF token
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
         formData.append('csrfmiddlewaretoken', csrfToken);
+
+        console.log('💾 Iniciando guardado automático...');
 
         fetch(`{% url 'preinformes:autosave_preinforme' pk=0 %}`.replace('0', preinformeId), {
             method: 'POST',
@@ -511,7 +553,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 lastSaveData = currentContent;
+                isEditing = false;
                 updateAutosaveIndicator('saved', `Guardado ${data.timestamp}`);
+                console.log('✅ Guardado exitoso');
                 
                 // Volver a estado normal después de 3 segundos
                 setTimeout(() => {
@@ -524,7 +568,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(error => {
-            console.error('Error en autoguardado:', error);
+            console.error('❌ Error en autoguardado:', error);
+            isEditing = false;
             updateAutosaveIndicator('error', 'Error al guardar');
             
             // Volver a estado normal después de 5 segundos
@@ -544,39 +589,71 @@ document.addEventListener('DOMContentLoaded', function() {
             scheduleAutosave(); // Reprogramar para el siguiente ciclo
         }, AUTOSAVE_INTERVAL);
     }
+    
+    function onContentChange() {
+        // Marcar como editando inmediatamente
+        if (!isEditing) {
+            isEditing = true;
+            updateAutosaveIndicator('editing', 'Editando...');
+        }
+        // Reprogramar autoguardado
+        scheduleAutosave();
+    }
 
     // Detectar cambios en los editores
     function setupChangeDetection() {
-        // Detectar cambios en CKEditor 5
-        setTimeout(() => {
-            ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
-                const editor = window.ckeditorInstances[fieldId];
-                if (editor) {
-                    editor.model.document.on('change:data', () => {
-                        scheduleAutosave();
-                    });
-                }
-            });
-        }, 3000); // Dar tiempo para inicialización completa
+        const maxAttempts = 10;
+        let attempts = 0;
         
-        // Fallback: detectar cambios en textareas
-        ['id_tecnica', 'id_hallazgos', 'id_conclusion'].forEach(fieldId => {
-            const textarea = document.getElementById(fieldId);
-            if (textarea) {
-                textarea.addEventListener('input', () => {
-                    scheduleAutosave();
+        function trySetup() {
+            attempts++;
+            const editor = window.ckeditorInstance;
+            
+            if (editor && editor.model && editor.model.document) {
+                editor.model.document.on('change:data', () => {
+                    console.log('📝 Cambio detectado en editor');
+                    onContentChange();
                 });
+                editorReady = true;
+                console.log('✅ Detección de cambios configurada en CKEditor5');
+                
+                // Guardar estado inicial
+                lastSaveData = getCurrentContent();
+                updateAutosaveIndicator('ready', 'Listo');
+                
+                return true;
             }
-        });
+            
+            if (attempts < maxAttempts) {
+                console.log(`⏳ Intento ${attempts}/${maxAttempts} de conectar con editor...`);
+                setTimeout(trySetup, 500);
+                return false;
+            } else {
+                console.warn('⚠️ No se pudo conectar con CKEditor después de ' + maxAttempts + ' intentos');
+                
+                // Fallback: usar textarea
+                const textarea = document.getElementById('id_informe_html');
+                if (textarea) {
+                    textarea.addEventListener('input', () => {
+                        console.log('📝 Cambio detectado en textarea (fallback)');
+                        onContentChange();
+                    });
+                    console.log('✅ Detección configurada en textarea (fallback)');
+                }
+                
+                lastSaveData = getCurrentContent();
+                updateAutosaveIndicator('ready', 'Listo');
+                return true;
+            }
+        }
+        
+        trySetup();
     }
 
-    // Inicializar autoguardado
-    setTimeout(() => {
-        lastSaveData = getCurrentContent();
-        setupChangeDetection();
-        scheduleAutosave();
-        console.log('✅ Sistema de autoguardado iniciado');
-    }, 4000);
+    // Inicializar autoguardado después de que el DOM esté listo
+    console.log('🚀 Iniciando sistema de autoguardado...');
+    setupChangeDetection();
+    scheduleAutosave();
 
     // Limpiar timer al salir
     window.addEventListener('beforeunload', () => {
@@ -585,277 +662,59 @@ document.addEventListener('DOMContentLoaded', function() {
 
     {% endif %}
     
-    // Control del aviso de Netterm en el modal
-    const sistemaDestinoModal = document.getElementById('id_sistema_destino_modal');
-    const avisoNetterm = document.getElementById('avisoNetterm');
-    
-    if (sistemaDestinoModal && avisoNetterm) {
-        sistemaDestinoModal.addEventListener('change', function() {
-            if (this.value === 'netterm') {
-                avisoNetterm.classList.remove('hidden');
-            } else {
-                avisoNetterm.classList.add('hidden');
-            }
-        });
-    }
-    
-    // Gestión del modal de nueva plantilla
-    const modal = document.getElementById('modalNuevaPlantilla');
+    // Botón de Nueva Plantilla - redirigir a página dedicada con contexto
     const btnAbrir = document.getElementById('btnNuevaPlantilla');
-    const btnCerrar = document.getElementById('btnCerrarModal');
-    const btnCancelar = document.getElementById('btnCancelarPlantilla');
-    const formPlantilla = document.getElementById('formNuevaPlantilla');
-    const errorDiv = document.getElementById('errorPlantilla');
+    const isEditMode = {{ preinforme.pk|default:'false' }};
     
-    console.log('🔍 Modal elements:', { modal, btnAbrir, btnCerrar, formPlantilla, errorDiv });
-    
-    // Abrir modal
-    if (btnAbrir) {
+    // En modo edición, no inicializar eventos de plantilla
+    if (isEditMode) {
+        console.log('📝 Modo edición: plantilla bloqueada');
+        // No continuar con la lógica de plantillas
+    } else if (btnAbrir) {
+        // Referencias a los selects
+        const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
+        const regionSelect = document.getElementById('id_region');
+        
+        // Función para habilitar/deshabilitar botón según contexto
+        function actualizarEstadoBoton() {
+            const tipoEstudio = tipoEstudioSelect?.value;
+            const region = regionSelect?.value;
+            
+            if (tipoEstudio && region) {
+                btnAbrir.disabled = false;
+                btnAbrir.title = 'Crear nueva plantilla para este tipo de estudio y región';
+                btnAbrir.classList.remove('opacity-50');
+            } else {
+                btnAbrir.disabled = true;
+                btnAbrir.title = 'Selecciona tipo de estudio y región primero';
+                btnAbrir.classList.add('opacity-50');
+            }
+        }
+        
+        // Actualizar estado al cambiar selects
+        tipoEstudioSelect?.addEventListener('change', actualizarEstadoBoton);
+        regionSelect?.addEventListener('change', actualizarEstadoBoton);
+        
+        // Estado inicial
+        actualizarEstadoBoton();
+        
         btnAbrir.addEventListener('click', function(e) {
             e.preventDefault();
-            console.log('🖱️ Click en Nueva Plantilla');
             
             // Verificar que hay tipo de estudio y región seleccionados
-            const tipoEstudio = document.getElementById('id_tipo_estudio').value;
-            const region = document.getElementById('id_region').value;
-            
-            console.log('📋 Tipo:', tipoEstudio, 'Región:', region);
+            const tipoEstudio = tipoEstudioSelect.value;
+            const region = regionSelect.value;
             
             if (!tipoEstudio || !region) {
                 alert('Por favor, selecciona primero el Tipo de Estudio y la Región antes de crear una plantilla.');
                 return;
             }
             
-            console.log('✅ Abriendo modal...');
-            modal.style.display = 'flex';
-            modal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
+            // Redirigir a la página de crear plantilla con parámetros
+            window.location.href = `{% url 'preinformes:crear_plantilla_residente' %}?tipo_estudio=${tipoEstudio}&region=${region}`;
         });
-    } else {
-        console.error('❌ No se encontró el botón btnNuevaPlantilla');
-    }
-    
-    // Cerrar modal
-    function cerrarModal() {
-        if (modal) {
-            modal.style.display = 'none';
-            modal.classList.add('hidden');
-            document.body.style.overflow = 'auto';
-        }
-        if (formPlantilla) {
-            formPlantilla.reset();
-            // Ocultar aviso de Netterm al cerrar
-            if (avisoNetterm) {
-                avisoNetterm.classList.add('hidden');
-            }
-        }
-        if (errorDiv) {
-            errorDiv.classList.add('hidden');
-        }
-    }
-    
-    if (btnCerrar) {
-        btnCerrar.addEventListener('click', cerrarModal);
-    }
-    
-    if (btnCancelar) {
-        btnCancelar.addEventListener('click', cerrarModal);
-    }
-    
-    // Cerrar al hacer clic fuera del modal
-    if (modal) {
-        modal.addEventListener('click', function(e) {
-            if (e.target === modal) {
-                cerrarModal();
-            }
-        });
-    }
-    
-    // Enviar formulario
-    if (formPlantilla) {
-        formPlantilla.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const btnGuardar = document.getElementById('btnGuardarPlantilla');
-            btnGuardar.disabled = true;
-            btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Guardando...';
-            
-            const formData = new FormData(formPlantilla);
-            formData.append('tipo_estudio', document.getElementById('id_tipo_estudio').value);
-            formData.append('region', document.getElementById('id_region').value);
-            
-            try {
-                const response = await fetch('{% url "preinformes:crear_plantilla_residente" %}', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                    }
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    // Recargar las plantillas
-                    cargarPlantillas();
-                    
-                    // Mostrar mensaje de éxito
-                    alert(data.message);
-                    
-                    // Cerrar modal
-                    cerrarModal();
-                } else {
-                    // Mostrar error
-                    errorDiv.classList.remove('hidden');
-                    errorDiv.querySelector('p').textContent = data.error || 'Ocurrió un error al guardar la plantilla.';
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                errorDiv.classList.remove('hidden');
-                errorDiv.querySelector('p').textContent = 'Error de conexión. Por favor, intenta nuevamente.';
-            } finally {
-                btnGuardar.disabled = false;
-                btnGuardar.innerHTML = '<i class="fas fa-save mr-2"></i>Guardar Plantilla';
-            }
-        });
-    }
+    } // Fin del else if (btnAbrir)
 });
 </script>
-
-<!-- Modal para crear nueva plantilla -->
-<div id="modalNuevaPlantilla" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 overflow-y-auto" style="display: none;">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full my-4 flex flex-col overflow-hidden" style="max-height: calc(100vh - 4rem);">
-            <!-- Header del modal (fijo) -->
-            <div class="bg-gradient-to-r from-teal-600 to-cyan-600 px-5 py-3 rounded-t-2xl flex-shrink-0">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-lg font-bold text-white flex items-center">
-                        <i class="fas fa-file-medical mr-2"></i>
-                        Crear Nueva Plantilla
-                    </h3>
-                    <button type="button" id="btnCerrarModal" class="text-white hover:text-gray-200 transition-colors">
-                        <i class="fas fa-times text-xl"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Contenido del modal (scrollable) -->
-            <form id="formNuevaPlantilla" class="flex-1 overflow-y-auto">
-                <div class="p-5 space-y-3">
-                    {% csrf_token %}
-                    
-                    <!-- Info -->
-                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p class="text-xs text-blue-800 flex items-start">
-                            <i class="fas fa-info-circle mt-0.5 mr-2 flex-shrink-0"></i>
-                            <span>Esta plantilla se asociará al <strong>tipo de estudio</strong> y <strong>región</strong> seleccionados.</span>
-                        </p>
-                    </div>
-                    
-                    <!-- Nombre de la plantilla -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">
-                            Nombre de la Plantilla *
-                        </label>
-                        <input type="text" 
-                               name="nombre" 
-                               id="nombre_plantilla"
-                               required
-                               placeholder="Ej: TC Tórax Normal, RX Rodilla con Fractura..."
-                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
-                        <p class="text-xs text-gray-500 mt-0.5">Usa un nombre descriptivo y único</p>
-                    </div>
-                    
-                    <!-- Sistema Destino -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">
-                            Sistema Destino *
-                        </label>
-                        <select name="sistema_destino" 
-                                id="id_sistema_destino_modal"
-                                required
-                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500">
-                            <option value="universal">Universal (ambos sistemas)</option>
-                            <option value="eges">EGES (con acentos y ñ)</option>
-                            <option value="netterm">Netterm (sin acentos ni ñ)</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Aviso Netterm -->
-                    <div id="avisoNetterm" class="hidden bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <p class="text-xs text-yellow-800 flex items-start">
-                            <i class="fas fa-exclamation-triangle mt-0.5 mr-2 flex-shrink-0 text-yellow-600"></i>
-                            <span><strong>¡Importante!</strong> Netterm no soporta tildes ni ñ. Escribe el texto sin estos caracteres (ej: "años" → "anos", "lesión" → "lesion").</span>
-                        </p>
-                    </div>
-                    
-                    <!-- Técnica -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">
-                            Técnica (Opcional)
-                        </label>
-                        <textarea name="tecnica_template" 
-                                  rows="2"
-                                  placeholder="Describe la técnica utilizada..."
-                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
-                    </div>
-                    
-                    <!-- Hallazgos -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">
-                            Hallazgos (Opcional)
-                        </label>
-                        <textarea name="hallazgos_template" 
-                                  rows="3"
-                                  placeholder="Describe los hallazgos principales..."
-                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
-                    </div>
-                    
-                    <!-- Conclusión -->
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-1">
-                            Conclusión (Opcional)
-                        </label>
-                        <textarea name="conclusion_template" 
-                                  rows="2"
-                                  placeholder="Escribe la conclusión o impresión diagnóstica..."
-                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
-                    </div>
-                    
-                    <!-- Compartir -->
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <label class="flex items-start cursor-pointer">
-                            <input type="checkbox" 
-                                   name="compartir" 
-                                   class="w-4 h-4 text-teal-600 bg-gray-100 border-gray-300 rounded focus:ring-teal-500 mt-0.5">
-                            <span class="ml-2">
-                                <span class="text-sm font-medium text-gray-900 block">Compartir con todos</span>
-                                <span class="text-xs text-gray-600">Si no lo marcas, solo tú la verás</span>
-                            </span>
-                        </label>
-                    </div>
-                    
-                    <!-- Mensaje de error -->
-                    <div id="errorPlantilla" class="hidden bg-red-50 border border-red-200 rounded-lg p-2">
-                        <p class="text-xs text-red-800"></p>
-                    </div>
-                </div>
-                
-                <!-- Botones (fijos en el footer) -->
-                <div class="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex-shrink-0">
-                    <button type="button" 
-                            id="btnCancelarPlantilla"
-                            class="px-4 py-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium rounded-lg transition-colors">
-                        Cancelar
-                    </button>
-                    <button type="submit" 
-                            id="btnGuardarPlantilla"
-                            class="px-4 py-2 text-sm bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-medium rounded-lg transition-all shadow-lg">
-                        <i class="fas fa-save mr-1"></i>
-                        Guardar
-                    </button>
-                </div>
-            </form>
-        </div>
-</div>
 
 {% endblock %}

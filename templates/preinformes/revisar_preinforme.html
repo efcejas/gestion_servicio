@@ -3,263 +3,363 @@
 
 {% block title %}{{ title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* Fix crítico para CKEditor + Tailwind */
+    .ck-editor__editable p,
+    .ck-content p {
+        margin: 0 0 1em 0 !important;
+        line-height: 1.6 !important;
+    }
+    
+    .ck-editor__editable p:last-child,
+    .ck-content p:last-child {
+        margin-bottom: 0 !important;
+    }
+    
+    .ck-editor__editable ul,
+    .ck-editor__editable ol,
+    .ck-content ul,
+    .ck-content ol {
+        margin: 0.75em 0 1em 0 !important;
+        padding-left: 2em !important;
+    }
+    
+    .ck-editor__editable li,
+    .ck-content li {
+        margin-bottom: 0.4em !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
     
-    <!-- Header -->
-    <div class="mb-6">
-        <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl shadow-lg overflow-hidden">
-            <div class="px-6 py-8">
-                <div class="flex items-center">
-                    <i class="fas fa-user-md text-white text-3xl mr-4"></i>
-                    <div>
-                        <h1 class="text-2xl font-bold text-white">Revisión de Preinforme</h1>
-                        <p class="text-blue-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+    <!-- Header con Gradiente -->
+    <div class="bg-gradient-to-r from-purple-600 to-purple-800 rounded-2xl shadow-lg mb-6 overflow-hidden">
+        <div class="px-8 py-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-user-md text-2xl text-white"></i>
                     </div>
+                    <div>
+                        <h1 class="text-3xl font-bold text-white">Revisión de Preinforme</h1>
+                        <p class="text-purple-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                    </div>
+                </div>
+                <div>
+                    <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold shadow-sm
+                        {% if preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white
+                        {% elif preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white{% endif %}">
+                        <i class="fas fa-circle text-xs mr-1.5"></i>
+                        {{ preinforme.get_estado_display }}
+                    </span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Información del Estudio -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Información del Estudio</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-                <span class="text-sm font-medium text-gray-500">Número de Estudio</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.numero_estudio }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Tipo de Estudio</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Región</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.region.nombre }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Residente</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Fecha de Creación</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.fecha_creacion|date:"d/m/Y H:i" }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Estado</span>
-                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1
-                    {% if preinforme.estado == 'en_revision' %}bg-orange-100 text-orange-800{% endif %}
-                    {% if preinforme.estado == 'pendiente_revision' %}bg-yellow-100 text-yellow-800{% endif %}">
-                    {{ preinforme.get_estado_display }}
-                </span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Información del Paciente -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4">Información del Paciente</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-                <span class="text-sm font-medium text-gray-500">Apellido</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.apellido_paciente }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Nombre</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.nombre_paciente }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">DNI</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.dni_paciente }}</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Edad</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.edad_paciente }} años</p>
-            </div>
-            <div>
-                <span class="text-sm font-medium text-gray-500">Sexo</span>
-                <p class="mt-1 text-sm text-gray-900">{{ preinforme.get_sexo_paciente_display }}</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Preinforme Original del Residente (Solo Lectura) -->
-    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-            <i class="fas fa-user-graduate text-blue-600 mr-3"></i>
-            Preinforme Original del Residente
-            <span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Solo Lectura</span>
-        </h2>
+    <!-- Grid de 2 columnas -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         
-        <div class="prose prose-gray max-w-none bg-gray-50 p-6 rounded-lg border">
-            <h3>TÉCNICA</h3>
-            <div class="mb-6">{{ preinforme.tecnica|safe }}</div>
+        <!-- Columna Izquierda: Información -->
+        <div class="lg:col-span-1 space-y-6">
             
-            <h3>HALLAZGOS</h3>
-            <div class="mb-6">{{ preinforme.hallazgos|safe }}</div>
-            
-            <h3>CONCLUSIÓN</h3>
-            <div>{{ preinforme.conclusion|safe }}</div>
-        </div>
-    </div>
+            <!-- Información del Estudio -->
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-clipboard-list text-purple-600 mr-2"></i>
+                    Datos del Estudio
+                </h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Número:</span>
+                        <span class="text-sm text-gray-900 font-semibold">{{ preinforme.numero_estudio }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Tipo:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Región:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.region.nombre }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Residente:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                        <span class="text-sm font-medium text-gray-600">Fecha:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.fecha_creacion|date:"d/m/Y H:i" }}</span>
+                    </div>
+                </div>
+            </div>
 
-    <!-- Formulario de Revisión del Staff -->
-    <form method="post">
-        {% csrf_token %}
-        
-        <!-- Editor del Staff -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <i class="fas fa-edit text-green-600 mr-3"></i>
-                Edición del Staff
-                <span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">Modifique solo lo necesario</span>
-            </h2>
-            
-            <div class="mb-4">
-                <p class="text-sm text-gray-600 mb-4">
-                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
-                    El editor está pre-cargado con el contenido del residente. Modifique solo las palabras, frases o secciones que necesiten corrección.
-                </p>
+            <!-- Información del Paciente -->
+            <div class="bg-white rounded-2xl shadow-lg p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-user-injured text-green-600 mr-2"></i>
+                    Datos del Paciente
+                </h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Apellido:</span>
+                        <span class="text-sm text-gray-900 font-semibold">{{ preinforme.apellido_paciente }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Nombre:</span>
+                        <span class="text-sm text-gray-900 font-semibold">{{ preinforme.nombre_paciente }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">DNI:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.dni_paciente }}</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b border-gray-100">
+                        <span class="text-sm font-medium text-gray-600">Edad:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.edad_paciente }} años</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                        <span class="text-sm font-medium text-gray-600">Sexo:</span>
+                        <span class="text-sm text-gray-900">{{ preinforme.get_sexo_paciente_display }}</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Columna Derecha: Editor y Feedback -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- Formulario -->
+            <form method="post">
+                {% csrf_token %}
                 
-                <label for="{{ form.informe_final_html.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                    Informe Final para EGES
-                </label>
-                {{ form.informe_final_html }}
-                {% if form.informe_final_html.errors %}
-                    <div class="text-red-600 text-sm mt-1">{{ form.informe_final_html.errors.0 }}</div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Feedback para el Residente -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <i class="fas fa-comments text-orange-600 mr-3"></i>
-                Feedback para el Residente
-            </h2>
-            
-            <div class="space-y-6">
-                <div>
-                    <label for="{{ form.comentarios_generales.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                        Comentarios Generales
-                    </label>
-                    {{ form.comentarios_generales }}
-                    {% if form.comentarios_generales.errors %}
-                        <div class="text-red-600 text-sm mt-1">{{ form.comentarios_generales.errors.0 }}</div>
+                <!-- Editor -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                                <i class="fas fa-edit text-purple-600 mr-2"></i>
+                                Editor de Correcciones
+                            </h2>
+                            <p class="text-sm text-gray-600 mt-1">El informe del residente está cargado. Realice las modificaciones necesarias.</p>
+                        </div>
+                        <div id="autosave-indicator" class="text-sm text-gray-500 flex items-center">
+                            <i class="fas fa-circle text-gray-400 mr-1" id="autosave-icon"></i>
+                            <span id="autosave-status">Listo</span>
+                        </div>
+                    </div>
+                    
+                    {{ form.informe_final_html }}
+                    {% if form.informe_final_html.errors %}
+                        <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                            <i class="fas fa-exclamation-circle mr-2"></i>{{ form.informe_final_html.errors.0 }}
+                        </div>
                     {% endif %}
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Feedback -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-comments text-orange-600 mr-2"></i>
+                        Feedback para el Residente
+                    </h2>
+                    
+                    <div class="mb-5">
+                        <label for="{{ form.comentarios_generales.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            Comentarios y Sugerencias
+                        </label>
+                        {{ form.comentarios_generales }}
+                        {% if form.comentarios_generales.errors %}
+                            <div class="mt-2 text-red-600 text-sm">
+                                <i class="fas fa-exclamation-circle mr-1"></i>{{ form.comentarios_generales.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
                     <div>
-                        <label for="{{ form.puntuacion.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                            Puntuación (1-10)
+                        <label for="{{ form.puntuacion.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                            Puntuación (1-10) - Opcional
                         </label>
                         {{ form.puntuacion }}
                         {% if form.puntuacion.errors %}
-                            <div class="text-red-600 text-sm mt-1">{{ form.puntuacion.errors.0 }}</div>
+                            <div class="mt-2 text-red-600 text-sm">
+                                <i class="fas fa-exclamation-circle mr-1"></i>{{ form.puntuacion.errors.0 }}
+                            </div>
                         {% endif %}
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Vista Previa del Informe Final -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                <i class="fas fa-file-export text-purple-600 mr-3"></i>
-                Vista Previa para Copiar a EGES
-                <button type="button" onclick="copiarInformeFinal()" 
-                        class="ml-4 inline-flex items-center px-3 py-1 border border-blue-300 rounded-md shadow-sm bg-blue-50 text-xs font-medium text-blue-700 hover:bg-blue-100">
-                    <i class="fas fa-copy mr-1"></i>
-                    Copiar
-                </button>
-            </h2>
-            
-            <div id="informe-preview" class="prose prose-gray max-w-none bg-gray-50 p-6 rounded-lg border">
-                {% if revision.informe_final_html %}
-                    {{ revision.informe_final_html|safe }}
-                {% else %}
-                    <p class="text-gray-500 italic">La vista previa se actualizará al modificar el editor arriba.</p>
-                {% endif %}
-            </div>
-        </div>
+                <!-- Botones de Acción -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <div class="flex flex-wrap gap-3 justify-between items-center">
+                        <button type="button" onclick="copiarInformeFinal()" 
+                                class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-xl transition-all shadow-lg">
+                            <i class="fas fa-copy mr-2"></i>
+                            Copiar Informe
+                        </button>
+                        
+                        <div class="flex flex-wrap gap-3">
+                            <a href="{% url 'preinformes:lista_revision' %}" 
+                               class="inline-flex items-center px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-all shadow-lg">
+                                <i class="fas fa-arrow-left mr-2"></i>
+                                Cancelar
+                            </a>
+                            
+                            <button type="submit" name="guardar_y_continuar"
+                                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-xl transition-all shadow-lg">
+                                <i class="fas fa-save mr-2"></i>
+                                Guardar Cambios
+                            </button>
+                            
+                            <button type="submit" name="finalizar_revision"
+                                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all shadow-lg"
+                                    onclick="return confirm('¿Está seguro de finalizar la revisión? Esta acción no se puede deshacer.')">
+                                <i class="fas fa-check-circle mr-2"></i>
+                                Finalizar Revisión
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- Botones de Acción -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <div class="flex flex-col sm:flex-row gap-4 justify-end">
-                <a href="{% url 'preinformes:lista_revision' %}" 
-                   class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
-                    <i class="fas fa-times mr-2"></i>
-                    Cancelar
-                </a>
-                
-                <button type="submit" name="guardar_y_continuar"
-                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
-                    <i class="fas fa-save mr-2"></i>
-                    Guardar y Continuar
-                </button>
-                
-                <button type="submit" name="finalizar_revision"
-                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200"
-                        onclick="return confirm('¿Está seguro de finalizar la revisión? Esta acción no se puede deshacer.')">
-                    <i class="fas fa-check mr-2"></i>
-                    Finalizar Revisión
-                </button>
-            </div>
-        </div>
-    </form>
+            </form>
 
-    <!-- CKEditor 5 Media (JS/CSS) -->
+        </div>
+    </div>
+
+    <!-- CKEditor Media -->
     {{ form.media }}
+
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Actualizar vista previa en tiempo real (si CKEditor está disponible)
-    // Esto dependerá de la implementación específica de django-ckeditor-5
-    const previewDiv = document.getElementById('informe-preview');
+// === SISTEMA DE AUTOGUARDADO ===
+const AUTOSAVE_INTERVAL = 30000; // 30 segundos
+let autosaveTimer = null;
+let editorInstance = null;
+
+const autosaveIndicator = document.getElementById('autosave-indicator');
+const autosaveStatus = document.getElementById('autosave-status');
+const autosaveIcon = document.getElementById('autosave-icon');
+
+function updateAutosaveIndicator(status, message) {
+    if (!autosaveStatus || !autosaveIcon) return;
     
-    // Función para actualizar vista previa
-    function actualizarVistaPrevia(content) {
-        if (content) {
-            previewDiv.innerHTML = content;
-        }
+    autosaveStatus.textContent = message;
+    autosaveIcon.className = 'fas fa-circle mr-1';
+    
+    switch(status) {
+        case 'saving':
+            autosaveIcon.className = 'fas fa-spinner fa-spin mr-1';
+            autosaveIcon.style.color = '#3B82F6'; // blue
+            break;
+        case 'success':
+            autosaveIcon.style.color = '#10B981'; // green
+            break;
+        case 'error':
+            autosaveIcon.style.color = '#EF4444'; // red
+            break;
+        default:
+            autosaveIcon.style.color = '#6B7280'; // gray
     }
+}
+
+function performAutosave() {
+    if (!editorInstance) return;
     
-    // Escuchar cambios en CKEditor si está disponible
-    // Esto se conectará cuando CKEditor esté listo
-    if (window.CKEDITOR) {
-        // Implementar listener de CKEditor aquí
-        // La implementación específica dependerá de django-ckeditor-5
+    const preinformeId = {{ preinforme.pk }};
+    const informeHtml = editorInstance.getData();
+    
+    if (!informeHtml || informeHtml.trim() === '') return;
+    
+    updateAutosaveIndicator('saving', 'Guardando...');
+    
+    fetch(`/preinformes/autosave-revision/${preinformeId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            informe_final_html: informeHtml
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateAutosaveIndicator('success', 'Guardado');
+            setTimeout(() => {
+                updateAutosaveIndicator('ready', 'Listo');
+            }, 2000);
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+    })
+    .catch(error => {
+        console.error('Error en autoguardado:', error);
+        updateAutosaveIndicator('error', 'Error al guardar');
+        setTimeout(() => {
+            updateAutosaveIndicator('ready', 'Listo');
+        }, 3000);
+    });
+}
+
+function startAutosave() {
+    if (autosaveTimer) clearInterval(autosaveTimer);
+    autosaveTimer = setInterval(performAutosave, AUTOSAVE_INTERVAL);
+}
+
+// Inicializar autoguardado cuando CKEditor esté listo
+document.addEventListener('DOMContentLoaded', function() {
+    const editorElement = document.querySelector('[name="informe_final_html"]');
+    if (editorElement) {
+        const checkEditor = setInterval(() => {
+            if (editorElement.ckeditorInstance) {
+                editorInstance = editorElement.ckeditorInstance;
+                startAutosave();
+                clearInterval(checkEditor);
+            }
+        }, 500);
     }
 });
 
 /**
- * Copia el informe final con formato HTML enriquecido
- * Soporta pegado en Word, Google Docs, etc. manteniendo formato
+ * Copia el informe final con formato HTML
+ * Compatible con EGES y Netterm (mantiene negritas, cursivas, etc.)
  */
 function copiarInformeFinal() {
-    // Obtener HTML del editor/preview
-    const previewElement = document.querySelector('#informe-preview');
-    if (!previewElement) {
-        mostrarNotificacion('No se encontró el informe para copiar', 'error');
+    // Obtener el contenido HTML del editor CKEditor
+    const editorElement = document.querySelector('[name="informe_final_html"]');
+    if (!editorElement) {
+        mostrarNotificacion('No se encontró el editor', 'error');
         return;
     }
     
-    // Obtener HTML limpio
-    let htmlContent = previewElement.innerHTML;
+    // Obtener el contenido del editor
+    let htmlContent = '';
+    if (editorElement.ckeditorInstance) {
+        // Si es CKEditor5, usar getData()
+        htmlContent = editorElement.ckeditorInstance.getData();
+    } else {
+        // Fallback: leer directamente del textarea
+        htmlContent = editorElement.value;
+    }
     
-    // Wrapper con estilos básicos inline para mejor compatibilidad con Word
-    const htmlWithStyles = `
-        <div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">
-            ${htmlContent}
-        </div>
-    `;
+    if (!htmlContent || htmlContent.trim() === '') {
+        mostrarNotificacion('El informe está vacío', 'error');
+        return;
+    }
+    
+    // Envolver con estilos inline para mejor compatibilidad
+    const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${htmlContent}</div>`;
     
     // Generar versión texto plano (fallback)
-    const plainText = previewElement.innerText || previewElement.textContent;
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const plainText = tempDiv.innerText || tempDiv.textContent;
     
-    // Intentar copiar con ClipboardItem (soporta múltiples MIME types)
+    // Intentar copiar con ClipboardItem API (navegadores modernos)
     if (navigator.clipboard && window.ClipboardItem) {
         try {
             const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
@@ -276,40 +376,35 @@ function copiarInformeFinal() {
                 })
                 .catch(err => {
                     console.error('Error con ClipboardItem:', err);
-                    copiarConFallbackHTML(htmlWithStyles, plainText);
+                    copiarConFallback(htmlWithStyles, plainText);
                 });
         } catch (err) {
             console.error('Error creando ClipboardItem:', err);
-            copiarConFallbackHTML(htmlWithStyles, plainText);
+            copiarConFallback(htmlWithStyles, plainText);
         }
     } else {
-        // Fallback para navegadores sin ClipboardItem
-        copiarConFallbackHTML(htmlWithStyles, plainText);
+        copiarConFallback(htmlWithStyles, plainText);
     }
 }
 
 /**
- * Fallback: Copia HTML usando contentEditable y execCommand
+ * Método fallback usando execCommand
  */
-function copiarConFallbackHTML(htmlContent, plainText) {
-    // Crear elemento temporal contentEditable
+function copiarConFallback(htmlContent, plainText) {
     const tempDiv = document.createElement('div');
     tempDiv.contentEditable = 'true';
     tempDiv.style.position = 'fixed';
     tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '0';
     tempDiv.innerHTML = htmlContent;
     document.body.appendChild(tempDiv);
     
     try {
-        // Seleccionar todo el contenido
         const range = document.createRange();
         range.selectNodeContents(tempDiv);
         const selection = window.getSelection();
         selection.removeAllRanges();
         selection.addRange(range);
         
-        // Copiar con execCommand (incluye formato)
         const success = document.execCommand('copy');
         
         if (success) {
@@ -319,7 +414,6 @@ function copiarConFallbackHTML(htmlContent, plainText) {
         }
     } catch (err) {
         console.error('Error con fallback HTML:', err);
-        // Último recurso: copiar solo texto plano
         copiarTextoPlano(plainText);
     } finally {
         document.body.removeChild(tempDiv);
@@ -328,7 +422,7 @@ function copiarConFallbackHTML(htmlContent, plainText) {
 }
 
 /**
- * Último recurso: Copiar solo texto plano
+ * Último recurso: copiar solo texto plano
  */
 function copiarTextoPlano(texto) {
     const textarea = document.createElement('textarea');
@@ -342,26 +436,53 @@ function copiarTextoPlano(texto) {
         document.execCommand('copy');
         mostrarNotificacion('Informe copiado (texto plano)', 'success');
     } catch (err) {
-        mostrarNotificacion('Error al copiar al portapapeles', 'error');
+        mostrarNotificacion('Error al copiar', 'error');
     } finally {
         document.body.removeChild(textarea);
     }
 }
 
+/**
+ * Muestra notificación toast
+ */
 function mostrarNotificacion(mensaje, tipo) {
     const notification = document.createElement('div');
     notification.textContent = mensaje;
-    notification.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 ${
-        tipo === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-    }`;
+    
+    const bgColor = tipo === 'success' ? 'bg-green-500' : 'bg-red-500';
+    notification.className = `fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-slide-in`;
+    
     document.body.appendChild(notification);
     
     setTimeout(() => {
-        if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-        }
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(100%)';
+        notification.style.transition = 'all 0.3s ease-out';
+        
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
+        }, 300);
     }, 3000);
 }
 </script>
+
+<style>
+@keyframes slide-in {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-slide-in {
+    animation: slide-in 0.3s ease-out;
+}
+</style>
 
 {% endblock %}

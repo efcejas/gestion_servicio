@@ -214,7 +214,7 @@ customColorPalette = [
     },
 ]
 
-# Configuración de CKEditor 5 (simplificada para preinformes médicos)
+# Configuración de CKEditor 5 (optimizada para copiar/pegar desde Word)
 CKEDITOR_5_CONFIGS = {
     'default': {
         'toolbar': [
@@ -224,7 +224,9 @@ CKEDITOR_5_CONFIGS = {
             'outdent', 'indent', '|',
             'fontSize', 'fontColor', '|',
             'subscript', 'superscript', '|',
-            'removeFormat'
+            'undo', 'redo', '|',
+            'removeFormat', '|',
+            'sourceEditing'  # Permite ver/editar HTML directamente
         ],
         'heading': {
             'options': [
@@ -246,6 +248,17 @@ CKEDITOR_5_CONFIGS = {
                 { 'color': '#1976d2', 'label': 'Azul (Conclusiones)' },
                 { 'color': '#388e3c', 'label': 'Verde' },
                 { 'color': '#f57c00', 'label': 'Naranja' }
+            ]
+        },
+        # Preservar formatos al pegar desde Word (saltos de línea, negritas, listas, etc.)
+        'htmlSupport': {
+            'allow': [
+                {
+                    'name': r'^(p|br|span|strong|b|em|i|u|s|sub|sup|ol|ul|li|h[1-6]|div)$',
+                    'attributes': True,
+                    'classes': True,
+                    'styles': True
+                }
             ]
         }
     }

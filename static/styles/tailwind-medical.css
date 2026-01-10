@@ -240,3 +240,54 @@
     color: var(--medical-primary);
     background-color: #eff6ff;
 }
+/* ========================================
+   CKEDITOR 5: Separación visual de párrafos
+   ======================================== */
+
+/* Estilos para el área editable de CKEditor5 */
+.ck-editor__editable p,
+.ck-editor__editable_inline p,
+.ck-content p,
+.ck.ck-content p,
+.ck.ck-editor__editable p {
+    display: block !important;
+    margin: 0 0 0.85em 0 !important;
+    line-height: 1.6 !important;
+}
+
+.ck-editor__editable p:last-child,
+.ck-content p:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* Ocultar párrafos vacíos */
+.ck-editor__editable p:empty,
+.ck-content p:empty {
+    display: none !important;
+}
+
+/* Listas dentro del editor */
+.ck-editor__editable ul,
+.ck-editor__editable ol,
+.ck-content ul,
+.ck-content ol {
+    margin: 0.5em 0 1em 0 !important;
+    padding-left: 2em !important;
+}
+
+.ck-editor__editable li,
+.ck-content li {
+    margin-bottom: 0.3em !important;
+    display: list-item !important;
+}
+
+/* Asegurar que listas con viñetas muestren las viñetas */
+.ck-editor__editable ul,
+.ck-content ul {
+    list-style-type: disc !important;
+}
+
+.ck-editor__editable ol,
+.ck-content ol {
+    list-style-type: decimal !important;
+}

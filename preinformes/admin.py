@@ -18,22 +18,22 @@ class RegionAdmin(admin.ModelAdmin):
 
 @admin.register(PlantillaPreinforme)
 class PlantillaPreinformeAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'tipo_estudio', 'region', 'activa', 'creada_por']
-    list_filter = ['tipo_estudio', 'region', 'activa', 'fecha_creacion']
+    list_display = ['nombre', 'tipo_estudio', 'region', 'sistema_destino', 'estado', 'activa', 'creada_por']
+    list_filter = ['tipo_estudio', 'region', 'sistema_destino', 'estado', 'activa', 'fecha_creacion']
     search_fields = ['nombre', 'tipo_estudio__nombre', 'region__nombre']
     readonly_fields = ['fecha_creacion', 'fecha_modificacion']
     
     fieldsets = (
         ('Información General', {
-            'fields': ('nombre', 'tipo_estudio', 'region', 'activa', 'creada_por')
+            'fields': ('nombre', 'tipo_estudio', 'region', 'sistema_destino', 'estado', 'activa', 'creada_por')
         }),
-        ('Plantillas por Sección', {
-            'fields': ('tecnica_template', 'hallazgos_template', 'conclusion_template'),
-            'description': 'Contenido específico para cada sección del preinforme'
-        }),
-        ('Legacy', {
+        ('Contenido de la Plantilla', {
             'fields': ('contenido',),
-            'description': 'Campo legacy para compatibilidad (opcional)',
+            'description': 'Contenido completo de la plantilla. Pega directamente desde Word con formato.'
+        }),
+        ('LEGACY - Campos Separados (Obsoleto)', {
+            'fields': ('tecnica_template', 'hallazgos_template', 'conclusion_template'),
+            'description': 'Campos legacy para compatibilidad con plantillas antiguas. NO usar para plantillas nuevas.',
             'classes': ('collapse',)
         }),
         ('Metadata', {

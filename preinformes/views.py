@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
+import json
 
 from accounts.decorators import role_required
 from .models import (
@@ -294,19 +295,18 @@ def revisar_preinforme(request, pk):
         defaults={'revisor': request.user}
     )
     
-    # CRÍTICO: Asegurar que snapshot existe SIEMPRE
+    # 1) Snapshot: congelar lo que envió el residente (una vez)
     if not revision.informe_residente_snapshot:
-        revision.crear_snapshot_residente()
+        revision.informe_residente_snapshot = preinforme.get_informe_html_or_legacy() or ""
+        revision.save(update_fields=['informe_residente_snapshot'])
     
-    # CRÍTICO: Pre-cargar informe_final_html si está vacío
-    # Esto debe hacerse ANTES de crear el form para que aparezca en el editor
+    # 2) Precarga del editor del staff (solo si todavía no editó)
     if not revision.informe_final_html:
-        contenido_base = revision.informe_residente_snapshot or revision.generar_informe_original_residente()
-        # Cargar TAL CUAL sin modificaciones
-        revision.informe_final_html = contenido_base
-        revision.save()
+        revision.informe_final_html = revision.informe_residente_snapshot
+        revision.save(update_fields=['informe_final_html'])
     
     if request.method == 'POST':
+        # Guardar y finalizar revisión
         form = RevisionPreinformeForm(request.POST, instance=revision, preinforme=preinforme)
         if form.is_valid():
             revision = form.save(commit=False)
@@ -347,13 +347,20 @@ def revisar_preinforme(request, pk):
 def autosave_revision(request, pk):
     """Guarda automáticamente el informe_final_html sin recargar la página"""
     try:
+        # pk es el ID del preinforme, no de la revisión
+        preinforme = get_object_or_404(
+            Preinforme,
+            pk=pk,
+            estado__in=['pendiente_revision', 'en_revision']
+        )
+        
+        # Obtener la revisión asociada
         revision = get_object_or_404(
             RevisionPreinforme,
-            pk=pk,
+            preinforme=preinforme,
             revisor=request.user
         )
         
-        import json
         data = json.loads(request.body)
         informe_html = data.get('informe_final_html', '')
         
@@ -428,7 +435,7 @@ def cargar_plantillas(request):
 
 @login_required
 def plantilla_json(request, pk):
-    """Endpoint JSON para obtener una plantilla específica con campos separados"""
+    """Endpoint JSON para obtener una plantilla específica"""
     try:
         plantilla = PlantillaPreinforme.objects.get(pk=pk, activa=True)
         
@@ -437,9 +444,7 @@ def plantilla_json(request, pk):
             return JsonResponse({'error': 'No tienes permiso para acceder a esta plantilla'}, status=403)
         
         data = {
-            'tecnica': plantilla.tecnica_template or '',
-            'hallazgos': plantilla.hallazgos_template or '',
-            'conclusion': plantilla.conclusion_template or '',
+            'contenido': plantilla.contenido or '',
             'nombre': plantilla.nombre
         }
         
@@ -452,20 +457,27 @@ def plantilla_json(request, pk):
 @login_required
 @role_required('medico_residente', 'jefe_residentes')
 def crear_plantilla_residente(request):
-    """Vista AJAX para que residentes creen nuevas plantillas"""
+    """Vista para que residentes creen nuevas plantillas (página completa)"""
+    # Obtener tipo_estudio y region desde GET o sesión
+    tipo_estudio_id = request.GET.get('tipo_estudio') or request.session.get('plantilla_tipo_estudio')
+    region_id = request.GET.get('region') or request.session.get('plantilla_region')
+    
+    if not tipo_estudio_id or not region_id:
+        messages.error(request, 'Debes seleccionar primero el tipo de estudio y región en el formulario de preinforme.')
+        return redirect('preinformes:crear_preinforme')
+    
+    try:
+        tipo_estudio = TipoEstudio.objects.get(id=tipo_estudio_id)
+        region = Region.objects.get(id=region_id)
+    except (TipoEstudio.DoesNotExist, Region.DoesNotExist):
+        messages.error(request, 'Tipo de estudio o región no válidos.')
+        return redirect('preinformes:crear_preinforme')
+    
+    # Guardar en sesión para persistencia
+    request.session['plantilla_tipo_estudio'] = tipo_estudio_id
+    request.session['plantilla_region'] = region_id
+    
     if request.method == 'POST':
-        tipo_estudio_id = request.POST.get('tipo_estudio')
-        region_id = request.POST.get('region')
-        
-        try:
-            tipo_estudio = TipoEstudio.objects.get(id=tipo_estudio_id)
-            region = Region.objects.get(id=region_id)
-        except (TipoEstudio.DoesNotExist, Region.DoesNotExist):
-            return JsonResponse({
-                'success': False,
-                'error': 'Tipo de estudio o región no válidos'
-            }, status=400)
-        
         form = NuevaPlantillaResidenteForm(
             request.POST,
             tipo_estudio=tipo_estudio,
@@ -473,7 +485,7 @@ def crear_plantilla_residente(request):
         )
         
         if form.is_valid():
-            # Verificar que no exista una plantilla con el mismo nombre para ese tipo/región
+            # Verificar que no exista una plantilla con el mismo nombre
             nombre = form.cleaned_data['nombre']
             existe = PlantillaPreinforme.objects.filter(
                 nombre__iexact=nombre,
@@ -482,42 +494,56 @@ def crear_plantilla_residente(request):
             ).exists()
             
             if existe:
-                return JsonResponse({
-                    'success': False,
-                    'error': f'Ya existe una plantilla con el nombre "{nombre}" para {tipo_estudio.nombre} - {region.nombre}'
-                }, status=400)
-            
-            plantilla = form.save(commit=False)
-            plantilla.tipo_estudio = tipo_estudio
-            plantilla.region = region
-            plantilla.creada_por = request.user
-            plantilla.activa = True
-            
-            # Definir estado según checkbox de compartir
-            compartir = form.cleaned_data.get('compartir', False)
-            plantilla.estado = 'publica' if compartir else 'borrador'
-            
-            plantilla.save()
-            
-            return JsonResponse({
-                'success': True,
-                'plantilla': {
-                    'id': plantilla.id,
-                    'nombre': plantilla.nombre,
-                    'estado': plantilla.get_estado_display(),
-                    'es_publica': plantilla.estado == 'publica'
-                },
-                'message': f'Plantilla "{plantilla.nombre}" creada exitosamente. ' + 
-                          ('Visible para todos.' if compartir else 'Solo visible para ti.')
-            })
-        else:
-            errors = form.errors.as_json()
-            return JsonResponse({
-                'success': False,
-                'errors': errors
-            }, status=400)
+                messages.error(
+                    request, 
+                    f'Ya existe una plantilla con el nombre "{nombre}" para {tipo_estudio.nombre} - {region.nombre}'
+                )
+            else:
+                plantilla = form.save(commit=False)
+                plantilla.tipo_estudio = tipo_estudio
+                plantilla.region = region
+                plantilla.creada_por = request.user
+                plantilla.activa = True
+                
+                # Convertir saltos de línea a HTML si es necesario
+                if plantilla.contenido:
+                    # Si no tiene tags HTML, convertir saltos de línea a párrafos
+                    if not ('<p>' in plantilla.contenido or '<br>' in plantilla.contenido):
+                        lines = plantilla.contenido.split('\n')
+                        html_lines = []
+                        for line in lines:
+                            line = line.strip()
+                            if line:
+                                html_lines.append(f'<p>{line}</p>')
+                        plantilla.contenido = ''.join(html_lines)
+                
+                # Definir estado según checkbox
+                compartir = form.cleaned_data.get('compartir', False)
+                plantilla.estado = 'publica' if compartir else 'borrador'
+                
+                plantilla.save()
+                
+                messages.success(
+                    request,
+                    f'Plantilla "{plantilla.nombre}" creada exitosamente. ' +
+                    ('Visible para todos.' if compartir else 'Solo visible para ti.')
+                )
+                
+                # Redirigir al formulario de preinforme con la plantilla seleccionada
+                return redirect(f"{reverse('preinformes:crear_preinforme')}?plantilla_id={plantilla.id}")
+    else:
+        form = NuevaPlantillaResidenteForm(
+            tipo_estudio=tipo_estudio,
+            region=region
+        )
     
-    return JsonResponse({'error': 'Método no permitido'}, status=405)
+    context = {
+        'form': form,
+        'tipo_estudio': tipo_estudio,
+        'region': region,
+    }
+    
+    return render(request, 'preinformes/crear_plantilla.html', context)
 
 @login_required
 def autosave_preinforme(request, pk):
@@ -533,25 +559,13 @@ def autosave_preinforme(request, pk):
             estado='borrador'
         )
         
-        # Obtener datos del POST
-        tecnica = request.POST.get('tecnica', '')
-        hallazgos = request.POST.get('hallazgos', '')
-        conclusion = request.POST.get('conclusion', '')
+        # Obtener contenido del POST
+        informe_html = request.POST.get('informe_html', '')
         
         # Guardar solo si hay cambios
-        cambios = False
-        if preinforme.tecnica != tecnica:
-            preinforme.tecnica = tecnica
-            cambios = True
-        if preinforme.hallazgos != hallazgos:
-            preinforme.hallazgos = hallazgos
-            cambios = True
-        if preinforme.conclusion != conclusion:
-            preinforme.conclusion = conclusion
-            cambios = True
-        
-        if cambios:
-            preinforme.save(update_fields=['tecnica', 'hallazgos', 'conclusion'])
+        if preinforme.informe_html != informe_html:
+            preinforme.informe_html = informe_html
+            preinforme.save(update_fields=['informe_html'])
             return JsonResponse({
                 'success': True, 
                 'message': 'Preinforme guardado automáticamente',
@@ -613,37 +627,16 @@ def copiar_informe_final(request, pk):
     
     # Obtener HTML e informe final
     if hasattr(preinforme, 'revision') and preinforme.revision.informe_final_html:
-        # HTML con formato
+        # HTML con formato desde la revisión finalizada
         informe_html = preinforme.revision.informe_final_html
         # Texto plano como fallback
         from django.utils.html import strip_tags
         informe_texto = strip_tags(informe_html)
     else:
-        # Si no hay revisión, usar el preinforme original
-        tecnica_html = preinforme.tecnica
-        hallazgos_html = preinforme.hallazgos
-        conclusion_html = preinforme.conclusion
-        
-        informe_html = f"""
-<h3>TÉCNICA</h3>
-{tecnica_html}
-
-<h3>HALLAZGOS</h3>
-{hallazgos_html}
-
-<h3>CONCLUSIÓN</h3>
-{conclusion_html}
-        """.strip()
-        
+        # Si no hay revisión, usar el preinforme original con método unificado
+        informe_html = preinforme.get_informe_html_or_legacy()
         from django.utils.html import strip_tags
-        informe_texto = f"""TÉCNICA:
-{strip_tags(tecnica_html)}
-
-HALLAZGOS:
-{strip_tags(hallazgos_html)}
-
-CONCLUSIÓN:
-{strip_tags(conclusion_html)}"""
+        informe_texto = strip_tags(informe_html)
     
     return JsonResponse({
         'informe_html': informe_html,

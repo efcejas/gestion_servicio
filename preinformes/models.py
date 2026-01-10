@@ -179,30 +179,35 @@ class PlantillaPreinforme(models.Model):
         help_text="Sistema para el que está diseñada esta plantilla"
     )
     
-    # Campos separados para cada sección
-    tecnica_template = CKEditor5Field(
+    # Campo único de contenido completo (enfoque simplificado)
+    contenido = CKEditor5Field(
         config_name='default',
-        verbose_name="Plantilla de Técnica",
-        help_text="Plantilla para la sección de técnica",
-        blank=True
-    )
-    hallazgos_template = CKEditor5Field(
-        config_name='default', 
-        verbose_name="Plantilla de Hallazgos",
-        help_text="Plantilla para la sección de hallazgos",
-        blank=True
-    )
-    conclusion_template = CKEditor5Field(
-        config_name='default',
-        verbose_name="Plantilla de Conclusión", 
-        help_text="Plantilla para la sección de conclusión",
+        verbose_name="Contenido de la Plantilla",
+        help_text="Contenido completo de la plantilla con formato. Pega directamente desde Word.",
         blank=True
     )
     
-    # Mantener campo legacy para compatibilidad
-    contenido = models.TextField(
-        help_text="Plantilla base del preinforme (campo legacy)",
-        blank=True
+    # DEPRECATED: Campos legacy separados (mantener para migración)
+    tecnica_template = CKEditor5Field(
+        config_name='default',
+        verbose_name="[LEGACY] Plantilla de Técnica",
+        help_text="Campo legacy - usar 'contenido' en su lugar",
+        blank=True,
+        null=True
+    )
+    hallazgos_template = CKEditor5Field(
+        config_name='default', 
+        verbose_name="[LEGACY] Plantilla de Hallazgos",
+        help_text="Campo legacy - usar 'contenido' en su lugar",
+        blank=True,
+        null=True
+    )
+    conclusion_template = CKEditor5Field(
+        config_name='default',
+        verbose_name="[LEGACY] Plantilla de Conclusión", 
+        help_text="Campo legacy - usar 'contenido' en su lugar",
+        blank=True,
+        null=True
     )
     
     activa = models.BooleanField(default=True)
@@ -278,19 +283,36 @@ class Preinforme(models.Model):
         choices=[('M', 'Masculino'), ('F', 'Femenino'), ('O', 'Otro')]
     )
     
-    # Contenido del preinforme
+    # Contenido del preinforme - Campo único simplificado
+    informe_html = CKEditor5Field(
+        config_name='default',
+        verbose_name="Contenido del Preinforme",
+        help_text="Informe completo con formato. Incluye técnica, hallazgos y conclusión.",
+        blank=True,
+        null=True
+    )
+    
+    # DEPRECATED: Campos legacy separados (mantener para migración y compatibilidad)
     tecnica = CKEditor5Field(
         config_name='default',
-        help_text="Descripción de la técnica utilizada"
+        verbose_name="[LEGACY] Técnica",
+        help_text="Campo legacy - usar 'informe_html' en su lugar",
+        blank=True,
+        null=True
     )
     hallazgos = CKEditor5Field(
         config_name='default',
-        help_text="Hallazgos encontrados por el residente"
+        verbose_name="[LEGACY] Hallazgos",
+        help_text="Campo legacy - usar 'informe_html' en su lugar",
+        blank=True,
+        null=True
     )
     conclusion = CKEditor5Field(
         config_name='default',
-        help_text="Conclusión del residente",
-        blank=True
+        verbose_name="[LEGACY] Conclusión",
+        help_text="Campo legacy - usar 'informe_html' en su lugar",
+        blank=True,
+        null=True
     )
     
     # Estado y revisión
@@ -317,6 +339,36 @@ class Preinforme(models.Model):
     
     def __str__(self):
         return f"{self.numero_estudio} - {self.apellido_paciente}, {self.nombre_paciente} ({self.residente.username})"
+    
+    def get_informe_html_or_legacy(self) -> str:
+        """Fuente única: si existe informe_html, usarlo. Si no, armar desde legacy."""
+        if self.informe_html:
+            return self.informe_html
+        
+        # Fallback: construir desde campos legacy
+        parts = []
+        
+        # Título basado en plantilla o tipo de estudio
+        if self.plantilla_utilizada:
+            titulo = self.plantilla_utilizada.nombre
+        else:
+            titulo = self.tipo_estudio.nombre
+        parts.append(f'<p><strong>{titulo.upper()}</strong></p>')
+        
+        # Técnica
+        if self.tecnica:
+            parts.append(self.tecnica)
+        
+        # Hallazgos
+        if self.hallazgos:
+            parts.append(self.hallazgos)
+        
+        # Conclusión (solo si tiene contenido real)
+        if self.conclusion and has_real_text(self.conclusion):
+            parts.append('<p><strong>CONCLUSIÓN</strong></p>')
+            parts.append(self.conclusion)
+        
+        return ''.join(parts)
     
     def enviar_a_revision(self):
         """Envía el preinforme para revisión"""
@@ -391,47 +443,10 @@ class RevisionPreinforme(models.Model):
     
     def generar_informe_original_residente(self):
         """
-        Genera el informe completo del residente con formato médico estándar.
-        - Título SIN centrado (alineado a la izquierda)
-        - Párrafos correctamente separados
-        - Conclusión SOLO si hay texto real
+        Genera el informe completo del residente.
+        Usa el método helper del modelo para obtener el HTML correcto.
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        # Obtener el nombre de la plantilla utilizada, o el tipo de estudio como fallback
-        if self.preinforme.plantilla_utilizada:
-            titulo = self.preinforme.plantilla_utilizada.nombre
-        else:
-            titulo = self.preinforme.tipo_estudio.nombre
-        
-        # Título SIN alineación centrada
-        informe_html = f'<p><strong>{titulo.upper()}</strong></p>'
-        
-        # Normalizar técnica
-        tecnica_normalizada = normalize_html_content(self.preinforme.tecnica)
-        informe_html += tecnica_normalizada
-        
-        # Normalizar hallazgos
-        hallazgos_normalizados = normalize_html_content(self.preinforme.hallazgos)
-        informe_html += hallazgos_normalizados
-        
-        # CONCLUSIÓN: Solo si tiene texto real
-        if has_real_text(self.preinforme.conclusion):
-            informe_html += '<p><strong>CONCLUSIÓN</strong></p>'
-            conclusion_normalizada = normalize_html_content(self.preinforme.conclusion)
-            informe_html += conclusion_normalizada
-            logger.info(f"✅ Conclusión incluida para preinforme {self.preinforme.numero_estudio}")
-        else:
-            logger.info(f"⏭️  Conclusión omitida (vacía) para preinforme {self.preinforme.numero_estudio}")
-        
-        # Sanitizar cualquier alineación centrada que pudiera existir
-        informe_html = sanitize_center_alignment(informe_html)
-        
-        # DEBUG: Mostrar HTML generado (primeros 500 caracteres)
-        logger.debug(f"\n{'='*60}\n📄 HTML generado para {self.preinforme.numero_estudio}:\n{informe_html[:500]}...\n{'='*60}\n")
-        
-        return informe_html
+        return self.preinforme.get_informe_html_or_legacy()
     
     def crear_snapshot_residente(self):
         """Crea un snapshot del informe original del residente"""
