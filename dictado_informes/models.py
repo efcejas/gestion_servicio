@@ -525,6 +525,7 @@ class CorreccionAprendizaje(models.Model):
         indexes = [
             models.Index(fields=['-fecha_creacion']),
             models.Index(fields=['fue_aplicada']),
+            models.Index(fields=['usuario', '-fecha_creacion']),  # 🚀 Optimización para queries por usuario
         ]
     
     def __str__(self):
@@ -576,6 +577,7 @@ class CorreccionAprendizaje(models.Model):
     def obtener_ejemplos_aprendizaje(usuario=None, limite=10):
         """
         Obtiene los ejemplos de correcciones más recientes para entrenar la IA
+        🚀 OPTIMIZADO: Con caché y solo campos necesarios
         
         Args:
             usuario: Usuario específico (opcional)
@@ -584,13 +586,21 @@ class CorreccionAprendizaje(models.Model):
         Returns:
             str: Ejemplos formateados para incluir en el prompt
         """
+        from django.core.cache import cache
+        
+        # 🚀 CACHÉ: Verificar si ya tenemos esto en caché
+        cache_key = f'aprendizaje_ejemplos_{usuario.id if usuario else "global"}_{limite}'
+        cached_ejemplos = cache.get(cache_key)
+        if cached_ejemplos:
+            return cached_ejemplos
+        
         query = CorreccionAprendizaje.objects.all()
         
         if usuario:
             query = query.filter(usuario=usuario)
         
-        # Obtener los más recientes
-        correcciones = query[:limite]
+        # 🚀 OPTIMIZACIÓN: Solo traer campos necesarios
+        correcciones = query.only('cambios_detectados')[:limite]
         
         if not correcciones:
             return ""
@@ -610,5 +620,9 @@ class CorreccionAprendizaje(models.Model):
         
         # Limitar a los 20 ejemplos más relevantes
         ejemplos_unicos = list(dict.fromkeys(ejemplos))[:20]
+        resultado = "\n".join(ejemplos_unicos)
         
-        return "\n".join(ejemplos_unicos)
+        # 🚀 GUARDAR EN CACHÉ (5 minutos)
+        cache.set(cache_key, resultado, timeout=300)
+        
+        return resultado

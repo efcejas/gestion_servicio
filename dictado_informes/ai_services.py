@@ -3,8 +3,10 @@ Servicios de IA para dictado y mejora de informes médicos
 """
 from openai import OpenAI
 from django.conf import settings
+from django.core.cache import cache
 from decouple import config
 import logging
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +128,16 @@ class AIService:
                     'error': 'Archivo de audio demasiado pequeño o inválido'
                 }
             
+            # 🚀 CACHÉ: Verificar si ya transcribimos este audio
+            audio_hash = hashlib.md5(audio_content).hexdigest()
+            cache_key = f'whisper_transcription_{audio_hash}'
+            cached_result = cache.get(cache_key)
+            
+            if cached_result:
+                logger.info(f"✅ Transcripción recuperada del caché (hash: {audio_hash[:8]}...)")
+                cached_result['from_cache'] = True
+                return cached_result
+            
             # Detectar el tipo de archivo basado en los primeros bytes (magic numbers)
             # WebM: starts with 0x1A, 0x45, 0xDF, 0xA3
             # WAV: starts with "RIFF"
@@ -152,13 +164,11 @@ class AIService:
             # Crear una tupla con el formato esperado por OpenAI
             file_tuple = (f"audio.{file_extension}", audio_content, mime_type)
             
-            # Prompt para guiar a Whisper en contexto médico
-            # Optimizado para informes radiológicos con separación automática de conceptos
+            # Prompt optimizado para Whisper (más corto = menos latencia)
             prompt_whisper = (
-                "Informe radiológico estructurado. Terminología médica especializada. "
-                "Pausa breve = coma. Pausa media = punto. Pausa larga = punto y salto de línea. "
-                "Cada hallazgo o estructura anatómica en línea separada. "
-                "Detecta pausas del hablante para separar conceptos automáticamente."
+                "Informe radiológico. Terminología médica. "
+                "Pausas: breve=coma, media=punto, larga=salto. "
+                "Separar estructuras anatómicas."
             )
             
             # Transcribir con OpenAI Whisper
@@ -167,9 +177,25 @@ class AIService:
                 file=file_tuple,
                 language="es",  # Español
                 prompt=prompt_whisper,  # Contexto para mejorar precisión
-                temperature=0.8,  # 0-1: MÁS sensible a pausas = más puntuación automática (aumentado de 0.5 → 0.8)
+                temperature=0.6,  # Optimizado: balance entre precisión y velocidad (reducido de 0.8)
                 response_format="verbose_json"
             )
+            
+            logger.info(f"✅ Whisper transcripción exitosa: {len(transcript.text)} caracteres")
+            
+            result = {
+                'text': transcript.text,
+                'confidence': 0.95,
+                'duration': getattr(transcript, 'duration', None),
+                'provider': 'openai',
+                'from_cache': False
+            }
+            
+            # 🚀 GUARDAR EN CACHÉ (1 hora de expiración)
+            cache.set(cache_key, result, timeout=3600)
+            logger.info(f"💾 Transcripción guardada en caché (hash: {audio_hash[:8]}...)")
+            
+            return result
             
             logger.info(f"✅ Whisper transcripción exitosa: {len(transcript.text)} caracteres")
             
@@ -310,37 +336,29 @@ IMPORTANTE:
                 logger.info(f"🧠 Sistema de aprendizaje: {cantidad_ejemplos} ejemplos activos para {usuario}")
             
             if modo == 'FIEL':
-                # MODO FIEL: Solo corregir ortografía SIN inventar estructura ni agregar texto
-                prompt_base = f"""Eres un corrector ortográfico ESTRICTO. Tu ÚNICA tarea es corregir errores de ortografía SIN MODIFICAR NADA MÁS.
+                # MODO FIEL: Solo corregir ortografía y puntuación básica
+                prompt_base = f"""Corrector ortográfico médico. Corrige ortografía y normaliza puntuación final.
 
-TEXTO ORIGINAL:
+TEXTO:
 {texto_original}
 
-INSTRUCCIONES ESTRICTAS:
-1. Corrige ÚNICAMENTE ortografía: acentos, mayúsculas iniciales, términos médicos mal escritos
-2. NO agregues comas donde no hay
-3. NO agregues puntos donde no hay  
-4. NO agregues saltos de línea donde no hay
-5. NO quites comas que ya existen
-6. NO quites puntos que ya existen
-7. NO quites saltos de línea que ya existen
-8. NO cambies el orden de las palabras
-9. NO reorganices las frases
-10. Capitaliza SOLO la primera letra después de punto o salto de línea
+REGLAS:
+1. Corrige ortografía: acentos, mayúsculas, términos médicos
+2. MANTÉN toda la puntuación existente (comas, puntos intermedios)
+3. Si una oración completa NO termina en punto, agrégalo
+4. Si termina en salto de línea, asegura que tenga punto antes
+5. RESPETA saltos de línea existentes
+6. NO agregues comas nuevas
+7. NO reorganices frases
+8. Capitaliza después de punto o inicio de línea
 
-PROHIBIDO ABSOLUTAMENTE:
-❌ Agregar o quitar puntuación
-❌ Agregar o quitar saltos de línea
-❌ Cambiar la estructura del texto
-❌ Agregar palabras o frases
-❌ Quitar palabras o frases
+PUNTUACIÓN FINAL:
+✅ "meniscos normales" → "Meniscos normales."
+✅ "meniscos normales." → "Meniscos normales." (ya tenía punto)
+✅ "rodilla derecha\nmeniscos normales" → "Rodilla derecha.\nMeniscos normales."
+❌ "meniscos normales sin" → "Meniscos normales sin" (oración incompleta, no agregar punto)
 
-EJEMPLO DE LO QUE DEBES HACER:
-ORIGINAL: "la rotula presenta implantacion alta"
-CORRECTO: "La rótula presenta implantación alta"
-INCORRECTO: "La rótula presenta implantación alta." ← NO agregues punto si no había
-
-RESPONDE ÚNICAMENTE CON EL TEXTO CORREGIDO, SIN EXPLICACIONES:"""
+Responde solo con el texto corregido:"""
                 
                 # Agregar ejemplos de aprendizaje si existen
                 if ejemplos_aprendizaje:
@@ -430,6 +448,29 @@ CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
                             'Articulación radio-carpiana conservada.',
                             'No se observa aumento del líquido articular.'
                         ]
+                    },
+                    'PIE': {
+                        'titulo': 'RM DE PIE [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el pie [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            'Estructuras óseas del pie sin alteraciones.',
+                            'Articulaciones intertarsianas conservadas.',
+                            'Tendones y ligamentos sin signos de lesión.',
+                            'No se observa aumento del líquido articular.',
+                            'No se visualizan lesiones óseas.'
+                        ]
+                    },
+                    'CADERA': {
+                        'titulo': 'RM DE CADERA [<DERECHA/IZQUIERDA>]',
+                        'seccion_tecnica': 'Se exploró la cadera [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            'Cabeza femoral de morfología y señal normales.',
+                            'Acetábulo sin alteraciones.',
+                            'Labrum acetabular íntegro.',
+                            'Músculos periarticulares sin signos de lesión.',
+                            'No se observa aumento del líquido articular.',
+                            'Estructuras óseas sin lesiones evidentes.'
+                        ]
                     }
                 }
                 
@@ -500,7 +541,7 @@ IMPORTANTE: Una estructura NO puede estar normal Y alterada al mismo tiempo. REE
                         "content": prompt
                     }
                 ],
-                temperature=0.1,  # MUY baja para máxima fidelidad en modo FIEL (reducido de 0.3)
+                temperature=0.2,  # Optimizado para modo FIEL: permite puntuación inteligente manteniendo fidelidad
                 max_tokens=1500
             )
             

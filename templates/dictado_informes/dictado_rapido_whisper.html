@@ -6,6 +6,36 @@
 {% block page_title %}Dictado Rápido con Whisper AI{% endblock %}
 {% block page_description %}Tu "tipista personal" inteligente para transcripción profesional médica{% endblock %}
 
+{% block extra_css %}
+<style>
+    @keyframes pulse-slow {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.8;
+        }
+    }
+    
+    .animate-pulse-slow {
+        animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes waveform {
+        0%, 100% {
+            transform: scaleY(1);
+        }
+        50% {
+            transform: scaleY(1.5);
+        }
+    }
+    
+    .fa-waveform-lines {
+        animation: waveform 1s ease-in-out infinite;
+    }
+</style>
+{% endblock %}
+
 {% block page_actions %}
 <div class="flex items-center gap-4">
     <button id="btnHistorial" 
@@ -83,6 +113,8 @@
                         <option value="TOBILLO">🦶 RM de Tobillo</option>
                         <option value="MANO">🤚 RM de Mano</option>
                         <option value="MUÑECA">⌚ RM de Muñeca</option>
+                        <option value="PIE">🦶 RM de Pie</option>
+                        <option value="CADERA">🦴 RM de Cadera</option>
                     </select>
                 </div>
             </div>
@@ -103,6 +135,21 @@
                     <strong>🧠 Aprendizaje Activo:</strong> <span id="aprendizajeTexto">Cargando...</span>
                 </p>
             </div>
+            
+            <!-- Toggle Preview en Tiempo Real -->
+            <div class="mt-4 bg-cyan-900/30 border border-cyan-700 rounded-lg p-3">
+                <label class="flex items-center justify-between cursor-pointer">
+                    <div>
+                        <p class="text-xs font-bold text-cyan-200">
+                            <i class="fas fa-bolt mr-1"></i>
+                            Preview en Tiempo Real
+                        </p>
+                        <p class="text-xs text-cyan-300 mt-1">Ver texto mientras hablas (experimental)</p>
+                    </div>
+                    <input type="checkbox" id="checkPreviewTiempoReal" checked
+                           class="w-5 h-5 text-cyan-600 rounded focus:ring-cyan-500">
+                </label>
+            </div>
         </div>
 
         <!-- Panel Derecho: Resultado -->
@@ -111,6 +158,25 @@
                 <i class="fas fa-file-medical text-green-500 mr-2"></i>
                 2. Texto Final
             </h2>
+
+            <!-- Preview en tiempo real (mientras graba) -->
+            <div id="contenedorPreview" class="hidden mb-6">
+                <div class="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border-2 border-blue-500 rounded-lg p-4 animate-pulse-slow">
+                    <label class="text-sm font-semibold text-blue-300 mb-2 block flex items-center">
+                        <i class="fas fa-waveform-lines text-blue-400 mr-2 animate-pulse"></i>
+                        ⚡ Preview en Tiempo Real (provisional)
+                        <span class="ml-auto text-xs bg-blue-600 px-2 py-1 rounded-full">Grabando...</span>
+                    </label>
+                    <div id="textoPreview" 
+                         class="min-h-24 bg-gray-900/80 border border-blue-400 rounded-lg p-4 text-blue-200 text-sm italic whitespace-pre-wrap">
+                        <span class="text-gray-500">Esperando que hables...</span>
+                    </div>
+                    <p class="text-xs text-blue-300 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Este texto se refina automáticamente con Whisper al finalizar
+                    </p>
+                </div>
+            </div>
 
             <!-- Área de resultado -->
             <div id="contenedorResultado" class="hidden">
@@ -287,6 +353,59 @@ const iconGrabar = document.getElementById('iconGrabar');
 const estadoGrabacion = document.getElementById('estadoGrabacion');
 const tiempoGrabacion = document.getElementById('tiempoGrabacion');
 
+// 🚀 WEB SPEECH API para preview en tiempo real
+let recognition = null;
+let previewActivo = false;
+
+// Verificar si el navegador soporta Web Speech API
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;  // Continuar escuchando
+    recognition.interimResults = true;  // Mostrar resultados intermedios
+    recognition.lang = 'es-ES';  // Español
+    
+    // Manejar resultados en tiempo real
+    recognition.onresult = (event) => {
+        let textoInterino = '';
+        let textoFinal = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                textoFinal += transcript + ' ';
+            } else {
+                textoInterino += transcript;
+            }
+        }
+        
+        // Actualizar preview
+        const previewDiv = document.getElementById('textoPreview');
+        if (previewDiv) {
+            const textoCompleto = (previewDiv.dataset.textoAcumulado || '') + textoFinal + textoInterino;
+            previewDiv.textContent = textoCompleto || 'Esperando que hables...';
+            previewDiv.classList.remove('text-gray-500');
+            previewDiv.classList.add('text-blue-200');
+            
+            // Guardar texto acumulado
+            if (textoFinal) {
+                previewDiv.dataset.textoAcumulado = (previewDiv.dataset.textoAcumulado || '') + textoFinal;
+            }
+        }
+    };
+    
+    recognition.onerror = (event) => {
+        console.warn('⚠️ Web Speech error:', event.error);
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.log('ℹ️ Preview en tiempo real no disponible, usando solo Whisper');
+        }
+    };
+    
+    console.log('✅ Web Speech API disponible para preview en tiempo real');
+} else {
+    console.log('⚠️ Web Speech API no disponible en este navegador');
+}
+
 // Cargar información de aprendizaje al inicio
 cargarInfoAprendizaje();
 
@@ -348,6 +467,35 @@ async function iniciarGrabacion(e) {
             }
         });
         
+        // 🚀 Activar preview en tiempo real si está habilitado
+        const checkPreview = document.getElementById('checkPreviewTiempoReal');
+        if (checkPreview && checkPreview.checked && recognition) {
+            const contenedorPreview = document.getElementById('contenedorPreview');
+            const textoPreview = document.getElementById('textoPreview');
+            
+            // Mostrar contenedor de preview
+            contenedorPreview.classList.remove('hidden');
+            
+            // Resetear preview
+            textoPreview.textContent = 'Esperando que hables...';
+            textoPreview.classList.add('text-gray-500');
+            textoPreview.classList.remove('text-blue-200');
+            textoPreview.dataset.textoAcumulado = '';
+            
+            // Ocultar resultado anterior
+            document.getElementById('contenedorResultado').classList.add('hidden');
+            document.getElementById('estadoInicial').classList.add('hidden');
+            
+            // Iniciar reconocimiento de voz
+            try {
+                recognition.start();
+                previewActivo = true;
+                console.log('🎤 Preview en tiempo real activado');
+            } catch (error) {
+                console.warn('⚠️ No se pudo iniciar Web Speech:', error);
+            }
+        }
+        
         // Detectar el mejor formato soportado
         let mimeType = 'audio/webm;codecs=opus';
         if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -378,7 +526,8 @@ async function iniciarGrabacion(e) {
         mediaRecorder.onstop = procesarAudio;
         
         // Usar timeslice para generar chunks regulares
-        mediaRecorder.start(100); // Genera chunks cada 100ms
+        // Optimizado: 500ms reduce overhead sin perder calidad
+        mediaRecorder.start(500); // Genera chunks cada 500ms
         tiempoInicio = Date.now();
         
         // UI grabando
@@ -416,6 +565,29 @@ async function iniciarGrabacion(e) {
 function detenerGrabacion() {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         const duracion = Date.now() - tiempoInicio;
+        
+        // 🚀 Detener preview en tiempo real
+        if (previewActivo && recognition) {
+            try {
+                recognition.stop();
+                previewActivo = false;
+                console.log('⏸️ Preview en tiempo real detenido');
+                
+                // Cambiar estilo del preview a "procesando"
+                const contenedorPreview = document.getElementById('contenedorPreview');
+                const textoPreview = document.getElementById('textoPreview');
+                if (contenedorPreview && !contenedorPreview.classList.contains('hidden')) {
+                    textoPreview.style.opacity = '0.5';
+                    const label = contenedorPreview.querySelector('label');
+                    if (label) {
+                        label.querySelector('.text-blue-300').innerHTML = 
+                            '<i class="fas fa-sync fa-spin text-purple-400 mr-2"></i>⏳ Refinando con Whisper AI...';
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Error al detener Web Speech:', error);
+            }
+        }
         
         mediaRecorder.stop();
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
@@ -488,10 +660,14 @@ async function procesarAudio() {
         
         // Mostrar procesando
         document.getElementById('estadoInicial').classList.add('hidden');
-        document.getElementById('procesando').classList.remove('hidden');
+        const procesandoDiv = document.getElementById('procesando');
+        procesandoDiv.classList.remove('hidden');
         
         try {
-            // 1. Transcribir con Whisper
+            // 🚀 PASO 1: Transcribir con Whisper
+            const t1 = Date.now();
+            procesandoDiv.querySelector('p').textContent = '🎤 Transcribiendo con Whisper AI...';
+            
             const responseTranscripcion = await fetch('{% url "dictado_informes:transcribir_whisper" %}', {
                 method: 'POST',
                 headers: {
@@ -502,15 +678,34 @@ async function procesarAudio() {
             });
             
             const dataTranscripcion = await responseTranscripcion.json();
+            const t2 = Date.now();
+            console.log(`⏱️ Transcripción completada en ${t2-t1}ms`);
             
             if (!dataTranscripcion.success) {
                 throw new Error(dataTranscripcion.error || 'Error en transcripción');
             }
             
             const textoTranscrito = dataTranscripcion.texto_transcrito;
+            const fromCache = dataTranscripcion.from_cache;
             
-            // PREVISUALIZACIÓN EN TIEMPO REAL - Mostrar transcripción inmediatamente
-            document.getElementById('procesando').classList.add('hidden');
+            if (fromCache) {
+                console.log('✅ Transcripción recuperada del caché - ¡Súper rápido!');
+            }
+            
+            // 🚀 OCULTAR PREVIEW y mostrar resultado final
+            const contenedorPreview = document.getElementById('contenedorPreview');
+            if (contenedorPreview && !contenedorPreview.classList.contains('hidden')) {
+                // Fade out del preview
+                contenedorPreview.style.transition = 'opacity 0.3s ease-out';
+                contenedorPreview.style.opacity = '0';
+                setTimeout(() => {
+                    contenedorPreview.classList.add('hidden');
+                    contenedorPreview.style.opacity = '1';
+                }, 300);
+            }
+            
+            // MOSTRAR resultado en el área principal
+            procesandoDiv.classList.add('hidden');
             document.getElementById('contenedorResultado').classList.remove('hidden');
             document.getElementById('textoTranscrito').textContent = textoTranscrito;
             document.getElementById('textoMejorado').textContent = '⏳ Mejorando con IA...';
@@ -521,7 +716,8 @@ async function procesarAudio() {
             // Guardar texto original para aprendizaje
             textoOriginalGlobal = textoTranscrito;
             
-            // 2. Mejorar con IA según modo seleccionado
+            // 🚀 PASO 2: Mejorar con IA según modo seleccionado
+            const t3 = Date.now();
             const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
             const tipoPlantilla = document.getElementById('tipoPlantilla').value;
             
@@ -539,6 +735,9 @@ async function procesarAudio() {
             });
             
             const dataMejora = await responseMejora.json();
+            const t4 = Date.now();
+            console.log(`⏱️ Mejora IA completada en ${t4-t3}ms`);
+            console.log(`⏱️ TIEMPO TOTAL: ${t4-t1}ms (Whisper: ${t2-t1}ms, IA: ${t4-t3}ms)`);
             
             if (!dataMejora.success) {
                 throw new Error(dataMejora.error || 'Error en mejora IA');
@@ -559,7 +758,8 @@ async function procesarAudio() {
             }
             
             // Mostrar resultado
-            document.getElementById('procesando').classList.add('hidden');
+            const tiempoTotal = Math.round((t4 - t1) / 1000 * 10) / 10; // Redondear a 1 decimal
+            estadoGrabacion.textContent = `✅ Listo en ${tiempoTotal}s! ${fromCache ? '⚡ (caché)' : ''}`
             document.getElementById('contenedorResultado').classList.remove('hidden');
             
             estadoGrabacion.textContent = '✅ Listo! Puedes grabar de nuevo';
