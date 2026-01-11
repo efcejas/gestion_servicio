@@ -471,23 +471,38 @@ CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
                             'No se observa aumento del líquido articular.',
                             'Estructuras óseas sin lesiones evidentes.'
                         ]
+                    },
+                    'TC_MSK': {
+                        'titulo': 'TC DE [<REGIÓN ANATÓMICA>]',
+                        'seccion_tecnica': 'Se realizó estudio tomográfico de la región solicitada con reconstrucciones multiplanares, sin contraste endovenoso.',
+                        'comentarios': [
+                            'Estructuras óseas de la región sin alteraciones.',
+                            'Articulaciones conservadas.',
+                            'Tejidos blandos sin signos de lesión.',
+                            'No se observan colecciones ni masas.',
+                            'No se visualizan lesiones evidentes.'
+                        ]
                     }
                 }
                 
                 plantilla_actual = plantillas.get(tipo_plantilla, plantillas['RODILLA'])
                 comentarios_str = '\n'.join(plantilla_actual['comentarios'])
                 
-                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado y estructura la información usando la plantilla solicitada.
+                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado y estructura la información usando ÚNICAMENTE la plantilla proporcionada.
+
+⚠️ ADVERTENCIA CRÍTICA: NO mezcles plantillas de diferentes modalidades (RM vs TC). Usa SOLO la plantilla que te doy.
 
 TEXTO DICTADO:
 {texto_original}
 
-INSTRUCCIONES: Usa EXACTAMENTE esta plantilla y completa los campos entre [<>] con la información del dictado:
+════════════════════════════════════════════════
+PLANTILLA A USAR (NO CAMBIES NADA DE ESTO):
+════════════════════════════════════════════════
 
 {plantilla_actual['titulo']}
 
 INFORMACIÓN CLÍNICA
-[<extraer indicación del dictado o poner "A determinar">]
+[<extraer indicación del dictado o poner "Sin datos clínicos disponibles.">]
 
 TÉCNICA
 {plantilla_actual['seccion_tecnica']}
@@ -498,35 +513,26 @@ COMENTARIO
 CONCLUSIÓN
 [<resumir hallazgos principales del dictado>]
 
-REGLAS IMPORTANTES:
-- Mantén EXACTAMENTE la estructura de secciones
-- En el TÍTULO: completa [<LADO>] con DERECHO/IZQUIERDO en MAYÚSCULAS
-- En la TÉCNICA: completa [<lado>] con "derecho" o "izquierdo" en minúsculas
-- En COMENTARIO: Revisa LÍNEA POR LÍNEA cada estructura anatómica:
-  * Si el dictado NO menciona alteraciones en esa estructura → MANTÉN la línea normal tal como está
-  * Si el dictado menciona patología en esa estructura → REEMPLAZA COMPLETAMENTE esa línea (NO agregues líneas adicionales)
-- NUNCA tengas líneas contradictorias (ej: "normal" y "roto" para la misma estructura)
-- Respeta la concordancia de género: el hombro, la rodilla, el codo, la muñeca, etc.
-- NO agregues corchetes [], paréntesis () ni símbolos especiales
-- Cada línea del comentario debe ser texto directo y limpio
-- MANTÉN el mismo número de líneas en el comentario
+════════════════════════════════════════════════
 
-EJEMPLO CORRECTO de análisis:
-DICTADO: "Rodilla derecha con desgarro del menisco interno"
+INSTRUCCIONES OBLIGATORIAS:
+1. Los corchetes [<...>] son MARCADORES que debes REEMPLAZAR y ELIMINAR completamente
+2. Ejemplo: "[<DERECHO/IZQUIERDO>]" → "DERECHO" (sin corchetes)
+3. Ejemplo: "[<lado>]" → "derecho" (sin corchetes)
+4. USA LA TÉCNICA EXACTA que te di arriba (NO inventes otra)
+5. Mantén TODAS las líneas del COMENTARIO (no agregues ni quites líneas)
+6. Si el dictado menciona patología, REEMPLAZA solo esa línea específica
+7. Si el dictado NO menciona una estructura, DEJA la línea normal intacta
+8. NO uses términos de otras modalidades (ej: si es RM, no menciones "contraste endovenoso")
 
-COMENTARIO RESULTANTE (6 líneas como la plantilla):
-Desgarro del menisco interno, menisco externo conservado.
-Ligamentos cruzados de trayecto y morfología conservados.
-Resto de tendones y ligamentos de la rodilla sin alteraciones.
-Rótula centrada, sin lesión visible.
-No se observa aumento del líquido articular.
-No se visualizan lesiones óseas.
+EJEMPLOS DE REEMPLAZO CORRECTO:
+✅ "RM DE RODILLA [<DERECHA/IZQUIERDA>]" → "RM DE RODILLA DERECHA"
+✅ "Se exploró la rodilla [<lado>]" → "Se exploró la rodilla derecha"
+❌ "RM DE RODILLA [DERECHA]" (mal, dejó corchetes)
+❌ "Se exploró la rodilla [derecha]" (mal, dejó corchetes)
 
-EJEMPLO INCORRECTO (contradictorio):
-❌ Meniscos de altura y señal normales.
-❌ Desgarro compuesto en el cuerno posterior del menisco interno.
-
-IMPORTANTE: Una estructura NO puede estar normal Y alterada al mismo tiempo. REEMPLAZA la línea completa."""
+FORMATO DE SALIDA:
+Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchetes."""
 
         try:
             response = self.client.chat.completions.create(
