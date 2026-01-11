@@ -268,11 +268,14 @@ class AIService:
         tipo_nombre = tipos_estudios.get(tipo_estudio, 'estudio médico')
         template_tecnica = templates_tecnica.get(tipo_estudio, templates_tecnica['OTR'])
         
-        # Detectar si hay plantilla activa
-        plantilla = contexto.get('plantilla') if contexto else None
+        # Verificar modo antes de aplicar plantilla
+        modo = contexto.get('modo', 'LIBRE') if contexto else 'LIBRE'
+        
+        # Detectar si hay plantilla activa (SOLO si NO es modo FIEL)
+        plantilla = contexto.get('plantilla') if contexto and modo != 'FIEL' else None
         
         # MODO PLANTILLA: Completar campos específicos respetando estructura
-        if plantilla:
+        if plantilla and modo != 'FIEL':
             logger.info(f"🎯 Modo PLANTILLA activado: {plantilla.get('nombre', 'sin nombre')}")
             
             campos = plantilla.get('campos_actuales', {})
@@ -317,13 +320,8 @@ IMPORTANTE:
 - Si la Técnica ya está completa, devuélvela SIN CAMBIOS
 - Cada sección debe terminar con línea en blanco"""
         
-        # MODO LIBRE: Generar estructura completa
+        # MODO LIBRE O FIEL: No usar plantilla
         else:
-            logger.info("📝 Modo LIBRE - generando estructura completa")
-            
-            # Verificar si el usuario quiere solo corrección o estructura completa
-            modo = contexto.get('modo', 'LIBRE') if contexto else 'LIBRE'
-            
             # Obtener ejemplos de aprendizaje del usuario
             from .models import CorreccionAprendizaje
             ejemplos_aprendizaje = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(
@@ -336,37 +334,66 @@ IMPORTANTE:
                 logger.info(f"🧠 Sistema de aprendizaje: {cantidad_ejemplos} ejemplos activos para {usuario}")
             
             if modo == 'FIEL':
-                # MODO FIEL: Solo corregir ortografía y puntuación básica
-                prompt_base = f"""Corrector ortográfico médico. Corrige ortografía y normaliza puntuación final.
+                logger.info("✏️ Modo FIEL AL DICTADO - solo corrección ortográfica")
+                # MODO FIEL: Corregir ortografía + aplicar estilo del usuario
+                
+                # Obtener ejemplos de estilo completo del usuario
+                ejemplos_estilo = CorreccionAprendizaje.obtener_ejemplos_estilo_completo(
+                    usuario=usuario,
+                    limite=3
+                )
+                
+                if ejemplos_estilo:
+                    logger.info(f"🎨 Aplicando estilo personal del usuario (3 ejemplos completos)")
+                    prompt_base = f"""Eres un corrector ortográfico ESTRICTO. Tu ÚNICA tarea es corregir ortografía sin cambiar nada más.
 
-TEXTO:
+TEXTO DICTADO (SOLO CORRIGE ESTO):
 {texto_original}
 
-REGLAS:
-1. Corrige ortografía: acentos, mayúsculas, términos médicos
-2. MANTÉN toda la puntuación existente (comas, puntos intermedios)
-3. Si una oración completa NO termina en punto, agrégalo
-4. Si termina en salto de línea, asegura que tenga punto antes
-5. RESPETA saltos de línea existentes
-6. NO agregues comas nuevas
-7. NO reorganices frases
-8. Capitaliza después de punto o inicio de línea
+════════════════════════════════════════════════
+EJEMPLOS DE ESTILO DEL USUARIO (solo referencia):
+════════════════════════════════════════════════
 
-PUNTUACIÓN FINAL:
-✅ "meniscos normales" → "Meniscos normales."
-✅ "meniscos normales." → "Meniscos normales." (ya tenía punto)
-✅ "rodilla derecha\nmeniscos normales" → "Rodilla derecha.\nMeniscos normales."
-❌ "meniscos normales sin" → "Meniscos normales sin" (oración incompleta, no agregar punto)
+{ejemplos_estilo}
 
-Responde solo con el texto corregido:"""
+════════════════════════════════════════════════
+
+REGLAS ABSOLUTAS:
+1. ✅ Corrige SOLO ortografía: acentos, mayúsculas, términos médicos
+2. ❌ NO agregues información que no fue dictada
+3. ❌ NO crees secciones (TÉCNICA, CONCLUSIÓN, etc.) si no fueron dictadas
+4. ❌ NO repitas información de diferentes formas
+5. ❌ NO inventes hallazgos adicionales
+6. ✅ Si la oración termina sin punto, agrégalo
+7. ✅ Respeta EXACTAMENTE lo que fue dictado, solo corrígelo
+
+IMPORTANTE: El texto dictado es UNA SOLA ORACIÓN o fragmento. NO lo expandes en un informe completo.
+Los ejemplos de estilo son solo para ver terminología, NO para copiar su estructura.
+
+Devuelve SOLO el texto corregido, sin agregar nada más:"""
+                else:
+                    # Sin ejemplos de estilo, usar prompt básico
+                    prompt_base = f"""Corrector ortográfico médico ESTRICTO. SOLO corrige ortografía del texto dictado.
+
+TEXTO DICTADO:
+{texto_original}
+
+REGLAS ABSOLUTAS:
+1. ✅ Corrige SOLO ortografía: acentos, mayúsculas, términos médicos
+2. ❌ NO agregues información nueva
+3. ❌ NO crees secciones ni estructura
+4. ❌ NO repitas el texto de diferentes formas
+5. ✅ Si termina sin punto, agrégalo
+6. ✅ Respeta EXACTAMENTE lo dictado
+
+Devuelve SOLO el texto corregido, una sola vez:"""
                 
-                # Agregar ejemplos de aprendizaje si existen
+                # Agregar ejemplos de aprendizaje si existen (pero con advertencia)
                 if ejemplos_aprendizaje:
                     prompt = f"""{prompt_base}
 
-CORRECCIONES PREVIAS DEL USUARIO (aprende estos patrones):
-{ejemplos_aprendizaje}
-"""
+NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los copies, solo aprende la terminología):
+{ejemplos_aprendizaje}"""
                 else:
                     prompt = prompt_base
 

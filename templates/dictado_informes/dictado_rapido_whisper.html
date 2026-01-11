@@ -220,14 +220,15 @@
                     <button id="btnCopiar" 
                             class="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg group">
                         <i class="fas fa-copy mr-2"></i>
-                        Copiar Texto
+                        Copiar Texto <span class="ml-1 text-xs">✨ Guarda automáticamente</span>
                         <span class="ml-2 text-xs opacity-70">Ctrl+Enter</span>
                     </button>
                     <button id="btnGuardarAprendizaje" 
-                            class="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors shadow-lg group">
+                            class="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors shadow-lg group opacity-60"
+                            title="Ya no es necesario - se guarda automáticamente al copiar">
                         <i class="fas fa-brain mr-2"></i>
-                        Guardar Aprendizaje
-                        <span class="ml-2 text-xs opacity-70">Ctrl+S</span>
+                        Guardar Manual
+                        <span class="ml-2 text-xs opacity-70">Opcional</span>
                     </button>
                 </div>
                 
@@ -807,7 +808,7 @@ async function procesarAudio() {
     };
 }
 
-// Copiar texto
+// Copiar texto y guardar aprendizaje automáticamente
 document.getElementById('btnCopiar').addEventListener('click', async () => {
     let texto = document.getElementById('textoMejorado').textContent;
     
@@ -821,6 +822,10 @@ document.getElementById('btnCopiar').addEventListener('click', async () => {
         btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Copiado!';
         btn.classList.remove('bg-green-600', 'hover:bg-green-700');
         btn.classList.add('bg-green-500');
+        
+        // 🎯 Guardar aprendizaje automáticamente al copiar
+        guardarAprendizajeAutomatico();
+        
         setTimeout(() => {
             btn.innerHTML = textoOriginal;
             btn.classList.add('bg-green-600', 'hover:bg-green-700');
@@ -853,7 +858,48 @@ function limpiarCorchetes(texto) {
 let textoOriginalGlobal = '';
 let textoIAGlobal = '';
 
-// Guardar aprendizaje
+// 🎯 Función para guardar aprendizaje automáticamente
+async function guardarAprendizajeAutomatico() {
+    const textoFinal = document.getElementById('textoMejorado').textContent;
+    
+    // Solo guardar si hay texto válido
+    if (!textoFinal || textoFinal.trim().length < 50) {
+        console.log('📝 Texto muy corto para aprendizaje automático');
+        return;
+    }
+    
+    try {
+        const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
+        
+        const response = await fetch('{% url "dictado_informes:guardar_aprendizaje" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                texto_original: textoOriginalGlobal,
+                texto_ia: textoIAGlobal,
+                texto_final: textoFinal,
+                tipo_estudio: modoIA === 'FIEL' ? 'OTR' : '',
+                auto_guardado: true  // Flag para indicar guardado automático
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.guardado) {
+            console.log('✅ Aprendizaje guardado automáticamente:', data.message);
+            // Recargar contador silenciosamente
+            cargarInfoAprendizaje();
+        }
+    } catch (error) {
+        console.error('⚠️ Error al guardar aprendizaje automático:', error);
+        // No mostrar error al usuario para no interrumpir el flujo
+    }
+}
+
+// Guardar aprendizaje (botón manual - ahora opcional)
 document.getElementById('btnGuardarAprendizaje').addEventListener('click', async () => {
     const textoFinal = document.getElementById('textoMejorado').textContent;
     

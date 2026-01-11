@@ -479,14 +479,20 @@ def mejorar_texto_ia(request):
         # Construir contexto con modo y campo específico
         contexto = {
             'modo': modo,  # 'FIEL' = solo corregir, 'AUTO' = detectar, 'ESTRUCTURADO' = crear secciones
-            'field_name': field_name,  # Para mejor contexto del campo específico
-            'tipo_plantilla': tipo_plantilla  # Tipo de plantilla seleccionado
+            'field_name': field_name  # Para mejor contexto del campo específico
         }
-        if plantilla:
+        
+        # Solo agregar tipo_plantilla si NO es modo FIEL
+        if modo != 'FIEL':
+            contexto['tipo_plantilla'] = tipo_plantilla
+            logger.info(f"📋 Tipo de plantilla: {tipo_plantilla}")
+        else:
+            logger.info(f"✏️ Modo FIEL - sin plantilla, solo corrección")
+        
+        # Solo agregar plantilla si NO es modo FIEL
+        if plantilla and modo != 'FIEL':
             contexto['plantilla'] = plantilla
             logger.info(f"🎯 Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
-        
-        logger.info(f"📋 Tipo de plantilla: {tipo_plantilla}")
         
         # 3. MEJORAR CON IA
         result = ai_service.improve_medical_text(

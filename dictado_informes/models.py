@@ -626,3 +626,49 @@ class CorreccionAprendizaje(models.Model):
         cache.set(cache_key, resultado, timeout=300)
         
         return resultado
+    
+    @staticmethod
+    def obtener_ejemplos_estilo_completo(usuario=None, limite=3):
+        """
+        Obtiene ejemplos COMPLETOS de informes del usuario para aprender su estilo
+        No solo cambios, sino cómo escribe informes completos
+        
+        Args:
+            usuario: Usuario específico (opcional)
+            limite: Número de ejemplos completos
+            
+        Returns:
+            str: Ejemplos de informes completos formateados
+        """
+        from django.core.cache import cache
+        
+        cache_key = f'estilo_completo_{usuario.id if usuario else "global"}_{limite}'
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+        
+        query = CorreccionAprendizaje.objects.all()
+        
+        if usuario:
+            query = query.filter(usuario=usuario)
+        
+        # Traer los más recientes con texto completo
+        correcciones = query.only('texto_final').order_by('-fecha_creacion')[:limite]
+        
+        if not correcciones:
+            return ""
+        
+        ejemplos = []
+        for i, corr in enumerate(correcciones, 1):
+            if corr.texto_final and len(corr.texto_final.strip()) > 50:  # Solo si es suficientemente largo
+                ejemplos.append(f"EJEMPLO {i}:\n{corr.texto_final.strip()}")
+        
+        if not ejemplos:
+            return ""
+        
+        resultado = "\n\n---\n\n".join(ejemplos)
+        
+        # Cachear por 10 minutos
+        cache.set(cache_key, resultado, timeout=600)
+        
+        return resultado
