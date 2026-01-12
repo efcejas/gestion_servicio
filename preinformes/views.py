@@ -84,6 +84,12 @@ def crear_preinforme(request):
             request.session['preinforme_form_data'] = request.POST.dict()
             tipo_estudio = request.POST.get('tipo_estudio')
             region = request.POST.get('region')
+            
+            # Validar que tipo_estudio y region sean valores válidos
+            if not tipo_estudio or not region or tipo_estudio == 'None' or region == 'None':
+                messages.error(request, 'Debes seleccionar primero el tipo de estudio y región antes de crear una plantilla.')
+                return redirect('preinformes:crear_preinforme')
+            
             return redirect(f"{reverse('preinformes:crear_plantilla_residente')}?tipo_estudio={tipo_estudio}&region={region}")
         
         form = PreinformeForm(request.POST)
@@ -531,14 +537,15 @@ def crear_plantilla_residente(request):
     tipo_estudio_id = request.GET.get('tipo_estudio') or request.session.get('plantilla_tipo_estudio')
     region_id = request.GET.get('region') or request.session.get('plantilla_region')
     
-    if not tipo_estudio_id or not region_id:
+    # Validar que no sean strings "None" o valores inválidos
+    if tipo_estudio_id in [None, '', 'None', 'null'] or region_id in [None, '', 'None', 'null']:
         messages.error(request, 'Debes seleccionar primero el tipo de estudio y región en el formulario de preinforme.')
         return redirect('preinformes:crear_preinforme')
     
     try:
         tipo_estudio = TipoEstudio.objects.get(id=tipo_estudio_id)
         region = Region.objects.get(id=region_id)
-    except (TipoEstudio.DoesNotExist, Region.DoesNotExist):
+    except (TipoEstudio.DoesNotExist, Region.DoesNotExist, ValueError):
         messages.error(request, 'Tipo de estudio o región no válidos.')
         return redirect('preinformes:crear_preinforme')
     
