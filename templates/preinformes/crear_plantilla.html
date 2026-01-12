@@ -42,6 +42,53 @@
         </div>
     </div>
 
+    <!-- Advertencia de Plantilla Duplicada -->
+    {% if plantilla_existente and mostrar_advertencia %}
+    <div class="bg-amber-50 border-l-4 border-amber-500 p-6 mb-6 rounded-lg shadow-lg">
+        <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-amber-600 text-2xl mt-1 mr-4"></i>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-amber-900 mb-2">⚠️ Plantilla Duplicada Detectada</h3>
+                <p class="text-amber-800 mb-4">
+                    Ya existe una plantilla pública con el nombre <strong>"{{ plantilla_existente.nombre }}"</strong>
+                    para {{ tipo_estudio.nombre }} - {{ region.nombre }}.
+                </p>
+                
+                <div class="bg-white rounded-lg p-4 mb-4 border border-amber-200">
+                    <p class="text-sm font-semibold text-gray-900 mb-2">Detalles de la plantilla existente:</p>
+                    <div class="text-sm text-gray-700 space-y-1">
+                        <p><strong>Creada por:</strong> {{ plantilla_existente.creada_por.get_full_name|default:plantilla_existente.creada_por.username }}</p>
+                        <p><strong>Fecha:</strong> {{ plantilla_existente.fecha_creacion|date:"d/m/Y" }}</p>
+                        <p><strong>Sistema:</strong> {{ plantilla_existente.get_sistema_destino_display }}</p>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4 mb-4">
+                    <p class="text-sm font-semibold text-blue-900 mb-2">Opciones recomendadas:</p>
+                    <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                        <li>Usar la plantilla existente directamente</li>
+                        <li>Crear tu plantilla como privada (desmarcando "Compartir con otros residentes")</li>
+                        <li>Cambiar el nombre de tu plantilla para evitar confusión</li>
+                    </ul>
+                </div>
+                
+                <div class="flex gap-3 mt-4">
+                    <a href="{% url 'preinformes:crear_preinforme' %}?plantilla_id={{ plantilla_existente.id }}"
+                       class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-check mr-2"></i>
+                        Usar plantilla existente
+                    </a>
+                    <button type="button" onclick="document.getElementById('id_nombre').focus()"
+                            class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        <i class="fas fa-edit mr-2"></i>
+                        Modificar nombre
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Formulario -->
     <form method="post" class="space-y-6">
         {% csrf_token %}
@@ -152,5 +199,71 @@
 
     <!-- CKEditor 5 Media (JS/CSS) -->
     {{ form.media }}
+
+    <!-- Modal de Plantilla Duplicada (solo se muestra al guardar si existe duplicado) -->
+    <div id="modal-plantilla-duplicada" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 rounded-t-2xl">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-triangle text-white text-2xl mr-3"></i>
+                        <h3 class="text-xl font-bold text-white">Plantilla Duplicada Detectada</h3>
+                    </div>
+                    <button onclick="cerrarModalPlantillaDuplicada()" 
+                            type="button"
+                            aria-label="Cerrar modal"
+                            class="text-white hover:text-amber-100 transition">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6">
+                <div class="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded">
+                    <p class="text-amber-800">
+                        <i class="fas fa-info-circle mr-2"></i>
+                        Ya existe una plantilla pública con estas características:
+                    </p>
+                </div>
+                
+                <div id="detalles-plantilla-duplicada" class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <!-- Los detalles se llenarán dinámicamente con JavaScript -->
+                </div>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
+                    <p class="text-blue-800 font-medium mb-2">¿Qué opciones tienes?</p>
+                    <div class="text-sm text-blue-700 space-y-2">
+                        <div class="flex items-start">
+                            <i class="fas fa-check-circle mt-1 mr-2"></i>
+                            <span>Usar la plantilla existente directamente</span>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-check-circle mt-1 mr-2"></i>
+                            <span>Crear tu plantilla como privada (desmarcando "Compartir con otros residentes")</span>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-check-circle mt-1 mr-2"></i>
+                            <span>Cambiar el nombre de tu plantilla para hacerla pública</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-3 justify-end px-6 pb-6 pt-4 border-t border-gray-200">
+                <button onclick="cerrarModalPlantillaDuplicada()" 
+                        type="button"
+                        class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-edit mr-2"></i>
+                    Modificar mi plantilla
+                </button>
+                <a id="link-usar-plantilla-existente" href="#"
+                   class="inline-flex justify-center items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-check mr-2"></i>
+                    Usar plantilla existente
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
+
 {% endblock %}
