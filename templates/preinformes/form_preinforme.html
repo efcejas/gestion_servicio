@@ -747,8 +747,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Redirigir a la página de crear plantilla con parámetros
-            window.location.href = `{% url 'preinformes:crear_plantilla_residente' %}?tipo_estudio=${tipoEstudio}&region=${region}`;
+            // Crear formulario temporal para guardar datos en sesión
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '{% url "preinformes:crear_preinforme" %}';
+            
+            // Agregar CSRF token
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = '{{ csrf_token }}';
+            form.appendChild(csrfInput);
+            
+            // Agregar input para indicar que se va a crear plantilla
+            const createTemplateInput = document.createElement('input');
+            createTemplateInput.type = 'hidden';
+            createTemplateInput.name = 'crear_plantilla';
+            createTemplateInput.value = '1';
+            form.appendChild(createTemplateInput);
+            
+            // Copiar todos los campos del formulario actual
+            const mainForm = document.querySelector('form[method="post"]');
+            const formData = new FormData(mainForm);
+            
+            for (let [key, value] of formData.entries()) {
+                if (key !== 'csrfmiddlewaretoken') {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+            }
+            
+            // Enviar formulario
+            document.body.appendChild(form);
+            form.submit();
         });
     } // Fin del else if (btnAbrir)
     

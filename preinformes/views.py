@@ -78,11 +78,23 @@ def dashboard_residente(request):
 def crear_preinforme(request):
     """Crear un nuevo preinforme"""
     if request.method == 'POST':
+        # Guardar datos del formulario en sesión antes de procesar
+        if 'crear_plantilla' in request.POST:
+            # Usuario quiere crear una plantilla nueva
+            request.session['preinforme_form_data'] = request.POST.dict()
+            tipo_estudio = request.POST.get('tipo_estudio')
+            region = request.POST.get('region')
+            return redirect(f"{reverse('preinformes:crear_plantilla_residente')}?tipo_estudio={tipo_estudio}&region={region}")
+        
         form = PreinformeForm(request.POST)
         if form.is_valid():
             preinforme = form.save(commit=False)
             preinforme.residente = request.user
             preinforme.save()
+            
+            # Limpiar datos guardados en sesión
+            if 'preinforme_form_data' in request.session:
+                del request.session['preinforme_form_data']
             
             # Actualizar historial
             historial, created = HistorialEstudios.objects.get_or_create(residente=request.user)
@@ -99,7 +111,31 @@ def crear_preinforme(request):
             else:
                 return redirect('preinformes:dashboard_residente')
     else:
-        form = PreinformeForm()
+        # GET: Restaurar datos del formulario si existen en sesión
+        initial_data = {}
+        if 'preinforme_form_data' in request.session:
+            saved_data = request.session['preinforme_form_data']
+            # Restaurar solo los campos que queremos preservar
+            fields_to_restore = [
+                'numero_estudio', 'tipo_estudio', 'region', 'sistema_destino',
+                'apellido_paciente', 'nombre_paciente', 'dni_paciente',
+                'edad_paciente', 'sexo_paciente', 'fecha_estudio'
+            ]
+            for field in fields_to_restore:
+                if field in saved_data and saved_data[field]:
+                    initial_data[field] = saved_data[field]
+        
+        # Si viene de crear plantilla, cargar la plantilla en el formulario
+        plantilla_id = request.GET.get('plantilla_id')
+        if plantilla_id:
+            try:
+                plantilla = PlantillaPreinforme.objects.get(id=plantilla_id)
+                initial_data['plantilla'] = plantilla.id
+                messages.success(request, f'Plantilla "{plantilla.nombre}" cargada exitosamente.')
+            except PlantillaPreinforme.DoesNotExist:
+                pass
+        
+        form = PreinformeForm(initial=initial_data if initial_data else None)
     
     context = {
         'form': form,

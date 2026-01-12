@@ -312,8 +312,7 @@ class Preinforme(models.Model):
         max_length=20, 
         help_text="DNI o documento de identidad del paciente",
         null=True,
-        blank=True,
-        default='00000000'
+        blank=True
     )
     edad_paciente = models.PositiveIntegerField()
     sexo_paciente = models.CharField(

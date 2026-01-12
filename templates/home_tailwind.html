@@ -122,6 +122,40 @@
                         </a>
                     </div>
                 </div>
+
+                <!-- Crear preinforme -->
+                {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-pink-500 to-pink-600 rounded-2xl mb-4">
+                        <i class="fas fa-notes-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Crear Preinforme</h5>
+                    <p class="text-gray-600 mb-4">Inicia la creación de un preinforme para un estudio radiológico.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:crear_preinforme' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors">
+                            Crear preinforme
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Revisar Preinformes (solo jefes e instructores de residentes) -->
+                {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
+                        <i class="fas fa-check-circle text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Revisar Preinformes</h5>
+                    <p class="text-gray-600 mb-4">Revisa y finaliza preinformes pendientes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:lista_revision' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                            Revisar preinformes
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -270,6 +304,21 @@
                         <a href="{% url 'gestion_eventos:lista_eventos' %}" 
                            class="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
                             Ver novedades
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Revisar preinformes -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
+                        <i class="fas fa-notes-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Revisar Preinformes</h5>
+                    <p class="text-gray-600 mb-4">Revisa y finaliza preinformes pendientes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:lista_revision' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                            Revisar preinformes
                         </a>
                     </div>
                 </div>

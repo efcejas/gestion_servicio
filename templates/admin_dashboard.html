@@ -388,6 +388,89 @@
                 </div>
                 {% endif %}
 
+                <!-- Card: Novedades del Servicio -->
+                <a href="{% url 'gestion_eventos:lista_eventos' %}" 
+                   class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 hover:bg-gray-750 transition-colors group">
+                    <div class="flex items-start justify-between gap-3 md:gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Novedades del Servicio</h3>
+                            <div class="text-2xl md:text-3xl font-bold text-orange-400">
+                                {{ eventos_nuevos_count|default:0 }}
+                            </div>
+                            <p class="text-sm text-gray-400 mt-1">
+                                {% if eventos_nuevos_count > 0 %}
+                                    Nuevas novedades sin leer
+                                {% else %}
+                                    No hay novedades nuevas
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0 {% if eventos_nuevos_count > 0 %}bg-orange-500{% else %}bg-gray-600{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
+                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    <!-- Botón Ver todos -->
+                    <div class="mt-4 pt-4 border-t border-gray-600">
+                        <div class="flex justify-end">
+                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
+                                <span class="text-xs font-medium">Ver todas las novedades</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+
+                {% if SANATORIO_MODULOS.preinformes %}
+                <!-- Card: Revisión de Preinformes -->
+                <a href="{% url 'preinformes:lista_revision' %}" 
+                   class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 hover:bg-gray-750 transition-colors group">
+                    <div class="flex items-start justify-between gap-3 md:gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Preinformes Pendientes</h3>
+                            <div class="text-2xl md:text-3xl font-bold text-pink-400">
+                                {{ preinformes_pendientes_count|default:0 }}
+                            </div>
+                            <p class="text-sm text-gray-400 mt-1">
+                                {% if preinformes_pendientes_count > 0 %}
+                                    Pendientes de revisión
+                                {% else %}
+                                    No hay preinformes pendientes
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="flex-shrink-0 {% if preinformes_pendientes_count > 0 %}bg-pink-500{% else %}bg-gray-600{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
+                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    
+                    {% if preinformes_en_revision_count > 0 %}
+                        <div class="mt-4 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+                            <div class="text-sm text-yellow-300 font-medium">{{ preinformes_en_revision_count }} en revisión actualmente</div>
+                            <div class="text-xs text-yellow-400 mt-1">Siendo revisados por otros médicos</div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Botón Ver todos -->
+                    <div class="mt-4 pt-4 border-t border-gray-600">
+                        <div class="flex justify-end">
+                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
+                                <span class="text-xs font-medium">Ir a revisión</span>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                {% endif %}
+
                 {% if SANATORIO_MODULOS.guardias %}
                 <!-- Card: Médico de Guardia -->
                 <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">

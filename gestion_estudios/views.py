@@ -220,6 +220,15 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'fecha_actual': hoy,
             })
 
+        try:
+            context.update(self.get_preinformes_context())
+        except Exception as e:
+            print(f"❌ Error en preinformes: {e}")
+            context.update({
+                'preinformes_pendientes_count': 0,
+                'preinformes_en_revision_count': 0,
+            })
+
         return context
 
     # ------------------------ EVENTOS ------------------------
@@ -421,6 +430,34 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             'notas_recientes': notas_recientes,
             'fecha_actual': fecha_hoy,
         }
+
+    # ------------------------ PREINFORMES ------------------------
+
+    def get_preinformes_context(self):
+        """Obtiene el contexto de preinformes para el dashboard"""
+        try:
+            from preinformes.models import Preinforme
+            
+            # Contar preinformes pendientes de revisión
+            preinformes_pendientes = Preinforme.objects.filter(
+                estado='pendiente_revision'
+            ).count()
+            
+            # Contar preinformes actualmente en revisión
+            preinformes_en_revision = Preinforme.objects.filter(
+                estado='en_revision'
+            ).count()
+            
+            return {
+                'preinformes_pendientes_count': preinformes_pendientes,
+                'preinformes_en_revision_count': preinformes_en_revision,
+            }
+        except ImportError:
+            # Si el módulo de preinformes no está disponible
+            return {
+                'preinformes_pendientes_count': 0,
+                'preinformes_en_revision_count': 0,
+            }
 
 @superuser_required
 def eventos_modal(request):
