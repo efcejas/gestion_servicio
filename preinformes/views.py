@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import models
+from django.db import models, IntegrityError
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -611,16 +611,32 @@ def crear_plantilla_residente(request):
                             html_lines.append(f'<p>{line}</p>')
                     plantilla.contenido = ''.join(html_lines)
             
-            plantilla.save()
+            try:
+                plantilla.save()
+                
+                messages.success(
+                    request,
+                    f'Plantilla "{plantilla.nombre}" creada exitosamente. ' +
+                    ('Visible para todos.' if compartir else 'Solo visible para ti.')
+                )
+                
+                # Redirigir al formulario de preinforme con la plantilla seleccionada
+                return redirect(f"{reverse('preinformes:crear_preinforme')}?plantilla_id={plantilla.id}")
             
-            messages.success(
-                request,
-                f'Plantilla "{plantilla.nombre}" creada exitosamente. ' +
-                ('Visible para todos.' if compartir else 'Solo visible para ti.')
-            )
-            
-            # Redirigir al formulario de preinforme con la plantilla seleccionada
-            return redirect(f"{reverse('preinformes:crear_preinforme')}?plantilla_id={plantilla.id}")
+            except IntegrityError:
+                # Ya existe una plantilla con el mismo nombre, tipo_estudio y región
+                messages.error(
+                    request,
+                    f'Ya existe una plantilla con el nombre "{form.cleaned_data["nombre"]}" '
+                    f'para {tipo_estudio.nombre} - {region.nombre}. '
+                    f'Por favor, elige un nombre diferente.'
+                )
+                # Volver a renderizar el formulario con los datos ingresados
+                return render(request, 'preinformes/crear_plantilla.html', {
+                    'form': form,
+                    'tipo_estudio': tipo_estudio,
+                    'region': region,
+                })
     else:
         form = NuevaPlantillaResidenteForm(
             tipo_estudio=tipo_estudio,
