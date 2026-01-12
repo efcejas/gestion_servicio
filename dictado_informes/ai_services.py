@@ -19,43 +19,44 @@ class AIService:
         groq_key = config('GROQ_API_KEY', default=None)
         openai_key = config('OPENAI_API_KEY', default=None)
         
-        # Cliente Groq para mejora de texto (gratis, 14,400 req/día)
+        # Cliente OpenAI para STT (Whisper)
+        if openai_key:
+            self.stt_client = OpenAI(api_key=openai_key)
+            self.stt_enabled = True
+            logger.info("✅ OpenAI Whisper configurado para transcripción")
+        else:
+            self.stt_client = None
+            self.stt_enabled = False
+        
+        # Cliente Groq para LLM (mejora de texto, gratis 14,400 req/día)
         if groq_key:
-            self.groq_client = OpenAI(
+            self.llm_client = OpenAI(
                 api_key=groq_key,
                 base_url="https://api.groq.com/openai/v1"
             )
-            self.groq_enabled = True
-            self.model = 'llama-3.3-70b-versatile'
-            logger.info("✅ Groq API configurada para mejora de texto (Gratis)")
+            self.llm_enabled = True
+            self.llm_model = 'llama-3.3-70b-versatile'
+            self.llm_provider = 'groq'
+            logger.info("✅ Groq LLM configurado para mejora de texto (Gratis)")
+        elif openai_key:
+            # Fallback a OpenAI si no hay Groq
+            self.llm_client = OpenAI(api_key=openai_key)
+            self.llm_enabled = True
+            self.llm_model = 'gpt-4o-mini'
+            self.llm_provider = 'openai'
+            logger.info("✅ OpenAI LLM configurado para mejora de texto")
         else:
-            self.groq_client = None
-            self.groq_enabled = False
+            self.llm_client = None
+            self.llm_enabled = False
+            self.llm_model = None
+            self.llm_provider = None
         
-        # Cliente OpenAI para Whisper (transcripción de audio)
-        if openai_key:
-            self.openai_client = OpenAI(api_key=openai_key)
-            self.openai_enabled = True
-            logger.info("✅ OpenAI API configurada para Whisper (transcripción)")
-        else:
-            self.openai_client = None
-            self.openai_enabled = False
+        # Cliente OpenAI secundario para fallback
+        self.openai_fallback = OpenAI(api_key=openai_key) if openai_key and groq_key else None
         
-        # Prioridad: Groq para texto, OpenAI para audio
-        if self.groq_enabled:
-            self.client = self.groq_client
-            self.enabled = True
-            self.provider = 'groq'
-        elif self.openai_enabled:
-            self.client = self.openai_client
-            self.enabled = True
-            self.provider = 'openai'
-            self.model = 'gpt-4o-mini'
-        else:
-            self.client = None
-            self.enabled = False
-            self.provider = None
-            self.model = None
+        # Compatibilidad con código existente
+        self.enabled = self.stt_enabled or self.llm_enabled
+        if not self.enabled:
             logger.warning("⚠️ Ninguna API de IA configurada. Servicios deshabilitados.")
     
     def get_api_info(self):
@@ -69,13 +70,13 @@ class AIService:
             }
         
         info = {
-            'provider': self.provider,
-            'model': self.model,
+            'provider': self.llm_provider,
+            'model': self.llm_model,
             'enabled': True
         }
         
         # Límites según proveedor
-        if self.provider == 'groq':
+        if self.llm_provider == 'groq':
             info['limits'] = {
                 'requests_per_day': 14400,
                 'requests_per_minute': 30,
@@ -83,7 +84,7 @@ class AIService:
                 'cost': 'GRATIS',
                 'description': 'Plan gratuito de Groq con límite diario generoso'
             }
-        elif self.provider == 'openai':
+        elif self.llm_provider == 'openai':
             info['limits'] = {
                 'cost': 'PAGO',
                 'description': 'Plan de pago según uso de OpenAI'
@@ -101,7 +102,7 @@ class AIService:
         Returns:
             dict: {'text': str, 'confidence': float}
         """
-        if not self.openai_enabled:
+        if not self.stt_enabled:
             return {
                 'text': '',
                 'confidence': 0.0,
@@ -139,9 +140,6 @@ class AIService:
                 return cached_result
             
             # Detectar el tipo de archivo basado en los primeros bytes (magic numbers)
-            # WebM: starts with 0x1A, 0x45, 0xDF, 0xA3
-            # WAV: starts with "RIFF"
-            # OGG: starts with "OggS"
             magic_bytes = audio_content[:4]
             
             if magic_bytes.startswith(b'\x1a\x45\xdf\xa3'):
@@ -172,7 +170,7 @@ class AIService:
             )
             
             # Transcribir con OpenAI Whisper
-            transcript = self.openai_client.audio.transcriptions.create(
+            transcript = self.stt_client.audio.transcriptions.create(
                 model="whisper-1",
                 file=file_tuple,
                 language="es",  # Español
@@ -196,15 +194,6 @@ class AIService:
             logger.info(f"💾 Transcripción guardada en caché (hash: {audio_hash[:8]}...)")
             
             return result
-            
-            logger.info(f"✅ Whisper transcripción exitosa: {len(transcript.text)} caracteres")
-            
-            return {
-                'text': transcript.text,
-                'confidence': 0.95,
-                'duration': getattr(transcript, 'duration', None),
-                'provider': 'openai'
-            }
         
         except Exception as e:
             error_msg = str(e)
@@ -235,13 +224,17 @@ class AIService:
         Returns:
             dict: {'texto_mejorado': str, 'confianza': float, 'sugerencias': list}
         """
-        if not self.enabled:
+        if not self.llm_enabled:
             return {
                 'texto_mejorado': texto_original,
                 'confianza': 0.0,
                 'sugerencias': [],
-                'error': 'API de OpenAI no configurada'
+                'error': 'API de LLM no configurada'
             }
+        
+        # Normalizar contexto
+        contexto = contexto or {}
+        modo = contexto.get('modo', 'LIBRE')
         
         # Mapeo de tipos de estudio
         tipos_estudios = {
@@ -268,11 +261,8 @@ class AIService:
         tipo_nombre = tipos_estudios.get(tipo_estudio, 'estudio médico')
         template_tecnica = templates_tecnica.get(tipo_estudio, templates_tecnica['OTR'])
         
-        # Verificar modo antes de aplicar plantilla
-        modo = contexto.get('modo', 'LIBRE') if contexto else 'LIBRE'
-        
         # Detectar si hay plantilla activa (SOLO si NO es modo FIEL)
-        plantilla = contexto.get('plantilla') if contexto and modo != 'FIEL' else None
+        plantilla = contexto.get('plantilla') if modo != 'FIEL' else None
         
         # MODO PLANTILLA: Completar campos específicos respetando estructura
         if plantilla and modo != 'FIEL':
@@ -322,29 +312,16 @@ IMPORTANTE:
         
         # MODO LIBRE O FIEL: No usar plantilla
         else:
-            # Obtener ejemplos de aprendizaje del usuario
-            from .models import CorreccionAprendizaje
-            ejemplos_aprendizaje = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(
-                usuario=usuario,
-                limite=10
-            )
-            
-            if ejemplos_aprendizaje:
-                cantidad_ejemplos = len(ejemplos_aprendizaje.split('\n'))
-                logger.info(f"🧠 Sistema de aprendizaje: {cantidad_ejemplos} ejemplos activos para {usuario}")
+            # Obtener ejemplos de aprendizaje del usuario (con caché)
+            ejemplos_aprendizaje = self._get_ejemplos_aprendizaje_cached(usuario)
+            ejemplos_estilo = self._get_ejemplos_estilo_cached(usuario) if modo == 'FIEL' else None
             
             if modo == 'FIEL':
                 logger.info("✏️ Modo FIEL AL DICTADO - solo corrección ortográfica")
                 # MODO FIEL: Corregir ortografía + aplicar estilo del usuario
                 
-                # Obtener ejemplos de estilo completo del usuario
-                ejemplos_estilo = CorreccionAprendizaje.obtener_ejemplos_estilo_completo(
-                    usuario=usuario,
-                    limite=3
-                )
-                
                 if ejemplos_estilo:
-                    logger.info(f"🎨 Aplicando estilo personal del usuario (3 ejemplos completos)")
+                    logger.info(f"🎨 Aplicando estilo personal del usuario")
                     prompt_base = f"""Eres un corrector ortográfico ESTRICTO. Tu ÚNICA tarea es corregir ortografía sin cambiar nada más.
 
 TEXTO DICTADO (SOLO CORRIGE ESTO):
@@ -399,7 +376,7 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
 
             else:
                 # MODO ESTRUCTURADO: Crear informe con plantilla específica según tipo
-                tipo_plantilla = contexto.get('tipo_plantilla', 'RODILLA') if contexto else 'RODILLA'
+                tipo_plantilla = contexto.get('tipo_plantilla', 'RODILLA')
                 logger.info(f"📋 Generando plantilla tipo: {tipo_plantilla}")
                 
                 # Definir plantillas según tipo
@@ -562,8 +539,8 @@ FORMATO DE SALIDA:
 Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchetes."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,  # Usar el modelo configurado (Groq o OpenAI)
+            response = self.llm_client.chat.completions.create(
+                model=self.llm_model,
                 messages=[
                     {
                         "role": "system",
@@ -579,9 +556,9 @@ Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchet
             )
             
             texto_mejorado = response.choices[0].message.content.strip()
+            modo_usado = "PLANTILLA" if plantilla else modo
             
-            modo = "PLANTILLA" if plantilla else "LIBRE"
-            logger.info(f"✅ Texto mejorado con {self.provider.upper()} en modo {modo} ({self.model})")
+            logger.info(f"✅ Texto mejorado con {self.llm_provider.upper()} ({self.llm_model})")
             
             # Calcular "confianza" basada en la longitud y coherencia
             confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
@@ -591,17 +568,104 @@ Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchet
                 'confianza': confianza,
                 'sugerencias': self._extract_suggestions(texto_original, texto_mejorado),
                 'tokens_used': response.usage.total_tokens,
-                'modo': modo
+                'modo': modo_usado
             }
         
         except Exception as e:
-            logger.error(f"Error en mejora de texto: {str(e)}")
+            logger.error(f"❌ Error en mejora de texto con {self.llm_provider}: {str(e)}")
+            
+            # 🔄 FALLBACK: Intentar con OpenAI si Groq falló
+            if self.llm_provider == 'groq' and self.openai_fallback:
+                logger.info("🔄 Intentando fallback con OpenAI...")
+                try:
+                    response = self.openai_fallback.chat.completions.create(
+                        model='gpt-4o-mini',
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales."
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        temperature=0.2,
+                        max_tokens=1500
+                    )
+                    
+                    texto_mejorado = response.choices[0].message.content.strip()
+                    modo_usado = "PLANTILLA" if plantilla else modo
+                    
+                    logger.info("✅ Texto mejorado con OpenAI (fallback)")
+                    
+                    confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
+                    
+                    return {
+                        'texto_mejorado': texto_mejorado,
+                        'confianza': confianza,
+                        'sugerencias': self._extract_suggestions(texto_original, texto_mejorado),
+                        'tokens_used': response.usage.total_tokens,
+                        'modo': modo_usado
+                    }
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback también falló: {str(fallback_error)}")
+            
             return {
                 'texto_mejorado': texto_original,
                 'confianza': 0.0,
                 'sugerencias': [],
                 'error': str(e)
             }
+    
+    def _get_ejemplos_aprendizaje_cached(self, usuario):
+        """Obtiene ejemplos de aprendizaje con caché por usuario (20 min)"""
+        if not usuario:
+            return None
+        
+        cache_key = f'ejemplos_aprendizaje_{usuario.id if hasattr(usuario, "id") else usuario}'
+        cached = cache.get(cache_key)
+        
+        if cached:
+            logger.info(f"📦 Ejemplos de aprendizaje recuperados del caché")
+            return cached
+        
+        from .models import CorreccionAprendizaje
+        ejemplos = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(
+            usuario=usuario,
+            limite=10
+        )
+        
+        if ejemplos:
+            cache.set(cache_key, ejemplos, timeout=1200)  # 20 minutos
+            cantidad = len(ejemplos.split('\n'))
+            logger.info(f"🧠 Sistema de aprendizaje: {cantidad} ejemplos activos")
+        
+        return ejemplos
+    
+    def _get_ejemplos_estilo_cached(self, usuario):
+        """Obtiene ejemplos de estilo completo con caché por usuario (30 min)"""
+        if not usuario:
+            return None
+        
+        cache_key = f'ejemplos_estilo_{usuario.id if hasattr(usuario, "id") else usuario}'
+        cached = cache.get(cache_key)
+        
+        if cached:
+            logger.info(f"📦 Ejemplos de estilo recuperados del caché")
+            return cached
+        
+        from .models import CorreccionAprendizaje
+        ejemplos = CorreccionAprendizaje.obtener_ejemplos_estilo_completo(
+            usuario=usuario,
+            limite=3
+        )
+        
+        if ejemplos:
+            cache.set(cache_key, ejemplos, timeout=1800)  # 30 minutos
+            logger.info(f"🎨 Ejemplos de estilo cargados (3 textos completos)")
+        
+        return ejemplos
     
     def _extract_suggestions(self, original, mejorado):
         """Extrae sugerencias comparando texto original y mejorado"""
