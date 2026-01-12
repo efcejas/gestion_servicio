@@ -90,7 +90,19 @@
                                 <input type="hidden" name="plantilla_utilizada" value="{{ preinforme.plantilla_utilizada.id|default:'' }}">
                             {% else %}
                                 <!-- En creación: campo normal -->
-                                {{ form.plantilla_utilizada }}
+                                <div class="relative flex-1">
+                                    <!-- Spinner de carga solo sobre el select -->
+                                    <div id="plantillaLoadingSpinner" class="hidden absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-md z-10 pointer-events-none">
+                                        <div class="flex items-center gap-2 text-teal-600">
+                                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-xs font-medium">Cargando...</span>
+                                        </div>
+                                    </div>
+                                    {{ form.plantilla_utilizada }}
+                                </div>
                                 <button type="button" 
                                         id="btnNuevaPlantilla"
                                         disabled
@@ -376,9 +388,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function aplicarPlantilla() {
         const plantillaId = plantillaSelect.value;
-        if (!plantillaId) return;
+        if (!plantillaId) {
+            // Si no hay plantilla seleccionada, limpiar el editor
+            const editor = initializeEditorIfNeeded();
+            if (editor) {
+                editor.setData('');
+            }
+            return;
+        }
         
         console.log('📋 Aplicando plantilla ID:', plantillaId);
+        
+        // Mostrar spinner
+        const spinner = document.getElementById('plantillaLoadingSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+        }
         
         // Actualizar el campo hidden plantilla_utilizada
         const plantillaUtilizadaField = document.getElementById('id_plantilla_utilizada');
@@ -395,31 +420,56 @@ document.addEventListener('DOMContentLoaded', function() {
                 return response.json();
             })
             .then(data => {
+                console.log('📦 Datos de plantilla recibidos:', data);
+                
                 // Dar tiempo a CKEditor 5 para inicializar completamente
                 setTimeout(() => {
                     try {
-                        // Aplicar contenido único
+                        // Limpiar y aplicar contenido
                         if (data.contenido) {
-                            setEditorContent(data.contenido);
-                            console.log('✅ Plantilla aplicada correctamente');
+                            const editor = initializeEditorIfNeeded();
+                            if (editor) {
+                                // Limpiar primero
+                                editor.setData('');
+                                // Dar un momento y luego aplicar el nuevo contenido (forzar aplicación)
+                                setTimeout(() => {
+                                    setEditorContent(data.contenido, false);  // false = forzar aunque haya contenido
+                                    console.log('✅ Plantilla aplicada correctamente');
+                                }, 100);
+                            }
                         } else {
                             console.warn('⚠️ La plantilla no tiene contenido');
                         }
                         
-                        // Dar foco al editor
-                        const editor = initializeEditorIfNeeded();
-                        if (editor && typeof editor.editing.view.focus === 'function') {
-                            editor.editing.view.focus();
-                        }
+                        // Dar foco al editor después de aplicar contenido
+                        setTimeout(() => {
+                            const editor = initializeEditorIfNeeded();
+                            if (editor && typeof editor.editing.view.focus === 'function') {
+                                editor.editing.view.focus();
+                            }
+                            
+                            // Ocultar spinner
+                            if (spinner) {
+                                spinner.classList.add('hidden');
+                            }
+                        }, 200);
                         
                     } catch (error) {
                         console.error('❌ Error aplicando plantilla:', error);
+                        // Ocultar spinner en caso de error
+                        if (spinner) {
+                            spinner.classList.add('hidden');
+                        }
                     }
                 }, 1500); // Tiempo generoso para inicialización
             })
             .catch(error => {
                 console.error('❌ Error cargando datos de plantilla:', error);
                 alert('Error al cargar la plantilla. Intente nuevamente.');
+                // Ocultar spinner en caso de error
+                if (spinner) {
+                    spinner.classList.add('hidden');
+                }
             });
     }
     
@@ -435,8 +485,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 2000);
 
     // Event listeners
-    tipoEstudioSelect.addEventListener('change', cargarPlantillas);
-    regionSelect.addEventListener('change', cargarPlantillas);
+    // Función wrapper para confirmar cambio si hay contenido
+    function confirmarYCargarPlantillas() {
+        // Verificar si hay contenido en el editor
+        const editor = initializeEditorIfNeeded();
+        let tieneContenido = false;
+        
+        if (editor) {
+            const contenido = editor.getData().trim();
+            tieneContenido = contenido && contenido !== '<p>&nbsp;</p>' && contenido !== '<p></p>';
+        }
+        
+        if (tieneContenido) {
+            const confirmar = confirm(
+                '⚠️ Al cambiar el tipo de estudio o región se perderá el contenido actual del editor.\n\n¿Deseas continuar?'
+            );
+            
+            if (!confirmar) {
+                // Restaurar valores previos
+                return;
+            }
+            
+            // Limpiar el editor
+            if (editor) {
+                editor.setData('');
+            }
+        }
+        
+        // Continuar con la carga de plantillas
+        cargarPlantillas();
+    }
+    
+    tipoEstudioSelect.addEventListener('change', confirmarYCargarPlantillas);
+    regionSelect.addEventListener('change', confirmarYCargarPlantillas);
     plantillaSelect.addEventListener('change', aplicarPlantilla);
     
     // Listener para sistema_destino: recargar plantillas cuando cambia
