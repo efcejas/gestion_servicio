@@ -249,7 +249,6 @@ class PlantillaPreinforme(models.Model):
     class Meta:
         verbose_name = "Plantilla de Preinforme"
         verbose_name_plural = "Plantillas de Preinformes"
-        unique_together = ['nombre', 'tipo_estudio', 'region']
         ordering = ['tipo_estudio__nombre', 'region__nombre', 'nombre']
         constraints = [
             models.UniqueConstraint(

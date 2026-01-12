@@ -565,8 +565,9 @@ def crear_plantilla_residente(request):
             compartir = form.cleaned_data.get('compartir', False)
             sistema_destino = form.cleaned_data['sistema_destino']
             
-            # Verificar si existe una plantilla duplicada (solo advertencia, no bloqueo)
+            # Verificar duplicados según el tipo de plantilla
             if compartir:
+                # Para plantillas públicas: NO permitir duplicados
                 plantilla_existente = PlantillaPreinforme.objects.filter(
                     nombre__iexact=nombre,
                     tipo_estudio=tipo_estudio,
@@ -576,13 +577,14 @@ def crear_plantilla_residente(request):
                 ).first()
                 
                 if plantilla_existente:
-                    messages.warning(
+                    messages.error(
                         request,
-                        f'⚠️ Ya existe una plantilla pública con el nombre "{nombre}" '
-                        f'creada por {plantilla_existente.creada_por.get_full_name() or plantilla_existente.creada_por.username}. '
-                        f'Considera usar la plantilla existente o cambiar el nombre para evitar confusiones.'
+                        f'❌ Ya existe una plantilla pública con el nombre "{nombre}" '
+                        f'para {tipo_estudio.nombre} - {region.nombre} ({sistema_destino}). '
+                        f'No se pueden crear plantillas públicas duplicadas. '
+                        f'Cambia el nombre o usa la plantilla existente creada por '
+                        f'{plantilla_existente.creada_por.get_full_name() or plantilla_existente.creada_por.username}.'
                     )
-                    # Mostrar contexto de la plantilla existente
                     context = {
                         'form': form,
                         'tipo_estudio': tipo_estudio,
@@ -591,6 +593,24 @@ def crear_plantilla_residente(request):
                         'mostrar_advertencia': True
                     }
                     return render(request, 'preinformes/crear_plantilla.html', context)
+            else:
+                # Para plantillas privadas: solo advertir si el mismo usuario tiene una similar
+                plantilla_similar = PlantillaPreinforme.objects.filter(
+                    nombre__iexact=nombre,
+                    tipo_estudio=tipo_estudio,
+                    region=region,
+                    creada_por=request.user,
+                    estado='borrador',
+                    sistema_destino=sistema_destino
+                ).first()
+                
+                if plantilla_similar:
+                    messages.info(
+                        request,
+                        f'ℹ️ Ya tienes una plantilla privada con el nombre "{nombre}" '
+                        f'para {tipo_estudio.nombre} - {region.nombre}. '
+                        f'Se creará esta nueva plantilla de todas formas.'
+                    )
             
             # Crear la plantilla
             plantilla = form.save(commit=False)
