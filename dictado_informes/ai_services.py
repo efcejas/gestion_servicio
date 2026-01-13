@@ -429,6 +429,18 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                             'No se observa aumento del líquido articular.'
                         ]
                     },
+                    'ANTEBRAZO': {
+                        'titulo': 'RM DE ANTEBRAZO [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el antebrazo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            'Estructuras óseas del radio y cúbito sin alteraciones.',
+                            'Músculos del antebrazo de morfología y señal normales.',
+                            'Tendones flexores y extensores conservados.',
+                            'Nervios mediano, radial y cubital sin signos de compresión.',
+                            'No se observa aumento del líquido articular.',
+                            'No se visualizan lesiones óseas.'
+                        ]
+                    },
                     'MANO': {
                         'titulo': 'RM DE MANO [<DERECHA/IZQUIERDA>]',
                         'seccion_tecnica': 'Se exploró la mano [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
