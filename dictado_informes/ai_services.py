@@ -488,6 +488,16 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                             'Estructuras óseas sin lesiones evidentes.'
                         ]
                     },
+                    'MUSLO': {
+                        'titulo': 'RM DE MUSLO [<DERECHO/IZQUIERDO>]',
+                        'seccion_tecnica': 'Se exploró el muslo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            'Músculos del muslo de morfología y señal normales.',
+                            'Tendones y ligamentos sin alteraciones.',
+                            'No se observan colecciones ni masas.',
+                            'No se visualizan lesiones óseas.'
+                        ]
+                    },
                     'TC_MSK': {
                         'titulo': 'TC DE [<REGIÓN ANATÓMICA>]',
                         'seccion_tecnica': 'Se realizó estudio tomográfico de la región solicitada con reconstrucciones multiplanares, sin contraste endovenoso.',
