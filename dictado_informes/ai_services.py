@@ -546,10 +546,11 @@ INSTRUCCIONES OBLIGATORIAS:
 2. Ejemplo: "[<DERECHO/IZQUIERDO>]" → "DERECHO" (sin corchetes)
 3. Ejemplo: "[<lado>]" → "derecho" (sin corchetes)
 4. USA LA TÉCNICA EXACTA que te di arriba (NO inventes otra)
-5. Mantén TODAS las líneas del COMENTARIO (no agregues ni quites líneas)
-6. Si el dictado menciona patología, REEMPLAZA solo esa línea específica. Por ejemplo, si dice el usuario dice "Se obseva derrame articular", debes reemplazar la línea correspondiente en COMENTARIO "No se observa aumento del líquido articular." por "Se observa derrame articular."
-7. Si el dictado NO menciona una estructura, DEJA la línea normal intacta
-8. NO uses términos de otras modalidades (ej: si es RM, no menciones "contraste endovenoso")
+5. Debes ver linea por linea el texto dictado y REEMPLAZAR las líneas de la plantilla según corresponda, entiendiendo el contexto médico
+6. Mantén TODAS las líneas del COMENTARIO (no agregues ni quites líneas)
+7. Si el dictado menciona patología, REEMPLAZA solo esa línea específica. Por ejemplo, si dice el usuario dice "Se obseva derrame articular", debes reemplazar la línea correspondiente en COMENTARIO "No se observa aumento del líquido articular." por "Se observa derrame articular."
+8. Si el dictado NO menciona una estructura, DEJA la línea normal intacta
+9. NO uses términos de otras modalidades (ej: si es RM, no menciones "contraste endovenoso")
 
 EJEMPLOS DE REEMPLAZO CORRECTO:
 ✅ "RM DE RODILLA [<DERECHA/IZQUIERDA>]" → "RM DE RODILLA DERECHA"
