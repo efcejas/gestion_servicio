@@ -181,11 +181,13 @@ def detalle_batch(request, batch_id):
 def procesar_excel_eges(archivo, batch):
     """
     Procesa un archivo Excel EGES y crea las filas en la base de datos.
-    Detecta automáticamente duplicados usando get_or_create.
+    Optimizado con bulk_create para mejor rendimiento.
     
     Returns:
         dict: {'creadas': int, 'duplicadas': int, 'errores': int}
     """
+    from django.db import transaction
+    
     print(f"[EGES] Abriendo workbook...")
     wb = openpyxl.load_workbook(archivo, read_only=True, data_only=True)
     ws = wb.active
@@ -221,24 +223,24 @@ def procesar_excel_eges(archivo, batch):
     idx_equipo = get_col_index('Equipo', ['Modalidad'])
     idx_estado = get_col_index('Estado Turno', ['Estado'])
     
-    print(f"[EGES] Índices mapeados. Iniciando procesamiento de filas...")
+    print(f"[EGES] Índices mapeados. Iniciando lectura de filas...")
     
-    filas_creadas = 0
-    filas_duplicadas = 0
-    filas_error = 0
+    # Primero, leer TODAS las filas del Excel y crear objetos en memoria
+    filas_a_crear = []
     filas_procesadas = 0
+    filas_error = 0
     
-    # Procesar filas (saltear encabezado)
+    # Leer todas las filas del Excel
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-        filas_procesadas += 1
-        
-        # Log cada 100 filas
-        if filas_procesadas % 100 == 0:
-            print(f"[EGES] Procesadas {filas_procesadas} filas: {filas_creadas} nuevas, {filas_duplicadas} duplicadas, {filas_error} errores...")
-        
         # Saltar filas vacías
         if not any(row):
             continue
+        
+        filas_procesadas += 1
+        
+        # Log cada 500 filas
+        if filas_procesadas % 500 == 0:
+            print(f"[EGES] Leyendo fila {filas_procesadas}...")
         
         try:
             # Extraer valores
@@ -283,37 +285,25 @@ def procesar_excel_eges(archivo, batch):
             equipo = str(row[idx_equipo]) if idx_equipo is not None and row[idx_equipo] else ''
             estado = str(row[idx_estado]) if idx_estado is not None and row[idx_estado] else ''
             
-            # Usar get_or_create para detectar duplicados
-            # El constraint unique_together está en (HC, fecha, hora, centro, servicio)
-            fila, created = EgesRow.objects.get_or_create(
-                # Campos del unique_together
-                historia_clinica=hc,
+            # Crear objeto en memoria (NO guardarlo todavía)
+            fila = EgesRow(
+                batch=batch,
+                numero_turno=numero_turno,
                 fecha_turno=fecha_turno,
                 hora_turno=hora_turno,
                 centro_atencion=centro,
+                historia_clinica=hc,
+                apellido_nombre=nombre,
                 servicio=servicio,
-                # Defaults para el resto de campos si se crea
-                defaults={
-                    'batch': batch,
-                    'numero_turno': numero_turno,
-                    'apellido_nombre': nombre,
-                    'equipo': equipo,
-                    'estado_turno': estado,
-                }
+                equipo=equipo,
+                estado_turno=estado,
             )
             
-            if created:
-                # IMPORTANTE: Clasificar modalidad e insumo después de crear
-                # porque get_or_create no ejecuta el método save() personalizado
-                fila.es_insumo = fila.clasificar_insumo()
-                fila.modalidad = fila.clasificar_modalidad()
-                fila.save(update_fields=['es_insumo', 'modalidad'])
-                filas_creadas += 1
-            else:
-                filas_duplicadas += 1
-                # Opcional: asociar también al batch actual si se quiere tracking
-                # fila.batch = batch  
-                # fila.save()
+            # Clasificar modalidad e insumo en memoria
+            fila.es_insumo = fila.clasificar_insumo()
+            fila.modalidad = fila.clasificar_modalidad()
+            
+            filas_a_crear.append(fila)
             
         except Exception as e:
             # Registrar error pero continuar con las demás filas
@@ -322,7 +312,50 @@ def procesar_excel_eges(archivo, batch):
             continue
     
     wb.close()
-    print(f"[EGES] Workbook cerrado. Total: {filas_creadas} nuevas, {filas_duplicadas} duplicadas, {filas_error} errores de {filas_procesadas} procesadas")
+    print(f"[EGES] Workbook cerrado. Leídas {len(filas_a_crear)} filas válidas, {filas_error} errores.")
+    
+    # Ahora verificar duplicados y crear en batch
+    print(f"[EGES] Verificando duplicados y guardando en base de datos...")
+    
+    # Obtener todas las combinaciones existentes para detectar duplicados
+    combinaciones_existentes = set(
+        EgesRow.objects.values_list(
+            'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'servicio'
+        )
+    )
+    
+    filas_nuevas = []
+    filas_duplicadas = 0
+    
+    for fila in filas_a_crear:
+        combinacion = (
+            fila.historia_clinica,
+            fila.fecha_turno,
+            fila.hora_turno,
+            fila.centro_atencion,
+            fila.servicio
+        )
+        
+        if combinacion not in combinaciones_existentes:
+            filas_nuevas.append(fila)
+            combinaciones_existentes.add(combinacion)  # Evitar duplicados dentro del mismo batch
+        else:
+            filas_duplicadas += 1
+    
+    # Guardar en batch (mucho más rápido)
+    filas_creadas = 0
+    if filas_nuevas:
+        print(f"[EGES] Insertando {len(filas_nuevas)} filas nuevas en la base de datos...")
+        with transaction.atomic():
+            # Insertar en lotes de 500 para evitar problemas de memoria
+            batch_size = 500
+            for i in range(0, len(filas_nuevas), batch_size):
+                lote = filas_nuevas[i:i + batch_size]
+                EgesRow.objects.bulk_create(lote, ignore_conflicts=True)
+                filas_creadas += len(lote)
+                print(f"[EGES] Insertadas {filas_creadas}/{len(filas_nuevas)} filas...")
+    
+    print(f"[EGES] Proceso completado: {filas_creadas} nuevas, {filas_duplicadas} duplicadas, {filas_error} errores")
     
     return {
         'creadas': filas_creadas,
