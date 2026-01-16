@@ -28,8 +28,26 @@ class AIService:
             self.stt_client = None
             self.stt_enabled = False
         
-        # Cliente Groq para LLM (mejora de texto, gratis 14,400 req/día)
-        if groq_key:
+        # 🎯 PRIORIDAD: OpenAI GPT-4o-mini para LLM (mejor calidad médica)
+        if openai_key:
+            self.llm_client = OpenAI(api_key=openai_key)
+            self.llm_enabled = True
+            self.llm_model = 'gpt-4o-mini'
+            self.llm_provider = 'openai'
+            logger.info("✅ OpenAI GPT-4o-mini configurado para mejora de texto (PRIORITARIO)")
+            
+            # Groq como fallback gratuito si OpenAI falla
+            if groq_key:
+                self.groq_fallback = OpenAI(
+                    api_key=groq_key,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                logger.info("✅ Groq disponible como fallback gratuito")
+            else:
+                self.groq_fallback = None
+                
+        elif groq_key:
+            # Solo Groq disponible (fallback total)
             self.llm_client = OpenAI(
                 api_key=groq_key,
                 base_url="https://api.groq.com/openai/v1"
@@ -37,22 +55,14 @@ class AIService:
             self.llm_enabled = True
             self.llm_model = 'llama-3.3-70b-versatile'
             self.llm_provider = 'groq'
-            logger.info("✅ Groq LLM configurado para mejora de texto (Gratis)")
-        elif openai_key:
-            # Fallback a OpenAI si no hay Groq
-            self.llm_client = OpenAI(api_key=openai_key)
-            self.llm_enabled = True
-            self.llm_model = 'gpt-4o-mini'
-            self.llm_provider = 'openai'
-            logger.info("✅ OpenAI LLM configurado para mejora de texto")
+            self.groq_fallback = None
+            logger.info("✅ Groq LLM configurado (solo Groq disponible)")
         else:
             self.llm_client = None
             self.llm_enabled = False
             self.llm_model = None
             self.llm_provider = None
-        
-        # Cliente OpenAI secundario para fallback
-        self.openai_fallback = OpenAI(api_key=openai_key) if openai_key and groq_key else None
+            self.groq_fallback = None
         
         # Compatibilidad con código existente
         self.enabled = self.stt_enabled or self.llm_enabled
@@ -72,11 +82,22 @@ class AIService:
         info = {
             'provider': self.llm_provider,
             'model': self.llm_model,
-            'enabled': True
+            'enabled': True,
+            'fallback': 'Groq (gratis)' if self.groq_fallback else None
         }
         
         # Límites según proveedor
-        if self.llm_provider == 'groq':
+        if self.llm_provider == 'openai':
+            info['limits'] = {
+                'cost': 'PAGO',
+                'model': 'GPT-4o-mini',
+                'input_cost': '$0.15 / 1M tokens',
+                'output_cost': '$0.60 / 1M tokens',
+                'estimated_per_report': '~$0.0003 USD',
+                'estimated_monthly': '~$5-10 USD (30 informes/día)',
+                'description': 'Calidad superior para terminología médica, con fallback gratuito a Groq'
+            }
+        elif self.llm_provider == 'groq':
             info['limits'] = {
                 'requests_per_day': 14400,
                 'requests_per_minute': 30,
@@ -514,21 +535,20 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                 plantilla_actual = plantillas.get(tipo_plantilla, plantillas['RODILLA'])
                 comentarios_str = '\n'.join(plantilla_actual['comentarios'])
                 
-                prompt = f"""Eres un médico radiólogo experto. Analiza el siguiente texto dictado y estructura la información usando ÚNICAMENTE la plantilla proporcionada.
+                prompt = f"""Eres un médico radiólogo experto. Analiza el texto dictado y genera un informe radiológico profesional.
 
-⚠️ ADVERTENCIA CRÍTICA: NO mezcles plantillas de diferentes modalidades (RM vs TC). Usa SOLO la plantilla que te doy.
-
+════════════════════════════════════════════════
 TEXTO DICTADO:
+════════════════════════════════════════════════
 {texto_original}
 
 ════════════════════════════════════════════════
-PLANTILLA A USAR (NO CAMBIES NADA DE ESTO):
+PLANTILLA BASE DE REFERENCIA:
 ════════════════════════════════════════════════
-
 {plantilla_actual['titulo']}
 
 INFORMACIÓN CLÍNICA
-[<extraer indicación del dictado o poner "Sin datos clínicos disponibles.">]
+[Extraer del dictado]
 
 TÉCNICA
 {plantilla_actual['seccion_tecnica']}
@@ -537,29 +557,108 @@ COMENTARIO
 {comentarios_str}
 
 CONCLUSIÓN
-[<resumir hallazgos principales del dictado>]
+[Impresión diagnóstica]
+
+════════════════════════════════════════════════
+INSTRUCCIONES PARA GENERAR EL INFORME:
+════════════════════════════════════════════════
+
+1️⃣ INFORMACIÓN CLÍNICA:
+   • Incluye SOLO síntomas/antecedentes del paciente
+   • ✅ Correcto: "Paciente con omalgia derecha", "Antecedente de trauma"
+   • ❌ Prohibido: "tendinopatía", "desgarro" (son hallazgos radiológicos)
+
+2️⃣ TÉCNICA:
+   • Usa EXACTAMENTE la técnica de la plantilla
+   • Reemplaza [<DERECHO/IZQUIERDO>] → DERECHO (sin corchetes)
+   • Reemplaza [<lado>] → derecho (sin corchetes)
+
+3️⃣ COMENTARIO - REGLAS INTELIGENTES:
+   
+   📋 FORMATO: Una línea por hallazgo/estructura (con saltos de línea)
+   
+   A) Si el usuario DICTA HALLAZGOS ESPECÍFICOS:
+      • Usa exactamente lo que dictó
+      • Una línea por hallazgo
+      Ejemplo:
+      Desgarro del ligamento cruzado anterior con avulsión cortical.
+      Edema óseo en cóndilo femoral externo.
+      Menisco externo con desgarro de rampa posterior.
+   
+   B) Si DICTA PATOLOGÍA GENÉRICA ("artrosis", "tendinopatía"):
+      • Expande con hallazgos típicos razonables
+      Ejemplo dictado "tendinopatía del supraespinoso":
+      Tendinopatía del supraespinoso con señal aumentada.
+      Desgarro parcial en su porción intrasustancial.
+   
+   C) Para estructuras NO mencionadas:
+      • Usa las líneas normales de la plantilla
+   
+   D) 🚫 ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
+      
+      REGLA: Si describes patología en una estructura → ELIMINA su línea "sin alteraciones"
+      
+      ❌ Prohibido:
+      • "Desgarro del LCA" + "Ligamentos cruzados conservados"
+      • "Derrame articular" + "No se observa aumento del líquido articular"
+      • "Tendinopatía de epicondilia" + "Epicóndilos sin epicondilitis"
+      
+      🗺️ MAPEO ANATÓMICO (sinónimos):
+      • "desgarro del LCA" contradice "ligamentos cruzados conservados"
+      • "derrame articular" contradice "no se observa aumento del líquido articular"
+      • "tendinopatía de epicondilia" = "epicondilitis"
+      • "supraespinoso" pertenece al "manguito rotador"
+      • "edema óseo" contradice "estructuras óseas sin alteraciones"
+      
+      Si mencionas patología, NO puede existir línea normal de esa estructura.
+   
+   E) 🏁 CIERRE PROFESIONAL:
+      • Después de listar TODAS las patologías
+      • Agrega 1-2 líneas indicando que el resto está normal:
+        "No se observan otras lesiones tendinosas ni ligamentarias."
+        "Resto del examen sin hallazgos patológicos significativos."
+
+4️⃣ CONCLUSIÓN:
+   • Resumen diagnóstico en 1-2 líneas
+   • NO repitas todo el comentario
+
+════════════════════════════════════════════════
+EJEMPLO COMPLETO:
+════════════════════════════════════════════════
+
+Dictado: "Rodilla derecha con trauma. Desgarro del LCA con avulsión. Edema en cóndilo femoral externo y platillos tibiales. Desgarro meniscal externo. Derrame articular."
+
+Informe correcto:
+
+RM DE RODILLA DERECHA
+
+INFORMACIÓN CLÍNICA
+Paciente con antecedente de trauma de rodilla derecha.
+
+TÉCNICA
+Se exploró la rodilla derecha con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.
+
+COMENTARIO
+Desgarro con avulsión cortical en la inserción distal del ligamento cruzado anterior.
+Edema óseo contusivo en el cóndilo femoral externo y en el margen posterior de ambos platillos tibiales.
+Menisco externo muestra hallazgo compatible con desgarro de su rampa posterior inferior.
+Marcado derrame articular a predominio del receso suprapatelar.
+No se observan otras lesiones tendinosas ni ligamentarias.
+
+CONCLUSIÓN
+Desgarro con avulsión cortical del ligamento cruzado anterior y desgarro meniscal externo. Edema óseo contusivo.
 
 ════════════════════════════════════════════════
 
-INSTRUCCIONES OBLIGATORIAS:
-1. Los corchetes [<...>] son MARCADORES que debes REEMPLAZAR y ELIMINAR completamente
-2. Ejemplo: "[<DERECHO/IZQUIERDO>]" → "DERECHO" (sin corchetes)
-3. Ejemplo: "[<lado>]" → "derecho" (sin corchetes)
-4. USA LA TÉCNICA EXACTA que te di arriba (NO inventes otra)
-5. Debes ver linea por linea el texto dictado y REEMPLAZAR las líneas de la plantilla según corresponda, entiendiendo el contexto médico
-6. Mantén TODAS las líneas del COMENTARIO (no agregues ni quites líneas)
-7. Si el dictado menciona patología, REEMPLAZA solo esa línea específica. Por ejemplo, si dice el usuario dice "Se obseva derrame articular", debes reemplazar la línea correspondiente en COMENTARIO "No se observa aumento del líquido articular." por "Se observa derrame articular."
-8. Si el dictado NO menciona una estructura, DEJA la línea normal intacta
-9. NO uses términos de otras modalidades (ej: si es RM, no menciones "contraste endovenoso")
+⚠️ REGLAS CRÍTICAS:
+✓ Una línea por hallazgo (no todo junto)
+✓ NO contradecirse internamente
+✓ NO inventar hallazgos no dictados
+✓ Eliminar completamente corchetes [<...>]
+✓ Cierre profesional indicando normalidad residual
+✓ Lenguaje técnico conciso y profesional
 
-EJEMPLOS DE REEMPLAZO CORRECTO:
-✅ "RM DE RODILLA [<DERECHA/IZQUIERDA>]" → "RM DE RODILLA DERECHA"
-✅ "Se exploró la rodilla [<lado>]" → "Se exploró la rodilla derecha"
-❌ "RM DE RODILLA [DERECHA]" (mal, dejó corchetes)
-❌ "Se exploró la rodilla [derecha]" (mal, dejó corchetes)
-
-FORMATO DE SALIDA:
-Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchetes."""
+Genera el informe siguiendo estas reglas:"""
 
         try:
             response = self.llm_client.chat.completions.create(
@@ -597,12 +696,12 @@ Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchet
         except Exception as e:
             logger.error(f"❌ Error en mejora de texto con {self.llm_provider}: {str(e)}")
             
-            # 🔄 FALLBACK: Intentar con OpenAI si Groq falló
-            if self.llm_provider == 'groq' and self.openai_fallback:
-                logger.info("🔄 Intentando fallback con OpenAI...")
+            # 🔄 FALLBACK: Intentar con Groq (gratis) si OpenAI falló
+            if self.llm_provider == 'openai' and self.groq_fallback:
+                logger.info("🔄 OpenAI falló, intentando fallback gratuito con Groq...")
                 try:
-                    response = self.openai_fallback.chat.completions.create(
-                        model='gpt-4o-mini',
+                    response = self.groq_fallback.chat.completions.create(
+                        model='llama-3.3-70b-versatile',
                         messages=[
                             {
                                 "role": "system",
@@ -620,7 +719,7 @@ Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchet
                     texto_mejorado = response.choices[0].message.content.strip()
                     modo_usado = "PLANTILLA" if plantilla else modo
                     
-                    logger.info("✅ Texto mejorado con OpenAI (fallback)")
+                    logger.info("✅ Texto mejorado con Groq (fallback)")
                     
                     confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
                     
@@ -632,7 +731,7 @@ Copia la estructura de arriba, completa los campos [<...>] y ELIMINA los corchet
                         'modo': modo_usado
                     }
                 except Exception as fallback_error:
-                    logger.error(f"❌ Fallback también falló: {str(fallback_error)}")
+                    logger.error(f"❌ Fallback Groq también falló: {str(fallback_error)}")
             
             return {
                 'texto_mejorado': texto_original,
