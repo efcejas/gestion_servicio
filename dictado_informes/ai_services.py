@@ -442,12 +442,10 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                         'titulo': 'RM DE TOBILLO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el tobillo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            'Tendón de Aquiles de grosor y señal normales.',
-                            'Tendones peroneos de trayecto conservado.',
-                            'Ligamentos laterales sin alteraciones.',
-                            'Ligamento deltoideo íntegro.',
-                            'Tendón tibial posterior conservado.',
-                            'No se observa aumento del líquido articular.'
+                            'Tendones retromaleolares internos, retromaleolares externos y tendones flexores del pie sin alteraciones.',
+                            'No se observa aumento del líquido articular.',
+                            'Fascia plantar  y tendón de Aquiles de espesor y señal normales.',
+                            'No se visualizan lesiones óseas.'
                         ]
                     },
                     'ANTEBRAZO': {
