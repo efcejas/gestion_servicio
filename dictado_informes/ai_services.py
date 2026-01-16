@@ -590,7 +590,11 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
       Desgarro parcial en su porción intrasustancial.
    
    C) Para estructuras NO mencionadas:
-      • Usa las líneas normales de la plantilla
+      • Usa las líneas normales de la plantilla. Deja las que no apliquen si ya se describió patología.
+      
+   D) Si dice que es estudio comparativo:
+        • Agrega línea inicial en COMENTARIO: "Estudio comparativo con RM de [<FECHA>]."
+        • Usa hallazgos dictados para diferencias. Si no hay diferencias, indica "No se observan diferencias significativas respecto al estudio previo."
    
    D) 🚫 ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
       
@@ -612,12 +616,10 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
    
    E) 🏁 CIERRE PROFESIONAL:
       • Después de listar TODAS las patologías
-      • Agrega 1-2 líneas indicando que el resto está normal:
-        "No se observan otras lesiones tendinosas ni ligamentarias."
-        "Resto del examen sin hallazgos patológicos significativos."
+      • Conserva aquellas lineas normales que NO se contradigan. Indican normalidad residual.
 
 4️⃣ CONCLUSIÓN:
-   • Resumen diagnóstico en 1-2 líneas
+   • Resumen diagnóstico breve pero que no omita hallazgos patológicos importantes. 
    • NO repitas todo el comentario
 
 ════════════════════════════════════════════════
