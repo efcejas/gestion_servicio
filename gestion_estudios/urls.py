@@ -60,6 +60,7 @@ urlpatterns = [
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('protocolos/', include('protocolos.urls')),  # URLs para protocolos
     path('equipos/', include('equipos.urls')),  # URLs para equipos
+    path('consultorios/', include('consultorios.urls')),  # URLs para gestión de consultorios
     # path('clases/', include('clases_residentes.urls')),  # URLs para clases de residentes - DESHABILITADO TEMPORALMENTE
     path('eges/', include('eges_import.urls')),  # URLs para importación EGES
     path('preinformes/', include('preinformes.urls')),  # URLs para preinformes

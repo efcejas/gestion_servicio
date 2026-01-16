@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'clases_residentes.apps.ClasesResidentesConfig',
     'eges_import.apps.EgesImportConfig',
     'preinformes.apps.PreinformesConfig',
+    'consultorios.apps.ConsultoriosConfig',
     
     # Tailwind CSS
     'tailwind',
