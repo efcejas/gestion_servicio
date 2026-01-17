@@ -216,6 +216,10 @@ class AsignacionEquipoConsultorioAdmin(admin.ModelAdmin):
     
     def estado_vigencia(self, obj):
         """Muestra si la asignación está vigente"""
+        # Proteger para objetos nuevos que aún no se han guardado
+        if not obj or not obj.pk:
+            return format_html('<span style="color: #999;">-</span>')
+        
         if obj.esta_vigente():
             return format_html('<span style="color: green; font-weight: bold;">✓ VIGENTE</span>')
         return format_html('<span style="color: red;">✗ No vigente</span>')

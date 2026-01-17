@@ -226,9 +226,19 @@ class AsignacionEquipoConsultorio(models.Model):
             return True
         
         hoy = timezone.now().date()
+        
+        # Asegurar que fecha_inicio sea date, no datetime
+        fecha_inicio = self.fecha_inicio
+        if hasattr(fecha_inicio, 'date'):
+            fecha_inicio = fecha_inicio.date()
+        
         if self.fecha_fin:
-            return self.fecha_inicio <= hoy <= self.fecha_fin
-        return self.fecha_inicio <= hoy
+            fecha_fin = self.fecha_fin
+            if hasattr(fecha_fin, 'date'):
+                fecha_fin = fecha_fin.date()
+            return fecha_inicio <= hoy <= fecha_fin
+        
+        return fecha_inicio <= hoy
 
 
 class TipoActividad(models.TextChoices):
