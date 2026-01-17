@@ -205,15 +205,20 @@ class AsignacionEquipoConsultorio(models.Model):
     
     def clean(self):
         """Validaciones del modelo"""
-        if not self.es_permanente and not self.fecha_fin:
-            raise ValidationError(
-                "Si la asignación no es permanente, debe especificar una fecha de fin."
-            )
+        from django.core.exceptions import ValidationError
         
-        if self.fecha_fin and self.fecha_inicio > self.fecha_fin:
-            raise ValidationError(
-                "La fecha de inicio no puede ser posterior a la fecha de fin."
-            )
+        # Si no es permanente, debe tener fecha de fin
+        if not self.es_permanente:
+            if not self.fecha_fin:
+                raise ValidationError({
+                    'fecha_fin': "Si la asignación no es permanente, debe especificar una fecha de fin."
+                })
+            
+            # Validar que fecha_inicio < fecha_fin
+            if self.fecha_inicio and self.fecha_fin and self.fecha_inicio > self.fecha_fin:
+                raise ValidationError({
+                    'fecha_fin': "La fecha de fin no puede ser anterior a la fecha de inicio."
+                })
     
     def esta_vigente(self):
         """Verifica si la asignación está vigente en la fecha actual"""

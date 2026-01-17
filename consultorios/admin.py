@@ -177,7 +177,8 @@ class AsignacionEquipoConsultorioAdmin(admin.ModelAdmin):
             'fields': ('consultorio', 'equipo')
         }),
         ('Período', {
-            'fields': ('fecha_inicio', 'fecha_fin', 'es_permanente')
+            'fields': ('es_permanente', 'fecha_inicio', 'fecha_fin'),
+            'description': 'Si es permanente, no necesita fecha de fin. Si es temporal, debe especificar ambas fechas.'
         }),
         ('Información Adicional', {
             'fields': ('observaciones',)
@@ -187,6 +188,24 @@ class AsignacionEquipoConsultorioAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def get_form(self, request, obj=None, **kwargs):
+        """Personalizar el formulario del admin"""
+        form = super().get_form(request, obj, **kwargs)
+        
+        # Establecer fecha de inicio por defecto como hoy
+        if not obj and 'fecha_inicio' in form.base_fields:
+            from django.utils import timezone
+            form.base_fields['fecha_inicio'].initial = timezone.now().date()
+        
+        # Ayuda contextual para el campo es_permanente
+        if 'es_permanente' in form.base_fields:
+            form.base_fields['es_permanente'].help_text = (
+                "Marca esto si el equipo estará asignado indefinidamente. "
+                "Si NO es permanente, debes especificar una fecha de fin."
+            )
+        
+        return form
     
     def tipo_asignacion(self, obj):
         """Muestra el tipo de asignación"""
