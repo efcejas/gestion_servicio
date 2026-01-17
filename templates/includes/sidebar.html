@@ -150,6 +150,16 @@
             </li>
             {% endif %}
             
+            <!-- Consultorios -->
+            <li>
+                <a href="{% url 'consultorios:dashboard' %}" class="flex items-center p-2 text-white rounded-lg transition-all duration-200 hover:bg-gray-700 group {% if request.resolver_match and request.resolver_match.app_name == 'consultorios' %}bg-blue-900 text-blue-400{% endif %}">
+                    <svg class="w-5 h-5 {% if request.resolver_match and request.resolver_match.app_name == 'consultorios' %}text-blue-400{% else %}text-gray-400{% endif %} transition duration-200 group-hover:text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 0a10 10 0 1 0 10 10A10.011 10.011 0 0 0 10 0Zm3.982 13.982a1 1 0 0 1-1.414 0l-3.274-3.274A1.012 1.012 0 0 1 9 10V6a1 1 0 0 1 2 0v3.586l2.982 2.982a1 1 0 0 1 0 1.414Z"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap">Consultorios</span>
+                </a>
+            </li>
+            
             {% if SANATORIO_MODULOS.protocolos %}
             <!-- Protocolos Radiológicos -->
             <li>

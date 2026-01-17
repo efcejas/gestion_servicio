@@ -1,0 +1,226 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Consultorios - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-0">
+    
+    <!-- Header -->
+    <div class="mb-6 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-8 text-white">
+        <h1 class="text-3xl font-bold">
+            📅 Gestión de Consultorios
+        </h1>
+        <p class="mt-2 text-blue-100">
+            Sistema de gestión de disponibilidad y horarios
+        </p>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Consultorios -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <span class="text-2xl">🏥</span>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-blue-100">Consultorios</p>
+                    <p class="text-2xl font-semibold">{{ consultorios_activos }}/{{ total_consultorios }}</p>
+                    <p class="text-xs text-blue-100">Activos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bloques Activos -->
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <span class="text-2xl">📋</span>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-green-100">Bloques Activos</p>
+                    <p class="text-2xl font-semibold">{{ total_bloques }}</p>
+                    <p class="text-xs text-green-100">Horarios asignados</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profesionales Externos -->
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <span class="text-2xl">👨‍⚕️</span>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-purple-100">Profesionales Ext.</p>
+                    <p class="text-2xl font-semibold">{{ total_profesionales_externos }}</p>
+                    <p class="text-xs text-purple-100">Activos</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hoy -->
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-12 h-12 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                        <span class="text-2xl">📆</span>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-orange-100">{{ dia_hoy }}</p>
+                    <p class="text-2xl font-semibold">{{ bloques_hoy|length }}</p>
+                    <p class="text-xs text-orange-100">Bloques hoy</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid principal -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        
+        <!-- Consultorios con más actividad -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="p-6 border-b bg-gradient-to-br from-blue-100 to-green-200 rounded-t-lg">
+                <h2 class="text-xl font-semibold text-blue-900">
+                    Consultorios con Más Actividad
+                </h2>
+            </div>
+            <div class="p-6">
+                {% if consultorios_top %}
+                    <div class="space-y-4">
+                        {% for consultorio in consultorios_top %}
+                            <a href="{% url 'consultorios:detalle' consultorio.pk %}" 
+                               class="block p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">
+                                            {{ consultorio.nombre }}
+                                        </h3>
+                                        <p class="text-sm text-gray-500">
+                                            📍 {{ consultorio.ubicacion|default:"Sin ubicación" }}
+                                        </p>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-2xl font-bold text-blue-600">
+                                            {{ consultorio.total_bloques }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            bloques
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">
+                        No hay consultorios con bloques activos
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Bloques de hoy -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="p-6 border-b bg-gradient-to-br from-blue-100 to-green-200 rounded-t-lg">
+                <h2 class="text-xl font-semibold text-blue-900">
+                    Bloques de Hoy ({{ dia_hoy }})
+                </h2>
+            </div>
+            <div class="p-6">
+                {% if bloques_hoy %}
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        {% for bloque in bloques_hoy %}
+                            <div class="p-3 border border-gray-200 rounded-lg">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <div class="font-semibold text-gray-900 text-sm">
+                                            {{ bloque.consultorio.nombre }}
+                                        </div>
+                                        <div class="text-sm text-gray-600">
+                                            {% if bloque.profesional_interno %}
+                                                <span class="text-blue-600">👤</span> {{ bloque.profesional_interno.get_full_name }}
+                                            {% elif bloque.profesional_externo %}
+                                                <span class="text-green-600">👨‍⚕️</span> Dr./Dra. {{ bloque.profesional_externo.apellido }}
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-xs text-gray-500 mt-1">
+                                            {{ bloque.get_tipo_actividad_display }}
+                                        </div>
+                                    </div>
+                                    <div class="text-right ml-2">
+                                        <div class="text-sm font-semibold text-gray-900">
+                                            {{ bloque.hora_inicio|time:"H:i" }}
+                                        </div>
+                                        <div class="text-xs text-gray-500">
+                                            {{ bloque.hora_fin|time:"H:i" }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-500 text-center py-8">
+                        No hay bloques programados para hoy
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <a href="{% url 'consultorios:lista' %}" 
+           class="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition">
+            <div class="text-center">
+                <div class="text-4xl mb-3">🏥</div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                    Ver Todos los Consultorios
+                </h3>
+                <p class="text-sm text-gray-500">
+                    Lista completa con disponibilidad
+                </p>
+            </div>
+        </a>
+
+        {% if user.is_superuser %}
+        <a href="{% url 'admin:consultorios_bloquehorario_add' %}" 
+           class="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition">
+            <div class="text-center">
+                <div class="text-4xl mb-3">➕</div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                    Crear Bloque Horario
+                </h3>
+                <p class="text-sm text-gray-500">
+                    Asignar nuevo horario
+                </p>
+            </div>
+        </a>
+
+        <a href="{% url 'admin:consultorios_consultorio_changelist' %}" 
+           class="block p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition">
+            <div class="text-center">
+                <div class="text-4xl mb-3">⚙️</div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                    Panel de Administración
+                </h3>
+                <p class="text-sm text-gray-500">
+                    Gestión avanzada
+                </p>
+            </div>
+        </a>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
