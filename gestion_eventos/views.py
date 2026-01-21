@@ -27,7 +27,10 @@ from .forms import (
     FiltroEventoForm,
     NotaEventoForm,
 )
+
 from .models import EventoServicio
+from django.core.mail import send_mail
+from django.conf import settings
 
 # Variables globales
 User = get_user_model()
@@ -71,6 +74,16 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
             self.request, 
             f'✓ Evento creado exitosamente: "{tipo_evento_display}"{servicio_info}{paciente_info}'
         )
+
+        # Enviar email de notificación
+        try:
+            subject = f"Nuevo evento creado: {tipo_evento_display}"
+            message = f"Se ha creado un nuevo evento.\n\nTipo: {tipo_evento_display}\n{servicio_info}\n{paciente_info}\nDescripción: {self.object.descripcion}"
+            from_email = settings.EMAIL_HOST_USER
+            recipient_list = ["ecejas@sanatoriocolegiales.com.ar"]
+            send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+        except Exception as e:
+            pass
         
         return response
 
