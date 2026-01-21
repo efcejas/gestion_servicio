@@ -202,10 +202,22 @@
                                         </span>
                                         {% if evento.ultima_nota %}
                                         <span class="flex items-center text-blue-600 whitespace-nowrap">
-                                            <i class="fas fa-comment mr-1"></i>Última nota
+                                            <i class="fas fa-comment mr-1"></i>{{ evento.notas.count }} nota{% if evento.notas.count != 1 %}s{% endif %}
                                         </span>
                                         {% endif %}
                                     </div>
+                                    
+                                    <!-- Última nota si existe -->
+                                    {% if evento.ultima_nota %}
+                                    <div class="mt-3 p-3 bg-blue-50 rounded-lg">
+                                        <p class="text-blue-800 text-sm italic">
+                                            "{{ evento.ultima_nota.comentario|truncatechars:100 }}"
+                                        </p>
+                                        <p class="text-blue-600 text-xs mt-1">
+                                            {{ evento.ultima_nota.creado_por.get_full_name|title }} - {{ evento.ultima_nota.fecha|date:"d/m/Y H:i" }}
+                                        </p>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             
