@@ -430,12 +430,10 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                         'titulo': 'RM DE CODO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el codo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            'Tendón del bíceps distal de grosor y señal normales.',
-                            'Tendón del tríceps de morfología conservada.',
-                            'Ligamentos colaterales sin alteraciones.',
-                            'Epicóndilos sin signos de epicondilitis.',
-                            'Articulación radiocubital proximal conservada.',
-                            'No se observa aumento del líquido articular.'
+                            'Tendones epicondíleos y epitrocleares normales.',
+                            'Resto de tendones y ligamentos de la articulación del codo sin alteraciones.',
+                            'No se observa aumento del liquido articular.',
+                            'No se visualizan lesiones óseas.'
                         ]
                     },
                     'TOBILLO': {
@@ -590,12 +588,39 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
       Desgarro parcial en su porción intrasustancial.
    
    C) Para estructuras NO mencionadas:
-      • Usa las líneas normales de la plantilla. Deja las que no apliquen si ya se describió patología.
+      • Usa las líneas normales de la plantilla. Deja las que no apliquen si ya se describió patología. Aquellas lineas que estan relacionadas con la patología, si corresponde, agrera "resto de..." o "otras..."
+      Ejemplo:
+      Si dictó "desgarro del LCA" → elimina "ligamentos cruzados conservados" y agrega en un punto seguido a lo patológico "ligamento cruzado posterior conservado."
+      Si dictó "derrame articular" → elimina "no se observa aumento del líquido articular."
+      Si dictó "tendinopatía de epicondilia" → elimina "epicóndilos sin signos de epicondilitis." Agrega "Tendones epitrocleares normales."
+      Si dictó "edema óseo" → elimina "estructuras óseas sin alteraciones."
       
+    D) UBICACIÓN SEGÚN PLANTILLA (ORDEN ANATÓMICO):
+        • Cada hallazgo patológico dictado debe REEMPLAZAR la línea de la plantilla que corresponde a esa estructura, manteniendo el ORDEN ORIGINAL de la plantilla.
+        • Si hay varias patologías para una estructura, agrúpalas en esa posición.
+        • Si el dictado menciona estructuras que no están en la plantilla, agrégalas al final del comentario.
+        • Así el informe mantiene la lógica anatómica esperada y es más fácil de leer y comparar.
+
    D) Si dice que es estudio comparativo:
         • Agrega línea inicial en COMENTARIO: "Estudio comparativo con RM de [<FECHA>]."
         • Usa hallazgos dictados para diferencias. Si no hay diferencias, indica "No se observan diferencias significativas respecto al estudio previo."
    
+    E) FRASES DE CIERRE AUTOMÁTICO:
+        • Si el dictado contiene alguna de estas frases (o variantes):
+          - "el resto normal"
+          - "el resto del informe normal"
+          - "el resto sin alteraciones"
+          - "sin otros hallazgos"
+          - "no se observan otras alteraciones"
+          - "no se observan otros hallazgos"
+          - "el resto de las estructuras normales"
+          - "el resto de los hallazgos normales"
+        • Entonces:
+          - NO incluyas esa frase textual en el informe final
+          - Simplemente conserva todas las líneas normales de la plantilla para las estructuras no mencionadas por patología
+          - Solo reemplaza las líneas de la plantilla que correspondan a la patología dictada
+          - Así el informe queda profesional, breve y sin redundancias
+
    D) 🚫 ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
       
       REGLA: Si describes patología en una estructura → ELIMINA su línea "sin alteraciones"
