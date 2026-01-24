@@ -1,7 +1,9 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+
 from cloudinary.models import CloudinaryField
+from .storages import S3MediaStorage
 
 
 class ClaseResidente(models.Model):
@@ -9,14 +11,20 @@ class ClaseResidente(models.Model):
     Modelo para gestionar clases/presentaciones de residentes.
     Cada clase puede estar dirigida a años específicos de residencia.
     """
+
+    def get_anios_display_list(self):
+        """Devuelve los labels legibles de los años dirigidos (ej: 'R1 - Primer Año')"""
+        if not self.anios_dirigidos:
+            return []
+        choices_dict = dict(self.ANIO_CHOICES)
+        return [choices_dict.get(anio, anio) for anio in self.anios_dirigidos]
     
     # Opciones de años de residencia dirigidos
     ANIO_CHOICES = [
-        ('R1', 'R1 - Primer Año'),
-        ('R2', 'R2 - Segundo Año'),
-        ('R3', 'R3 - Tercer Año'),
-        ('R4', 'R4 - Cuarto Año'),
-        ('R5', 'R5 - Quinto Año'),
+        ('R1', 'R1'),
+        ('R2', 'R2'),
+        ('R3', 'R3'),
+        ('R4', 'R4'),
     ]
     
     # Categorías de clases
@@ -51,13 +59,12 @@ class ClaseResidente(models.Model):
         help_text='Categoría temática de la clase'
     )
     
-    # Archivos (usando Cloudinary)
-    archivo = CloudinaryField(
-        'archivo',
+    # Archivos (usando S3 para archivos pesados y Cloudinary para thumbnails)
+    archivo = models.FileField(
+        storage=S3MediaStorage(),
         blank=True,
         null=True,
-        resource_type='auto',
-        folder='clases_residentes',
+        upload_to='',  # Se guarda en la carpeta definida por location en el storage
         help_text='Archivo de la presentación (PPT, PDF, etc.) - OPCIONAL'
     )
     archivo_thumbnail = CloudinaryField(
@@ -127,7 +134,7 @@ class ClaseResidente(models.Model):
         """Retorna string legible de años dirigidos"""
         if not self.anios_dirigidos:
             return "Todos los años"
-        return ", ".join(self.anios_dirigidos)
+        return ", ".join(str(a) for a in self.anios_dirigidos)
     
     def get_anios_list(self):
         """Retorna lista de años dirigidos para usar en templates"""

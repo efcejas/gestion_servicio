@@ -21,46 +21,71 @@ class ClaseListView(LoginRequiredMixin, ListView):
     paginate_by = 12
     
     def get_queryset(self):
+        from django.db import connection
         queryset = ClaseResidente.objects.filter(activa=True).select_related('autor')
         user = self.request.user
-        
+
+        # Detectar si estamos en SQLite
+        is_sqlite = connection.vendor == 'sqlite'
+
         # Filtrar según permisos del usuario
         if user.rol == 'medico_residente' and user.anio_residencia:
-            # Residentes ven clases para su año o sin restricción
-            queryset = queryset.filter(
-                Q(anios_dirigidos=[]) |  # Sin restricción (todos)
-                Q(anios_dirigidos__contains=[user.anio_residencia])  # Su año
-            )
-        # Jefes, instructores y staff ven todo (no filtrar)
-        
+            if is_sqlite:
+                # Filtrar en Python
+                queryset = [c for c in queryset if not c.anios_dirigidos or user.anio_residencia in c.anios_dirigidos]
+            else:
+                queryset = queryset.filter(
+                    Q(anios_dirigidos=[]) |
+                    Q(anios_dirigidos__contains=[user.anio_residencia])
+                )
+
         # Búsqueda y filtros
         form = BuscarClaseForm(self.request.GET)
         if form.is_valid():
             q = form.cleaned_data.get('q')
             if q:
-                queryset = queryset.filter(
-                    Q(titulo__icontains=q) |
-                    Q(descripcion__icontains=q) |
-                    Q(tags__icontains=q)
-                )
-            
+                if is_sqlite:
+                    queryset = [c for c in queryset if q.lower() in (c.titulo or '').lower() or q.lower() in (c.descripcion or '').lower() or q.lower() in (c.tags or '').lower()]
+                else:
+                    queryset = queryset.filter(
+                        Q(titulo__icontains=q) |
+                        Q(descripcion__icontains=q) |
+                        Q(tags__icontains=q)
+                    )
+
             categoria = form.cleaned_data.get('categoria')
             if categoria:
-                queryset = queryset.filter(categoria=categoria)
-            
+                if is_sqlite:
+                    queryset = [c for c in queryset if c.categoria == categoria]
+                else:
+                    queryset = queryset.filter(categoria=categoria)
+
             anio = form.cleaned_data.get('anio')
             if anio:
-                queryset = queryset.filter(anios_dirigidos__contains=[anio])
-            
+                if is_sqlite:
+                    queryset = [c for c in queryset if anio in (c.anios_dirigidos or [])]
+                else:
+                    queryset = queryset.filter(anios_dirigidos__contains=[anio])
+
             if form.cleaned_data.get('solo_destacadas'):
-                queryset = queryset.filter(es_destacada=True)
-        
-        return queryset.annotate(num_comentarios=Count('comentarios'))
+                if is_sqlite:
+                    queryset = [c for c in queryset if c.es_destacada]
+                else:
+                    queryset = queryset.filter(es_destacada=True)
+
+        # Si es SQLite, queryset es lista, si no, es queryset
+        if is_sqlite:
+            # Simular annotate para comentarios (opcional, si usas en template)
+            for c in queryset:
+                c.num_comentarios = getattr(c, 'comentarios', []).count() if hasattr(c, 'comentarios') else 0
+            return queryset
+        else:
+            return queryset.annotate(num_comentarios=Count('comentarios'))
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form_busqueda'] = BuscarClaseForm(self.request.GET)
-        context['total_clases'] = self.get_queryset().count()
+        context['total_clases'] = len(self.get_queryset())
         context['categorias'] = ClaseResidente.CATEGORIA_CHOICES
         
         # Estadísticas adicionales
