@@ -75,7 +75,7 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
             f'✓ Evento creado exitosamente: "{tipo_evento_display}"{servicio_info}{paciente_info}'
         )
 
-        # Enviar email de notificación
+        # Enviar email de notificación, tanto para evento nuevo como para nota agregada
         try:
             subject = f"Nuevo evento creado: {tipo_evento_display}"
             message = f"Se ha creado un nuevo evento.\n\nTipo: {tipo_evento_display}\n{servicio_info}\n{paciente_info}\nDescripción: {self.object.descripcion}"
@@ -275,6 +275,25 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
                 nota.evento = self.object
                 nota.creado_por = request.user
                 nota.save()
+                # Enviar email de notificación por nueva nota
+                try:
+                    subject = f"Nueva nota agregada al evento: {self.object.get_tipo_evento_display()}"
+                    paciente_info = f"Paciente: {self.object.nombre_paciente}" if self.object.nombre_paciente else ""
+                    servicio_info = f"Servicio: {self.object.get_servicio_origen_evento_display()}" if self.object.servicio_origen_evento else ""
+                    message = (
+                        f"Se ha agregado una nueva nota al evento.\n\n"
+                        f"Tipo: {self.object.get_tipo_evento_display()}\n"
+                        f"{servicio_info}\n"
+                        f"{paciente_info}\n"
+                        f"Descripción: {self.object.descripcion}\n\n"
+                        f"Nota: {nota.comentario}\n"
+                        f"Autor de la nota: {nota.creado_por.get_full_name()}"
+                    )
+                    from_email = settings.EMAIL_HOST_USER
+                    recipient_list = ["ecejas@sanatoriocolegiales.com.ar"]
+                    send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+                except Exception as e:
+                    pass
                 
                 # Mensaje contextual con información del evento
                 paciente_info = f" para {self.object.nombre_paciente}" if self.object.nombre_paciente else ""

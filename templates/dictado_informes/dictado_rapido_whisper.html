@@ -218,6 +218,8 @@
                     </label>
                 </div>
 
+                <!-- CSRF token para AJAX -->
+                <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
                 <div class="mt-4 grid grid-cols-2 gap-3">
                     <button id="btnCopiar" 
                             class="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg group">
@@ -233,6 +235,7 @@
                         <span class="ml-2 text-xs opacity-70">Opcional</span>
                     </button>
                 </div>
+
                 
                 <!-- Mensaje de aprendizaje guardado -->
                 <div id="mensajeAprendizaje" class="hidden mt-3 bg-green-900/30 border border-green-600 rounded-lg p-3">
@@ -346,6 +349,70 @@
 </div>
 
 <script>
+// ...existing code...
+
+// --- Aprendizaje automático al copiar texto ---
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCopiar = document.getElementById('btnCopiar');
+    if (btnCopiar) {
+        btnCopiar.addEventListener('click', async function() {
+            // Obtener textos relevantes
+            const textoOriginal = document.getElementById('textoTranscrito')?.innerText || '';
+            const textoMejorado = document.getElementById('textoMejorado')?.innerText || '';
+            // El usuario puede editar el texto mejorado antes de copiar
+            const textoFinal = textoMejorado;
+
+            // Copiar al portapapeles
+            try {
+                await navigator.clipboard.writeText(textoFinal);
+            } catch (e) {
+                // fallback si clipboard falla
+                const temp = document.createElement('textarea');
+                temp.value = textoFinal;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+            }
+
+            // Guardar aprendizaje automáticamente
+            try {
+                const response = await fetch('/dictado_informes/api/guardar-aprendizaje/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '')
+                    },
+                    body: JSON.stringify({
+                        texto_original: textoOriginal,
+                        texto_ia: textoMejorado,
+                        texto_usuario: textoFinal
+                    })
+                });
+                const data = await response.json();
+                mostrarToast(data.success ? 'Aprendizaje guardado correctamente' : 'No se pudo guardar aprendizaje');
+            } catch (err) {
+                mostrarToast('Error al guardar aprendizaje');
+            }
+        });
+    }
+
+    // Función para mostrar notificación tipo toast
+    function mostrarToast(mensaje) {
+        const toast = document.getElementById('toast');
+        const toastTexto = document.getElementById('toastTexto');
+        if (toast && toastTexto) {
+            toastTexto.textContent = mensaje;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 2500);
+        } else {
+            alert(mensaje);
+        }
+    }
+});
+// --- Fin aprendizaje automático ---
 let mediaRecorder;
 let audioChunks = [];
 let tiempoInicio;
