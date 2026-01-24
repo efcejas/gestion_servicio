@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     # Tailwind CSS
     'tailwind',
     'theme',
+    'storages',
 ]
 
 MIDDLEWARE = [
@@ -377,3 +378,14 @@ if all([CLOUDINARY_STORAGE['CLOUD_NAME'], CLOUDINARY_STORAGE['API_KEY'], CLOUDIN
     print("✓ Cloudinary configurado correctamente")
 else:
     print("⚠ Cloudinary NO configurado - usando almacenamiento local")
+
+# Configuración de AWS S3
+AWS_ACCESS_KEY_ID = os.environ.get('STACKHERO_MINIO_ROOT_ACCESS_KEY')
+AWS_SECRET_ACCESS_KEY = os.environ.get('STACKHERO_MINIO_ROOT_SECRET_KEY')
+AWS_STORAGE_BUCKET_NAME = 'gestion-servicio'  # El nombre exacto de tu bucket
+AWS_S3_ENDPOINT_URL = os.environ.get('STACKHERO_MINIO_HOST')
+AWS_S3_REGION_NAME = 'us-east-1'  # MinIO suele usar esto por defecto
+AWS_S3_USE_SSL = True
+AWS_S3_ADDRESSING_STYLE = "virtual"
+
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
