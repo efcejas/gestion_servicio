@@ -101,21 +101,39 @@
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">
                             <i class="fas fa-file-alt mr-2 text-blue-600"></i>Material de la Clase
                         </h3>
-                        
-                        <!-- Visor de archivo -->
+                        <!-- Visor de archivo mejorado -->
                         <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                            <div class="aspect-video w-full bg-white rounded-lg overflow-hidden shadow-lg border border-gray-200">
-                                <!-- Microsoft Office Online Viewer - Soporta Word, Excel, PowerPoint, PDF -->
+                            <div id="visor-archivo-container" class="aspect-video w-full bg-white rounded-lg overflow-hidden shadow-lg border border-gray-200 relative">
+                                <!-- Loader -->
+                                <div id="loader-visor" class="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
+                                    <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
+                                    <span class="text-xs text-gray-500">Cargando visualizador...</span>
+                                </div>
+                                <!-- Iframe principal -->
                                 <iframe 
+                                    id="iframe-visor"
                                     src="https://view.officeapps.live.com/op/embed.aspx?src={{ object.get_archivo_url_publico|urlencode }}" 
-                                    class="w-full h-full border-0"
+                                    class="w-full h-full border-0 relative z-0"
                                     frameborder="0"
-                                    title="Visualizador de documentos">
-                                </iframe>
+                                    title="Visualizador de documentos"
+                                    onload="document.getElementById('loader-visor').style.display='none';"
+                                    onerror="mostrarFallbackVisor()"
+                                ></iframe>
+                                <!-- Fallback si no carga -->
+                                <div id="fallback-visor" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-100 z-20">
+                                    <i class="fas fa-file-alt text-5xl text-gray-400 mb-2"></i>
+                                    <span class="text-gray-500 text-sm mb-2">No se pudo cargar la previsualización.</span>
+                                    <button onclick="abrirVisualizadorAlternativo('{{ object.get_archivo_url_publico|urlencode }}')" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-center mb-2" title="Abrir con Google Docs">
+                                        <i class="fab fa-google-drive mr-2"></i>Probar visor alternativo
+                                    </button>
+                                    <a href="{{ object.get_archivo_url_publico }}" target="_blank" rel="noopener noreferrer" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 text-center" title="Abrir archivo en nueva pestaña">
+                                        <i class="fas fa-external-link-alt mr-2"></i>Abrir archivo
+                                    </a>
+                                </div>
                             </div>
                             <p class="text-xs text-gray-500 mt-2 text-center">
-                                <i class="fas fa-spinner fa-spin mr-1"></i>
-                                Cargando visualizador... Si no aparece en 10 segundos, usa los botones de abajo
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Si el visor no aparece, usa los botones de abajo o el visor alternativo.
                             </p>
                         </div>
 
@@ -139,22 +157,23 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <!-- Botón 1: Visualizador alternativo -->
                             <button onclick="abrirVisualizadorAlternativo('{{ object.get_archivo_url_publico|urlencode }}')"
-                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
-                                <i class="fas fa-eye mr-2"></i>Visor alternativo
+                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                                    title="Abrir con Google Docs">
+                                <i class="fab fa-google-drive mr-2"></i>Visor alternativo
                             </button>
-                            
                             <!-- Botón 2: Abrir en nueva ventana -->
                             <a href="{{ object.get_archivo_url_publico }}" 
                                target="_blank" 
                                rel="noopener noreferrer"
-                               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
+                               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                               title="Abrir archivo en nueva pestaña">
                                 <i class="fas fa-external-link-alt mr-2"></i>Abrir archivo
                             </a>
-                            
                             <!-- Botón 3: Descargar -->
                             <a href="{{ object.get_archivo_url_publico }}" 
                                download="{{ object.titulo }}"
-                               class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center">
+                               class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                               title="Descargar archivo">
                                 <i class="fas fa-download mr-2"></i>Descargar
                             </a>
                         </div>
@@ -178,12 +197,22 @@
 
                     <script>
                     function abrirVisualizadorAlternativo(url) {
-                        // Decodificar URL primero
                         const urlDecodificada = decodeURIComponent(url);
-                        // Google Docs Viewer como alternativa
                         const googleViewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(urlDecodificada) + '&embedded=true';
                         window.open(googleViewerUrl, '_blank', 'width=1200,height=800');
                     }
+                    function mostrarFallbackVisor() {
+                        document.getElementById('iframe-visor').style.display = 'none';
+                        document.getElementById('loader-visor').style.display = 'none';
+                        document.getElementById('fallback-visor').classList.remove('hidden');
+                    }
+                    // Fallback automático para PDF (usar Google Docs Viewer si es PDF)
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var url = '{{ object.get_archivo_url_publico|urlencode }}'.toLowerCase();
+                        if (url.endsWith('.pdf')) {
+                            document.getElementById('iframe-visor').src = 'https://docs.google.com/viewer?url=' + encodeURIComponent(decodeURIComponent(url)) + '&embedded=true';
+                        }
+                    });
                     </script>
                     {% endif %}
                 </div>
