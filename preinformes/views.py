@@ -74,7 +74,7 @@ def dashboard_residente(request):
 
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def crear_preinforme(request):
     """Crear un nuevo preinforme"""
     if request.method == 'POST':
