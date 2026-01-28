@@ -75,9 +75,23 @@
         <!-- ========== CARDS SEGÚN EL ROL DEL USUARIO ========== -->
         
         <!-- RESIDENTES (médico_residente, jefe_residentes, instructor_residentes) -->
-        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+        {% if user.es_medico or user.is_superuser %}
         <div class="container mx-auto mt-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Clases -->
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
+                        <i class="fas fa-graduation-cap text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Clases</h5>
+                    <p class="text-gray-600 mb-4">Accede al listado de clases, materiales y resúmenes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'clases_residentes:lista' %}"
+                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                            Ver clases
+                        </a>
+                    </div>
+                </div>
                 <!-- Protocolos Radiológicos -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                     <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">

@@ -4,13 +4,17 @@
 {% block title %}{{ object.titulo }} - Clases Residentes{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-6">
+<div class="container mx-auto px-4 py-0">
     <!-- Breadcrumb -->
-    <nav class="mb-6 text-sm">
-        <ol class="flex items-center space-x-2 text-gray-600">
-            <li><a href="{% url 'clases_residentes:lista' %}" class="hover:text-blue-600"><i class="fas fa-graduation-cap mr-1"></i>Clases</a></li>
-            <li><i class="fas fa-chevron-right text-xs"></i></li>
-            <li class="text-gray-900 font-semibold">{{ object.titulo|truncatewords:5 }}</li>
+    <nav class="text-sm font-medium text-gray-600 mb-4" aria-label="Breadcrumb">
+        <ol class="list-reset flex">
+            <li>
+                <a href="{% url 'clases_residentes:lista' %}" class="text-gray-600 hover:text-gray-800">
+                    <i class="fas fa-graduation-cap mr-1"></i> Clases
+                </a>
+            </li>
+            <li><span class="mx-2">/</span></li>
+            <li class="text-gray-800 font-semibold">{{ object.titulo }}</li>
         </ol>
     </nav>
 
@@ -22,7 +26,9 @@
                 <!-- Header con imagen -->
                 <div class="h-64 bg-gradient-to-br from-blue-400 to-blue-600 relative">
                     {% if object.archivo_thumbnail %}
-                        <img src="{{ object.archivo_thumbnail.url }}" alt="{{ object.titulo }}" class="w-full h-full object-cover">
+                        <div class="w-full h-64 bg-white overflow-hidden flex items-center justify-center">
+                            <img src="{{ object.archivo_thumbnail.url }}" alt="{{ object.titulo }}" class="w-full object-cover" />
+                        </div>
                     {% else %}
                         <div class="flex items-center justify-center h-full">
                             <i class="fas fa-file-powerpoint text-8xl text-white opacity-50"></i>
@@ -103,7 +109,7 @@
                         </h3>
                         <!-- Visor de archivo mejorado -->
                         <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                            <div id="visor-archivo-container" class="aspect-video w-full bg-white rounded-lg overflow-hidden shadow-lg border border-gray-200 relative">
+                            <div id="visor-archivo-container" class="w-full max-w-3xl mx-auto bg-white rounded-xl overflow-hidden shadow-lg border border-gray-200 relative flex items-center justify-center" style="min-height:340px;">
                                 <!-- Loader -->
                                 <div id="loader-visor" class="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
                                     <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-2"></i>
@@ -113,7 +119,8 @@
                                 <iframe 
                                     id="iframe-visor"
                                     src="https://view.officeapps.live.com/op/embed.aspx?src={{ object.get_archivo_url_publico|urlencode }}" 
-                                    class="w-full h-full border-0 relative z-0"
+                                    class="w-full border-0 relative z-0"
+                                    style="min-height:480px; height:60vh; max-height:700px;"
                                     frameborder="0"
                                     title="Visualizador de documentos"
                                     onload="document.getElementById('loader-visor').style.display='none';"
@@ -137,31 +144,9 @@
                             </p>
                         </div>
 
-                        <!-- Información del archivo -->
-                        <div class="bg-blue-50 border-l-4 border-blue-500 p-3 mb-4">
-                            <div class="flex items-center">
-                                <i class="fas fa-info-circle text-blue-600 mr-2"></i>
-                                <p class="text-sm text-blue-800">
-                                    <strong>Archivo:</strong> {{ object.archivo.url|slice:"-40:" }} | 
-                                    <strong>Tipo:</strong> 
-                                    {% if ".pdf" in object.archivo.url|lower %}PDF
-                                    {% elif ".doc" in object.archivo.url|lower %}Word
-                                    {% elif ".ppt" in object.archivo.url|lower %}PowerPoint
-                                    {% elif ".xls" in object.archivo.url|lower %}Excel
-                                    {% else %}Documento{% endif %}
-                                </p>
-                            </div>
-                        </div>
-
                         <!-- Botones de acción -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <!-- Botón 1: Visualizador alternativo -->
-                            <button onclick="abrirVisualizadorAlternativo('{{ object.get_archivo_url_publico|urlencode }}')"
-                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
-                                    title="Abrir con Google Docs">
-                                <i class="fab fa-google-drive mr-2"></i>Visor alternativo
-                            </button>
-                            <!-- Botón 2: Abrir en nueva ventana -->
+                            <!-- Botón: Abrir en nueva ventana -->
                             <a href="{{ object.get_archivo_url_publico }}" 
                                target="_blank" 
                                rel="noopener noreferrer"
@@ -169,7 +154,7 @@
                                title="Abrir archivo en nueva pestaña">
                                 <i class="fas fa-external-link-alt mr-2"></i>Abrir archivo
                             </a>
-                            <!-- Botón 3: Descargar -->
+                            <!-- Botón: Descargar -->
                             <a href="{{ object.get_archivo_url_publico }}" 
                                download="{{ object.titulo }}"
                                class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
