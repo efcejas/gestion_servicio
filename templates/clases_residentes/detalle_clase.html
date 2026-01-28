@@ -285,11 +285,11 @@
                     <!-- Favorito -->
                     <button id="btn-favorito" 
                             data-clase-id="{{ object.pk }}"
-                            data-es-favorito="{% if es_favorito %}true{% else %}false{% endif %}"
+                            data-es-favorito="{% if es_favorita %}true{% else %}false{% endif %}"
                             class="w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center
-                                   {% if es_favorito %}bg-yellow-500 hover:bg-yellow-600 text-white{% else %}bg-gray-200 hover:bg-gray-300 text-gray-700{% endif %}">
-                        <i class="fas fa-star mr-2"></i>
-                        <span id="texto-favorito">{% if es_favorito %}Quitar de Favoritos{% else %}Agregar a Favoritos{% endif %}</span>
+                                {% if es_favorita %}bg-yellow-500 hover:bg-yellow-600 text-white{% else %}bg-gray-200 hover:bg-gray-300 text-gray-700{% endif %}">
+                           <i class="fas fa-star mr-2"></i>
+                           <span id="texto-favorito">{% if es_favorita %}Quitar de Favoritos{% else %}Agregar a Favoritos{% endif %}</span>
                     </button>
 
                     {% if user == object.autor or user.is_staff or user.profile.rol == 'JI' %}
@@ -340,8 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     btnFavorito.addEventListener('click', function() {
         const claseId = this.dataset.claseId;
-        
-        fetch(`/clases/favorito/${claseId}/`, {
+        fetch(`/clases/${claseId}/favorito/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',
@@ -351,8 +350,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                this.dataset.esFavorito = data.es_favorito;
-                if (data.es_favorito) {
+                this.dataset.esFavorito = data.es_favorita;
+                if (data.es_favorita) {
                     this.className = 'w-full py-2.5 px-4 rounded-lg font-semibold transition duration-200 flex items-center justify-center bg-yellow-500 hover:bg-yellow-600 text-white';
                     textoFavorito.textContent = 'Quitar de Favoritos';
                 } else {
@@ -370,8 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
     formComentario.addEventListener('submit', function(e) {
         e.preventDefault();
         const contenido = this.querySelector('[name="contenido"]').value;
-        
-        fetch(`/clases/comentario/{{ object.pk }}/`, {
+        fetch(`/clases/{{ object.pk }}/comentario/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': '{{ csrf_token }}',

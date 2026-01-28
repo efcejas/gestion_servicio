@@ -171,6 +171,7 @@ class ClaseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['usuario'] = self.request.user
+        kwargs['request'] = self.request
         return kwargs
     
     def get_success_url(self):
@@ -205,18 +206,26 @@ def agregar_comentario(request, pk):
     """
     if request.method == 'POST':
         clase = get_object_or_404(ClaseResidente, pk=pk)
-        
         # Verificar permisos
         if not clase.puede_ver(request.user):
             return JsonResponse({'success': False, 'error': 'No tienes permiso'}, status=403)
-        
-        form = ComentarioClaseForm(request.POST)
+
+        # Soportar JSON y POST clásico
+        import json
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body.decode('utf-8'))
+            except Exception:
+                data = {}
+            form = ComentarioClaseForm(data)
+        else:
+            form = ComentarioClaseForm(request.POST)
+
         if form.is_valid():
             comentario = form.save(commit=False)
             comentario.clase = clase
             comentario.autor = request.user
             comentario.save()
-            
             return JsonResponse({
                 'success': True,
                 'comentario': {
@@ -225,9 +234,7 @@ def agregar_comentario(request, pk):
                     'fecha': comentario.fecha_creacion.strftime('%d/%m/%Y %H:%M')
                 }
             })
-        
         return JsonResponse({'success': False, 'error': 'Formulario inválido'}, status=400)
-    
     return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
 
 

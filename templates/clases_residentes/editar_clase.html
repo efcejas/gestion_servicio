@@ -4,5 +4,221 @@
 {% block title %}Editar Clase{% endblock %}
 
 {% block content %}
-{% include 'clases_residentes/crear_clase.html' %}
+<div class="max-w-4xl mx-auto px-4 py-0">
+
+    <!-- Breadcrumb -->
+    <nav class="text-sm font-medium text-gray-600 mb-4" aria-label="Breadcrumb">
+        <ol class="list-reset flex">
+            <li>
+                <a href="{% url 'clases_residentes:lista' %}" class="text-gray-600 hover:text-gray-800">
+                    <i class="fas fa-graduation-cap mr-1"></i> Clases
+                </a>
+            </li>
+            <li><span class="mx-2">/</span></li>
+            <li class="text-gray-800 font-semibold">
+                {% if form.instance.pk %}
+                    <i class="fas fa-edit mr-1"></i> Editar Clase
+                {% else %}
+                    <i class="fas fa-plus mr-1"></i> Nueva Clase
+                {% endif %}
+            </li>
+        </ol>
+    </nav>
+
+    <!-- Card Header -->
+    <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-lg shadow-md p-8 mb-6 text-white">
+        <h1 class="text-2xl font-bold text-white flex items-center">
+            {% if form.instance.pk %}
+            <i class="fas fa-edit mr-3 text-blue-200"></i> Editar Clase
+            {% else %}
+            <i class="fas fa-plus mr-3 text-blue-200"></i> Nueva Clase
+            {% endif %}
+        </h1>
+        {% if form.instance.pk %}
+        <p class="text-blue-100 mt-2 text-center md:text-left">
+            Editando la clase: <strong>"{{ form.instance.titulo }}"</strong>
+        </p>
+        {% else %}
+        <p class="text-blue-100 mt-2 text-center md:text-left">
+            Acá podrás crear una nueva clase
+        </p>
+        {% endif %}
+    </div>
+
+    <form method="post" enctype="multipart/form-data" class="bg-white rounded-lg shadow p-6 space-y-6">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="bg-red-50 border border-red-200 text-red-700 p-3 rounded">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <!-- Título + Categoría -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Título *</label>
+                {{ form.titulo }}
+                {{ form.titulo.errors }}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Categoría *</label>
+                {{ form.categoria }}
+                {{ form.categoria.errors }}
+            </div>
+        </div>
+
+        <!-- Fecha + Años -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Fecha de la clase *</label>
+                {{ form.fecha_clase }}
+                {{ form.fecha_clase.errors }}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">
+                    Dirigida a (años de residencia)
+                </label>
+
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    <div class="grid grid-cols-4 gap-3">
+                    {% for opt in form.anios_dirigidos %}
+                        <label class="flex items-center gap-2 text-sm text-gray-700 select-none">
+                        {{ opt.tag }}
+                        <span>{{ opt.choice_label }}</span>
+                        </label>
+                    {% endfor %}
+                    </div>
+
+                    <p class="text-xs text-gray-500 mt-2">
+                    Dejar vacío para “Todos los años”
+                    </p>
+                </div>
+
+                {% if form.anios_dirigidos.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.anios_dirigidos.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Descripción -->
+        <div>
+            <label class="block text-sm font-semibold mb-1">Descripción</label>
+            {{ form.descripcion }}
+            {{ form.descripcion.errors }}
+        </div>
+
+        <!-- Archivos -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">
+                    Archivo (PPT / PDF)
+                </label>
+                <div id="archivo-actual-wrapper">
+                    {% if form.instance.archivo %}
+                        <div class="flex items-center gap-2 mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg shadow-sm">
+                            <span class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                            </span>
+                            <a href="{{ form.instance.archivo.url }}" target="_blank" class="text-blue-700 underline font-medium truncate max-w-xs">{{ form.instance.archivo.name|slice:'30' }}{% if form.instance.archivo.name|length > 30 %}...{% endif %}</a>
+                            <button type="button" id="eliminar-archivo-btn" class="ml-auto group relative flex items-center justify-center w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full transition" title="Eliminar archivo">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 group-hover:text-red-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <span class="sr-only">Eliminar archivo</span>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+                <div id="input-archivo-wrapper" {% if form.instance.archivo %}style="display:none;"{% endif %} class="mt-2">
+                    {{ form.archivo }}
+                </div>
+                {{ form.archivo.errors }}
+                <input type="hidden" name="eliminar_archivo" id="eliminar-archivo" value="0">
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">
+                    Imagen de portada
+                </label>
+                <div id="imagen-actual-wrapper">
+                    {% if form.instance.archivo_thumbnail %}
+                        <div class="relative inline-block mt-2 border border-gray-200 rounded-lg shadow-sm bg-gray-50">
+                            <img src="{{ form.instance.archivo_thumbnail.url }}" class="rounded-lg max-h-40 object-contain bg-white">
+                            <button type="button" id="eliminar-imagen-btn" class="absolute top-2 right-2 group flex items-center justify-center w-8 h-8 bg-red-100 hover:bg-red-200 rounded-full transition shadow" title="Eliminar imagen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600 group-hover:text-red-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <span class="sr-only">Eliminar imagen</span>
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+                <div id="input-imagen-wrapper" {% if form.instance.archivo_thumbnail %}style="display:none;"{% endif %} class="mt-2">
+                    {{ form.archivo_thumbnail }}
+                </div>
+                {{ form.archivo_thumbnail.errors }}
+                <input type="hidden" name="eliminar_imagen" id="eliminar-imagen" value="0">
+            </div>
+        </div>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var eliminarArchivoBtn = document.getElementById('eliminar-archivo-btn');
+            var archivoActualWrapper = document.getElementById('archivo-actual-wrapper');
+            var inputArchivoWrapper = document.getElementById('input-archivo-wrapper');
+            var eliminarArchivoInput = document.getElementById('eliminar-archivo');
+
+            if (eliminarArchivoBtn) {
+                eliminarArchivoBtn.addEventListener('click', function() {
+                    archivoActualWrapper.style.display = 'none';
+                    inputArchivoWrapper.style.display = 'block';
+                    eliminarArchivoInput.value = '1';
+                });
+            }
+
+            var eliminarImagenBtn = document.getElementById('eliminar-imagen-btn');
+            var imagenActualWrapper = document.getElementById('imagen-actual-wrapper');
+            var inputImagenWrapper = document.getElementById('input-imagen-wrapper');
+            var eliminarImagenInput = document.getElementById('eliminar-imagen');
+
+            if (eliminarImagenBtn) {
+                eliminarImagenBtn.addEventListener('click', function() {
+                    imagenActualWrapper.style.display = 'none';
+                    inputImagenWrapper.style.display = 'block';
+                    eliminarImagenInput.value = '1';
+                });
+            }
+        });
+        </script>
+
+        <!-- Tags -->
+        <div>
+            <label class="block text-sm font-semibold mb-1">Tags</label>
+            {{ form.tags }}
+            <p class="text-xs text-gray-500 mt-1">
+                Separados por comas
+            </p>
+        </div>
+
+        <!-- Destacada -->
+        {% if form.es_destacada.is_hidden == False %}
+        <div class="flex items-center gap-2">
+            {{ form.es_destacada }}
+            <label class="text-sm">Clase destacada</label>
+        </div>
+        {% endif %}
+
+        <!-- Botones -->
+        <div class="flex justify-end gap-3 pt-4 border-t">
+            <a href="{% url 'clases_residentes:lista' %}"
+               class="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300">
+                Cancelar
+            </a>
+
+            <button type="submit"
+                    class="px-5 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">
+                Guardar
+            </button>
+        </div>
+    </form>
+</div>
 {% endblock %}
