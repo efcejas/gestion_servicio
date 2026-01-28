@@ -109,15 +109,35 @@ class ClaseDetailView(LoginRequiredMixin, DetailView):
     
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
-        
         # Verificar permisos de visualización
         if not self.object.puede_ver(request.user):
             messages.error(request, 'No tienes permiso para ver esta clase.')
             return redirect('clases_residentes:lista')
-        
-        # Incrementar contador de visitas
-        self.object.incrementar_visitas()
-        
+
+        # Control de visitas por sesión: solo cuenta si no vio hoy o pasaron 6h
+        session_key = f'clase_vista_{self.object.pk}'
+        now = timezone.now()
+        ultima_vista = request.session.get(session_key)
+        debe_sumar = False
+        if ultima_vista:
+            try:
+                from django.utils.dateparse import parse_datetime
+                ultima_vista_dt = parse_datetime(ultima_vista)
+                if ultima_vista_dt is not None:
+                    # Si es otro día o pasaron más de 6 horas
+                    if ultima_vista_dt.date() != now.date() or (now - ultima_vista_dt).total_seconds() > 21600:
+                        debe_sumar = True
+                else:
+                    debe_sumar = True
+            except Exception:
+                debe_sumar = True
+        else:
+            debe_sumar = True
+
+        if debe_sumar:
+            self.object.incrementar_visitas()
+            request.session[session_key] = now.isoformat()
+
         context = self.get_context_data(object=self.object)
         return self.render_to_response(context)
     
