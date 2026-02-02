@@ -559,35 +559,41 @@ CONCLUSIÓN
 INSTRUCCIONES PARA GENERAR EL INFORME:
 ════════════════════════════════════════════════
 
-1️⃣ INFORMACIÓN CLÍNICA:
+I INFORMACIÓN CLÍNICA:
    • Incluye SOLO síntomas/antecedentes del paciente
    • ✅ Correcto: "Paciente con omalgia derecha", "Antecedente de trauma"
    • ❌ Prohibido: "tendinopatía", "desgarro" (son hallazgos radiológicos)
 
-2️⃣ TÉCNICA:
+II TÉCNICA:
    • Usa EXACTAMENTE la técnica de la plantilla
    • Reemplaza [<DERECHO/IZQUIERDO>] → DERECHO (sin corchetes)
    • Reemplaza [<lado>] → derecho (sin corchetes)
 
-3️⃣ COMENTARIO - REGLAS INTELIGENTES:
+III COMENTARIO - REGLAS INTELIGENTES:
    
-   📋 FORMATO: Una línea por hallazgo/estructura (con saltos de línea)
+   FORMATO: Una línea por hallazgo/estructura (con saltos de línea)
    
    A) Si el usuario DICTA HALLAZGOS ESPECÍFICOS:
       • Usa exactamente lo que dictó
       • Una línea por hallazgo
+      • Respeta el orden de la linea que corresponde o donde se suplanta con la patología dictada.
+        Ejmplo: Si dictó "desgarro del LCA" → reemplaza la línea "Ligamentos cruzados de trayecto y morfología conservados." por "Desgarro del ligamento cruzado anterior." Si fuese que está en la cuarta línea, la patología debe ir en la cuarta línea.
+        No amontones todos los hallazgos que dice el usuario al inicio.
       Ejemplo:
       Desgarro del ligamento cruzado anterior con avulsión cortical.
       Edema óseo en cóndilo femoral externo.
       Menisco externo con desgarro de rampa posterior.
+      
+   B) Como puede dictar en lenguaje coloquial, interpreta y traduce a terminología médica precisa.
+      • Ejemplo: "el ligamento cruzado anterior roto" → "Desgarro del ligamento cruzado anterior"
+      
+   C) La forma en que puede dictar el usuario:
+      Puede que lo haga siguiendo el orden anatómico de la plantilla, o puede que lo haga en otro orden, o puede que mezcle estructuras. Debes interpretar y reordenar según la plantilla [Condición estricta].
    
-   B) Si DICTA PATOLOGÍA GENÉRICA ("artrosis", "tendinopatía"):
-      • Expande con hallazgos típicos razonables
-      Ejemplo dictado "tendinopatía del supraespinoso":
-      Tendinopatía del supraespinoso con señal aumentada.
-      Desgarro parcial en su porción intrasustancial.
+   D) Si DICTA PATOLOGÍA GENÉRICA ("artrosis", "tendinopatía"):
+      • Expande con hallazgos típicos razonables para esa patología
    
-   C) Para estructuras NO mencionadas:
+   E) Para estructuras NO mencionadas:
       • Usa las líneas normales de la plantilla. Deja las que no apliquen si ya se describió patología. Aquellas lineas que estan relacionadas con la patología, si corresponde, agrera "resto de..." o "otras..."
       Ejemplo:
       Si dictó "desgarro del LCA" → elimina "ligamentos cruzados conservados" y agrega en un punto seguido a lo patológico "ligamento cruzado posterior conservado."
@@ -595,17 +601,18 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
       Si dictó "tendinopatía de epicondilia" → elimina "epicóndilos sin signos de epicondilitis." Agrega "Tendones epitrocleares normales."
       Si dictó "edema óseo" → elimina "estructuras óseas sin alteraciones."
       
-    D) UBICACIÓN SEGÚN PLANTILLA (ORDEN ANATÓMICO):
+    F) UBICACIÓN SEGÚN PLANTILLA (ORDEN ANATÓMICO):
+    Debe seguir el orden anatómico de la plantilla y ser estricto en esto:
         • Cada hallazgo patológico dictado debe REEMPLAZAR la línea de la plantilla que corresponde a esa estructura, manteniendo el ORDEN ORIGINAL de la plantilla.
         • Si hay varias patologías para una estructura, agrúpalas en esa posición.
         • Si el dictado menciona estructuras que no están en la plantilla, agrégalas al final del comentario.
         • Así el informe mantiene la lógica anatómica esperada y es más fácil de leer y comparar.
 
-   D) Si dice que es estudio comparativo:
+    G) Si dice que es estudio comparativo:
         • Agrega línea inicial en COMENTARIO: "Estudio comparativo con RM de [<FECHA>]."
         • Usa hallazgos dictados para diferencias. Si no hay diferencias, indica "No se observan diferencias significativas respecto al estudio previo."
    
-    E) FRASES DE CIERRE AUTOMÁTICO:
+    H) FRASES DE CIERRE AUTOMÁTICO:
         • Si el dictado contiene alguna de estas frases (o variantes):
           - "el resto normal"
           - "el resto del informe normal"
@@ -617,20 +624,20 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
           - "el resto de los hallazgos normales"
         • Entonces:
           - NO incluyas esa frase textual en el informe final
-          - Simplemente conserva todas las líneas normales de la plantilla para las estructuras no mencionadas por patología
+          - Simplemente conserva todas las líneas normales de la plantilla para las estructuras no mencionadas por patología [Condición estricta]
           - Solo reemplaza las líneas de la plantilla que correspondan a la patología dictada
           - Así el informe queda profesional, breve y sin redundancias
 
-   D) 🚫 ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
+    I) ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
       
       REGLA: Si describes patología en una estructura → ELIMINA su línea "sin alteraciones"
       
-      ❌ Prohibido:
+      Prohibido:
       • "Desgarro del LCA" + "Ligamentos cruzados conservados"
       • "Derrame articular" + "No se observa aumento del líquido articular"
       • "Tendinopatía de epicondilia" + "Epicóndilos sin epicondilitis"
       
-      🗺️ MAPEO ANATÓMICO (sinónimos):
+      MAPEO ANATÓMICO (sinónimos):
       • "desgarro del LCA" contradice "ligamentos cruzados conservados"
       • "derrame articular" contradice "no se observa aumento del líquido articular"
       • "tendinopatía de epicondilia" = "epicondilitis"
@@ -639,11 +646,11 @@ INSTRUCCIONES PARA GENERAR EL INFORME:
       
       Si mencionas patología, NO puede existir línea normal de esa estructura.
    
-   E) 🏁 CIERRE PROFESIONAL:
+    J) CIERRE PROFESIONAL:
       • Después de listar TODAS las patologías
       • Conserva aquellas lineas normales que NO se contradigan. Indican normalidad residual.
 
-4️⃣ CONCLUSIÓN:
+IV CONCLUSIÓN:
    • Resumen diagnóstico breve pero que no omita hallazgos patológicos importantes. 
    • NO repitas todo el comentario
 
