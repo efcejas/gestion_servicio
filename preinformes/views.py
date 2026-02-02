@@ -154,26 +154,26 @@ def crear_preinforme(request):
 @login_required
 @role_required('medico_residente', 'jefe_residentes')
 def editar_preinforme(request, pk):
-    """Editar preinforme existente (solo en borrador)"""
-    preinforme = get_object_or_404(
-        Preinforme, 
-        pk=pk, 
-        residente=request.user,
-        estado='borrador'
-    )
-    
+    """Editar preinforme existente (solo si está pendiente de revisión y es el creador)"""
+    preinforme = get_object_or_404(Preinforme, pk=pk)
+    if preinforme.residente != request.user:
+        messages.error(request, 'No tiene permiso para editar este preinforme.')
+        return redirect('preinformes:mis_preinformes')
+    if preinforme.estado not in ['borrador', 'pendiente_revision']:
+        messages.error(request, 'Solo puede editar preinformes en borrador o pendientes de revisión.')
+        return redirect('preinformes:mis_preinformes')
+
     # Marcar como en edición al abrir el formulario
     if request.method == 'GET':
         preinforme.marcar_en_edicion(request.user)
-    
+
     if request.method == 'POST':
         form = PreinformeForm(request.POST, instance=preinforme)
         if form.is_valid():
             form.save()
             messages.success(request, 'Preinforme actualizado exitosamente.')
-            
+
             if 'guardar_y_continuar' in request.POST:
-                # Renovar marca de edición
                 preinforme.marcar_en_edicion(request.user)
                 return redirect('preinformes:editar_preinforme', pk=preinforme.pk)
             elif 'guardar_y_enviar' in request.POST:
@@ -186,13 +186,13 @@ def editar_preinforme(request, pk):
                 return redirect('preinformes:dashboard_residente')
     else:
         form = PreinformeForm(instance=preinforme)
-    
+
     context = {
         'form': form,
         'preinforme': preinforme,
         'title': 'Editar Preinforme'
     }
-    
+
     return render(request, 'preinformes/form_preinforme.html', context)
 
 
