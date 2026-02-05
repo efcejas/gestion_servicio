@@ -2,7 +2,9 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import re
+import logging
 
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
@@ -534,10 +536,11 @@ class CorreccionAprendizaje(models.Model):
     
     def calcular_diferencias(self):
         """
-        Calcula las diferencias entre texto_ia y texto_final
-        Guarda en cambios_detectados
+        🚀 MEJORADO: Calcula diferencias con análisis semántico
+        Detecta patrones, categoriza correcciones y asigna scores
         """
         import difflib
+        from collections import Counter
         
         # Usar difflib para detectar cambios palabra por palabra
         palabras_ia = self.texto_ia.split()
@@ -546,50 +549,162 @@ class CorreccionAprendizaje(models.Model):
         matcher = difflib.SequenceMatcher(None, palabras_ia, palabras_final)
         cambios = []
         
+        # Patrones médicos comunes
+        terminologia_medica = {
+            'grado': ['grado i', 'grado ii', 'grado iii', 'grado iv'],
+            'lateralidad': ['derecho', 'izquierdo', 'bilateral'],
+            'presencia': ['se observa', 'se visualiza', 'se identifica', 'se evidencia'],
+            'ausencia': ['no se observa', 'sin evidencia', 'ausencia de']
+        }
+        
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             if tag == 'replace':
+                texto_de = ' '.join(palabras_ia[i1:i2])
+                texto_a = ' '.join(palabras_final[j1:j2])
+                
+                # 🧠 Análisis semántico: categorizar el tipo de cambio
+                categoria = self._categorizar_cambio(texto_de, texto_a, terminologia_medica)
+                
+                # Calcular score de importancia (0-100)
+                score = self._calcular_score_importancia(texto_de, texto_a, categoria)
+                
                 cambios.append({
                     'tipo': 'reemplazo',
-                    'de': ' '.join(palabras_ia[i1:i2]),
-                    'a': ' '.join(palabras_final[j1:j2])
+                    'de': texto_de,
+                    'a': texto_a,
+                    'categoria': categoria,
+                    'score': score
                 })
             elif tag == 'delete':
+                texto = ' '.join(palabras_ia[i1:i2])
                 cambios.append({
                     'tipo': 'eliminado',
-                    'texto': ' '.join(palabras_ia[i1:i2])
+                    'texto': texto,
+                    'categoria': 'eliminacion',
+                    'score': 30  # Score medio para eliminaciones
                 })
             elif tag == 'insert':
+                texto = ' '.join(palabras_final[j1:j2])
+                # Verificar si es información clínica importante
+                score = 80 if any(kw in texto.lower() for kw in ['desgarro', 'fractura', 'lesión', 'edema']) else 50
                 cambios.append({
                     'tipo': 'agregado',
-                    'texto': ' '.join(palabras_final[j1:j2])
+                    'texto': texto,
+                    'categoria': 'agregado',
+                    'score': score
                 })
         
         self.cambios_detectados = cambios
+        logger.info(f"📊 Análisis semántico: {len(cambios)} cambios detectados")
         return cambios
     
+    def _categorizar_cambio(self, texto_de, texto_a, terminologia):
+        """
+        🧠 Categoriza el tipo de cambio basándose en patrones semánticos
+        
+        Returns:
+            str: Categoría del cambio (ortografia, terminologia, estructural, etc.)
+        """
+        import difflib
+        
+        texto_de_lower = texto_de.lower()
+        texto_a_lower = texto_a.lower()
+        
+        # 1. Cambio ortográfico (solo difieren en acentos/mayúsculas)
+        if texto_de_lower.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u') == \
+           texto_a_lower.replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u'):
+            return 'ortografia'
+        
+        # 2. Corrección de terminología médica (palabras similares pero técnicas)
+        similitud = difflib.SequenceMatcher(None, texto_de_lower, texto_a_lower).ratio()
+        if similitud > 0.6 and similitud < 0.95:
+            # Palabras muy similares pero no iguales = probablemente terminología
+            return 'terminologia'
+        
+        # 3. Cambio en grado/clasificación
+        if any(grado in texto_de_lower or grado in texto_a_lower for categoria in terminologia.get('grado', []) for grado in [categoria]):
+            return 'clasificacion'
+        
+        # 4. Cambio estructural (diferencia significativa)
+        if len(texto_a.split()) > len(texto_de.split()) * 1.5:
+            return 'estructural'
+        
+        # 5. Cambio semántico puro (diferente significado)
+        if similitud < 0.3:
+            return 'semantico'
+        
+        return 'otro'
+    
+    def _calcular_score_importancia(self, texto_de, texto_a, categoria):
+        """
+        📊 Calcula un score de importancia para priorizar correcciones
+        
+        Args:
+            texto_de: Texto original
+            texto_a: Texto corregido
+            categoria: Categoría del cambio
+        
+        Returns:
+            int: Score 0-100 (mayor = más importante)
+        """
+        # Score base según categoría
+        scores_base = {
+            'ortografia': 20,
+            'terminologia': 85,  # MUY importante
+            'clasificacion': 90,  # CRÍTICO (ej: grado II vs grado III)
+            'estructural': 70,
+            'semantico': 80,
+            'otro': 50
+        }
+        
+        score = scores_base.get(categoria, 50)
+        
+        # Bonus: Términos médicos críticos
+        terminos_criticos = [
+            'desgarro', 'fractura', 'lesión', 'edema', 'tumor',
+            'grado', 'maligno', 'benigno', 'metástasis'
+        ]
+        
+        if any(term in texto_a.lower() for term in terminos_criticos):
+            score += 10
+        
+        # Penalización: Cambios muy pequeños (1-2 caracteres)
+        if len(texto_de) <= 3 and len(texto_a) <= 3:
+            score -= 30
+        
+        return max(0, min(100, score))  # Clamp entre 0-100
+    
     def save(self, *args, **kwargs):
-        """Al guardar, calcular diferencias automáticamente"""
+        """Al guardar, calcular diferencias automáticamente e invalidar caché"""
         if not self.cambios_detectados:
             self.calcular_diferencias()
+        
         super().save(*args, **kwargs)
+        
+        # 🚀 NUEVO: Invalidar caché del usuario después de guardar
+        if self.usuario:
+            # Importar aquí para evitar circular import
+            from .ai_services import AIService
+            AIService.invalidar_cache_usuario(self.usuario)
+            logger.info(f"🗑️ Caché invalidado para usuario {self.usuario.id} tras nueva corrección")
     
     @staticmethod
     def obtener_ejemplos_aprendizaje(usuario=None, limite=10):
         """
-        Obtiene los ejemplos de correcciones más recientes para entrenar la IA
-        🚀 OPTIMIZADO: Con caché y solo campos necesarios
+        Obtiene ejemplos de correcciones priorizados por importancia
+        🚀 MEJORADO: Usa scores semánticos para priorizar
         
         Args:
             usuario: Usuario específico (opcional)
             limite: Número máximo de ejemplos
             
         Returns:
-            str: Ejemplos formateados para incluir en el prompt
+            str: Ejemplos formateados priorizados para incluir en el prompt
         """
         from django.core.cache import cache
         
         # 🚀 CACHÉ: Verificar si ya tenemos esto en caché
-        cache_key = f'aprendizaje_ejemplos_{usuario.id if usuario else "global"}_{limite}'
+        cache_key = f'aprendizaje_ejemplos_v2_{usuario.id if usuario else "global"}_{limite}'
         cached_ejemplos = cache.get(cache_key)
         if cached_ejemplos:
             return cached_ejemplos
@@ -599,31 +714,76 @@ class CorreccionAprendizaje(models.Model):
         if usuario:
             query = query.filter(usuario=usuario)
         
-        # 🚀 OPTIMIZACIÓN: Solo traer campos necesarios
-        correcciones = query.only('cambios_detectados')[:limite]
+        # Traer más correcciones para poder filtrar las mejores
+        correcciones = query.only('cambios_detectados').order_by('-fecha_creacion')[:limite * 3]
         
         if not correcciones:
             return ""
         
-        ejemplos = []
+        # 📊 Recolectar y puntuar todos los cambios
+        cambios_con_score = []
         for corr in correcciones:
             if corr.cambios_detectados:
-                # Formatear cada cambio detectado
                 for cambio in corr.cambios_detectados:
+                    # Obtener score del análisis semántico (default 50 si no existe)
+                    score = cambio.get('score', 50)
+                    categoria = cambio.get('categoria', 'otro')
+                    
                     if cambio['tipo'] == 'reemplazo':
-                        ejemplos.append(f"❌ {cambio['de']} → ✅ {cambio['a']}")
-                    elif cambio['tipo'] == 'agregado':
-                        ejemplos.append(f"✅ Agregar: {cambio['texto']}")
+                        cambios_con_score.append({
+                            'texto': f"❌ {cambio['de']} → ✅ {cambio['a']}",
+                            'score': score,
+                            'categoria': categoria
+                        })
+                    elif cambio['tipo'] == 'agregado' and score > 60:  # Solo agregados importantes
+                        cambios_con_score.append({
+                            'texto': f"✅ Agregar: {cambio['texto']}",
+                            'score': score,
+                            'categoria': categoria
+                        })
         
-        if not ejemplos:
+        if not cambios_con_score:
             return ""
         
-        # Limitar a los 20 ejemplos más relevantes
-        ejemplos_unicos = list(dict.fromkeys(ejemplos))[:20]
-        resultado = "\n".join(ejemplos_unicos)
+        # 🎯 Ordenar por score (más importantes primero)
+        cambios_con_score.sort(key=lambda x: x['score'], reverse=True)
+        
+        # 🧹 Eliminar duplicados manteniendo los de mayor score
+        ejemplos_unicos = []
+        textos_vistos = set()
+        
+        for cambio in cambios_con_score:
+            if cambio['texto'] not in textos_vistos:
+                textos_vistos.add(cambio['texto'])
+                ejemplos_unicos.append(cambio)
+        
+        # Limitar a los N ejemplos más importantes
+        ejemplos_top = ejemplos_unicos[:limite * 2]  # Doble límite para tener más diversidad
+        
+        # Formatear resultado con indicador de prioridad
+        lineas = []
+        for i, cambio in enumerate(ejemplos_top[:20], 1):  # Máximo 20 líneas
+            # Emoji según categoría
+            emoji_categoria = {
+                'terminologia': '🔬',
+                'clasificacion': '⚠️',
+                'ortografia': '✏️',
+                'semantico': '💭',
+                'estructural': '🏗️',
+                'otro': '📝'
+            }
+            emoji = emoji_categoria.get(cambio['categoria'], '📝')
+            
+            # Solo mostrar emoji de prioridad para los MUY importantes (score > 80)
+            prioridad = '⭐' if cambio['score'] > 80 else ''
+            lineas.append(f"{emoji} {prioridad}{cambio['texto']}")
+        
+        resultado = "\n".join(lineas)
         
         # 🚀 GUARDAR EN CACHÉ (5 minutos)
         cache.set(cache_key, resultado, timeout=300)
+        
+        logger.info(f"📚 Ejemplos priorizados: {len(lineas)} de {len(cambios_con_score)} cambios disponibles")
         
         return resultado
     

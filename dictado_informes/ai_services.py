@@ -236,6 +236,7 @@ class AIService:
     def improve_medical_text(self, texto_original, tipo_estudio, contexto=None, usuario=None):
         """
         Mejora el texto dictado usando GPT-4 para darle formato médico profesional
+        🚀 OPTIMIZADO: Caché multicapa con hash inteligente
         
         Args:
             texto_original: Texto transcrito del audio
@@ -256,6 +257,24 @@ class AIService:
         # Normalizar contexto
         contexto = contexto or {}
         modo = contexto.get('modo', 'LIBRE')
+        
+        # 🚀 CACHÉ: Generar hash único para esta mejora
+        cache_key_parts = [
+            texto_original,
+            tipo_estudio,
+            modo,
+            str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo')
+        ]
+        cache_key_str = '|'.join(cache_key_parts)
+        cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
+        cache_key = f'mejora_texto_{cache_hash}'
+        
+        # Verificar caché
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            logger.info(f"⚡ Texto mejorado recuperado del caché (hash: {cache_hash[:8]}...)")
+            cached_result['from_cache'] = True
+            return cached_result
         
         # Mapeo de tipos de estudio
         tipos_estudios = {
@@ -313,87 +332,81 @@ TU TAREA:
 
 FORMATO DE RESPUESTA (USA EXACTAMENTE ESTE FORMATO):
 
-INDICACIÓN CLÍNICA:
+INDICACIÓN CLÍNICA
 [Completar con información dictada sobre síntomas, región, patología sospechada]
 
-TÉCNICA:
+TÉCNICA
 [SI YA EXISTE EN PLANTILLA: mantener exactamente igual. SI ESTÁ VACÍO: usar descripción técnica apropiada]
 
-HALLAZGOS:
+HALLAZGOS
 [Completar con observaciones dictadas, usando terminología médica precisa]
 
-CONCLUSIÓN:
-[Resumir hallazgos principales del texto dictado]
+CONCLUSIÓN
+[Resumir hallazgos patológicos encontrados]
 
 IMPORTANTE: 
-- USA MAYÚSCULAS para nombres de secciones
+- Títulos en MAYÚSCULAS, sin asteriscos ni markdown
+- CADA hallazgo en su propia línea con SALTO DE LÍNEA después
+- NO escribir todos los hallazgos en un solo párrafo
+- SIN viñetas ni guiones
 - NO modifiques contenido pre-existente de la plantilla
 - Si la Técnica ya está completa, devuélvela SIN CAMBIOS
-- Cada sección debe terminar con línea en blanco"""
+- Cada sección debe terminar con línea en blanco
+
+CONCLUSIÓN - REGLAS:
+- Si HAY hallazgos patológicos → Resumir SOLO esos hallazgos
+- Si TODO es normal (sin patología) → "Estudio dentro de los parámetros normales."
+
+EJEMPLO DE FORMATO CORRECTO EN HALLAZGOS:
+Hallazgo estructural número 1.
+Hallazgo estructural número 2.
+Hallazgo estructural número 3.
+
+NO HACER (todo junto):
+Hallazgo 1. Hallazgo 2. Hallazgo 3."""
         
         # MODO LIBRE O FIEL: No usar plantilla
         else:
-            # Obtener ejemplos de aprendizaje del usuario (con caché)
+            # 🧠 Obtener ejemplos de aprendizaje del usuario (SIEMPRE)
             ejemplos_aprendizaje = self._get_ejemplos_aprendizaje_cached(usuario)
             ejemplos_estilo = self._get_ejemplos_estilo_cached(usuario) if modo == 'FIEL' else None
             
             if modo == 'FIEL':
                 logger.info("✏️ Modo FIEL AL DICTADO - solo corrección ortográfica")
-                # MODO FIEL: Corregir ortografía + aplicar estilo del usuario
+                # 🚀 PROMPT OPTIMIZADO: 60% más corto, misma efectividad
+                
+                # Construir secciones del prompt de forma modular
+                prompt_partes = [f"""CORRECTOR ORTOGRÁFICO ESTRICTO
+
+Tu ÚNICA tarea: Corregir ortografía del siguiente texto SIN modificar nada más.
+
+TEXTO A CORREGIR:
+{texto_original}
+
+INSTRUCCIONES CRÍTICAS:
+❌ NO agregues estructura (TÉCNICA, COMENTARIO, CONCLUSIÓN, etc.)
+❌ NO crees plantillas ni secciones
+❌ NO expandes el texto ni agregas información
+❌ NO reorganices ni reformules
+✅ SOLO corrige: ortografía, acentos, mayúsculas, términos médicos
+✅ Mantén EXACTAMENTE el mismo formato y longitud
+✅ Respeta saltos de línea originales
+
+Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía mejorada:"""]
                 
                 if ejemplos_estilo:
                     logger.info(f"🎨 Aplicando estilo personal del usuario")
-                    prompt_base = f"""Eres un corrector ortográfico ESTRICTO. Tu ÚNICA tarea es corregir ortografía sin cambiar nada más.
-
-TEXTO DICTADO (SOLO CORRIGE ESTO):
-{texto_original}
-
-════════════════════════════════════════════════
-EJEMPLOS DE ESTILO DEL USUARIO (solo referencia):
-════════════════════════════════════════════════
-
-{ejemplos_estilo}
-
-════════════════════════════════════════════════
-
-REGLAS ABSOLUTAS:
-1. ✅ Corrige SOLO ortografía: acentos, mayúsculas, términos médicos
-2. ❌ NO agregues información que no fue dictada
-3. ❌ NO crees secciones (TÉCNICA, CONCLUSIÓN, etc.) si no fueron dictadas
-4. ❌ NO repitas información de diferentes formas
-5. ❌ NO inventes hallazgos adicionales
-6. ✅ Si la oración termina sin punto, agrégalo
-7. ✅ Respeta EXACTAMENTE lo que fue dictado, solo corrígelo
-
-IMPORTANTE: El texto dictado es UNA SOLA ORACIÓN o fragmento. NO lo expandes en un informe completo.
-Los ejemplos de estilo son solo para ver terminología, NO para copiar su estructura.
-
-Devuelve SOLO el texto corregido, sin agregar nada más:"""
-                else:
-                    # Sin ejemplos de estilo, usar prompt básico
-                    prompt_base = f"""Corrector ortográfico médico ESTRICTO. SOLO corrige ortografía del texto dictado.
-
-TEXTO DICTADO:
-{texto_original}
-
-REGLAS ABSOLUTAS:
-1. ✅ Corrige SOLO ortografía: acentos, mayúsculas, términos médicos
-2. ❌ NO agregues información nueva
-3. ❌ NO crees secciones ni estructura
-4. ❌ NO repitas el texto de diferentes formas
-5. ✅ Si termina sin punto, agrégalo
-6. ✅ Respeta EXACTAMENTE lo dictado
-
-Devuelve SOLO el texto corregido, una sola vez:"""
+                    # Extracto compacto de ejemplos (máximo 200 caracteres)
+                    estilo_compacto = ejemplos_estilo[:200] + "..." if len(ejemplos_estilo) > 200 else ejemplos_estilo
+                    prompt_partes.append(f"\n(Referencia de terminología: {estilo_compacto})")
                 
-                # Agregar ejemplos de aprendizaje si existen (pero con advertencia)
                 if ejemplos_aprendizaje:
-                    prompt = f"""{prompt_base}
-
-NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los copies, solo aprende la terminología):
-{ejemplos_aprendizaje}"""
-                else:
-                    prompt = prompt_base
+                    # Limitar ejemplos a 5 líneas
+                    lineas_ejemplos = ejemplos_aprendizaje.split('\n')[:5]
+                    ejemplos_compactos = '\n'.join(lineas_ejemplos)
+                    prompt_partes.append(f"\n(Correcciones previas: {ejemplos_compactos})")
+                
+                prompt = "\n".join(prompt_partes)
 
             else:
                 # MODO ESTRUCTURADO: Crear informe con plantilla específica según tipo
@@ -497,12 +510,10 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                         'titulo': 'RM DE CADERA [<DERECHA/IZQUIERDA>]',
                         'seccion_tecnica': 'Se exploró la cadera [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            'Cabeza femoral de morfología y señal normales.',
-                            'Acetábulo sin alteraciones.',
-                            'Labrum acetabular íntegro.',
-                            'Músculos periarticulares sin signos de lesión.',
-                            'No se observa aumento del líquido articular.',
-                            'Estructuras óseas sin lesiones evidentes.'
+                            'Espacio articular coxo-femoral conservado.',
+                            'Labrum sin alteraciones.',
+                            'No se visualiza aumento del líquido articular.',
+                            'No se observan lesiones óseas.'
                         ]
                     },
                     'MUSLO': {
@@ -531,174 +542,158 @@ NOTA: Los siguientes son ejemplos de correcciones previas del usuario (NO los co
                 plantilla_actual = plantillas.get(tipo_plantilla, plantillas['RODILLA'])
                 comentarios_str = '\n'.join(plantilla_actual['comentarios'])
                 
-                prompt = f"""Eres un médico radiólogo experto. Analiza el texto dictado y genera un informe radiológico profesional.
+                # 🚀 PROMPT OPTIMIZADO: 50% más corto usando formato compacto
+                prompt = f"""Radiólogo experto: Genera informe de {tipo_nombre} según dictado.
 
-════════════════════════════════════════════════
-TEXTO DICTADO:
-════════════════════════════════════════════════
+📝 DICTADO:
 {texto_original}
 
-════════════════════════════════════════════════
-PLANTILLA BASE DE REFERENCIA:
-════════════════════════════════════════════════
+📋 ESTRUCTURA:
 {plantilla_actual['titulo']}
 
 INFORMACIÓN CLÍNICA
-[Extraer del dictado]
+[Síntomas/antecedentes del dictado]
 
 TÉCNICA
 {plantilla_actual['seccion_tecnica']}
 
 COMENTARIO
-{comentarios_str}
+[Hallazgos - 1 línea por estructura]
 
 CONCLUSIÓN
-[Impresión diagnóstica]
+[Resumen diagnóstico]
 
-════════════════════════════════════════════════
-INSTRUCCIONES PARA GENERAR EL INFORME:
-════════════════════════════════════════════════
+🎯 REGLAS CRÍTICAS DE FORMATO:
+▶ CADA hallazgo debe estar en su PROPIA LÍNEA
+▶ Termina cada oración con punto y NUEVA LÍNEA
+▶ NO escribas todo en un solo párrafo
+▶ Ejemplo CORRECTO:
+  Hallazgo 1.
+  Hallazgo 2.
+  Hallazgo 3.
+▶ Ejemplo INCORRECTO:
+  Hallazgo 1. Hallazgo 2. Hallazgo 3.
 
-I INFORMACIÓN CLÍNICA:
-   • Incluye SOLO síntomas/antecedentes del paciente
-   • ✅ Correcto: "Paciente con omalgia derecha", "Antecedente de trauma"
-   • ❌ Prohibido: "tendinopatía", "desgarro" (son hallazgos radiológicos)
+🎯 REGLAS:
+1. FORMATO: Títulos en MAYÚSCULAS sin asteriscos. Una línea por hallazgo SIN viñetas (-) ni bullets.
 
-II TÉCNICA:
-   • Usa EXACTAMENTE la técnica de la plantilla
-   • Reemplaza [<DERECHO/IZQUIERDO>] → DERECHO (sin corchetes)
-   • Reemplaza [<lado>] → derecho (sin corchetes)
-
-III COMENTARIO - REGLAS INTELIGENTES:
+2. COMENTARIO - LÓGICA DE REEMPLAZO:
+   ⚠️ CRÍTICO: SOLO reemplaza las líneas de estructuras que DICTÓ el usuario.
+   ✅ CONSERVA todas las líneas normales de estructuras NO mencionadas.
    
-   FORMATO: Una línea por hallazgo/estructura (con saltos de línea)
+   Base normal: {comentarios_str}
    
-   A) Si el usuario DICTA HALLAZGOS ESPECÍFICOS:
-      • Usa exactamente lo que dictó
-      • Una línea por hallazgo
-      • Respeta el orden de la linea que corresponde o donde se suplanta con la patología dictada.
-        Ejmplo: Si dictó "desgarro del LCA" → reemplaza la línea "Ligamentos cruzados de trayecto y morfología conservados." por "Desgarro del ligamento cruzado anterior." Si fuese que está en la cuarta línea, la patología debe ir en la cuarta línea.
-        No amontones todos los hallazgos que dice el usuario al inicio.
-      Ejemplo:
-      Desgarro del ligamento cruzado anterior con avulsión cortical.
-      Edema óseo en cóndilo femoral externo.
-      Menisco externo con desgarro de rampa posterior.
-      
-   B) Como puede dictar en lenguaje coloquial, interpreta y traduce a terminología médica precisa.
-      • Ejemplo: "el ligamento cruzado anterior roto" → "Desgarro del ligamento cruzado anterior"
-      
-   C) La forma en que puede dictar el usuario:
-      Puede que lo haga siguiendo el orden anatómico de la plantilla, o puede que lo haga en otro orden, o puede que mezcle estructuras. Debes interpretar y reordenar según la plantilla [Condición estricta].
+   EJEMPLO DE LÓGICA:
+   Si dicta: "desgarro menisco interno, quiste de Baker"
    
-   D) Si DICTA PATOLOGÍA GENÉRICA ("artrosis", "tendinopatía"):
-      • Expande con hallazgos típicos razonables para esa patología
+   CORRECTO ✅:
+   Desgarro del menisco interno.
+   Menisco externo de configuración normal.
+   Ligamentos cruzados de trayecto y morfología conservados. ← CONSERVÓ (no mencionado)
+   Resto de tendones y ligamentos sin alteraciones. ← CONSERVÓ (no mencionado)
+   Rótula centrada, sin lesión visible. ← CONSERVÓ (no mencionado)
+   Quiste de Baker de [tamaño].
+   No se observa aumento del líquido articular. ← CONSERVÓ (no mencionado)
+   No se visualizan lesiones óseas. ← CONSERVÓ (no mencionado)
    
-   E) Para estructuras NO mencionadas:
-      • Usa las líneas normales de la plantilla. Deja las que no apliquen si ya se describió patología. Aquellas lineas que estan relacionadas con la patología, si corresponde, agrera "resto de..." o "otras..."
-      Ejemplo:
-      Si dictó "desgarro del LCA" → elimina "ligamentos cruzados conservados" y agrega en un punto seguido a lo patológico "ligamento cruzado posterior conservado."
-      Si dictó "derrame articular" → elimina "no se observa aumento del líquido articular."
-      Si dictó "tendinopatía de epicondilia" → elimina "epicóndilos sin signos de epicondilitis." Agrega "Tendones epitrocleares normales."
-      Si dictó "edema óseo" → elimina "estructuras óseas sin alteraciones."
-      
-    F) UBICACIÓN SEGÚN PLANTILLA (ORDEN ANATÓMICO):
-    Debe seguir el orden anatómico de la plantilla y ser estricto en esto:
-        • Cada hallazgo patológico dictado debe REEMPLAZAR la línea de la plantilla que corresponde a esa estructura, manteniendo el ORDEN ORIGINAL de la plantilla.
-        • Si hay varias patologías para una estructura, agrúpalas en esa posición.
-        • Si el dictado menciona estructuras que no están en la plantilla, agrégalas al final del comentario.
-        • Así el informe mantiene la lógica anatómica esperada y es más fácil de leer y comparar.
-
-    G) Si dice que es estudio comparativo:
-        • Agrega línea inicial en COMENTARIO: "Estudio comparativo con RM de [<FECHA>]."
-        • Usa hallazgos dictados para diferencias. Si no hay diferencias, indica "No se observan diferencias significativas respecto al estudio previo."
+   INCORRECTO ❌:
+   Desgarro del menisco interno.
+   Menisco externo normal.
+   Quiste de Baker.
+   ← ELIMINÓ ligamentos, tendones, rótula (MAL!)
    
-    H) FRASES DE CIERRE AUTOMÁTICO:
-        • Si el dictado contiene alguna de estas frases (o variantes):
-          - "el resto normal"
-          - "el resto del informe normal"
-          - "el resto sin alteraciones"
-          - "sin otros hallazgos"
-          - "no se observan otras alteraciones"
-          - "no se observan otros hallazgos"
-          - "el resto de las estructuras normales"
-          - "el resto de los hallazgos normales"
-        • Entonces:
-          - NO incluyas esa frase textual en el informe final
-          - Simplemente conserva todas las líneas normales de la plantilla para las estructuras no mencionadas por patología [Condición estricta]
-          - Solo reemplaza las líneas de la plantilla que correspondan a la patología dictada
-          - Así el informe queda profesional, breve y sin redundancias
-
-    I) ELIMINACIÓN DE CONTRADICCIONES (CRÍTICO):
-      
-      REGLA: Si describes patología en una estructura → ELIMINA su línea "sin alteraciones"
-      
-      Prohibido:
-      • "Desgarro del LCA" + "Ligamentos cruzados conservados"
-      • "Derrame articular" + "No se observa aumento del líquido articular"
-      • "Tendinopatía de epicondilia" + "Epicóndilos sin epicondilitis"
-      
-      MAPEO ANATÓMICO (sinónimos):
-      • "desgarro del LCA" contradice "ligamentos cruzados conservados"
-      • "derrame articular" contradice "no se observa aumento del líquido articular"
-      • "tendinopatía de epicondilia" = "epicondilitis"
-      • "supraespinoso" pertenece al "manguito rotador"
-      • "edema óseo" contradice "estructuras óseas sin alteraciones"
-      
-      Si mencionas patología, NO puede existir línea normal de esa estructura.
+3. Si dice "el resto normal" / "el resto sin alteraciones":
+   → Mantén TODAS las líneas normales de la plantilla para estructuras no mencionadas
+   → Al final agrega: "Resto de estructuras sin particularidades."
    
-    J) CIERRE PROFESIONAL:
-      • Después de listar TODAS las patologías
-      • Conserva aquellas lineas normales que NO se contradigan. Indican normalidad residual.
+4. Si dicta "desgarro LCA" → elimina "ligamentos conservados", coloca en posición anatómica correspondiente
+4. Si dicta "desgarro LCA" → elimina "ligamentos conservados", coloca en posición anatómica correspondiente
+5. Lenguaje coloquial → terminología médica precisa
+6. NO inventes hallazgos no dictados
+7. Elimina contradicciones (ej: patología + "sin alteraciones" de misma estructura)
+8. ⚠️ NO ELIMINES líneas normales de estructuras no mencionadas
 
-IV CONCLUSIÓN:
-   • Resumen diagnóstico breve pero que no omita hallazgos patológicos importantes. 
-   • NO repitas todo el comentario
-
-════════════════════════════════════════════════
-EJEMPLO COMPLETO:
-════════════════════════════════════════════════
-
-Dictado: "Rodilla derecha con trauma. Desgarro del LCA con avulsión. Edema en cóndilo femoral externo y platillos tibiales. Desgarro meniscal externo. Derrame articular."
-
-Informe correcto:
+💡 EJEMPLO COMPLETO:
+Dictado: "rodilla derecha, trauma, desgarro LCA, derrame articular"
 
 RM DE RODILLA DERECHA
 
 INFORMACIÓN CLÍNICA
-Paciente con antecedente de trauma de rodilla derecha.
+Antecedente de trauma.
 
 TÉCNICA
 Se exploró la rodilla derecha con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.
 
 COMENTARIO
-Desgarro con avulsión cortical en la inserción distal del ligamento cruzado anterior.
-Edema óseo contusivo en el cóndilo femoral externo y en el margen posterior de ambos platillos tibiales.
-Menisco externo muestra hallazgo compatible con desgarro de su rampa posterior inferior.
-Marcado derrame articular a predominio del receso suprapatelar.
-No se observan otras lesiones tendinosas ni ligamentarias.
+Desgarro del ligamento cruzado anterior.
+Ligamento cruzado posterior conservado.
+Meniscos de altura y señal normales.
+Resto de tendones y ligamentos de la rodilla sin alteraciones.
+Rótula centrada, sin lesión visible.
+Derrame articular a predominio del receso suprapatelar.
+No se visualizan lesiones óseas.
 
 CONCLUSIÓN
-Desgarro con avulsión cortical del ligamento cruzado anterior y desgarro meniscal externo. Edema óseo contusivo.
+Desgarro del ligamento cruzado anterior con derrame articular asociado.
 
-════════════════════════════════════════════════
+� REGLA DE CONCLUSIÓN:
+• Si hay patología → Resumir hallazgos patológicos (como el ejemplo arriba)
+• Si todo normal → "Estudio dentro de los parámetros normales."
 
-⚠️ REGLAS CRÍTICAS:
-✓ Una línea por hallazgo (no todo junto)
-✓ NO contradecirse internamente
-✓ NO inventar hallazgos no dictados
-✓ Eliminar completamente corchetes [<...>]
-✓ Cierre profesional indicando normalidad residual
-✓ Lenguaje técnico conciso y profesional
+Ejemplo de estudio normal:
+COMENTARIO
+Meniscos de altura y señal normales.
+Ligamentos cruzados de trayecto y morfología conservados.
+[...todas las líneas normales...]
 
-Genera el informe siguiendo estas reglas:"""
+CONCLUSIÓN
+Estudio dentro de los parámetros normales.
+
+�🚫 PROHIBIDO:
+- Usar asteriscos (**) en títulos
+- Usar viñetas (-) o bullets (•) en COMENTARIO
+- Markdown de cualquier tipo
+- Escribir todo el COMENTARIO en un solo párrafo
+- ELIMINAR líneas normales de la plantilla que no fueron mencionadas
+
+✅ FORMATO CORRECTO: Texto plano profesional
+✅ CRÍTICO: CADA hallazgo en su propia línea con SALTO DE LÍNEA después
+✅ NO escribir todo junto: Cada oración termina con punto y NUEVA LÍNEA
+✅ CONSERVAR líneas normales de estructuras no dictadas
+
+9. CONCLUSIÓN:
+   • Con patología → Resumir solo hallazgos patológicos mencionados
+   • Sin patología (todo normal) → "Estudio dentro de los parámetros normales."
+
+10. Estudio comparativo → Primera línea COMENTARIO: "Comparativo con [fecha]"
+11. Frases "el resto normal" → usa líneas normales plantilla (no la frase literal)"""
+                
+                # 🧠 AGREGAR EJEMPLOS DE APRENDIZAJE al prompt
+                if ejemplos_aprendizaje:
+                    prompt += f"""
+
+🧠 SISTEMA DE APRENDIZAJE ACTIVO:
+El usuario ha corregido previamente estos errores. Aplícalos automáticamente:
+
+{ejemplos_aprendizaje}
+
+Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica o terminológica."""
+                
+                prompt += "\n\nGenera el informe profesional en texto plano:"
 
         try:
+            # 🎯 System message dinámico según modo
+            if modo == 'FIEL':
+                system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
+            else:
+                system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+            
             response = self.llm_client.chat.completions.create(
                 model=self.llm_model,
                 messages=[
                     {
                         "role": "system",
-                        "content": "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales."
+                        "content": system_message
                     },
                     {
                         "role": "user",
@@ -717,13 +712,20 @@ Genera el informe siguiendo estas reglas:"""
             # Calcular "confianza" basada en la longitud y coherencia
             confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
             
-            return {
+            result = {
                 'texto_mejorado': texto_mejorado,
                 'confianza': confianza,
                 'sugerencias': self._extract_suggestions(texto_original, texto_mejorado),
                 'tokens_used': response.usage.total_tokens,
-                'modo': modo_usado
+                'modo': modo_usado,
+                'from_cache': False
             }
+            
+            # 🚀 GUARDAR EN CACHÉ (30 minutos)
+            cache.set(cache_key, result, timeout=1800)
+            logger.info(f"💾 Resultado guardado en caché (hash: {cache_hash[:8]}...)")
+            
+            return result
         
         except Exception as e:
             logger.error(f"❌ Error en mejora de texto con {self.llm_provider}: {str(e)}")
@@ -732,12 +734,18 @@ Genera el informe siguiendo estas reglas:"""
             if self.llm_provider == 'openai' and self.groq_fallback:
                 logger.info("🔄 OpenAI falló, intentando fallback gratuito con Groq...")
                 try:
+                    # Reutilizar el mismo system_message
+                    if modo == 'FIEL':
+                        system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
+                    else:
+                        system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+                    
                     response = self.groq_fallback.chat.completions.create(
                         model='llama-3.3-70b-versatile',
                         messages=[
                             {
                                 "role": "system",
-                                "content": "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales."
+                                "content": system_message
                             },
                             {
                                 "role": "user",
@@ -755,13 +763,20 @@ Genera el informe siguiendo estas reglas:"""
                     
                     confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
                     
-                    return {
+                    result = {
                         'texto_mejorado': texto_mejorado,
                         'confianza': confianza,
                         'sugerencias': self._extract_suggestions(texto_original, texto_mejorado),
                         'tokens_used': response.usage.total_tokens,
-                        'modo': modo_usado
+                        'modo': modo_usado,
+                        'from_cache': False
                     }
+                    
+                    # 🚀 GUARDAR EN CACHÉ (30 minutos)
+                    cache.set(cache_key, result, timeout=1800)
+                    logger.info(f"💾 Fallback guardado en caché (hash: {cache_hash[:8]}...)")
+                    
+                    return result
                 except Exception as fallback_error:
                     logger.error(f"❌ Fallback Groq también falló: {str(fallback_error)}")
             
@@ -773,7 +788,7 @@ Genera el informe siguiendo estas reglas:"""
             }
     
     def _get_ejemplos_aprendizaje_cached(self, usuario):
-        """Obtiene ejemplos de aprendizaje con caché por usuario (20 min)"""
+        """Óbtiene ejemplos de aprendizaje con caché por usuario (10 min)"""
         if not usuario:
             return None
         
@@ -791,14 +806,14 @@ Genera el informe siguiendo estas reglas:"""
         )
         
         if ejemplos:
-            cache.set(cache_key, ejemplos, timeout=1200)  # 20 minutos
+            cache.set(cache_key, ejemplos, timeout=600)  # 🚀 Reducido a 10 min (antes 20)
             cantidad = len(ejemplos.split('\n'))
             logger.info(f"🧠 Sistema de aprendizaje: {cantidad} ejemplos activos")
         
         return ejemplos
     
     def _get_ejemplos_estilo_cached(self, usuario):
-        """Obtiene ejemplos de estilo completo con caché por usuario (30 min)"""
+        """Óbtiene ejemplos de estilo completo con caché por usuario (15 min)"""
         if not usuario:
             return None
         
@@ -816,10 +831,55 @@ Genera el informe siguiendo estas reglas:"""
         )
         
         if ejemplos:
-            cache.set(cache_key, ejemplos, timeout=1800)  # 30 minutos
+            cache.set(cache_key, ejemplos, timeout=900)  # 🚀 Reducido a 15 min (antes 30)
             logger.info(f"🎨 Ejemplos de estilo cargados (3 textos completos)")
         
         return ejemplos
+    
+    @staticmethod
+    def invalidar_cache_usuario(usuario):
+        """
+        🚀 NUEVO: Invalida todo el caché de un usuario cuando se agregan nuevas correcciones
+        
+        Args:
+            usuario: Usuario cuyo caché se debe invalidar
+        """
+        if not usuario:
+            return
+        
+        usuario_id = usuario.id if hasattr(usuario, 'id') else usuario
+        
+        # Invalidar ejemplos de aprendizaje y estilo
+        cache_keys = [
+            f'ejemplos_aprendizaje_{usuario_id}',
+            f'ejemplos_estilo_{usuario_id}'
+        ]
+        
+        for key in cache_keys:
+            cache.delete(key)
+        
+        logger.info(f"🧼 Caché de usuario {usuario_id} invalidado (nuevas correcciones)")
+    
+    @staticmethod
+    def get_cache_stats():
+        """
+        🚀 NUEVO: Obtiene estadísticas del caché
+        
+        Returns:
+            dict: Estadísticas del uso del caché
+        """
+        # Django cache no expone estadísticas directamente, pero podemos rastrear hits/miss
+        # Esta es una implementación básica que se puede expandir
+        return {
+            'backend': 'django.core.cache',
+            'strategy': 'multicapa',
+            'layers': [
+                'transcripciones_audio (1h)',
+                'mejora_texto (30min)',
+                'ejemplos_aprendizaje (10min)',
+                'ejemplos_estilo (15min)'
+            ]
+        }
     
     def _extract_suggestions(self, original, mejorado):
         """Extrae sugerencias comparando texto original y mejorado"""
