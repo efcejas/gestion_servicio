@@ -313,10 +313,12 @@ class Preinforme(models.Model):
         null=True,
         blank=True
     )
-    edad_paciente = models.PositiveIntegerField()
+    edad_paciente = models.PositiveIntegerField(null=True, blank=True)
     sexo_paciente = models.CharField(
         max_length=1, 
-        choices=[('M', 'Masculino'), ('F', 'Femenino'), ('O', 'Otro')]
+        choices=[('M', 'Masculino'), ('F', 'Femenino'), ('O', 'Otro')],
+        null=True,
+        blank=True
     )
     
     # Contenido del preinforme - Campo único simplificado
