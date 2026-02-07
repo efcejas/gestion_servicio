@@ -353,9 +353,14 @@ IMPORTANTE:
 - Si la Técnica ya está completa, devuélvela SIN CAMBIOS
 - Cada sección debe terminar con línea en blanco
 
-CONCLUSIÓN - REGLAS:
-- Si HAY hallazgos patológicos → Resumir SOLO esos hallazgos
-- Si TODO es normal (sin patología) → "Estudio dentro de los parámetros normales."
+CONCLUSIÓN - REGLAS OBLIGATORIAS:
+1. JERARQUIZAR: patología principal → asociados → secundarios
+2. REDACCIÓN DIRECTA: "Desgarro del LCA" (NO "se observa desgarro")
+3. TEXTO CORRIDO narrativo (NO ítems ni viñetas en conclusión)
+4. TERMINOLOGÍA ESTÁNDAR: gonartrosis, meniscopatía, tendinopatía, condromalacia
+5. 2-4 líneas máximo, sin repetir frases literales
+6. NO describir estructuras normales, NO sugerencias clínicas
+7. Si TODO normal → "Estudio dentro de los parámetros normales."
 
 EJEMPLO DE FORMATO CORRECTO EN HALLAZGOS:
 Hallazgo estructural número 1.
@@ -636,9 +641,34 @@ No se visualizan lesiones óseas.
 CONCLUSIÓN
 Desgarro del ligamento cruzado anterior con derrame articular asociado.
 
-� REGLA DE CONCLUSIÓN:
-• Si hay patología → Resumir hallazgos patológicos (como el ejemplo arriba)
-• Si todo normal → "Estudio dentro de los parámetros normales."
+🎯 REGLAS DE CONCLUSIÓN (MÉDICO RADIÓLOGO):
+
+1️⃣ JERARQUIZACIÓN - Ordenar hallazgos por importancia clínica:
+   • Patología principal (lesión, desgarro, fractura, injuria) → PRIMERO
+   • Hallazgos asociados relevantes (edema, extrusión, condromalacia) → SEGUNDO
+   • Hallazgos secundarios (derrame, sinovitis, flogosis) → TERCERO
+   • Cierre: "Resto de las estructuras sin hallazgos significativos" (si aplica)
+
+2️⃣ TERMINOLOGÍA RADIOLÓGICA ESTÁNDAR - Usar términos profesionales:
+   ✅ gonartrosis tricompartimental, meniscopatía degenerativa, desgarro compuesto
+   ✅ extrusión meniscal, condromalacia grado III/IV, tendinopatía, entesitis
+   ✅ derrame articular, edema óseo, sinovitis, flogosis de partes blandas
+   ✅ injuria ósea por estrés, disposición en garra, subluxación
+   ❌ NO generalizar: "alteraciones", "cambios inespecíficos"
+
+3️⃣ REDACCIÓN PROFESIONAL:
+   ✅ Texto corrido, narrativo, UNA SOLA PIEZA (no ítems, no viñetas en conclusión)
+   ✅ Redacción directa: "Desgarro del LCA" (NO "se observa desgarro del LCA")
+   ❌ Evitar verbos innecesarios: "se observa", "se identifica", "se evidencia"
+   ✅ Sintética: 2-4 líneas como máximo
+   ✅ Sin repetir frases literales del comentario
+
+4️⃣ COMPLETITUD - Incluir TODOS los hallazgos patológicos mencionados:
+   ✅ NO omitir patología descrita en COMENTARIO
+   ❌ NO describir estructuras normales (salvo que sea clínicamente relevante)
+   ❌ NO agregar sugerencias ni recomendaciones clínicas
+
+5️⃣ Si todo normal → "Estudio dentro de los parámetros normales."
 
 Ejemplo de estudio normal:
 COMENTARIO
@@ -661,9 +691,14 @@ Estudio dentro de los parámetros normales.
 ✅ NO escribir todo junto: Cada oración termina con punto y NUEVA LÍNEA
 ✅ CONSERVAR líneas normales de estructuras no dictadas
 
-9. CONCLUSIÓN:
-   • Con patología → Resumir solo hallazgos patológicos mencionados
-   • Sin patología (todo normal) → "Estudio dentro de los parámetros normales."
+9. CONCLUSIÓN (RADIÓLOGO PROFESIONAL):
+   • Texto corrido, narrativo (NO ítems ni viñetas en la conclusión)
+   • Redacción directa: "Desgarro del LCA" (NO "se observa desgarro")
+   • Jerarquía: patología principal → asociados → secundarios → cierre
+   • Terminología estándar (gonartrosis, meniscopatía, tendinopatía, etc.)
+   • 2-4 líneas máximo, sin repetir frases literales del comentario
+   • NO describir estructuras normales, NO agregar sugerencias clínicas
+   • Si todo normal → "Estudio dentro de los parámetros normales."
 
 10. Estudio comparativo → Primera línea COMENTARIO: "Comparativo con [fecha]"
 11. Frases "el resto normal" → usa líneas normales plantilla (no la frase literal)"""
