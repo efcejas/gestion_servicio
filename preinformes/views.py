@@ -28,7 +28,7 @@ User = get_user_model()
 # === VISTAS PARA RESIDENTES ===
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def dashboard_residente(request):
     """Dashboard principal para residentes"""
     # Obtener o crear historial del residente
@@ -92,7 +92,7 @@ def crear_preinforme(request):
             
             return redirect(f"{reverse('preinformes:crear_plantilla_residente')}?tipo_estudio={tipo_estudio}&region={region}")
         
-        form = PreinformeForm(request.POST)
+        form = PreinformeForm(request.POST, user=request.user)
         if form.is_valid():
             preinforme = form.save(commit=False)
             preinforme.residente = request.user
@@ -141,7 +141,7 @@ def crear_preinforme(request):
             except PlantillaPreinforme.DoesNotExist:
                 pass
         
-        form = PreinformeForm(initial=initial_data if initial_data else None)
+        form = PreinformeForm(initial=initial_data if initial_data else None, user=request.user)
     
     context = {
         'form': form,
@@ -152,7 +152,7 @@ def crear_preinforme(request):
 
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def editar_preinforme(request, pk):
     """Editar preinforme existente (solo si está pendiente de revisión y es el creador)"""
     preinforme = get_object_or_404(Preinforme, pk=pk)
@@ -168,7 +168,7 @@ def editar_preinforme(request, pk):
         preinforme.marcar_en_edicion(request.user)
 
     if request.method == 'POST':
-        form = PreinformeForm(request.POST, instance=preinforme)
+        form = PreinformeForm(request.POST, instance=preinforme, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Preinforme actualizado exitosamente.')
@@ -185,7 +185,7 @@ def editar_preinforme(request, pk):
                 preinforme.liberar_edicion()
                 return redirect('preinformes:dashboard_residente')
     else:
-        form = PreinformeForm(instance=preinforme)
+        form = PreinformeForm(instance=preinforme, user=request.user)
 
     context = {
         'form': form,
@@ -197,7 +197,7 @@ def editar_preinforme(request, pk):
 
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def mis_preinformes(request):
     """Lista de preinformes del residente"""
     form = FiltroPreinformesForm(request.GET)
@@ -249,7 +249,7 @@ def mis_preinformes(request):
 
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def ver_preinforme(request, pk):
     """Ver detalle de preinforme con revisión si existe"""
     preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
@@ -268,9 +268,16 @@ def ver_preinforme(request, pk):
 @role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def dashboard_staff(request):
     """Dashboard para médicos de staff"""
-    # Preinformes pendientes de revisión
+    # Preinformes asignados a mí (pendientes o en revisión)
+    mis_asignados = Preinforme.objects.filter(
+        revisor=request.user,
+        estado__in=['pendiente_revision', 'en_revision']
+    ).count()
+    
+    # Preinformes sin asignar (pendientes de revisión sin revisor)
     pendientes_revision = Preinforme.objects.filter(
-        estado='pendiente_revision'
+        estado='pendiente_revision',
+        revisor__isnull=True
     ).count()
     
     # Preinformes en revisión por este usuario
@@ -285,15 +292,24 @@ def dashboard_staff(request):
         fecha_creacion__year=timezone.now().year
     ).count()
     
-    # Últimos preinformes pendientes
+    # Últimos preinformes asignados a mí
+    mis_ultimos_asignados = Preinforme.objects.filter(
+        revisor=request.user,
+        estado__in=['pendiente_revision', 'en_revision']
+    ).order_by('-fecha_envio_revision')[:5]
+    
+    # Últimos preinformes pendientes sin asignar
     ultimos_pendientes = Preinforme.objects.filter(
-        estado='pendiente_revision'
+        estado='pendiente_revision',
+        revisor__isnull=True
     ).order_by('-fecha_envio_revision')[:5]
     
     context = {
+        'mis_asignados': mis_asignados,
         'pendientes_revision': pendientes_revision,
         'en_revision': en_revision,
         'total_preinformes_mes': total_preinformes_mes,
+        'mis_ultimos_asignados': mis_ultimos_asignados,
         'ultimos_pendientes': ultimos_pendientes,
     }
     
@@ -306,27 +322,43 @@ def lista_revision(request):
     """Lista de preinformes para revisar"""
     form = FiltroPreinformesForm(request.GET)
     
-    # Solo preinformes pendientes o en revisión por este usuario
-    preinformes = Preinforme.objects.filter(
-        Q(estado='pendiente_revision') | 
-        Q(estado='en_revision', revisor=request.user)
-    )
+    # Filtro para mostrar diferentes categorías
+    mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'todos'
     
-    # Aplicar filtros (eliminar residente del form para staff)
+    if mostrar == 'asignados':
+        # Solo mis preinformes asignados
+        preinformes = Preinforme.objects.filter(
+            Q(revisor=request.user) & Q(estado__in=['pendiente_revision', 'en_revision'])
+        )
+    elif mostrar == 'sin_asignar':
+        # Solo preinformes sin asignar
+        preinformes = Preinforme.objects.filter(
+            estado='pendiente_revision',
+            revisor__isnull=True
+        )
+    else:
+        # Todos: pendientes sin asignar o asignados a mí, o en revisión por mí
+        preinformes = Preinforme.objects.filter(
+            Q(estado='pendiente_revision', revisor__isnull=True) |
+            Q(estado='pendiente_revision', revisor=request.user) |
+            Q(estado='en_revision', revisor=request.user)
+        )
+    
+    # Aplicar filtros
     if form.is_valid():
-        if form.cleaned_data['estado']:
+        if form.cleaned_data.get('estado'):
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
-        if form.cleaned_data['tipo_estudio']:
+        if form.cleaned_data.get('tipo_estudio'):
             preinformes = preinformes.filter(tipo_estudio=form.cleaned_data['tipo_estudio'])
-        if form.cleaned_data['region']:
+        if form.cleaned_data.get('region'):
             preinformes = preinformes.filter(region=form.cleaned_data['region'])
-        if form.cleaned_data['residente']:
+        if form.cleaned_data.get('residente'):
             preinformes = preinformes.filter(residente=form.cleaned_data['residente'])
-        if form.cleaned_data['fecha_desde']:
+        if form.cleaned_data.get('fecha_desde'):
             preinformes = preinformes.filter(fecha_envio_revision__date__gte=form.cleaned_data['fecha_desde'])
-        if form.cleaned_data['fecha_hasta']:
+        if form.cleaned_data.get('fecha_hasta'):
             preinformes = preinformes.filter(fecha_envio_revision__date__lte=form.cleaned_data['fecha_hasta'])
-        if form.cleaned_data['numero_estudio']:
+        if form.cleaned_data.get('numero_estudio'):
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
     
     preinformes = preinformes.order_by('-fecha_envio_revision')
@@ -339,10 +371,54 @@ def lista_revision(request):
     context = {
         'page_obj': page_obj,
         'form': form,
-        'title': 'Preinformes para Revisar'
+        'title': 'Preinformes para Revisar',
+        'mostrar': mostrar,  # Para debugging y preservar filtro
     }
     
     return render(request, 'preinformes/lista_revision.html', context)
+
+
+@login_required
+@role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
+def asignar_revisor(request, pk):
+    """Asignar un revisor a un preinforme (o asignarse a uno mismo)"""
+    preinforme = get_object_or_404(Preinforme, pk=pk)
+    
+    # Obtener de dónde viene para redirigir correctamente
+    mostrar = request.GET.get('mostrar', 'asignados')
+    redirect_url = f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
+    
+    # Solo se pueden asignar preinformes pendientes o en revisión
+    if preinforme.estado not in ['pendiente_revision', 'en_revision']:
+        messages.error(request, 'Solo se pueden asignar preinformes pendientes o en revisión.')
+        return redirect(redirect_url)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        
+        if action == 'asignarme':
+            # Asignarse a sí mismo
+            preinforme.revisor = request.user
+            preinforme.save()
+            messages.success(request, f'Te asignaste el preinforme #{preinforme.numero_estudio}.')
+        elif action == 'desasignar':
+            # Desasignar el preinforme
+            preinforme.revisor = None
+            preinforme.save()
+            messages.success(request, f'Desasignaste el preinforme #{preinforme.numero_estudio}.')
+        else:
+            # Asignar a otro usuario específico
+            revisor_id = request.POST.get('revisor_id')
+            if revisor_id:
+                try:
+                    revisor = User.objects.get(pk=revisor_id, rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'])
+                    preinforme.revisor = revisor
+                    preinforme.save()
+                    messages.success(request, f'Asignaste el preinforme #{preinforme.numero_estudio} a {revisor.get_full_name()}.')
+                except User.DoesNotExist:
+                    messages.error(request, 'Revisor no válido.')
+    
+    return redirect(redirect_url)
 
 
 @login_required
@@ -530,7 +606,7 @@ def plantilla_json(request, pk):
 
 
 @login_required
-@role_required('medico_residente', 'jefe_residentes')
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def crear_plantilla_residente(request):
     """Vista para que residentes creen nuevas plantillas (página completa)"""
     # Obtener tipo_estudio y region desde GET o sesión

@@ -8,6 +8,20 @@ User = get_user_model()
 class PreinformeForm(forms.ModelForm):
     """Formulario para crear/editar preinformes"""
     
+    # Campo adicional para asignar revisor
+    revisor = forms.ModelChoiceField(
+        queryset=User.objects.filter(
+            rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+        ).order_by('first_name', 'last_name'),
+        required=False,
+        empty_label="Asignar revisor (opcional)",
+        label="Asignar a",
+        help_text="Selecciona un médico staff para que revise este preinforme",
+        widget=forms.Select(attrs={
+            'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors'
+        })
+    )
+    
     class Meta:
         model = Preinforme
         fields = [
@@ -16,6 +30,7 @@ class PreinformeForm(forms.ModelForm):
             'region',
             'sistema_destino',
             'plantilla_utilizada',
+            'revisor',
             'apellido_paciente',
             'nombre_paciente',
             'dni_paciente',
@@ -70,7 +85,10 @@ class PreinformeForm(forms.ModelForm):
         }
     
     def __init__(self, *args, **kwargs):
+        # Extraer el usuario del kwargs
+        user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        
         # Filtrar plantillas activas
         self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.filter(activa=True)
         self.fields['plantilla_utilizada'].empty_label = "Seleccionar plantilla (opcional)"
@@ -78,6 +96,19 @@ class PreinformeForm(forms.ModelForm):
         # Filtrar tipos de estudio y regiones activas
         self.fields['tipo_estudio'].queryset = TipoEstudio.objects.filter(activo=True)
         self.fields['region'].queryset = Region.objects.filter(activo=True)
+        
+        # Filtrar revisores según el rol del usuario
+        if user:
+            if user.rol == 'medico_residente':
+                # Residentes pueden asignar a: staff, jefes, instructores y jefe servicio
+                self.fields['revisor'].queryset = User.objects.filter(
+                    rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+                ).order_by('first_name', 'last_name')
+            elif user.rol in ['jefe_residentes', 'instructor_residentes']:
+                # Jefes e instructores solo pueden asignar a: staff y jefe servicio
+                self.fields['revisor'].queryset = User.objects.filter(
+                    rol__in=['medico_staff', 'jefe_servicio']
+                ).order_by('first_name', 'last_name')
 
 
 class FiltroPreinformesForm(forms.Form):
