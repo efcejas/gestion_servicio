@@ -433,14 +433,23 @@ def revisar_preinforme(request, pk):
         estado__in=['pendiente_revision', 'en_revision']
     )
     
-    # Si está pendiente, iniciar revisión
+    # Lógica de asignación automática
     if preinforme.estado == 'pendiente_revision':
+        # Si está pendiente, iniciar revisión y asignar al usuario actual
         preinforme.iniciar_revision(request.user)
-    
-    # Verificar que este usuario es el revisor
-    if preinforme.estado == 'en_revision' and preinforme.revisor != request.user:
-        messages.error(request, 'Este preinforme está siendo revisado por otro médico.')
-        return redirect('preinformes:lista_revision')
+    elif preinforme.estado == 'en_revision':
+        # Si está en revisión, verificar quién es el revisor
+        if preinforme.revisor is None:
+            # Sin revisor asignado → asignarse automáticamente
+            preinforme.revisor = request.user
+            preinforme.save(update_fields=['revisor'])
+        elif preinforme.revisor != request.user:
+            # Otro médico lo está revisando
+            messages.error(
+                request, 
+                f'Este preinforme está siendo revisado por {preinforme.revisor.get_full_name()}.'
+            )
+            return redirect('preinformes:lista_revision')
     
     # Obtener o crear revisión
     revision, created = RevisionPreinforme.objects.get_or_create(
