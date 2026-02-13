@@ -89,6 +89,9 @@ class PreinformeForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
+        # Configurar el campo revisor para mostrar nombre completo
+        self.fields['revisor'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+        
         # Filtrar plantillas activas
         self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.filter(activa=True)
         self.fields['plantilla_utilizada'].empty_label = "Seleccionar plantilla (opcional)"
