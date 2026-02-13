@@ -24,6 +24,7 @@ from control_guardias.models import Guardia, MedicoGuardia
 from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
 from agenda.models import AgendaItem, NotaPersonal
+from equipos.models import EquipoImagen
 
 
 def superuser_required(view_func):
@@ -142,8 +143,8 @@ class HomeView(LoginRequiredMixin, TemplateView):
 
         context['ultimos_registros_medicos'] = ultimos_registros
 
-        # 🚀 Datos de eventos actuales
-        eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'pendiente'])
+        # Datos de eventos actuales (estados válidos: abierto, en_revision, resuelto)
+        eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'en_revision'])
         context['cantidad_eventos_abiertos'] = eventos_abiertos.count()
 
         ultima_actualizacion = None
@@ -177,7 +178,14 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             context.update(self.get_eventos_context())
         except Exception as e:
             print(f"❌ Error en eventos: {e}")
-            context.update({'cantidad_eventos_abiertos': 0, 'ultimo_evento_abierto': None})
+            import traceback
+            traceback.print_exc()
+            context.update({
+                'cantidad_eventos_abiertos': 0,
+                'cantidad_eventos_en_revision': 0,
+                'cantidad_eventos_resueltos_hoy': 0,
+                'ultimo_evento_abierto': None
+            })
 
         try:
             context.update(self.get_medicos_context())
@@ -229,6 +237,20 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'preinformes_en_revision_count': 0,
             })
 
+        try:
+            context.update(self.get_equipos_context())
+        except Exception as e:
+            print(f"❌ Error en equipos: {e}")
+            import traceback
+            traceback.print_exc()
+            context.update({
+                'equipos_total': 0,
+                'equipos_en_servicio': 0,
+                'equipos_fuera_servicio': 0,
+                'equipos_por_area': [],
+                'equipos_recientes': [],
+            })
+
         return context
 
     # ------------------------ EVENTOS ------------------------
@@ -245,12 +267,25 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             fecha_creacion__date=hoy
         )
         
-        return {
-            'cantidad_eventos_abiertos': eventos_abiertos.count(),
-            'cantidad_eventos_en_revision': eventos_en_revision.count(),
-            'cantidad_eventos_resueltos_hoy': eventos_resueltos_hoy.count(),
-            'ultimo_evento_abierto': eventos_abiertos.order_by('-fecha_creacion').first(),
+        # Contadores
+        count_abiertos = eventos_abiertos.count()
+        count_en_revision = eventos_en_revision.count()
+        count_resueltos = eventos_resueltos_hoy.count()
+        
+        # Buscar último evento activo (abierto o en revisión)
+        ultimo_evento = EventoServicio.objects.filter(
+            estado__in=['abierto', 'en_revision']
+        ).order_by('-fecha_creacion').first()
+        
+        context = {
+            'cantidad_eventos_abiertos': count_abiertos,
+            'cantidad_eventos_en_revision': count_en_revision,
+            'cantidad_eventos_resueltos_hoy': count_resueltos,
+            'ultimo_evento_abierto': ultimo_evento,
         }
+        
+        print(f"  - Contexto devuelto: {context}")
+        return context
 
     # ------------------------ MÉDICOS ------------------------
 
@@ -458,6 +493,41 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'preinformes_pendientes_count': 0,
                 'preinformes_en_revision_count': 0,
             }
+
+    # ------------------------ EQUIPOS ------------------------
+
+    def get_equipos_context(self):
+        """Obtiene el contexto de equipos de imágenes para el dashboard"""
+        # Total de equipos
+        equipos_total = EquipoImagen.objects.count()
+        
+        # Equipos en servicio y fuera de servicio
+        equipos_en_servicio = EquipoImagen.objects.filter(en_servicio=True).count()
+        equipos_fuera_servicio = EquipoImagen.objects.filter(en_servicio=False).count()
+        
+        # Distribución por área
+        equipos_por_area = EquipoImagen.objects.values('area').annotate(
+            cantidad=Count('id')
+        ).order_by('-cantidad')
+        
+        # Agregar nombre legible del área
+        from equipos.models import AreaServicio
+        for area_data in equipos_por_area:
+            area_data['area_display'] = dict(AreaServicio.choices).get(
+                area_data['area'], 
+                area_data['area']
+            )
+        
+        # Últimos 5 equipos agregados
+        equipos_recientes = EquipoImagen.objects.order_by('-fecha_creacion')[:5]
+        
+        return {
+            'equipos_total': equipos_total,
+            'equipos_en_servicio': equipos_en_servicio,
+            'equipos_fuera_servicio': equipos_fuera_servicio,
+            'equipos_por_area': list(equipos_por_area),
+            'equipos_recientes': equipos_recientes,
+        }
 
 @superuser_required
 def eventos_modal(request):

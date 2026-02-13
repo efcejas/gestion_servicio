@@ -180,20 +180,20 @@
                     <!-- Estudios por Profesional -->
                     {% url 'liquidacion:informados_por_medico_por_mes' as estudios_url %}
                     {% if estudios_url %}
-                    <a href="{{ estudios_url }}" 
+                    <!-- <a href="{{ estudios_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
                         <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>Estudios por Profesional
-                    </a>
+                    </a> -->
                     {% endif %}
 
                     <!-- Calendario de Guardias (solo superusuarios) -->
                     {% if user.is_superuser %}
                     {% url 'control_guardias:calendario_guardias_full_tw' as guardias_url %}
                     {% if guardias_url %}
-                    <a href="{{ guardias_url }}" 
+                    <!-- <a href="{{ guardias_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
                         <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
-                    </a>
+                    </a> -->
                     {% endif %}
                     {% endif %}
 
