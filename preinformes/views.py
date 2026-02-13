@@ -331,17 +331,16 @@ def lista_revision(request):
             Q(revisor=request.user) & Q(estado__in=['pendiente_revision', 'en_revision'])
         )
     elif mostrar == 'sin_asignar':
-        # Solo preinformes sin asignar
+        # Preinformes sin revisor asignado
         preinformes = Preinforme.objects.filter(
-            estado='pendiente_revision',
+            estado__in=['pendiente_revision', 'en_revision'],
             revisor__isnull=True
         )
     else:
-        # Todos: pendientes sin asignar o asignados a mí, o en revisión por mí
+        # Todos: pendientes/en_revision sin asignar, o asignados a mí
         preinformes = Preinforme.objects.filter(
-            Q(estado='pendiente_revision', revisor__isnull=True) |
-            Q(estado='pendiente_revision', revisor=request.user) |
-            Q(estado='en_revision', revisor=request.user)
+            Q(estado__in=['pendiente_revision', 'en_revision'], revisor__isnull=True) |
+            Q(estado__in=['pendiente_revision', 'en_revision'], revisor=request.user)
         )
     
     # Aplicar filtros
@@ -404,6 +403,9 @@ def asignar_revisor(request, pk):
         elif action == 'desasignar':
             # Desasignar el preinforme
             preinforme.revisor = None
+            # Si estaba en revisión, volver a pendiente
+            if preinforme.estado == 'en_revision':
+                preinforme.estado = 'pendiente_revision'
             preinforme.save()
             messages.success(request, f'Desasignaste el preinforme #{preinforme.numero_estudio}.')
         else:

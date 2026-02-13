@@ -4,6 +4,10 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block extra_css %}
+<!-- Preload CKEditor para carga más rápida -->
+<link rel="preconnect" href="https://cdn.ckeditor.com">
+<link rel="dns-prefetch" href="https://cdn.ckeditor.com">
+
 <style>
     /* Fix crítico para CKEditor + Tailwind */
     .ck-editor__editable p,
@@ -33,6 +37,9 @@
 {% endblock %}
 
 {% block content %}
+<!-- Cargar CKEditor lo antes posible -->
+{{ form.media }}
+
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
     
     <!-- Header con Gradiente -->
@@ -244,9 +251,6 @@
         </div>
     </div>
 
-    <!-- CKEditor Media -->
-    {{ form.media }}
-
 </div>
 
 <script>
@@ -333,7 +337,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const editorContainer = document.getElementById('editor-container');
     
     if (editorElement) {
-        const checkEditor = setInterval(() => {
+        // Intentar primero con el evento nativo de CKEditor si está disponible
+        const initEditor = () => {
             if (editorElement.ckeditorInstance) {
                 editorInstance = editorElement.ckeditorInstance;
                 
@@ -346,13 +351,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 
                 startAutosave();
-                clearInterval(checkEditor);
-                
                 console.log('✅ CKEditor cargado y listo');
+                return true;
             }
-        }, 500);
+            return false;
+        };
         
-        // Timeout de seguridad: si después de 10 segundos no se carga, mostrar de todos modos
+        // Intentar detectar el evento de carga del widget Django CKEditor5
+        editorElement.addEventListener('ckeditor5:ready', function() {
+            console.log('📝 CKEditor evento nativo detectado');
+            initEditor();
+        });
+        
+        // Fallback: polling más rápido (100ms en lugar de 500ms)
+        const checkEditor = setInterval(() => {
+            if (initEditor()) {
+                clearInterval(checkEditor);
+            }
+        }, 100);
+        
+        // Timeout de seguridad: si después de 8 segundos no se carga, mostrar de todos modos
         setTimeout(() => {
             if (editorLoading && editorLoading.style.display !== 'none') {
                 console.warn('⚠️ CKEditor tardó demasiado, mostrando de todos modos');
@@ -362,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 clearInterval(checkEditor);
             }
-        }, 10000);
+        }, 8000);
     }
 });
 
