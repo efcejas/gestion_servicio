@@ -1,4 +1,5 @@
 # Importaciones de bibliotecas estándar de Python
+import logging
 from datetime import datetime
 
 # Importaciones de Django (ordenadas alfabéticamente)
@@ -34,6 +35,7 @@ from django.conf import settings
 
 # Variables globales
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class EventoServicioCreateView(LoginRequiredMixin, CreateView):
@@ -79,11 +81,12 @@ class EventoServicioCreateView(LoginRequiredMixin, CreateView):
         try:
             subject = f"Nuevo evento creado: {tipo_evento_display}"
             message = f"Se ha creado un nuevo evento.\n\nTipo: {tipo_evento_display}\n{servicio_info}\n{paciente_info}\nDescripción: {self.object.descripcion}"
-            from_email = settings.EMAIL_HOST_USER
+            from_email = settings.DEFAULT_FROM_EMAIL
             recipient_list = ["ecejas@sanatoriocolegiales.com.ar"]
-            send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+            send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+            logger.info(f"Email de notificación enviado para evento {self.object.id}")
         except Exception as e:
-            pass
+            logger.error(f"Error enviando email de notificación: {e}", exc_info=True)
         
         return response
 
@@ -289,11 +292,12 @@ class EventoServicioDetailView(LoginRequiredMixin, DetailView):
                         f"Nota: {nota.comentario}\n"
                         f"Autor de la nota: {nota.creado_por.get_full_name()}"
                     )
-                    from_email = settings.EMAIL_HOST_USER
+                    from_email = settings.DEFAULT_FROM_EMAIL
                     recipient_list = ["ecejas@sanatoriocolegiales.com.ar"]
-                    send_mail(subject, message, from_email, recipient_list, fail_silently=True)
+                    send_mail(subject, message, from_email, recipient_list, fail_silently=False)
+                    logger.info(f"Email de notificación enviado para nota en evento {self.object.id}")
                 except Exception as e:
-                    pass
+                    logger.error(f"Error enviando email de notificación de nota: {e}", exc_info=True)
                 
                 # Mensaje contextual con información del evento
                 paciente_info = f" para {self.object.nombre_paciente}" if self.object.nombre_paciente else ""
