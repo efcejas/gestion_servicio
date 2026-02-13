@@ -95,7 +95,7 @@ class PreinformeForm(forms.ModelForm):
         # Si estamos procesando datos del formulario (POST), permitir todas las plantillas activas
         # para que pase la validación inicial. El método clean_plantilla_utilizada validará correctamente
         if self.is_bound and self.data:
-            self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.filter(activo=True)
+            self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.filter(activa=True)
         else:
             # En carga inicial, mantener vacío para carga dinámica via JavaScript
             self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.none()
@@ -137,7 +137,7 @@ class PreinformeForm(forms.ModelForm):
                     id=plantilla.id,
                     tipo_estudio=tipo_estudio,
                     region=region,
-                    activo=True
+                    activa=True
                 )
                 return plantilla_valida
             except PlantillaPreinforme.DoesNotExist:
