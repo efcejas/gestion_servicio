@@ -367,48 +367,73 @@ document.addEventListener('DOMContentLoaded', function() {
         const regionId = regionSelect.value;
         const sistemaDestino = document.getElementById('id_sistema_destino')?.value || 'eges';
 
-        if (tipoEstudioId && regionId) {
-            return fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Guardar plantilla seleccionada actual
-                    const plantillaActual = plantillaSelect.value;
-                    
-                    // Limpiar opciones existentes
-                    plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
-                    
-                    // Agregar nuevas opciones con badge de sistema
-                    data.plantillas.forEach(plantilla => {
-                        const option = document.createElement('option');
-                        option.value = plantilla.id;
-                        option.textContent = plantilla.nombre + (plantilla.sistema_destino ? ` [${plantilla.sistema_destino}]` : '');
-                        plantillaSelect.appendChild(option);
-                    });
-                    
-                    // Restaurar selección si todavía existe
-                    if (plantillaActual) {
-                        const optionExists = Array.from(plantillaSelect.options).some(opt => opt.value === plantillaActual);
-                        if (optionExists) {
-                            plantillaSelect.value = plantillaActual;
-                        }
-                    }
-        
-        // Si no hay plantilla seleccionada, limpiar el editor
-        if (!plantillaId) {
-            console.log('🧹 Limpiando contenido del editor');
-            setEditorContent('');
-            return;
-        }
-                    return data;
-                })
-                .catch(error => {
-                    console.error('Error cargando plantillas:', error);
-                    throw error;
-                });
-        } else {
-            plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+        // Verificar si ambos campos están seleccionados
+        if (!tipoEstudioId || !regionId) {
+            // Limpiar y deshabilitar el selector de plantillas
+            plantillaSelect.innerHTML = '<option value="">Primero selecciona tipo y región</option>';
+            plantillaSelect.disabled = true;
+            
             return Promise.resolve();
         }
+
+        // Habilitar selector de plantillas
+        plantillaSelect.disabled = false;
+
+        // Mostrar spinner mientras carga
+        const spinner = document.getElementById('plantillaLoadingSpinner');
+        if (spinner) {
+            spinner.classList.remove('hidden');
+        }
+
+        return fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
+            .then(response => response.json())
+            .then(data => {
+                // Guardar plantilla seleccionada actual
+                const plantillaActual = plantillaSelect.value;
+                
+                // Limpiar opciones existentes
+                plantillaSelect.innerHTML = '<option value="">Seleccionar plantilla (opcional)</option>';
+                
+                // Agregar nuevas opciones con badge de sistema
+                data.plantillas.forEach(plantilla => {
+                    const option = document.createElement('option');
+                    option.value = plantilla.id;
+                    option.textContent = plantilla.nombre + (plantilla.sistema_destino ? ` [${plantilla.sistema_destino}]` : '');
+                    plantillaSelect.appendChild(option);
+                });
+                
+                // Restaurar selección si todavía existe
+                if (plantillaActual) {
+                    const optionExists = Array.from(plantillaSelect.options).some(opt => opt.value === plantillaActual);
+                    if (optionExists) {
+                        plantillaSelect.value = plantillaActual;
+                    }
+                }
+    
+    // Si no hay plantilla seleccionada, limpiar el editor
+    if (!plantillaId) {
+        console.log('🧹 Limpiando contenido del editor');
+        setEditorContent('');
+        return;
+    }
+                
+                // Ocultar spinner
+                if (spinner) {
+                    spinner.classList.add('hidden');
+                }
+                
+                return data;
+            })
+            .catch(error => {
+                console.error('Error cargando plantillas:', error);
+                
+                // Ocultar spinner
+                if (spinner) {
+                    spinner.classList.add('hidden');
+                }
+                
+                throw error;
+            });
     }
 
     function aplicarPlantilla() {
@@ -549,6 +574,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const sistemaDestinoField = document.getElementById('id_sistema_destino');
     if (sistemaDestinoField) {
         sistemaDestinoField.addEventListener('change', cargarPlantillas);
+    }
+
+    // Inicializar estado del selector de plantillas
+    if (!tipoEstudioSelect.value || !regionSelect.value) {
+        plantillaSelect.disabled = true;
+        plantillaSelect.innerHTML = '<option value="">Primero selecciona tipo y región</option>';
     }
 
     // Cargar plantillas al inicio si hay valores seleccionados

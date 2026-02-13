@@ -92,9 +92,9 @@ class PreinformeForm(forms.ModelForm):
         # Configurar el campo revisor para mostrar nombre completo
         self.fields['revisor'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
         
-        # Filtrar plantillas activas
-        self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.filter(activa=True)
-        self.fields['plantilla_utilizada'].empty_label = "Seleccionar plantilla (opcional)"
+        # Inicializar plantillas vacías - se cargarán dinámicamente via JavaScript
+        self.fields['plantilla_utilizada'].queryset = PlantillaPreinforme.objects.none()
+        self.fields['plantilla_utilizada'].empty_label = "Primero selecciona tipo y región"
         
         # Filtrar tipos de estudio y regiones activas
         self.fields['tipo_estudio'].queryset = TipoEstudio.objects.filter(activo=True)
