@@ -112,6 +112,35 @@ class PreinformeForm(forms.ModelForm):
                 self.fields['revisor'].queryset = User.objects.filter(
                     rol__in=['medico_staff', 'jefe_servicio']
                 ).order_by('first_name', 'last_name')
+    
+    def clean_plantilla_utilizada(self):
+        """
+        Validación personalizada para plantilla_utilizada.
+        Como el queryset inicial es .none() para carga dinámica,
+        necesitamos validar manualmente contra la base de datos.
+        """
+        plantilla = self.cleaned_data.get('plantilla_utilizada')
+        
+        if plantilla:
+            # Validar que la plantilla existe y es válida para el tipo y región seleccionados
+            tipo_estudio = self.cleaned_data.get('tipo_estudio')
+            region = self.cleaned_data.get('region')
+            
+            try:
+                # Verificar que la plantilla existe y coincide con tipo_estudio y region
+                plantilla_valida = PlantillaPreinforme.objects.get(
+                    id=plantilla.id,
+                    tipo_estudio=tipo_estudio,
+                    region=region,
+                    activo=True
+                )
+                return plantilla_valida
+            except PlantillaPreinforme.DoesNotExist:
+                raise forms.ValidationError(
+                    "La plantilla seleccionada no es válida para el tipo de estudio y región especificados."
+                )
+        
+        return plantilla
 
 
 class FiltroPreinformesForm(forms.Form):
