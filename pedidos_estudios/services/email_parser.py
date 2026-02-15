@@ -89,6 +89,7 @@ class EmailParser:
             r'ubicaci[oó]n\s*:\s*piso\s+(\d+)',
         ],
         'estudio': [
+            # Patrones que capturan el estudio en la misma línea
             r'tipo\s*:?\s*([^\n]+?)(?=\s*(?:datos\s*cl[ií]nicos|indicaci[oó]n|medico|$))',
             r'estudio\s*requerido\s*:?\s*(?:tipo\s*:?\s*)?([^\n]+)',
             r'estudio\s*solicitado\s*:?\s*([^\n]+)',
@@ -96,6 +97,11 @@ class EmailParser:
             r'tipo\s*de\s*estudio\s*:?\s*([^\n]+)',
             r'solicito\s*:?\s*([^\n]+)',
             r'solicita\s*:?\s*([^\n]+)',
+            # Patrones que capturan cuando el valor está en la siguiente línea (con salto)
+            r'estudio\s*solicitado\s*:?\s*\n\s*([^\n]+)',
+            r'estudio\s*requerido\s*:?\s*\n\s*(?:tipo\s*:?\s*\n\s*)?([^\n]+)',
+            r'tipo\s*de\s*estudio\s*:?\s*\n\s*([^\n]+)',
+            r'(?:^|\n)\s*estudio\s*:?\s*\n\s*([^\n]+)',
             # Formato simple: línea que empieza con palabras clave de estudios
             r'(?:^|\n)\s*(ecodoppler[^\n]+)',
             r'(?:^|\n)\s*(ecocardio(?:grama)?[^\n]+)',
@@ -119,6 +125,16 @@ class EmailParser:
             r'obra\s*social\s*:?\s*([a-záéíóúñ0-9][^\n]+?)(?=\s*(?:nro|afiliado|estudio|$))',
             r'o\.?\s*s\.?\s*:?\s*([a-záéíóúñ0-9][^\n]+)',
             r'cobertura\s*:?\s*([a-záéíóúñ][^\n]+)',
+        ],
+        'indicacion_clinica': [
+            # Mismo patrón que estudio: captura misma línea o siguiente línea
+            r'indicaci[oó]n\s*cl[ií]nica\s*:?\s*([^\n]+)',
+            r'indicaci[oó]n\s*:?\s*([^\n]+)',
+            r'datos\s*cl[ií]nicos\s*:?\s*([^\n]+)',
+            # Con salto de línea
+            r'indicaci[oó]n\s*cl[ií]nica\s*:?\s*\n\s*([^\n]+)',
+            r'indicaci[oó]n\s*:?\s*\n\s*([^\n]+)',
+            r'datos\s*cl[ií]nicos\s*:?\s*\n\s*([^\n]+)',
         ],
     }
     
@@ -388,6 +404,13 @@ class EmailParser:
                 # Eliminar palabras que no forman parte del nombre del médico
                 medico = re.sub(r'\s+(servicio|interno|int|cl[ií]nica)\b.*$', '', medico, flags=re.IGNORECASE)
                 datos['medico_solicitante'] = medico
+                break
+        
+        # Extraer indicación clínica
+        for patron in self.PATRONES.get('indicacion_clinica', []):
+            match = re.search(patron, texto_busqueda, re.IGNORECASE)
+            if match:
+                datos['indicacion_clinica'] = self._limpiar_valor(match.group(1))
                 break
         
         # Si no se encontró descripción, usar el asunto del email
