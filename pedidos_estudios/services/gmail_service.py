@@ -4,8 +4,11 @@ Servicio para conexión y lectura de emails desde Gmail usando la API de Google.
 Documentación oficial: https://developers.google.com/gmail/api/guides
 """
 import base64
+import json
 import logging
+import os
 from email.mime.text import MIMEText
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 
@@ -67,42 +70,99 @@ class GmailService:
         """
         Autentica con Google OAuth 2.0 y construye el servicio de Gmail.
         
-        Primera vez:
-        1. Descarga credentials.json desde Google Cloud Console
-        2. Ejecuta el script y se abrirá el navegador para autorizar
-        3. Se guardará token.json para futuros usos
+        Soporta dos modos:
+        1. PRODUCCIÓN (Heroku): Lee credenciales desde variables de entorno
+           - GMAIL_TOKEN_JSON: Token de acceso en formato JSON
+           - GMAIL_CREDENTIALS_JSON: Credenciales OAuth (fallback)
         
-        Siguientes veces: Usa token.json automáticamente
+        2. DESARROLLO: Lee desde archivos locales
+           - token.json: Token generado localmente
+           - credentials.json: Credenciales descargadas de Google Cloud
+        
+        El token se renueva automáticamente si está expirado.
         """
         creds = None
         token_file = self.config.get('TOKEN_FILE', 'token.json')
         credentials_file = self.config.get('CREDENTIALS_FILE', 'credentials.json')
         
-        # Cargar credenciales guardadas si existen
-        try:
-            from pathlib import Path
-            if Path(token_file).exists():
-                creds = Credentials.from_authorized_user_file(token_file, self.SCOPES)
-        except Exception as e:
-            logger.warning(f"No se pudo cargar token guardado: {e}")
+        # MODO 1: Intentar cargar desde variables de entorno (PRODUCCIÓN)
+        if os.getenv('GMAIL_TOKEN_JSON'):
+            try:
+                logger.info("Cargando token desde variable de entorno GMAIL_TOKEN_JSON")
+                token_data = json.loads(os.getenv('GMAIL_TOKEN_JSON'))
+                creds = Credentials.from_authorized_user_info(token_data, self.SCOPES)
+                logger.info("✓ Token cargado exitosamente desde variable de entorno")
+            except Exception as e:
+                logger.error(f"Error cargando token desde variable de entorno: {e}")
         
-        # Si no hay credenciales válidas, solicitar login
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
+        # MODO 2: Fallback a archivos locales (DESARROLLO)
+        if not creds:
+            try:
+                if Path(token_file).exists():
+                    logger.info(f"Cargando token desde archivo: {token_file}")
+                    creds = Credentials.from_authorized_user_file(token_file, self.SCOPES)
+                    logger.info("✓ Token cargado exitosamente desde archivo")
+            except Exception as e:
+                logger.warning(f"No se pudo cargar token desde archivo: {e}")
+        
+        # Renovar token si está expirado
+        if creds and creds.expired and creds.refresh_token:
+            try:
+                logger.info("Token expirado, renovando...")
                 creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    credentials_file, self.SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-            
-            # Guardar credenciales para futuros usos
-            with open(token_file, 'w') as token:
-                token.write(creds.to_json())
+                logger.info("✓ Token renovado exitosamente")
+                
+                # Guardar token renovado en archivo (solo en desarrollo)
+                if Path(token_file).exists() or not os.getenv('GMAIL_TOKEN_JSON'):
+                    try:
+                        with open(token_file, 'w') as token:
+                            token.write(creds.to_json())
+                        logger.info(f"Token actualizado guardado en {token_file}")
+                    except Exception as e:
+                        logger.warning(f"No se pudo guardar token renovado: {e}")
+                
+                # En producción, informar que se debe actualizar la variable
+                if os.getenv('GMAIL_TOKEN_JSON'):
+                    logger.warning(
+                        "ATENCION: Token renovado. Actualiza GMAIL_TOKEN_JSON en Heroku con: "
+                        f"{creds.to_json()}"
+                    )
+            except Exception as e:
+                logger.error(f"Error renovando token: {e}")
+                creds = None
         
+        # Si no hay credenciales válidas, intentar flujo OAuth (solo desarrollo)
+        if not creds or not creds.valid:
+            if os.getenv('HEROKU_APP_NAME') or os.getenv('DYNO'):
+                # Estamos en producción, no podemos hacer flujo interactivo
+                logger.error(
+                    "No hay credenciales válidas en producción. "
+                    "Configura GMAIL_TOKEN_JSON en las variables de entorno de Heroku."
+                )
+                raise ValueError(
+                    "Gmail credentials not configured. Set GMAIL_TOKEN_JSON environment variable."
+                )
+            else:
+                # Modo desarrollo: flujo OAuth interactivo
+                logger.info("Iniciando flujo OAuth interactivo (solo desarrollo)...")
+                try:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        credentials_file, self.SCOPES
+                    )
+                    creds = flow.run_local_server(port=0)
+                    
+                    # Guardar credenciales para futuros usos
+                    with open(token_file, 'w') as token:
+                        token.write(creds.to_json())
+                    logger.info(f"✓ Token generado y guardado en {token_file}")
+                except Exception as e:
+                    logger.error(f"Error en flujo OAuth: {e}")
+                    raise
+        
+        # Construir servicio de Gmail
         try:
             self.service = build('gmail', 'v1', credentials=creds)
-            logger.info("Servicio de Gmail autenticado correctamente")
+            logger.info("✓ Servicio de Gmail autenticado correctamente")
         except HttpError as error:
             logger.error(f"Error al construir servicio de Gmail: {error}")
             raise
