@@ -1,0 +1,491 @@
+"""
+Procesador principal de emails de pedidos de estudios.
+
+Este módulo coordina la lectura de emails, parsing y creación de pedidos.
+"""
+import logging
+import time
+from typing import List, Dict, Tuple, Optional
+from datetime import datetime
+from django.db import transaction
+from django.utils import timezone
+from django.core.files.base import ContentFile
+
+from ..models import (
+    PacienteEstudio, 
+    TipoEstudio, 
+    PedidoEstudio,
+    AdjuntoEmail,
+    LogProcesamientoEmail
+)
+from .gmail_service import GmailService
+from .email_parser import EmailParser, serializar_datos_raw
+from .notificador import NotificadorPedidos, notificar_error_procesamiento, notificar_pedido_urgente
+
+logger = logging.getLogger(__name__)
+
+
+class ProcesadorPedidos:
+    """
+    Procesador principal que coordina todo el flujo de trabajo.
+    
+    Flujo:
+    1. Leer emails nuevos desde Gmail
+    2. Parsear contenido y extraer datos
+    3. Crear o actualizar pacientes
+    4. Crear pedidos de estudios
+    5. Guardar adjuntos
+    6. Enviar notificaciones
+    7. Marcar email como procesado
+    """
+    
+    def __init__(self):
+        """Inicializa el procesador."""
+        self.gmail = None
+        self.parser = EmailParser()
+        self.notificador = NotificadorPedidos()
+    
+    def procesar_emails_pendientes(
+        self, 
+        max_emails: int = 10,
+        marcar_como_leido: bool = True,
+        enviar_notificaciones: bool = True
+    ) -> Dict[str, int]:
+        """
+        Procesa todos los emails pendientes.
+        
+        Args:
+            max_emails: Número máximo de emails a procesar
+            marcar_como_leido: Si debe marcar los emails como leídos
+            enviar_notificaciones: Si debe enviar notificaciones
+        
+        Returns:
+            Diccionario con estadísticas del procesamiento:
+            {
+                'procesados': int,
+                'exitosos': int,
+                'errores': int,
+                'duplicados': int
+            }
+        """
+        stats = {
+            'procesados': 0,
+            'exitosos': 0,
+            'errores': 0,
+            'duplicados': 0,
+        }
+        
+        try:
+            # Conectar a Gmail
+            self.gmail = GmailService()
+            
+            # Obtener emails nuevos
+            logger.info(f"Buscando emails pendientes (max: {max_emails})")
+            emails = self.gmail.obtener_emails_nuevos(max_results=max_emails)
+            
+            if not emails:
+                logger.info("No hay emails pendientes para procesar")
+                return stats
+            
+            logger.info(f"Procesando {len(emails)} emails")
+            
+            # Procesar cada email
+            for email_data in emails:
+                stats['procesados'] += 1
+                
+                resultado, pedido = self.procesar_email_individual(
+                    email_data,
+                    enviar_notificacion=enviar_notificaciones
+                )
+                
+                if resultado == 'EXITO':
+                    stats['exitosos'] += 1
+                    
+                    # Marcar como leído si fue exitoso
+                    if marcar_como_leido:
+                        self.gmail.marcar_como_leido(email_data['id'])
+                
+                elif resultado == 'DUPLICADO':
+                    stats['duplicados'] += 1
+                    
+                    # También marcar duplicados como leídos
+                    if marcar_como_leido:
+                        self.gmail.marcar_como_leido(email_data['id'])
+                
+                else:
+                    stats['errores'] += 1
+            
+            logger.info(
+                f"Procesamiento completado: {stats['exitosos']} exitosos, "
+                f"{stats['errores']} errores, {stats['duplicados']} duplicados"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error en procesamiento de emails: {e}", exc_info=True)
+        
+        return stats
+    
+    @transaction.atomic
+    def procesar_email_individual(
+        self, 
+        email_data: Dict,
+        enviar_notificacion: bool = True
+    ) -> Tuple[str, Optional[PedidoEstudio]]:
+        """
+        Procesa un email individual y crea el pedido.
+        
+        Args:
+            email_data: Datos del email desde GmailService
+            enviar_notificacion: Si debe enviar notificación
+        
+        Returns:
+            Tupla (resultado, pedido):
+            - resultado: 'EXITO', 'ERROR', 'DUPLICADO', 'PARCIAL'
+            - pedido: Instancia de PedidoEstudio o None
+        """
+        tiempo_inicio = time.time()
+        pedido = None
+        resultado = 'ERROR'
+        mensaje = ''
+        errores = []
+        
+        try:
+            message_id = email_data.get('message_id', '')
+            
+            # Verificar si ya fue procesado
+            if self._email_ya_procesado(message_id):
+                logger.info(f"Email {message_id} ya fue procesado previamente")
+                self._registrar_log(email_data, 'DUPLICADO', None, "Email ya procesado", [], time.time() - tiempo_inicio)
+                return ('DUPLICADO', None)
+            
+            # Parsear email
+            logger.info(f"Parseando email: {email_data.get('asunto', '')}")
+            datos_parseados = self.parser.parsear_email(email_data)
+            
+            errores.extend(datos_parseados.get('errores', []))
+            errores.extend(datos_parseados.get('advertencias_validacion', []))
+            
+            # Crear o actualizar paciente
+            paciente = self._crear_o_actualizar_paciente(datos_parseados['paciente'])
+            
+            # Determinar tipo de estudio
+            tipo_estudio = self._determinar_tipo_estudio(datos_parseados['estudio'])
+            
+            # Crear pedido
+            pedido = self._crear_pedido(
+                paciente=paciente,
+                tipo_estudio=tipo_estudio,
+                datos_estudio=datos_parseados['estudio'],
+                datos_metadata=datos_parseados['metadata'],
+                prioridad=datos_parseados['prioridad'],
+                datos_raw=datos_parseados['datos_raw']
+            )
+            
+            # Guardar adjuntos
+            self._guardar_adjuntos(pedido, email_data.get('adjuntos', []))
+            
+            # Enviar notificación
+            if enviar_notificacion:
+                # Notificación especial para pedidos urgentes
+                if pedido.prioridad == 'URGENTE':
+                    if notificar_pedido_urgente(pedido):
+                        logger.info(f"Notificación URGENTE enviada para pedido {pedido.id}")
+                    else:
+                        errores.append("No se pudo enviar notificación urgente")
+                else:
+                    # Notificación normal
+                    if self.notificador.notificar_pedido(pedido):
+                        logger.info(f"Notificación enviada para pedido {pedido.id}")
+                    else:
+                        errores.append("No se pudo enviar notificación")
+            
+            resultado = 'PARCIAL' if errores else 'EXITO'
+            mensaje = f"Pedido #{pedido.id} creado exitosamente"
+            
+            if errores:
+                mensaje += f" con {len(errores)} advertencias"
+            
+            logger.info(mensaje)
+        
+        except Exception as e:
+            resultado = 'ERROR'
+            mensaje = f"Error al procesar email: {str(e)}"
+            errores.append(str(e))
+            logger.error(mensaje, exc_info=True)
+            
+            # Enviar alerta de error a administradores
+            import traceback
+            traceback_str = traceback.format_exc()
+            notificar_error_procesamiento(
+                error_msg=str(e),
+                email_data=email_data,
+                traceback_info=traceback_str
+            )
+        
+        finally:
+            # Registrar log de procesamiento
+            tiempo_procesamiento = time.time() - tiempo_inicio
+            self._registrar_log(
+                email_data, 
+                resultado, 
+                pedido, 
+                mensaje, 
+                errores,
+                tiempo_procesamiento
+            )
+        
+        return (resultado, pedido)
+    
+    def _email_ya_procesado(self, message_id: str) -> bool:
+        """
+        Verifica si un email ya fue procesado.
+        
+        Args:
+            message_id: Message-ID del email
+        
+        Returns:
+            True si ya fue procesado
+        """
+        if not message_id:
+            return False
+        
+        return PedidoEstudio.objects.filter(email_message_id=message_id).exists()
+    
+    def _crear_o_actualizar_paciente(self, datos_paciente: Dict) -> PacienteEstudio:
+        """
+        Crea o actualiza un paciente.
+        
+        Args:
+            datos_paciente: Datos del paciente parseados
+        
+        Returns:
+            Instancia de PacienteEstudio
+        """
+        historia_clinica = datos_paciente.get('historia_clinica')
+        
+        # Intentar encontrar por historia clínica
+        if historia_clinica:
+            paciente = PacienteEstudio.objects.filter(
+                historia_clinica=historia_clinica
+            ).first()
+            
+            if paciente:
+                # Actualizar datos si están vacíos
+                self._actualizar_datos_paciente(paciente, datos_paciente)
+                return paciente
+        
+        # Crear nuevo paciente
+        paciente = PacienteEstudio.objects.create(
+            nombre_completo=datos_paciente.get('nombre_completo') or 'Paciente sin nombre',
+            dni=datos_paciente.get('dni'),
+            historia_clinica=historia_clinica,
+            habitacion=datos_paciente.get('habitacion'),
+            cama=datos_paciente.get('cama'),
+            piso=datos_paciente.get('piso'),
+            obra_social=datos_paciente.get('obra_social'),
+        )
+        
+        logger.info(f"Paciente creado: {paciente.nombre_completo}")
+        return paciente
+    
+    def _actualizar_datos_paciente(
+        self, 
+        paciente: PacienteEstudio, 
+        nuevos_datos: Dict
+    ):
+        """
+        Actualiza datos del paciente si los nuevos son más completos.
+        
+        Args:
+            paciente: Instancia de PacienteEstudio
+            nuevos_datos: Nuevos datos parseados
+        """
+        actualizado = False
+        
+        campos = ['habitacion', 'cama', 'piso', 'dni', 'obra_social']
+        
+        for campo in campos:
+            valor_actual = getattr(paciente, campo, None)
+            valor_nuevo = nuevos_datos.get(campo)
+            
+            if valor_nuevo and not valor_actual:
+                setattr(paciente, campo, valor_nuevo)
+                actualizado = True
+        
+        if actualizado:
+            paciente.save()
+            logger.info(f"Paciente {paciente.id} actualizado")
+    
+    def _determinar_tipo_estudio(self, datos_estudio: Dict) -> Optional[TipoEstudio]:
+        """
+        Intenta determinar el tipo de estudio desde el catálogo.
+        
+        Args:
+            datos_estudio: Datos del estudio parseados
+        
+        Returns:
+            Instancia de TipoEstudio o None
+        """
+        tipo_sugerido = datos_estudio.get('tipo_estudio_sugerido')
+        descripcion = datos_estudio.get('descripcion_estudio', '')
+        
+        # Buscar por coincidencia exacta
+        if tipo_sugerido:
+            tipo = TipoEstudio.objects.filter(
+                nombre__icontains=tipo_sugerido,
+                activo=True
+            ).first()
+            
+            if tipo:
+                return tipo
+        
+        # Buscar por palabras clave en descripción
+        if descripcion:
+            palabras = descripcion.lower().split()
+            
+            for palabra in palabras:
+                if len(palabra) > 3:  # Palabras significativas
+                    tipo = TipoEstudio.objects.filter(
+                        nombre__icontains=palabra,
+                        activo=True
+                    ).first()
+                    
+                    if tipo:
+                        return tipo
+        
+        return None
+    
+    def _crear_pedido(
+        self,
+        paciente: PacienteEstudio,
+        tipo_estudio: Optional[TipoEstudio],
+        datos_estudio: Dict,
+        datos_metadata: Dict,
+        prioridad: str,
+        datos_raw: Dict
+    ) -> PedidoEstudio:
+        """
+        Crea un nuevo pedido de estudio.
+        
+        Args:
+            paciente: Instancia de PacienteEstudio
+            tipo_estudio: Instancia de TipoEstudio o None
+            datos_estudio: Datos del estudio parseados
+            datos_metadata: Metadata del email
+            prioridad: Prioridad del pedido
+            datos_raw: Datos crudos completos
+        
+        Returns:
+            Instancia de PedidoEstudio
+        """
+        pedido = PedidoEstudio.objects.create(
+            paciente=paciente,
+            tipo_estudio=tipo_estudio,
+            descripcion_estudio=datos_estudio.get('descripcion_estudio') or 'Sin descripción',
+            indicacion_clinica=datos_estudio.get('indicacion_clinica') or '',
+            medico_solicitante=datos_estudio.get('medico_solicitante') or 'No especificado',
+            estado='PENDIENTE',
+            prioridad=prioridad,
+            email_message_id=datos_metadata.get('email_message_id'),
+            email_asunto=datos_metadata.get('email_asunto'),
+            email_remitente=datos_metadata.get('email_remitente'),
+            email_fecha=datos_metadata.get('email_fecha'),
+            datos_raw=datos_raw,
+            procesado_automaticamente=True,
+            requiere_revision=True,  # Siempre requiere revisión inicial
+        )
+        
+        logger.info(f"Pedido {pedido.id} creado para {paciente.nombre_completo}")
+        return pedido
+    
+    def _guardar_adjuntos(self, pedido: PedidoEstudio, adjuntos: List[Dict]):
+        """
+        Descarga y guarda los adjuntos del email.
+        
+        Args:
+            pedido: Instancia de PedidoEstudio
+            adjuntos: Lista de adjuntos del email
+        """
+        if not adjuntos or not self.gmail:
+            return
+        
+        for adjunto_info in adjuntos:
+            try:
+                # Descargar adjunto desde Gmail
+                contenido = self.gmail.descargar_adjunto(
+                    adjunto_info['message_id'],
+                    adjunto_info['attachment_id']
+                )
+                
+                if contenido:
+                    # Crear registro de adjunto
+                    adjunto = AdjuntoEmail(
+                        pedido=pedido,
+                        nombre_archivo=adjunto_info['nombre'],
+                        tipo_mime=adjunto_info['mime_type'],
+                        tamaño=adjunto_info['tamaño'],
+                    )
+                    
+                    # Guardar archivo
+                    adjunto.archivo.save(
+                        adjunto_info['nombre'],
+                        ContentFile(contenido),
+                        save=True
+                    )
+                    
+                    logger.info(f"Adjunto guardado: {adjunto_info['nombre']}")
+            
+            except Exception as e:
+                logger.error(f"Error al guardar adjunto {adjunto_info['nombre']}: {e}")
+    
+    def _registrar_log(
+        self,
+        email_data: Dict,
+        resultado: str,
+        pedido: Optional[PedidoEstudio],
+        mensaje: str,
+        errores: List[str],
+        tiempo_procesamiento: float
+    ):
+        """
+        Registra el resultado del procesamiento en el log.
+        
+        Args:
+            email_data: Datos del email
+            resultado: Resultado del procesamiento
+            pedido: Pedido creado o None
+            mensaje: Mensaje descriptivo
+            errores: Lista de errores
+            tiempo_procesamiento: Tiempo en segundos
+        """
+        try:
+            LogProcesamientoEmail.objects.create(
+                email_message_id=email_data.get('message_id', ''),
+                email_asunto=email_data.get('asunto', ''),
+                email_remitente=email_data.get('remitente', ''),
+                email_fecha=email_data.get('fecha') or timezone.now(),
+                resultado=resultado,
+                pedido_creado=pedido,
+                mensaje=mensaje,
+                datos_extraidos=serializar_datos_raw(email_data),  # Serializar para JSON
+                errores=errores,
+                tiempo_procesamiento=tiempo_procesamiento,
+            )
+        except Exception as e:
+            logger.error(f"Error al registrar log: {e}")
+
+
+# Funciones helper para uso en management commands o tasks
+
+def procesar_emails_ahora(max_emails: int = 10) -> Dict[str, int]:
+    """
+    Helper function para procesar emails inmediatamente.
+    
+    Args:
+        max_emails: Número máximo de emails a procesar
+    
+    Returns:
+        Estadísticas del procesamiento
+    """
+    procesador = ProcesadorPedidos()
+    return procesador.procesar_emails_pendientes(max_emails=max_emails)

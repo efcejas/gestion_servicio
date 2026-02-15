@@ -33,6 +33,15 @@ DEBUG = config('DEBUG', default='False').lower() in ['true', '1', 't']
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
+# Administradores del sistema (reciben alertas de errores)
+ADMINS = [
+    ('Ernesto Cejas', 'ecejas@sanatoriocolegiales.com.ar'),
+]
+MANAGERS = ADMINS
+
+# Email predeterminado para notificaciones de pedidos
+PEDIDOS_EMAIL_DEFAULT = 'ecejas@sanatoriocolegiales.com.ar'
+
 
 # Application definition
 
@@ -64,6 +73,7 @@ INSTALLED_APPS = [
     'eges_import.apps.EgesImportConfig',
     'preinformes.apps.PreinformesConfig',
     'consultorios.apps.ConsultoriosConfig',
+    'pedidos_estudios.apps.PedidosEstudiosConfig',  # Sistema de pedidos por email
     
     # Tailwind CSS
     'tailwind',
@@ -312,9 +322,12 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@example.com")
 
 # -----------------------------------------------------------------------------
-# LOGGING: Forzar que los errores del middleware personalizado aparezcan siempre.
-# Heroku captura stdout/stderr, así que añadimos handlers de consola.
+# LOGGING: Sistema mejorado con archivos y alertas
 # -----------------------------------------------------------------------------
+import os
+LOGS_DIR = BASE_DIR / 'logs'
+os.makedirs(LOGS_DIR, exist_ok=True)
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -327,27 +340,79 @@ LOGGING = {
             'format': '[{levelname}] {name} {message}',
             'style': '{',
         },
+        'detailed': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_false': {
+            'class': 'django.utils.log.RequireDebugFalse',
+        },
+        'require_debug_true': {
+            'class': 'django.utils.log.RequireDebugTrue',
+        },
     },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
+        'file_general': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'general.log',
+            'maxBytes': 1024 * 1024 * 5,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+        },
+        'file_pedidos': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'pedidos_estudios.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'detailed',
+        },
+        'file_errors': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'errors.log',
+            'maxBytes': 1024 * 1024 * 10,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'detailed',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'class': 'django.utils.log.AdminEmailHandler',
+            'filters': ['require_debug_false'],
+            'include_html': True,
+        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_general'],
             'level': 'INFO',
             'propagate': True,
         },
         'django.request': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_errors', 'mail_admins'],
             'level': 'ERROR',
             'propagate': False,
         },
         'gestion_estudios.middleware': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_errors'],
             'level': 'ERROR',
+            'propagate': False,
+        },
+        'pedidos_estudios': {
+            'handlers': ['console', 'file_pedidos', 'file_errors'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'pedidos_estudios.services': {
+            'handlers': ['console', 'file_pedidos', 'file_errors'],
+            'level': 'DEBUG',
             'propagate': False,
         },
     },
@@ -391,3 +456,13 @@ AWS_S3_USE_SSL = True
 AWS_S3_ADDRESSING_STYLE = "path"
 
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# =============================================================================
+# CONFIGURACIÓN LOCAL (no se sube a Git)
+# =============================================================================
+# Importar configuración local si existe
+try:
+    from .settings_local import *
+    print("✓ settings_local.py importado correctamente")
+except ImportError:
+    print("⚠ settings_local.py no encontrado - usando solo configuración base")

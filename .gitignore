@@ -27,6 +27,11 @@ media/
 # Claves y configuraciones sensibles
 .env
 
+# Gmail API credentials
+credentials.json
+token.json
+gestion_estudios/settings_local.py
+
 # Node.js dependencies (para Tailwind CSS)
 node_modules/
 theme/static_src/node_modules/

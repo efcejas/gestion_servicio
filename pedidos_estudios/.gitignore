@@ -1,0 +1,12 @@
+# Archivos de credenciales de Google
+credentials.json
+token.json
+
+# Archivos de configuración local
+settings_local.py
+
+# Adjuntos subidos
+media/pedidos_estudios/
+
+# Logs
+*.log

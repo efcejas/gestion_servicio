@@ -641,34 +641,81 @@ No se visualizan lesiones óseas.
 CONCLUSIÓN
 Desgarro del ligamento cruzado anterior con derrame articular asociado.
 
-🎯 REGLAS DE CONCLUSIÓN (MÉDICO RADIÓLOGO):
+🎯 CONCLUSIÓN - ESTILO RADIÓLOGO PROFESIONAL:
 
-1️⃣ JERARQUIZACIÓN - Ordenar hallazgos por importancia clínica:
-   • Patología principal (lesión, desgarro, fractura, injuria) → PRIMERO
-   • Hallazgos asociados relevantes (edema, extrusión, condromalacia) → SEGUNDO
-   • Hallazgos secundarios (derrame, sinovitis, flogosis) → TERCERO
-   • Cierre: "Resto de las estructuras sin hallazgos significativos" (si aplica)
+PRINCIPIOS FUNDAMENTALES:
+1. JERARQUIZACIÓN CLÍNICA - Ordenar por relevancia médica:
+   • Primero: Lesión principal o diagnóstico clave (desgarro, fractura, masa)
+   • Segundo: Hallazgos directamente relacionados (edema óseo asociado, extrusión meniscal)
+   • Tercero: Hallazgos secundarios/inflamatorios (derrame, sinovitis, edema de partes blandas)
+   • Cierre (si aplica): "Resto de estructuras sin particularidades" o frase equivalente
 
-2️⃣ TERMINOLOGÍA RADIOLÓGICA ESTÁNDAR - Usar términos profesionales:
-   ✅ gonartrosis tricompartimental, meniscopatía degenerativa, desgarro compuesto
-   ✅ extrusión meniscal, condromalacia grado III/IV, tendinopatía, entesitis
-   ✅ derrame articular, edema óseo, sinovitis, flogosis de partes blandas
-   ✅ injuria ósea por estrés, disposición en garra, subluxación
-   ❌ NO generalizar: "alteraciones", "cambios inespecíficos"
+2. TERMINOLOGÍA RADIOLÓGICA ESTÁNDAR - Usar lenguaje profesional preciso:
+   ✅ USAR: meniscopatía degenerativa, desgarro complejo, gonartrosis tricompartimental
+   ✅ USAR: condromalacia grado III-IV, tendinopatía, entesitis, extrusión meniscal
+   ✅ USAR: edema óseo subcondral, contusión ósea, cambios degenerativos
+   ✅ USAR: derrame articular, sinovitis, tenosinovitis, bursitis
+   ❌ EVITAR: "alteraciones inespecíficas", "cambios", "hallazgos"
+   ❌ EVITAR: lenguaje vago o genérico
 
-3️⃣ REDACCIÓN PROFESIONAL:
-   ✅ Texto corrido, narrativo, UNA SOLA PIEZA (no ítems, no viñetas en conclusión)
-   ✅ Redacción directa: "Desgarro del LCA" (NO "se observa desgarro del LCA")
-   ❌ Evitar verbos innecesarios: "se observa", "se identifica", "se evidencia"
-   ✅ Sintética: 2-4 líneas como máximo
-   ✅ Sin repetir frases literales del comentario
+3. REDACCIÓN DIRECTA Y PROFESIONAL:
+   ✅ Estilo afirmativo: "Desgarro del ligamento cruzado anterior"
+   ❌ Evitar: "Se observa desgarro del LCA", "Se evidencia", "Se visualiza"
+   ✅ Sustantivos y adjetivos, no verbos innecesarios
+   ✅ Conectores naturales: "con", "asociado a", "que compromete"
+   
+4. FORMATO Y EXTENSIÓN:
+   • Texto CORRIDO narrativo - UNA SOLA PIEZA de prosa
+   • NO usar viñetas, ítems, ni listas numeradas en la conclusión
+   • Longitud: 2-4 líneas máximo (conciso pero completo)
+   • NO repetir frases textuales del COMENTARIO (parafrasear si es necesario)
+   • Usar comas y puntos para separar hallazgos relacionados
 
-4️⃣ COMPLETITUD - Incluir TODOS los hallazgos patológicos mencionados:
-   ✅ NO omitir patología descrita en COMENTARIO
-   ❌ NO describir estructuras normales (salvo que sea clínicamente relevante)
-   ❌ NO agregar sugerencias ni recomendaciones clínicas
+5. COMPLETITUD Y PRECISIÓN:
+   ✅ Incluir TODOS los hallazgos patológicos del COMENTARIO
+   ✅ Especificar localización anatómica cuando sea relevante
+   ✅ Mencionar lateralidad si es pertinente (medial/lateral, interno/externo)
+   ❌ NO describir estructuras normales (salvo relevancia clínica específica)
+   ❌ NO agregar recomendaciones clínicas ni correlación clínica
+   ❌ NO omitir patología descrita en el COMENTARIO
 
-5️⃣ Si todo normal → "Estudio dentro de los parámetros normales."
+6. CASOS ESPECIALES:
+   • Estudio NORMAL → "Estudio dentro de los parámetros normales."
+   • Estudio con hallazgo único → ser igualmente conciso y directo
+   • Múltiples hallazgos → jerarquizar y agrupar lógicamente
+
+EJEMPLOS DE CONCLUSIONES CORRECTAS:
+
+Ejemplo 1 (lesión meniscal + edema):
+"Meniscopatía determinada por desgarro horizontal que compromete el cuerpo y cuerno posterior del menisco interno, con edema óseo de aspecto contusivo en el cóndilo femoral medial asociado. Derrame articular leve."
+
+Ejemplo 2 (manguito rotador):
+"Tendinopatía del supraespinoso y tenosinovitis del tendón de la porción larga del bíceps, con edema óseo en la articulación acromioclavicular."
+
+Ejemplo 3 (gonartrosis):
+"Gonartrosis tricompartimental con condromalacia rotuliana grado III-IV. Meniscopatía degenerativa con desgarro complejo del menisco interno y extrusión meniscal asociada."
+
+Ejemplo 4 (normal):
+"Estudio dentro de los parámetros normales."
+
+EJEMPLOS DE CONCLUSIONES INCORRECTAS:
+
+❌ "Se observa desgarro del menisco interno. También se visualiza derrame articular."
+   (Problema: verbos innecesarios, estructura fragmentada)
+
+❌ "- Desgarro meniscal
+    - Derrame articular  
+    - Edema óseo"
+   (Problema: formato de lista, no es prosa narrativa)
+
+❌ "Meniscos normales. Ligamentos normales. Derrame articular presente."
+   (Problema: menciona estructuras normales innecesariamente)
+
+❌ "Hallazgos compatibles con cambios degenerativos inespecíficos."
+   (Problema: lenguaje vago, poco profesional)
+
+INSTRUCCIÓN FINAL:
+Genera una conclusión que sea un párrafo narrativo profesional, jerarquizado, usando terminología radiológica precisa, sin verbos de observación innecesarios, que sintetice los hallazgos patológicos principales del COMENTARIO en 2-4 líneas máximo.
 
 Ejemplo de estudio normal:
 COMENTARIO
