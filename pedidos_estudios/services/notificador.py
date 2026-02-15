@@ -37,6 +37,7 @@ class NotificadorPedidos:
     def notificar_pedido(self, pedido: PedidoEstudio) -> bool:
         """
         Envía notificación de nuevo pedido al médico responsable.
+        Envía emails personalizados con tokens para cada médico de guardia.
         
         Args:
             pedido: Instancia de PedidoEstudio
@@ -44,36 +45,59 @@ class NotificadorPedidos:
         Returns:
             True si se envió correctamente
         """
+        from ..models import MedicoGuardia
+        
         try:
-            # Determinar destinatarios
-            destinatarios = self._obtener_destinatarios(pedido)
+            # Determinar destinatarios y médicos
+            destinatarios_emails = self._obtener_destinatarios(pedido)
             
-            if not destinatarios:
+            if not destinatarios_emails:
                 logger.warning(f"No hay destinatarios para pedido {pedido.id}")
                 return False
             
-            # Preparar contenido del email
+            # Preparar asunto común
             asunto = self._generar_asunto(pedido)
-            contenido_html = self._generar_contenido_html(pedido)
-            contenido_texto = strip_tags(contenido_html)
             
-            # Enviar email
-            email = EmailMultiAlternatives(
-                subject=asunto,
-                body=contenido_texto,
-                from_email=self.from_email,
-                to=destinatarios,
-            )
-            email.attach_alternative(contenido_html, "text/html")
-            email.send(fail_silently=False)
+            # Enviar email personalizado a cada médico
+            emails_enviados = 0
+            
+            for email in destinatarios_emails:
+                # Buscar si este email corresponde a un médico de guardia
+                try:
+                    medico = MedicoGuardia.objects.filter(email=email).first()
+                    if not medico:
+                        # Intentar buscar por usuario
+                        medico = MedicoGuardia.objects.filter(usuario__email=email).first()
+                except Exception:
+                    medico = None
+                
+                # Generar contenido HTML personalizado (con o sin token)
+                contenido_html = self._generar_contenido_html(pedido, medico)
+                contenido_texto = strip_tags(contenido_html)
+                
+                # Enviar email individual
+                email_msg = EmailMultiAlternatives(
+                    subject=asunto,
+                    body=contenido_texto,
+                    from_email=self.from_email,
+                    to=[email],
+                )
+                email_msg.attach_alternative(contenido_html, "text/html")
+                email_msg.send(fail_silently=False)
+                
+                emails_enviados += 1
+                logger.info(f"Email enviado a {email} para pedido {pedido.id}")
             
             # Marcar como notificado
-            pedido.notificacion_enviada = True
-            pedido.fecha_notificacion = timezone.now()
-            pedido.save()
+            if emails_enviados > 0:
+                pedido.notificacion_enviada = True
+                pedido.fecha_notificacion = timezone.now()
+                pedido.save()
+                
+                logger.info(f"Notificación enviada para pedido {pedido.id} a {emails_enviados} destinatarios")
+                return True
             
-            logger.info(f"Notificación enviada para pedido {pedido.id} a {destinatarios}")
-            return True
+            return False
         
         except Exception as e:
             logger.error(f"Error al enviar notificación de pedido {pedido.id}: {e}", exc_info=True)
@@ -127,25 +151,41 @@ class NotificadorPedidos:
     def _obtener_destinatarios(self, pedido: PedidoEstudio) -> List[str]:
         """
         Obtiene la lista de destinatarios para un pedido.
+        Incluye médicos de guardia según especialidad.
         
         Args:
             pedido: Instancia de PedidoEstudio
         
         Returns:
-            Lista de emails
+            Lista de emails (sin duplicados)
         """
-        destinatarios = []
+        from ..models import MedicoGuardia
+        
+        destinatarios = set()  # Usar set para evitar duplicados
         
         # Médico asignado
         if pedido.medico_asignado and pedido.medico_asignado.email:
-            destinatarios.append(pedido.medico_asignado.email)
+            destinatarios.add(pedido.medico_asignado.email)
         
-        # Médico responsable del tipo de estudio
-        elif pedido.tipo_estudio:
+        # Médicos de guardia según especialidad del estudio
+        if pedido.tipo_estudio:
+            tipo_estudio_nombre = pedido.tipo_estudio.nombre.lower()
+            
+            # Buscar médicos activos que puedan realizar este tipo de estudio
+            medicos_guardia = MedicoGuardia.objects.filter(activo=True)
+            
+            for medico in medicos_guardia:
+                if medico.puede_realizar_estudio(pedido.tipo_estudio.nombre):
+                    email = medico.get_email_contacto()
+                    if email:
+                        destinatarios.add(email)
+        
+        # Médico responsable del tipo de estudio (legacy)
+        if pedido.tipo_estudio:
             if pedido.tipo_estudio.email_notificacion:
-                destinatarios.append(pedido.tipo_estudio.email_notificacion)
+                destinatarios.add(pedido.tipo_estudio.email_notificacion)
             elif pedido.tipo_estudio.medico_responsable and pedido.tipo_estudio.medico_responsable.email:
-                destinatarios.append(pedido.tipo_estudio.medico_responsable.email)
+                destinatarios.add(pedido.tipo_estudio.medico_responsable.email)
         
         # Email por defecto si no hay ninguno configurado
         if not destinatarios:
@@ -154,9 +194,9 @@ class NotificadorPedidos:
                 'PEDIDOS_EMAIL_DEFAULT', 
                 'ecejas@sanatoriocolegiales.com.ar'
             )
-            destinatarios.append(email_default)
+            destinatarios.add(email_default)
         
-        return destinatarios
+        return list(destinatarios)
     
     def _generar_asunto(self, pedido: PedidoEstudio) -> str:
         """
@@ -174,12 +214,13 @@ class NotificadorPedidos:
         
         return f"{prioridad_texto}Nuevo pedido: {tipo} - {pedido.paciente.nombre_completo}"
     
-    def _generar_contenido_html(self, pedido: PedidoEstudio) -> str:
+    def _generar_contenido_html(self, pedido: PedidoEstudio, medico=None) -> str:
         """
         Genera el contenido HTML del email.
         
         Args:
             pedido: Instancia de PedidoEstudio
+            medico: MedicoGuardia opcional para personalizar con token
         
         Returns:
             HTML del email
@@ -194,11 +235,29 @@ class NotificadorPedidos:
             'BAJA': '#6c757d',
         }.get(pedido.prioridad, '#6c757d')
         
+        # Generar enlace de acceso si hay médico
+        enlace_acceso = ""
+        if medico and medico.token_acceso:
+            url_acceso = medico.get_url_acceso()
+            enlace_acceso = f"""
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="{url_acceso}" 
+                       style="background-color: #007bff; color: white; padding: 15px 30px; 
+                              text-decoration: none; border-radius: 5px; font-weight: bold; 
+                              display: inline-block;">
+                        📋 Ver Mis Estudios Pendientes
+                    </a>
+                    <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                        Haz clic en el botón para ver todos tus estudios pendientes
+                    </p>
+                </div>
+            """
+        
         html = f"""
         <html>
         <head>
             <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
                 .header {{ background-color: #007bff; color: white; padding: 20px; }}
                 .content {{ padding: 20px; }}
                 .badge {{ 
@@ -210,12 +269,13 @@ class NotificadorPedidos:
                 }}
                 .info-row {{ margin: 10px 0; }}
                 .label {{ font-weight: bold; }}
-                .footer {{ padding: 20px; background-color: #f8f9fa; margin-top: 20px; }}
+                .footer {{ padding: 20px; background-color: #f8f9fa; margin-top: 20px; text-align: center; color: #666; }}
             </style>
         </head>
         <body>
             <div class="header">
                 <h2>Nuevo Pedido de Estudio</h2>
+                {f'<p style="margin: 5px 0; font-size: 14px;">Dr/a. {medico.nombre_completo}</p>' if medico else ''}
             </div>
             <div class="content">
                 <div class="info-row">
@@ -267,11 +327,16 @@ class NotificadorPedidos:
                 <div class="info-row">
                     <span class="label">Fecha Solicitud:</span> {timezone.localtime(pedido.fecha_solicitud).strftime('%d/%m/%Y %H:%M')}
                 </div>
+                
+                {enlace_acceso}
             </div>
             
             <div class="footer">
                 <p>Este es un mensaje automático del sistema de gestión de estudios.</p>
                 <p>Pedido ID: #{pedido.id}</p>
+                <p style="font-size: 11px; margin-top: 10px;">
+                    Sanatorio de los Colegiales - Sistema de Gestión de Estudios
+                </p>
             </div>
         </body>
         </html>

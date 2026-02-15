@@ -4,6 +4,7 @@ URLs para la app pedidos_estudios.
 from django.urls import path
 from . import views
 from . import views_dashboard
+from . import views_medicos
 
 app_name = 'pedidos_estudios'
 
@@ -11,6 +12,14 @@ urlpatterns = [
     # Dashboard
     path('', views_dashboard.dashboard_pedidos, name='dashboard'),
     path('dashboard/', views_dashboard.dashboard_pedidos, name='dashboard_pedidos'),  # Alias
+    
+    # Médicos - Sus estudios
+    path('mis-estudios/', views_medicos.mis_estudios_pendientes, name='mis_estudios'),
+    path('estudios/<int:pedido_id>/marcar-realizado/', views_medicos.marcar_realizado, name='marcar_realizado'),
+    
+    # Médicos - Acceso con token (sin login)
+    path('mis-estudios/<str:token>/', views_medicos.mis_estudios_token, name='mis_estudios_token'),
+    path('estudios/<str:token>/<int:pedido_id>/marcar-realizado/', views_medicos.marcar_realizado_token, name='marcar_realizado_token'),
     
     # Pedidos
     path('pedidos/', views.lista_pedidos, name='lista_pedidos'),

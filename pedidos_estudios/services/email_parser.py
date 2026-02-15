@@ -57,7 +57,9 @@ class EmailParser:
             r'apellido\s+y\s+nombre\s*:?\s*([a-záéíóúñ]{2,}(?:\s*,?\s*[a-záéíóúñ]+)*)(?=\s*(?:\n|documento|dni|historia|habitaci[oó]n))',
             r'paciente\s*:?\s*([a-záéíóúñ][a-záéíóúñ\s,]+?)(?=\s*(?:dni|documento|historia|habitaci[oó]n|$))',
             r'nombre\s*:?\s*([a-záéíóúñ][a-záéíóúñ\s,]+?)(?=\s*(?:dni|documento|historia|$))',
-            r'pac(?:iente)?[\.:]?\s*([a-záéíóúñ][a-záéíóúñ\s,]+?)(?=\s*(?:dni|documento|$))',
+            # Formato simple: Pac: Apellido Nombre o Pcte: Apellido Nombre
+            r'pac[\.:]?\s+([a-záéíóúñ][a-záéíóúñ\s,]+?)(?=\s*\n)',
+            r'pcte[\.:]?\s+([a-záéíóúñ][a-záéíóúñ\s,]+?)(?=\s*\n)',
             r'nombre\s*completo\s*:?\s*([a-záéíóúñ\s,]+)',
         ],
         'dni': [
@@ -73,8 +75,8 @@ class EmailParser:
             r'historia\s*:?\s*([hH]?[cC]?-?\d+)',
         ],
         'habitacion': [
-            r'habitaci[oó]n\s*:?\s*(\d+[a-z]?)',
-            r'hab\.?\s*:?\s*(\d+[a-z]?)',
+            r'habitaci[oó]n\s*:?\s*(\d+[a-z]?(?:-\d+)?)',
+            r'hab\.?\s*:?\s*(\d+[a-z]?(?:-\d+)?)',
             r'sala\s*:?\s*(\d+[a-z]?)',
             r'ubicaci[oó]n\s*:.*?habitaci[oó]n\s+(\d+)',
         ],
@@ -94,6 +96,11 @@ class EmailParser:
             r'tipo\s*de\s*estudio\s*:?\s*([^\n]+)',
             r'solicito\s*:?\s*([^\n]+)',
             r'solicita\s*:?\s*([^\n]+)',
+            # Formato simple: línea que empieza con palabras clave de estudios
+            r'(?:^|\n)\s*(ecodoppler[^\n]+)',
+            r'(?:^|\n)\s*(ecocardio(?:grama)?[^\n]+)',
+            r'(?:^|\n)\s*(eco\s+cardio[^\n]+)',
+            r'(?:^|\n)\s*(doppler[^\n]+)',
         ],
         'medico_solicitante': [
             r'm[eé]dico\s*solicitante\s*:?\s*((?:dr|dra)\.?\s*[a-záéíóúñ][a-záéíóúñ\s]+)',

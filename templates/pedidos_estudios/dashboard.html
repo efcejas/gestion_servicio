@@ -7,7 +7,7 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
     <!-- Header con Gradiente -->
     <div class="mb-6 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl shadow-xl p-8 text-white">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-4">
             <div class="flex items-center gap-4">
                 <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                     <i class="fas fa-heartbeat text-3xl text-white"></i>
@@ -17,9 +17,21 @@
                     <p class="mt-1 text-blue-100">Monitoreo en tiempo real de estudios solicitados</p>
                 </div>
             </div>
-            <div class="hidden md:block text-right">
-                <div class="text-sm text-blue-100">Última actualización</div>
-                <div class="text-lg font-semibold">{% now "H:i" %} hs</div>
+            <div class="flex items-center gap-4">
+                {% if user.is_superuser or user.rol == 'administrativo' %}
+                <form method="post" action="{% url 'pedidos_estudios:procesar_emails' %}" class="hidden md:block">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            class="bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white font-semibold py-3 px-6 rounded-lg transition-all transform hover:scale-105 inline-flex items-center gap-2 shadow-lg">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Procesar Emails Ahora</span>
+                    </button>
+                </form>
+                {% endif %}
+                <div class="hidden md:block text-right bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3">
+                    <div class="text-sm text-blue-100">Última actualización</div>
+                    <div class="text-lg font-semibold">{% now "H:i" %} hs</div>
+                </div>
             </div>
         </div>
     </div>
@@ -108,6 +120,18 @@
                 <i class="fas fa-flag mr-1"></i>
                 Requieren Revisión
             </a>
+            
+            {% if user.is_superuser or user.rol == 'administrativo' %}
+            <!-- Botón para móvil/tablet -->
+            <form method="post" action="{% url 'pedidos_estudios:procesar_emails' %}" class="md:hidden ml-auto">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 shadow-md transition-all">
+                    <i class="fas fa-sync-alt mr-1"></i>
+                    Procesar Emails
+                </button>
+            </form>
+            {% endif %}
         </div>
     </div>
 

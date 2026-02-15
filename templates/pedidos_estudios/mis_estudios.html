@@ -1,0 +1,306 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Mis Estudios Pendientes{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 sm:px-4 py-2">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg shadow-lg p-4 md:p-6 mb-6 text-white">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold mb-2">
+                    <i class="fas fa-stethoscope mr-2"></i>
+                    Mis Estudios Pendientes
+                </h1>
+                <p class="text-sm md:text-base text-blue-100">
+                    {{ medico.nombre_completo }} - {{ medico.get_especialidad_display }}
+                </p>
+                {% if es_acceso_token %}
+                <p class="text-xs text-blue-200 mt-1">
+                    <i class="fas fa-link mr-1"></i>
+                    Acceso con enlace directo
+                </p>
+                {% endif %}
+            </div>
+            <div class="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 text-center md:text-right">
+                <p class="text-xs md:text-sm text-blue-100">Última actualización</p>
+                <p class="text-base md:text-lg font-semibold">{% now "H:i" %}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-6">
+        <!-- Total -->
+        <div class="bg-white rounded-lg shadow p-4 md:p-6 border-l-4 border-blue-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-blue-100 rounded-full p-2 md:p-3">
+                    <i class="fas fa-clipboard-list text-blue-600 text-xl md:text-2xl"></i>
+                </div>
+                <div class="ml-3 md:ml-4">
+                    <p class="text-gray-600 text-xs md:text-sm font-medium">Total Pendientes</p>
+                    <p class="text-2xl md:text-3xl font-bold text-gray-800">{{ total_estudios }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Urgentes -->
+        <div class="bg-white rounded-lg shadow p-4 md:p-6 border-l-4 border-red-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-red-100 rounded-full p-2 md:p-3">
+                    <i class="fas fa-exclamation-circle text-red-600 text-xl md:text-2xl"></i>
+                </div>
+                <div class="ml-3 md:ml-4">
+                    <p class="text-gray-600 text-xs md:text-sm font-medium">Urgentes</p>
+                    <p class="text-2xl md:text-3xl font-bold text-gray-800">{{ urgentes }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hoy -->
+        <div class="bg-white rounded-lg shadow p-4 md:p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-green-100 rounded-full p-2 md:p-3">
+                    <i class="fas fa-calendar-day text-green-600 text-xl md:text-2xl"></i>
+                </div>
+                <div class="ml-3 md:ml-4">
+                    <p class="text-gray-600 text-xs md:text-sm font-medium">Solicitados Hoy</p>
+                    <p class="text-2xl md:text-3xl font-bold text-gray-800">{{ estudios_hoy }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if not medico.activo %}
+    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 md:p-4 mb-6">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-yellow-400"></i>
+            </div>
+            <div class="ml-3">
+                <p class="text-xs md:text-sm text-yellow-700">
+                    Tu perfil está marcado como inactivo. Contacta al administrador si necesitas que te activen.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Lista de Estudios -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-gradient-to-r from-blue-500 to-cyan-500 px-4 md:px-6 py-3 md:py-4">
+            <h2 class="text-lg md:text-xl font-bold text-white">
+                <i class="fas fa-list mr-2"></i>
+                Estudios para Realizar
+            </h2>
+        </div>
+
+        {% if estudios %}
+        <!-- Vista Desktop: Tabla -->
+        <div class="hidden md:block overflow-x-auto">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Paciente / Ubicación
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estudio
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Prioridad
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Estado
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Solicitado
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Acción
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for pedido in estudios %}
+                    <tr class="hover:bg-gray-50 transition-colors" id="pedido-{{ pedido.id }}">
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ pedido.paciente.nombre_completo }}
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                {% if pedido.paciente.habitacion %}
+                                <i class="fas fa-bed mr-1"></i>
+                                Hab. {{ pedido.paciente.habitacion }}
+                                {% if pedido.paciente.cama %}Cama {{ pedido.paciente.cama }}{% endif %}
+                                {% endif %}
+                            </div>
+                            {% if pedido.paciente.historia_clinica %}
+                            <div class="text-xs text-gray-400">
+                                HC: {{ pedido.paciente.historia_clinica }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ pedido.tipo_estudio.nombre|default:"Sin especificar" }}
+                            </div>
+                            <div class="text-xs text-gray-500">
+                                {{ pedido.descripcion_estudio|truncatewords:8 }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if pedido.prioridad == 'URGENTE' %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                <i class="fas fa-exclamation-circle mr-1"></i> URGENTE
+                            </span>
+                            {% elif pedido.prioridad == 'ALTA' %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                <i class="fas fa-arrow-up mr-1"></i> ALTA
+                            </span>
+                            {% else %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                Normal
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if pedido.estado == 'PENDIENTE' %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                <i class="fas fa-clock mr-1"></i> Pendiente
+                            </span>
+                            {% elif pedido.estado == 'PROCESANDO' %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                <i class="fas fa-sync-alt mr-1"></i> En Proceso
+                            </span>
+                            {% elif pedido.estado == 'PROGRAMADO' %}
+                            <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                                <i class="fas fa-calendar-check mr-1"></i> Programado
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            {{ pedido.fecha_solicitud|date:"d/m/Y H:i" }}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <form method="post" action="{% if es_acceso_token %}{% url 'pedidos_estudios:marcar_realizado_token' token pedido.id %}{% else %}{% url 'pedidos_estudios:marcar_realizado' pedido.id %}{% endif %}" class="marcar-realizado-form">
+                                {% csrf_token %}
+                                <button type="submit" 
+                                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                                    <i class="fas fa-check mr-2"></i>
+                                    Realizado
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Vista Móvil: Cards -->
+        <div class="md:hidden divide-y divide-gray-200">
+            {% for pedido in estudios %}
+            <div class="p-4 hover:bg-gray-50 transition-colors" id="pedido-mobile-{{ pedido.id }}">
+                <!-- Paciente y Prioridad -->
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex-1">
+                        <h3 class="text-base font-semibold text-gray-900">
+                            {{ pedido.paciente.nombre_completo }}
+                        </h3>
+                        <div class="text-sm text-gray-600 mt-1">
+                            {% if pedido.paciente.habitacion %}
+                            <i class="fas fa-bed mr-1"></i>
+                            Hab. {{ pedido.paciente.habitacion }}
+                            {% if pedido.paciente.cama %}Cama {{ pedido.paciente.cama }}{% endif %}
+                            {% endif %}
+                        </div>
+                        {% if pedido.paciente.historia_clinica %}
+                        <div class="text-xs text-gray-400 mt-1">
+                            HC: {{ pedido.paciente.historia_clinica }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="ml-2">
+                        {% if pedido.prioridad == 'URGENTE' %}
+                        <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </span>
+                        {% elif pedido.prioridad == 'ALTA' %}
+                        <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                            <i class="fas fa-arrow-up"></i>
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Estudio -->
+                <div class="mb-3">
+                    <div class="text-sm font-medium text-gray-900">
+                        <i class="fas fa-file-medical text-blue-500 mr-1"></i>
+                        {{ pedido.tipo_estudio.nombre|default:"Sin especificar" }}
+                    </div>
+                    {% if pedido.descripcion_estudio %}
+                    <div class="text-xs text-gray-500 mt-1">
+                        {{ pedido.descripcion_estudio|truncatewords:12 }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Estado y Fecha -->
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        {% if pedido.estado == 'PENDIENTE' %}
+                        <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                            <i class="fas fa-clock mr-1"></i> Pendiente
+                        </span>
+                        {% elif pedido.estado == 'PROCESANDO' %}
+                        <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            <i class="fas fa-sync-alt mr-1"></i> En Proceso
+                        </span>
+                        {% elif pedido.estado == 'PROGRAMADO' %}
+                        <span class="px-2 py-1 inline-flex text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            <i class="fas fa-calendar-check mr-1"></i> Programado
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        <i class="fas fa-calendar-alt mr-1"></i>
+                        {{ pedido.fecha_solicitud|date:"d/m H:i" }}
+                    </div>
+                </div>
+
+                <!-- Botón Acción -->
+                <form method="post" action="{% if es_acceso_token %}{% url 'pedidos_estudios:marcar_realizado_token' token pedido.id %}{% else %}{% url 'pedidos_estudios:marcar_realizado' pedido.id %}{% endif %}" class="marcar-realizado-form">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            class="w-full inline-flex items-center justify-center px-4 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                        <i class="fas fa-check mr-2"></i>
+                        Marcar como Realizado
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-4 md:px-6 py-8 md:py-12 text-center">
+            <i class="fas fa-check-circle text-green-500 text-5xl md:text-6xl mb-4"></i>
+            <p class="text-lg md:text-xl text-gray-600 font-medium">¡No hay estudios pendientes!</p>
+            <p class="text-sm md:text-base text-gray-500 mt-2">Todos los estudios de tu especialidad han sido realizados.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Confirmación al marcar como realizado
+document.querySelectorAll('.marcar-realizado-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        if (!confirm('¿Confirmas que has realizado este estudio?')) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

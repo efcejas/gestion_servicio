@@ -42,6 +42,9 @@ MANAGERS = ADMINS
 # Email predeterminado para notificaciones de pedidos
 PEDIDOS_EMAIL_DEFAULT = 'ecejas@sanatoriocolegiales.com.ar'
 
+# URL base del sitio (para generar enlaces en emails)
+SITE_URL = config('SITE_URL', default='http://localhost:8000')
+
 
 # Application definition
 

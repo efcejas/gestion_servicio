@@ -18,6 +18,7 @@ from .forms import (
     RevisarPedidoForm
 )
 from .services.procesador import procesar_emails_ahora
+from accounts.decorators import puede_procesar_emails
 from .services.gmail_service import verificar_configuracion_gmail
 
 logger = logging.getLogger(__name__)
@@ -177,8 +178,14 @@ def cambiar_estado(request, pk):
 
 
 @login_required
+@login_required
 def procesar_emails_manual(request):
-    """Vista para procesar emails manualmente."""
+    """Vista para procesar emails manualmente. Solo superusuarios y administrativos."""
+    
+    # Verificar permisos
+    if not puede_procesar_emails(request.user):
+        messages.error(request, 'No tienes permisos para procesar emails.')
+        return redirect('home')
     
     if request.method == 'POST':
         try:
@@ -189,7 +196,7 @@ def procesar_emails_manual(request):
             
             messages.success(
                 request,
-                f'Procesamiento completado: {stats["exitosos"]} exitosos, '
+                f'✓ Emails procesados: {stats["exitosos"]} exitosos, '
                 f'{stats["errores"]} errores, {stats["duplicados"]} duplicados'
             )
         
@@ -204,7 +211,12 @@ def procesar_emails_manual(request):
 
 @login_required
 def verificar_gmail(request):
-    """Verifica la configuración de Gmail."""
+    """Verifica la configuración de Gmail. Solo superusuarios y administrativos."""
+    
+    # Verificar permisos
+    if not puede_procesar_emails(request.user):
+        messages.error(request, 'No tienes permisos para verificar la configuración.')
+        return redirect('home')
     
     exito, mensaje = verificar_configuracion_gmail()
     
@@ -218,7 +230,12 @@ def verificar_gmail(request):
 
 @login_required
 def logs_procesamiento(request):
-    """Lista de logs de procesamiento."""
+    """Lista de logs de procesamiento. Solo superusuarios y administrativos."""
+    
+    # Verificar permisos
+    if not puede_procesar_emails(request.user):
+        messages.error(request, 'No tienes permisos para ver los logs.')
+        return redirect('home')
     
     logs = LogProcesamientoEmail.objects.select_related(
         'pedido_creado'

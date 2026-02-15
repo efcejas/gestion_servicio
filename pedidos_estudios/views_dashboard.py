@@ -12,11 +12,12 @@ from django.core.paginator import Paginator
 
 from .models import PedidoEstudio, PacienteEstudio, LogProcesamientoEmail
 from .forms import FiltroPedidosForm
+from accounts.decorators import dashboard_pedidos_required
 
 logger = logging.getLogger(__name__)
 
 
-@login_required
+@dashboard_pedidos_required
 def dashboard_pedidos(request):
     """
     Dashboard principal de pedidos de estudios.

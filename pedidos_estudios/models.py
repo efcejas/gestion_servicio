@@ -330,3 +330,154 @@ class LogProcesamientoEmail(models.Model):
     
     def __str__(self):
         return f"{self.email_asunto} - {self.get_resultado_display()}"
+
+
+class MedicoGuardia(models.Model):
+    """
+    Médicos de guardia que pueden realizar estudios.
+    Puede estar vinculado a un usuario del sistema o tener datos manuales.
+    """
+    ESPECIALIDAD_CHOICES = [
+        ('DOPPLER', 'Ecodoppler'),
+        ('ECOCARDIO', 'Ecocardiograma'),
+        ('AMBOS', 'Doppler y Ecocardio'),
+    ]
+    
+    DIAS_SEMANA = [
+        (1, 'Lunes'),
+        (2, 'Martes'),
+        (3, 'Miércoles'),
+        (4, 'Jueves'),
+        (5, 'Viernes'),
+        (6, 'Sábado'),
+        (7, 'Domingo'),
+    ]
+    
+    # Vinculación con usuario (opcional)
+    usuario = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='medico_guardia',
+        help_text="Usuario del sistema (si está registrado)"
+    )
+    
+    # Datos del médico (obligatorios si no hay usuario)
+    nombre_completo = models.CharField(
+        max_length=255,
+        help_text="Nombre completo del médico"
+    )
+    matricula = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Número de matrícula provincial/nacional"
+    )
+    
+    # Especialidad y disponibilidad
+    especialidad = models.CharField(
+        max_length=20,
+        choices=ESPECIALIDAD_CHOICES,
+        default='AMBOS',
+        help_text="Tipo de estudios que puede realizar"
+    )
+    
+    # Contacto
+    email = models.EmailField(
+        help_text="Email para notificaciones"
+    )
+    telefono = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Teléfono de contacto"
+    )
+    whatsapp = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Número de WhatsApp (con código de país)"
+    )
+    
+    # Disponibilidad
+    activo = models.BooleanField(
+        default=True,
+        help_text="Si está actualmente disponible para recibir asignaciones"
+    )
+    orden_rotacion = models.IntegerField(
+        default=0,
+        help_text="Orden en la rotación (para asignación automática futura)"
+    )
+    
+    # Notas
+    notas = models.TextField(
+        blank=True,
+        help_text="Notas internas sobre el médico (horarios especiales, etc.)"
+    )
+    
+    # Token de acceso para médicos externos (sin cuenta de usuario)
+    token_acceso = models.CharField(
+        max_length=64,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Token único para acceder sin login (generado automáticamente)"
+    )
+    
+    # Metadata
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'pedidos_medicos_guardia'
+        verbose_name = 'Médico de Guardia'
+        verbose_name_plural = 'Médicos de Guardia'
+        ordering = ['especialidad', 'orden_rotacion', 'nombre_completo']
+    
+    def __str__(self):
+        especialidad_display = self.get_especialidad_display()
+        estado = "✓" if self.activo else "✗"
+        return f"{estado} {self.nombre_completo} - {especialidad_display}"
+    
+    def save(self, *args, **kwargs):
+        """Genera token de acceso si no existe"""
+        if not self.token_acceso:
+            import secrets
+            self.token_acceso = secrets.token_urlsafe(48)
+        super().save(*args, **kwargs)
+    
+    def get_url_acceso(self):
+        """Genera la URL de acceso con token para este médico"""
+        from django.urls import reverse
+        from django.conf import settings
+        base_url = getattr(settings, 'SITE_URL', 'http://localhost:8000')
+        path = reverse('pedidos_estudios:mis_estudios_token', kwargs={'token': self.token_acceso})
+        return f"{base_url}{path}"
+    
+    def get_email_contacto(self):
+        """Obtiene el email de contacto (del usuario o del campo email)"""
+        if self.usuario and self.usuario.email:
+            return self.usuario.email
+        return self.email
+    
+    def puede_realizar_estudio(self, tipo_estudio_nombre):
+        """
+        Verifica si este médico puede realizar un tipo de estudio.
+        
+        Args:
+            tipo_estudio_nombre: Nombre del tipo de estudio
+        
+        Returns:
+            bool: True si puede realizarlo
+        """
+        if not self.activo:
+            return False
+        
+        tipo_lower = tipo_estudio_nombre.lower()
+        
+        if self.especialidad == 'AMBOS':
+            return True
+        elif self.especialidad == 'DOPPLER':
+            return 'doppler' in tipo_lower and 'ecocardio' not in tipo_lower
+        elif self.especialidad == 'ECOCARDIO':
+            return 'ecocardio' in tipo_lower or 'eco cardio' in tipo_lower
+        
+        return False

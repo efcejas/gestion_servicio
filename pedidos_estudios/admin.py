@@ -10,7 +10,8 @@ from .models import (
     TipoEstudio,
     PedidoEstudio,
     AdjuntoEmail,
-    LogProcesamientoEmail
+    LogProcesamientoEmail,
+    MedicoGuardia
 )
 
 
@@ -290,3 +291,68 @@ class LogProcesamientoEmailAdmin(admin.ModelAdmin):
     
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(MedicoGuardia)
+class MedicoGuardiaAdmin(admin.ModelAdmin):
+    list_display = [
+        'nombre_completo', 'especialidad_badge', 'activo_badge',
+        'email_display', 'orden_rotacion'
+    ]
+    list_filter = ['especialidad', 'activo', 'fecha_creacion']
+    search_fields = ['nombre_completo', 'email', 'matricula', 'telefono']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion']
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('usuario', 'nombre_completo', 'matricula')
+        }),
+        ('Especialidad y Disponibilidad', {
+            'fields': ('especialidad', 'activo', 'orden_rotacion')
+        }),
+        ('Contacto', {
+            'fields': ('email', 'telefono', 'whatsapp')
+        }),
+        ('Notas', {
+            'fields': ('notas',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def especialidad_badge(self, obj):
+        colors = {
+            'DOPPLER': '#17a2b8',
+            'ECOCARDIO': '#28a745',
+            'AMBOS': '#6f42c1',
+        }
+        color = colors.get(obj.especialidad, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; '
+            'padding: 3px 10px; border-radius: 3px;">{}</span>',
+            color, obj.get_especialidad_display()
+        )
+    especialidad_badge.short_description = 'Especialidad'
+    
+    def activo_badge(self, obj):
+        if obj.activo:
+            return format_html(
+                '<span style="color: #28a745; font-weight: bold;">✓ Activo</span>'
+            )
+        return format_html(
+            '<span style="color: #dc3545; font-weight: bold;">✗ Inactivo</span>'
+        )
+    activo_badge.short_description = 'Estado'
+    
+    def email_display(self, obj):
+        email = obj.get_email_contacto()
+        if obj.usuario:
+            return format_html(
+                '{} <small>(usuario del sistema)</small>',
+                email
+            )
+        return email
+    email_display.short_description = 'Email'

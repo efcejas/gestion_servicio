@@ -114,3 +114,34 @@ def protocolos_access_required(view_func):
         return redirect('home')
     
     return _wrapped_view
+
+
+def dashboard_pedidos_required(view_func):
+    """
+    Decorador para acceso al dashboard completo de pedidos de estudios.
+    Permite: superusuarios, administrativos, jefe de servicio, jefe de residentes, instructor de residentes.
+    """
+    @wraps(view_func)
+    @login_required
+    def _wrapped_view(request, *args, **kwargs):
+        # Roles permitidos para ver dashboard completo
+        roles_permitidos = ['administrativo', 'jefe_servicio', 'jefe_residentes', 'instructor_residentes']
+        
+        if request.user.is_superuser or request.user.rol in roles_permitidos:
+            return view_func(request, *args, **kwargs)
+        
+        messages.error(
+            request,
+            'Acceso denegado. El dashboard de pedidos está disponible para personal administrativo y coordinadores.'
+        )
+        return redirect('home')
+    
+    return _wrapped_view
+
+
+def puede_procesar_emails(user):
+    """
+    Verifica si un usuario puede procesar emails manualmente.
+    Solo superusuarios y administrativos.
+    """
+    return user.is_superuser or user.rol == 'administrativo'
