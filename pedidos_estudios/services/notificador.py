@@ -106,7 +106,7 @@ class NotificadorPedidos:
                 f"Paciente: {pedido.paciente.nombre_completo}\n"
                 f"Estudio: {pedido.descripcion_estudio}\n"
                 f"Nuevo estado: {pedido.get_estado_display()}\n"
-                f"Fecha: {timezone.now().strftime('%d/%m/%Y %H:%M')}\n"
+                f"Fecha: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M')}\n"
             )
             
             send_mail(
@@ -265,7 +265,7 @@ class NotificadorPedidos:
                     <span class="label">Médico Solicitante:</span> {pedido.medico_solicitante}
                 </div>
                 <div class="info-row">
-                    <span class="label">Fecha Solicitud:</span> {pedido.fecha_solicitud.strftime('%d/%m/%Y %H:%M')}
+                    <span class="label">Fecha Solicitud:</span> {timezone.localtime(pedido.fecha_solicitud).strftime('%d/%m/%Y %H:%M')}
                 </div>
             </div>
             
@@ -317,7 +317,7 @@ def notificar_error_procesamiento(
         
         # Construir mensaje
         mensaje = f"Se detectó un error en el procesamiento de pedidos de estudios.\n\n"
-        mensaje += f"Fecha y hora: {timezone.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+        mensaje += f"Fecha y hora: {timezone.localtime(timezone.now()).strftime('%d/%m/%Y %H:%M:%S')}\n"
         mensaje += f"Error: {error_msg}\n\n"
         
         if email_data:

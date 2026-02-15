@@ -98,7 +98,7 @@ class ProcesadorPedidos:
                     enviar_notificacion=enviar_notificaciones
                 )
                 
-                if resultado == 'EXITO':
+                if resultado in ['EXITO', 'MULTIPLES']:
                     stats['exitosos'] += 1
                     
                     # Marcar como leído si fue exitoso
@@ -109,6 +109,12 @@ class ProcesadorPedidos:
                     stats['duplicados'] += 1
                     
                     # También marcar duplicados como leídos
+                    if marcar_como_leido:
+                        self.gmail.marcar_como_leido(email_data['id'])
+                
+                elif resultado == 'PARCIAL':
+                    stats['exitosos'] += 1  # Considerar parcial como exitoso
+                    
                     if marcar_como_leido:
                         self.gmail.marcar_como_leido(email_data['id'])
                 
@@ -132,7 +138,10 @@ class ProcesadorPedidos:
         enviar_notificacion: bool = True
     ) -> Tuple[str, Optional[PedidoEstudio]]:
         """
-        Procesa un email individual y crea el pedido.
+        Procesa un email individual y crea el/los pedido(s).
+        
+        Detecta automáticamente si el email contiene múltiples estudios
+        y los procesa todos.
         
         Args:
             email_data: Datos del email desde GmailService
@@ -140,10 +149,12 @@ class ProcesadorPedidos:
         
         Returns:
             Tupla (resultado, pedido):
-            - resultado: 'EXITO', 'ERROR', 'DUPLICADO', 'PARCIAL'
-            - pedido: Instancia de PedidoEstudio o None
+            - resultado: 'EXITO', 'ERROR', 'DUPLICADO', 'PARCIAL', 'MULTIPLES'
+            - pedido: Instancia del primer PedidoEstudio o None
         """
         tiempo_inicio = time.time()
+        
+        # Inicializar variables para el bloque finally
         pedido = None
         resultado = 'ERROR'
         mensaje = ''
@@ -158,9 +169,26 @@ class ProcesadorPedidos:
                 self._registrar_log(email_data, 'DUPLICADO', None, "Email ya procesado", [], time.time() - tiempo_inicio)
                 return ('DUPLICADO', None)
             
-            # Parsear email
+            # Parsear email (detecta automáticamente múltiples estudios)
             logger.info(f"Parseando email: {email_data.get('asunto', '')}")
-            datos_parseados = self.parser.parsear_email(email_data)
+            estudios_parseados = self.parser.parsear_multiples_estudios(email_data)
+            
+            if len(estudios_parseados) > 1:
+                # Email con múltiples estudios
+                logger.info(f"Detectados {len(estudios_parseados)} estudios en el email")
+                return self._procesar_multiples_estudios(
+                    email_data, 
+                    estudios_parseados, 
+                    enviar_notificacion, 
+                    tiempo_inicio
+                )
+            
+            # Email con un solo estudio (proceso normal)
+            datos_parseados = estudios_parseados[0]
+            pedido = None
+            resultado = 'ERROR'
+            mensaje = ''
+            errores = []
             
             errores.extend(datos_parseados.get('errores', []))
             errores.extend(datos_parseados.get('advertencias_validacion', []))
@@ -210,7 +238,8 @@ class ProcesadorPedidos:
         except Exception as e:
             resultado = 'ERROR'
             mensaje = f"Error al procesar email: {str(e)}"
-            errores.append(str(e))
+            errores = [str(e)]
+            pedido = None
             logger.error(mensaje, exc_info=True)
             
             # Enviar alerta de error a administradores
@@ -236,9 +265,115 @@ class ProcesadorPedidos:
         
         return (resultado, pedido)
     
+    def _procesar_multiples_estudios(
+        self,
+        email_data: Dict,
+        estudios_parseados: List[Dict],
+        enviar_notificacion: bool,
+        tiempo_inicio: float
+    ) -> Tuple[str, Optional[PedidoEstudio]]:
+        """
+        Procesa un email que contiene múltiples estudios.
+        
+        Args:
+            email_data: Datos del email original
+            estudios_parseados: Lista de estudios parseados
+            enviar_notificacion: Si debe enviar notificaciones
+            tiempo_inicio: Tiempo de inicio del procesamiento
+        
+        Returns:
+            Tupla (resultado, primer_pedido)
+        """
+        pedidos_creados = []
+        errores_totales = []
+        resultado = 'EXITO'
+        
+        logger.info(f"Procesando {len(estudios_parseados)} estudios del email")
+        
+        for i, datos_parseados in enumerate(estudios_parseados, 1):
+            try:
+                errores = []
+                errores.extend(datos_parseados.get('errores', []))
+                errores.extend(datos_parseados.get('advertencias_validacion', []))
+                
+                # Crear o actualizar paciente
+                paciente = self._crear_o_actualizar_paciente(datos_parseados['paciente'])
+                logger.info(f"Estudio {i}/{len(estudios_parseados)}: Paciente {paciente}")
+                
+                # Determinar tipo de estudio
+                tipo_estudio = self._determinar_tipo_estudio(datos_parseados['estudio'])
+                
+                # Crear pedido (con sufijo único si hay múltiples estudios)
+                pedido = self._crear_pedido(
+                    paciente=paciente,
+                    tipo_estudio=tipo_estudio,
+                    datos_estudio=datos_parseados['estudio'],
+                    datos_metadata=datos_parseados['metadata'],
+                    prioridad=datos_parseados['prioridad'],
+                    datos_raw=datos_parseados['datos_raw'],
+                    indice_estudio=i if len(estudios_parseados) > 1 else None
+                )
+                
+                # Solo guardar adjuntos en el primer pedido (son compartidos)
+                if i == 1:
+                    self._guardar_adjuntos(pedido, email_data.get('adjuntos', []))
+                
+                # Enviar notificación
+                if enviar_notificacion:
+                    if pedido.prioridad == 'URGENTE':
+                        if notificar_pedido_urgente(pedido):
+                            logger.info(f"Notificación URGENTE enviada para pedido {pedido.id}")
+                        else:
+                            errores.append("No se pudo enviar notificación urgente")
+                    else:
+                        if self.notificador.notificar_pedido(pedido):
+                            logger.info(f"Notificación enviada para pedido {pedido.id}")
+                        else:
+                            errores.append("No se pudo enviar notificación")
+                
+                pedidos_creados.append(pedido)
+                
+                if errores:
+                    errores_totales.extend(errores)
+                    resultado = 'PARCIAL'
+                
+                logger.info(f"Pedido #{pedido.id} creado (estudio {i}/{len(estudios_parseados)})")
+            
+            except Exception as e:
+                error_msg = f"Error en estudio {i}: {str(e)}"
+                logger.error(error_msg, exc_info=True)
+                errores_totales.append(error_msg)
+                resultado = 'PARCIAL'
+        
+        # Registrar log del procesamiento
+        mensaje = f"Procesados {len(pedidos_creados)}/{len(estudios_parseados)} estudios del email"
+        if errores_totales:
+            mensaje += f" con {len(errores_totales)} errores"
+        
+        tiempo_procesamiento = time.time() - tiempo_inicio
+        self._registrar_log(
+            email_data, 
+            resultado if pedidos_creados else 'ERROR',
+            pedidos_creados[0] if pedidos_creados else None,
+            mensaje,
+            errores_totales,
+            tiempo_procesamiento
+        )
+        
+        logger.info(mensaje)
+        
+        # Retornar el primer pedido creado
+        return (
+            'MULTIPLES' if len(pedidos_creados) > 1 else resultado,
+            pedidos_creados[0] if pedidos_creados else None
+        )
+    
     def _email_ya_procesado(self, message_id: str) -> bool:
         """
         Verifica si un email ya fue procesado.
+        
+        Busca tanto el message_id exacto como aquellos que empiezan con el message_id
+        (en caso de emails con múltiples estudios que tienen sufijos -estudio1, -estudio2, etc.)
         
         Args:
             message_id: Message-ID del email
@@ -249,7 +384,11 @@ class ProcesadorPedidos:
         if not message_id:
             return False
         
-        return PedidoEstudio.objects.filter(email_message_id=message_id).exists()
+        # Buscar pedidos con el message_id exacto o que empiecen con el message_id
+        # Esto cubre tanto emails simples como los con múltiples estudios (con sufijos)
+        return PedidoEstudio.objects.filter(
+            email_message_id__startswith=message_id
+        ).exists()
     
     def _crear_o_actualizar_paciente(self, datos_paciente: Dict) -> PacienteEstudio:
         """
@@ -362,7 +501,8 @@ class ProcesadorPedidos:
         datos_estudio: Dict,
         datos_metadata: Dict,
         prioridad: str,
-        datos_raw: Dict
+        datos_raw: Dict,
+        indice_estudio: Optional[int] = None
     ) -> PedidoEstudio:
         """
         Crea un nuevo pedido de estudio.
@@ -374,10 +514,16 @@ class ProcesadorPedidos:
             datos_metadata: Metadata del email
             prioridad: Prioridad del pedido
             datos_raw: Datos crudos completos
+            indice_estudio: Índice del estudio si hay múltiples (1, 2, 3...)
         
         Returns:
             Instancia de PedidoEstudio
         """
+        # Si hay múltiples estudios, agregar sufijo al email_message_id para hacerlo único
+        email_message_id = datos_metadata.get('email_message_id')
+        if indice_estudio is not None and email_message_id:
+            email_message_id = f"{email_message_id}-estudio{indice_estudio}"
+        
         pedido = PedidoEstudio.objects.create(
             paciente=paciente,
             tipo_estudio=tipo_estudio,
@@ -386,7 +532,7 @@ class ProcesadorPedidos:
             medico_solicitante=datos_estudio.get('medico_solicitante') or 'No especificado',
             estado='PENDIENTE',
             prioridad=prioridad,
-            email_message_id=datos_metadata.get('email_message_id'),
+            email_message_id=email_message_id,
             email_asunto=datos_metadata.get('email_asunto'),
             email_remitente=datos_metadata.get('email_remitente'),
             email_fecha=datos_metadata.get('email_fecha'),

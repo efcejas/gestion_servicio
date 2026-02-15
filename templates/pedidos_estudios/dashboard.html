@@ -1,0 +1,449 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Pedidos de Estudios{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
+    <!-- Header con Gradiente -->
+    <div class="mb-6 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl shadow-xl p-8 text-white">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <div class="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                    <i class="fas fa-heartbeat text-3xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold">Dashboard de Pedidos de Estudios</h1>
+                    <p class="mt-1 text-blue-100">Monitoreo en tiempo real de estudios solicitados</p>
+                </div>
+            </div>
+            <div class="hidden md:block text-right">
+                <div class="text-sm text-blue-100">Última actualización</div>
+                <div class="text-lg font-semibold">{% now "H:i" %} hs</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas Rápidas  -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Hoy -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-700 rounded-xl shadow-lg p-6 text-white transform transition-all hover:scale-105">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white/90">Pedidos Hoy</p>
+                    <p class="text-3xl font-bold">{{ stats.hoy }}</p>
+                </div>
+                <div class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <i class="fas fa-calendar-day text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Urgentes -->
+        <div class="bg-gradient-to-br from-red-500 to-red-700 rounded-xl shadow-lg p-6 text-white transform transition-all hover:scale-105">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white/90">Urgentes</p>
+                    <p class="text-3xl font-bold">{{ stats.urgentes }}</p>
+                </div>
+                <div class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <i class="fas fa-exclamation-triangle text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pendientes -->
+        <div class="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-xl shadow-lg p-6 text-white transform transition-all hover:scale-105">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white/90">Pendientes</p>
+                    <p class="text-3xl font-bold">{{ stats.pendientes }}</p>
+                </div>
+                <div class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <i class="fas fa-clock text-2xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Realizados Hoy -->
+        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl shadow-lg p-6 text-white transform transition-all hover:scale-105">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-white/90">Realizados Hoy</p>
+                    <p class="text-3xl font-bold">{{ stats.realizados_hoy }}</p>
+                </div>
+                <div class="p-3 bg-white/20 rounded-xl backdrop-blur-sm">
+                    <i class="fas fa-check-circle text-2xl"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros Rápidos -->
+    <div class="bg-white rounded-xl shadow-md p-4 mb-6">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-600 mr-2">Vista rápida:</span>
+            <a href="?mostrar=todos" 
+               class="px-4 py-2 rounded-lg transition-all {% if mostrar == 'todos' %}bg-blue-600 text-white shadow-md{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-list mr-1"></i>
+                Todos
+            </a>
+            <a href="?mostrar=hoy" 
+               class="px-4 py-2 rounded-lg transition-all {% if mostrar == 'hoy' %}bg-blue-600 text-white shadow-md{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-calendar-day mr-1"></i>
+                Hoy
+            </a>
+            <a href="?mostrar=urgentes" 
+               class="px-4 py-2 rounded-lg transition-all {% if mostrar == 'urgentes' %}bg-red-600 text-white shadow-md{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                Urgentes
+            </a>
+            <a href="?mostrar=pendientes" 
+               class="px-4 py-2 rounded-lg transition-all {% if mostrar == 'pendientes' %}bg-yellow-600 text-white shadow-md{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-clock mr-1"></i>
+                Pendientes
+            </a>
+            <a href="?mostrar=revision" 
+               class="px-4 py-2 rounded-lg transition-all {% if mostrar == 'revision' %}bg-orange-600 text-white shadow-md{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-flag mr-1"></i>
+                Requieren Revisión
+            </a>
+        </div>
+    </div>
+
+    <!-- Buscador y Filtros Avanzados -->
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-search text-blue-600 mr-2"></i>
+                Búsqueda y Filtros
+            </h2>
+        </div>
+        
+        <form method="get" class="space-y-4">
+            <input type="hidden" name="mostrar" value="{{ mostrar }}">
+            
+            <!-- Búsqueda general -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Buscar paciente, DNI o HC</label>
+                    <input type="text" 
+                           name="search" 
+                           value="{{ search }}"
+                           placeholder="Ej: González, 12345678, HC-2026-001"
+                           class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" 
+                            class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium py-2 px-6 rounded-lg transition-all shadow-md">
+                        <i class="fas fa-search mr-2"></i>Buscar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtros adicionales -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                    <select name="estado" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todos</option>
+                        <option value="PENDIENTE" {% if estado_filtro == 'PENDIENTE' %}selected{% endif %}>Pendiente</option>
+                        <option value="PROCESANDO" {% if estado_filtro == 'PROCESANDO' %}selected{% endif %}>En proceso</option>
+                        <option value="PROGRAMADO" {% if estado_filtro == 'PROGRAMADO' %}selected{% endif %}>Programado</option>
+                        <option value="REALIZADO" {% if estado_filtro == 'REALIZADO' %}selected{% endif %}>Realizado</option>
+                        <option value="CANCELADO" {% if estado_filtro == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                        <option value="ERROR" {% if estado_filtro == 'ERROR' %}selected{% endif %}>Error</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                    <select name="prioridad" 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todas</option>
+                        <option value="URGENTE" {% if prioridad_filtro == 'URGENTE' %}selected{% endif %}>Urgente</option>
+                        <option value="ALTA" {% if prioridad_filtro == 'ALTA' %}selected{% endif %}>Alta</option>
+                        <option value="NORMAL" {% if prioridad_filtro == 'NORMAL' %}selected{% endif %}>Normal</option>
+                        <option value="BAJA" {% if prioridad_filtro == 'BAJA' %}selected{% endif %}>Baja</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 flex items-end gap-2">
+                    <button type="submit" 
+                            class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-medium py-2 px-6 rounded-lg transition-all shadow-md">
+                        <i class="fas fa-filter mr-2"></i>Filtrar
+                    </button>
+                    <a href="{% url 'pedidos_estudios:dashboard_pedidos' %}?mostrar={{ mostrar }}" 
+                       class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-lg transition-all shadow-md">
+                        <i class="fas fa-times mr-2"></i>Limpiar
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla de Pedidos -->
+    <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        {% if page_obj.object_list %}
+        <div class="overflow-x-auto">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gradient-to-r from-blue-50 to-cyan-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Fecha
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Paciente
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Ubicación
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Estudio
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Prioridad
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Estado
+                        </th>
+                        <!-- <th class="px-6 py-3 text-left text-xs font-medium text-blue-700 uppercase tracking-wider">
+                            Acciones
+                        </th> -->
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for pedido in page_obj.object_list %}
+                    <tr class="hover:bg-blue-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-500">
+                                <i class="far fa-calendar-alt mr-1"></i>
+                                {{ pedido.fecha_creacion|date:"d/m/Y" }}
+                            </div>
+                            <div class="text-xs text-gray-400">
+                                {{ pedido.fecha_creacion|date:"H:i" }} hs
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ pedido.paciente.nombre_completo }}
+                            </div>
+                            {% if pedido.paciente.dni %}
+                            <div class="text-sm text-gray-500">
+                                <i class="fas fa-id-card mr-1"></i>DNI: {{ pedido.paciente.dni }}
+                            </div>
+                            {% endif %}
+                            {% if pedido.paciente.historia_clinica %}
+                            <div class="text-xs text-gray-400">
+                                HC: {{ pedido.paciente.historia_clinica }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if pedido.paciente.habitacion %}
+                            <div class="text-sm text-gray-900">
+                                <i class="fas fa-bed mr-1"></i>Hab. {{ pedido.paciente.habitacion }}
+                            </div>
+                            {% endif %}
+                            {% if pedido.paciente.cama %}
+                            <div class="text-xs text-gray-500">Cama {{ pedido.paciente.cama }}</div>
+                            {% endif %}
+                            {% if pedido.paciente.piso %}
+                            <div class="text-xs text-gray-500">Piso {{ pedido.paciente.piso }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">
+                                {% if pedido.tipo_estudio %}
+                                    {{ pedido.tipo_estudio.nombre }}
+                                {% else %}
+                                    <span class="text-gray-400 italic">No especificado</span>
+                                {% endif %}
+                            </div>
+                            {% if pedido.descripcion_estudio %}
+                            <div class="text-xs text-gray-500 max-w-xs truncate">
+                                {{ pedido.descripcion_estudio|truncatewords:8 }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if pedido.prioridad == 'URGENTE' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-red-500 to-red-600 text-white shadow-md">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    URGENTE
+                                </span>
+                            {% elif pedido.prioridad == 'ALTA' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-400 to-orange-500 text-white shadow-sm">
+                                    <i class="fas fa-chevron-up mr-1"></i>
+                                    ALTA
+                                </span>
+                            {% elif pedido.prioridad == 'NORMAL' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    Normal
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                    Baja
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if pedido.estado == 'PENDIENTE' %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-yellow-400 to-orange-400 text-white shadow-sm">
+                                    <i class="fas fa-circle text-xs mr-1.5 animate-pulse"></i>
+                                    Pendiente
+                                </span>
+                            {% elif pedido.estado == 'PROCESANDO' %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-sm">
+                                    <i class="fas fa-spinner fa-spin mr-1.5"></i>
+                                    Procesando
+                                </span>
+                            {% elif pedido.estado == 'PROGRAMADO' %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm">
+                                    <i class="fas fa-calendar-check mr-1.5"></i>
+                                    Programado
+                                </span>
+                            {% elif pedido.estado == 'REALIZADO' %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-sm">
+                                    <i class="fas fa-check-circle mr-1.5"></i>
+                                    Realizado
+                                </span>
+                            {% elif pedido.estado == 'ERROR' %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-gradient-to-r from-red-600 to-pink-600 text-white shadow-sm">
+                                    <i class="fas fa-exclamation-circle mr-1.5"></i>
+                                    Error
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                    {{ pedido.get_estado_display }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <!-- <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <a href="{% url 'admin:pedidos_estudios_pedidoestudio_change' pedido.id %}"
+                               class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm">
+                                <i class="fas fa-eye mr-1"></i>
+                                Ver
+                            </a>
+                        </td> -->
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if page_obj.has_other_pages %}
+        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+            <div class="flex-1 flex justify-between sm:hidden">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}&mostrar={{ mostrar }}" 
+                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Anterior
+                </a>
+                {% endif %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&mostrar={{ mostrar }}" 
+                   class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    Siguiente
+                </a>
+                {% endif %}
+            </div>
+            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div>
+                    <p class="text-sm text-gray-700">
+                        Mostrando <span class="font-medium">{{ page_obj.start_index }}</span>
+                        a <span class="font-medium">{{ page_obj.end_index }}</span>
+                        de <span class="font-medium">{{ page_obj.paginator.count }}</span> resultados
+                    </p>
+                </div>
+                <div>
+                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        {% if page_obj.has_previous %}
+                        <a href="?page={{ page_obj.previous_page_number }}&mostrar={{ mostrar }}" 
+                           class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        {% endif %}
+                        <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+                        </span>
+                        {% if page_obj.has_next %}
+                        <a href="?page={{ page_obj.next_page_number }}&mostrar={{ mostrar }}" 
+                           class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        {% endif %}
+                    </nav>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Mensaje cuando no hay resultados -->
+        <div class="text-center py-12">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                <i class="fas fa-inbox text-3xl text-blue-600"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No se encontraron pedidos</h3>
+            <p class="text-gray-500">Intenta ajustar los filtros o realiza una nueva búsqueda</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Info adicional -->
+    <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Últimos procesami entos -->
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-history text-blue-600 mr-2"></i>
+                Últimos Procesamientos
+            </h3>
+            {% if  ultimos_emails %}
+            <div class="space-y-3">
+                {% for log in ultimos_emails %}
+                <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <i class="fas fa-envelope text-green-600 text-sm"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">
+                            {{ log.email_asunto|truncatewords:8 }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ log.fecha_procesamiento|date:"d/m/Y H:i" }} - 
+                            <span class="text-green-600 font-medium">{{ log.get_resultado_display }}</span>
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500 italic">No hay procesamientos recientes</p>
+            {% endif %}
+        </div>
+
+        <!-- Tipos de estudio hoy -->
+        <div class="bg-white rounded-xl shadow-md p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <i class="fas fa-chart-pie text-blue-600 mr-2"></i>
+                Estudios Solicitados Hoy
+            </h3>
+            {% if stats_tipos %}
+            <div class="space-y-3">
+                {% for tipo in stats_tipos %}
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-700">{{ tipo.tipo_estudio__nombre|default:"Sin especificar" }}</span>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                        {{ tipo.total }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500 italic">No hay estudios registrados hoy</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

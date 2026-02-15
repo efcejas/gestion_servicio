@@ -172,6 +172,115 @@ class EmailParser:
             'errores': self.errores,
         }
     
+    def parsear_multiples_estudios(self, email_data: Dict) -> List[Dict[str, Any]]:
+        """
+        Detecta y parsea múltiples estudios en un mismo email.
+        
+        Args:
+            email_data: Diccionario con datos del email
+        
+        Returns:
+            Lista de diccionarios con datos parseados de cada estudio
+        """
+        texto = self._obtener_texto_limpio(email_data)
+        
+        # Detectar si hay múltiples estudios
+        bloques = self._dividir_en_bloques_estudios(texto)
+        
+        if len(bloques) <= 1:
+            # Solo hay un estudio, parsear normalmente
+            return [self.parsear_email(email_data)]
+        
+        # Hay múltiples estudios
+        logger.info(f"Detectados {len(bloques)} estudios en el email")
+        resultados = []
+        
+        # Extraer información común (médico solicitante, etc.)
+        medico_comun = self._extraer_medico_comun(texto)
+        
+        for i, bloque in enumerate(bloques, 1):
+            # Crear email_data modificado para cada bloque
+            email_data_bloque = email_data.copy()
+            email_data_bloque['cuerpo_texto'] = bloque
+            email_data_bloque['body'] = bloque
+            
+            # Parsear el bloque
+            resultado = self.parsear_email(email_data_bloque)
+            
+            # Si no se encontró médico en el bloque, usar el común
+            if not resultado['estudio'].get('medico_solicitante') and medico_comun:
+                resultado['estudio']['medico_solicitante'] = medico_comun
+            
+            # Agregar número de estudio a metadata
+            resultado['metadata']['numero_estudio_en_email'] = i
+            resultado['metadata']['total_estudios_en_email'] = len(bloques)
+            
+            resultados.append(resultado)
+        
+        return resultados
+    
+    def _dividir_en_bloques_estudios(self, texto: str) -> List[str]:
+        """
+        Divide el texto en bloques cuando detecta múltiples estudios.
+        
+        Detecta patrones como:
+        - 1) Paciente: ...
+        - 2) Paciente: ...
+        
+        Args:
+            texto: Texto completo del email
+        
+        Returns:
+            Lista de bloques de texto (uno por estudio)
+        """
+        # Patrón para detectar inicio de cada estudio numerado
+        patron_inicio = r'(?:^|\n)\s*(\d+)\s*\)\s*(?:paciente|estudio)'
+        
+        coincidencias = list(re.finditer(patron_inicio, texto, re.IGNORECASE | re.MULTILINE))
+        
+        if len(coincidencias) < 2:
+            # No hay múltiples estudios numerados
+            return [texto]
+        
+        bloques = []
+        for i, match in enumerate(coincidencias):
+            inicio = match.start()
+            
+            # El final es el inicio del siguiente bloque o el final del texto
+            if i + 1 < len(coincidencias):
+                fin = coincidencias[i + 1].start()
+            else:
+                fin = len(texto)
+            
+            bloque = texto[inicio:fin].strip()
+            bloques.append(bloque)
+        
+        return bloques
+    
+    def _extraer_medico_comun(self, texto: str) -> Optional[str]:
+        """
+        Extrae el médico solicitante que aparece al final del email
+        (común para todos los estudios).
+        
+        Args:
+            texto: Texto completo del email
+        
+        Returns:
+            Nombre del médico o None
+        """
+        # Buscar médico en la firma/final del email
+        # Típicamente después de "Gracias," o "Saludos,"
+        patron_firma = r'(?:gracias|saludos|atentamente|atte)[\s,]*\n\s*(dra?\.?\s+[a-záéíóúñ][a-záéíóúñ\s]+?)(?=\s*\n)'
+        
+        match = re.search(patron_firma, texto.lower(), re.IGNORECASE)
+        if match:
+            medico = self._limpiar_valor(match.group(1))
+            # Eliminar palabras que no forman parte del nombre
+            medico = re.sub(r'\s+(servicio|interno|int|cl[ií]nica)\b.*$', '', medico, flags=re.IGNORECASE)
+            return medico
+        
+        return None
+    
     def _obtener_texto_limpio(self, email_data: Dict) -> str:
         """
         Obtiene el texto limpio del email (sin HTML).
@@ -292,41 +401,81 @@ class EmailParser:
         """
         Intenta clasificar el tipo de estudio basándose en palabras clave.
         
-        Enfocado en Ecodoppler y Ecocardiogramas.
+        Devuelve el nombre específico del tipo de estudio para coincidir
+        con los nombres en la base de datos TipoEstudio.
+        
+        La estrategia es evaluar desde los más específicos a los más generales.
         
         Args:
             descripcion: Descripción del estudio
         
         Returns:
-            Tipo de estudio sugerido o None
+            Nombre específico del tipo de estudio o None
         """
         descripcion_lower = descripcion.lower()
         
-        # Mapeo de palabras clave a tipos de estudio
-        # Enfocado en ecodoppler y ecocardiogramas
-        clasificaciones = {
-            'ecocardiograma': [
-                'ecocardio', 'eco cardio', 'ecocardiograma', 
-                'eco-cardio', 'ecg doppler', 'doppler cardiaco',
-                'transtoracico', 'transesofagico', 'tee', 'tt ', 'ete',
-                'eco tt', 'eco tee', 'eco ete', 'transtorácico', 'transesofágico',
-                'ecocardio tt', 'ecocardio tee', 'ecocardio ete', 'doppler color'
-            ],
-            'ecodoppler': [
-                'doppler', 'eco doppler', 'ecodoppler',
-                'mmii', 'mmss', 'miembros inferiores', 'miembros superiores',
-                'carotideo', 'carotídeo', 'carotidas', 'carótidas',
-                'arterial', 'venoso', 'vascular', 'renal', 'vertebral',
-                'ecd ', 'miembro inferior', 'miembro superior'
-            ],
-            'ecografía': [
-                'eco ', 'ecograf', 'ultrason', 'us '
-            ],
-        }
+        # NIVEL 1: Patrones muy específicos anatómicos/técnicos
+        # Orden: de más específico a más general
         
-        for tipo, palabras_clave in clasificaciones.items():
-            if any(palabra in descripcion_lower for palabra in palabras_clave):
-                return tipo
+        # Carotídeo y/o Vertebral
+        if any(k in descripcion_lower for k in ['carotideo', 'carotídeo', 'carotida', 'carótida', 'vertebral', 'tsa', 'troncos supraaorticos']):
+            return "Ecodoppler Carotídeo y Vertebral"
+        
+        # Renal
+        if any(k in descripcion_lower for k in ['renal', 'riñon', 'riñón']):
+            return "Ecodoppler Renal"
+        
+        # Aorta
+        if any(k in descripcion_lower for k in ['aorta', 'aórtica']):
+            return "Ecodoppler de Aorta Abdominal"
+        
+        # Testicular
+        if any(k in descripcion_lower for k in ['testicular', 'testiculo', 'testículo', 'escrotal']):
+            return "Ecodoppler Testicular"
+        
+        # Peneano
+        if any(k in descripcion_lower for k in ['peneano', 'pene', 'peniano']):
+            return "Ecodoppler Peneano"
+        
+        # NIVEL 2: Ecodoppler de extremidades con especificidad arterial/venoso
+        
+        # MMII - Arterial
+        if any(k in descripcion_lower for k in ['mmii', 'miembro inferior', 'miembros inferiores', 'pierna']):
+            if any(k in descripcion_lower for k in ['arterial', 'arterias']):
+                return "Ecodoppler Arterial de MMII"
+            elif any(k in descripcion_lower for k in ['venoso', 'venas', 'venosa']):
+                return "Ecodoppler Venoso de MMII"
+            else:
+                # Por defecto, si solo menciona MMII sin especificar, asumir el tipo genérico
+                return "Ecodoppler de Miembros Inferiores"
+        
+        # MMSS
+        if any(k in descripcion_lower for k in ['mmss', 'miembro superior', 'miembros superiores', 'brazo']):
+            return "Ecodoppler de Miembros Superiores"
+        
+        # NIVEL 3: Ecocardiogramas
+        
+        # Ecocardiograma con variantes TT/TEE/ETE
+        if any(k in descripcion_lower for k in [
+            'ecocardio', 'eco cardio', 'ecocardiograma', 'eco-cardio',
+            'transtoracico', 'transtorácico', 'tt ', ' tt',
+            'transesofagico', 'transesofágico', 'tee', 'ete',
+            'doppler cardiaco', 'doppler color'
+        ]):
+            return "Ecocardiograma Doppler Color"
+        
+        # NIVEL 4: Genéricos
+        
+        # Ecodoppler genérico (si no coincidió con nada más específico)
+        if any(k in descripcion_lower for k in [
+            'doppler', 'eco doppler', 'ecodoppler', 'ecd ',
+            'arterial', 'venoso', 'vascular'
+        ]):
+            return "ecodoppler"  # Genérico para que el procesador busque por descripción
+        
+        # Ecografía genérica
+        if any(k in descripcion_lower for k in ['eco ', 'ecograf', 'ultrason', 'us ']):
+            return "ecografía"
         
         return None
     

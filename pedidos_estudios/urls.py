@@ -3,12 +3,14 @@ URLs para la app pedidos_estudios.
 """
 from django.urls import path
 from . import views
+from . import views_dashboard
 
 app_name = 'pedidos_estudios'
 
 urlpatterns = [
     # Dashboard
-    path('', views.dashboard, name='dashboard'),
+    path('', views_dashboard.dashboard_pedidos, name='dashboard'),
+    path('dashboard/', views_dashboard.dashboard_pedidos, name='dashboard_pedidos'),  # Alias
     
     # Pedidos
     path('pedidos/', views.lista_pedidos, name='lista_pedidos'),
