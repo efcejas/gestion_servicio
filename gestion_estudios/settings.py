@@ -468,4 +468,6 @@ try:
     from .settings_local import *
     print("✓ settings_local.py importado correctamente")
 except ImportError:
-    print("⚠ settings_local.py no encontrado - usando solo configuración base")
+    # Solo mostrar warning en desarrollo local (no en Heroku)
+    if not os.getenv('DYNO'):  # DYNO existe solo en Heroku
+        print("⚠ settings_local.py no encontrado - usando solo configuración base")
