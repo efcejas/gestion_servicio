@@ -137,10 +137,7 @@ class PracticaForm(forms.ModelForm):
         # Formato de fecha
         self.fields['fecha_del_informe'].input_formats = ['%Y-%m-%d']
 
-        # Ocultar campo horario para staff (se auto-asigna NA en el modelo)
-        if self.user and self.user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']:
-            self.fields['horario'].widget = forms.HiddenInput()
-            self.fields['horario'].initial = 'NA'
+        # Horario se asigna automáticamente en models.RegistroEstudiosPorMedico.save()
 
     def clean_cantidad_regiones(self):
         cantidad = self.cleaned_data.get('cantidad_regiones')

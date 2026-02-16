@@ -255,8 +255,8 @@
                                 <i class="fas fa-dollar-sign mr-2 text-amber-500"></i>Facturación
                             </h3>
                             <div class="space-y-4">
-                                <!-- Tipo de Obra Social -->
-                                <div>
+                                <!-- Tipo de Obra Social (solo si hay estudios con precios diferenciados) -->
+                                <div id="tipo-obra-social-section" style="display: none;">
                                     <label class="block text-sm font-semibold text-gray-700 mb-3">
                                         Tipo de Obra Social <span class="text-red-500">*</span>
                                     </label>
@@ -290,8 +290,8 @@
                             </div>
                         </div>
 
-                        <!-- Bonus Urgencia (colapsable) -->
-                        <div class="mb-6">
+                        <!-- Bonus Urgencia (solo para Resonancia Magnética) -->
+                        <div class="mb-6" id="bonus-urgencia-section" style="display: none;">
                             <button type="button" id="toggle-bonus-urgencia" class="w-full flex items-center justify-between p-4 bg-orange-50 border-2 border-orange-200 rounded-lg hover:bg-orange-100 transition-all">
                                 <div class="flex items-center">
                                     <div class="bg-orange-500 rounded-lg p-2 mr-3">
@@ -660,6 +660,7 @@ document.addEventListener('DOMContentLoaded', function() {
         estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
         actualizarSelectOriginal();
         renderizarEstudiosSeleccionados();
+        actualizarVisibilidadSecciones();
     };
 
     // Función para agregar estudio
@@ -668,9 +669,53 @@ document.addEventListener('DOMContentLoaded', function() {
             estudiosSeleccionadosIds.push(id);
             actualizarSelectOriginal();
             renderizarEstudiosSeleccionados();
+            actualizarVisibilidadSecciones();
         }
         estudioSearch.value = '';
         estudioDropdown.classList.add('hidden');
+    }
+
+    // Función para actualizar visibilidad de secciones según estudios seleccionados
+    function actualizarVisibilidadSecciones() {
+        if (estudiosSeleccionadosIds.length === 0) {
+            // Sin estudios seleccionados, ocultar todo
+            document.getElementById('tipo-obra-social-section').style.display = 'none';
+            document.getElementById('bonus-urgencia-section').style.display = 'none';
+            return;
+        }
+
+        // Verificar si algún estudio tiene precio diferenciado
+        const hayPrecioDiferenciado = estudiosSeleccionadosIds.some(id => {
+            const estudio = estudios.find(e => e.id === id);
+            return estudio && !estudio.precio_unico;
+        });
+
+        // Verificar si algún estudio es Resonancia
+        const hayResonancia = estudiosSeleccionadosIds.some(id => {
+            const estudio = estudios.find(e => e.id === id);
+            return estudio && estudio.tipo === 'RES';
+        });
+
+        // Mostrar/ocultar secciones
+        document.getElementById('tipo-obra-social-section').style.display = hayPrecioDiferenciado ? 'block' : 'none';
+        document.getElementById('bonus-urgencia-section').style.display = hayResonancia ? 'block' : 'none';
+        
+        // Si no hay precio diferenciado, establecer un valor por defecto para tipo_obra_social
+        if (!hayPrecioDiferenciado) {
+            // Desmarcar radios si existían
+            document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
+                radio.checked = false;
+                radio.required = false;
+            });
+        } else {
+            // Hacer requerido si hay precio diferenciado
+            document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
+                radio.required = true;
+            });
+        }
+        
+        // Recalcular monto
+        calcularMontoTiempoReal();
     }
 
     // Variables para navegación por teclado
@@ -922,7 +967,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const estudioSelectOriginal = document.getElementById('id_estudio');
         const estudiosSelIds = Array.from(estudioSelectOriginal.selectedOptions).map(opt => parseInt(opt.value));
         
-        if (estudiosSelIds.length === 0 || cantidadRegiones === 0 || !tipoOS) {
+        if (estudiosSelIds.length === 0 || cantidadRegiones === 0) {
             document.getElementById('monto-preview').textContent = '$0.00';
             document.getElementById('monto-desglose').textContent = '';
             return;
@@ -935,10 +980,22 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Precio base según tipo de OS
-        let precioBase = tipoOS === 'COBER' 
-            ? parseFloat(primerEstudio.precio_cober) 
-            : parseFloat(primerEstudio.precio_otras_os);
+        // Determinar precio base
+        let precioBase;
+        if (primerEstudio.precio_unico) {
+            // Si es precio único, no importa tipo_obra_social
+            precioBase = parseFloat(primerEstudio.precio_cober);
+        } else {
+            // Si hay diferencia de precios, necesitamos que seleccione tipo_obra_social
+            if (!tipoOS) {
+                document.getElementById('monto-preview').textContent = '$0.00';
+                document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
+                return;
+            }
+            precioBase = tipoOS === 'COBER' 
+                ? parseFloat(primerEstudio.precio_cober) 
+                : parseFloat(primerEstudio.precio_otras_os);
+        }
         
         // Calcular subtotal
         let subtotal = precioBase * cantidadRegiones;
