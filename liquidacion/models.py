@@ -68,7 +68,30 @@ class DiaSinPacientes(models.Model):
     def __str__(self):
         return f"{self.medico.get_full_name()} - {self.fecha.strftime('%d/%m/%Y')}"
 
+
+# ============================================================================
+# [ANULADO - 16 de febrero 2026 - Sanatorio Colegiales]
+# RegistroProcedimientosIntervensionismo - NO ELIMINAR ESTE CÓDIGO
+# ============================================================================
+# Razón: En Colegiales no se usa. Procedimientos se registran como Estudios.
+# 
+# ⚠️ IMPORTANTE: Este modelo NO se elimina del código para mantener
+# compatibilidad con migraciones existentes. Si eliminas este modelo,
+# Django intentará crear una migración que borre la tabla y fallará
+# en producción si hay datos históricos.
+#
+# Alternativa segura: Crear migración personalizada que renombre la tabla
+# a "liquidacion_registroprocedimientosintervensionismo_archive" y luego
+# eliminar este modelo del código.
+#
+# Si necesitas recuperar datos: liquidacion_backup_completo_2026-02-16.json
+# ============================================================================
+
 class RegistroProcedimientosIntervensionismo(models.Model):
+    """
+    [DESHABILITADO] Este modelo ya no se usa en Sanatorio Colegiales.
+    Mantenido solo para compatibilidad con migraciones existentes.
+    """
     medico = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name='Médico')
     nombre_paciente = models.CharField(max_length=50, verbose_name='Nombre del paciente')
     apellido_paciente = models.CharField(max_length=50, verbose_name='Apellido del paciente')
@@ -80,8 +103,10 @@ class RegistroProcedimientosIntervensionismo(models.Model):
     notas = models.TextField(verbose_name='Notas', blank=True, null=True)
 
     class Meta:
-        verbose_name = 'Registro de procedimiento de intervencionismo'
-        verbose_name_plural = 'Registros de procedimientos de intervencionismo'
+        verbose_name = '[DESHABILITADO] Registro de procedimiento de intervencionismo'
+        verbose_name_plural = '[DESHABILITADO] Registros de procedimientos de intervencionismo'
+        # Marcar como "managed = False" para que Django NO intente crear/modificar esta tabla
+        managed = True  # Dejamos en True temporalmente para no romper migraciones
 
     def __str__(self):
         return f'{self.medico} - {self.fecha_registro}'
