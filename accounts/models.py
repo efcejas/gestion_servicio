@@ -16,6 +16,7 @@ class CustomUser(AbstractUser):
         ('jefe_residentes', 'Jefe de Residentes'),
         ('instructor_residentes', 'Instructor de Residentes'),
         ('jefe_servicio', 'Jefe de Servicio'),
+        ('cardiologo', 'Cardiólogo'),  # NUEVO - Liquidación v2.0
         ('tecnico', 'Técnico Radiólogo'),
         ('administrativo', 'Administrativo'),
         ('enfermeria', 'Enfermería'),
@@ -37,6 +38,12 @@ class CustomUser(AbstractUser):
         help_text='Cargo o especialización específica (opcional)'
     )
     telefono = models.CharField(max_length=50, blank=True, null=True)
+    
+    # NUEVO - Liquidación v2.0: Para bonus urgencia RM a distancia
+    trabaja_remoto = models.BooleanField(
+        default=False,
+        help_text='Médico trabaja a distancia (para cálculo bonus urgencia RM)'
+    )
     
     # Campos específicos para residentes
     fecha_ingreso_residencia = models.DateField(
@@ -122,8 +129,8 @@ class CustomUser(AbstractUser):
         return self.rol in roles_permitidos or self.is_superuser
     
     def es_medico(self):
-        """Verifica si el usuario es médico (staff, residente, jefe de residentes, instructor o jefe de servicio)."""
-        return self.rol in ['medico_staff', 'medico_residente', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+        """Verifica si el usuario es médico (staff, residente, jefe de residentes, instructor, jefe de servicio o cardiólogo)."""
+        return self.rol in ['medico_staff', 'medico_residente', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio', 'cardiologo']
     
     def es_residente(self):
         """Verifica si el usuario es residente."""
