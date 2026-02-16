@@ -637,7 +637,10 @@ class RegistroEstudiosPorMedico(models.Model):
                 self.horario = 'EXTRA'
         
         # Calcular monto ANTES de guardar (INMUTABLE)
-        self.monto_calculado = self.calcular_monto()
+        # IMPORTANTE: Solo si ya tiene ID (no es nuevo) o si ya tiene estudios asignados
+        # Esto evita el error de ManyToMany cuando se crea desde formulario
+        if self.pk or (hasattr(self, '_estudios_temp') and self._estudios_temp):
+            self.monto_calculado = self.calcular_monto()
         
         super().save(*args, **kwargs)
     

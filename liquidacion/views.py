@@ -189,11 +189,15 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         self.object.medico = user
         self.object.sesion_contable = sesion
         
-        # IMPORTANTE: Guardar primero para obtener el ID
+        # IMPORTANTE: Guardar primero para obtener el ID (sin calcular monto aún)
         self.object.save()
         
         # AHORA guardar las relaciones ManyToMany (estudio)
         form.save_m2m()
+        
+        # AHORA que tenemos M2M guardado, calcular y guardar el monto
+        self.object.monto_calculado = self.object.calcular_monto()
+        self.object.save(update_fields=['monto_calculado'])
         
         # Mostrar desglose del cálculo
         desglose = self.object.get_desglose_monto()

@@ -1012,17 +1012,30 @@ document.addEventListener('DOMContentLoaded', function() {
         // Calcular bonus urgencia (20%)
         let bonusUrgencia = 0;
         let aplicaBonus = false;
+        let mensajeBonus = '';
         
-        if (primerEstudio.tipo === 'RES' && trabajaRemoto && pacienteInternado && fechaSolicitud && fechaInforme) {
-            // Calcular diferencia en horas
-            const solicitud = new Date(fechaSolicitud);
-            const informe = new Date(fechaInforme);
-            const diffHoras = Math.abs(informe - solicitud) / (1000 * 60 * 60);
-            
-            if (diffHoras < 24) {
-                aplicaBonus = true;
-                bonusUrgencia = subtotal * 0.20;
-                subtotal += bonusUrgencia;
+        // Verificar condiciones para bonus urgencia
+        if (primerEstudio.tipo === 'RES') {
+            if (!trabajaRemoto) {
+                mensajeBonus = 'Bonus no aplica: solo para médicos remotos';
+            } else if (!pacienteInternado) {
+                mensajeBonus = 'Marca "Paciente Internado" para bonus';
+            } else if (!fechaSolicitud || !fechaInforme) {
+                mensajeBonus = 'Ingresa ambas fechas para calcular bonus';
+            } else {
+                // Calcular diferencia en horas
+                const solicitud = new Date(fechaSolicitud);
+                const informe = new Date(fechaInforme);
+                const diffHoras = Math.abs(informe - solicitud) / (1000 * 60 * 60);
+                
+                if (diffHoras < 24) {
+                    aplicaBonus = true;
+                    bonusUrgencia = subtotal * 0.20;
+                    subtotal += bonusUrgencia;
+                    mensajeBonus = `✓ Bonus aplicado (${diffHoras.toFixed(1)}hs < 24hs)`;
+                } else {
+                    mensajeBonus = `Bonus no aplica: ${diffHoras.toFixed(1)}hs > 24hs`;
+                }
             }
         }
         
@@ -1036,6 +1049,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (aplicaBonus) {
             desglose += (desglose ? ' + ' : '') + '20% bonus urgencia';
+        }
+        // Mostrar mensaje de bonus si hay uno (tanto si aplica como si no)
+        if (mensajeBonus && primerEstudio.tipo === 'RES') {
+            desglose += (desglose ? ' | ' : '') + mensajeBonus;
         }
         document.getElementById('monto-desglose').textContent = desglose;
     }
