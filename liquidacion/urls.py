@@ -12,6 +12,7 @@ from .views import (
     exportar_excel_informes,
     exportar_excel_ecografias,
     # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
+    RegistrarGuardiaPasivaView,  # [NUEVO v2.0]
     CargaMasivaView,
     PortalLiquidacionInicioView
 )
@@ -45,6 +46,9 @@ urlpatterns = [
     path('editar/<int:pk>/', RegistroEstudiosPorMedicoUpdateView.as_view(), name='registroestudios_edit'),
     path('eliminar/<int:pk>/', RegistroEstudiosPorMedicoDeleteView.as_view(), name='registroestudios_delete'),
     # path('registrar-dia-sin-pacientes/', RegistrarDiaSinPacientesView.as_view(), name='registrar_dia_sin_pacientes'),  # [DEPRECADO]
+
+    # Rutas nuevas v2.0
+    path('guardia-pasiva/nuevo/', RegistrarGuardiaPasivaView.as_view(), name='registrar_guardia_pasiva'),
 
     # Ruta para generar PDF
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),

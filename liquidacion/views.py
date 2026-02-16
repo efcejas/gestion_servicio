@@ -57,6 +57,10 @@ class EstudiosListView(LoginRequiredMixin, ListView):
     context_object_name = 'estudios'
 
 class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    """
+    Vista para registro de prácticas médicas - Liquidación v2.0
+    Incluye validaciones de sesión contable y cálculo automático de montos
+    """
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
     template_name = 'liquidacion/registroestudios_form_tailwind.html'
@@ -64,55 +68,88 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     success_message = "✅ Registro guardado exitosamente"
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.groups.filter(name='Médicos de staff - informes').exists():
+        # Validar que sea médico (por rol, no por grupo)
+        if not request.user.es_medico():
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
-            return redirect('home')  # o donde quieras mandarlo
+            return redirect('home')
         return super().dispatch(request, *args, **kwargs)
+    
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user  # Pasar usuario al form para lógica condicional
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         today = datetime.today()
 
-        tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')
+        # Obtener o crear sesión contable del mes actual
+        sesion, created = SesionContable.objects.get_or_create(
+            mes=today.month,
+            año=today.year,
+            defaults={'estado': 'ABIERTA'}
+        )
+        context['sesion_contable'] = sesion
+        context['puede_registrar'] = sesion.puede_registrar_practicas(user)
 
-        # Si no hay selección en el POST, recuperar el último tipo de estudio usado por el usuario
+        # Tipo de estudio seleccionado (para filtrar estudios con JS)
+        tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')
         if not tipo_estudio_seleccionado:
             ultimo_registro = RegistroEstudiosPorMedico.objects.filter(medico=user).order_by('-fecha_registro').first()
             if ultimo_registro and ultimo_registro.estudio.exists():
                 tipo_estudio_seleccionado = ultimo_registro.estudio.first().tipo
 
         context['tipo_estudio_seleccionado'] = tipo_estudio_seleccionado
-        context['estudios'] = json.dumps(list(Estudios.objects.values('id', 'nombre', 'tipo')))
+        context['estudios'] = json.dumps(list(Estudios.objects.filter(activo=True).values(
+            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os', 
+            'precio_unico', 'conteo_regiones_default'
+        )))
         
-        # Registros del mes actual
+        # Registros del mes actual con prefetch de estudios
         registros = RegistroEstudiosPorMedico.objects.filter(
             medico=user,
-            fecha_registro__year=today.year,
-            fecha_registro__month=today.month
-        ).order_by('-fecha_registro')
+            sesion_contable=sesion
+        ).prefetch_related('estudio').order_by('-fecha_registro')
         
         context['registros'] = registros
         
-        # Calcular total de regiones del mes
-        total_regiones_mes = sum(
-            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
-            for registro in registros
-            for estudio in registro.estudio.all()
-        )
-        context['total_regiones_mes'] = total_regiones_mes
+        # Calcular totales del mes
+        total_regiones_mes = sum(reg.cantidad_regiones for reg in registros)
+        total_monto_mes = sum(reg.monto_calculado for reg in registros)
         
-        # [DEPRECADO] DiaSinPacientes no se usa en Colegiales
-        # context['form_dia_sin_pacientes'] = DiaSinPacientesForm()
+        context['total_regiones_mes'] = total_regiones_mes
+        context['total_monto_mes'] = total_monto_mes
+        context['total_practicas_mes'] = registros.count()
+        
+        # Información del médico
+        context['es_staff'] = user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
+        context['trabaja_remoto'] = user.trabaja_remoto
 
         return context
 
     def form_valid(self, form):
-        # Asignar el usuario logueado al campo 'medico'
-        form.instance.medico = self.request.user
+        user = self.request.user
         
-        # Verificar si ya existe un registro duplicado RECIENTE (últimos 5 minutos)
-        # Esto evita doble envío accidental pero permite registros legítimos posteriores
+        # Validar que la sesión permita registrar
+        sesion, created = SesionContable.objects.get_or_create(
+            mes=form.instance.fecha_del_informe.month,
+            año=form.instance.fecha_del_informe.year,
+            defaults={'estado': 'ABIERTA'}
+        )
+        
+        if not sesion.puede_registrar_practicas(user):
+            messages.error(
+                self.request,
+                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes registrar prácticas."
+            )
+            return redirect(self.success_url)
+        
+        # Asignar el usuario logueado
+        form.instance.medico = user
+        
+        # Verificar duplicados recientes (últimos 5 minutos)
         from django.utils import timezone
         from datetime import timedelta
         
@@ -121,15 +158,13 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         estudios_seleccionados = form.cleaned_data['estudio']
         hace_5_minutos = timezone.now() - timedelta(minutes=5)
         
-        # Buscar registros recientes (últimos 5 minutos) del mismo médico, paciente y fecha
         registros_recientes = RegistroEstudiosPorMedico.objects.filter(
-            medico=self.request.user,
+            medico=user,
             dni_paciente=dni_paciente,
             fecha_del_informe=fecha_informe,
             fecha_registro__gte=hace_5_minutos
         )
         
-        # Verificar si alguno tiene los mismos estudios
         for registro in registros_recientes:
             estudios_existentes = set(registro.estudio.all())
             if estudios_existentes == set(estudios_seleccionados):
@@ -140,7 +175,25 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                 )
                 return redirect(self.success_url)
         
-        return super().form_valid(form)
+        # Guardar y mostrar desglose del monto
+        response = super().form_valid(form)
+        
+        # Mostrar desglose del cálculo
+        desglose = self.object.get_desglose_monto()
+        mensaje_desglose = (
+            f"✅ Práctica registrada | "
+            f"Estudio: {desglose['estudio']} | "
+            f"Regiones: {desglose['regiones']} | "
+            f"OS: {desglose['tipo_os']} | "
+            f"Horario: {desglose['horario']} | "
+            f"Monto: ${desglose['monto_final']}"
+        )
+        if desglose.get('bonus_urgencia'):
+            mensaje_desglose += f" (incluye bonus urgencia {desglose['bonus_urgencia']})"
+        
+        messages.success(self.request, mensaje_desglose)
+        
+        return response
 
 
 # [DEPRECADO - 16 de febrero 2026]
@@ -165,6 +218,98 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
 #             messages.success(self.request, f"Se registró el día {fecha.strftime('%d/%m/%Y')} como sin pacientes.")
 # 
 #         return super().form_valid(form)
+
+
+# ============================================================================
+# NUEVAS VISTAS - LIQUIDACIÓN v2.0
+# ============================================================================
+
+class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    """
+    Vista para registrar guardias pasivas ($36.500 por día)
+    Solo disponible para médicos
+    """
+    model = GuardiaPasiva
+    form_class = GuardiaPasivaForm
+    template_name = 'liquidacion/guardia_pasiva_form.html'
+    success_url = reverse_lazy('liquidacion:registrar_guardia_pasiva')
+    success_message = "✅ Guardia pasiva registrada exitosamente"
+
+    def dispatch(self, request, *args, **kwargs):
+        # Solo médicos pueden registrar guardias
+        if not request.user.es_medico():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        today = datetime.today()
+
+        # Obtener sesión contable actual
+        sesion, created = SesionContable.objects.get_or_create(
+            mes=today.month,
+            año=today.year,
+            defaults={'estado': 'ABIERTA'}
+        )
+        context['sesion_contable'] = sesion
+        context['puede_registrar'] = sesion.puede_registrar_practicas(user)
+
+        # Guardias del mes actual
+        guardias = GuardiaPasiva.objects.filter(
+            medico=user,
+            sesion_contable=sesion
+        ).order_by('-fecha_guardia')
+        
+        context['guardias'] = guardias
+        context['total_guardias_mes'] = guardias.count()
+        context['total_monto_guardias_mes'] = sum(g.monto for g in guardias)
+
+        return context
+
+    def form_valid(self, form):
+        user = self.request.user
+        fecha_guardia = form.cleaned_data['fecha_guardia']
+        
+        # Validar que la sesión permita registrar
+        sesion, created = SesionContable.objects.get_or_create(
+            mes=fecha_guardia.month,
+            año=fecha_guardia.year,
+            defaults={'estado': 'ABIERTA'}
+        )
+        
+        if not sesion.puede_registrar_practicas(user):
+            messages.error(
+                self.request,
+                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes registrar guardias."
+            )
+            return redirect(self.success_url)
+        
+        # Verificar que no exista duplicado
+        if GuardiaPasiva.objects.filter(medico=user, fecha_guardia=fecha_guardia).exists():
+            messages.warning(
+                self.request,
+                f"⚠️ Ya tienes registrada una guardia para el día {fecha_guardia.strftime('%d/%m/%Y')}."
+            )
+            return redirect(self.success_url)
+        
+        # Asignar médico
+        form.instance.medico = user
+        
+        response = super().form_valid(form)
+        
+        # Mensaje de éxito detallado
+        messages.success(
+            self.request,
+            f"✅ Guardia pasiva registrada | "
+            f"Fecha: {fecha_guardia.strftime('%d/%m/%Y')} | "
+            f"Tipo: {form.instance.get_tipo_guardia_display()} | "
+            f"Monto: ${form.instance.monto}"
+        )
+        
+        return response
 
 
 User = get_user_model()
