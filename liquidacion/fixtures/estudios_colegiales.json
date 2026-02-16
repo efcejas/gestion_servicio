@@ -1,0 +1,418 @@
+[
+  {
+    "model": "liquidacion.estudios",
+    "pk": 1,
+    "fields": {
+      "codigo": "TAC001",
+      "nombre": "TOMOGRAFÍA COMPUTADA (TAC)",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "5000.00",
+      "precio_otras_os": "5000.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 2,
+    "fields": {
+      "codigo": "RMN001",
+      "nombre": "RESONANCIA MAGNÉTICA (RMN)",
+      "tipo": "RES",
+      "precio_unico": true,
+      "precio_cober": "6500.00",
+      "precio_otras_os": "6500.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 3,
+    "fields": {
+      "codigo": "RX001",
+      "nombre": "RADIOGRAFÍA (RX)",
+      "tipo": "RAD",
+      "precio_unico": true,
+      "precio_cober": "1500.00",
+      "precio_otras_os": "1500.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 4,
+    "fields": {
+      "codigo": "902225",
+      "nombre": "ANGIOTOMOGRAFÍA CARDÍACA",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 5,
+    "fields": {
+      "codigo": "902226",
+      "nombre": "SCORE DE CALCIO CORONARIO",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 6,
+    "fields": {
+      "codigo": "902227",
+      "nombre": "TC CARDÍACA CON CONTRASTE",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 7,
+    "fields": {
+      "codigo": "902228",
+      "nombre": "RM CARDÍACA CON CONTRASTE",
+      "tipo": "RES",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 8,
+    "fields": {
+      "codigo": "902229",
+      "nombre": "RM CARDÍACA SIN CONTRASTE",
+      "tipo": "RES",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 9,
+    "fields": {
+      "codigo": "902230",
+      "nombre": "TC ANGIO AORTA TORÁCICA",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 10,
+    "fields": {
+      "codigo": "902231",
+      "nombre": "TC ANGIO AORTA ABDOMINAL",
+      "tipo": "TOM",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 11,
+    "fields": {
+      "codigo": "902232",
+      "nombre": "RM AORTA TORÁCICA",
+      "tipo": "RES",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 12,
+    "fields": {
+      "codigo": "902233",
+      "nombre": "RM AORTA ABDOMINAL",
+      "tipo": "RES",
+      "precio_unico": true,
+      "precio_cober": "66550.00",
+      "precio_otras_os": "66550.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 13,
+    "fields": {
+      "codigo": "ECO001",
+      "nombre": "ECO ABDOMINAL COMPLETA",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 14,
+    "fields": {
+      "codigo": "ECO002",
+      "nombre": "ECO ABDOMINAL SUPERIOR",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 15,
+    "fields": {
+      "codigo": "ECO003",
+      "nombre": "ECO CADERA LACTANTE",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 16,
+    "fields": {
+      "codigo": "ECO004",
+      "nombre": "ECO HEPÁTICA",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1820.00",
+      "precio_otras_os": "2730.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 17,
+    "fields": {
+      "codigo": "ECO005",
+      "nombre": "ECO OBSTÉTRICA",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1855.00",
+      "precio_otras_os": "2782.50",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 18,
+    "fields": {
+      "codigo": "ECO006",
+      "nombre": "ECO RENAL",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 19,
+    "fields": {
+      "codigo": "ECO007",
+      "nombre": "ECO TIROIDEA",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 20,
+    "fields": {
+      "codigo": "ECO008",
+      "nombre": "ECO MAMARIA",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1785.00",
+      "precio_otras_os": "2677.50",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 21,
+    "fields": {
+      "codigo": "ECO009",
+      "nombre": "ECO PARTES BLANDAS",
+      "tipo": "ECO",
+      "precio_unico": false,
+      "precio_cober": "1750.00",
+      "precio_otras_os": "2625.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 22,
+    "fields": {
+      "codigo": "DOP001",
+      "nombre": "DOPPLER ARTERIAL MIEMBROS INFERIORES",
+      "tipo": "DOP",
+      "precio_unico": false,
+      "precio_cober": "2100.00",
+      "precio_otras_os": "3150.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 23,
+    "fields": {
+      "codigo": "DOP002",
+      "nombre": "DOPPLER VENOSO MIEMBROS INFERIORES",
+      "tipo": "DOP",
+      "precio_unico": false,
+      "precio_cober": "2100.00",
+      "precio_otras_os": "3150.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 24,
+    "fields": {
+      "codigo": "DOP003",
+      "nombre": "DOPPLER CAROTÍDEO",
+      "tipo": "DOP",
+      "precio_unico": false,
+      "precio_cober": "2100.00",
+      "precio_otras_os": "3150.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 25,
+    "fields": {
+      "codigo": "MAM001",
+      "nombre": "MAMOGRAFÍA BILATERAL",
+      "tipo": "MAM",
+      "precio_unico": true,
+      "precio_cober": "3500.00",
+      "precio_otras_os": "3500.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  },
+  {
+    "model": "liquidacion.estudios",
+    "pk": 26,
+    "fields": {
+      "codigo": "MAM002",
+      "nombre": "MAMOGRAFÍA + ECO MAMARIA",
+      "tipo": "MAM",
+      "precio_unico": true,
+      "precio_cober": "5000.00",
+      "precio_otras_os": "5000.00",
+      "conteo_regiones": 1,
+      "conteo_regiones_default": 1,
+      "activo": true,
+      "fecha_actualizacion_precios": "2026-02-16"
+    }
+  }
+]

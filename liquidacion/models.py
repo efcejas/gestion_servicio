@@ -631,13 +631,21 @@ class RegistroEstudiosPorMedico(models.Model):
         super().save(*args, **kwargs)
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
+# ============================================================================
+# [DEPRECADO - 16 de febrero 2026 - Sanatorio Colegiales]
+# DiaSinPacientes NO se usa en Colegiales (era del sistema anterior)
+# Se mantiene el modelo por compatibilidad con código legacy
+# TODO: Eliminar completamente en refactor futuro
+# ============================================================================
+
 class DiaSinPacientes(models.Model):
+    """[DEPRECADO] Modelo del sistema anterior, NO usar en Colegiales"""
     sesion_contable = models.ForeignKey(
         'SesionContable',
         on_delete=models.PROTECT,
         related_name='dias_sin_pacientes',
         verbose_name='Sesión Contable',
-        null=True,  # Permitir null temporalmente para migración
+        null=True,
         blank=True
     )
     medico = models.ForeignKey(
