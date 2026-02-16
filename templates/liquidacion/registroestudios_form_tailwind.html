@@ -613,6 +613,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Parsear datos
     const estudios = JSON.parse('{{ estudios|escapejs }}');
     const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+    
+    // Variables de usuario (necesarias para visibilidad de secciones)
+    const esStaff = {{ es_staff|lower }};
+    const trabajaRemoto = {{ trabaja_remoto|lower }};
+    
     let estudiosSeleccionadosIds = [];
     let estudiosFiltrados = [];
 
@@ -698,7 +703,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Mostrar/ocultar secciones
         document.getElementById('tipo-obra-social-section').style.display = hayPrecioDiferenciado ? 'block' : 'none';
-        document.getElementById('bonus-urgencia-section').style.display = hayResonancia ? 'block' : 'none';
+        // Bonus urgencia: solo si hay Resonancia Y el médico trabaja remoto
+        document.getElementById('bonus-urgencia-section').style.display = (hayResonancia && trabajaRemoto) ? 'block' : 'none';
         
         // Si no hay precio diferenciado, establecer un valor por defecto para tipo_obra_social
         if (!hayPrecioDiferenciado) {
@@ -946,8 +952,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Variables para cálculo
-    const esStaff = {{ es_staff|lower }};
-    const trabajaRemoto = {{ trabaja_remoto|lower }};
     const estudiosData = JSON.parse('{{ estudios|escapejs }}');
     
     // Función principal: Calcular monto en tiempo real
