@@ -45,7 +45,6 @@ class PracticaForm(forms.ModelForm):
             'cantidad_estudio',
             'cantidad_regiones',
             'tipo_obra_social',
-            'horario',
             'paciente_internado',
             'fecha_hora_solicitud',
             'fecha_hora_informe',
@@ -91,10 +90,6 @@ class PracticaForm(forms.ModelForm):
             'tipo_obra_social': forms.RadioSelect(attrs={
                 'class': TAILWIND_RADIO_CLASSES,
             }),
-            'horario': forms.RadioSelect(attrs={
-                'class': TAILWIND_RADIO_CLASSES,
-                'id': 'id_horario'
-            }),
             'paciente_internado': forms.CheckboxInput(attrs={
                 'class': TAILWIND_CHECKBOX_CLASSES,
                 'id': 'id_paciente_internado'
@@ -119,14 +114,12 @@ class PracticaForm(forms.ModelForm):
             'cantidad_estudio': 'Cantidad',
             'cantidad_regiones': 'Regiones',
             'tipo_obra_social': 'Obra Social',
-            'horario': 'Horario',
             'paciente_internado': '¿Paciente internado? (para bonus urgencia RM)',
             'fecha_hora_solicitud': 'Fecha/Hora Solicitud',
             'fecha_hora_informe': 'Fecha/Hora Informe',
         }
         help_texts = {
             'cantidad_regiones': 'Número entero (1, 2, 3...). No se permiten fracciones.',
-            'horario': 'INTRA: 50% del valor | EXTRA/NA: 100% del valor',
             'paciente_internado': 'Solo para estudios de Resonancia Magnética (RM) con médicos remotos. Bonus +20% si informe <24hs.',
         }
 

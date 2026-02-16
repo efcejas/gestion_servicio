@@ -158,9 +158,6 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             )
             return redirect(self.success_url)
         
-        # Asignar el usuario logueado
-        form.instance.medico = user
-        
         # Verificar duplicados recientes (últimos 5 minutos)
         from django.utils import timezone
         from datetime import timedelta
@@ -187,8 +184,16 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                 )
                 return redirect(self.success_url)
         
-        # Guardar y mostrar desglose del monto
-        response = super().form_valid(form)
+        # Guardar el objeto sin commit para asignar relaciones
+        self.object = form.save(commit=False)
+        self.object.medico = user
+        self.object.sesion_contable = sesion
+        
+        # IMPORTANTE: Guardar primero para obtener el ID
+        self.object.save()
+        
+        # AHORA guardar las relaciones ManyToMany (estudio)
+        form.save_m2m()
         
         # Mostrar desglose del cálculo
         desglose = self.object.get_desglose_monto()
@@ -205,7 +210,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         messages.success(self.request, mensaje_desglose)
         
-        return response
+        return redirect(self.success_url)
 
 
 # [DEPRECADO - 16 de febrero 2026]
