@@ -18,12 +18,13 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable
 from .forms import (
-    RegistroEstudiosPorMedicoCreateViewForm, 
+    RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
+    PracticaForm,
+    GuardiaPasivaForm,
     FiltroMedicoMesForm, 
     FiltroEstudiosPorMedicoForm,
-    DiaSinPacientesForm,
     CargaExcelForm,
 )
 import openpyxl
@@ -101,7 +102,8 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         )
         context['total_regiones_mes'] = total_regiones_mes
         
-        context['form_dia_sin_pacientes'] = DiaSinPacientesForm()
+        # [DEPRECADO] DiaSinPacientes no se usa en Colegiales
+        # context['form_dia_sin_pacientes'] = DiaSinPacientesForm()
 
         return context
 
@@ -140,25 +142,30 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         return super().form_valid(form)
 
-class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
-    template_name = 'liquidacion/registroestudios_form_tailwind.html'
-    form_class = DiaSinPacientesForm
-    success_url = reverse_lazy('liquidacion:registroestudios_nuevo')  # Redirigir a la página de registro de estudios
 
-    def form_valid(self, form):
-        fecha = form.cleaned_data['fecha']
-        medico = self.request.user
+# [DEPRECADO - 16 de febrero 2026]
+# RegistrarDiaSinPacientesView NO se usa en Colegiales
+# Se mantiene comentado por compatibilidad con código legacy
+#
+# class RegistrarDiaSinPacientesView(LoginRequiredMixin, FormView):
+#     template_name = 'liquidacion/registroestudios_form_tailwind.html'
+#     form_class = DiaSinPacientesForm
+#     success_url = reverse_lazy('liquidacion:registroestudios_nuevo')
+# 
+#     def form_valid(self, form):
+#         fecha = form.cleaned_data['fecha']
+#         medico = self.request.user
+# 
+#         if DiaSinPacientes.objects.filter(medico=medico, fecha=fecha).exists():
+#             messages.warning(self.request, f"Ya registraste el día {fecha.strftime('%d/%m/%Y')}.")
+#         else:
+#             dia = form.save(commit=False)
+#             dia.medico = medico
+#             dia.save()
+#             messages.success(self.request, f"Se registró el día {fecha.strftime('%d/%m/%Y')} como sin pacientes.")
+# 
+#         return super().form_valid(form)
 
-        # Evitar duplicado
-        if DiaSinPacientes.objects.filter(medico=medico, fecha=fecha).exists():
-            messages.warning(self.request, f"Ya registraste el día {fecha.strftime('%d/%m/%Y')}.")
-        else:
-            dia = form.save(commit=False)
-            dia.medico = medico
-            dia.save()
-            messages.success(self.request, f"Se registró el día {fecha.strftime('%d/%m/%Y')} como sin pacientes.")
-
-        return super().form_valid(form)
 
 User = get_user_model()
 
@@ -428,7 +435,8 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                 mostrar_totales_con_complemento = True
 
             registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').distinct()
-            dias_sin_pacientes = DiaSinPacientes.objects.all()
+            # [DEPRECADO] DiaSinPacientes no se usa en Colegiales
+            # dias_sin_pacientes = DiaSinPacientes.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
@@ -685,7 +693,8 @@ def exportar_excel_ecografias(request):
         Prefetch('estudio', queryset=Estudios.objects.all())
     ).distinct()
 
-    dias_sin_pacientes = DiaSinPacientes.objects.all()
+    # [DEPRECADO] DiaSinPacientes no se usa en Colegiales
+    # dias_sin_pacientes = DiaSinPacientes.objects.all()
 
     if medico_id:
         registros = registros.filter(medico_id=medico_id)

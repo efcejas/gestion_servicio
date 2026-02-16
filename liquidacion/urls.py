@@ -11,7 +11,7 @@ from .views import (
     EcografiasPorMedicoPorMesListView,
     exportar_excel_informes,
     exportar_excel_ecografias,
-    RegistrarDiaSinPacientesView,
+    # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
     CargaMasivaView,
     PortalLiquidacionInicioView
 )
@@ -44,7 +44,7 @@ urlpatterns = [
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
     path('editar/<int:pk>/', RegistroEstudiosPorMedicoUpdateView.as_view(), name='registroestudios_edit'),
     path('eliminar/<int:pk>/', RegistroEstudiosPorMedicoDeleteView.as_view(), name='registroestudios_delete'),
-    path('registrar-dia-sin-pacientes/', RegistrarDiaSinPacientesView.as_view(), name='registrar_dia_sin_pacientes'),
+    # path('registrar-dia-sin-pacientes/', RegistrarDiaSinPacientesView.as_view(), name='registrar_dia_sin_pacientes'),  # [DEPRECADO]
 
     # Ruta para generar PDF
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),
