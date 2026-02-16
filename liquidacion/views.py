@@ -101,10 +101,20 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                 tipo_estudio_seleccionado = ultimo_registro.estudio.first().tipo
 
         context['tipo_estudio_seleccionado'] = tipo_estudio_seleccionado
-        context['estudios'] = json.dumps(list(Estudios.objects.filter(activo=True).values(
+        
+        # Serializar estudios para JS (convertir Decimals a string)
+        estudios_data = []
+        for estudio in Estudios.objects.filter(activo=True).values(
             'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os', 
             'precio_unico', 'conteo_regiones_default'
-        )))
+        ):
+            estudio_dict = dict(estudio)
+            # Convertir Decimals a string para JSON
+            estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
+            estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudios_data.append(estudio_dict)
+        
+        context['estudios'] = json.dumps(estudios_data)
         
         # Registros del mes actual con prefetch de estudios
         registros = RegistroEstudiosPorMedico.objects.filter(
@@ -315,6 +325,10 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
 User = get_user_model()
 
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
+    """
+    Dashboard de prácticas del médico - Liquidación v2.0
+    Incluye prácticas, guardias pasivas, totales de montos y sesión contable
+    """
     template_name = 'liquidacion/registroestudios_list_tailwind.html'
 
     def get_context_data(self, **kwargs):
@@ -326,7 +340,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         año_actual = fecha_actual.year
 
         # Inicializar el formulario
-        # Si en la query no vienen mes/año (caso botones rápidos), forzamos valores actuales
         params = self.request.GET.copy()
         if not params.get('mes'):
             params['mes'] = str(mes_actual)
@@ -340,7 +353,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         else:
             mes, año = mes_actual, año_actual
 
-        # Convertir el mes a un valor entero si es necesario (por ejemplo, si el formulario lo devuelve como cadena)
         mes = int(mes)
 
         # Diccionario de nombres de meses
@@ -350,23 +362,36 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'
         }
 
+        # Obtener o crear sesión contable
+        sesion, created = SesionContable.objects.get_or_create(
+            mes=mes,
+            año=año,
+            defaults={'estado': 'ABIERTA'}
+        )
+        context['sesion_contable'] = sesion
+        context['puede_registrar'] = sesion.puede_registrar_practicas(self.request.user)
+
         # Pasar los valores base al contexto
         context['form'] = form
-        context['mes'] = MESES.get(mes, 'Desconocido')  # Mostrar el nombre del mes
+        context['mes'] = MESES.get(mes, 'Desconocido')
         context['año'] = año
-        # Valores numéricos para construir URLs de acciones (orden, botones rápidos)
         context['mes_num'] = mes
         context['año_num'] = año
 
-        # Filtrar registros del usuario logueado usando `fecha_del_informe`
+        # Filtrar registros del usuario logueado usando sesión contable
         registros = RegistroEstudiosPorMedico.objects.filter(
             medico=self.request.user,
-            fecha_del_informe__year=año,
-            fecha_del_informe__month=mes
-        )
+            sesion_contable=sesion
+        ).prefetch_related('estudio')
+
+        # Obtener guardias pasivas del mes
+        guardias = GuardiaPasiva.objects.filter(
+            medico=self.request.user,
+            sesion_contable=sesion
+        ).order_by('-fecha_guardia')
 
         # Obtener parámetros de ordenamiento y filtros
-        orden = self.request.GET.get('orden', 'fecha_desc')  # Por defecto: más recientes primero
+        orden = self.request.GET.get('orden', 'fecha_desc')
         filtro_rapido = self.request.GET.get('filtro_rapido', '')
         busqueda = self.request.GET.get('busqueda', '').strip()
 
@@ -392,7 +417,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             registros = registros.order_by('apellido_paciente', 'nombre_paciente')
         elif orden == 'paciente_desc':
             registros = registros.order_by('-apellido_paciente', '-nombre_paciente')
-        # Se elimina ordenamiento por DNI según requerimiento
 
         # Si el filtro rápido es 'hoy', ajustar visualmente mes/año
         if filtro_rapido == 'hoy':
@@ -402,7 +426,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             context['mes_num'] = hoy.month
             context['año_num'] = hoy.year
 
-        # Etiqueta descriptiva del filtro rápido para mostrar en UI
+        # Etiqueta descriptiva del filtro rápido
         filtro_labels = {
             '': '',
             'hoy': 'Solo hoy',
@@ -410,34 +434,53 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['filtro_rapido'] = filtro_rapido
         context['filtro_rapido_label'] = filtro_labels.get(filtro_rapido, '')
 
-        # Separar registros por tipo de estudio
+        # Separar registros por tipo de estudio (ECO vs OTROS)
         registros_eco = registros.filter(estudio__tipo='ECO').distinct()
         registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
 
         # Agregar contexto para los controles
         context['orden'] = orden
-        context['filtro_rapido'] = filtro_rapido
         context['busqueda'] = busqueda
 
-        # Calcular totales de regiones considerando la cantidad de estudios
-        total_regiones_eco = sum(
-            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
-            for registro in registros_eco
-            for estudio in registro.estudio.all()
-        )
-        total_regiones_otros = sum(
-            estudio.conteo_regiones * (registro.cantidad_estudio or 1)
-            for registro in registros_otros
-            for estudio in registro.estudio.all()
-        )
+        # ========== CÁLCULOS v2.0 - Usando monto_calculado ==========
+        
+        # Totales de prácticas de Ecografías
+        total_regiones_eco = sum(reg.cantidad_regiones for reg in registros_eco)
+        total_monto_eco = sum(reg.monto_calculado for reg in registros_eco)
+        
+        # Totales de prácticas Otros estudios
+        total_regiones_otros = sum(reg.cantidad_regiones for reg in registros_otros)
+        total_monto_otros = sum(reg.monto_calculado for reg in registros_otros)
+        
+        # Totales de guardias pasivas
+        total_guardias = guardias.count()
+        total_monto_guardias = sum(g.monto for g in guardias)
+        
+        # Totales generales del mes
+        total_practicas = registros.count()
+        total_regiones_general = total_regiones_eco + total_regiones_otros
+        total_monto_practicas = total_monto_eco + total_monto_otros
+        total_general = total_monto_practicas + total_monto_guardias
 
-        # Agregar registros al contexto
+        # Agregar todo al contexto
         context['registros_eco'] = registros_eco
         context['total_regiones_eco'] = total_regiones_eco
+        context['total_monto_eco'] = total_monto_eco
+        
         context['registros_otros'] = registros_otros
         context['total_regiones_otros'] = total_regiones_otros
+        context['total_monto_otros'] = total_monto_otros
         
-        # Determinar qué solapa debe estar activa (por defecto 'ecografias')
+        context['guardias'] = guardias
+        context['total_guardias'] = total_guardias
+        context['total_monto_guardias'] = total_monto_guardias
+        
+        context['total_practicas'] = total_practicas
+        context['total_regiones_general'] = total_regiones_general
+        context['total_monto_practicas'] = total_monto_practicas
+        context['total_general'] = total_general
+        
+        # Determinar qué solapa debe estar activa
         context['tipo_estudio_activo'] = self.request.GET.get('tipo_estudio', 'ecografias')
 
         return context
