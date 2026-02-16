@@ -1,0 +1,46 @@
+**ASUNTO:** Sistema de prevención de débitos - Solicitud de reunión (15 min)
+
+---
+
+Estimado Dr. [Nombre del Director],
+
+Le escribo para presentarle un sistema que desarrollé para prevenir débitos por estudios no realizados en tiempo.
+
+**El problema actual:**
+Las órdenes de Netterm solo pueden consultarse presencialmente, lo que genera que algunos estudios queden sin realizar dentro de las 24 horas requeridas por las obras sociales. Esto representa pérdidas mensuales estimadas en $120,000-200,000 ARS por débitos.
+
+**La solución:**
+Sistema automático que:
+- Procesa pedidos cada 10 minutos sin intervención manual
+- Destaca estudios URGENTES para evitar vencimientos
+- Permite acceso desde móvil para médicos y coordinadores
+- Genera trazabilidad completa de cada pedido
+
+**Estado actual:** 
+El sistema ya está funcionando en producción. Esta semana procesó automáticamente 2 pedidos de prueba con éxito total.
+
+🌐 **Demo:** https://gestion-colegiales.herokuapp.com/pedidos/
+
+**Impacto económico:**
+- Ahorro estimado: $150,000/mes en débitos evitados
+- Costo operativo: $12,000/mes
+- ROI: 1,289%
+
+**¿Podríamos coordinar 15 minutos para una demostración en vivo?**
+
+Puedo mostrarle cómo funciona en tiempo real y responder cualquier consulta técnica o económica.
+
+Adjunto documento con análisis detallado de costos, beneficios y propuesta económica.
+
+Quedo a su disposición.
+
+Saludos cordiales,
+
+**Enso Cejas**  
+Desarrollador del Sistema  
+📧 ensofermincejas@gmail.com  
+📱 [Tu teléfono]
+
+---
+
+📎 **Adjunto:** PROPUESTA_DIRECTOR_PEDIDOS.md (3 páginas)

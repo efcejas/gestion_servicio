@@ -35,3 +35,5 @@ gestion_estudios/settings_local.py
 # Node.js dependencies (para Tailwind CSS)
 node_modules/
 theme/static_src/node_modules/
+
+token_for_heroku.txt
