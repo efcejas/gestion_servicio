@@ -1538,15 +1538,23 @@ Antes de implementar, necesito que confirmes:
 
 ---
 
-## ⚠️ PREGUNTAS FINALES (RESPONDER ANTES DE IMPLEMENTAR):
+## ⚠️ DECISIONES FINALES CONFIRMADAS:
 
-**1. ¿Cuando actualizo precios de un estudio, las prácticas YA registradas usan el precio viejo o nuevo?**
-   - **Opción A:** Prácticas usan precio del momento del registro (inmutable) - MÁS SEGURO
-   - **Opción B:** Prácticas recalculan con precio actual (dinámico) - MÁS FLEXIBLE
+**1. ✅ Prácticas usan precio del momento del registro (INMUTABLE)**
+   - Modelo `Practica` tendrá campo `monto_calculado` (Decimal)
+   - Se calcula y guarda al momento de crear/editar la práctica
+   - Si cambio precio de estudio, prácticas viejas NO se recalculan
+   - **Implementación:** `monto_calculado = models.DecimalField()` + `save()` override
 
-**2. ¿El bonus de urgencia (+20%) aplica SOLO a médicos de RM a distancia? ¿O también a staff de RM en el hospital?**
+**2. ✅ Bonus urgencia (+20%) aplica SOLO a médicos de RM a distancia (remoto)**
+   - NO aplica a staff de RM del hospital
+   - **Implementación:** 
+     * Agregar campo `User.trabaja_remoto` (Boolean) o rol específico
+     * `calcular_bonus_urgencia()` valida: `if medico.trabaja_remoto and modalidad=='RES'`
 
-**3. ¿Los cardiólogos (futuro) funcionan igual que Staff (sin INTRA/EXTRA)?**
+**3. ✅ Cardiólogos son Staff (sin INTRA/EXTRA)**
+   - Cardiólogos siempre cobran 100%, no tienen diferenciación de horario
+   - **Implementación:** Rol 'cardiólogo' en lista de staff: `['radiólogo_staff', 'jefe_servicio', 'cardiólogo']`
 
 ---
 
@@ -1556,33 +1564,28 @@ Antes de implementar, necesito que confirmes:
 - 📄 Documento completo de especificación v2.0
 - 📊 Modelo de datos con historial de precios
 - 🏥 GuardiaPasiva (registro por día)
-- 🚀 Bonus urgencia RM (<24hs internados)
+- 🚀 Bonus urgencia RM (<24hs internados, solo remotos)
 - 🔄 Estados de sesión contable (ABIERTA → REVISION → CERRADA → FACTURADA → PAGADA)
 - ✅ Validaciones y reglas de negocio
 - 📋 Listado de estudios con precio único vs diferenciado
+- ✅ **TODAS LAS DECISIONES CONFIRMADAS** (inmutable, remoto, cardiólogos=staff)
 
-### ⚠️ PENDIENTE (RESPONDER ESTAS 3 PREGUNTAS):
+### 🚀 COMENZANDO IMPLEMENTACIÓN:
 
-**1. ¿Prácticas usan precio del momento del registro (A) o recalculan con precio actual (B)?**
-   - A = Inmutable (más seguro para auditoría)
-   - B = Dinámico (más flexible pero complejo)
-
-**2. ¿Bonus urgencia aplica SOLO a RM a distancia o también a staff RM del hospital?**
-
-**3. ¿Cardiólogos funcionan como Staff (sin INTRA/EXTRA)?**
-
-Una vez confirmes, comenzaré con:
-
-### 🚀 FASE 1: MODELOS Y MIGRACIONES (4-5 horas)
-1. Crear HistorialPrecioEstudio
-2. Actualizar Estudio (con precio_unico, actualizado_por)
-3. Crear SesionContable
-4. Crear Practica (con urgencia)
-5. Crear GuardiaPasiva
-6. Migración de datos existentes
+**FASE 1: MODELOS Y MIGRACIONES (4-5 horas)**
+1. ✅ Crear HistorialPrecioEstudio
+2. ✅ Actualizar Estudio (precio_unico, actualizado_por)
+3. ✅ Crear SesionContable (5 estados)
+4. ✅ Crear/Actualizar Practica:
+   - Campo `monto_calculado` (Decimal, se guarda al crear)
+   - Campos urgencia (paciente_internado, fechas)
+   - Método `calcular_monto()` (valida trabaja_remoto)
+5. ✅ Crear GuardiaPasiva
+6. ✅ Actualizar User: campo `trabaja_remoto` (Boolean)
+7. ✅ Migración de datos existentes
 
 **Tiempo estimado total:** 18-22 horas de desarrollo + 5 horas de testing/deploy
 
 ---
 
-¿Confirmás las 3 respuestas para arrancar? 🚀
+🚀 **ARRANCANDO CON LA IMPLEMENTACIÓN AHORA...**
