@@ -3,7 +3,10 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import date
-from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes, RegistroProcedimientosIntervensionismo
+from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
+
+# [ELIMINADO - 16 de febrero 2026]
+# Import de RegistroProcedimientosIntervensionismo eliminado
 
 User = get_user_model()
 
@@ -191,44 +194,10 @@ class DiaSinPacientesModelTest(TestCase):
             )
 
 
-class RegistroProcedimientosIntervensionismoModelTest(TestCase):
-    """Pruebas para el modelo RegistroProcedimientosIntervensionismo"""
-
-    def setUp(self):
-        """Configuración inicial para cada prueba"""
-        self.user = User.objects.create_user(
-            username='drtest',
-            password='testpass123'
-        )
-
-    def test_crear_procedimiento(self):
-        """Verifica que se puede crear un registro de procedimiento"""
-        procedimiento = RegistroProcedimientosIntervensionismo.objects.create(
-            medico=self.user,
-            nombre_paciente='Carlos',
-            apellido_paciente='Ruiz',
-            dni_paciente='22222222',
-            fecha_del_procedimiento=date.today(),
-            procedimiento='Biopsia guiada por TAC',
-            conteo_regiones=3,
-            notas='Procedimiento exitoso'
-        )
-        self.assertEqual(procedimiento.medico, self.user)
-        self.assertEqual(procedimiento.procedimiento, 'Biopsia guiada por TAC')
-        self.assertEqual(procedimiento.conteo_regiones, 3)
-
-    def test_procedimiento_str(self):
-        """Verifica la representación en string del procedimiento"""
-        procedimiento = RegistroProcedimientosIntervensionismo.objects.create(
-            medico=self.user,
-            nombre_paciente='Laura',
-            apellido_paciente='Martínez',
-            fecha_del_procedimiento=date.today(),
-            procedimiento='Drenaje percutáneo'
-        )
-        str_procedimiento = str(procedimiento)
-        self.assertIn(self.user.username, str_procedimiento)
-
+# [ANULADO - 16 de febrero 2026]
+# Tests de RegistroProcedimientosIntervensionismo eliminados
+# Razón: En Colegiales no se usa, se registra como Estudios
+# Si necesitas recuperar: git log o liquidacion_backup_completo_2026-02-16.json
 
 class LiquidacionViewsTest(TestCase):
     """Pruebas para las vistas de liquidación"""

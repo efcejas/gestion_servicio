@@ -1,9 +1,13 @@
 from django import forms
-from .models import Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils import timezone
+
+# [ELIMINADO - 16 de febrero 2026]
+# Import de RegistroProcedimientosIntervensionismo eliminado
+# Razón: En Colegiales se registra todo como Estudios
 
 # Clases Tailwind reutilizables para campos de formulario
 TAILWIND_INPUT_CLASSES = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all'
@@ -92,76 +96,13 @@ class FiltroMedicoMesForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
-class RegistroProcedimientosIntervensionismoCreateViewForm(forms.ModelForm):
-    class Meta:
-        model = RegistroProcedimientosIntervensionismo
-        fields = ['nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_del_procedimiento', 'procedimiento', 'notas', 'conteo_regiones']
-        widgets = {
-            'nombre_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-            }),
-            'apellido_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-            }),
-            'dni_paciente': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-                'maxlength': 8,
-            }),
-            'procedimiento': forms.TextInput(attrs={
-                'class': 'form-control form-control-sm',
-                'row' : 3,
-            }),
-            'fecha_del_procedimiento': forms.DateInput(attrs={
-                'type': 'date',
-                'class': 'form-control form-control-sm',
-            }),
-            'conteo_regiones': forms.NumberInput(attrs={
-                'class': 'form-control form-control-sm',
-                'min': 0,
-            }),
-            'notas': forms.Textarea(attrs={
-                'class': 'form-control form-control-sm',
-                'rows': 3,
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not self.initial.get('fecha_del_procedimiento'):
-            self.fields['fecha_del_procedimiento'].initial = timezone.now().date()
+# [ANULADO - 16 de febrero 2026]
+# Formularios RegistroProcedimientosIntervensionismoCreateViewForm y 
+# FiltroProcedimientosIntervensionismoForm eliminados
+# Razón: En Colegiales, procedimientos se registran como Estudios
+# Ver liquidacion_backup_completo_2026-02-16.json para datos históricos
 
 User = get_user_model()
-
-class FiltroProcedimientosIntervensionismoForm(forms.Form):
-    medico = forms.ModelChoiceField(
-        queryset=User.objects.filter(groups__name='Médicos de staff').order_by('first_name', 'last_name'),
-        required=False,
-        label="Médico",
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
-        empty_label="Todos los médicos"
-    )
-    mes = forms.ChoiceField(
-        choices=[
-            (1, 'Enero'), (2, 'Febrero'), (3, 'Marzo'), (4, 'Abril'),
-            (5, 'Mayo'), (6, 'Junio'), (7, 'Julio'), (8, 'Agosto'),
-            (9, 'Septiembre'), (10, 'Octubre'), (11, 'Noviembre'), (12, 'Diciembre')
-        ],
-        initial=datetime.now().month,
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
-        required=False, 
-        label="Mes"
-    )
-    año = forms.ChoiceField(
-        choices=[(i, i) for i in range(2000, 2031)],
-        widget=forms.Select(attrs={'class': 'form-control form-control-sm'}),
-        required=False, 
-        label="Año",
-        initial=datetime.now().year  # Establecer el año actual como valor inicial
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['medico'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
 
 class FiltroEstudiosPorMedicoForm(forms.Form):
     fecha_actual = datetime.now()

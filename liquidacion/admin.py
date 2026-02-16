@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
+
+# [ELIMINADO - 16 de febrero 2026]
+# Import de RegistroProcedimientosIntervensionismo eliminado
+# En Colegiales, procedimientos se registran como Estudios
 
 @admin.register(Estudios)
 class EstudiosAdmin(admin.ModelAdmin):
@@ -31,8 +35,7 @@ class DiaSinPacientesAdmin(admin.ModelAdmin):
     list_filter = ('fecha', 'medico')
     search_fields = ('medico__first_name', 'medico__last_name', 'fecha')
 
-@admin.register(RegistroProcedimientosIntervensionismo)
-class RegistroProcedimientosIntervensionismoAdmin(admin.ModelAdmin):
-    list_display = ('medico', 'nombre_paciente', 'apellido_paciente', 'dni_paciente', 'fecha_registro', 'fecha_del_procedimiento', 'procedimiento')
-    search_fields = ('nombre_paciente', 'apellido_paciente', 'dni_paciente', 'procedimiento')
-    list_filter = ('fecha_registro', 'fecha_del_procedimiento', 'medico')
+# [ANULADO - 16 de febrero 2026]
+# RegistroProcedimientosIntervensionismoAdmin eliminado
+# Razón: En Colegiales no se usa, se registra como Estudios
+# Ver liquidacion_backup_completo_2026-02-16.json para datos históricos

@@ -18,12 +18,10 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Estudios, RegistroEstudiosPorMedico, RegistroProcedimientosIntervensionismo, DiaSinPacientes
+from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm, 
     FiltroMedicoMesForm, 
-    RegistroProcedimientosIntervensionismoCreateViewForm, 
-    FiltroProcedimientosIntervensionismoForm, 
     FiltroEstudiosPorMedicoForm,
     DiaSinPacientesForm,
     CargaExcelForm,
@@ -354,80 +352,12 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
         # Limita los registros a los del usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
-class ProcedimientosIntervensionismoListCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    model = RegistroProcedimientosIntervensionismo
-    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
-    template_name = 'liquidacion/procedimientos_intervensionismo_form_tailwind.html'
-    success_url = reverse_lazy('liquidacion:procedimientos_intervensionismo')
-    success_message = "✅ Procedimiento registrado exitosamente"
-
-    def form_valid(self, form):
-        form.instance.medico = self.request.user
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        context['registros'] = RegistroProcedimientosIntervensionismo.objects.filter(medico=user).order_by('-fecha_registro')
-        return context
-
-class ProcedimientosIntervensionismoListView(LoginRequiredMixin, ListView):
-    model = RegistroProcedimientosIntervensionismo
-    template_name = 'liquidacion/procedimientos_intervensionismo_list_tailwind.html'
-    context_object_name = 'registros'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        
-        # Obtener el mes y año actual
-        fecha_actual = datetime.now()
-        mes_actual = fecha_actual.month
-        año_actual = fecha_actual.year
-
-        # Inicializar el formulario con los valores actuales
-        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None, initial={'mes': mes_actual, 'año': año_actual})
-
-        # Inicializar los valores de mes y año con los valores actuales
-        mes = mes_actual
-        año = año_actual
-
-        # Si el formulario es válido, actualizar los valores de mes y año
-        if form.is_valid():
-            mes = form.cleaned_data.get('mes') or mes_actual
-            año = form.cleaned_data.get('año') or año_actual
-
-        # Filtrar registros del usuario logueado para el mes y año seleccionados
-        registros = RegistroProcedimientosIntervensionismo.objects.filter(
-            medico=user,
-            fecha_del_procedimiento__month=mes,
-            fecha_del_procedimiento__year=año
-        ).order_by('-fecha_registro')
-
-        context['form'] = form
-        context['registros'] = registros
-        context['total_regiones'] = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
-        context['total_pacientes'] = registros.count()
-        context['mes'] = mes
-        context['año'] = año
-        return context
-
-class ProcedimientosIntervensionismoUpdateView(LoginRequiredMixin, UpdateView):
-    model = RegistroProcedimientosIntervensionismo
-    form_class = RegistroProcedimientosIntervensionismoCreateViewForm
-    template_name = 'liquidacion/procedimientos_intervensionismo_update_tailwind.html'
-    success_url = reverse_lazy('liquidacion:mis_procedimientos')
-
-    def get_queryset(self):
-        return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
-
-class ProcedimientosIntervensionismoDeleteView(LoginRequiredMixin, DeleteView):
-    model = RegistroProcedimientosIntervensionismo
-    template_name = 'liquidacion/procedimientos_intervensionismo_confirm_delete_tailwind.html'
-    success_url = reverse_lazy('liquidacion:mis_procedimientos')
-
-    def get_queryset(self):
-        return RegistroProcedimientosIntervensionismo.objects.filter(medico=self.request.user)
+# ============================================================
+# [ANULADO - 16 de febrero 2026]
+# Procedimientos de Intervensionismo - En Colegiales no se usa
+# Los procedimientos se registran como Estudios normales
+# Si necesitas datos históricos: ver liquidacion_backup_completo_2026-02-16.json
+# ============================================================
 
 # Vistas para quienes consultan la liquidación sin loguearse
 
@@ -579,44 +509,10 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
 
         return context
 
-class ProcedimientosPorMedicoPorMesListView(TemplateView):
-    template_name = 'liquidacion/procedimientos_por_medico_por_mes_tailwind.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        form = FiltroProcedimientosIntervensionismoForm(self.request.GET or None)
-        context['form'] = form
-
-        medico_data = []
-
-        if form.is_valid():
-            medicos = User.objects.filter(groups__name='Médicos de staff')
-            medico = form.cleaned_data.get('medico')
-            mes = int(form.cleaned_data.get('mes')) if form.cleaned_data.get('mes') else None
-            año = int(form.cleaned_data.get('año')) if form.cleaned_data.get('año') else None
-
-            if medico:
-                medicos = medicos.filter(id=medico.id)
-
-            for medico in medicos:
-                registros = RegistroProcedimientosIntervensionismo.objects.filter(medico=medico)
-
-                if mes and año:
-                    registros = registros.filter(fecha_del_procedimiento__year=año, fecha_del_procedimiento__month=mes)
-
-                registros = registros.order_by('-fecha_del_procedimiento')
-
-                total_regiones = registros.aggregate(total=Sum('conteo_regiones'))['total'] or 0
-
-                medico_data.append({
-                    'medico': medico,
-                    'registros': registros,
-                    'total_regiones': total_regiones,
-                    'total_pacientes': registros.count(),
-                })
-
-        context['medico_data'] = medico_data
-        return context
+# [ANULADO - 16 de febrero 2026]
+# Vista ProcedimientosPorMedicoPorMesListView eliminada
+# En Colegiales, los procedimientos se registran como Estudios
+# Ver liquidacion_backup_completo_2026-02-16.json para datos históricos
 
 def generar_pdf_liquidacion(request):
     buffer = io.BytesIO()
@@ -891,72 +787,10 @@ def exportar_excel_ecografias(request):
     wb.save(response)
     return response
 
-def exportar_excel_procedimientos(request):
-    # Obtener los filtros de la URL
-    medico_id = request.GET.get('medico')
-    mes = request.GET.get('mes')
-    año = request.GET.get('año')
-
-    # Imprimir los valores de los filtros para depuración
-    print(f"Filtros - Medico ID: {medico_id}, Mes: {mes}, Año: {año}")
-
-    # Filtrar registros basados en los parámetros
-    registros = RegistroProcedimientosIntervensionismo.objects.all()
-
-    if medico_id:
-        registros = registros.filter(medico_id=medico_id)
-        print(f"Registros después de filtrar por medico_id: {registros.count()}")
-
-    if mes and año:
-        registros = registros.filter(fecha_del_procedimiento__month=mes, fecha_del_procedimiento__year=año)
-        print(f"Registros después de filtrar por mes y año: {registros.count()}")
-
-    # Verificar si hay registros después del filtrado
-    print(f"Registros encontrados: {registros.count()}")
-
-    # Obtener el nombre del médico
-    medico = None
-    if medico_id:
-        medico = get_object_or_404(User, id=medico_id)
-        nombre_medico = f"{medico.first_name}_{medico.last_name}"
-    else:
-        nombre_medico = "todos_los_medicos"
-
-    # Crear un libro de Excel
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Procedimientos"
-
-    # Establecer la fila de encabezados
-    headers = ["Paciente", "DNI", "Fecha del Procedimiento", "Procedimiento", "Cantidad de Regiones", "Notas"]
-    ws.append(headers)
-
-    # Alinear encabezados al centro
-    for cell in ws[1]:
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-
-    # Agregar registros al Excel
-    for registro in registros:
-        nombre_completo = f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}"
-        ws.append([
-            nombre_completo,
-            registro.dni_paciente,
-            registro.fecha_del_procedimiento.strftime("%d/%m/%Y"),
-            registro.procedimiento.upper(),
-            registro.conteo_regiones,
-            registro.notas
-        ])
-
-    # Ajustar ancho de columnas automáticamente
-    for column in ws.columns:
-        max_length = max(len(str(cell.value)) for cell in column) + 2
-        ws.column_dimensions[column[0].column_letter].width = max_length
-
-    # Preparar respuesta HTTP
-    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="procedimientos_{nombre_medico}.xlsx"'
-    wb.save(response)
-    return response
+# [ANULADO - 16 de febrero 2026]
+# Función exportar_excel_procedimientos eliminada
+# En Colegiales los procedimientos se registran como estudios
+# Ver ANALISIS_LIQUIDACION_COLEGIALES.md para más detalles
 
 # A continuación, se agrega el formulario para carga masiva de estudios
 

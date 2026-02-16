@@ -8,19 +8,19 @@ from .views import (
     RegistroEstudiosPorMedicoDeleteView,
     generar_pdf_liquidacion,
     InformadosPorMedicoPorMesListView,
-    ProcedimientosIntervensionismoListCreateView,
-    ProcedimientosIntervensionismoListView,
-    ProcedimientosIntervensionismoUpdateView,
-    ProcedimientosIntervensionismoDeleteView,
-    ProcedimientosPorMedicoPorMesListView,
     EcografiasPorMedicoPorMesListView,
     exportar_excel_informes,
     exportar_excel_ecografias,
-    exportar_excel_procedimientos,
     RegistrarDiaSinPacientesView,
     CargaMasivaView,
     PortalLiquidacionInicioView
 )
+
+# [ELIMINADO - 16 de feb 2026] 
+# ProcedimientosIntervensionismoListCreateView, ProcedimientosIntervensionismoListView, 
+# ProcedimientosIntervensionismoUpdateView, ProcedimientosIntervensionismoDeleteView,
+# ProcedimientosPorMedicoPorMesListView, exportar_excel_procedimientos
+# Razón: En Colegiales, procedimientos se registran como estudios
 
 app_name = 'liquidacion'
 
@@ -30,10 +30,10 @@ urlpatterns = [
     path('portal/', PortalLiquidacionInicioView.as_view(), name='portal_inicio'),
     path('informados-por-medico-por-mes/', InformadosPorMedicoPorMesListView.as_view(), name='informados_por_medico_por_mes'),
     path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
-    path('procedimientos-por-medico-por-mes/', ProcedimientosPorMedicoPorMesListView.as_view(), name='procedimientos_por_medico_por_mes'),
+    # [ELIMINADO - 16 feb 2026] path('procedimientos-por-medico-por-mes/', ProcedimientosPorMedicoPorMesListView.as_view(), ...),
     path('exportar_excel_informes/', exportar_excel_informes, name='exportar_excel_informes'),
     path('exportar_excel_ecografias/', exportar_excel_ecografias, name='exportar_excel_ecografias'),
-    path('exportar_excel_procedimientos/', exportar_excel_procedimientos, name='exportar_excel_procedimientos'),
+    # [ELIMINADO - 16 feb 2026] path('exportar_excel_procedimientos/', exportar_excel_procedimientos, ...),
 
     # ===== RUTAS INTERNAS (Requieren Login) =====
     path('estudios/nuevo/', EstudiosCreateView.as_view(), name='estudios_nuevo'),
@@ -49,11 +49,13 @@ urlpatterns = [
     # Ruta para generar PDF
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),
 
-    # Rutas para Procedimientos de Intervensionismo
-    path('procedimientos-intervensionismo/', ProcedimientosIntervensionismoListCreateView.as_view(), name='procedimientos_intervensionismo'),
-    path('procedimientos_intervensionismo/<int:pk>/editar/', ProcedimientosIntervensionismoUpdateView.as_view(), name='editar_procedimiento'),
-    path('procedimientos_intervensionismo/<int:pk>/eliminar/', ProcedimientosIntervensionismoDeleteView.as_view(), name='eliminar_procedimiento'),
-    path('mis-procedimientos/', ProcedimientosIntervensionismoListView.as_view(), name='mis_procedimientos'),
+    # [ELIMINADO - 16 de febrero 2026]
+    # Rutas de procedimientos intervensionismo eliminadas:
+    # - path('procedimientos-intervensionismo/', ...)
+    # - path('procedimientos_intervensionismo/<int:pk>/editar/', ...)
+    # - path('procedimientos_intervensionismo/<int:pk>/eliminar/', ...)
+    # - path('mis-procedimientos/', ...)
+    # Razón: En Colegiales se usa RegistroEstudios para todo
 
     # Ruta para la carga masiva de estudios (solo admin)
     path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
