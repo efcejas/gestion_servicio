@@ -180,6 +180,8 @@
         <div id="filtros-content" class="hidden px-6 pb-6 border-t border-gray-100">
             <form method="get" class="mt-4">
                 {% csrf_token %}
+                <!-- Campo oculto para mantener la pestaña activa -->
+                <input type="hidden" name="tipo_estudio" value="{{ tipo_estudio_activo }}">
                 
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Búsqueda rápida - más prominente -->
