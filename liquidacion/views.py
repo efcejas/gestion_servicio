@@ -600,11 +600,13 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         # Preparar el contexto con datos por médico
         medico_data = []
         for medico, registros in registros_por_medico.items():
-            total_regiones = sum(registro.total_regiones() for registro in registros)
+            total_regiones = sum(registro.cantidad_regiones for registro in registros)
+            total_monto = sum(registro.monto_calculado for registro in registros)
             medico_data.append({
                 'medico': medico,
                 'registros': registros,
                 'total_regiones': total_regiones,
+                'total_monto': total_monto,
             })
 
         context['medico_data'] = medico_data
@@ -667,9 +669,11 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             dias = []
             total_regiones_mes = 0
             total_complemento_mes = 0
+            total_monto_mes = 0
 
             for fecha, registros_dia in sorted(registros_por_dia.items()):
-                regiones_hechas = sum(r.total_regiones() for r in registros_dia)
+                regiones_hechas = sum(r.cantidad_regiones for r in registros_dia)
+                monto_dia = sum(r.monto_calculado for r in registros_dia)
                 es_computable = fecha >= fecha_minima
                 es_dia_sin_pacientes = len(registros_dia) == 0 and any(
                     d.fecha == fecha for d in dias_sin_pacientes_por_medico.get(medico, [])
@@ -680,6 +684,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                     regiones_faltantes = 12 if es_dia_sin_pacientes else max(0, 12 - regiones_hechas)
 
                 total_regiones_mes += regiones_hechas
+                total_monto_mes += monto_dia
                 if es_computable:
                     total_complemento_mes += regiones_faltantes
 
@@ -689,6 +694,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                     'regiones_hechas': regiones_hechas,
                     'regiones_faltantes': regiones_faltantes,
                     'total_a_pagar': regiones_hechas + regiones_faltantes,
+                    'monto_dia': monto_dia,
                     'mostrar_complemento': es_computable,
                     'es_dia_sin_pacientes': es_dia_sin_pacientes,
                 })
@@ -699,6 +705,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                 'total_regiones_mes': total_regiones_mes,
                 'total_complemento_mes': total_complemento_mes,
                 'total_a_pagar_mes': total_regiones_mes + total_complemento_mes,
+                'total_monto_mes': total_monto_mes,
             })
 
         context['medico_data'] = medico_data
