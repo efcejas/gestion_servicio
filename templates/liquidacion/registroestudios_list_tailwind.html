@@ -131,6 +131,7 @@
                         <th class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Tipo</th>
                         <th class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Monto</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Observaciones</th>
+                        <th class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-emerald-200">
@@ -145,6 +146,26 @@
                         </td>
                         <td class="px-4 py-3 text-sm font-bold text-right text-gray-900">${{ guardia.monto|floatformat:2 }}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">{{ guardia.observaciones|default:"-" }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center space-x-2">
+                                {% if puede_registrar %}
+                                <a href="{% url 'liquidacion:editar_guardia_pasiva' guardia.pk %}" 
+                                   class="inline-flex items-center px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
+                                   title="Editar guardia">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'liquidacion:eliminar_guardia_pasiva' guardia.pk %}" 
+                                   class="inline-flex items-center px-2.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
+                                   title="Eliminar guardia">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                                {% else %}
+                                <span class="text-xs text-gray-400" title="Sesión cerrada - No se pueden editar guardias">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -152,7 +173,7 @@
                     <tr>
                         <td colspan="2" class="px-4 py-3 text-sm uppercase">Total Guardias</td>
                         <td class="px-4 py-3 text-sm text-right">${{ total_monto_guardias|floatformat:2 }}</td>
-                        <td></td>
+                        <td colspan="2"></td>
                     </tr>
                 </tfoot>
             </table>
