@@ -215,6 +215,19 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         messages.success(self.request, mensaje_desglose)
         
         return redirect(self.success_url)
+    
+    def form_invalid(self, form):
+        """Mostrar errores de validación al usuario"""
+        # Mostrar todos los errores del formulario
+        for field, errors in form.errors.items():
+            for error in errors:
+                if field == '__all__':
+                    messages.error(self.request, f"Error: {error}")
+                else:
+                    field_label = form.fields.get(field).label if field in form.fields else field
+                    messages.error(self.request, f"{field_label}: {error}")
+        
+        return super().form_invalid(form)
 
 
 # [DEPRECADO - 16 de febrero 2026]

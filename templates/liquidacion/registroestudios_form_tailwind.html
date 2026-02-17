@@ -708,11 +708,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Si no hay precio diferenciado, establecer un valor por defecto para tipo_obra_social
         if (!hayPrecioDiferenciado) {
-            // Desmarcar radios si existían
+            // Desmarcar radios y quitar required
             document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
                 radio.checked = false;
                 radio.required = false;
             });
+            // Establecer valor por defecto (OTRAS_OS) para evitar error de validación
+            const radioOtras = document.getElementById('id_tipo_obra_social_otras');
+            if (radioOtras) {
+                radioOtras.checked = true;
+            }
         } else {
             // Hacer requerido si hay precio diferenciado
             document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {

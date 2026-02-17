@@ -626,19 +626,21 @@ class RegistroEstudiosPorMedico(models.Model):
             self.sesion_contable = sesion
         
         # Validación: Asignar horario automáticamente según rol y hora
-        if self.medico.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']:
-            # Staff no tiene horario INTRA/EXTRA
-            self.horario = 'NA'
-        else:
-            # Residentes, jefe residentes, instructores: auto-asignar según hora
-            from django.utils import timezone
-            hora_actual = timezone.localtime(timezone.now()).hour
-            
-            # 8:00 a 16:59 → INTRA (17:00 ya es EXTRA)
-            if 8 <= hora_actual < 17:
-                self.horario = 'INTRA'
+        # SOLO si no está ya especificado o está vacío
+        if not self.horario or self.horario == '':
+            if self.medico.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']:
+                # Staff no tiene horario INTRA/EXTRA
+                self.horario = 'NA'
             else:
-                self.horario = 'EXTRA'
+                # Residentes, jefe residentes, instructores: auto-asignar según hora
+                from django.utils import timezone
+                hora_actual = timezone.localtime(timezone.now()).hour
+                
+                # 8:00 a 16:59 → INTRA (17:00 ya es EXTRA)
+                if 8 <= hora_actual < 17:
+                    self.horario = 'INTRA'
+                else:
+                    self.horario = 'EXTRA'
         
         # Calcular monto ANTES de guardar (INMUTABLE)
         # IMPORTANTE: Solo si ya tiene ID (no es nuevo) o si ya tiene estudios asignados

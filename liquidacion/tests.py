@@ -241,3 +241,322 @@ class LiquidacionViewsTest(TestCase):
         
         self.assertEqual(RegistroEstudiosPorMedico.objects.count(), 1)
         self.assertEqual(registro.total_regiones(), 1)
+
+
+class CalculoMontosTest(TestCase):
+    """
+    NUEVOS TESTS - Sistema de Liquidación v2.0
+    Verificación de cálculo de montos con descuentos según horario
+    """
+    
+    def setUp(self):
+        """Configuración inicial para las pruebas de montos"""
+        from decimal import Decimal
+        
+        # Crear estudio con precios diferenciados
+        self.estudio_doppler = Estudios.objects.create(
+            codigo='902225',
+            nombre='Doppler Periférico en Servicio',
+            tipo='DOP',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('8500.00'),
+            precio_otras_os=Decimal('10000.00'),
+            conteo_regiones_default=1,
+            activo=True
+        )
+        
+        # Crear usuarios con diferentes roles
+        # 1. Residente
+        self.residente = User.objects.create_user(
+            username='residente1',
+            password='testpass123',
+            first_name='Ana',
+            last_name='Residente',
+            rol='medico_residente'
+        )
+        
+        # 2. Jefe de Residentes
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_res',
+            password='testpass123',
+            first_name='Carlos',
+            last_name='Jefe',
+            rol='jefe_residentes'
+        )
+        
+        # 3. Instructor
+        self.instructor = User.objects.create_user(
+            username='instructor1',
+            password='testpass123',
+            first_name='María',
+            last_name='Instructor',
+            rol='instructor_residentes'
+        )
+        
+        # 4. Staff (siempre cobra 100%)
+        self.staff = User.objects.create_user(
+            username='staff1',
+            password='testpass123',
+            first_name='Luis',
+            last_name='Staff',
+            rol='medico_staff'
+        )
+    
+    def test_residente_horario_intra_descuento_50_porciento_COBER(self):
+        """
+        CRÍTICO: Residente en horario INTRA residencia debe cobrar 50% del valor
+        Fórmula: precio_cober × regiones × 0.5 (INTRA)
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Juan',
+            apellido_paciente='Pérez',
+            dni_paciente='12345678',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        # Recalcular monto
+        monto_calculado = registro.calcular_monto()
+        
+        # Esperado: $8.500 (COBER) × 1 región × 0.5 (INTRA) = $4.250
+        esperado = Decimal('4250.00')
+        
+        self.assertEqual(
+            monto_calculado, 
+            esperado,
+            f"❌ FALLA: Residente INTRA debería cobrar $4.250 (50% de $8.500), pero cobra ${monto_calculado}"
+        )
+    
+    def test_residente_horario_extra_cobra_100_porciento_COBER(self):
+        """
+        Residente en horario EXTRA residencia debe cobrar 100% del valor
+        Fórmula: precio_cober × regiones × 1.0 (EXTRA)
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='María',
+            apellido_paciente='González',
+            dni_paciente='87654321',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='EXTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        
+        # Esperado: $8.500 (COBER) × 1 región × 1.0 (EXTRA) = $8.500
+        esperado = Decimal('8500.00')
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Residente EXTRA debería cobrar $8.500 (100%), pero cobra ${monto_calculado}"
+        )
+    
+    def test_residente_horario_intra_descuento_50_porciento_OTRAS_OS(self):
+        """
+        Residente INTRA con OTRAS OS: 50% del precio otras_os
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Pedro',
+            apellido_paciente='López',
+            dni_paciente='11111111',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='OTRAS_OS',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        
+        # Esperado: $10.000 (OTRAS_OS) × 1 región × 0.5 (INTRA) = $5.000
+        esperado = Decimal('5000.00')
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Residente INTRA con OTRAS OS debería cobrar $5.000 (50% de $10.000), pero cobra ${monto_calculado}"
+        )
+    
+    def test_jefe_residentes_horario_intra_descuento_50_porciento(self):
+        """
+        Jefe de Residentes en INTRA también tiene descuento del 50%
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Laura',
+            apellido_paciente='Martínez',
+            dni_paciente='22222222',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        esperado = Decimal('4250.00')  # 50% de $8.500
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Jefe Residentes INTRA debe cobrar $4.250, pero cobra ${monto_calculado}"
+        )
+    
+    def test_instructor_horario_intra_descuento_50_porciento(self):
+        """
+        Instructor en INTRA también tiene descuento del 50%
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.instructor,
+            nombre_paciente='Diego',
+            apellido_paciente='Fernández',
+            dni_paciente='33333333',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        esperado = Decimal('4250.00')  # 50% de $8.500
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Instructor INTRA debe cobrar $4.250, pero cobra ${monto_calculado}"
+        )
+    
+    def test_staff_siempre_cobra_100_porciento_sin_descuento(self):
+        """
+        CRÍTICO: Staff SIEMPRE cobra 100%, no importa el horario
+        No aplica descuento INTRA/EXTRA
+        """
+        from decimal import Decimal
+        
+        # Staff en "horario INTRA" (que en realidad es N/A para ellos)
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.staff,
+            nombre_paciente='Carmen',
+            apellido_paciente='Ruiz',
+            dni_paciente='44444444',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='NA'  # Staff no tiene horario INTRA/EXTRA
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        
+        # Esperado: $8.500 (COBER) × 1 región × 1.0 (Staff siempre 100%) = $8.500
+        esperado = Decimal('8500.00')
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Staff debe cobrar $8.500 (100% siempre), pero cobra ${monto_calculado}"
+        )
+    
+    def test_residente_multiples_regiones_intra(self):
+        """
+        Verificar que el cálculo funciona con múltiples regiones
+        Fórmula: precio × regiones × porcentaje_horario
+        """
+        from decimal import Decimal
+        
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Roberto',
+            apellido_paciente='Sánchez',
+            dni_paciente='55555555',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=2,  # 2 regiones
+            tipo_obra_social='COBER',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        monto_calculado = registro.calcular_monto()
+        
+        # Esperado: $8.500 × 2 regiones × 0.5 (INTRA) = $8.500
+        esperado = Decimal('8500.00')
+        
+        self.assertEqual(
+            monto_calculado,
+            esperado,
+            f"❌ FALLA: Residente con 2 regiones INTRA debe cobrar $8.500, pero cobra ${monto_calculado}"
+        )
+    
+    def test_desglose_monto_incluye_porcentaje_horario(self):
+        """
+        Verificar que get_desglose_monto() muestra correctamente el porcentaje
+        """
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Test',
+            apellido_paciente='Desglose',
+            dni_paciente='66666666',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER',
+            horario='INTRA'
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        desglose = registro.get_desglose_monto()
+        
+        self.assertEqual(desglose['porcentaje'], '50%')
+        self.assertEqual(desglose['horario'], 'Intra Residencia (50%)')
+    
+    def test_horario_asignacion_automatica_staff(self):
+        """
+        Verificar que el horario se asigna como 'NA' para staff automáticamente
+        """
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.staff,
+            nombre_paciente='Auto',
+            apellido_paciente='Horario',
+            dni_paciente='77777777',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='COBER'
+            # No especificamos horario, debe asignarse automáticamente
+        )
+        registro.estudio.add(self.estudio_doppler)
+        registro.save()
+        
+        self.assertEqual(
+            registro.horario,
+            'NA',
+            "❌ FALLA: Staff debe tener horario 'NA' automáticamente"
+        )
+
