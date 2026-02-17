@@ -934,8 +934,8 @@ def exportar_excel_informes(request):
     if medico_id and mes and año:
         guardias = GuardiaPasiva.objects.filter(
             medico_id=medico_id,
-            sesion_contable__mes=int(mes),
-            sesion_contable__año=int(año)
+            fecha_guardia__year=int(año),
+            fecha_guardia__month=int(mes)
         ).order_by('fecha_guardia')
 
     # Obtener el nombre del médico
@@ -1089,6 +1089,15 @@ def exportar_excel_ecografias(request):
     if mes and año:
         registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
 
+    # Obtener guardias pasivas si hay filtros de médico y período
+    guardias = GuardiaPasiva.objects.none()
+    if medico_id and mes and año:
+        guardias = GuardiaPasiva.objects.filter(
+            medico_id=medico_id,
+            fecha_guardia__year=int(año),
+            fecha_guardia__month=int(mes)
+        ).order_by('fecha_guardia')
+
     # Crear Excel
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1145,6 +1154,56 @@ def exportar_excel_ecografias(request):
     for column in ws.columns:
         max_length = max(len(str(cell.value)) for cell in column) + 2
         ws.column_dimensions[column[0].column_letter].width = min(max_length, 50)
+
+    # ======== SHEET 2: GUARDIAS PASIVAS ========
+    if guardias.exists():
+        ws_guardias = wb.create_sheet(title="Guardias")
+        
+        headers_guardias = ["Fecha", "Tipo Guardia", "Monto", "Observaciones"]
+        ws_guardias.append(headers_guardias)
+        
+        # Estilo encabezados
+        for cell in ws_guardias[1]:
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+            cell.font = Font(bold=True, color="FFFFFF")
+        
+        total_guardias = 0
+        for guardia in guardias:
+            ws_guardias.append([
+                guardia.fecha_guardia.strftime("%d/%m/%Y"),
+                guardia.get_tipo_guardia_display(),
+                float(guardia.monto),
+                guardia.observaciones or ""
+            ])
+            total_guardias += guardia.monto
+        
+        # Fila de totales guardias
+        ws_guardias.append([])
+        totales_row_g = ws_guardias.max_row + 1
+        ws_guardias.append(["", "TOTAL", float(total_guardias), ""])
+        
+        for cell in ws_guardias[totales_row_g]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        
+        # Formato moneda
+        for row in range(2, ws_guardias.max_row + 1):
+            ws_guardias.cell(row=row, column=3).number_format = '$#,##0.00'
+        
+        # Ajustar columnas
+        for column in ws_guardias.columns:
+            max_length = max(len(str(cell.value)) for cell in column) + 2
+            ws_guardias.column_dimensions[column[0].column_letter].width = min(max_length, 40)
+        
+        # Agregar total general al final de ecografías
+        ws.append([])
+        ws.append(["", "", "", "TOTAL GENERAL (Ecografías + Guardias)", "", "", "", float(total_monto_mes + total_guardias)])
+        for cell in ws[ws.max_row]:
+            cell.font = Font(bold=True, size=12)
+            cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+        ws.cell(row=ws.max_row, column=8).number_format = '$#,##0.00'
 
     # Respuesta HTTP
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
