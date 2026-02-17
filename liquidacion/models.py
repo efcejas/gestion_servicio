@@ -194,6 +194,8 @@ class HistorialPrecioEstudio(models.Model):
     
     def get_variacion_cober(self):
         """Calcula porcentaje de variación COBER"""
+        if self.precio_cober_anterior is None or self.precio_cober_nuevo is None:
+            return 0
         if self.precio_cober_anterior == 0:
             return 0
         variacion = ((self.precio_cober_nuevo - self.precio_cober_anterior) / self.precio_cober_anterior) * 100
@@ -201,6 +203,8 @@ class HistorialPrecioEstudio(models.Model):
     
     def get_variacion_otras_os(self):
         """Calcula porcentaje de variación OTRAS OS"""
+        if self.precio_otras_os_anterior is None or self.precio_otras_os_nuevo is None:
+            return 0
         if self.precio_otras_os_anterior == 0:
             return 0
         variacion = ((self.precio_otras_os_nuevo - self.precio_otras_os_anterior) / self.precio_otras_os_anterior) * 100
