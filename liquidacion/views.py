@@ -759,6 +759,108 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
 
         return context
 
+
+# ========================================
+# VISTA UNIFICADA - v3.0 (Feb 2026)
+# ========================================
+
+class LiquidacionPorMedicoPorMesListView(TemplateView):
+    """
+    Vista unificada de liquidación mensual - Todas las prácticas + Guardias
+    
+    Muestra en un solo portal:
+    - Todas las prácticas (ECO + RAD + TOM + RES)
+    - Guardias pasivas
+    - Total general
+    
+    Eliminada lógica obsoleta:
+    - DiaSinPacientes (no se usa en Colegiales)
+    - Complemento por mínimo garantizado (no aplica)
+    - Cálculo de regiones faltantes
+    """
+    template_name = 'liquidacion/liquidacion_por_medico_por_mes_tailwind.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = FiltroMedicoMesForm(self.request.GET or None)
+        context['form'] = form
+
+        registros_por_medico = defaultdict(list)
+        guardias_por_medico = defaultdict(list)
+
+        if form.is_valid():
+            medico = form.cleaned_data.get('medico')
+            mes = form.cleaned_data.get('mes')
+            año = form.cleaned_data.get('año')
+
+            # Filtrar TODAS las prácticas (sin excluir ningún tipo)
+            registros = RegistroEstudiosPorMedico.objects.prefetch_related(
+                Prefetch('estudio', queryset=Estudios.objects.all())
+            ).distinct()
+
+            # Filtrar guardias pasivas
+            guardias = GuardiaPasiva.objects.all()
+
+            if medico:
+                registros = registros.filter(medico=medico)
+                guardias = guardias.filter(medico=medico)
+
+            if mes and año:
+                registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+                guardias = guardias.filter(fecha_guardia__year=int(año), fecha_guardia__month=int(mes))
+
+            # Agrupar registros por médico
+            for registro in registros.order_by('-fecha_del_informe'):
+                registros_por_medico[registro.medico].append(registro)
+            
+            # Agrupar guardias por médico
+            for guardia in guardias.order_by('-fecha_guardia'):
+                guardias_por_medico[guardia.medico].append(guardia)
+
+        # Preparar el contexto con datos por médico
+        medico_data = []
+        todos_medicos = set(registros_por_medico.keys()) | set(guardias_por_medico.keys())
+        
+        for medico in todos_medicos:
+            registros = registros_por_medico.get(medico, [])
+            guardias = guardias_por_medico.get(medico, [])
+            
+            # Agrupar prácticas por tipo para mostrar subtotales
+            practicas_por_tipo = defaultdict(list)
+            for registro in registros:
+                for estudio in registro.estudio.all():
+                    practicas_por_tipo[estudio.tipo].append(registro)
+            
+            total_regiones = sum(registro.cantidad_regiones for registro in registros)
+            total_monto = sum(registro.monto_calculado for registro in registros)
+            total_guardias = len(guardias)
+            total_monto_guardias = sum(guardia.monto for guardia in guardias)
+            
+            medico_data.append({
+                'medico': medico,
+                'registros': registros,
+                'practicas_por_tipo': dict(practicas_por_tipo),
+                'guardias': guardias,
+                'total_regiones': total_regiones,
+                'total_monto': total_monto,
+                'total_guardias': total_guardias,
+                'total_monto_guardias': total_monto_guardias,
+                'total_general': total_monto + total_monto_guardias,
+            })
+
+        context['medico_data'] = medico_data
+        
+        if form.is_valid() and not medico_data:
+            medico_seleccionado = form.cleaned_data.get('medico')
+            if medico_seleccionado:
+                context['mensaje_sin_registros'] = (
+                    f"No se encontraron registros para {medico_seleccionado.get_full_name()} en el período consultado."
+                )
+            else:
+                context['mensaje_sin_registros'] = "No se encontraron registros en el período consultado."
+
+        return context
+
 # [ANULADO - 16 de febrero 2026]
 # Vista ProcedimientosPorMedicoPorMesListView eliminada
 # En Colegiales, los procedimientos se registran como Estudios
@@ -1215,6 +1317,175 @@ def exportar_excel_ecografias(request):
 # Función exportar_excel_procedimientos eliminada
 # En Colegiales los procedimientos se registran como estudios
 # Ver ANALISIS_LIQUIDACION_COLEGIALES.md para más detalles
+
+
+# ========================================
+# EXPORTACIÓN UNIFICADA - v3.0 (Feb 2026)
+# ========================================
+
+def exportar_excel_liquidacion(request):
+    """
+    Exportar liquidación completa a Excel - v3.0 UNIFICADA
+    
+    Incluye:
+    - Todas las prácticas (ECO + RAD + TOM + RES)
+    - Guardias pasivas
+    - Total general
+    
+    Sheets del Excel:
+    1. "Prácticas" - Todas las prácticas ordenadas por fecha
+    2. "Guardias" - Guardias pasivas del período
+    """
+    medico_id = request.GET.get('medico')
+    mes = request.GET.get('mes')
+    año = request.GET.get('año')
+
+    # Filtrar TODAS las prácticas (sin excluir ningún tipo)
+    registros = RegistroEstudiosPorMedico.objects.prefetch_related(
+        Prefetch('estudio', queryset=Estudios.objects.all())
+    ).distinct()
+
+    if medico_id:
+        registros = registros.filter(medico_id=medico_id)
+    if mes and año:
+        registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+
+    # Obtener guardias pasivas
+    guardias = GuardiaPasiva.objects.none()
+    if medico_id and mes and año:
+        guardias = GuardiaPasiva.objects.filter(
+            medico_id=medico_id,
+            fecha_guardia__year=int(año),
+            fecha_guardia__month=int(mes)
+        ).order_by('fecha_guardia')
+
+    # Obtener nombre del médico para el archivo
+    medico = None
+    if medico_id:
+        medico = get_object_or_404(User, id=medico_id)
+        nombre_medico = f"{medico.first_name}_{medico.last_name}"
+    else:
+        nombre_medico = "todos_los_medicos"
+
+    # Crear libro de Excel
+    wb = openpyxl.Workbook()
+    
+    # ======== SHEET 1: PRÁCTICAS ========
+    ws = wb.active
+    ws.title = "Prácticas"
+
+    # Encabezados
+    headers = [
+        "Fecha", "Paciente", "DNI", "Estudios", 
+        "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus"
+    ]
+    ws.append(headers)
+
+    # Estilo encabezados
+    for cell in ws[1]:
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        cell.font = Font(bold=True, color="FFFFFF")
+
+    # Agregar registros
+    total_regiones = 0
+    total_monto = 0
+    
+    for registro in registros.order_by('-fecha_del_informe'):
+        estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
+        tipos_estudios = ", ".join(sorted(set([est.tipo for est in registro.estudio.all()])))
+        bonus_icon = "⚡ SÍ" if registro.paciente_internado else ""
+        
+        ws.append([
+            registro.fecha_del_informe.strftime("%d/%m/%Y"),
+            f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
+            registro.dni_paciente,
+            estudios_nombres,
+            tipos_estudios,
+            registro.cantidad_regiones,
+            registro.get_tipo_obra_social_display(),
+            registro.get_horario_display(),
+            float(registro.monto_calculado),
+            bonus_icon
+        ])
+        
+        total_regiones += registro.cantidad_regiones
+        total_monto += registro.monto_calculado
+
+    # Fila de totales prácticas
+    ws.append([])
+    totales_row = ws.max_row + 1
+    ws.append(["", "", "", "", "TOTALES", total_regiones, "", "", float(total_monto), ""])
+    
+    for cell in ws[totales_row]:
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+
+    # Formato moneda
+    for row in range(2, ws.max_row + 1):
+        ws.cell(row=row, column=9).number_format = '$#,##0.00'
+
+    # Ajustar columnas
+    for column in ws.columns:
+        max_length = max(len(str(cell.value)) for cell in column) + 2
+        ws.column_dimensions[column[0].column_letter].width = min(max_length, 50)
+
+    # ======== SHEET 2: GUARDIAS ========
+    if guardias.exists():
+        ws_guardias = wb.create_sheet(title="Guardias")
+        
+        headers_guardias = ["Fecha", "Tipo", "Monto", "Observaciones"]
+        ws_guardias.append(headers_guardias)
+        
+        # Estilo encabezados
+        for cell in ws_guardias[1]:
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+            cell.font = Font(bold=True, color="FFFFFF")
+        
+        total_guardias = 0
+        for guardia in guardias:
+            ws_guardias.append([
+                guardia.fecha_guardia.strftime("%d/%m/%Y"),
+                guardia.get_tipo_guardia_display(),
+                float(guardia.monto),
+                guardia.observaciones or ""
+            ])
+            total_guardias += guardia.monto
+        
+        # Totales guardias
+        ws_guardias.append([])
+        totales_row_g = ws_guardias.max_row + 1
+        ws_guardias.append(["", "TOTAL", float(total_guardias), ""])
+        
+        for cell in ws_guardias[totales_row_g]:
+            cell.font = Font(bold=True)
+            cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        
+        # Formato moneda
+        for row in range(2, ws_guardias.max_row + 1):
+            ws_guardias.cell(row=row, column=3).number_format = '$#,##0.00'
+        
+        # Ajustar columnas
+        for column in ws_guardias.columns:
+            max_length = max(len(str(cell.value)) for cell in column) + 2
+            ws_guardias.column_dimensions[column[0].column_letter].width = min(max_length, 40)
+        
+        # Total general en sheet prácticas
+        ws.append([])
+        ws.append(["", "", "", "", "TOTAL GENERAL (Prácticas + Guardias)", "", "", "", float(total_monto + total_guardias), ""])
+        for cell in ws[ws.max_row]:
+            cell.font = Font(bold=True, size=12)
+            cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+        ws.cell(row=ws.max_row, column=9).number_format = '$#,##0.00'
+
+    # Preparar respuesta HTTP
+    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    response["Content-Disposition"] = f'attachment; filename="liquidacion_completa_{nombre_medico}_{mes}_{año}.xlsx"'
+    wb.save(response)
+    return response
 
 # A continuación, se agrega el formulario para carga masiva de estudios
 
