@@ -825,16 +825,12 @@ def generar_pdf_liquidacion(request):
 
 def exportar_excel_liquidacion(request):
     """
-    Exportar liquidación completa a Excel - v3.0 UNIFICADA
+    Exportar liquidación completa a Excel - v3.1 UNIFICADA (Una sola solapa)
     
-    Incluye:
+    Incluye en una sola hoja:
     - Todas las prácticas (ECO + RAD + TOM + RES)
     - Guardias pasivas
     - Total general
-    
-    Sheets del Excel:
-    1. "Prácticas" - Todas las prácticas ordenadas por fecha
-    2. "Guardias" - Guardias pasivas del período
     """
     medico_id = request.GET.get('medico')
     mes = request.GET.get('mes')
@@ -869,28 +865,26 @@ def exportar_excel_liquidacion(request):
 
     # Crear libro de Excel
     wb = openpyxl.Workbook()
-    
-    # ======== SHEET 1: PRÁCTICAS ========
     ws = wb.active
-    ws.title = "Prácticas"
+    ws.title = "Liquidación Completa"
 
-    # Encabezados
-    headers = [
+    # ======== SECCIÓN: PRÁCTICAS ========
+    # Encabezados prácticas
+    headers_practicas = [
         "Fecha", "Paciente", "DNI", "Estudios", 
         "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus"
     ]
-    ws.append(headers)
+    ws.append(headers_practicas)
 
-    # Estilo encabezados
+    # Estilo encabezados prácticas
     for cell in ws[1]:
         cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
 
-    # Agregar registros
+    # Agregar registros de prácticas
     total_regiones = 0
-    total_monto = 0
+    total_monto_practicas = 0
     
     for registro in registros.order_by('-fecha_del_informe'):
         estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
@@ -911,75 +905,100 @@ def exportar_excel_liquidacion(request):
         ])
         
         total_regiones += registro.cantidad_regiones
-        total_monto += registro.monto_calculado
+        total_monto_practicas += registro.monto_calculado
 
     # Fila de totales prácticas
     ws.append([])
-    totales_row = ws.max_row + 1
-    ws.append(["", "", "", "", "TOTALES", total_regiones, "", "", float(total_monto), ""])
+    totales_practicas_row = ws.max_row + 1
+    ws.append(["", "", "", "", "SUBTOTAL PRÁCTICAS", total_regiones, "", "", float(total_monto_practicas), ""])
     
-    for cell in ws[totales_row]:
+    for cell in ws[totales_practicas_row]:
         cell.font = Font(bold=True)
         cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    
+    ws.cell(row=totales_practicas_row, column=9).number_format = '$#,##0.00'
 
-    # Formato moneda
-    for row in range(2, ws.max_row + 1):
-        ws.cell(row=row, column=9).number_format = '$#,##0.00'
-
-    # Ajustar columnas
-    for column in ws.columns:
-        max_length = max(len(str(cell.value)) for cell in column) + 2
-        ws.column_dimensions[column[0].column_letter].width = min(max_length, 50)
-
-    # ======== SHEET 2: GUARDIAS ========
+    # ======== SECCIÓN: GUARDIAS ========
+    total_monto_guardias = 0
+    
     if guardias.exists():
-        ws_guardias = wb.create_sheet(title="Guardias")
+        # Espaciado
+        ws.append([])
+        ws.append([])
         
-        headers_guardias = ["Fecha", "Tipo", "Monto", "Observaciones"]
-        ws_guardias.append(headers_guardias)
+        # Encabezados guardias
+        headers_guardias = ["Fecha", "Tipo de Guardia", "Monto", "Observaciones"]
+        header_row = ws.max_row + 1
+        ws.append(headers_guardias)
         
-        # Estilo encabezados
-        for cell in ws_guardias[1]:
+        # Estilo encabezados guardias
+        for col_num, cell in enumerate(ws[header_row], 1):
             cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
             cell.font = Font(bold=True, color="FFFFFF")
+            cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
         
-        total_guardias = 0
+        # Agregar guardias
         for guardia in guardias:
-            ws_guardias.append([
+            ws.append([
                 guardia.fecha_guardia.strftime("%d/%m/%Y"),
                 guardia.get_tipo_guardia_display(),
                 float(guardia.monto),
                 guardia.observaciones or ""
             ])
-            total_guardias += guardia.monto
+            total_monto_guardias += guardia.monto
         
         # Totales guardias
-        ws_guardias.append([])
-        totales_row_g = ws_guardias.max_row + 1
-        ws_guardias.append(["", "TOTAL", float(total_guardias), ""])
+        ws.append([])
+        totales_guardias_row = ws.max_row + 1
+        ws.append(["", "SUBTOTAL GUARDIAS", float(total_monto_guardias), ""])
         
-        for cell in ws_guardias[totales_row_g]:
+        for cell in ws[totales_guardias_row]:
             cell.font = Font(bold=True)
             cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
         
-        # Formato moneda
-        for row in range(2, ws_guardias.max_row + 1):
-            ws_guardias.cell(row=row, column=3).number_format = '$#,##0.00'
+        ws.cell(row=totales_guardias_row, column=3).number_format = '$#,##0.00'
+
+    # ======== TOTAL GENERAL ========
+    ws.append([])
+    ws.append([])
+    total_general_row = ws.max_row + 1
+    ws.append(["", "", "", "", "TOTAL GENERAL", "", "", "", float(total_monto_practicas + total_monto_guardias), ""])
+    
+    for cell in ws[total_general_row]:
+        cell.font = Font(bold=True, size=12)
+        cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
+    
+    ws.cell(row=total_general_row, column=9).number_format = '$#,##0.00'
+
+    # ======== FORMATO DE MONEDA EN TODAS LAS FILAS ========
+    # Columna 9 (Monto) en sección de prácticas
+    for row in range(2, totales_practicas_row):
+        ws.cell(row=row, column=9).number_format = '$#,##0.00'
+    
+    # Columna 3 (Monto) en sección de guardias si existen
+    if guardias.exists():
+        guardias_start = header_row + 1
+        guardias_end = totales_guardias_row - 1
+        for row in range(guardias_start, guardias_end + 1):
+            ws.cell(row=row, column=3).number_format = '$#,##0.00'
+
+    # ======== AJUSTE AUTOMÁTICO DE ANCHO DE COLUMNAS ========
+    for column_cells in ws.columns:
+        length = 0
+        column_letter = column_cells[0].column_letter
         
-        # Ajustar columnas
-        for column in ws_guardias.columns:
-            max_length = max(len(str(cell.value)) for cell in column) + 2
-            ws_guardias.column_dimensions[column[0].column_letter].width = min(max_length, 40)
+        for cell in column_cells:
+            try:
+                if cell.value:
+                    cell_length = len(str(cell.value))
+                    if cell_length > length:
+                        length = cell_length
+            except:
+                pass
         
-        # Total general en sheet prácticas
-        ws.append([])
-        ws.append(["", "", "", "", "TOTAL GENERAL (Prácticas + Guardias)", "", "", "", float(total_monto + total_guardias), ""])
-        for cell in ws[ws.max_row]:
-            cell.font = Font(bold=True, size=12)
-            cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
-        ws.cell(row=ws.max_row, column=9).number_format = '$#,##0.00'
+        # Ajustar ancho con margen adicional
+        adjusted_width = (length + 3)
+        ws.column_dimensions[column_letter].width = adjusted_width
 
     # Preparar respuesta HTTP
     response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
