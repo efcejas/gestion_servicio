@@ -101,17 +101,6 @@
     </div>
     {% endif %}
 
-    <!-- Mensajes -->
-    {% if messages %}
-    <div class="mb-6 space-y-3">
-        {% for message in messages %}
-        <div class="{% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% elif message.tags == 'warning' %}bg-yellow-50 border-yellow-200 text-yellow-800{% elif message.tags == 'success' %}bg-green-50 border-green-200 text-green-800{% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %} border rounded-xl p-4">
-            <p class="text-sm font-medium">{{ message }}</p>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
     <!-- Formulario -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
         <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
@@ -203,42 +192,63 @@
         </h2>
         
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for guardia in guardias %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {{ guardia.fecha_guardia|date:"d/m/Y" }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 py-1 text-xs font-semibold rounded-full {% if guardia.tipo_guardia == 'COBER' %}bg-blue-100 text-blue-800{% else %}bg-green-100 text-green-800{% endif %}">
-                                {{ guardia.get_tipo_guardia_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                            ${{ guardia.monto|floatformat:0 }}
-                        </td>
-                        <td class="px-6 py-4 text-sm text-gray-500">
-                            {{ guardia.observaciones|default:"-" }}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot class="bg-gray-50">
-                    <tr>
-                        <td colspan="2" class="px-6 py-4 text-sm font-bold text-gray-900">TOTAL</td>
-                        <td class="px-6 py-4 text-sm font-bold text-gray-900 text-right">${{ total_monto_guardias_mes|floatformat:0 }}</td>
-                        <td class="px-6 py-4"></td>
-                    </tr>
-                </tfoot>
+            <table class="w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>
+                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for guardia in guardias %}
+                <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {{ guardia.fecha_guardia|date:"d/m/Y" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-full {% if guardia.tipo_guardia == 'COBER' %}bg-blue-100 text-blue-800{% else %}bg-green-100 text-green-800{% endif %}">
+                    {{ guardia.get_tipo_guardia_display }}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                    ${{ guardia.monto|floatformat:0 }}
+                </td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    {{ guardia.observaciones|default:"-" }}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-center">
+                    <div class="flex items-center justify-center space-x-2">
+                        {% if puede_registrar %}
+                        <a href="{% url 'liquidacion:editar_guardia_pasiva' guardia.pk %}" 
+                           class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
+                           title="Editar guardia">
+                            <i class="fas fa-edit mr-1"></i>Editar
+                        </a>
+                        <a href="{% url 'liquidacion:eliminar_guardia_pasiva' guardia.pk %}" 
+                           class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition-colors shadow-sm"
+                           title="Eliminar guardia">
+                            <i class="fas fa-trash mr-1"></i>Eliminar
+                        </a>
+                        {% else %}
+                        <span class="text-xs text-gray-400">
+                            <i class="fas fa-lock mr-1"></i>Sesión cerrada
+                        </span>
+                        {% endif %}
+                    </div>
+                </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-gray-50">
+                <tr>
+                <td colspan="2" class="px-6 py-4 text-sm font-bold text-gray-900">TOTAL</td>
+                <td class="px-6 py-4 text-sm font-bold text-gray-900 text-right">${{ total_monto_guardias_mes|floatformat:0 }}</td>
+                <td colspan="2" class="px-6 py-4"></td>
+                </tr>
+            </tfoot>
             </table>
         </div>
     </div>

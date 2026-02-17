@@ -333,6 +333,126 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
         return response
 
 
+class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
+    """
+    Vista para editar guardias pasivas
+    Solo el médico que creó la guardia puede editarla
+    """
+    model = GuardiaPasiva
+    form_class = GuardiaPasivaForm
+    template_name = 'liquidacion/guardia_pasiva_update.html'
+    success_url = reverse_lazy('liquidacion:registrar_guardia_pasiva')
+    success_message = "✅ Guardia pasiva actualizada correctamente"
+
+    def dispatch(self, request, *args, **kwargs):
+        # Solo médicos pueden editar guardias
+        if not request.user.es_medico():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Solo puede editar sus propias guardias
+        return GuardiaPasiva.objects.filter(medico=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        guardia = self.object
+        
+        # Sesión contable de la guardia
+        context['sesion_contable'] = guardia.sesion_contable
+        context['puede_editar'] = guardia.sesion_contable.puede_registrar_practicas(self.request.user)
+        
+        return context
+
+    def form_valid(self, form):
+        guardia = self.object
+        user = self.request.user
+        fecha_guardia = form.cleaned_data['fecha_guardia']
+        
+        # Validar que la sesión permita editar
+        sesion = guardia.sesion_contable
+        if not sesion.puede_registrar_practicas(user):
+            messages.error(
+                self.request,
+                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes editar guardias."
+            )
+            return redirect(self.success_url)
+        
+        # Verificar duplicados (excluyendo esta misma guardia)
+        if GuardiaPasiva.objects.filter(
+            medico=user, 
+            fecha_guardia=fecha_guardia
+        ).exclude(pk=guardia.pk).exists():
+            messages.warning(
+                self.request,
+                f"⚠️ Ya tienes registrada otra guardia para el día {fecha_guardia.strftime('%d/%m/%Y')}."
+            )
+            return redirect(self.success_url)
+        
+        return super().form_valid(form)
+
+
+class GuardiaPasivaDeleteView(LoginRequiredMixin, DeleteView):
+    """
+    Vista para eliminar guardias pasivas
+    Solo el médico que creó la guardia puede eliminarla
+    """
+    model = GuardiaPasiva
+    template_name = 'liquidacion/guardia_pasiva_confirm_delete.html'
+    success_url = reverse_lazy('liquidacion:registrar_guardia_pasiva')
+
+    def dispatch(self, request, *args, **kwargs):
+        # Solo médicos pueden eliminar guardias
+        if not request.user.es_medico():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        # Solo puede eliminar sus propias guardias
+        return GuardiaPasiva.objects.filter(medico=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        guardia = self.object
+        
+        # Sesión contable de la guardia
+        context['sesion_contable'] = guardia.sesion_contable
+        context['puede_eliminar'] = guardia.sesion_contable.puede_registrar_practicas(self.request.user)
+        
+        return context
+
+    def delete(self, request, *args, **kwargs):
+        guardia = self.get_object()
+        user = request.user
+        
+        # Validar que la sesión permita eliminar
+        sesion = guardia.sesion_contable
+        if not sesion.puede_registrar_practicas(user):
+            messages.error(
+                request,
+                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes eliminar guardias."
+            )
+            return redirect(self.success_url)
+        
+        # Guardar datos para el mensaje antes de eliminar
+        fecha = guardia.fecha_guardia.strftime('%d/%m/%Y')
+        tipo = guardia.get_tipo_guardia_display()
+        monto = guardia.monto
+        
+        response = super().delete(request, *args, **kwargs)
+        
+        messages.success(
+            request,
+            f"🗑️ Guardia eliminada | Fecha: {fecha} | Tipo: {tipo} | Monto: ${monto}"
+        )
+        
+        return response
+
+
 User = get_user_model()
 
 class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
@@ -538,9 +658,18 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         fecha = self.object.fecha_del_informe
         
         # Determinar el tipo de estudio para mantener la solapa activa
-        tipo_estudio = 'otros'  # Por defecto
-        if self.object.estudio.filter(tipo='ECO').exists():
+        tipos = set(self.object.estudio.values_list('tipo', flat=True))
+        
+        if 'ECO' in tipos:
             tipo_estudio = 'ecografias'
+        elif 'RAD' in tipos:
+            tipo_estudio = 'radiologia'
+        elif 'TOM' in tipos:
+            tipo_estudio = 'tomografia'
+        elif 'RES' in tipos:
+            tipo_estudio = 'resonancia'
+        else:
+            tipo_estudio = 'otros'
         
         query_string = urlencode({
             'mes': fecha.month, 
@@ -552,11 +681,41 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
 class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroEstudiosPorMedico
     template_name = 'liquidacion/registroestudios_confirm_delete_tailwind.html'
-    success_url = reverse_lazy('liquidacion:registroestudios_list')
 
     def get_queryset(self):
         # Limita los registros a los del usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
+
+    def get_success_url(self):
+        # Mantener el filtro de mes/año y tipo de estudio tras eliminar
+        registro = self.object
+        fecha = registro.fecha_del_informe
+        
+        # Determinar el tipo de estudio para mantener la solapa activa
+        tipos = set(registro.estudio.values_list('tipo', flat=True))
+        
+        if 'ECO' in tipos:
+            tipo_estudio = 'ecografias'
+        elif 'RAD' in tipos:
+            tipo_estudio = 'radiologia'
+        elif 'TOM' in tipos:
+            tipo_estudio = 'tomografia'
+        elif 'RES' in tipos:
+            tipo_estudio = 'resonancia'
+        else:
+            tipo_estudio = 'otros'
+        
+        query_string = urlencode({
+            'mes': fecha.month,
+            'año': fecha.year,
+            'tipo_estudio': tipo_estudio
+        })
+        return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
+
+    def delete(self, request, *args, **kwargs):
+        registro = self.get_object()
+        messages.success(request, "✅ Registro eliminado correctamente.")
+        return super().delete(request, *args, **kwargs)
 
 # ============================================================
 # [ANULADO - 16 de febrero 2026]

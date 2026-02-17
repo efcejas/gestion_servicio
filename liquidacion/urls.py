@@ -11,6 +11,8 @@ from .views import (
     exportar_excel_liquidacion,  # [NUEVO v3.0] Exportación unificada
     # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
     RegistrarGuardiaPasivaView,  # [NUEVO v2.0]
+    GuardiaPasivaUpdateView,  # [NUEVO v3.2]
+    GuardiaPasivaDeleteView,  # [NUEVO v3.2]
     CargaMasivaView,
     PortalLiquidacionInicioView
 )
@@ -45,6 +47,8 @@ urlpatterns = [
 
     # Rutas nuevas v2.0
     path('guardia-pasiva/nuevo/', RegistrarGuardiaPasivaView.as_view(), name='registrar_guardia_pasiva'),
+    path('guardia-pasiva/editar/<int:pk>/', GuardiaPasivaUpdateView.as_view(), name='editar_guardia_pasiva'),
+    path('guardia-pasiva/eliminar/<int:pk>/', GuardiaPasivaDeleteView.as_view(), name='eliminar_guardia_pasiva'),
 
     # Ruta para generar PDF
     path('generar-pdf/', generar_pdf_liquidacion, name='generar_pdf_liquidacion'),
