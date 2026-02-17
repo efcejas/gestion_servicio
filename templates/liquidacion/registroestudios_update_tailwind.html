@@ -128,6 +128,14 @@
                                          data-value="RES">
                                         Resonancia Magnética
                                     </div>
+                                    <div class="px-4 py-2 hover:bg-purple-50 cursor-pointer transition-colors text-gray-700"
+                                         data-value="DOP">
+                                        Doppler
+                                    </div>
+                                    <div class="px-4 py-2 hover:bg-purple-50 cursor-pointer transition-colors text-gray-700"
+                                         data-value="MAM">
+                                        Mamografía
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -211,25 +219,41 @@
                 </div>
 
                 <!-- Obra Social -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-hospital text-green-500 mr-1"></i>Obra Social *
+                <div class="mb-4" id="obra-social-section">
+                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                        <i class="fas fa-hospital text-green-500 mr-1"></i>Tipo de Obra Social <span class="text-red-500">*</span>
                     </label>
-                    <div class="flex flex-wrap gap-4">
-                        {% for choice in form.tipo_obra_social %}
-                        <label class="inline-flex items-center">
-                            {{ choice.tag }}
-                            <span class="ml-2 text-gray-700">{{ choice.choice_label }}</span>
+                    <div class="grid grid-cols-2 gap-3" id="obra-social-radios-update">
+                        <label id="label-cober-update" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                            <input type="radio" name="tipo_obra_social" value="COBER" id="id_tipo_obra_social_cober_update" class="sr-only" {% if form.tipo_obra_social.value == 'COBER' %}checked{% endif %}>
+                            <div class="text-center">
+                                <i class="fas fa-hospital text-2xl text-blue-600 mb-2"></i>
+                                <p class="font-semibold text-gray-900">COBER</p>
+                                <p class="text-xs text-gray-600 mt-1">Cobertura principal</p>
+                            </div>
+                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                <i class="fas fa-check text-white text-xs hidden"></i>
+                            </div>
                         </label>
-                        {% endfor %}
+                        <label id="label-otras-update" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+                            <input type="radio" name="tipo_obra_social" value="OTRAS_OS" id="id_tipo_obra_social_otras_update" class="sr-only" {% if form.tipo_obra_social.value == 'OTRAS_OS' %}checked{% endif %}>
+                            <div class="text-center">
+                                <i class="fas fa-shield-alt text-2xl text-green-600 mb-2"></i>
+                                <p class="font-semibold text-gray-900">OTRAS OS</p>
+                                <p class="text-xs text-gray-600 mt-1">Otras obras sociales</p>
+                            </div>
+                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                <i class="fas fa-check text-white text-xs hidden"></i>
+                            </div>
+                        </label>
                     </div>
                     {% if form.tipo_obra_social.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ form.tipo_obra_social.errors.0 }}</p>
                     {% endif %}
                 </div>
 
-                <!-- Bonus Urgencia (solo para RM) -->
-                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <!-- Bonus Urgencia (solo para RM + médicos remotos) -->
+                <div class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4" id="bonus-urgencia-section" style="display: none;">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">
                             {{ form.paciente_internado }}
@@ -289,6 +313,7 @@
     const estudiosData = JSON.parse('{{ estudios|escapejs }}');
     const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
     const estudiosSeleccionadosIds = {{ estudios_seleccionados|safe }};
+    const trabajaRemoto = {{ trabaja_remoto|yesno:"true,false" }};
 
     document.addEventListener('DOMContentLoaded', function() {
         // ✅ Las clases Tailwind ya están aplicadas desde el formulario Django (sin parpadeo)
@@ -304,8 +329,65 @@
         const estudioDropdown = document.getElementById('estudio-dropdown');
         const estudiosSeleccionadosContainer = document.getElementById('estudios-seleccionados');
         const emptyMessage = document.getElementById('empty-message');
+        const obraSocialSection = document.getElementById('obra-social-section');
+        const bonusUrgenciaSection = document.getElementById('bonus-urgencia-section');
 
         let estudiosActualesSeleccionados = [...estudiosSeleccionadosIds];
+
+        // === FUNCIÓN PARA ACTUALIZAR VISIBILIDAD DE SECCIONES ===
+        function actualizarVisibilidadSecciones() {
+            if (estudiosActualesSeleccionados.length === 0) {
+                // Sin estudios, ocultar todo
+                obraSocialSection.style.display = 'none';
+                bonusUrgenciaSection.style.display = 'none';
+                return;
+            }
+
+            // Verificar si algún estudio tiene precio diferenciado (NO precio único)
+            const hayPrecioDiferenciado = estudiosActualesSeleccionados.some(id => {
+                const estudio = estudiosData.find(e => e.id === id);
+                return estudio && !estudio.precio_unico;
+            });
+
+            // Verificar si algún estudio es Resonancia Magnética
+            const hayResonancia = estudiosActualesSeleccionados.some(id => {
+                const estudio = estudiosData.find(e => e.id === id);
+                return estudio && estudio.tipo === 'RES';
+            });
+
+            // MOSTRAR/OCULTAR OBRA SOCIAL
+            // Solo mostrar si hay estudios con precio diferenciado
+            if (hayPrecioDiferenciado) {
+                obraSocialSection.style.display = 'block';
+                // Hacer campos requeridos
+                document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
+                    radio.required = true;
+                });
+            } else {
+                obraSocialSection.style.display = 'none';
+                // Si no se muestra, quitar required y pre-seleccionar OTRAS_OS
+                document.querySelectorAll('input[name="tipo_obra_social"]').forEach((radio, idx) => {
+                    radio.required = false;
+                    // Seleccionar el segundo radio (OTRAS_OS)
+                    if (idx === 1) radio.checked = true;
+                });
+            }
+
+            // MOSTRAR/OCULTAR BONUS URGENCIA
+            // Solo mostrar si:
+            // 1. Hay Resonancia Magnética
+            // 2. Y el médico trabaja remoto
+            if (hayResonancia && trabajaRemoto) {
+                bonusUrgenciaSection.style.display = 'block';
+            } else {
+                bonusUrgenciaSection.style.display = 'none';
+                // Desmarcar checkbox si se oculta
+                const checkboxInternado = document.getElementById('{{ form.paciente_internado.id_for_label }}');
+                if (checkboxInternado) {
+                    checkboxInternado.checked = false;
+                }
+            }
+        }
 
         // === TIPO DE ESTUDIO DROPDOWN ===
         tipoEstudioButton.addEventListener('click', function(e) {
@@ -322,7 +404,9 @@
                     'ECO': 'Ecografía',
                     'RAD': 'Radiografía',
                     'TOM': 'Tomografía',
-                    'RES': 'Resonancia Magnética'
+                    'RES': 'Resonancia Magnética',
+                    'DOP': 'Doppler',
+                    'MAM': 'Mamografía'
                 };
                 
                 tipoEstudioSelect.value = value;
@@ -373,6 +457,7 @@
         window.removerEstudio = function(id) {
             estudiosActualesSeleccionados = estudiosActualesSeleccionados.filter(estId => estId !== id);
             renderizarEstudiosSeleccionados();
+            actualizarVisibilidadSecciones(); // Actualizar visibilidad al remover
         };
 
         // Variables para navegación por teclado
@@ -410,6 +495,7 @@
                         if (!estudiosActualesSeleccionados.includes(id)) {
                             estudiosActualesSeleccionados.push(id);
                             renderizarEstudiosSeleccionados();
+                            actualizarVisibilidadSecciones(); // Actualizar visibilidad al agregar
                             estudioSearch.value = '';
                             estudioDropdown.classList.add('hidden');
                         }
@@ -538,11 +624,19 @@
                 'ECO': 'Ecografía',
                 'RAD': 'Radiografía',
                 'TOM': 'Tomografía',
-                'RES': 'Resonancia Magnética'
+                'RES': 'Resonancia Magnética',
+                'DOP': 'Doppler',
+                'MAM': 'Mamografía'
             };
             tipoEstudioText.textContent = textos[tipoEstudioSeleccionado] || 'Seleccione';
             cargarEstudios(tipoEstudioSeleccionado);
         }
+        
+        // Actualizar visibilidad inicial basada en datos precargados
+        actualizarVisibilidadSecciones();
+        
+        // Actualizar estilos visuales iniciales de radio buttons obra social
+        actualizarEstilosRadioOS();
     });
 </script>
 {% endblock %}

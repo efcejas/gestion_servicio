@@ -175,6 +175,14 @@
                                                      data-value="RES">
                                                     Resonancia Magnética
                                                 </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="DOP">
+                                                    Doppler
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="MAM">
+                                                    Mamografía
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -260,27 +268,27 @@
                                     <label class="block text-sm font-semibold text-gray-700 mb-3">
                                         Tipo de Obra Social <span class="text-red-500">*</span>
                                     </label>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <label class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50">
-                                            <input type="radio" name="tipo_obra_social" value="COBER" id="id_tipo_obra_social_cober" class="peer sr-only" required>
+                                    <div class="grid grid-cols-2 gap-3" id="obra-social-radios">
+                                        <label id="label-cober" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                                            <input type="radio" name="tipo_obra_social" value="COBER" id="id_tipo_obra_social_cober" class="sr-only" required>
                                             <div class="text-center">
                                                 <i class="fas fa-hospital text-2xl text-blue-600 mb-2"></i>
                                                 <p class="font-semibold text-gray-900">COBER</p>
                                                 <p class="text-xs text-gray-600 mt-1">Cobertura principal</p>
                                             </div>
-                                            <div class="absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 peer-checked:border-blue-600 peer-checked:bg-blue-600 flex items-center justify-center">
-                                                <i class="fas fa-check text-white text-xs hidden peer-checked:block"></i>
+                                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                                <i class="fas fa-check text-white text-xs hidden"></i>
                                             </div>
                                         </label>
-                                        <label class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all has-[:checked]:border-green-600 has-[:checked]:bg-green-50">
-                                            <input type="radio" name="tipo_obra_social" value="OTRAS_OS" id="id_tipo_obra_social_otras" class="peer sr-only" required>
+                                        <label id="label-otras" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+                                            <input type="radio" name="tipo_obra_social" value="OTRAS_OS" id="id_tipo_obra_social_otras" class="sr-only" required checked>
                                             <div class="text-center">
                                                 <i class="fas fa-shield-alt text-2xl text-green-600 mb-2"></i>
                                                 <p class="font-semibold text-gray-900">OTRAS OS</p>
                                                 <p class="text-xs text-gray-600 mt-1">Otras obras sociales</p>
                                             </div>
-                                            <div class="absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 peer-checked:border-green-600 peer-checked:bg-green-600 flex items-center justify-center">
-                                                <i class="fas fa-check text-white text-xs hidden peer-checked:block"></i>
+                                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                                <i class="fas fa-check text-white text-xs hidden"></i>
                                             </div>
                                         </label>
                                     </div>
@@ -561,7 +569,9 @@ document.addEventListener('DOMContentLoaded', function() {
         'ECO': { icon: 'fa-ultrasound', text: 'Ecografía', color: 'text-blue-500' },
         'RAD': { icon: 'fa-x-ray', text: 'Radiografía', color: 'text-green-500' },
         'TOM': { icon: 'fa-hospital', text: 'Tomografía', color: 'text-purple-500' },
-        'RES': { icon: 'fa-magnet', text: 'Resonancia Magnética', color: 'text-red-500' }
+        'RES': { icon: 'fa-magnet', text: 'Resonancia Magnética', color: 'text-red-500' },
+        'DOP': { icon: 'fa-heartbeat', text: 'Doppler', color: 'text-teal-500' },
+        'MAM': { icon: 'fa-stethoscope', text: 'Mamografía', color: 'text-pink-500' }
     };
     
     // Toggle dropdown tipo de estudio
@@ -617,6 +627,54 @@ document.addEventListener('DOMContentLoaded', function() {
     // Variables de usuario (necesarias para visibilidad de secciones)
     const esStaff = {{ es_staff|lower }};
     const trabajaRemoto = {{ trabaja_remoto|lower }};
+    
+    // === FUNCIÓN PARA ACTUALIZAR ESTILOS VISUALES DE RADIO BUTTONS OBRA SOCIAL ===
+    function actualizarEstilosRadioOS() {
+        const radioCober = document.getElementById('id_tipo_obra_social_cober');
+        const radioOtras = document.getElementById('id_tipo_obra_social_otras');
+        const labelCober = document.getElementById('label-cober');
+        const labelOtras = document.getElementById('label-otras');
+        
+        if (!radioCober || !radioOtras || !labelCober || !labelOtras) return;
+        
+        // Resetear estilos
+        [labelCober, labelOtras].forEach(label => {
+            label.classList.remove('border-blue-600', 'bg-blue-50', 'border-green-600', 'bg-green-50');
+            label.classList.add('border-gray-300');
+            const check = label.querySelector('.radio-check');
+            const icon = check.querySelector('i');
+            check.classList.remove('border-blue-600', 'bg-blue-600', 'border-green-600', 'bg-green-600');
+            check.classList.add('border-gray-400');
+            icon.classList.add('hidden');
+        });
+        
+        // Aplicar estilos al seleccionado
+        if (radioCober.checked) {
+            labelCober.classList.remove('border-gray-300');
+            labelCober.classList.add('border-blue-600', 'bg-blue-50');
+            const check = labelCober.querySelector('.radio-check');
+            const icon = check.querySelector('i');
+            check.classList.remove('border-gray-400');
+            check.classList.add('border-blue-600', 'bg-blue-600');
+            icon.classList.remove('hidden');
+        } else if (radioOtras.checked) {
+            labelOtras.classList.remove('border-gray-300');
+            labelOtras.classList.add('border-green-600', 'bg-green-50');
+            const check = labelOtras.querySelector('.radio-check');
+            const icon = check.querySelector('i');
+            check.classList.remove('border-gray-400');
+            check.classList.add('border-green-600', 'bg-green-600');
+            icon.classList.remove('hidden');
+        }
+    }
+    
+    // Escuchar cambios en radio buttons de obra social
+    document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            actualizarEstilosRadioOS();
+            calcularMontoTiempoReal();
+        });
+    });
     
     let estudiosSeleccionadosIds = [];
     let estudiosFiltrados = [];
@@ -727,6 +785,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Recalcular monto
         calcularMontoTiempoReal();
+        
+        // Actualizar estilos visuales de radio buttons
+        actualizarEstilosRadioOS();
     }
 
     // Variables para navegación por teclado
@@ -1100,6 +1161,9 @@ document.addEventListener('DOMContentLoaded', function() {
     newFields.forEach(field => {
         field.classList.add('w-full', 'px-4', 'py-2.5', 'border', 'border-gray-300', 'rounded-lg', 'focus:ring-2', 'focus:ring-blue-500', 'focus:border-blue-500', 'transition-all', 'text-gray-700');
     });
+    
+    // Actualizar estilos visuales iniciales de radio buttons obra social
+    actualizarEstilosRadioOS();
 });
 </script>
 {% endblock %}

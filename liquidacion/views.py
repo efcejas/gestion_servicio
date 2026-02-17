@@ -642,10 +642,19 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         registro = self.object
 
-        # JSON para Select2 con todos los estudios (id, nombre, tipo)
-        context['estudios'] = json.dumps(
-            list(Estudios.objects.values('id', 'nombre', 'tipo'))
-        )
+        # Serializar estudios para JS (con todos los datos necesarios)
+        estudios_data = []
+        for estudio in Estudios.objects.filter(activo=True).values(
+            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os', 
+            'precio_unico', 'conteo_regiones_default'
+        ):
+            estudio_dict = dict(estudio)
+            # Convertir Decimals a string para JSON
+            estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
+            estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudios_data.append(estudio_dict)
+        
+        context['estudios'] = json.dumps(estudios_data)
 
         # Estudios y tipo preseleccionado
         if registro and registro.estudio.exists():
@@ -654,6 +663,9 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         else:
             context['tipo_estudio_seleccionado'] = ''
             context['estudios_seleccionados'] = []
+        
+        # Información del médico para lógica condicional
+        context['trabaja_remoto'] = self.request.user.trabaja_remoto
 
         # URL del botón cancelar: vuelve a la lista con mes/año filtrados
         fecha = registro.fecha_del_informe
