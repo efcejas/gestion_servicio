@@ -137,6 +137,19 @@ class PracticaForm(forms.ModelForm):
         # Formato de fecha
         self.fields['fecha_del_informe'].input_formats = ['%Y-%m-%d']
 
+        # FIX: Pre-seleccionar Obra Social para evitar opción vacía "-----"
+        if self.instance.pk:
+            # Edición: usar valor actual o default si está vacío
+            self.fields['tipo_obra_social'].initial = (
+                self.instance.tipo_obra_social or 'OTRAS_OS'
+            )
+        else:
+            # Creación: usar default
+            self.fields['tipo_obra_social'].initial = 'OTRAS_OS'
+        
+        # Hacer campo required para evitar envío vacío
+        self.fields['tipo_obra_social'].required = True
+
         # Horario se asigna automáticamente en models.RegistroEstudiosPorMedico.save()
 
     def clean_cantidad_regiones(self):

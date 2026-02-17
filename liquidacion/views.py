@@ -669,17 +669,13 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         fecha = self.object.fecha_del_informe
         
         # Determinar el tipo de estudio para mantener la solapa activa
+        # Solo hay 2 pestañas: 'ecografias' y 'otros' (RAD/TOM/RES)
         tipos = set(self.object.estudio.values_list('tipo', flat=True))
         
         if 'ECO' in tipos:
             tipo_estudio = 'ecografias'
-        elif 'RAD' in tipos:
-            tipo_estudio = 'radiologia'
-        elif 'TOM' in tipos:
-            tipo_estudio = 'tomografia'
-        elif 'RES' in tipos:
-            tipo_estudio = 'resonancia'
         else:
+            # Cualquier otro tipo (RAD, TOM, RES, etc.) va a 'otros'
             tipo_estudio = 'otros'
         
         query_string = urlencode({
@@ -703,17 +699,13 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
         fecha = registro.fecha_del_informe
         
         # Determinar el tipo de estudio para mantener la solapa activa
+        # Solo hay 2 pestañas: 'ecografias' y 'otros' (RAD/TOM/RES)
         tipos = set(registro.estudio.values_list('tipo', flat=True))
         
         if 'ECO' in tipos:
             tipo_estudio = 'ecografias'
-        elif 'RAD' in tipos:
-            tipo_estudio = 'radiologia'
-        elif 'TOM' in tipos:
-            tipo_estudio = 'tomografia'
-        elif 'RES' in tipos:
-            tipo_estudio = 'resonancia'
         else:
+            # Cualquier otro tipo (RAD, TOM, RES, etc.) va a 'otros'
             tipo_estudio = 'otros'
         
         query_string = urlencode({

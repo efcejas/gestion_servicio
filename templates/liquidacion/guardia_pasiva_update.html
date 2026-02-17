@@ -88,7 +88,8 @@
         <form method="post" class="space-y-6">
             {% csrf_token %}
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Campos principales en grid de 3 columnas (desktop) -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                 <!-- Fecha -->
                 <div>
                     <label for="{{ form.fecha_guardia.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
@@ -103,11 +104,18 @@
 
                 <!-- Tipo de Guardia -->
                 <div>
-                    <label for="{{ form.tipo_guardia.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="fas fa-tag text-indigo-500 mr-1"></i>
                         Tipo de Guardia
                     </label>
-                    {{ form.tipo_guardia }}
+                    <div class="flex flex-wrap gap-4">
+                        {% for choice in form.tipo_guardia %}
+                        <label class="inline-flex items-center cursor-pointer">
+                            {{ choice.tag }}
+                            <span class="ml-2 text-gray-700">{{ choice.choice_label }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
                     {% if form.tipo_guardia.errors %}
                     <p class="mt-1 text-sm text-red-600">{{ form.tipo_guardia.errors.0 }}</p>
                     {% endif %}
@@ -124,19 +132,21 @@
                     <p class="mt-1 text-sm text-red-600">{{ form.monto.errors.0 }}</p>
                     {% endif %}
                 </div>
-
-                <!-- Observaciones -->
-                <div class="md:col-span-2">
-                    <label for="{{ form.observaciones.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-comment-alt text-indigo-500 mr-1"></i>
-                        Observaciones (opcional)
-                    </label>
-                    {{ form.observaciones }}
-                    {% if form.observaciones.errors %}
-                    <p class="mt-1 text-sm text-red-600">{{ form.observaciones.errors.0 }}</p>
-                    {% endif %}
-                </div>
             </div>
+
+            <!-- Observaciones separadas (full width) -->
+            <div class="mb-6">
+                <label for="{{ form.observaciones.id_for_label }}" class="block text-sm font-semibold text-gray-700 mb-2">
+                    <i class="fas fa-comment-alt text-indigo-500 mr-1"></i>
+                    Observaciones (opcional)
+                </label>
+                {{ form.observaciones }}
+                {% if form.observaciones.errors %}
+                <p class="mt-1 text-sm text-red-600">{{ form.observaciones.errors.0 }}</p>
+                {% endif %}
+            </div>
+            
+            <div>
 
             <!-- Botones -->
             <div class="flex items-center justify-between pt-6 border-t border-gray-200">
