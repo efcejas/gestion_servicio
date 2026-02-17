@@ -7,11 +7,7 @@ from .views import (
     RegistroEstudiosPorMedicoUpdateView,
     RegistroEstudiosPorMedicoDeleteView,
     generar_pdf_liquidacion,
-    InformadosPorMedicoPorMesListView,  # [DEPRECADO v3.0] - Usar LiquidacionPorMedicoPorMesListView
-    EcografiasPorMedicoPorMesListView,  # [DEPRECADO v3.0] - Usar LiquidacionPorMedicoPorMesListView
     LiquidacionPorMedicoPorMesListView,  # [NUEVO v3.0] Vista unificada
-    exportar_excel_informes,  # [DEPRECADO v3.0] - Usar exportar_excel_liquidacion
-    exportar_excel_ecografias,  # [DEPRECADO v3.0] - Usar exportar_excel_liquidacion
     exportar_excel_liquidacion,  # [NUEVO v3.0] Exportación unificada
     # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
     RegistrarGuardiaPasivaView,  # [NUEVO v2.0]
@@ -35,14 +31,6 @@ urlpatterns = [
     # [NUEVO v3.0 - VISTA UNIFICADA RECOMENDADA]
     path('liquidacion-mensual/', LiquidacionPorMedicoPorMesListView.as_view(), name='liquidacion_mensual'),
     path('exportar_excel_liquidacion/', exportar_excel_liquidacion, name='exportar_excel_liquidacion'),
-    
-    # [Mantenidas por compatibilidad - Considerar deprecar]
-    path('informados-por-medico-por-mes/', InformadosPorMedicoPorMesListView.as_view(), name='informados_por_medico_por_mes'),
-    path('ecografias-por-medico-por-mes/', EcografiasPorMedicoPorMesListView.as_view(), name='ecografias_por_medico_por_mes'),
-    # [ELIMINADO - 16 feb 2026] path('procedimientos-por-medico-por-mes/', ProcedimientosPorMedicoPorMesListView.as_view(), ...),
-    path('exportar_excel_informes/', exportar_excel_informes, name='exportar_excel_informes'),
-    path('exportar_excel_ecografias/', exportar_excel_ecografias, name='exportar_excel_ecografias'),
-    # [ELIMINADO - 16 feb 2026] path('exportar_excel_procedimientos/', exportar_excel_procedimientos, ...),
 
     # ===== RUTAS INTERNAS (Requieren Login) =====
     path('estudios/nuevo/', EstudiosCreateView.as_view(), name='estudios_nuevo'),
