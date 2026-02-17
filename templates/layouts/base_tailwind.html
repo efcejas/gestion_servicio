@@ -162,7 +162,7 @@
                 {% endif %}
 
                 <!-- Registro de estudios - Para médicos -->
-                {% if user.es_medico or user.is_superuser %}
+                {% if user.is_superuser %}
                 {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}
                 {% if nuevo_estudio_url %}
                 <a href="{{ nuevo_estudio_url }}" 
