@@ -589,7 +589,7 @@ class InformadosPorMedicoPorMesListView(TemplateView):
             ).distinct()
 
             # Filtrar guardias pasivas
-            guardias = GuardiasPasivas.objects.all()
+            guardias = GuardiaPasiva.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
@@ -597,14 +597,14 @@ class InformadosPorMedicoPorMesListView(TemplateView):
 
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-                guardias = guardias.filter(fecha__year=int(año), fecha__month=int(mes))
+                guardias = guardias.filter(fecha_guardia__year=int(año), fecha_guardia__month=int(mes))
 
             # Agrupar registros por médico
             for registro in registros.order_by('-fecha_del_informe'):
                 registros_por_medico[registro.medico].append(registro)
             
             # Agrupar guardias por médico
-            for guardia in guardias.order_by('-fecha'):
+            for guardia in guardias.order_by('-fecha_guardia'):
                 guardias_por_medico[guardia.medico].append(guardia)
 
         # Preparar el contexto con datos por médico
@@ -663,7 +663,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             dias_sin_pacientes = []  # Empty list since DiaSinPacientes is deprecated for Colegiales
             
             # Filtrar guardias pasivas
-            guardias = GuardiasPasivas.objects.all()
+            guardias = GuardiaPasiva.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
@@ -672,13 +672,13 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
 
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-                guardias = guardias.filter(fecha__year=int(año), fecha__month=int(mes))
+                guardias = guardias.filter(fecha_guardia__year=int(año), fecha_guardia__month=int(mes))
                 # dias_sin_pacientes ya es una lista vacía, no se filtra
 
             for registro in registros.order_by('-fecha_del_informe'):
                 registros_por_medico[registro.medico].append(registro)
             
-            for guardia in guardias.order_by('-fecha'):
+            for guardia in guardias.order_by('-fecha_guardia'):
                 guardias_por_medico[guardia.medico].append(guardia)
 
             for dia in dias_sin_pacientes:
