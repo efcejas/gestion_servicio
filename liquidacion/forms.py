@@ -31,7 +31,7 @@ class PracticaForm(forms.ModelForm):
         choices=[('', 'Seleccione modalidad')] + list(Estudios.TIPO_ESTUDIO_CHOICES),
         required=True,
         label="Modalidad",
-        widget=forms.Select(attrs={'class': TAILWIND_SELECT_CLASSES, 'id': 'id_tipo_estudio'}),
+        widget=forms.Select(attrs={'class': 'hidden', 'id': 'id_tipo_estudio'}),
     )
 
     class Meta:

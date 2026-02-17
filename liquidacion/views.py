@@ -653,6 +653,17 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         messages.success(self.request, "El registro fue actualizado correctamente.")
         return super().form_valid(form)
 
+    def form_invalid(self, form):
+        # Mostrar errores del formulario al usuario
+        for field, errors in form.errors.items():
+            for error in errors:
+                if field == '__all__':
+                    messages.error(self.request, f"Error: {error}")
+                else:
+                    field_label = form.fields.get(field).label if field in form.fields else field
+                    messages.error(self.request, f"{field_label}: {error}")
+        return super().form_invalid(form)
+
     def get_success_url(self):
         # Redirige a la lista con el mes y año del registro actualizado
         fecha = self.object.fecha_del_informe
