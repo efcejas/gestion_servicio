@@ -161,6 +161,20 @@
                 </a>
                 {% endif %}
 
+                <!-- Registro de estudios - Para médicos -->
+                {% if user.es_medico or user.is_superuser %}
+                {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}
+                {% if nuevo_estudio_url %}
+                <a href="{{ nuevo_estudio_url }}" 
+                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'liquidacion' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name == 'registroestudios_nuevo' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                    <i class="fas fa-notes-medical mr-2 group-hover:scale-110 transition-transform"></i>Registro de Estudios
+                    {% if 'liquidacion' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name == 'registroestudios_nuevo' %}
+                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                    {% endif %}
+                </a>
+                {% endif %}
+                {% endif %}
+
                 <!-- Protocolos - Para usuarios con acceso (residentes, médicos, técnicos) -->
                 {% if user.puede_acceder_protocolos %}
                 {% url 'protocolos:elegir' as protocolos_url %}
