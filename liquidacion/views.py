@@ -576,6 +576,7 @@ class InformadosPorMedicoPorMesListView(TemplateView):
         context['form'] = form
 
         registros_por_medico = defaultdict(list)
+        guardias_por_medico = defaultdict(list)
 
         if form.is_valid():
             medico = form.cleaned_data.get('medico')
@@ -587,26 +588,47 @@ class InformadosPorMedicoPorMesListView(TemplateView):
                 Prefetch('estudio', queryset=Estudios.objects.all())
             ).distinct()
 
+            # Filtrar guardias pasivas
+            guardias = GuardiasPasivas.objects.all()
+
             if medico:
                 registros = registros.filter(medico=medico)
+                guardias = guardias.filter(medico=medico)
 
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
+                guardias = guardias.filter(fecha__year=int(año), fecha__month=int(mes))
 
             # Agrupar registros por médico
             for registro in registros.order_by('-fecha_del_informe'):
                 registros_por_medico[registro.medico].append(registro)
+            
+            # Agrupar guardias por médico
+            for guardia in guardias.order_by('-fecha'):
+                guardias_por_medico[guardia.medico].append(guardia)
 
         # Preparar el contexto con datos por médico
         medico_data = []
-        for medico, registros in registros_por_medico.items():
+        todos_medicos = set(registros_por_medico.keys()) | set(guardias_por_medico.keys())
+        
+        for medico in todos_medicos:
+            registros = registros_por_medico.get(medico, [])
+            guardias = guardias_por_medico.get(medico, [])
+            
             total_regiones = sum(registro.cantidad_regiones for registro in registros)
             total_monto = sum(registro.monto_calculado for registro in registros)
+            total_guardias = len(guardias)
+            total_monto_guardias = sum(guardia.monto for guardia in guardias)
+            
             medico_data.append({
                 'medico': medico,
                 'registros': registros,
+                'guardias': guardias,
                 'total_regiones': total_regiones,
                 'total_monto': total_monto,
+                'total_guardias': total_guardias,
+                'total_monto_guardias': total_monto_guardias,
+                'total_general': total_monto + total_monto_guardias,
             })
 
         context['medico_data'] = medico_data
@@ -624,6 +646,7 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
 
         registros_por_medico = defaultdict(list)
         dias_sin_pacientes_por_medico = defaultdict(list)
+        guardias_por_medico = defaultdict(list)
         mostrar_totales_con_complemento = False
         fecha_minima = date(date.today().year, 3, 1)
 
@@ -636,28 +659,37 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
                 mostrar_totales_con_complemento = True
 
             registros = RegistroEstudiosPorMedico.objects.filter(estudio__tipo='ECO').distinct()
-            # [DEPRECADO] DiaSinPacientes no se usa en Colegiales
-            # dias_sin_pacientes = DiaSinPacientes.objects.all()
+            # [DEPRECADO] DiaSinPacientes no se usa en Colegiales - Inicializar como QuerySet vacío
+            dias_sin_pacientes = []  # Empty list since DiaSinPacientes is deprecated for Colegiales
+            
+            # Filtrar guardias pasivas
+            guardias = GuardiasPasivas.objects.all()
 
             if medico:
                 registros = registros.filter(medico=medico)
-                dias_sin_pacientes = dias_sin_pacientes.filter(medico=medico)
+                guardias = guardias.filter(medico=medico)
+                # dias_sin_pacientes ya es una lista vacía, no se filtra
 
             if mes and año:
                 registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-                dias_sin_pacientes = dias_sin_pacientes.filter(fecha__year=int(año), fecha__month=int(mes))
+                guardias = guardias.filter(fecha__year=int(año), fecha__month=int(mes))
+                # dias_sin_pacientes ya es una lista vacía, no se filtra
 
             for registro in registros.order_by('-fecha_del_informe'):
                 registros_por_medico[registro.medico].append(registro)
+            
+            for guardia in guardias.order_by('-fecha'):
+                guardias_por_medico[guardia.medico].append(guardia)
 
             for dia in dias_sin_pacientes:
                 dias_sin_pacientes_por_medico[dia.medico].append(dia)
 
         medico_data = []
-        todos_medicos = set(registros_por_medico.keys()) | set(dias_sin_pacientes_por_medico.keys())
+        todos_medicos = set(registros_por_medico.keys()) | set(dias_sin_pacientes_por_medico.keys()) | set(guardias_por_medico.keys())
 
         for medico in todos_medicos:
             registros = registros_por_medico.get(medico, [])
+            guardias = guardias_por_medico.get(medico, [])
             registros_por_dia = defaultdict(list)
             for registro in registros:
                 registros_por_dia[registro.fecha_del_informe].append(registro)
@@ -702,10 +734,14 @@ class EcografiasPorMedicoPorMesListView(TemplateView):
             medico_data.append({
                 'medico': medico,
                 'dias': dias,
+                'guardias': guardias,
                 'total_regiones_mes': total_regiones_mes,
                 'total_complemento_mes': total_complemento_mes,
                 'total_a_pagar_mes': total_regiones_mes + total_complemento_mes,
                 'total_monto_mes': total_monto_mes,
+                'total_guardias': len(guardias),
+                'total_monto_guardias': sum(g.monto for g in guardias),
+                'total_general': total_monto_mes + sum(g.monto for g in guardias),
             })
 
         context['medico_data'] = medico_data
