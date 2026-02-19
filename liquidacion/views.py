@@ -522,16 +522,19 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['mes_num'] = mes
         context['año_num'] = año
 
-        # Filtrar registros del usuario logueado usando sesión contable
+        # CAMBIO v3.3: Filtrar por fecha_del_informe (cuando se hizo) en lugar de sesión_contable (cuando se registró)
+        # Esto permite ver estudios atrasados en el mes que realmente se realizaron
         registros = RegistroEstudiosPorMedico.objects.filter(
             medico=self.request.user,
-            sesion_contable=sesion
+            fecha_del_informe__year=año,
+            fecha_del_informe__month=mes
         ).prefetch_related('estudio')
 
-        # Obtener guardias pasivas del mes
+        # Obtener guardias pasivas del mes (por fecha de guardia, no sesión)
         guardias = GuardiaPasiva.objects.filter(
             medico=self.request.user,
-            sesion_contable=sesion
+            fecha_guardia__year=año,
+            fecha_guardia__month=mes
         ).order_by('-fecha_guardia')
 
         # Obtener parámetros de ordenamiento y filtros
