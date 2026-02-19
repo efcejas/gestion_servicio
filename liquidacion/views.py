@@ -4,7 +4,7 @@ from django.views.generic import ListView, CreateView, TemplateView, UpdateView,
 from django.views.generic.edit import FormView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum, Count, Q, Prefetch
 from django.http import FileResponse, HttpResponse
 from django.contrib.auth import get_user_model
@@ -756,9 +756,11 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
 # VISTA UNIFICADA - v3.0 (Feb 2026)
 # ========================================
 
-class LiquidacionPorMedicoPorMesListView(TemplateView):
+class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """
     Vista unificada de liquidación mensual - Todas las prácticas + Guardias
+    
+    PERMISOS: Solo administrativos, jefes de servicio y superusuarios
     
     Muestra en un solo portal:
     - Todas las prácticas (ECO + RAD + TOM + RES)
@@ -771,6 +773,21 @@ class LiquidacionPorMedicoPorMesListView(TemplateView):
     - Cálculo de regiones faltantes
     """
     template_name = 'liquidacion/liquidacion_por_medico_por_mes_tailwind.html'
+    
+    def test_func(self):
+        """Solo administrativos, jefe de servicio, y superusuarios"""
+        return (
+            self.request.user.is_superuser or 
+            self.request.user.rol in ['administrativo', 'jefe_servicio', 'jefe_residentes', 'instructor_residentes']
+        )
+    
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para acceder a esta vista. '
+            'Esta sección está disponible solo para personal administrativo y coordinadores.'
+        )
+        return redirect('home')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -729,6 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
         actualizarSelectOriginal();
         renderizarEstudiosSeleccionados();
         actualizarVisibilidadSecciones();
+        actualizarCantidadRegiones(); // Recalcular regiones
     };
 
     // Función para agregar estudio
@@ -738,9 +739,33 @@ document.addEventListener('DOMContentLoaded', function() {
             actualizarSelectOriginal();
             renderizarEstudiosSeleccionados();
             actualizarVisibilidadSecciones();
+            actualizarCantidadRegiones(); // Recalcular regiones
         }
         estudioSearch.value = '';
         estudioDropdown.classList.add('hidden');
+    }
+
+    // Función para actualizar automáticamente cantidad de regiones
+    function actualizarCantidadRegiones() {
+        if (estudiosSeleccionadosIds.length === 0) {
+            return; // No cambiar si no hay estudios
+        }
+        
+        // Sumar conteo_regiones_default de todos los estudios seleccionados
+        let totalRegiones = 0;
+        estudiosSeleccionadosIds.forEach(id => {
+            const estudio = estudios.find(e => e.id === id);
+            if (estudio && estudio.conteo_regiones_default) {
+                totalRegiones += estudio.conteo_regiones_default;
+            }
+        });
+        
+        // Actualizar el campo cantidad_regiones
+        const campoRegiones = document.getElementById('id_cantidad_regiones');
+        if (campoRegiones && totalRegiones > 0) {
+            campoRegiones.value = totalRegiones;
+            calcularMontoTiempoReal(); // Recalcular monto
+        }
     }
 
     // Función para actualizar visibilidad de secciones según estudios seleccionados

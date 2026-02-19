@@ -463,7 +463,30 @@
             estudiosActualesSeleccionados = estudiosActualesSeleccionados.filter(estId => estId !== id);
             renderizarEstudiosSeleccionados();
             actualizarVisibilidadSecciones(); // Actualizar visibilidad al remover
+            actualizarCantidadRegiones(); // Recalcular regiones
         };
+
+        // Función para actualizar automáticamente cantidad de regiones
+        function actualizarCantidadRegiones() {
+            if (estudiosActualesSeleccionados.length === 0) {
+                return; // No cambiar si no hay estudios
+            }
+            
+            // Sumar conteo_regiones_default de todos los estudios seleccionados
+            let totalRegiones = 0;
+            estudiosActualesSeleccionados.forEach(id => {
+                const estudio = estudiosData.find(e => e.id === id);
+                if (estudio && estudio.conteo_regiones_default) {
+                    totalRegiones += estudio.conteo_regiones_default;
+                }
+            });
+            
+            // Actualizar el campo cantidad_regiones
+            const campoRegiones = document.getElementById('id_cantidad_regiones');
+            if (campoRegiones && totalRegiones > 0) {
+                campoRegiones.value = totalRegiones;
+            }
+        }
 
         // Variables para navegación por teclado
         let currentFocusIndex = -1;
@@ -501,6 +524,7 @@
                             estudiosActualesSeleccionados.push(id);
                             renderizarEstudiosSeleccionados();
                             actualizarVisibilidadSecciones(); // Actualizar visibilidad al agregar
+                            actualizarCantidadRegiones(); // Recalcular regiones
                             estudioSearch.value = '';
                             estudioDropdown.classList.add('hidden');
                         }
@@ -602,6 +626,8 @@
                         if (!estudiosActualesSeleccionados.includes(id)) {
                             estudiosActualesSeleccionados.push(id);
                             renderizarEstudiosSeleccionados();
+                            actualizarVisibilidadSecciones(); // Actualizar visibilidad
+                            actualizarCantidadRegiones(); // Recalcular regiones
                             estudioSearch.value = '';
                             estudioDropdown.classList.add('hidden');
                         }
