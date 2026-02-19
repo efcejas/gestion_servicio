@@ -395,7 +395,7 @@ class RegistroEstudiosPorMedico(models.Model):
     cantidad_regiones = models.PositiveIntegerField(
         default=1,
         verbose_name='Cantidad de Regiones',
-        help_text='Solo números enteros, no se fraccionan'
+        help_text='Campo informativo. Suma automática de las regiones de cada estudio seleccionado.'
     )
     
     TIPO_OS_CHOICES = [
@@ -505,8 +505,9 @@ class RegistroEstudiosPorMedico(models.Model):
         if precio_base_total == Decimal('0.00'):
             return Decimal('0.00')
         
-        # 2. Multiplicar por regiones (precio total de todos los estudios * regiones)
-        subtotal = precio_base_total * self.cantidad_regiones
+        # 2. El precio_base_total YA incluye todos los estudios con sus regiones
+        # cantidad_regiones es solo informativo, NO se multiplica
+        subtotal = precio_base_total
         
         # 3. Aplicar porcentaje según horario
         if self.medico.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente']:
@@ -590,9 +591,9 @@ class RegistroEstudiosPorMedico(models.Model):
         desglose = {
             'estudio': ', '.join(estudios_nombres),  # Concatenar todos los nombres
             'codigo': ', '.join(codigos) if codigos else 'N/A',
-            'precio_base': precio_base_total,
-            'regiones': self.cantidad_regiones,
-            'subtotal': subtotal,
+            'precio_base': precio_base_total,  # Ya incluye todas las regiones de cada estudio
+            'regiones': self.cantidad_regiones,  # Informativo
+            'subtotal': subtotal,  # Igual a precio_base (sin multiplicación)
             'tipo_os': self.get_tipo_obra_social_display(),
             'horario': self.get_horario_display(),
             'porcentaje': f"{int(porcentaje * 100)}%",

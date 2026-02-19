@@ -119,7 +119,7 @@ class PracticaForm(forms.ModelForm):
             'fecha_hora_informe': 'Fecha/Hora Informe',
         }
         help_texts = {
-            'cantidad_regiones': 'Número entero (1, 2, 3...). No se permiten fracciones.',
+            'cantidad_regiones': 'Se calcula automáticamente sumando las regiones de cada estudio seleccionado. Puedes ajustar manualmente si es necesario.',
             'paciente_internado': 'Solo para estudios de Resonancia Magnética (RM) con médicos remotos. Bonus +20% si informe <24hs.',
         }
 
