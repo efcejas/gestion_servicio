@@ -1048,31 +1048,44 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Obtener precio del primer estudio seleccionado (para simplificar)
-        const primerEstudio = estudiosData.find(e => e.id === estudiosSelIds[0]);
-        if (!primerEstudio) {
+        // Calcular precio base sumando TODOS los estudios seleccionados
+        let precioBase = 0;
+        let necesitaTipoOS = false;
+        let primerEstudio = null;
+        
+        for (const estudioId of estudiosSelIds) {
+            const estudio = estudiosData.find(e => e.id === estudioId);
+            if (!estudio) continue;
+            
+            // Guardar primer estudio para verificar bonus después
+            if (!primerEstudio) {
+                primerEstudio = estudio;
+            }
+            
+            // Determinar precio del estudio actual
+            if (estudio.precio_unico) {
+                // Si es precio único, no importa tipo_obra_social
+                precioBase += parseFloat(estudio.precio_cober);
+            } else {
+                necesitaTipoOS = true;
+                // Si hay diferencia de precios, necesitamos que seleccione tipo_obra_social
+                if (!tipoOS) {
+                    document.getElementById('monto-preview').textContent = '$0.00';
+                    document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
+                    return;
+                }
+                precioBase += tipoOS === 'COBER' 
+                    ? parseFloat(estudio.precio_cober) 
+                    : parseFloat(estudio.precio_otras_os);
+            }
+        }
+        
+        if (precioBase === 0 || !primerEstudio) {
             document.getElementById('monto-preview').textContent = '$0.00';
             return;
         }
         
-        // Determinar precio base
-        let precioBase;
-        if (primerEstudio.precio_unico) {
-            // Si es precio único, no importa tipo_obra_social
-            precioBase = parseFloat(primerEstudio.precio_cober);
-        } else {
-            // Si hay diferencia de precios, necesitamos que seleccione tipo_obra_social
-            if (!tipoOS) {
-                document.getElementById('monto-preview').textContent = '$0.00';
-                document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
-                return;
-            }
-            precioBase = tipoOS === 'COBER' 
-                ? parseFloat(primerEstudio.precio_cober) 
-                : parseFloat(primerEstudio.precio_otras_os);
-        }
-        
-        // Calcular subtotal
+        // Calcular subtotal (precio base de todos los estudios * cantidad de regiones)
         let subtotal = precioBase * cantidadRegiones;
         
         // Aplicar porcentaje horario (solo para residentes)
