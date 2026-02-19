@@ -492,20 +492,21 @@ class RegistroEstudiosPorMedico(models.Model):
         if not self.estudio.exists():
             return Decimal('0.00')
         
-        # Tomar el primer estudio (en v2.0 será FK, no M2M)
-        try:
-            estudio_obj = self.estudio.first()
-        except:
+        # Calcular precio base sumando TODOS los estudios seleccionados
+        precio_base_total = Decimal('0.00')
+        
+        for estudio_obj in self.estudio.all():
+            # Precio según OS para cada estudio
+            if self.tipo_obra_social == 'COBER':
+                precio_base_total += estudio_obj.precio_cober
+            else:
+                precio_base_total += estudio_obj.precio_otras_os
+        
+        if precio_base_total == Decimal('0.00'):
             return Decimal('0.00')
         
-        # 1. Precio base según OS
-        if self.tipo_obra_social == 'COBER':
-            precio_base = estudio_obj.precio_cober
-        else:
-            precio_base = estudio_obj.precio_otras_os
-        
-        # 2. Multiplicar por regiones
-        subtotal = precio_base * self.cantidad_regiones
+        # 2. Multiplicar por regiones (precio total de todos los estudios * regiones)
+        subtotal = precio_base_total * self.cantidad_regiones
         
         # 3. Aplicar porcentaje según horario
         if self.medico.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente']:
@@ -567,18 +568,29 @@ class RegistroEstudiosPorMedico(models.Model):
         if not self.estudio.exists():
             return {}
         
-        estudio_obj = self.estudio.first()
-        precio_base = (estudio_obj.precio_cober if self.tipo_obra_social == 'COBER' 
-                      else estudio_obj.precio_otras_os)
+        # Calcular precio base sumando TODOS los estudios
+        precio_base_total = Decimal('0.00')
+        estudios_nombres = []
+        codigos = []
         
-        subtotal = precio_base * self.cantidad_regiones
+        for estudio_obj in self.estudio.all():
+            estudios_nombres.append(estudio_obj.nombre)
+            if estudio_obj.codigo:
+                codigos.append(estudio_obj.codigo)
+            
+            if self.tipo_obra_social == 'COBER':
+                precio_base_total += estudio_obj.precio_cober
+            else:
+                precio_base_total += estudio_obj.precio_otras_os
+        
+        subtotal = precio_base_total * self.cantidad_regiones
         porcentaje = 0.5 if self.horario == 'INTRA' else 1.0
         bonus_urgencia = self.calcular_bonus_urgencia()
         
         desglose = {
-            'estudio': estudio_obj.nombre,
-            'codigo': estudio_obj.codigo if estudio_obj.codigo else 'N/A',
-            'precio_base': precio_base,
+            'estudio': ', '.join(estudios_nombres),  # Concatenar todos los nombres
+            'codigo': ', '.join(codigos) if codigos else 'N/A',
+            'precio_base': precio_base_total,
             'regiones': self.cantidad_regiones,
             'subtotal': subtotal,
             'tipo_os': self.get_tipo_obra_social_display(),
