@@ -136,6 +136,10 @@
                                          data-value="MAM">
                                         Mamografía
                                     </div>
+                                    <div class="px-4 py-2 hover:bg-purple-50 cursor-pointer transition-colors text-gray-700"
+                                         data-value="ECOCAR">
+                                        Ecocardiograma
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -406,7 +410,8 @@
                     'TOM': 'Tomografía',
                     'RES': 'Resonancia Magnética',
                     'DOP': 'Doppler',
-                    'MAM': 'Mamografía'
+                    'MAM': 'Mamografía',
+                    'ECOCAR': 'Ecocardiograma'
                 };
                 
                 tipoEstudioSelect.value = value;
@@ -626,7 +631,8 @@
                 'TOM': 'Tomografía',
                 'RES': 'Resonancia Magnética',
                 'DOP': 'Doppler',
-                'MAM': 'Mamografía'
+                'MAM': 'Mamografía',
+                'ECOCAR': 'Ecocardiograma'
             };
             tipoEstudioText.textContent = textos[tipoEstudioSeleccionado] || 'Seleccione';
             cargarEstudios(tipoEstudioSeleccionado);

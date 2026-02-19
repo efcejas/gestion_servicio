@@ -30,9 +30,10 @@ class Estudios(models.Model):
         ('RES', 'Resonancia Magnética'),
         ('DOP', 'Doppler'),
         ('MAM', 'Mamografía'),
+        ('ECOCAR', 'Ecocardiograma'),
     )
     tipo = models.CharField(
-        max_length=3,
+        max_length=6,
         choices=TIPO_ESTUDIO_CHOICES,
         default='ECO',
         verbose_name='Tipo de estudio'
