@@ -147,14 +147,18 @@
                             <td class="px-4 py-3 text-sm text-gray-700" style="min-width: 220px;">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span>{{ registro.estudio.all|join:", " }}</span>
-                                    {% for estudio in registro.estudio.all %}
+                                    {% regroup registro.estudio.all by tipo as estudios_por_tipo %}
+                                    {% for grupo in estudios_por_tipo %}
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap
-                                            {% if estudio.tipo == 'ECO' %}bg-blue-100 text-blue-700
-                                            {% elif estudio.tipo == 'RAD' %}bg-green-100 text-green-700
-                                            {% elif estudio.tipo == 'TOM' %}bg-purple-100 text-purple-700
-                                            {% elif estudio.tipo == 'RES' %}bg-pink-100 text-pink-700
+                                            {% if grupo.grouper == 'ECO' %}bg-blue-100 text-blue-700
+                                            {% elif grupo.grouper == 'RAD' %}bg-green-100 text-green-700
+                                            {% elif grupo.grouper == 'TOM' %}bg-purple-100 text-purple-700
+                                            {% elif grupo.grouper == 'RES' %}bg-pink-100 text-pink-700
+                                            {% elif grupo.grouper == 'DOP' %}bg-cyan-100 text-cyan-700
+                                            {% elif grupo.grouper == 'MAM' %}bg-rose-100 text-rose-700
+                                            {% elif grupo.grouper == 'ECOCAR' %}bg-red-100 text-red-700
                                             {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                            {{ estudio.tipo }}
+                                            {{ grupo.grouper }}{% if grupo.list|length > 1 %} ×{{ grupo.list|length }}{% endif %}
                                         </span>
                                     {% endfor %}
                                     {% if registro.paciente_internado %}
