@@ -192,47 +192,42 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Estudios con Select2 mejorado -->
+                                <!-- Buscar y agregar estudios -->
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Estudios a registrar <span class="text-red-500">*</span>
+                                        Buscar y seleccionar estudios <span class="text-red-500">*</span>
                                     </label>
                                     
-                                    <!-- Select múltiple oculto (mantiene la funcionalidad) -->
+                                    <!-- Barra de búsqueda con dropdown -->
+                                    <div class="relative">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-search absolute left-3 text-gray-400"></i>
+                                            <input 
+                                                type="text" 
+                                                id="estudio-search" 
+                                                placeholder="Buscar estudio para agregar..."
+                                                class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-gray-700"
+                                                autocomplete="off"
+                                            >
+                                        </div>
+                                        
+                                        <!-- Dropdown de resultados -->
+                                        <div id="estudio-dropdown" class="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden">
+                                            <!-- Se llena dinámicamente con JavaScript -->
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Tags de estudios seleccionados -->
+                                    <div id="estudios-seleccionados" class="mt-3 flex flex-wrap gap-2 min-h-[40px] p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                        <div id="empty-message" class="text-sm text-gray-500 italic">
+                                            <i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio arriba, luego busca y agrega los estudios realizados
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Select oculto para el formulario -->
                                     <div class="hidden">
                                         {{ form.estudio }}
                                     </div>
-                                    
-                                    <!-- Interface visual mejorada -->
-                                    <div id="estudio-selector-container" class="relative">
-                                        <!-- Barra de búsqueda -->
-                                        <div class="relative mb-3">
-                                            <input type="text" 
-                                                   id="estudio-search" 
-                                                   placeholder="Buscar estudio para agregar..."
-                                                   class="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
-                                                   disabled>
-                                            <i class="fas fa-search absolute left-3 top-3.5 text-gray-400"></i>
-                                        </div>
-                                        
-                                        <!-- Dropdown de resultados (oculto por defecto) -->
-                                        <div id="estudio-dropdown" 
-                                             class="hidden absolute z-50 left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                        </div>
-                                        
-                                        <!-- Tags de estudios seleccionados -->
-                                        <div id="estudios-seleccionados" 
-                                             class="flex flex-wrap gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg min-h-[60px]">
-                                            <p class="text-sm text-purple-600 italic w-full" id="empty-message">
-                                                <i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar
-                                            </p>
-                                        </div>
-                                    </div>
-                                    
-                                    <p class="text-xs text-gray-500 mt-2">
-                                        <i class="fas fa-lightbulb mr-1 text-yellow-500"></i>
-                                        Puedes seleccionar múltiples estudios si el paciente tiene más de uno
-                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -243,15 +238,12 @@
                                 <i class="fas fa-calendar-check mr-2 text-green-500"></i>Detalles del Registro
                             </h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Cantidad de Regiones <span class="text-red-500">*</span>
-                                    </label>
-                                    {{ form.cantidad_regiones }}
-                                    <p class="text-xs text-gray-500 mt-1">
-                                        <i class="fas fa-magic mr-1 text-purple-600"></i>Se calcula automáticamente. Cada estudio ya incluye su valor completo.
-                                    </p>
-                                </div>
+                                <!-- Campo oculto - se calcula automáticamente -->
+                                <input type="hidden" name="cantidad_regiones" id="id_cantidad_regiones" value="">
+                                
+                                <!-- Container para cantidades de estudios (se llena con JavaScript antes del submit) -->
+                                <div id="cantidades-estudios-container"></div>
+                                
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                                         Fecha del informe <span class="text-red-500">*</span>
@@ -608,7 +600,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // === RESTO DEL CÓDIGO ===
+    // === REST DEL CÓDIGO - VERSIÓN MULTI-ESTUDIO v3.1 ===
+    // Ahora estudio es M2M (múltiples por registro)
     const estudioSelectOriginal = document.getElementById('id_estudio');
     const estudioSearch = document.getElementById('estudio-search');
     const estudioDropdown = document.getElementById('estudio-dropdown');
@@ -616,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const emptyMessage = document.getElementById('empty-message');
     const fechaInput = document.getElementById("id_fecha_del_informe");
 
-    // Establecer la fecha actual si el campo está vacío
+    // Establecer la fecha actual en hora local si el campo está vacío
     if (fechaInput && !fechaInput.value) {
         const hoy = new Date();
         const dia = String(hoy.getDate()).padStart(2, '0');
@@ -628,10 +621,302 @@ document.addEventListener('DOMContentLoaded', function() {
     // Parsear datos
     const estudios = JSON.parse('{{ estudios|escapejs }}');
     const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
+    let estudiosFiltrados = [];
+    let estudiosSeleccionadosIds = [];
+    let estudiosConCantidades = {}; // {id_estudio: cantidad} - CRÍTICO: debe estar declarado
     
     // Variables de usuario (necesarias para visibilidad de secciones)
     const esStaff = {{ es_staff|lower }};
     const trabajaRemoto = {{ trabaja_remoto|lower }};
+    
+    // === FUNCIONES PARA MANEJO DE ESTUDIOS MÚLTIPLES ===
+    
+    // Función para actualizar el select original (hidden)
+    function actualizarSelectOriginal() {
+        Array.from(estudioSelectOriginal.options).forEach(opt => opt.selected = false);
+        estudiosSeleccionadosIds.forEach(id => {
+            const option = Array.from(estudioSelectOriginal.options).find(opt => opt.value == id);
+            if (option) option.selected = true;
+        });
+    }
+
+    // Función para renderizar tags de estudios seleccionados
+    function renderizarEstudiosSeleccionados() {
+        if (estudiosSeleccionadosIds.length === 0) {
+            emptyMessage.classList.remove('hidden');
+            estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
+            return;
+        }
+        
+        emptyMessage.classList.add('hidden');
+        estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
+        
+        estudiosSeleccionadosIds.forEach(id => {
+            const estudio = estudios.find(e => e.id == id);
+            if (!estudio) return;
+            
+            const cantidad = estudiosConCantidades[id] || 1;
+            
+            const tag = document.createElement('div');
+            tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
+            tag.innerHTML = `
+                <i class="fas fa-x-ray"></i>
+                <span>${estudio.nombre}</span>
+                <span class="text-xs opacity-75">×</span>
+                <input type="number" 
+                       min="1" 
+                       max="10" 
+                       value="${cantidad}"
+                       data-estudio-id="${id}"
+                       class="cantidad-estudio w-12 px-1 py-0.5 text-center bg-white/20 border border-white/30 rounded text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
+                       onclick="event.stopPropagation()"
+                       onchange="actualizarCantidadEstudio(${id}, this.value)">
+                <button type="button" 
+                        class="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                        onclick="eliminarEstudio(${id})">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            `;
+            estudiosSeleccionados.appendChild(tag);
+        });
+    }
+
+    // Función global para eliminar estudio
+    window.eliminarEstudio = function(id) {
+        estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
+        delete estudiosConCantidades[id];
+        actualizarSelectOriginal();
+        renderizarEstudiosSeleccionados();
+        actualizarVisibilidadSecciones();
+        actualizarCantidadRegiones();
+    };
+    
+    // Función global para actualizar cantidad de un estudio
+    window.actualizarCantidadEstudio = function(id, cantidad) {
+        const cantidadNum = parseInt(cantidad) || 1;
+        estudiosConCantidades[id] = Math.max(1, Math.min(10, cantidadNum));
+        actualizarCantidadRegiones();
+        calcularMontoTiempoReal(); // Recalcular monto con nueva cantidad
+    };
+
+    // Función para agregar estudio
+    function agregarEstudio(id) {
+        if (!estudiosSeleccionadosIds.includes(id)) {
+            estudiosSeleccionadosIds.push(id);
+            estudiosConCantidades[id] = 1; // Por defecto cantidad = 1
+            actualizarSelectOriginal();
+            renderizarEstudiosSeleccionados();
+            actualizarVisibilidadSecciones();
+            actualizarCantidadRegiones();
+        }
+        estudioSearch.value = '';
+        estudioDropdown.classList.add('hidden');
+    }
+
+    // Función para actualizar automáticamente cantidad de regiones
+    function actualizarCantidadRegiones() {
+        const cantidadRegionesInput = document.getElementById('id_cantidad_regiones');
+        if (!cantidadRegionesInput) return;
+        
+        if (estudiosSeleccionadosIds.length === 0) {
+            cantidadRegionesInput.value = '';
+            calcularMontoTiempoReal(); // Actualizar monto a $0.00
+            return;
+        }
+        
+        // Sumar conteo_regiones_default × cantidad de todos los estudios seleccionados
+        let totalRegiones = 0;
+        estudiosSeleccionadosIds.forEach(id => {
+            const estudio = estudios.find(e => e.id === id);
+            const cantidad = estudiosConCantidades[id] || 1;
+            if (estudio && estudio.conteo_regiones_default) {
+                totalRegiones += (estudio.conteo_regiones_default * cantidad);
+            }
+        });
+        
+        // Asignar el valor calculado al campo oculto
+        cantidadRegionesInput.value = totalRegiones;
+        calcularMontoTiempoReal();
+    }
+
+    // Variables para navegación por teclado
+    let currentFocusIndex = -1;
+    let dropdownItems = [];
+
+    // Función para filtrar y mostrar estudios
+    function filtrarYMostrarEstudios(busqueda) {
+        const busquedaLower = busqueda.toLowerCase();
+        const resultados = estudiosFiltrados.filter(est => 
+            est.nombre.toLowerCase().includes(busquedaLower)
+        );
+
+        estudioDropdown.innerHTML = '';
+        currentFocusIndex = -1;
+        dropdownItems = [];
+        
+        if (resultados.length === 0) {
+            estudioDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 italic">No se encontraron estudios</div>';
+        } else {
+            resultados.forEach((est, index) => {
+                const yaSeleccionado = estudiosSeleccionadosIds.includes(est.id);
+                const item = document.createElement('div');
+                item.className = `dropdown-item px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors flex items-center justify-between ${yaSeleccionado ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}`;
+                item.setAttribute('data-index', index);
+                item.setAttribute('data-estudio-id', est.id);
+                item.innerHTML = `
+                    <span class="flex-1">${est.nombre}</span>
+                    ${yaSeleccionado ? '<i class="fas fa-check text-purple-600"></i>' : ''}
+                `;
+                item.addEventListener('click', () => {
+                    if (!yaSeleccionado) {
+                        agregarEstudio(est.id);
+                    }
+                });
+                estudioDropdown.appendChild(item);
+                dropdownItems.push(item);
+            });
+        }
+        
+        estudioDropdown.classList.remove('hidden');
+    }
+
+    // Función para resaltar item del dropdown
+    function highlightItem(index) {
+        dropdownItems.forEach(item => {
+            item.classList.remove('bg-purple-100');
+            if (!estudiosSeleccionadosIds.includes(parseInt(item.dataset.estudioId))) {
+                item.classList.add('text-gray-700');
+                item.classList.remove('text-purple-700');
+            }
+        });
+        
+        if (index >= 0 && index < dropdownItems.length) {
+            const item = dropdownItems[index];
+            item.classList.add('bg-purple-100', 'text-purple-700');
+            item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+    }
+
+    // Función para cargar estudios según tipo
+    function cargarEstudios(tipoSeleccionado) {
+        estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+        
+        // Actualizar el select original
+        estudioSelectOriginal.innerHTML = '';
+        
+        if (estudiosFiltrados.length === 0) {
+            const option = document.createElement('option');
+            option.textContent = 'No hay estudios disponibles';
+            option.disabled = true;
+            estudioSelectOriginal.appendChild(option);
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'No hay estudios para este tipo';
+        } else {
+            estudiosFiltrados.forEach(est => {
+                const option = document.createElement('option');
+                option.value = est.id;
+                option.textContent = est.nombre;
+                estudioSelectOriginal.appendChild(option);
+            });
+            estudioSearch.disabled = false;
+            estudioSearch.placeholder = 'Buscar estudio para agregar...';
+            emptyMessage.innerHTML = '<i class="fas fa-search mr-1"></i>Busca y selecciona los estudios realizados';
+        }
+        
+        renderizarEstudiosSeleccionados();
+    }
+
+    // Event listeners para búsqueda
+    estudioSearch.addEventListener('input', function() {
+        if (this.value.length > 0) {
+            filtrarYMostrarEstudios(this.value);
+        } else {
+            estudioDropdown.classList.add('hidden');
+        }
+    });
+
+    estudioSearch.addEventListener('focus', function() {
+        if (this.value.length > 0) {
+            filtrarYMostrarEstudios(this.value);
+        }
+    });
+
+    // Navegación por teclado
+    estudioSearch.addEventListener('keydown', function(e) {
+        if (estudioDropdown.classList.contains('hidden') || dropdownItems.length === 0) {
+            return;
+        }
+
+        switch(e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                currentFocusIndex = (currentFocusIndex + 1) % dropdownItems.length;
+                highlightItem(currentFocusIndex);
+                break;
+            
+            case 'ArrowUp':
+                e.preventDefault();
+                currentFocusIndex = currentFocusIndex <= 0 ? dropdownItems.length - 1 : currentFocusIndex - 1;
+                highlightItem(currentFocusIndex);
+                break;
+            
+            case 'Enter':
+                e.preventDefault();
+                if (currentFocusIndex >= 0 && currentFocusIndex < dropdownItems.length) {
+                    const selectedItem = dropdownItems[currentFocusIndex];
+                    const estudioId = parseInt(selectedItem.dataset.estudioId);
+                    if (!estudiosSeleccionadosIds.includes(estudioId)) {
+                        agregarEstudio(estudioId);
+                    }
+                }
+                break;
+            
+            case 'Escape':
+            case 'Tab':
+                estudioDropdown.classList.add('hidden');
+                currentFocusIndex = -1;
+                break;
+        }
+    });
+
+    // Evento cambio de tipo de estudio
+    tipoEstudioSelect.addEventListener('change', function() {
+        const tipoSeleccionado = this.value;
+        estudiosSeleccionadosIds = [];
+        estudiosConCantidades = {}; // Resetear cantidades también
+        
+        if (!tipoSeleccionado) {
+            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
+            emptyMessage.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar';
+            renderizarEstudiosSeleccionados();
+            return;
+        }
+        
+        cargarEstudios(tipoSeleccionado);
+    });
+
+    // Inicialización
+    if (tipoEstudioSeleccionado) {
+        tipoEstudioSelect.value = tipoEstudioSeleccionado;
+        const tipo = tiposIconos[tipoEstudioSeleccionado];
+        if (tipo) {
+            tipoEstudioText.textContent = tipo.text;
+        }
+        cargarEstudios(tipoEstudioSeleccionado);
+    }
+
+    // Cerrar dropdowns al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!tipoEstudioButton.contains(e.target) && !tipoEstudioDropdown.contains(e.target)) {
+            tipoEstudioDropdown.classList.add('hidden');
+            tipoEstudioIcon.classList.remove('rotate-180');
+        }
+        if (!estudioSearch.contains(e.target) && !estudioDropdown.contains(e.target)) {
+            estudioDropdown.classList.add('hidden');
+        }
+    });
     
     // === FUNCIÓN PARA ACTUALIZAR ESTILOS VISUALES DE RADIO BUTTONS OBRA SOCIAL ===
     function actualizarEstilosRadioOS() {
@@ -680,100 +965,18 @@ document.addEventListener('DOMContentLoaded', function() {
             calcularMontoTiempoReal();
         });
     });
-    
-    let estudiosSeleccionadosIds = [];
-    let estudiosFiltrados = [];
 
-    // Función para actualizar el select original (hidden)
-    function actualizarSelectOriginal() {
-        Array.from(estudioSelectOriginal.options).forEach(opt => opt.selected = false);
-        estudiosSeleccionadosIds.forEach(id => {
-            const option = Array.from(estudioSelectOriginal.options).find(opt => opt.value == id);
-            if (option) option.selected = true;
-        });
-    }
-
-    // Función para renderizar tags de estudios seleccionados
-    function renderizarEstudiosSeleccionados() {
-        if (estudiosSeleccionadosIds.length === 0) {
-            emptyMessage.classList.remove('hidden');
-            estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
-            return;
-        }
-        
-        emptyMessage.classList.add('hidden');
-        estudiosSeleccionados.querySelectorAll('.estudio-tag').forEach(tag => tag.remove());
-        
-        estudiosSeleccionadosIds.forEach(id => {
-            const estudio = estudios.find(e => e.id == id);
-            if (!estudio) return;
-            
-            const tag = document.createElement('div');
-            tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
-            tag.innerHTML = `
-                <i class="fas fa-x-ray"></i>
-                <span>${estudio.nombre}</span>
-                <button type="button" 
-                        class="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
-                        onclick="eliminarEstudio(${id})">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
-            `;
-            estudiosSeleccionados.appendChild(tag);
-        });
-    }
-
-    // Función global para eliminar estudio
-    window.eliminarEstudio = function(id) {
-        estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
-        actualizarSelectOriginal();
-        renderizarEstudiosSeleccionados();
-        actualizarVisibilidadSecciones();
-        actualizarCantidadRegiones(); // Recalcular regiones
-    };
-
-    // Función para agregar estudio
-    function agregarEstudio(id) {
-        if (!estudiosSeleccionadosIds.includes(id)) {
-            estudiosSeleccionadosIds.push(id);
-            actualizarSelectOriginal();
-            renderizarEstudiosSeleccionados();
-            actualizarVisibilidadSecciones();
-            actualizarCantidadRegiones(); // Recalcular regiones
-        }
-        estudioSearch.value = '';
-        estudioDropdown.classList.add('hidden');
-    }
-
-    // Función para actualizar automáticamente cantidad de regiones
-    function actualizarCantidadRegiones() {
-        if (estudiosSeleccionadosIds.length === 0) {
-            return; // No cambiar si no hay estudios
-        }
-        
-        // Sumar conteo_regiones_default de todos los estudios seleccionados
-        let totalRegiones = 0;
-        estudiosSeleccionadosIds.forEach(id => {
-            const estudio = estudios.find(e => e.id === id);
-            if (estudio && estudio.conteo_regiones_default) {
-                totalRegiones += estudio.conteo_regiones_default;
-            }
-        });
-        
-        // Actualizar el campo cantidad_regiones
-        const campoRegiones = document.getElementById('id_cantidad_regiones');
-        if (campoRegiones && totalRegiones > 0) {
-            campoRegiones.value = totalRegiones;
-            calcularMontoTiempoReal(); // Recalcular monto
-        }
-    }
-
-    // Función para actualizar visibilidad de secciones según estudios seleccionados
+    // === FUNCIÓN PARA ACTUALIZAR VISIBILIDAD DE SECCIONES ===
     function actualizarVisibilidadSecciones() {
+        const radiosObraSocial = document.querySelectorAll('input[name="tipo_obra_social"]');
+        
         if (estudiosSeleccionadosIds.length === 0) {
-            // Sin estudios seleccionados, ocultar todo
             document.getElementById('tipo-obra-social-section').style.display = 'none';
             document.getElementById('bonus-urgencia-section').style.display = 'none';
+            // Remover required cuando no hay estudios
+            radiosObraSocial.forEach(radio => {
+                radio.removeAttribute('required');
+            });
             return;
         }
 
@@ -791,216 +994,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Mostrar/ocultar secciones
         document.getElementById('tipo-obra-social-section').style.display = hayPrecioDiferenciado ? 'block' : 'none';
-        // Bonus urgencia: solo si hay Resonancia Y el médico trabaja remoto
         document.getElementById('bonus-urgencia-section').style.display = (hayResonancia && trabajaRemoto) ? 'block' : 'none';
         
-        // Si no hay precio diferenciado, establecer un valor por defecto para tipo_obra_social
+        // Si no hay precio diferenciado, establecer valor por defecto
         if (!hayPrecioDiferenciado) {
-            // Desmarcar radios y quitar required
-            document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
+            radiosObraSocial.forEach(radio => {
                 radio.checked = false;
-                radio.required = false;
+                radio.removeAttribute('required');
             });
-            // Establecer valor por defecto (OTRAS_OS) para evitar error de validación
             const radioOtras = document.getElementById('id_tipo_obra_social_otras');
             if (radioOtras) {
                 radioOtras.checked = true;
             }
         } else {
-            // Hacer requerido si hay precio diferenciado
-            document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
-                radio.required = true;
+            radiosObraSocial.forEach(radio => {
+                radio.setAttribute('required', 'required');
             });
         }
         
-        // Recalcular monto
         calcularMontoTiempoReal();
-        
-        // Actualizar estilos visuales de radio buttons
         actualizarEstilosRadioOS();
     }
-
-    // Variables para navegación por teclado
-    let currentFocusIndex = -1;
-    let dropdownItems = [];
-
-    // Función para filtrar y mostrar estudios
-    function filtrarYMostrarEstudios(busqueda) {
-        const busquedaLower = busqueda.toLowerCase();
-        const resultados = estudiosFiltrados.filter(est => 
-            est.nombre.toLowerCase().includes(busquedaLower)
-        );
-
-        estudioDropdown.innerHTML = '';
-        currentFocusIndex = -1;
-        dropdownItems = [];
-        
-        if (resultados.length === 0) {
-            estudioDropdown.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500 italic">No se encontraron estudios</div>';
-        } else {
-            resultados.forEach((est, index) => {
-                const yaSeleccionado = estudiosSeleccionadosIds.includes(est.id);
-                const item = document.createElement('div');
-                item.className = `dropdown-item px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors flex items-center justify-between ${yaSeleccionado ? 'bg-purple-100 text-purple-700' : 'text-gray-700'}`;
-                item.setAttribute('data-index', index);
-                item.setAttribute('data-estudio-id', est.id);
-                item.innerHTML = `
-                    <span class="flex-1">${est.nombre}</span>
-                    ${yaSeleccionado ? '<i class="fas fa-check text-purple-600"></i>' : ''}
-                `;
-                item.addEventListener('click', () => {
-                    if (!yaSeleccionado) {
-                        agregarEstudio(est.id);
-                    }
-                });
-                estudioDropdown.appendChild(item);
-                dropdownItems.push(item);
-            });
-        }
-        
-        estudioDropdown.classList.remove('hidden');
-    }
-
-    // Función para resaltar item del dropdown
-    function highlightItem(index) {
-        // Remover highlight de todos
-        dropdownItems.forEach(item => {
-            item.classList.remove('bg-purple-100');
-            if (!estudiosSeleccionadosIds.includes(parseInt(item.dataset.estudioId))) {
-                item.classList.add('text-gray-700');
-                item.classList.remove('text-purple-700');
-            }
-        });
-        
-        // Agregar highlight al actual
-        if (index >= 0 && index < dropdownItems.length) {
-            const item = dropdownItems[index];
-            item.classList.add('bg-purple-100', 'text-purple-700');
-            item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
-    }
-
-    // Función para cargar estudios según tipo
-    function cargarEstudios(tipoSeleccionado) {
-        estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
-        
-        // Actualizar el select original
-        estudioSelectOriginal.innerHTML = '';
-        
-        if (estudiosFiltrados.length === 0) {
-            const option = document.createElement('option');
-            option.textContent = 'No hay estudios disponibles';
-            option.disabled = true;
-            estudioSelectOriginal.appendChild(option);
-            estudioSearch.disabled = true;
-            estudioSearch.placeholder = 'No hay estudios para este tipo';
-        } else {
-            estudiosFiltrados.forEach(est => {
-                const option = document.createElement('option');
-                option.value = est.id;
-                option.textContent = est.nombre;
-                estudioSelectOriginal.appendChild(option);
-            });
-            estudioSearch.disabled = false;
-            estudioSearch.placeholder = 'Buscar estudio para agregar...';
-            emptyMessage.innerHTML = '<i class="fas fa-search mr-1"></i>Busca y selecciona los estudios realizados';
-        }
-        
-        renderizarEstudiosSeleccionados();
-    }
-
-    // Event listeners
-    estudioSearch.addEventListener('input', function() {
-        if (this.value.length > 0) {
-            filtrarYMostrarEstudios(this.value);
-        } else {
-            estudioDropdown.classList.add('hidden');
-        }
-    });
-
-    estudioSearch.addEventListener('focus', function() {
-        if (this.value.length > 0) {
-            filtrarYMostrarEstudios(this.value);
-        }
-    });
-
-    // Navegación por teclado en dropdown de estudios
-    estudioSearch.addEventListener('keydown', function(e) {
-        if (estudioDropdown.classList.contains('hidden') || dropdownItems.length === 0) {
-            return;
-        }
-
-        switch(e.key) {
-            case 'ArrowDown':
-                e.preventDefault();
-                currentFocusIndex = (currentFocusIndex + 1) % dropdownItems.length;
-                highlightItem(currentFocusIndex);
-                break;
-            
-            case 'ArrowUp':
-                e.preventDefault();
-                currentFocusIndex = currentFocusIndex <= 0 ? dropdownItems.length - 1 : currentFocusIndex - 1;
-                highlightItem(currentFocusIndex);
-                break;
-            
-            case 'Enter':
-                e.preventDefault();
-                if (currentFocusIndex >= 0 && currentFocusIndex < dropdownItems.length) {
-                    const selectedItem = dropdownItems[currentFocusIndex];
-                    const estudioId = parseInt(selectedItem.dataset.estudioId);
-                    if (!estudiosSeleccionadosIds.includes(estudioId)) {
-                        agregarEstudio(estudioId);
-                    }
-                }
-                break;
-            
-            case 'Escape':
-            case 'Tab':
-                estudioDropdown.classList.add('hidden');
-                currentFocusIndex = -1;
-                break;
-        }
-    });
-
-    // Evento cambio de tipo de estudio
-    tipoEstudioSelect.addEventListener('change', function() {
-        const tipoSeleccionado = this.value;
-        estudiosSeleccionadosIds = [];
-        
-        if (!tipoSeleccionado) {
-            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
-            estudioSearch.disabled = true;
-            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
-            emptyMessage.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar';
-            renderizarEstudiosSeleccionados();
-            return;
-        }
-        
-        cargarEstudios(tipoSeleccionado);
-    });
-
-    // Inicialización
-    if (tipoEstudioSeleccionado) {
-        tipoEstudioSelect.value = tipoEstudioSeleccionado;
-        const tipo = tiposIconos[tipoEstudioSeleccionado];
-        if (tipo) {
-            tipoEstudioText.textContent = tipo.text;
-        }
-        cargarEstudios(tipoEstudioSeleccionado);
-    }
-
-    // Cerrar dropdowns al hacer clic fuera
-    document.addEventListener('click', function(e) {
-        // Cerrar dropdown de tipo de estudio
-        if (!tipoEstudioButton.contains(e.target) && !tipoEstudioDropdown.contains(e.target)) {
-            tipoEstudioDropdown.classList.add('hidden');
-            tipoEstudioIcon.classList.remove('rotate-180');
-        }
-        // Cerrar dropdown de estudios
-        if (!estudioSearch.contains(e.target) && !estudioDropdown.contains(e.target)) {
-            estudioDropdown.classList.add('hidden');
-        }
-    });
 
     // Cerrar modales al hacer clic fuera
     document.querySelectorAll('[id$="Modal"]').forEach(modal => {
@@ -1053,7 +1067,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función principal: Calcular monto en tiempo real
     function calcularMontoTiempoReal() {
         // Obtener valores del formulario
-        const cantidadRegiones = parseInt(document.getElementById('id_cantidad_regiones')?.value) || 0;
         const tipoOS = document.querySelector('input[name="tipo_obra_social"]:checked')?.value;
         const pacienteInternado = document.getElementById('id_paciente_internado')?.checked || false;
         const fechaSolicitud = document.getElementById('id_fecha_hora_solicitud')?.value;
@@ -1063,34 +1076,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const horaActual = new Date().getHours();
         const horario = (!esStaff && horaActual >= 8 && horaActual < 17) ? 'INTRA' : 'EXTRA';
         
-        // Obtener estudios seleccionados
-        const estudioSelectOriginal = document.getElementById('id_estudio');
-        const estudiosSelIds = Array.from(estudioSelectOriginal.selectedOptions).map(opt => parseInt(opt.value));
-        
-        if (estudiosSelIds.length === 0 || cantidadRegiones === 0) {
+        // Verificar que haya estudios seleccionados
+        if (estudiosSeleccionadosIds.length === 0) {
             document.getElementById('monto-preview').textContent = '$0.00';
             document.getElementById('monto-desglose').textContent = '';
             return;
         }
         
-        // Calcular precio base sumando TODOS los estudios seleccionados
-        let precioBase = 0;
+        // Calcular precio total sumando TODOS los estudios seleccionados
+        let precioTotal = 0;
         let necesitaTipoOS = false;
         let primerEstudio = null;
         
-        for (const estudioId of estudiosSelIds) {
+        for (const estudioId of estudiosSeleccionadosIds) {
             const estudio = estudiosData.find(e => e.id === estudioId);
             if (!estudio) continue;
+            
+            // Obtener cantidad/multiplicador de este estudio
+            const cantidad = estudiosConCantidades[estudioId] || 1;
             
             // Guardar primer estudio para verificar bonus después
             if (!primerEstudio) {
                 primerEstudio = estudio;
             }
             
-            // Determinar precio del estudio actual
+            // Determinar precio del estudio actual × cantidad
             if (estudio.precio_unico) {
                 // Si es precio único, no importa tipo_obra_social
-                precioBase += parseFloat(estudio.precio_cober);
+                precioTotal += parseFloat(estudio.precio_cober) * cantidad;
             } else {
                 necesitaTipoOS = true;
                 // Si hay diferencia de precios, necesitamos que seleccione tipo_obra_social
@@ -1099,22 +1112,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
                     return;
                 }
-                precioBase += tipoOS === 'COBER' 
+                const precioEstudio = tipoOS === 'COBER' 
                     ? parseFloat(estudio.precio_cober) 
                     : parseFloat(estudio.precio_otras_os);
+                precioTotal += precioEstudio * cantidad;
             }
         }
         
-        if (precioBase === 0 || !primerEstudio) {
+        if (precioTotal === 0 || !primerEstudio) {
             document.getElementById('monto-preview').textContent = '$0.00';
             return;
         }
         
-        // CORRECCIÓN v3.3: precioBase YA es la suma de todos los estudios con sus valores completos
-        // cantidad_regiones es solo informativo, NO se multiplica
-        let subtotal = precioBase;
-        
         // Aplicar porcentaje horario (solo para residentes)
+        let subtotal = precioTotal;
         let porcentajeHorario = 1.0;
         if (!esStaff) {
             if (horario === 'INTRA') {
@@ -1128,8 +1139,14 @@ document.addEventListener('DOMContentLoaded', function() {
         let aplicaBonus = false;
         let mensajeBonus = '';
         
+        // Verificar si algún estudio es Resonancia para bonus
+        const hayResonancia = estudiosSeleccionadosIds.some(id => {
+            const estudio = estudiosData.find(e => e.id === id);
+            return estudio && estudio.tipo === 'RES';
+        });
+        
         // Verificar condiciones para bonus urgencia
-        if (primerEstudio.tipo === 'RES') {
+        if (hayResonancia) {
             if (!trabajaRemoto) {
                 mensajeBonus = 'Bonus no aplica: solo para médicos remotos';
             } else if (!pacienteInternado) {
@@ -1165,7 +1182,7 @@ document.addEventListener('DOMContentLoaded', function() {
             desglose += (desglose ? ' + ' : '') + '20% bonus urgencia';
         }
         // Mostrar mensaje de bonus si hay uno (tanto si aplica como si no)
-        if (mensajeBonus && primerEstudio.tipo === 'RES') {
+        if (mensajeBonus && hayResonancia) {
             desglose += (desglose ? ' | ' : '') + mensajeBonus;
         }
         document.getElementById('monto-desglose').textContent = desglose;
@@ -1194,11 +1211,8 @@ document.addEventListener('DOMContentLoaded', function() {
         fechaInformeInput.addEventListener('change', calcularMontoTiempoReal);
     }
     
-    // Calcular al cambiar estudios seleccionados
-    const estudioSelectCalculator = document.getElementById('id_estudio');
-    if (estudioSelectCalculator) {
-        estudioSelectCalculator.addEventListener('change', calcularMontoTiempoReal);
-    }
+    // El cálculo se dispara automáticamente cuando se agregan/eliminan estudios
+    // mediante las funciones agregarEstudio() y eliminarEstudio()
     
     // Aplicar estilos Tailwind a los nuevos campos
     const newFields = document.querySelectorAll('#id_cantidad_regiones, #id_fecha_hora_solicitud, #id_fecha_hora_informe');
@@ -1208,6 +1222,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Actualizar estilos visuales iniciales de radio buttons obra social
     actualizarEstilosRadioOS();
+    
+    // === ENVIAR CANTIDADES AL BACKEND ===
+    const form = document.getElementById('registroForm');
+    form.addEventListener('submit', function(e) {
+        // Limpiar container de cantidades
+        const container = document.getElementById('cantidades-estudios-container');
+        container.innerHTML = '';
+        
+        // Crear input hidden por cada estudio con su cantidad
+        for (const [estudioId, cantidad] of Object.entries(estudiosConCantidades)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = `cantidad_estudio_${estudioId}`;
+            input.value = cantidad;
+            container.appendChild(input);
+        }
+    });
 });
 </script>
 {% endblock %}

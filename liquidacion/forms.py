@@ -24,8 +24,8 @@ TAILWIND_RADIO_CLASSES = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-ind
 
 class PracticaForm(forms.ModelForm):
     """
-    Formulario para registro de prácticas médicas - Liquidación v2.0
-    Incluye campos para facturación, bonus urgencia, y auditoría
+    Formulario para registro de prácticas médicas - Liquidación v3.1
+    MULTI-ESTUDIO: 1 registro (paciente) = N estudios, cada uno con su precio
     """
     tipo_estudio = forms.ChoiceField(
         choices=[('', 'Seleccione modalidad')] + list(Estudios.TIPO_ESTUDIO_CHOICES),
@@ -42,7 +42,6 @@ class PracticaForm(forms.ModelForm):
             'apellido_paciente',
             'dni_paciente',
             'estudio',
-            'cantidad_estudio',
             'cantidad_regiones',
             'tipo_obra_social',
             'paciente_internado',
@@ -72,14 +71,8 @@ class PracticaForm(forms.ModelForm):
                 'placeholder': 'DNI sin puntos'
             }),
             'estudio': forms.SelectMultiple(attrs={
-                'class': 'hidden',
+                'class': TAILWIND_SELECT_CLASSES,
                 'id': 'id_estudio',
-                'size': '5'
-            }),
-            'cantidad_estudio': forms.NumberInput(attrs={
-                'class': TAILWIND_INPUT_CLASSES,
-                'min': 1,
-                'value': 1
             }),
             'cantidad_regiones': forms.NumberInput(attrs={
                 'class': TAILWIND_INPUT_CLASSES,
@@ -110,16 +103,16 @@ class PracticaForm(forms.ModelForm):
             'nombre_paciente': 'Nombre',
             'apellido_paciente': 'Apellido',
             'dni_paciente': 'DNI',
-            'estudio': 'Estudio',
-            'cantidad_estudio': 'Cantidad',
-            'cantidad_regiones': 'Regiones',
+            'estudio': 'Estudios Realizados',
+            'cantidad_regiones': 'Cantidad de Regiones',
             'tipo_obra_social': 'Obra Social',
             'paciente_internado': '¿Paciente internado? (para bonus urgencia RM)',
             'fecha_hora_solicitud': 'Fecha/Hora Solicitud',
             'fecha_hora_informe': 'Fecha/Hora Informe',
         }
         help_texts = {
-            'cantidad_regiones': 'Se calcula automáticamente sumando las regiones de cada estudio seleccionado. Puedes ajustar manualmente si es necesario.',
+            'estudio': 'Selecciona todos los estudios realizados a este paciente',
+            'cantidad_regiones': 'Se calcula automáticamente sumando las regiones de cada estudio',
             'paciente_internado': 'Solo para estudios de Resonancia Magnética (RM) con médicos remotos. Bonus +20% si informe <24hs.',
         }
 
@@ -127,9 +120,9 @@ class PracticaForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Inicializar choices de estudio vacío (se carga con JavaScript según modalidad)
-        self.fields['estudio'].choices = []
-
+        # Cargar estudios activos filtrados por tipo (se actualiza con JavaScript)
+        self.fields['estudio'].queryset = Estudios.objects.filter(activo=True).order_by('tipo', 'nombre')
+        
         # Precargar fecha actual si es nuevo registro
         if not self.instance.pk and not self.initial.get('fecha_del_informe'):
             self.fields['fecha_del_informe'].initial = timezone.now().date()

@@ -145,24 +145,31 @@
                                 {{ registro.dni_paciente|default:"-" }}
                             </td>
                             <td class="px-4 py-3 text-sm text-gray-700" style="min-width: 220px;">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <span>{{ registro.estudio.all|join:", " }}</span>
-                                    {% regroup registro.estudio.all by tipo as estudios_por_tipo %}
-                                    {% for grupo in estudios_por_tipo %}
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap
-                                            {% if grupo.grouper == 'ECO' %}bg-blue-100 text-blue-700
-                                            {% elif grupo.grouper == 'RAD' %}bg-green-100 text-green-700
-                                            {% elif grupo.grouper == 'TOM' %}bg-purple-100 text-purple-700
-                                            {% elif grupo.grouper == 'RES' %}bg-pink-100 text-pink-700
-                                            {% elif grupo.grouper == 'DOP' %}bg-cyan-100 text-cyan-700
-                                            {% elif grupo.grouper == 'MAM' %}bg-rose-100 text-rose-700
-                                            {% elif grupo.grouper == 'ECOCAR' %}bg-red-100 text-red-700
-                                            {% else %}bg-gray-100 text-gray-700{% endif %}">
-                                            {{ grupo.grouper }}{% if grupo.list|length > 1 %} ×{{ grupo.list|length }}{% endif %}
+                                <div class="flex flex-col gap-1">
+                                    <!-- v3.1 - Marzo 2026: Mostrar estudios con cantidades individuales -->
+                                    {% for item in registro.estudios_con_cantidades %}
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-gray-800">{{ item.estudio.nombre }}</span>
+                                        {% if item.cantidad > 1 %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap bg-indigo-100 text-indigo-700">
+                                            ×{{ item.cantidad }}
                                         </span>
+                                        {% endif %}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap
+                                            {% if item.tipo == 'ECO' %}bg-blue-100 text-blue-700
+                                            {% elif item.tipo == 'RAD' %}bg-green-100 text-green-700
+                                            {% elif item.tipo == 'TOM' %}bg-purple-100 text-purple-700
+                                            {% elif item.tipo == 'RES' %}bg-pink-100 text-pink-700
+                                            {% elif item.tipo == 'DOP' %}bg-cyan-100 text-cyan-700
+                                            {% elif item.tipo == 'MAM' %}bg-rose-100 text-rose-700
+                                            {% elif item.tipo == 'ECOCAR' %}bg-red-100 text-red-700
+                                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                            {{ item.tipo }}
+                                        </span>
+                                    </div>
                                     {% endfor %}
                                     {% if registro.paciente_internado %}
-                                    <span class="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap" title="Bonus Urgencia 20%">
+                                    <span class="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap mt-1" title="Bonus Urgencia 20%">
                                         <i class="fas fa-bolt mr-1"></i> URGENCIA
                                     </span>
                                     {% endif %}

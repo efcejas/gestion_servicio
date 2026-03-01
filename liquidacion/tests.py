@@ -87,14 +87,13 @@ class RegistroEstudiosPorMedicoModelTest(TestCase):
             nombre_paciente='Juan',
             apellido_paciente='Pérez',
             dni_paciente='12345678',
-            fecha_del_informe=date.today(),
-            cantidad_estudio=1
+            fecha_del_informe=date.today()
         )
         registro.estudio.add(self.estudio1)
         
         self.assertEqual(registro.medico, self.user)
         self.assertEqual(registro.nombre_paciente, 'Juan')
-        self.assertEqual(registro.estudio.count(), 1)
+        self.assertIn(self.estudio1, registro.estudio.all())
 
     def test_registro_str(self):
         """Verifica la representación en string del registro"""
@@ -105,37 +104,42 @@ class RegistroEstudiosPorMedicoModelTest(TestCase):
             dni_paciente='12345678',
             fecha_del_informe=date.today()
         )
+        registro.estudio.add(self.estudio1)
         str_registro = str(registro)
         self.assertIn(self.user.username, str_registro)
 
-    def test_total_regiones_un_estudio(self):
-        """Verifica el cálculo de regiones con un estudio"""
+    def test_cantidad_regiones_campo(self):
+        """Verifica que se puede establecer cantidad_regiones"""
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.user,
             nombre_paciente='Juan',
             apellido_paciente='Pérez',
             dni_paciente='12345678',
             fecha_del_informe=date.today(),
-            cantidad_estudio=2
+            cantidad_regiones=2
         )
-        registro.estudio.add(self.estudio1)  # 1 región
+        registro.estudio.add(self.estudio1)
         
-        # 1 región * 2 cantidad = 2 regiones totales
-        self.assertEqual(registro.total_regiones(), 2)
+        # Verificar que cantidad_regiones se almacenó correctamente
+        self.assertEqual(registro.cantidad_regiones, 2)
 
-    def test_total_regiones_multiples_estudios(self):
-        """Verifica el cálculo de regiones con múltiples estudios"""
+    def test_multiples_estudios_por_registro(self):
+        """Verifica que cada registro puede tener múltiples estudios (M2M)"""
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.user,
             nombre_paciente='María',
             apellido_paciente='González',
             dni_paciente='87654321',
             fecha_del_informe=date.today(),
-            cantidad_estudio=1
+            cantidad_regiones=3
         )
-        registro.estudio.add(self.estudio1, self.estudio2)  # 1 + 1 = 2 regiones
+        # Agregar múltiples estudios
+        registro.estudio.add(self.estudio1, self.estudio2)
         
-        self.assertEqual(registro.total_regiones(), 2)
+        # Verificar que estudio es M2M y contiene ambos estudios
+        self.assertEqual(registro.estudio.count(), 2)
+        self.assertIn(self.estudio1, registro.estudio.all())
+        self.assertIn(self.estudio2, registro.estudio.all())
 
     def test_fecha_registro_automatica(self):
         """Verifica que la fecha de registro se asigna automáticamente"""
@@ -146,6 +150,7 @@ class RegistroEstudiosPorMedicoModelTest(TestCase):
             dni_paciente='11111111',
             fecha_del_informe=date.today()
         )
+        registro.estudio.add(self.estudio1)
         self.assertIsNotNone(registro.fecha_registro)
 
 
@@ -235,12 +240,13 @@ class LiquidacionViewsTest(TestCase):
             nombre_paciente='Test',
             apellido_paciente='Patient',
             dni_paciente='12345678',
-            fecha_del_informe=date.today()
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1
         )
         registro.estudio.add(self.estudio)
         
         self.assertEqual(RegistroEstudiosPorMedico.objects.count(), 1)
-        self.assertEqual(registro.total_regiones(), 1)
+        self.assertEqual(registro.cantidad_regiones, 1)
 
 
 class CalculoMontosTest(TestCase):
@@ -257,6 +263,19 @@ class CalculoMontosTest(TestCase):
         self.estudio_doppler = Estudios.objects.create(
             codigo='902225',
             nombre='Doppler Periférico en Servicio',
+            tipo='DOP',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('8500.00'),
+            precio_otras_os=Decimal('10000.00'),
+            conteo_regiones_default=1,
+            activo=True
+        )
+        
+        # Crear segundo estudio para tests de múltiples estudios
+        self.estudio_doppler2 = Estudios.objects.create(
+            codigo='902226',
+            nombre='Doppler Arterial MMII',
             tipo='DOP',
             conteo_regiones=1,
             precio_unico=False,
@@ -321,7 +340,6 @@ class CalculoMontosTest(TestCase):
             horario='INTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         # Recalcular monto
         monto_calculado = registro.calcular_monto()
@@ -353,7 +371,6 @@ class CalculoMontosTest(TestCase):
             horario='EXTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         monto_calculado = registro.calcular_monto()
         
@@ -383,7 +400,6 @@ class CalculoMontosTest(TestCase):
             horario='INTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         monto_calculado = registro.calcular_monto()
         
@@ -413,7 +429,6 @@ class CalculoMontosTest(TestCase):
             horario='INTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         monto_calculado = registro.calcular_monto()
         esperado = Decimal('4250.00')  # 50% de $8.500
@@ -441,7 +456,6 @@ class CalculoMontosTest(TestCase):
             horario='INTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         monto_calculado = registro.calcular_monto()
         esperado = Decimal('4250.00')  # 50% de $8.500
@@ -471,7 +485,6 @@ class CalculoMontosTest(TestCase):
             horario='NA'  # Staff no tiene horario INTRA/EXTRA
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         monto_calculado = registro.calcular_monto()
         
@@ -486,8 +499,8 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_multiples_regiones_intra(self):
         """
-        Verificar que el cálculo funciona con múltiples regiones
-        Fórmula: precio × regiones × porcentaje_horario
+        Verificar que el cálculo funciona con múltiples estudios (regiones)
+        Fórmula v3.1 M2M: Σ(precio estudios) × porcentaje_horario
         """
         from decimal import Decimal
         
@@ -497,22 +510,21 @@ class CalculoMontosTest(TestCase):
             apellido_paciente='Sánchez',
             dni_paciente='55555555',
             fecha_del_informe=date.today(),
-            cantidad_regiones=2,  # 2 regiones
             tipo_obra_social='COBER',
             horario='INTRA'
         )
-        registro.estudio.add(self.estudio_doppler)
-        registro.save()
+        # Agregar 2 estudios diferentes
+        registro.estudio.add(self.estudio_doppler, self.estudio_doppler2)
         
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: $8.500 × 2 regiones × 0.5 (INTRA) = $8.500
+        # Esperado: ($8.500 + $8.500) × 0.5 (INTRA) = $8.500
         esperado = Decimal('8500.00')
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente con 2 regiones INTRA debe cobrar $8.500, pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente con 2 estudios INTRA debe cobrar $8.500, pero cobra ${monto_calculado}"
         )
     
     def test_desglose_monto_incluye_porcentaje_horario(self):
@@ -530,7 +542,6 @@ class CalculoMontosTest(TestCase):
             horario='INTRA'
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         desglose = registro.get_desglose_monto()
         
@@ -552,7 +563,6 @@ class CalculoMontosTest(TestCase):
             # No especificamos horario, debe asignarse automáticamente
         )
         registro.estudio.add(self.estudio_doppler)
-        registro.save()
         
         self.assertEqual(
             registro.horario,

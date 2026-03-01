@@ -272,7 +272,7 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         'tipo_obra_social',
         'horario',
         'medico',
-        'estudio'
+        # 'estudio' removido - ahora es M2M through
     )
     search_fields = (
         'nombre_paciente',
@@ -301,10 +301,9 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         }),
         ('Estudio', {
             'fields': (
-                'estudio',
-                'cantidad_estudio',
                 'cantidad_regiones',
-            )
+            ),
+            'description': 'Los estudios se gestionan desde la tabla intermedia RegistroEstudio'
         }),
         ('Facturación', {
             'fields': (
@@ -338,18 +337,22 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
     paciente_display.short_description = 'Paciente'
     
     def estudio_display(self, obj):
-        estudio = obj.estudio.first()
-        return estudio.nombre if estudio else '-'
-    estudio_display.short_description = 'Estudio'
+        estudios_lista = obj.estudio.all()
+        if not estudios_lista.exists():
+            return '-'
+        nombres = [e.nombre for e in estudios_lista]
+        return ", ".join(nombres) if len(nombres) <= 2 else f"{nombres[0]}, {nombres[1]} +{len(nombres)-2} más"
+    estudio_display.short_description = 'Estudios'
     
     def desglose_monto_display(self, obj):
         desglose = obj.get_desglose_monto()
+        if not desglose:
+            return '<div>Sin estudios</div>'
         html = f"""<div style='font-family: monospace;'>
-        <strong>Código:</strong> {desglose['codigo']}<br>
-        <strong>Estudio:</strong> {desglose['estudio']}<br>
-        <strong>Precio base ({desglose['tipo_os']}):</strong> ${desglose['precio_base']}<br>
+        <strong>Estudios:</strong> {desglose['estudios']}<br>
+        <strong>Cantidad:</strong> {desglose['cantidad_estudios']} estudio(s)<br>
+        <strong>Precio total ({desglose['tipo_os']}):</strong> ${desglose['precio_total']}<br>
         <strong>Regiones:</strong> {desglose['regiones']}<br>
-        <strong>Subtotal:</strong> ${desglose['subtotal']}<br>
         <strong>Horario:</strong> {desglose['horario']} ({desglose['porcentaje']})<br>
         """
         if desglose.get('bonus_urgencia'):

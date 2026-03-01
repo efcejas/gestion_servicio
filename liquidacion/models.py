@@ -350,11 +350,55 @@ class GuardiaPasiva(models.Model):
         super().save(*args, **kwargs)
 
 
+class RegistroEstudio(models.Model):
+    """
+    Tabla intermedia para la relación M2M entre Registro y Estudios.
+    Permite almacenar la CANTIDAD de cada estudio realizado.
+    
+    Ejemplo:
+    - RM RODILLA × 2 (bilateral)
+    - ECO ABDOMINAL × 1
+    
+    v3.1 - Marzo 2026: Migración de M2M simple a M2M through
+    """
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.CASCADE,
+        verbose_name='Registro'
+    )
+    estudio = models.ForeignKey(
+        'Estudios',
+        on_delete=models.PROTECT,
+        verbose_name='Estudio'
+    )
+    cantidad = models.PositiveSmallIntegerField(
+        default=1,
+        verbose_name='Cantidad',
+        help_text='Número de veces que se realizó este estudio (ej: 2 para bilateral)'
+    )
+    
+    # Metadata
+    fecha_agregado = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de agregado'
+    )
+    
+    class Meta:
+        db_table = 'liquidacion_registro_estudio'
+        verbose_name = 'Estudio por Registro'
+        verbose_name_plural = 'Estudios por Registro'
+        unique_together = [['registro', 'estudio']]  # Un estudio no se puede repetir en el mismo registro
+        ordering = ['fecha_agregado']
+    
+    def __str__(self):
+        return f"{self.estudio.nombre} (×{self.cantidad})"
+
+
 class RegistroEstudiosPorMedico(models.Model):
     """
     Registro individual de una práctica médica realizada
-    ACTUALIZADO v2.0 - Febrero 2026
-    TODO: Renombrar a 'Practica' en migración futura
+    ACTUALIZADO v3.1 - Marzo 2026
+    Usa tabla intermedia RegistroEstudio para guardar cantidades de cada estudio
     """
     # Relaciones
     sesion_contable = models.ForeignKey(
@@ -380,14 +424,14 @@ class RegistroEstudiosPorMedico(models.Model):
     fecha_registro = models.DateTimeField(default=timezone.now, verbose_name='Fecha de registro')
     fecha_del_informe = models.DateField(verbose_name='Fecha del informe')
     
-    # MANTENER M2M por ahora para compatibilidad con código existente
-    # En migración futura se convertirá a FK
-    estudio = models.ManyToManyField(Estudios, verbose_name='Estudios')
-    cantidad_estudio = models.PositiveIntegerField(
-        default=1,
-        blank=True,
-        null=True,
-        verbose_name='Cantidad por estudio'
+    # Estudios realizados (puede ser más de uno por paciente)
+    # v3.1 - Marzo 2026: Usa tabla intermedia RegistroEstudio para persistir cantidades
+    estudio = models.ManyToManyField(
+        Estudios,
+        through='RegistroEstudio',
+        verbose_name='Estudios',
+        related_name='registros',
+        help_text='Selecciona todos los estudios realizados a este paciente'
     )
     
     # NUEVOS CAMPOS v2.0
@@ -395,7 +439,7 @@ class RegistroEstudiosPorMedico(models.Model):
     cantidad_regiones = models.PositiveIntegerField(
         default=1,
         verbose_name='Cantidad de Regiones',
-        help_text='Campo informativo. Suma automática de las regiones de cada estudio seleccionado.'
+        help_text='Se calcula automáticamente sumando las regiones de todos los estudios seleccionados'
     )
     
     TIPO_OS_CHOICES = [
@@ -474,52 +518,44 @@ class RegistroEstudiosPorMedico(models.Model):
 
     def __str__(self):
         return f'{self.medico} - {self.fecha_registro}'
-
-    def total_regiones(self):
-        """LEGACY - mantener para compatibilidad"""
-        total = 0
-        for estudio in self.estudio.all():
-            cantidad = self.cantidad_estudio or 1
-            total += estudio.conteo_regiones * cantidad
-        return total
     
     def calcular_monto(self):
         """
         Calcula el monto a facturar por esta práctica
-        Aplica toda la lógica de: OS + Regiones + Horario + Urgencia
+        v3.1 - Marzo 2026: Lee cantidades desde tabla intermedia RegistroEstudio
+        Suma: (precio_estudio × cantidad) × factor_horario × bonus_urgencia
         """
         # Si no hay estudios asignados, retornar 0
-        if not self.estudio.exists():
+        relaciones = self.registroestudio_set.select_related('estudio').all()
+        if not relaciones.exists():
             return Decimal('0.00')
         
-        # Calcular precio base sumando TODOS los estudios seleccionados
-        precio_base_total = Decimal('0.00')
-        
-        for estudio_obj in self.estudio.all():
-            # Precio según OS para cada estudio
+        # 1. Sumar (precio × cantidad) de todos los estudios según tipo de obra social
+        precio_total = Decimal('0.00')
+        for rel in relaciones:
+            estudio = rel.estudio
+            cantidad = rel.cantidad
+            
+            # Determinar precio según tipo de obra social
             if self.tipo_obra_social == 'COBER':
-                precio_base_total += estudio_obj.precio_cober
+                precio_estudio = estudio.precio_cober
             else:
-                precio_base_total += estudio_obj.precio_otras_os
+                precio_estudio = estudio.precio_otras_os
+            
+            precio_total += (precio_estudio * Decimal(str(cantidad)))
         
-        if precio_base_total == Decimal('0.00'):
+        if precio_total == Decimal('0.00'):
             return Decimal('0.00')
         
-        # 2. El precio_base_total YA incluye todos los estudios con sus regiones
-        # cantidad_regiones es solo informativo, NO se multiplica
-        subtotal = precio_base_total
-        
-        # 3. Aplicar porcentaje según horario
+        # 2. Aplicar factor horario (solo para residentes)
+        subtotal = precio_total
         if self.medico.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente']:
             if self.horario == 'INTRA':
                 subtotal = subtotal * Decimal('0.5')  # 50%
-            elif self.horario == 'EXTRA':
-                subtotal = subtotal  # 100%
-        else:
-            # Staff (incluye cardiólogos) siempre cobra 100%
-            pass
+            # EXTRA es 100%, no hace falta multiplicar
+        # Staff siempre cobra 100%
         
-        # 4. Bonus urgencia para RM con pacientes internados (solo remotos)
+        # 3. Bonus urgencia para RM con pacientes internados (solo remotos)
         bonus_urgencia = self.calcular_bonus_urgencia()
         monto_final = subtotal * (Decimal('1.0') + bonus_urgencia)
         
@@ -535,12 +571,10 @@ class RegistroEstudiosPorMedico(models.Model):
         if not self.medico.trabaja_remoto:
             return Decimal('0.0')
         
-        # Solo aplica a estudios de Resonancia Magnética
-        if not self.estudio.exists():
-            return Decimal('0.0')
-        
-        estudio_obj = self.estudio.first()
-        if estudio_obj.tipo != 'RES':
+        # Solo aplica si hay al menos un estudio de Resonancia Magnética
+        estudios_lista = self.estudio.all()
+        hay_resonancia = any(est.tipo == 'RES' for est in estudios_lista)
+        if not hay_resonancia:
             return Decimal('0.0')
         
         # Solo si paciente estaba internado
@@ -564,36 +598,43 @@ class RegistroEstudiosPorMedico(models.Model):
     def get_desglose_monto(self):
         """
         Retorna un diccionario con el desglose del cálculo
-        Útil para mostrar al médico cómo se calculó su pago
+        v3.1 - Marzo 2026: Incluye cantidades desde tabla intermedia
         """
-        if not self.estudio.exists():
+        relaciones = self.registroestudio_set.select_related('estudio').all()
+        if not relaciones.exists():
             return {}
         
-        # Calcular precio base sumando TODOS los estudios
-        precio_base_total = Decimal('0.00')
+        # Calcular precio total de todos los estudios con cantidades
+        precio_total = Decimal('0.00')
         estudios_nombres = []
-        codigos = []
-        
-        for estudio_obj in self.estudio.all():
-            estudios_nombres.append(estudio_obj.nombre)
-            if estudio_obj.codigo:
-                codigos.append(estudio_obj.codigo)
+        for rel in relaciones:
+            estudio = rel.estudio
+            cantidad = rel.cantidad
             
+            # Determinar precio según tipo de obra social
             if self.tipo_obra_social == 'COBER':
-                precio_base_total += estudio_obj.precio_cober
+                precio_estudio = estudio.precio_cober
             else:
-                precio_base_total += estudio_obj.precio_otras_os
+                precio_estudio = estudio.precio_otras_os
+            
+            precio_total += (precio_estudio * Decimal(str(cantidad)))
+            
+            # Agregar nombre con cantidad si es mayor a 1
+            if cantidad > 1:
+                estudios_nombres.append(f"{estudio.nombre} ×{cantidad}")
+            else:
+                estudios_nombres.append(estudio.nombre)
         
-        subtotal = precio_base_total * self.cantidad_regiones
+        # Porcentaje según horario
         porcentaje = 0.5 if self.horario == 'INTRA' else 1.0
+        subtotal = precio_total * Decimal(str(porcentaje))
         bonus_urgencia = self.calcular_bonus_urgencia()
         
         desglose = {
-            'estudio': ', '.join(estudios_nombres),  # Concatenar todos los nombres
-            'codigo': ', '.join(codigos) if codigos else 'N/A',
-            'precio_base': precio_base_total,  # Ya incluye todas las regiones de cada estudio
-            'regiones': self.cantidad_regiones,  # Informativo
-            'subtotal': subtotal,  # Igual a precio_base (sin multiplicación)
+            'estudios': ", ".join(estudios_nombres),
+            'cantidad_estudios': relaciones.count(),
+            'precio_total': precio_total,
+            'regiones': self.cantidad_regiones,
             'tipo_os': self.get_tipo_obra_social_display(),
             'horario': self.get_horario_display(),
             'porcentaje': f"{int(porcentaje * 100)}%",
@@ -656,11 +697,9 @@ class RegistroEstudiosPorMedico(models.Model):
                 else:
                     self.horario = 'EXTRA'
         
-        # Calcular monto ANTES de guardar (INMUTABLE)
-        # IMPORTANTE: Solo si ya tiene ID (no es nuevo) o si ya tiene estudios asignados
-        # Esto evita el error de ManyToMany cuando se crea desde formulario
-        if self.pk or (hasattr(self, '_estudios_temp') and self._estudios_temp):
-            self.monto_calculado = self.calcular_monto()
+        # NOTA: No se puede calcular monto aquí porque estudio es M2M
+        # Los M2M se guardan después del save() principal
+        # El cálculo de monto se hace en form_valid() de las vistas
         
         super().save(*args, **kwargs)
     

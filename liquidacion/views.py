@@ -6,11 +6,11 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum, Count, Q, Prefetch
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
 import io, json
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -167,6 +167,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         estudios_seleccionados = form.cleaned_data['estudio']
         hace_5_minutos = timezone.now() - timedelta(minutes=5)
         
+        # Buscar registros recientes del mismo médico, paciente y fecha
         registros_recientes = RegistroEstudiosPorMedico.objects.filter(
             medico=user,
             dni_paciente=dni_paciente,
@@ -174,36 +175,73 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             fecha_registro__gte=hace_5_minutos
         )
         
+        # Verificar si alguno tiene los mismos estudios
         for registro in registros_recientes:
-            estudios_existentes = set(registro.estudio.all())
-            if estudios_existentes == set(estudios_seleccionados):
+            estudios_registro = set(registro.estudio.values_list('id', flat=True))
+            estudios_nuevos = set(est.id for est in estudios_seleccionados)
+            if estudios_registro == estudios_nuevos:
                 messages.warning(
                     self.request, 
-                    f"⚠️ Ya registraste este mismo estudio hace menos de 5 minutos. "
+                    f"⚠️ Ya registraste estos mismos estudios hace menos de 5 minutos. "
                     f"Si realmente necesitas crear otro registro, espera unos minutos."
                 )
                 return redirect(self.success_url)
         
-        # Guardar el objeto sin commit para asignar relaciones
+        # Guardar el registro
         self.object = form.save(commit=False)
         self.object.medico = user
         self.object.sesion_contable = sesion
-        
-        # IMPORTANTE: Guardar primero para obtener el ID (sin calcular monto aún)
         self.object.save()
         
-        # AHORA guardar las relaciones ManyToMany (estudio)
-        form.save_m2m()
+        # v3.1 - Marzo 2026: NO usar save_m2m() con through model
+        # Crear instancias de RegistroEstudio manualmente con cantidades
         
-        # AHORA que tenemos M2M guardado, calcular y guardar el monto
-        self.object.monto_calculado = self.object.calcular_monto()
-        self.object.save(update_fields=['monto_calculado'])
+        # Leer cantidades de estudios desde el POST
+        cantidades_estudios = {}
+        for key in self.request.POST:
+            if key.startswith('cantidad_estudio_'):
+                estudio_id = int(key.replace('cantidad_estudio_', ''))
+                cantidad = int(self.request.POST[key])
+                cantidades_estudios[estudio_id] = cantidad
+        
+        # Importar el modelo intermedio
+        from liquidacion.models import RegistroEstudio
+        
+        # Crear las relaciones en la tabla intermedia con cantidades
+        for estudio in estudios_seleccionados:
+            cantidad = cantidades_estudios.get(estudio.id, 1)  # Default = 1 si no está en el dict
+            RegistroEstudio.objects.create(
+                registro=self.object,
+                estudio=estudio,
+                cantidad=cantidad
+            )
+        
+        # Calcular cantidad de regiones con las cantidades especificadas
+        total_regiones = 0
+        for estudio in estudios_seleccionados:
+            cantidad = cantidades_estudios.get(estudio.id, 1)
+            total_regiones += (estudio.conteo_regiones_default * cantidad)
+        
+        self.object.cantidad_regiones = total_regiones
+        
+        # v3.1: Calcular monto usando método unificado del modelo (lee cantidades de RegistroEstudio)
+        total_monto = self.object.calcular_monto()
+        self.object.monto_calculado = total_monto
+        
+        # También guardar campos de bonus urgencia que vienen del formulario
+        self.object.save(update_fields=[
+            'cantidad_regiones', 
+            'monto_calculado',
+            'paciente_internado',
+            'fecha_hora_solicitud',
+            'fecha_hora_informe'
+        ])
         
         # Mostrar desglose del cálculo
         desglose = self.object.get_desglose_monto()
         mensaje_desglose = (
             f"✅ Práctica registrada | "
-            f"Estudio: {desglose['estudio']} | "
+            f"Estudios: {desglose['estudios']} | "
             f"Regiones: {desglose['regiones']} | "
             f"OS: {desglose['tipo_os']} | "
             f"Horario: {desglose['horario']} | "
@@ -290,15 +328,19 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
         context['sesion_contable'] = sesion
         context['puede_registrar'] = sesion.puede_registrar_practicas(user)
 
-        # Guardias del mes actual
+        # Guardias recientes del usuario (últimos 3 meses)
+        # Esto permite ver guardias de meses anteriores/futuros
+        fecha_desde = today.replace(day=1) - timedelta(days=90)
         guardias = GuardiaPasiva.objects.filter(
             medico=user,
-            sesion_contable=sesion
+            fecha_guardia__gte=fecha_desde
         ).order_by('-fecha_guardia')
         
         context['guardias'] = guardias
-        context['total_guardias_mes'] = guardias.count()
-        context['total_monto_guardias_mes'] = sum(g.monto for g in guardias)
+        # Contar solo las del mes actual para el badge
+        guardias_mes_actual = guardias.filter(sesion_contable=sesion)
+        context['total_guardias_mes'] = guardias_mes_actual.count()
+        context['total_monto_guardias_mes'] = sum(g.monto for g in guardias_mes_actual)
 
         return context
 
@@ -635,7 +677,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroEstudiosPorMedico
     form_class = RegistroEstudiosPorMedicoCreateViewForm
-    template_name = 'liquidacion/registroestudios_update_tailwind.html'
+    template_name = 'liquidacion/registroestudios_update_tailwind_v2.html'
 
     def get_queryset(self):
         # Filtra los registros que pertenecen al usuario logueado
@@ -658,17 +700,27 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             estudios_data.append(estudio_dict)
         
         context['estudios'] = json.dumps(estudios_data)
+        context['estudios_json'] = json.dumps(estudios_data)  # Alias para compatibilidad
 
         # Estudios y tipo preseleccionado
         if registro and registro.estudio.exists():
             context['tipo_estudio_seleccionado'] = registro.estudio.first().tipo
             context['estudios_seleccionados'] = list(registro.estudio.values_list('id', flat=True))
+            
+            # v3.1 - Marzo 2026: Cargar cantidades desde tabla intermedia RegistroEstudio
+            from liquidacion.models import RegistroEstudio
+            cantidades_dict = {}
+            for rel in RegistroEstudio.objects.filter(registro=registro).select_related('estudio'):
+                cantidades_dict[rel.estudio_id] = rel.cantidad
+            context['cantidades_estudios'] = json.dumps(cantidades_dict)
         else:
             context['tipo_estudio_seleccionado'] = ''
             context['estudios_seleccionados'] = []
+            context['cantidades_estudios'] = '{}'  # Objeto JSON vacío
         
         # Información del médico para lógica condicional
         context['trabaja_remoto'] = self.request.user.trabaja_remoto
+        context['es_staff'] = self.request.user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
 
         # URL del botón cancelar: vuelve a la lista con mes/año filtrados
         fecha = registro.fecha_del_informe
@@ -677,9 +729,75 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        # Agrega mensaje de éxito si el formulario fue válido
-        messages.success(self.request, "El registro fue actualizado correctamente.")
-        return super().form_valid(form)
+        # Guardar objeto
+        self.object = form.save(commit=False)
+        self.object.save()
+        
+        # v3.1 - Marzo 2026: NO usar save_m2m() con through model
+        # Actualizar tabla intermedia RegistroEstudio con cantidades
+        
+        # Leer cantidades de estudios desde el POST
+        cantidades_estudios = {}
+        for key in self.request.POST:
+            if key.startswith('cantidad_estudio_'):
+                estudio_id = int(key.replace('cantidad_estudio_', ''))
+                cantidad = int(self.request.POST[key])
+                cantidades_estudios[estudio_id] = cantidad
+        
+        # Importar el modelo intermedio
+        from liquidacion.models import RegistroEstudio, Estudios
+        
+        # Limpiar relaciones existentes
+        RegistroEstudio.objects.filter(registro=self.object).delete()
+        
+        # Obtener estudios seleccionados del formulario
+        estudios_seleccionados = form.cleaned_data['estudio']
+        
+        # Crear nuevas relaciones con cantidades actualizadas
+        for estudio in estudios_seleccionados:
+            cantidad = cantidades_estudios.get(estudio.id, 1)  # Default = 1 si no está en el dict
+            RegistroEstudio.objects.create(
+                registro=self.object,
+                estudio=estudio,
+                cantidad=cantidad
+            )
+        
+        # Recalcular cantidad de regiones con las cantidades especificadas
+        total_regiones = 0
+        for estudio in estudios_seleccionados:
+            cantidad = cantidades_estudios.get(estudio.id, 1)
+            total_regiones += (estudio.conteo_regiones_default * cantidad)
+        
+        self.object.cantidad_regiones = total_regiones
+        
+        # v3.1: Recalcular monto usando método unificado del modelo
+        total_monto = self.object.calcular_monto()
+        self.object.monto_calculado = total_monto
+        
+        # También guardar campos de bonus urgencia que vienen del formulario
+        self.object.save(update_fields=[
+            'cantidad_regiones', 
+            'monto_calculado',
+            'paciente_internado',
+            'fecha_hora_solicitud',
+            'fecha_hora_informe'
+        ])
+        
+        # Mostrar desglose del cálculo actualizado
+        desglose = self.object.get_desglose_monto()
+        mensaje_desglose = (
+            f"✅ Registro actualizado | "
+            f"Estudios: {desglose['estudios']} | "
+            f"Regiones: {desglose['regiones']} | "
+            f"OS: {desglose['tipo_os']} | "
+            f"Horario: {desglose['horario']} | "
+            f"Monto: ${desglose['monto_final']}"
+        )
+        if desglose.get('bonus_urgencia'):
+            mensaje_desglose += f" (incluye bonus urgencia {desglose['bonus_urgencia']})"
+        
+        messages.success(self.request, mensaje_desglose)
+        return HttpResponseRedirect(self.get_success_url())
 
     def form_invalid(self, form):
         # Mostrar errores del formulario al usuario
@@ -837,7 +955,26 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
             registros = registros_por_medico.get(medico, [])
             guardias = guardias_por_medico.get(medico, [])
             
-            # Agrupar prácticas por tipo para mostrar subtotales
+            # v3.1 - Marzo 2026: Enriquecer cada registro con cantidades de estudios
+            from liquidacion.models import RegistroEstudio
+            for registro in registros:
+                # Agregar lista de estudios con cantidades al registro
+                estudios_con_cantidades = []
+                cantidades_por_tipo = defaultdict(int)  # {'RES': 4, 'ECO': 1}
+                
+                for rel in RegistroEstudio.objects.filter(registro=registro).select_related('estudio'):
+                    estudios_con_cantidades.append({
+                        'estudio': rel.estudio,
+                        'cantidad': rel.cantidad,
+                        'tipo': rel.estudio.tipo,
+                    })
+                    cantidades_por_tipo[rel.estudio.tipo] += rel.cantidad
+                
+                # Agregar atributos temporales al objeto (no se guardan en BD)
+                registro.estudios_con_cantidades = estudios_con_cantidades
+                registro.cantidades_por_tipo = dict(cantidades_por_tipo)
+            
+            # Agrupar prácticas por tipo para mostrar subtotales (ya no se usa en v3.1)
             practicas_por_tipo = defaultdict(list)
             for registro in registros:
                 for estudio in registro.estudio.all():
@@ -919,7 +1056,8 @@ def generar_pdf_liquidacion(request):
             total_monto = 0
 
             for registro in registros:
-                estudios_texto = ", ".join([est.nombre for est in registro.estudio.all()])
+                estudios_lista = registro.estudio.all()
+                estudios_texto = ", ".join(e.nombre for e in estudios_lista) if estudios_lista.exists() else "N/A"
                 regiones = registro.cantidad_regiones
                 total_regiones += regiones
                 total_monto += registro.monto_calculado
@@ -1094,8 +1232,9 @@ def exportar_excel_liquidacion(request):
     total_monto_practicas = 0
     
     for registro in registros.order_by('-fecha_del_informe'):
-        estudios_nombres = ", ".join([est.nombre for est in registro.estudio.all()])
-        tipos_estudios = ", ".join(sorted(set([est.tipo for est in registro.estudio.all()])))
+        estudios_lista = registro.estudio.all()
+        estudios_nombres = ", ".join(e.nombre for e in estudios_lista) if estudios_lista.exists() else "N/A"
+        tipos_estudios = ", ".join(e.get_tipo_display() for e in estudios_lista) if estudios_lista.exists() else "N/A"
         bonus_icon = "⚡ SÍ" if registro.paciente_internado else ""
         
         ws.append([
@@ -1315,9 +1454,9 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                         apellido_paciente=item['apellido'],
                         dni_paciente=item['dni'],
                         fecha_del_informe=item['fecha'],
-                        cantidad_estudio=1
+                        estudio=estudio,
+                        cantidad_regiones=1
                     )
-                    registro.estudio.add(estudio)
                     cargados += 1
                 except Exception:
                     errores += 1

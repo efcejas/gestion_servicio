@@ -46,8 +46,12 @@ class Command(BaseCommand):
         sin_cambios = 0
         
         for registro in registros:
-            # Calcular cantidad_regiones sumando conteo_regiones_default de cada estudio
-            regiones_esperadas = sum([e.conteo_regiones_default for e in registro.estudio.all()])
+            # v3.1 - Marzo 2026: Calcular cantidad_regiones desde tabla intermedia RegistroEstudio
+            # Sumar (conteo_regiones_default × cantidad) de cada estudio
+            regiones_esperadas = 0
+            for rel in registro.registroestudio_set.select_related('estudio').all():
+                regiones_esperadas += (rel.estudio.conteo_regiones_default * rel.cantidad)
+            
             regiones_actuales = registro.cantidad_regiones
             
             cambio_regiones = regiones_esperadas != regiones_actuales and regiones_esperadas > 0
