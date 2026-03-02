@@ -324,11 +324,11 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             # Calcular total de estudios para este día
             total_estudios = 0
             for r in registros_del_dia:
-                cantidad = r.cantidad_estudio or 1
-                total_estudios += r.estudio.count() * cantidad
+                # Leer cantidades desde tabla intermedia RegistroEstudio
+                total_estudios += r.registroestudio_set.count()
             
             # Calcular total de regiones para este día
-            total_regiones = sum(r.total_regiones() for r in registros_del_dia)
+            total_regiones = sum(r.cantidad_regiones for r in registros_del_dia)
 
             resultados.append({
                 'medico': medico,
@@ -359,8 +359,8 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'nombre_paciente', 'apellido_paciente', 'dni_paciente'
             ).distinct().count(),
             'estudios_hoy': registros_hoy.count(),
-            'regiones_hoy': sum(r.total_regiones() for r in registros_hoy),
-            'total_regiones_mes': sum(r.total_regiones() for r in registros_mes),
+            'regiones_hoy': sum(r.cantidad_regiones for r in registros_hoy),
+            'total_regiones_mes': sum(r.cantidad_regiones for r in registros_mes),
             'medicos_activos_semana': RegistroEstudiosPorMedico.objects.filter(
                 fecha_registro__date__gte=fecha_hace_7_dias
             ).values('medico').distinct().count(),

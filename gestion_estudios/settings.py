@@ -35,7 +35,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
 # Administradores del sistema (reciben alertas de errores)
 ADMINS = [
-    ('Ernesto Cejas', 'ecejas@sanatoriocolegiales.com.ar'),
+    ('Enso Cejas', 'ensofermincejas@gmail.com'),
 ]
 MANAGERS = ADMINS
 
