@@ -191,16 +191,11 @@
                             <div class="flex flex-col space-y-1">
                                 {% if preinforme.estado == 'finalizado' %}
                                     <!-- Preinforme finalizado: solo lectura -->
-                                    <a href="{% url 'preinformes:ver_preinforme' preinforme.pk %}"
-                                       class="inline-flex items-center justify-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                        <i class="fas fa-eye mr-1"></i>
-                                        Ver final
-                                    </a>
                                     {% if preinforme.revision %}
                                     <a href="{% url 'preinformes:comparacion_revision' preinforme.pk %}"
                                        class="inline-flex items-center justify-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-xs">
                                         <i class="fas fa-columns mr-1"></i>
-                                        Comparar
+                                        Ver comparación
                                     </a>
                                     {% endif %}
                                 {% else %}
