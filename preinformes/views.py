@@ -931,10 +931,16 @@ def ver_comparacion_revision(request, pk):
     if not revision.informe_residente_snapshot:
         revision.crear_snapshot_residente()
     
+    # Determinar si quien ve es el residente autor o el staff revisor
+    es_residente = (request.user == preinforme.residente)
+    es_staff = request.user.rol in ['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+    
     context = {
         'preinforme': preinforme,
         'revision': revision,
-        'title': f'Comparación de Revisión - {preinforme.numero_estudio}'
+        'title': f'Comparación de Revisión - {preinforme.numero_estudio}',
+        'es_residente': es_residente,
+        'es_staff': es_staff,
     }
     
     return render(request, 'preinformes/comparacion_revision.html', context)
