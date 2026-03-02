@@ -697,9 +697,10 @@ class RegistroEstudiosPorMedico(models.Model):
                 else:
                     self.horario = 'EXTRA'
         
-        # NOTA: No se puede calcular monto aquí porque estudio es M2M
-        # Los M2M se guardan después del save() principal
-        # El cálculo de monto se hace en form_valid() de las vistas
+        # NOTA v3.1: No se puede calcular monto aquí porque usa tabla intermedia RegistroEstudio
+        # Los RegistroEstudio se crean DESPUÉS del save() principal (necesita ID)
+        # El cálculo de monto se hace en form_valid() de las vistas después de crear RegistroEstudio
+        # Secuencia: save() → crear RegistroEstudio → calcular_monto() → save(update_fields)
         
         super().save(*args, **kwargs)
     

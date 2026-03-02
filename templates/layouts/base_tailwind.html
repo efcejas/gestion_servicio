@@ -237,6 +237,18 @@
                     </a>
                     {% endif %}
 
+                    <!-- Preinformes - dashboard staff -->
+                    {% url 'preinformes:dashboard_staff' as preinformes_staff_url %}
+                    {% if preinformes_staff_url %}
+                    <a href="{{ preinformes_staff_url }}" 
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-user-md mr-2 group-hover:scale-110 transition-transform"></i>Revisión de Preinformes
+                        {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
                     <!-- Panel de Administración -->
                     {% url 'admin_dashboard' as admin_url %}
                     {% if admin_url %}

@@ -323,7 +323,7 @@ def lista_revision(request):
     form = FiltroPreinformesForm(request.GET)
     
     # Filtro para mostrar diferentes categorías
-    mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'todos'
+    mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'todos', 'finalizados'
     
     if mostrar == 'asignados':
         # Solo mis preinformes asignados
@@ -336,6 +336,12 @@ def lista_revision(request):
             estado__in=['pendiente_revision', 'en_revision'],
             revisor__isnull=True
         )
+    elif mostrar == 'finalizados':
+        # Preinformes que ya revisé y están finalizados (solo lectura)
+        preinformes = Preinforme.objects.filter(
+            revisor=request.user,
+            estado='finalizado',
+        ).select_related('revision', 'residente', 'tipo_estudio', 'region')
     else:
         # Todos: pendientes/en_revision sin asignar, o asignados a mí
         preinformes = Preinforme.objects.filter(
