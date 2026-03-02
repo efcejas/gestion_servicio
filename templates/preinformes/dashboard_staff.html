@@ -145,6 +145,19 @@
                     {% endif %}
                 </a>
 
+                <a href="{% url 'preinformes:lista_revision' %}?mostrar=finalizados" 
+                   class="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group">
+                    <div class="p-2 bg-green-500 text-white rounded-lg mr-4">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-medium text-gray-900">Mis Preinformes Revisados</h3>
+                        <p class="text-sm text-gray-600">Preinformes que finalicé y corregí</p>
+                    </div>
+                </a>
+
                 {% if user.rol in 'jefe_residentes,instructor_residentes,jefe_servicio' %}
                 <a href="{% url 'preinformes:estadisticas' %}" 
                    class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
