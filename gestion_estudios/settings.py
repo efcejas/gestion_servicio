@@ -48,6 +48,10 @@ PEDIDOS_FROM_EMAIL = config('PEDIDOS_FROM_EMAIL', default=None)  # Si no se defi
 # URL base del sitio (para generar enlaces en emails)
 SITE_URL = config('SITE_URL', default='http://localhost:8000')
 
+# Configuración de validación de pedidos
+# Score mínimo de confianza para aceptar un email como pedido válido (0-100)
+PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
+
 
 # Application definition
 

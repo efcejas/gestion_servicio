@@ -10,6 +10,10 @@ MEJORAS IMPLEMENTADAS (03/03/2026):
   3. Palabras clave prioritarias como fallback
 - Logging detallado de decisiones de clasificación
 - Score mínimo de 2 palabras coincidentes para mejor precisión
+- Sistema de validación en 3 capas para rechazar emails no relacionados a pedidos:
+  1. Detección de remitentes automáticos (no-reply, etc)
+  2. Validación de contenido mínimo (tipo estudio + datos paciente)
+  3. Score de confianza basado en completitud de información
 """
 import logging
 import time
@@ -32,6 +36,183 @@ from .notificador import NotificadorPedidos, notificar_error_procesamiento, noti
 
 logger = logging.getLogger(__name__)
 
+
+# ============================================================================
+# FUNCIONES DE VALIDACIÓN DE EMAILS
+# ============================================================================
+
+def es_email_automatico(email_data: Dict) -> Tuple[bool, str]:
+    """
+    Detecta si un email es automático/sistema y no un pedido legítimo.
+    
+    CAPA 1 de validación: Filtro rápido de emails de sistema.
+    
+    Args:
+        email_data: Diccionario con datos del email
+    
+    Returns:
+        Tupla (es_automatico, razón)
+    """
+    remitente = email_data.get('remitente', '').lower()
+    asunto = email_data.get('asunto', '').lower()
+    
+    # Remitentes automáticos típicos
+    remitentes_automaticos = [
+        'no-reply', 'noreply', 'no_reply', 'donotreply',
+        'alerts', 'security', 'notification', 'automated',
+        'mailer-daemon', 'postmaster', 'daemon@',
+        '@accounts.google.com', '@notify.google.com'
+    ]
+    
+    for pattern in remitentes_automaticos:
+        if pattern in remitente:
+            return True, f"Remitente automático detectado: {pattern}"
+    
+    # Asuntos típicos de emails de sistema
+    asuntos_sistema = [
+        'alerta de seguridad', 'security alert', 'security code',
+        'verificación', 'verification', 'verify your',
+        'password reset', 'contraseña', 'reset password',
+        'activación de cuenta', 'account activation',
+        'confirm your email', 'confirma tu email',
+        'two-factor', '2fa', 'código de verificación',
+        'se ha activado', 'has been enabled'
+    ]
+    
+    for pattern in asuntos_sistema:
+        if pattern in asunto:
+            return True, f"Asunto de sistema detectado: {pattern}"
+    
+    return False, "No parece email automático"
+
+
+def tiene_datos_minimos_pedido(datos_parseados: Dict) -> Tuple[bool, str]:
+    """
+    Verifica que el email tenga información mínima para ser un pedido válido.
+    
+    CAPA 2 de validación: Contenido mínimo requerido.
+    
+    Args:
+        datos_parseados: Diccionario con datos parseados del email
+    
+    Returns:
+        Tupla (es_valido, razón)
+    """
+    # Debe tener tipo de estudio sugerido
+    tipo_sugerido = datos_parseados['estudio'].get('tipo_sugerido', '').strip()
+    if not tipo_sugerido or len(tipo_sugerido) < 3:
+        return False, "No tiene tipo de estudio identificable"
+    
+    # Debe tener al menos UN dato del paciente
+    paciente = datos_parseados['paciente']
+    tiene_nombre = paciente.get('nombre_completo') and len(paciente['nombre_completo']) > 3
+    tiene_dni = paciente.get('dni')
+    tiene_hc = paciente.get('historia_clinica')
+    
+    if not (tiene_nombre or tiene_dni or tiene_hc):
+        return False, "No tiene datos de paciente identificable"
+    
+    return True, "Tiene datos mínimos suficientes"
+
+
+def calcular_score_confianza(datos_parseados: Dict) -> Tuple[int, Dict[str, int]]:
+    """
+    Calcula un score de confianza (0-100) de que el email es un pedido legítimo.
+    
+    CAPA 3 de validación: Score basado en completitud de información.
+    
+    Args:
+        datos_parseados: Diccionario con datos parseados del email
+    
+    Returns:
+        Tupla (score_total, desglose_puntos)
+    """
+    desglose = {}
+    
+    # Tipo de estudio encontrado (+40 pts)
+    if datos_parseados['estudio'].get('tipo_sugerido'):
+        desglose['tipo_estudio'] = 40
+    else:
+        desglose['tipo_estudio'] = 0
+    
+    # Datos de paciente (+30 pts total)
+    if datos_parseados['paciente'].get('nombre_completo'):
+        desglose['nombre_paciente'] = 15
+    else:
+        desglose['nombre_paciente'] = 0
+        
+    if datos_parseados['paciente'].get('dni'):
+        desglose['dni'] = 10
+    else:
+        desglose['dni'] = 0
+        
+    if datos_parseados['paciente'].get('historia_clinica'):
+        desglose['historia_clinica'] = 5
+    else:
+        desglose['historia_clinica'] = 0
+    
+    # Datos adicionales del estudio (+20 pts total)
+    if datos_parseados['estudio'].get('descripcion'):
+        desglose['descripcion'] = 10
+    else:
+        desglose['descripcion'] = 0
+        
+    if datos_parseados['estudio'].get('medico_solicitante'):
+        desglose['medico_solicitante'] = 10
+    else:
+        desglose['medico_solicitante'] = 0
+    
+    # Prioridad definida (+10 pts)
+    if datos_parseados.get('prioridad') and datos_parseados['prioridad'] != 'NORMAL':
+        desglose['prioridad'] = 10
+    else:
+        desglose['prioridad'] = 0
+    
+    score_total = sum(desglose.values())
+    return score_total, desglose
+
+
+def validar_email_es_pedido(email_data: Dict, datos_parseados: Dict) -> Tuple[bool, str, int]:
+    """
+    Valida si un email es realmente un pedido legítimo usando las 3 capas.
+    
+    Args:
+        email_data: Datos crudos del email
+        datos_parseados: Datos parseados del email
+    
+    Returns:
+        Tupla (es_valido, razon, score)
+    """
+    from django.conf import settings
+    
+    # CAPA 1: Detectar emails automáticos
+    es_automatico, razon_auto = es_email_automatico(email_data)
+    if es_automatico:
+        logger.warning(f"Email rechazado - {razon_auto}")
+        return False, razon_auto, 0
+    
+    # CAPA 2: Verificar datos mínimos
+    tiene_minimos, razon_minimos = tiene_datos_minimos_pedido(datos_parseados)
+    if not tiene_minimos:
+        logger.warning(f"Email rechazado - {razon_minimos}")
+        return False, razon_minimos, 0
+    
+    # CAPA 3: Calcular score de confianza
+    score, desglose = calcular_score_confianza(datos_parseados)
+    score_minimo = getattr(settings, 'PEDIDOS_SCORE_MINIMO', 50)
+    
+    if score < score_minimo:
+        razon = f"Score de confianza insuficiente: {score}/{score_minimo}. Desglose: {desglose}"
+        logger.warning(f"Email rechazado - {razon}")
+        return False, razon, score
+    
+    logger.info(f"Email validado como pedido legítimo - Score: {score}/100. Desglose: {desglose}")
+    return True, "Validación exitosa", score
+
+
+# ============================================================================
+# PROCESADOR PRINCIPAL
+# ============================================================================
 
 class ProcesadorPedidos:
     """
@@ -73,7 +254,8 @@ class ProcesadorPedidos:
                 'procesados': int,
                 'exitosos': int,
                 'errores': int,
-                'duplicados': int
+                'duplicados': int,
+                'rechazados': int
             }
         """
         stats = {
@@ -81,13 +263,14 @@ class ProcesadorPedidos:
             'exitosos': 0,
             'errores': 0,
             'duplicados': 0,
+            'rechazados': 0,
         }
         
         try:
             # Conectar a Gmail
             self.gmail = GmailService()
             
-            # Obtener emails nuevos
+            # Obtener emails nuevos (sin filtrar por remitente)
             logger.info(f"Buscando emails pendientes (max: {max_emails})")
             emails = self.gmail.obtener_emails_nuevos(max_results=max_emails)
             
@@ -120,6 +303,13 @@ class ProcesadorPedidos:
                     if marcar_como_leido:
                         self.gmail.marcar_como_leido(email_data['id'])
                 
+                elif resultado == 'RECHAZADO':
+                    stats['rechazados'] += 1
+                    
+                    # Marcar rechazados como leídos (no son pedidos válidos)
+                    if marcar_como_leido:
+                        self.gmail.marcar_como_leido(email_data['id'])
+                
                 elif resultado == 'PARCIAL':
                     stats['exitosos'] += 1  # Considerar parcial como exitoso
                     
@@ -131,7 +321,8 @@ class ProcesadorPedidos:
             
             logger.info(
                 f"Procesamiento completado: {stats['exitosos']} exitosos, "
-                f"{stats['errores']} errores, {stats['duplicados']} duplicados"
+                f"{stats['errores']} errores, {stats['duplicados']} duplicados, "
+                f"{stats['rechazados']} rechazados"
             )
             
         except Exception as e:
@@ -180,6 +371,27 @@ class ProcesadorPedidos:
             # Parsear email (detecta automáticamente múltiples estudios)
             logger.info(f"Parseando email: {email_data.get('asunto', '')}")
             estudios_parseados = self.parser.parsear_multiples_estudios(email_data)
+            
+            # VALIDACIÓN: Verificar que el primer estudio sea un pedido legítimo
+            # Si el email tiene múltiples estudios, validamos solo el primero como representativo
+            es_valido, razon_validacion, score = validar_email_es_pedido(
+                email_data, 
+                estudios_parseados[0]
+            )
+            
+            if not es_valido:
+                resultado = 'RECHAZADO'
+                mensaje = f"Email rechazado: {razon_validacion}"
+                logger.warning(mensaje)
+                self._registrar_log(
+                    email_data, 
+                    resultado, 
+                    None, 
+                    mensaje, 
+                    [razon_validacion],
+                    time.time() - tiempo_inicio
+                )
+                return (resultado, None)
             
             if len(estudios_parseados) > 1:
                 # Email con múltiples estudios
