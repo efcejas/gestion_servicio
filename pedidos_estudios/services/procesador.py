@@ -98,9 +98,9 @@ def tiene_datos_minimos_pedido(datos_parseados: Dict) -> Tuple[bool, str]:
     Returns:
         Tupla (es_valido, razón)
     """
-    # Debe tener tipo de estudio sugerido
-    tipo_sugerido = datos_parseados['estudio'].get('tipo_sugerido', '').strip()
-    if not tipo_sugerido or len(tipo_sugerido) < 3:
+    # Debe tener tipo de estudio sugerido (buscar ambos nombres de campo por compatibilidad)
+    tipo_sugerido = datos_parseados['estudio'].get('tipo_estudio_sugerido') or datos_parseados['estudio'].get('tipo_sugerido', '')
+    if not tipo_sugerido or len(str(tipo_sugerido).strip()) < 3:
         return False, "No tiene tipo de estudio identificable"
     
     # Debe tener al menos UN dato del paciente
@@ -130,7 +130,9 @@ def calcular_score_confianza(datos_parseados: Dict) -> Tuple[int, Dict[str, int]
     desglose = {}
     
     # Tipo de estudio encontrado (+40 pts)
-    if datos_parseados['estudio'].get('tipo_sugerido'):
+    # Buscar ambos nombres de campo por compatibilidad
+    tipo_estudio = datos_parseados['estudio'].get('tipo_estudio_sugerido') or datos_parseados['estudio'].get('tipo_sugerido')
+    if tipo_estudio:
         desglose['tipo_estudio'] = 40
     else:
         desglose['tipo_estudio'] = 0
