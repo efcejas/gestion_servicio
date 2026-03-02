@@ -2,6 +2,14 @@
 Procesador principal de emails de pedidos de estudios.
 
 Este módulo coordina la lectura de emails, parsing y creación de pedidos.
+
+MEJORAS IMPLEMENTADAS (03/03/2026):
+- Búsqueda mejorada de tipos de estudio con 3 estrategias:
+  1. Coincidencia exacta o muy cercana del tipo sugerido
+  2. Búsqueda por múltiples palabras coincidentes
+  3. Palabras clave prioritarias como fallback
+- Logging detallado de decisiones de clasificación
+- Score mínimo de 2 palabras coincidentes para mejor precisión
 """
 import logging
 import time
@@ -459,6 +467,11 @@ class ProcesadorPedidos:
         """
         Intenta determinar el tipo de estudio desde el catálogo.
         
+        Usa una estrategia mejorada:
+        1. Busca coincidencia exacta o muy cercana del tipo sugerido
+        2. Busca por frases completas en la descripción
+        3. Como último recurso, busca por palabras clave
+        
         Args:
             datos_estudio: Datos del estudio parseados
         
@@ -468,30 +481,72 @@ class ProcesadorPedidos:
         tipo_sugerido = datos_estudio.get('tipo_estudio_sugerido')
         descripcion = datos_estudio.get('descripcion_estudio', '')
         
-        # Buscar por coincidencia exacta
+        # Estrategia 1: Búsqueda por tipo sugerido (más confiable)
         if tipo_sugerido:
+            # Búsqueda exacta primero
+            tipo = TipoEstudio.objects.filter(
+                nombre__iexact=tipo_sugerido,
+                activo=True
+            ).first()
+            
+            if tipo:
+                logger.info(f"Tipo encontrado (exacto): {tipo.nombre}")
+                return tipo
+            
+            # Búsqueda por contiene (caso insensitive)
             tipo = TipoEstudio.objects.filter(
                 nombre__icontains=tipo_sugerido,
                 activo=True
             ).first()
             
             if tipo:
+                logger.info(f"Tipo encontrado (contiene): {tipo.nombre}")
                 return tipo
         
-        # Buscar por palabras clave en descripción
+        # Estrategia 2: Búsqueda por frases en la descripción
         if descripcion:
-            palabras = descripcion.lower().split()
+            descripcion_lower = descripcion.lower()
             
-            for palabra in palabras:
-                if len(palabra) > 3:  # Palabras significativas
+            # Obtener todos los tipos activos y buscar coincidencias
+            tipos = TipoEstudio.objects.filter(activo=True)
+            mejor_coincidencia = None
+            max_palabras_coincidentes = 0
+            
+            for tipo in tipos:
+                nombre_lower = tipo.nombre.lower()
+                palabras_tipo = set(nombre_lower.split())
+                palabras_desc = set(descripcion_lower.split())
+                
+                # Contar palabras coincidentes (excluyendo palabras cortas comunes)
+                palabras_tipo_significativas = {p for p in palabras_tipo if len(p) > 3}
+                coincidencias = palabras_tipo_significativas & palabras_desc
+                
+                if coincidencias and len(coincidencias) > max_palabras_coincidentes:
+                    max_palabras_coincidentes = len(coincidencias)
+                    mejor_coincidencia = tipo
+            
+            if mejor_coincidencia and max_palabras_coincidentes >= 2:
+                logger.info(f"Tipo encontrado (múltiples palabras): {mejor_coincidencia.nombre}")
+                return mejor_coincidencia
+        
+        # Estrategia 3: Búsqueda por palabras clave individuales (último recurso)
+        if descripcion:
+            # Palabras clave específicas y prioritarias
+            palabras_prioritarias = ['mmii', 'mmss', 'carotideo', 'renal', 'cardiograma', 'testicular']
+            descripcion_lower = descripcion.lower()
+            
+            for palabra_clave in palabras_prioritarias:
+                if palabra_clave in descripcion_lower:
                     tipo = TipoEstudio.objects.filter(
-                        nombre__icontains=palabra,
+                        nombre__icontains=palabra_clave,
                         activo=True
                     ).first()
                     
                     if tipo:
+                        logger.info(f"Tipo encontrado (palabra clave): {tipo.nombre}")
                         return tipo
         
+        logger.warning(f"No se pudo determinar tipo de estudio para: {descripcion}")
         return None
     
     def _crear_pedido(

@@ -3,6 +3,13 @@ Parser de emails para extraer información de pedidos de estudios.
 
 Este módulo procesa el contenido de emails y extrae datos estructurados
 de pacientes y estudios solicitados.
+
+MEJORAS IMPLEMENTADAS (03/03/2026):
+- Sistema de puntuación para clasificación de estudios (evita falsos positivos)
+- Priorización de extremidades (MMII/MMSS) sobre vasos específicos
+- Penalización para palabras conflictivas (ej: "carotídea" en contexto de MMII)
+- Mejor manejo de variantes arterial/venoso en extremidades
+- Logging de debug para puntuaciones y decisiones
 """
 import re
 import logging
@@ -431,10 +438,8 @@ class EmailParser:
         """
         Intenta clasificar el tipo de estudio basándose en palabras clave.
         
-        Devuelve el nombre específico del tipo de estudio para coincidir
-        con los nombres en la base de datos TipoEstudio.
-        
-        La estrategia es evaluar desde los más específicos a los más generales.
+        Usa un sistema de puntuación para detectar el tipo más probable
+        analizando el contexto completo en lugar de solo palabras sueltas.
         
         Args:
             descripcion: Descripción del estudio
@@ -442,70 +447,118 @@ class EmailParser:
         Returns:
             Nombre específico del tipo de estudio o None
         """
+        if not descripcion:
+            return None
+            
         descripcion_lower = descripcion.lower()
         
-        # NIVEL 1: Patrones muy específicos anatómicos/técnicos
-        # Orden: de más específico a más general
+        # Sistema de puntuación: cada tipo de estudio suma puntos
+        puntuaciones = {}
         
-        # Carotídeo y/o Vertebral
-        if any(k in descripcion_lower for k in ['carotideo', 'carotídeo', 'carotida', 'carótida', 'vertebral', 'tsa', 'troncos supraaorticos']):
-            return "Ecodoppler Carotídeo y Vertebral"
+        # ===================================================================
+        # ECODOPPLER DE EXTREMIDADES (Alta prioridad por especificidad)
+        # ===================================================================
+        
+        # MMII (Miembros Inferiores)
+        mmii_score = 0
+        mmii_keywords = ['mmii', 'miembro inferior', 'miembros inferiores', 'pierna', 'extremidad inferior']
+        if any(k in descripcion_lower for k in mmii_keywords):
+            mmii_score += 10  # Base alta por mención explícita
+            
+            # Especificar arterial o venoso
+            if any(k in descripcion_lower for k in ['arterial', 'arteria']):
+                puntuaciones["Ecodoppler Arterial de MMII"] = mmii_score + 5
+            elif any(k in descripcion_lower for k in ['venoso', 'venas', 'venosa', 'tvp', 'trombosis']):
+                puntuaciones["Ecodoppler Venoso de MMII"] = mmii_score + 5
+            else:
+                # Genérico de MMII
+                puntuaciones["Ecodoppler de Miembros Inferiores"] = mmii_score
+        
+        # MMSS (Miembros Superiores)
+        mmss_keywords = ['mmss', 'miembro superior', 'miembros superiores', 'brazo', 'extremidad superior']
+        if any(k in descripcion_lower for k in mmss_keywords):
+            puntuaciones["Ecodoppler de Miembros Superiores"] = 10
+        
+        # ===================================================================
+        # VASOS ESPECÍFICOS (Alta prioridad)
+        # ===================================================================
+        
+        # Carotídeo y/o Vertebral - SOLO si no es de MMII
+        carotideo_keywords = ['carotideo', 'carotídeo', 'carotida', 'carótida', 'vertebral', 'tsa', 'troncos supraaorticos']
+        if any(k in descripcion_lower for k in carotideo_keywords):
+            # Verificar que NO sea un error contextual (no debe mencionar MMII)
+            if mmii_score == 0:  # Solo si NO mencionó miembros inferiores
+                puntuaciones["Ecodoppler Carotídeo y Vertebral"] = 8
+            else:
+                # Penalización menor si aparece junto a MMII (probable error)
+                puntuaciones["Ecodoppler Carotídeo y Vertebral"] = 2
         
         # Renal
-        if any(k in descripcion_lower for k in ['renal', 'riñon', 'riñón']):
-            return "Ecodoppler Renal"
+        if any(k in descripcion_lower for k in ['renal', 'riñon', 'riñón', 'arteria renal']):
+            puntuaciones["Ecodoppler Renal"] = 8
         
         # Aorta
-        if any(k in descripcion_lower for k in ['aorta', 'aórtica']):
-            return "Ecodoppler de Aorta Abdominal"
+        if any(k in descripcion_lower for k in ['aorta', 'aórtica', 'abdominal']):
+            puntuaciones["Ecodoppler de Aorta Abdominal"] = 8
+        
+        # ===================================================================
+        # ESPECÍFICOS ANATÓMICOS
+        # ===================================================================
         
         # Testicular
         if any(k in descripcion_lower for k in ['testicular', 'testiculo', 'testículo', 'escrotal']):
-            return "Ecodoppler Testicular"
+            puntuaciones["Ecodoppler Testicular"] = 10
         
         # Peneano
         if any(k in descripcion_lower for k in ['peneano', 'pene', 'peniano']):
-            return "Ecodoppler Peneano"
+            puntuaciones["Ecodoppler Peneano"] = 10
         
-        # NIVEL 2: Ecodoppler de extremidades con especificidad arterial/venoso
+        # ===================================================================
+        # ECOCARDIOGRAMAS
+        # ===================================================================
         
-        # MMII - Arterial
-        if any(k in descripcion_lower for k in ['mmii', 'miembro inferior', 'miembros inferiores', 'pierna']):
-            if any(k in descripcion_lower for k in ['arterial', 'arterias']):
-                return "Ecodoppler Arterial de MMII"
-            elif any(k in descripcion_lower for k in ['venoso', 'venas', 'venosa']):
-                return "Ecodoppler Venoso de MMII"
+        cardio_score = 0
+        cardio_keywords = ['ecocardio', 'eco cardio', 'ecocardiograma', 'eco-cardio', 'doppler cardiaco']
+        if any(k in descripcion_lower for k in cardio_keywords):
+            cardio_score = 10
+        
+        # Variantes específicas
+        if cardio_score > 0:
+            if any(k in descripcion_lower for k in ['transesofagico', 'transesofágico', 'tee', 'ete']):
+                puntuaciones["Ecocardiograma Transesofágico"] = cardio_score + 3
+            elif any(k in descripcion_lower for k in ['transtoracico', 'transtorácico', 'tt ']):
+                puntuaciones["Ecocardiograma Transtorácico"] = cardio_score + 3
+            elif any(k in descripcion_lower for k in ['doppler color']):
+                puntuaciones["Ecocardiograma Doppler Color"] = cardio_score + 2
             else:
-                # Por defecto, si solo menciona MMII sin especificar, asumir el tipo genérico
-                return "Ecodoppler de Miembros Inferiores"
+                # Genérico
+                puntuaciones["Ecocardiograma Doppler Color"] = cardio_score
         
-        # MMSS
-        if any(k in descripcion_lower for k in ['mmss', 'miembro superior', 'miembros superiores', 'brazo']):
-            return "Ecodoppler de Miembros Superiores"
+        # ===================================================================
+        # SELECCIÓN FINAL
+        # ===================================================================
         
-        # NIVEL 3: Ecocardiogramas
+        if puntuaciones:
+            # Retornar el tipo con mayor puntuación
+            tipo_sugerido = max(puntuaciones, key=puntuaciones.get)
+            score_max = puntuaciones[tipo_sugerido]
+            
+            logger.debug(f"Clasificación de estudio: {tipo_sugerido} (score: {score_max})")
+            logger.debug(f"Todas las puntuaciones: {puntuaciones}")
+            
+            return tipo_sugerido
         
-        # Ecocardiograma con variantes TT/TEE/ETE
-        if any(k in descripcion_lower for k in [
-            'ecocardio', 'eco cardio', 'ecocardiograma', 'eco-cardio',
-            'transtoracico', 'transtorácico', 'tt ', ' tt',
-            'transesofagico', 'transesofágico', 'tee', 'ete',
-            'doppler cardiaco', 'doppler color'
-        ]):
-            return "Ecocardiograma Doppler Color"
+        # ===================================================================
+        # FALLBACKS GENÉRICOS
+        # ===================================================================
         
-        # NIVEL 4: Genéricos
-        
-        # Ecodoppler genérico (si no coincidió con nada más específico)
-        if any(k in descripcion_lower for k in [
-            'doppler', 'eco doppler', 'ecodoppler', 'ecd ',
-            'arterial', 'venoso', 'vascular'
-        ]):
-            return "ecodoppler"  # Genérico para que el procesador busque por descripción
+        # Ecodoppler genérico
+        if any(k in descripcion_lower for k in ['doppler', 'eco doppler', 'ecodoppler', 'ecd']):
+            return None  # Dejar que el procesador busque por descripción
         
         # Ecografía genérica
         if any(k in descripcion_lower for k in ['eco ', 'ecograf', 'ultrason', 'us ']):
-            return "ecografía"
+            return None
         
         return None
     

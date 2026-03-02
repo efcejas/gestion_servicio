@@ -39,8 +39,11 @@ ADMINS = [
 ]
 MANAGERS = ADMINS
 
-# Email predeterminado para notificaciones de pedidos
+# Email predeterminado para notificaciones de pedidos (destinatario fallback)
 PEDIDOS_EMAIL_DEFAULT = 'ecejas@sanatoriocolegiales.com.ar'
+
+# Email remitente específico para notificaciones de pedidos (puede ser diferente al DEFAULT_FROM_EMAIL)
+PEDIDOS_FROM_EMAIL = config('PEDIDOS_FROM_EMAIL', default=None)  # Si no se define, usa DEFAULT_FROM_EMAIL
 
 # URL base del sitio (para generar enlaces en emails)
 SITE_URL = config('SITE_URL', default='http://localhost:8000')

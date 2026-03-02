@@ -21,11 +21,17 @@ class NotificadorPedidos:
     
     def __init__(self):
         """Inicializa el notificador."""
-        self.from_email = getattr(
-            settings, 
-            'DEFAULT_FROM_EMAIL', 
-            'no-reply@sanatoriocolegiales.com.ar'
-        )
+        # Usar email específico para pedidos o el default del sistema
+        pedidos_from = getattr(settings, 'PEDIDOS_FROM_EMAIL', None)
+        
+        if pedidos_from:
+            self.from_email = pedidos_from
+        else:
+            self.from_email = getattr(
+                settings, 
+                'DEFAULT_FROM_EMAIL', 
+                'no-reply@sanatoriocolegiales.com.ar'
+            )
         self.admin_emails = getattr(
             settings,
             'ADMINS',
