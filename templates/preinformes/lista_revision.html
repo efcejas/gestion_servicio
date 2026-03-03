@@ -22,27 +22,30 @@
 
     <!-- Tabs de filtro rápido -->
     <div class="bg-white rounded-xl shadow-md p-4 mb-6">
-        <div class="flex items-center gap-2">
-            <span class="text-sm font-medium text-gray-600 mr-2">Ver:</span>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-sm font-medium text-gray-600 mr-2 w-full sm:w-auto mb-2 sm:mb-0">Ver:</span>
             <a href="{% url 'preinformes:lista_revision' %}?mostrar=asignados" 
-               class="px-4 py-2 rounded-lg transition-colors {% if mostrar == 'asignados' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+               class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'asignados' %}bg-indigo-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
                 <i class="fas fa-user-md mr-1"></i>
-                Mis Asignados
+                <span class="hidden sm:inline">Mis Asignados</span>
+                <span class="sm:hidden">Asignados</span>
             </a>
             <a href="{% url 'preinformes:lista_revision' %}?mostrar=sin_asignar" 
-               class="px-4 py-2 rounded-lg transition-colors {% if mostrar == 'sin_asignar' %}bg-pink-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+               class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'sin_asignar' %}bg-pink-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
                 <i class="fas fa-clock mr-1"></i>
-                Sin Asignar
+                <span class="hidden sm:inline">Sin Asignar</span>
+                <span class="sm:hidden">Sin Asig.</span>
             </a>
             <a href="{% url 'preinformes:lista_revision' %}?mostrar=todos" 
-               class="px-4 py-2 rounded-lg transition-colors {% if mostrar == 'todos' %}bg-orange-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+               class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'todos' %}bg-orange-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
                 <i class="fas fa-list mr-1"></i>
                 Todos
             </a>
             <a href="{% url 'preinformes:lista_revision' %}?mostrar=finalizados" 
-               class="px-4 py-2 rounded-lg transition-colors {% if mostrar == 'finalizados' %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+               class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'finalizados' %}bg-green-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
                 <i class="fas fa-check-double mr-1"></i>
-                Corregidos por mí
+                <span class="hidden sm:inline">Corregidos por mí</span>
+                <span class="sm:hidden">Corregidos</span>
             </a>
         </div>
     </div>

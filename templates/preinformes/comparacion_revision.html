@@ -159,14 +159,32 @@
             <div>
                 <h2 class="text-xl font-semibold text-gray-900 flex items-center">
                     <i class="fas fa-file-export text-purple-600 mr-3"></i>
-                    Informe Final para EGES
+                    {% if preinforme.sistema_destino == 'netterm' %}
+                        Informe Final para NetTerm
+                    {% elif preinforme.sistema_destino == 'eges' %}
+                        Informe Final para EGES
+                    {% else %}
+                        Informe Final
+                    {% endif %}
                 </h2>
-                <p class="text-sm text-gray-600 mt-1">Copia el informe corregido al portapapeles con formato</p>
+                <p class="text-sm text-gray-600 mt-1">
+                    {% if preinforme.sistema_destino == 'netterm' %}
+                        Copia el informe corregido al portapapeles en texto plano
+                    {% else %}
+                        Copia el informe corregido al portapapeles con formato
+                    {% endif %}
+                </p>
             </div>
             <button type="button" onclick="copiarInformeFinal()" 
                     class="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg shadow-sm font-medium transition-colors">
                 <i class="fas fa-copy mr-2"></i>
-                Copiar Informe
+                {% if preinforme.sistema_destino == 'netterm' %}
+                    Copiar para NetTerm
+                {% elif preinforme.sistema_destino == 'eges' %}
+                    Copiar para EGES
+                {% else %}
+                    Copiar Informe
+                {% endif %}
             </button>
         </div>
         <!-- Contenido oculto para copiar -->
@@ -206,47 +224,62 @@
 </div>
 
 <script>
+const SISTEMA_DESTINO = '{{ preinforme.sistema_destino }}';
+const PREINFORME_ID = {{ preinforme.pk }};
+
 /**
  * Copia el informe final con formato HTML enriquecido
  * Soporta pegado en Word, Google Docs, etc. manteniendo formato
+ * Diferencia entre NetTerm (texto plano) y EGES (formato)
  */
 function copiarInformeFinal() {
-    const previewElement = document.querySelector('#informe-final-eges');
-    if (!previewElement) {
-        mostrarNotificacion('No se encontró el informe para copiar', 'error');
-        return;
-    }
-    
-    let htmlContent = previewElement.innerHTML;
-    const htmlWithStyles = `
-        <div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">
-            ${htmlContent}
-        </div>
-    `;
-    const plainText = previewElement.innerText || previewElement.textContent;
-    
-    if (navigator.clipboard && window.ClipboardItem) {
-        try {
-            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
-            const textBlob = new Blob([plainText], { type: 'text/plain' });
-            const clipboardItem = new ClipboardItem({
-                'text/html': htmlBlob,
-                'text/plain': textBlob
-            });
+    // Usar el endpoint del backend que convierte correctamente HTML a texto
+    fetch(`/preinformes/copiar-informe/${PREINFORME_ID}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.informe_html) {
+                mostrarNotificacion('No se pudo obtener el informe', 'error');
+                return;
+            }
             
-            navigator.clipboard.write([clipboardItem])
-                .then(() => mostrarNotificacion('¡Informe copiado con formato!', 'success'))
-                .catch(err => {
-                    console.error('Error con ClipboardItem:', err);
+            const sistemaDestino = data.sistema_destino || SISTEMA_DESTINO;
+            
+            // Para NetTerm: copiar solo texto plano CON saltos de línea preservados
+            if (sistemaDestino === 'netterm') {
+                copiarTextoPlano(data.informe_texto);
+            } else {
+                // Para EGES: copiar con formato
+                const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${data.informe_html}</div>`;
+                const plainText = data.informe_texto;
+                
+                if (navigator.clipboard && window.ClipboardItem) {
+                    try {
+                        const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+                        const textBlob = new Blob([plainText], { type: 'text/plain' });
+                        const clipboardItem = new ClipboardItem({
+                            'text/html': htmlBlob,
+                            'text/plain': textBlob
+                        });
+                        
+                        navigator.clipboard.write([clipboardItem])
+                            .then(() => mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success'))
+                            .catch(err => {
+                                console.error('Error con ClipboardItem:', err);
+                                copiarConFallbackHTML(htmlWithStyles, plainText);
+                            });
+                    } catch (err) {
+                        console.error('Error creando ClipboardItem:', err);
+                        copiarConFallbackHTML(htmlWithStyles, plainText);
+                    }
+                } else {
                     copiarConFallbackHTML(htmlWithStyles, plainText);
-                });
-        } catch (err) {
-            console.error('Error creando ClipboardItem:', err);
-            copiarConFallbackHTML(htmlWithStyles, plainText);
-        }
-    } else {
-        copiarConFallbackHTML(htmlWithStyles, plainText);
-    }
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error al obtener informe:', error);
+            mostrarNotificacion('Error al obtener el informe', 'error');
+        });
 }
 
 function copiarConFallbackHTML(htmlContent, plainText) {
@@ -254,6 +287,10 @@ function copiarConFallbackHTML(htmlContent, plainText) {
     tempDiv.contentEditable = 'true';
     tempDiv.style.position = 'fixed';
     tempDiv.style.left = '-9999px';
+    // Reset explícito de estilos para evitar herencia
+    tempDiv.style.fontWeight = 'normal';
+    tempDiv.style.fontStyle = 'normal';
+    tempDiv.style.textDecoration = 'none';
     tempDiv.innerHTML = htmlContent;
     document.body.appendChild(tempDiv);
     
@@ -288,7 +325,7 @@ function copiarTextoPlano(texto) {
     
     try {
         document.execCommand('copy');
-        mostrarNotificacion('Informe copiado (texto plano)', 'success');
+        mostrarNotificacion('¡Informe copiado en texto plano para NetTerm!', 'success');
     } catch (err) {
         mostrarNotificacion('Error al copiar al portapapeles', 'error');
     } finally {

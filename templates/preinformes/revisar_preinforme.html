@@ -220,7 +220,13 @@
                         <button type="button" onclick="copiarInformeFinal()" 
                                 class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium rounded-xl transition-all shadow-lg">
                             <i class="fas fa-copy mr-2"></i>
-                            Copiar Informe
+                            {% if preinforme.sistema_destino == 'netterm' %}
+                                Copiar para NetTerm
+                            {% elif preinforme.sistema_destino == 'eges' %}
+                                Copiar para EGES
+                            {% else %}
+                                Copiar Informe
+                            {% endif %}
                         </button>
                         
                         <div class="flex flex-wrap gap-3">
@@ -388,6 +394,9 @@ document.addEventListener('DOMContentLoaded', function() {
  * Copia el informe final con formato HTML
  * Compatible con EGES y Netterm (mantiene negritas, cursivas, etc.)
  */
+
+const SISTEMA_DESTINO = '{{ preinforme.sistema_destino }}';
+
 function copiarInformeFinal() {
     // Obtener el contenido HTML del editor CKEditor
     const editorElement = document.querySelector('[name="informe_final_html"]');
@@ -411,39 +420,68 @@ function copiarInformeFinal() {
         return;
     }
     
-    // Envolver con estilos inline para mejor compatibilidad
-    const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${htmlContent}</div>`;
-    
-    // Generar versión texto plano (fallback)
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    const plainText = tempDiv.innerText || tempDiv.textContent;
-    
-    // Intentar copiar con ClipboardItem API (navegadores modernos)
-    if (navigator.clipboard && window.ClipboardItem) {
-        try {
-            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
-            const textBlob = new Blob([plainText], { type: 'text/plain' });
-            
-            const clipboardItem = new ClipboardItem({
-                'text/html': htmlBlob,
-                'text/plain': textBlob
-            });
-            
-            navigator.clipboard.write([clipboardItem])
-                .then(() => {
-                    mostrarNotificacion('¡Informe copiado con formato!', 'success');
-                })
-                .catch(err => {
-                    console.error('Error con ClipboardItem:', err);
-                    copiarConFallback(htmlWithStyles, plainText);
+    // Para NetTerm: convertir HTML a texto plano preservando saltos de línea
+    if (SISTEMA_DESTINO === 'netterm') {
+        // Convertir HTML a texto preservando estructura
+        let textoPlano = htmlContent;
+        // Reemplazar </p> con salto de línea
+        textoPlano = textoPlano.replace(/<\/p>/gi, '\n');
+        // Reemplazar <br> con salto de línea
+        textoPlano = textoPlano.replace(/<br\s*\/?>/gi, '\n');
+        // Reemplazar </div> con salto de línea
+        textoPlano = textoPlano.replace(/<\/div>/gi, '\n');
+        // Reemplazar </h1-6> con salto de línea
+        textoPlano = textoPlano.replace(/<\/h[1-6]>/gi, '\n');
+        // Reemplazar </li> con salto de línea
+        textoPlano = textoPlano.replace(/<\/li>/gi, '\n');
+        
+        // Eliminar todas las etiquetas HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = textoPlano;
+        textoPlano = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // Limpiar exceso de saltos de línea (máximo 2 consecutivos)
+        while (textoPlano.includes('\n\n\n')) {
+            textoPlano = textoPlano.replace(/\n\n\n/g, '\n\n');
+        }
+        
+        textoPlano = textoPlano.trim();
+        copiarTextoPlano(textoPlano);
+    } else {
+        // Para EGES: copiar con estilos inline para mejor compatibilidad
+        const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${htmlContent}</div>`;
+        
+        // Generar versión texto plano como fallback
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = htmlContent;
+        const plainText = tempDiv.textContent || tempDiv.innerText || '';
+        
+        // Intentar copiar con ClipboardItem API (navegadores modernos)
+        if (navigator.clipboard && window.ClipboardItem) {
+            try {
+                const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+                const textBlob = new Blob([plainText], { type: 'text/plain' });
+                
+                const clipboardItem = new ClipboardItem({
+                    'text/html': htmlBlob,
+                    'text/plain': textBlob
                 });
-        } catch (err) {
-            console.error('Error creando ClipboardItem:', err);
+                
+                navigator.clipboard.write([clipboardItem])
+                    .then(() => {
+                        mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success');
+                    })
+                    .catch(err => {
+                        console.error('Error con ClipboardItem:', err);
+                        copiarConFallback(htmlWithStyles, plainText);
+                    });
+            } catch (err) {
+                console.error('Error creando ClipboardItem:', err);
+                copiarConFallback(htmlWithStyles, plainText);
+            }
+        } else {
             copiarConFallback(htmlWithStyles, plainText);
         }
-    } else {
-        copiarConFallback(htmlWithStyles, plainText);
     }
 }
 
@@ -494,7 +532,7 @@ function copiarTextoPlano(texto) {
     
     try {
         document.execCommand('copy');
-        mostrarNotificacion('Informe copiado (texto plano)', 'success');
+        mostrarNotificacion('¡Informe copiado en texto plano para NetTerm!', 'success');
     } catch (err) {
         mostrarNotificacion('Error al copiar', 'error');
     } finally {

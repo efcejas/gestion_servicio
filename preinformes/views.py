@@ -837,6 +837,9 @@ def generar_informe_final(request, pk):
 @login_required
 def copiar_informe_final(request, pk):
     """Copiar informe final al portapapeles"""
+    import re
+    from bs4 import BeautifulSoup
+    
     preinforme = get_object_or_404(Preinforme, pk=pk)
     
     # Verificar permisos
@@ -850,19 +853,61 @@ def copiar_informe_final(request, pk):
     # Obtener HTML e informe final
     if hasattr(preinforme, 'revision') and preinforme.revision.informe_final_html:
         # HTML con formato desde la revisión finalizada
-        informe_html = preinforme.revision.informe_final_html
-        # Texto plano como fallback
-        from django.utils.html import strip_tags
-        informe_texto = strip_tags(informe_html)
+        informe_html_original = preinforme.revision.informe_final_html
     else:
         # Si no hay revisión, usar el preinforme original con método unificado
-        informe_html = preinforme.get_informe_html_or_legacy()
-        from django.utils.html import strip_tags
-        informe_texto = strip_tags(informe_html)
+        informe_html_original = preinforme.get_informe_html_or_legacy()
+    
+    # Limpiar HTML de estilos de fondo para evitar el problema del resaltado verde
+    soup = BeautifulSoup(informe_html_original, 'html.parser')
+    # Eliminar atributos de estilo que contienen background
+    for tag in soup.find_all(True):
+        if tag.has_attr('style'):
+            style = tag['style']
+            # Eliminar propiedades background-*
+            style_parts = [s.strip() for s in style.split(';') if s.strip()]
+            cleaned_parts = [s for s in style_parts if not s.lower().startswith('background')]
+            if cleaned_parts:
+                tag['style'] = '; '.join(cleaned_parts)
+            else:
+                del tag['style']
+    informe_html = str(soup)
+    
+    # Convertir HTML a texto plano preservando saltos de línea
+    from django.utils.html import strip_tags
+    
+    # Primero reemplazar etiquetas HTML con saltos de línea antes de eliminarlas
+    texto_con_saltos = informe_html_original
+    
+    # Los </p> generan un salto simple (no doble para evitar mucho espacio)
+    texto_con_saltos = texto_con_saltos.replace('</p>', '\n').replace('</P>', '\n')
+    
+    # Los <br> generan un salto simple
+    texto_con_saltos = re.sub(r'<br\s*/?>', '\n', texto_con_saltos, flags=re.IGNORECASE)
+    
+    # Los </div> y otros bloques generan un salto
+    texto_con_saltos = texto_con_saltos.replace('</div>', '\n').replace('</DIV>', '\n')
+    
+    # Los encabezados generan un salto simple
+    texto_con_saltos = re.sub(r'</h[1-6]>', '\n', texto_con_saltos, flags=re.IGNORECASE)
+    
+    # Lista items generan salto
+    texto_con_saltos = texto_con_saltos.replace('</li>', '\n').replace('</LI>', '\n')
+    
+    # Ahora eliminar todas las etiquetas HTML restantes
+    informe_texto = strip_tags(texto_con_saltos)
+    
+    # Limpiar exceso de saltos (máximo 1 línea vacía entre párrafos)
+    while '\n\n\n' in informe_texto:
+        informe_texto = informe_texto.replace('\n\n\n', '\n\n')
+    
+    # Limpiar espacios y tabs al final
+    informe_texto = informe_texto.strip()
     
     return JsonResponse({
         'informe_html': informe_html,
         'informe_texto': informe_texto,
+        'sistema_destino': preinforme.sistema_destino,
         # Mantener compatibilidad con código antiguo
         'informe_final': informe_texto
     })
