@@ -724,6 +724,31 @@ def crear_plantilla_residente(request):
                             html_lines.append(f'<p>{line}</p>')
                     plantilla.contenido = ''.join(html_lines)
             
+            # === LIMPIEZA DE HTML ANTES DE GUARDAR ===
+            if plantilla.contenido:
+                from preinformes.models import sanitize_center_alignment, normalize_html_content
+                from bs4 import BeautifulSoup
+                
+                # 1. Eliminar alineación centrada
+                plantilla.contenido = sanitize_center_alignment(plantilla.contenido)
+                
+                # 2. Eliminar backgrounds (para evitar resaltados verdes/amarillos de Word)
+                soup = BeautifulSoup(plantilla.contenido, 'html.parser')
+                for tag in soup.find_all(True):
+                    if tag.has_attr('style'):
+                        style_parts = [s.strip() for s in tag['style'].split(';') if s.strip()]
+                        cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
+                        
+                        if cleaned_parts:
+                            tag['style'] = '; '.join(cleaned_parts)
+                        else:
+                            del tag['style']
+                
+                plantilla.contenido = str(soup)
+                
+                # 3. Normalizar HTML (convertir <br> a múltiples <p>, eliminar <p>&nbsp;</p>)
+                plantilla.contenido = normalize_html_content(plantilla.contenido)
+            
             try:
                 plantilla.save()
                 

@@ -57,6 +57,34 @@ class PlantillaPreinformeAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        """Limpiar HTML antes de guardar plantilla desde el admin"""
+        if obj.contenido:
+            from preinformes.models import sanitize_center_alignment, normalize_html_content
+            from bs4 import BeautifulSoup
+            
+            # 1. Eliminar alineación centrada
+            obj.contenido = sanitize_center_alignment(obj.contenido)
+            
+            # 2. Eliminar backgrounds
+            soup = BeautifulSoup(obj.contenido, 'html.parser')
+            for tag in soup.find_all(True):
+                if tag.has_attr('style'):
+                    style_parts = [s.strip() for s in tag['style'].split(';') if s.strip()]
+                    cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
+                    
+                    if cleaned_parts:
+                        tag['style'] = '; '.join(cleaned_parts)
+                    else:
+                        del tag['style']
+            
+            obj.contenido = str(soup)
+            
+            # 3. Normalizar HTML
+            obj.contenido = normalize_html_content(obj.contenido)
+        
+        super().save_model(request, obj, form, change)
 
 
 class RevisionPreinformeInline(admin.StackedInline):
