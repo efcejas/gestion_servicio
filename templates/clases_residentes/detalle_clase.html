@@ -105,9 +105,65 @@
                     {% if object.archivo %}
                     <div class="border-t border-gray-200 pt-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                            <i class="fas fa-file-alt mr-2 text-blue-600"></i>Material de la Clase
+                            {% if object.es_video %}
+                                <i class="fas fa-video mr-2 text-blue-600"></i>Video de la Clase
+                            {% else %}
+                                <i class="fas fa-file-alt mr-2 text-blue-600"></i>Material de la Clase
+                            {% endif %}
                         </h3>
-                        <!-- Visor de archivo mejorado -->
+                        
+                        {% if object.es_video %}
+                        <!-- VISUALIZADOR DE VIDEO -->
+                        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                            <div id="visor-video-container" class="w-full max-w-4xl mx-auto bg-black rounded-lg overflow-hidden shadow-lg relative">
+                                <!-- Video player con controles nativos -->
+                                <video 
+                                    id="video-player" 
+                                    controls 
+                                    controlsList="nodownload"
+                                    class="w-full h-auto"
+                                    style="max-height: 70vh;"
+                                    preload="metadata"
+                                >
+                                    <source src="{{ object.get_archivo_url_publico }}" type="{{ object.get_mime_type }}">
+                                    <p class="text-white p-4">Tu navegador no soporta la reproducción de video. 
+                                        <a href="{{ object.get_archivo_url_publico }}" class="text-blue-400 underline">Descarga el video aquí</a>.
+                                    </p>
+                                </video>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2 text-center">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Usa los controles del reproductor. Puedes usar pantalla completa desde el botón de abajo.
+                            </p>
+                        </div>
+                        
+                        <!-- Botones de acción para video -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Botón: Pantalla completa -->
+                            <button onclick="abrirPantallaCompletaVideo()" 
+                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                                    title="Ver en pantalla completa">
+                                <i class="fas fa-expand mr-2"></i>Pantalla Completa
+                            </button>
+                            <!-- Botón: Abrir en nueva ventana -->
+                            <a href="{{ object.get_archivo_url_publico }}" 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                               title="Abrir video en nueva pestaña">
+                                <i class="fas fa-external-link-alt mr-2"></i>Abrir video
+                            </a>
+                            <!-- Botón: Descargar -->
+                            <a href="{{ object.get_archivo_url_publico }}" 
+                               download="{{ object.titulo }}"
+                               class="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                               title="Descargar video">
+                                <i class="fas fa-download mr-2"></i>Descargar
+                            </a>
+                        </div>
+                        
+                        {% else %}
+                        <!-- VISUALIZADOR DE DOCUMENTOS (PPT, PDF, etc.) -->
                         <div class="bg-gray-50 rounded-lg p-4 mb-4">
                             <div id="visor-archivo-container" class="w-full max-w-3xl mx-auto bg-white rounded-xl overflow-hidden shadow-lg border border-gray-200 relative flex items-center justify-center" style="min-height:340px;">
                                 <!-- Loader -->
@@ -144,8 +200,14 @@
                             </p>
                         </div>
 
-                        <!-- Botones de acción -->
+                        <!-- Botones de acción para documentos -->
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <!-- Botón: Pantalla completa -->
+                            <button onclick="abrirPantallaCompletaDocumento('{{ object.get_archivo_url_publico|urlencode }}')" 
+                                    class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 text-center"
+                                    title="Ver en pantalla completa">
+                                <i class="fas fa-expand mr-2"></i>Pantalla Completa
+                            </button>
                             <!-- Botón: Abrir en nueva ventana -->
                             <a href="{{ object.get_archivo_url_publico }}" 
                                target="_blank" 
@@ -162,6 +224,7 @@
                                 <i class="fas fa-download mr-2"></i>Descargar
                             </a>
                         </div>
+                        {% endif %}
                         
                         <!-- Ayuda -->
                         <details class="mt-4">
@@ -169,6 +232,15 @@
                                 <i class="fas fa-question-circle mr-1"></i>¿Problemas para ver el archivo?
                             </summary>
                             <div class="bg-gray-50 p-3 mt-2 rounded text-sm text-gray-700 space-y-2">
+                                {% if object.es_video %}
+                                <p>✓ <strong>Opción 1:</strong> Usa el botón "Pantalla Completa" para ver el video a pantalla completa</p>
+                                <p>✓ <strong>Opción 2:</strong> Usa el botón "Abrir video" (abre en tu navegador)</p>
+                                <p>✓ <strong>Opción 3:</strong> Descarga el video y ábrelo localmente con VLC u otro reproductor</p>
+                                <p class="text-xs text-gray-500 mt-2">
+                                    <i class="fas fa-lightbulb mr-1"></i>
+                                    Si el video no carga, verifica tu conexión. Los videos pueden tardar en cargar según su peso.
+                                </p>
+                                {% else %}
                                 <p>✓ <strong>Opción 1:</strong> Usa el botón "Visor alternativo" (abre con Google Docs)</p>
                                 <p>✓ <strong>Opción 2:</strong> Usa el botón "Abrir archivo" (abre en tu navegador)</p>
                                 <p>✓ <strong>Opción 3:</strong> Descarga el archivo y ábrelo localmente</p>
@@ -176,11 +248,32 @@
                                     <i class="fas fa-lightbulb mr-1"></i>
                                     El visualizador integrado funciona mejor con PowerPoint y Word. Los PDFs pueden tardar más en cargar.
                                 </p>
+                                {% endif %}
                             </div>
                         </details>
                     </div>
 
                     <script>
+                    // FUNCIONES PARA PANTALLA COMPLETA
+                    function abrirPantallaCompletaVideo() {
+                        const video = document.getElementById('video-player');
+                        if (video) {
+                            if (video.requestFullscreen) {
+                                video.requestFullscreen();
+                            } else if (video.webkitRequestFullscreen) { /* Safari */
+                                video.webkitRequestFullscreen();
+                            } else if (video.msRequestFullscreen) { /* IE11 */
+                                video.msRequestFullscreen();
+                            }
+                        }
+                    }
+                    
+                    function abrirPantallaCompletaDocumento(url) {
+                        const urlDecodificada = decodeURIComponent(url);
+                        const officeViewerUrl = 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(urlDecodificada);
+                        window.open(officeViewerUrl, '_blank', 'width=' + screen.width + ',height=' + screen.height);
+                    }
+                    
                     function abrirVisualizadorAlternativo(url) {
                         const urlDecodificada = decodeURIComponent(url);
                         const googleViewerUrl = 'https://docs.google.com/viewer?url=' + encodeURIComponent(urlDecodificada) + '&embedded=true';

@@ -75,6 +75,18 @@ class ClaseResidente(models.Model):
         help_text='Miniatura de la presentación'
     )
     
+    # Tipo de archivo (documento o video)
+    TIPO_ARCHIVO_CHOICES = [
+        ('documento', 'Documento (PPT, PDF, etc.)'),
+        ('video', 'Video (MP4, MOV, etc.)'),
+    ]
+    tipo_archivo = models.CharField(
+        max_length=20,
+        choices=TIPO_ARCHIVO_CHOICES,
+        default='documento',
+        help_text='Tipo de archivo cargado'
+    )
+    
     # Clasificación por año de residencia (múltiple)
     anios_dirigidos = models.JSONField(
         default=list,
@@ -206,6 +218,66 @@ class ClaseResidente(models.Model):
             pass
         
         return None
+    
+    def get_tipo_archivo_detectado(self):
+        """
+        Detecta automáticamente el tipo de archivo según su extensión.
+        Útil para archivos cargados antes de agregar el campo tipo_archivo.
+        """
+        if not self.archivo:
+            return 'documento'
+        
+        try:
+            nombre_archivo = self.archivo.name.lower()
+            extension = nombre_archivo.split('.')[-1] if '.' in nombre_archivo else ''
+            
+            EXTENSIONES_VIDEO = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'flv', 'wmv']
+            
+            if extension in EXTENSIONES_VIDEO:
+                return 'video'
+            return 'documento'
+        except Exception:
+            return 'documento'
+    
+    def es_video(self):
+        """
+        Retorna True si el archivo es un video.
+        Verifica tanto el campo tipo_archivo como la extensión real.
+        """
+        # Priorizar el campo tipo_archivo si está definido
+        if self.tipo_archivo == 'video':
+            return True
+        # Fallback: detectar por extensión
+        return self.get_tipo_archivo_detectado() == 'video'
+    
+    def get_mime_type(self):
+        """
+        Retorna el MIME type aproximado según el tipo y extensión del archivo.
+        """
+        if not self.archivo:
+            return None
+        
+        try:
+            extension = self.archivo.name.lower().split('.')[-1] if '.' in self.archivo.name else ''
+            
+            MIME_TYPES = {
+                # Videos
+                'mp4': 'video/mp4',
+                'webm': 'video/webm',
+                'mov': 'video/quicktime',
+                'avi': 'video/x-msvideo',
+                'mkv': 'video/x-matroska',
+                'm4v': 'video/x-m4v',
+                # Documentos
+                'pdf': 'application/pdf',
+                'ppt': 'application/vnd.ms-powerpoint',
+                'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'key': 'application/x-iwork-keynote-sffkey',
+            }
+            
+            return MIME_TYPES.get(extension, 'application/octet-stream')
+        except Exception:
+            return 'application/octet-stream'
 
 
 class ComentarioClase(models.Model):

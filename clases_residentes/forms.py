@@ -34,7 +34,7 @@ class ClaseResidenteForm(forms.ModelForm):
             }),
             'archivo': forms.FileInput(attrs={
                 'class': 'w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none',
-                'accept': '.ppt,.pptx,.pdf,.key'
+                'accept': '.ppt,.pptx,.pdf,.key,.mp4,.mov,.avi,.webm,.mkv,.m4v'
             }),
             'archivo_thumbnail': forms.FileInput(attrs={
                 'class': 'w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none',
@@ -64,11 +64,50 @@ class ClaseResidenteForm(forms.ModelForm):
         if 'fecha_clase' in self.fields and self.instance and self.instance.pk and self.instance.fecha_clase:
             self.initial['fecha_clase'] = self.instance.fecha_clase.strftime('%Y-%m-%d')
     
+    def clean_archivo(self):
+        """
+        Valida que el archivo tenga una extensión permitida.
+        """
+        archivo = self.cleaned_data.get('archivo')
+        if archivo:
+            # Solo validar si es un archivo nuevo (no un FileField existente)
+            if hasattr(archivo, 'name'):
+                nombre_archivo = archivo.name.lower()
+                extension = nombre_archivo.split('.')[-1] if '.' in nombre_archivo else ''
+                
+                EXTENSIONES_VALIDAS = [
+                    # Documentos
+                    'ppt', 'pptx', 'pdf', 'key',
+                    # Videos
+                    'mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'flv', 'wmv'
+                ]
+                
+                if extension not in EXTENSIONES_VALIDAS:
+                    raise forms.ValidationError(
+                        f'Formato de archivo no soportado. '
+                        f'Extensiones permitidas: {', '.join(EXTENSIONES_VALIDAS)}'
+                    )
+        
+        return archivo
+    
     def save(self, commit=True):
         instance = super().save(commit=False)
         # Convertir MultipleChoiceField a lista para JSONField
         anios = self.cleaned_data.get('anios_dirigidos', [])
         instance.anios_dirigidos = list(anios) if anios else []
+        
+        # Detectar automáticamente el tipo de archivo si hay un archivo nuevo
+        archivo = self.cleaned_data.get('archivo')
+        if archivo and hasattr(archivo, 'name'):
+            nombre_archivo = archivo.name.lower()
+            extension = nombre_archivo.split('.')[-1] if '.' in nombre_archivo else ''
+            
+            EXTENSIONES_VIDEO = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'flv', 'wmv']
+            
+            if extension in EXTENSIONES_VIDEO:
+                instance.tipo_archivo = 'video'
+            else:
+                instance.tipo_archivo = 'documento'
 
         # Eliminar archivo si el usuario lo solicita
         request = getattr(self, 'request', None)
