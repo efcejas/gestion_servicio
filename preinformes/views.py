@@ -918,6 +918,10 @@ def copiar_informe_final(request, pk):
     # Ahora eliminar todas las etiquetas HTML restantes
     informe_texto = strip_tags(texto_con_saltos)
     
+    # Convertir entidades HTML (&nbsp;, &amp;, etc.) a texto real
+    import html
+    informe_texto = html.unescape(informe_texto)
+    
     # Limpiar exceso de saltos (máximo 1 línea vacía entre párrafos)
     while '\n\n\n' in informe_texto:
         informe_texto = informe_texto.replace('\n\n\n', '\n\n')
