@@ -504,11 +504,6 @@ function copiarInformeFinal(preinformeId) {
             if (data.informe_html) {
                 const sistemaDestino = data.sistema_destino || 'eges';
                 
-                // DEBUG: Ver qué HTML viene del backend
-                console.log('=== HTML DEL BACKEND ===');
-                console.log(data.informe_html);
-                console.log('========================');
-                
                 // Para NetTerm: copiar solo texto plano con saltos de línea preservados
                 if (sistemaDestino === 'netterm') {
                     copiarTextoPlano(data.informe_texto);
