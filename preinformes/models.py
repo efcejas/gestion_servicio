@@ -117,6 +117,140 @@ def normalize_html_content(content):
     return content
 
 
+def normalize_html_content_soft(content: str, br_threshold: int = 3) -> str:
+    """
+    Versión "soft" de normalización HTML que RESPETA la estructura original del usuario.
+    
+    Esta función es menos agresiva que normalize_html_content() y preserva la estructura
+    intencional creada por el usuario (por ejemplo, técnicas narrativas con 1-2 <br>,
+    o separaciones verticales con <br><br>).
+    
+    Heurística de decisión:
+    
+    1. HTML con 2+ <p>: NO reestructurar (ya está bien formado)
+       - Solo eliminar <p> vacíos (&nbsp;, <br>, espacios)
+       - Preservar todos los <br> tal como están
+       
+    2. HTML con 0 <p> (texto plano): Convertir líneas por saltos \n
+       - Interpretar como texto sin formatear
+       - Crear <p> por cada línea
+       
+    3. HTML con 1 <p> y >= br_threshold <br>: Interpretar como "pegado sucio"
+       - Probablemente viene de Word/otro editor
+       - SÍ convertir <br> en nuevos <p>
+       
+    4. HTML con 1 <p> pero < br_threshold <br>: PRESERVAR
+       - Probablemente es contenido intencional (técnica narrativa)
+       - NO convertir <br> a <p>
+       
+    5. No tocar <br> dentro de <table>, <ul>, <ol>, <li>
+       - Estructuras complejas se preservan intactas
+    
+    Args:
+        content: HTML a normalizar
+        br_threshold: Número mínimo de <br> para considerar "pegado sucio" (default: 3)
+    
+    Returns:
+        HTML normalizado de forma respetuosa
+    
+    Ejemplos:
+        >>> # Caso 1: Técnica narrativa (NO convertir)
+        >>> html = '<p><strong>TÉCNICA:</strong></p><p>Linea 1<br>Linea 2</p>'
+        >>> normalize_html_content_soft(html)
+        '<p><strong>TÉCNICA:</strong></p><p>Linea 1<br>Linea 2</p>'
+        
+        >>> # Caso 2: Pegado sucio con muchos br (SÍ convertir)
+        >>> html = '<p>L1<br>L2<br>L3<br>L4</p>'
+        >>> normalize_html_content_soft(html)
+        '<p>L1</p><p>L2</p><p>L3</p><p>L4</p>'
+    """
+    # Manejar None o vacío
+    if not content:
+        return ''
+    
+    content = content.strip()
+    if not content:
+        return ''
+    
+    # Paso 1: Contar <p> existentes (con o sin atributos)
+    p_count = len(re.findall(r'<p(?:\s[^>]*)?>',  content, flags=re.IGNORECASE))
+    
+    # Paso 2: Si tiene 2+ <p>, asumir que está bien estructurado
+    # Solo limpiar párrafos vacíos y devolver
+    if p_count >= 2:
+        # Eliminar <p> vacíos: <p>&nbsp;</p>, <p> </p>, <p><br></p>, <p></p>
+        cleaned = re.sub(
+            r'<p(?:\s[^>]*)?>(\s|&nbsp;|<br\s*/?>)*</p>',
+            '',
+            content,
+            flags=re.IGNORECASE
+        )
+        
+        # Eliminar múltiples <p></p> consecutivos que puedan quedar
+        cleaned = re.sub(r'(</p>)\s*(<p(?:\s[^>]*)?>)\s*(?=\s*<p)', r'\1\2', cleaned)
+        
+        return cleaned.strip()
+    
+    # Paso 3: Si tiene 0 <p>, es texto plano con posibles \n
+    if p_count == 0:
+        # Convertir saltos de línea en párrafos
+        lines = [line.strip() for line in content.split('\n') if line.strip()]
+        if lines:
+            return ''.join(f'<p>{line}</p>' for line in lines)
+        # Si no hay líneas válidas, envolver en un <p>
+        return f'<p>{content}</p>' if content else ''
+    
+    # Paso 4: Si tiene exactamente 1 <p>, analizar <br> dentro
+    # Contar <br> fuera de estructuras complejas
+    
+    # Crear una copia sin tablas, listas, para contar <br> "peligrosos"
+    # TODO: Mejorar esta heurística si se encuentran edge cases
+    temp_content = content
+    
+    # Remover temporalmente contenido de tablas
+    temp_content = re.sub(r'<table[^>]*>.*?</table>', '', temp_content, flags=re.IGNORECASE | re.DOTALL)
+    # Remover temporalmente listas
+    temp_content = re.sub(r'<[uo]l[^>]*>.*?</[uo]l>', '', temp_content, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Contar <br> en el contenido filtrado
+    br_count = len(re.findall(r'<br\s*/?>', temp_content, flags=re.IGNORECASE))
+    
+    # Si tiene >= br_threshold <br>, interpretar como pegado sucio
+    if br_count >= br_threshold:
+        # Convertir <br> a saltos de línea temporales
+        content = re.sub(r'<br\s*/?>', '\n', content, flags=re.IGNORECASE)
+        
+        # Eliminar párrafos vacíos
+        content = re.sub(
+            r'<p(?:\s[^>]*)?>(\s|&nbsp;|<br\s*/?>)*</p>',
+            '',
+            content,
+            flags=re.IGNORECASE
+        )
+        
+        # Extraer contenido de <p> y dividir por \n
+        def process_p_tag(match):
+            inner = match.group(1)
+            # Dividir por saltos de línea y crear párrafos individuales
+            lines = [line.strip() for line in inner.split('\n') if line.strip()]
+            return ''.join(f'<p>{line}</p>' for line in lines)
+        
+        # Procesar el tag <p>
+        result = re.sub(r'<p(?:\s[^>]*)?>(.*?)</p>', process_p_tag, content, flags=re.DOTALL | re.IGNORECASE)
+        return result.strip()
+    
+    # Paso 5: Si tiene < br_threshold <br>, PRESERVAR estructura original
+    # Solo eliminar párrafos vacíos obvios
+    cleaned = re.sub(
+        r'<p(?:\s[^>]*)?>(\s|&nbsp;)*</p>',
+        '',
+        content,
+        flags=re.IGNORECASE
+    )
+    
+    return cleaned.strip()
+
+
 def strip_html_tags(text):
     """Remueve tags HTML y devuelve solo el texto"""
     if not text:
@@ -550,8 +684,8 @@ class RevisionPreinforme(models.Model):
         if not self.informe_final_html:
             # Preferir snapshot si existe, sino generar
             contenido_base = self.informe_residente_snapshot or self.generar_informe_original_residente()
-            # IMPORTANTE: Normalizar el HTML para que CKEditor muestre párrafos separados
-            self.informe_final_html = normalize_html_content(contenido_base)
+            # IMPORTANTE: Normalizar el HTML de forma RESPETUOSA para CKEditor (preserva estructura original)
+            self.informe_final_html = normalize_html_content_soft(contenido_base)
             if save:
                 self.save()
     

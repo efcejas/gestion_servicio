@@ -61,7 +61,7 @@ class PlantillaPreinformeAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """Limpiar HTML antes de guardar plantilla desde el admin"""
         if obj.contenido:
-            from preinformes.models import sanitize_center_alignment, normalize_html_content
+            from preinformes.models import sanitize_center_alignment, normalize_html_content_soft
             from bs4 import BeautifulSoup
             
             # 1. Eliminar alineación centrada
@@ -81,8 +81,8 @@ class PlantillaPreinformeAdmin(admin.ModelAdmin):
             
             obj.contenido = str(soup)
             
-            # 3. Normalizar HTML
-            obj.contenido = normalize_html_content(obj.contenido)
+            # 3. Normalizar HTML de forma RESPETUOSA (preserva estructura original)
+            obj.contenido = normalize_html_content_soft(obj.contenido)
         
         super().save_model(request, obj, form, change)
 

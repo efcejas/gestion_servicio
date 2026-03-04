@@ -9,7 +9,7 @@ Uso:
 """
 
 from django.core.management.base import BaseCommand
-from preinformes.models import PlantillaPreinforme, sanitize_center_alignment, normalize_html_content
+from preinformes.models import PlantillaPreinforme, sanitize_center_alignment, normalize_html_content_soft
 from bs4 import BeautifulSoup
 
 
@@ -79,8 +79,8 @@ class Command(BaseCommand):
             
             contenido_limpio = str(soup)
 
-            # 3. Normalizar HTML
-            contenido_limpio = normalize_html_content(contenido_limpio)
+            # 3. Normalizar HTML de forma RESPETUOSA (preserva estructura original)
+            contenido_limpio = normalize_html_content_soft(contenido_limpio)
 
             # Verificar si hubo cambios
             if contenido_limpio != original_contenido:

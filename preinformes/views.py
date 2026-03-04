@@ -726,7 +726,7 @@ def crear_plantilla_residente(request):
             
             # === LIMPIEZA DE HTML ANTES DE GUARDAR ===
             if plantilla.contenido:
-                from preinformes.models import sanitize_center_alignment, normalize_html_content
+                from preinformes.models import sanitize_center_alignment, normalize_html_content_soft
                 from bs4 import BeautifulSoup
                 
                 # 1. Eliminar alineación centrada
@@ -746,8 +746,8 @@ def crear_plantilla_residente(request):
                 
                 plantilla.contenido = str(soup)
                 
-                # 3. Normalizar HTML (convertir <br> a múltiples <p>, eliminar <p>&nbsp;</p>)
-                plantilla.contenido = normalize_html_content(plantilla.contenido)
+                # 3. Normalizar HTML de forma RESPETUOSA (preserva estructura original)
+                plantilla.contenido = normalize_html_content_soft(plantilla.contenido)
             
             try:
                 plantilla.save()
