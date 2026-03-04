@@ -858,19 +858,40 @@ def copiar_informe_final(request, pk):
         # Si no hay revisión, usar el preinforme original con método unificado
         informe_html_original = preinforme.get_informe_html_or_legacy()
     
-    # Limpiar HTML de estilos de fondo para evitar el problema del resaltado verde
+    # Limpiar HTML solo de backgrounds (resaltado verde) - mantener todo lo demás fiel al guardado
     soup = BeautifulSoup(informe_html_original, 'html.parser')
-    # Eliminar atributos de estilo que contienen background
+    
+    # Convertir <span style="color:..."> a <font color="..."> para compatibilidad con Word/EGES
+    for span in soup.find_all('span'):
+        if span.has_attr('style'):
+            style = span['style']
+            style_parts = [s.strip() for s in style.split(';') if s.strip()]
+            
+            color_value = None
+            for part in style_parts:
+                part_lower = part.lower()
+                if part_lower.startswith('color:'):
+                    color_value = part.split(':', 1)[1].strip()
+                    break
+            
+            # Si tiene color, convertir a <font>
+            if color_value:
+                font_tag = soup.new_tag('font', color=color_value)
+                font_tag.string = span.get_text()
+                span.replace_with(font_tag)
+    
+    # Limpiar backgrounds de todos los tags
     for tag in soup.find_all(True):
         if tag.has_attr('style'):
             style = tag['style']
-            # Eliminar propiedades background-*
             style_parts = [s.strip() for s in style.split(';') if s.strip()]
-            cleaned_parts = [s for s in style_parts if not s.lower().startswith('background')]
+            cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
+            
             if cleaned_parts:
                 tag['style'] = '; '.join(cleaned_parts)
             else:
                 del tag['style']
+    
     informe_html = str(soup)
     
     # Convertir HTML a texto plano preservando saltos de línea

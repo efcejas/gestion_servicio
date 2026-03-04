@@ -53,9 +53,7 @@ class PreinformeForm(forms.ModelForm):
             }),
             'dni_paciente': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
-                'placeholder': 'DNI del paciente (ej: 12345678)',
-                'pattern': '[0-9]{7,8}',
-                'title': 'Ingrese un DNI válido (7 u 8 dígitos)'
+                'placeholder': 'DNI del paciente (opcional)',
             }),
             'edad_paciente': forms.NumberInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
@@ -91,6 +89,9 @@ class PreinformeForm(forms.ModelForm):
         
         # Configurar el campo revisor para mostrar nombre completo
         self.fields['revisor'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+        
+        # Hacer que el DNI no sea obligatorio para residentes
+        self.fields['dni_paciente'].required = False
         
         # Si estamos procesando datos del formulario (POST), permitir todas las plantillas activas
         # para que pase la validación inicial. El método clean_plantilla_utilizada validará correctamente

@@ -448,8 +448,7 @@ function copiarInformeFinal() {
         textoPlano = textoPlano.trim();
         copiarTextoPlano(textoPlano);
     } else {
-        // Para EGES: copiar con estilos inline para mejor compatibilidad
-        const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${htmlContent}</div>`;
+        // Para EGES: copiar HTML tal cual está guardado (sin wrapper que sobrescriba estilos)
         
         // Generar versión texto plano como fallback
         const tempDiv = document.createElement('div');
@@ -459,7 +458,7 @@ function copiarInformeFinal() {
         // Intentar copiar con ClipboardItem API (navegadores modernos)
         if (navigator.clipboard && window.ClipboardItem) {
             try {
-                const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+                const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
                 const textBlob = new Blob([plainText], { type: 'text/plain' });
                 
                 const clipboardItem = new ClipboardItem({
@@ -473,14 +472,14 @@ function copiarInformeFinal() {
                     })
                     .catch(err => {
                         console.error('Error con ClipboardItem:', err);
-                        copiarConFallback(htmlWithStyles, plainText);
+                        copiarConFallback(htmlContent, plainText);
                     });
             } catch (err) {
                 console.error('Error creando ClipboardItem:', err);
-                copiarConFallback(htmlWithStyles, plainText);
+                copiarConFallback(htmlContent, plainText);
             }
         } else {
-            copiarConFallback(htmlWithStyles, plainText);
+            copiarConFallback(htmlContent, plainText);
         }
     }
 }

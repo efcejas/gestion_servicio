@@ -319,13 +319,13 @@ function copiarInformeFinal(preinformeId) {
                 if (sistemaDestino === 'netterm') {
                     copiarTextoPlano(data.informe_texto);
                 } else {
-                    // Para EGES: copiar HTML con formato pero sin estilos de fondo
-                    const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${data.informe_html}</div>`;
+                    // Para EGES: copiar HTML tal cual está guardado (solo sin backgrounds)
+                    const htmlContent = data.informe_html;
                     const plainText = data.informe_texto || data.informe_final;
                     
                     if (navigator.clipboard && window.ClipboardItem) {
                         try {
-                            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+                            const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
                             const textBlob = new Blob([plainText], { type: 'text/plain' });
                             const clipboardItem = new ClipboardItem({
                                 'text/html': htmlBlob,
@@ -336,14 +336,14 @@ function copiarInformeFinal(preinformeId) {
                                 .then(() => mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success'))
                                 .catch(err => {
                                     console.error('Error con ClipboardItem:', err);
-                                    copiarConFallbackHTML(htmlWithStyles, plainText);
+                                    copiarConFallbackHTML(htmlContent, plainText);
                                 });
                         } catch (err) {
                             console.error('Error creando ClipboardItem:', err);
-                            copiarConFallbackHTML(htmlWithStyles, plainText);
+                            copiarConFallbackHTML(htmlContent, plainText);
                         }
                     } else {
-                        copiarConFallbackHTML(htmlWithStyles, plainText);
+                        copiarConFallbackHTML(htmlContent, plainText);
                     }
                 }
             } else {

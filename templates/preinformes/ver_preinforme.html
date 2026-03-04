@@ -268,9 +268,51 @@
             </h2>
             
             <div class="mt-2 p-4 bg-blue-50 rounded-md border border-blue-200">
-                <div class="ck-content text-sm text-gray-700">
-                    {{ preinforme.get_informe_html_or_legacy|safe }}
-                </div>
+                <!-- Visualizador aislado con iframe para versión original -->
+                <iframe id="informe-original-viewer" 
+                        style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
+                        frameborder="0">
+                </iframe>
+                <script>
+                    // Inyectar HTML de versión original en iframe
+                    (function() {
+                        const iframe = document.getElementById('informe-original-viewer');
+                        const htmlContent = `{{ preinforme.get_informe_html_or_legacy|escapejs }}`;
+                        const doc = iframe.contentDocument || iframe.contentWindow.document;
+                        doc.open();
+                        doc.write(`
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <meta charset="UTF-8">
+                                <style>
+                                    body {
+                                        font-family: Arial, sans-serif;
+                                        font-size: 12pt;
+                                        line-height: 1.6;
+                                        padding: 15px;
+                                        margin: 0;
+                                        color: #333;
+                                    }
+                                </style>
+                            </head>
+                            <body>${htmlContent}</body>
+                            </html>
+                        `);
+                        doc.close();
+                        
+                        // Ajustar altura del iframe al contenido
+                        iframe.onload = function() {
+                            try {
+                                const body = iframe.contentDocument.body;
+                                const height = body.scrollHeight + 30;
+                                iframe.style.height = height + 'px';
+                            } catch(e) {
+                                console.log('No se pudo ajustar altura del iframe original');
+                            }
+                        };
+                    })();
+                </script>
             </div>
         </div>
 
@@ -309,9 +351,51 @@
                             Informe Final Corregido
                         </h3>
                         <div class="p-4 bg-green-50 border border-green-200 rounded-md">
-                            <div class="ck-content text-sm text-gray-700">
-                                {{ preinforme.revision.informe_final_html|safe }}
-                            </div>
+                            <!-- Visualizador aislado con iframe para mostrar HTML exactamente como está guardado -->
+                            <iframe id="informe-final-viewer" 
+                                    style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
+                                    frameborder="0">
+                            </iframe>
+                            <script>
+                                // Inyectar HTML en iframe para aislarlo del CSS del sitio
+                                (function() {
+                                    const iframe = document.getElementById('informe-final-viewer');
+                                    const htmlContent = `{{ preinforme.revision.informe_final_html|escapejs }}`;
+                                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                    doc.open();
+                                    doc.write(`
+                                        <!DOCTYPE html>
+                                        <html>
+                                        <head>
+                                            <meta charset="UTF-8">
+                                            <style>
+                                                body {
+                                                    font-family: Arial, sans-serif;
+                                                    font-size: 12pt;
+                                                    line-height: 1.6;
+                                                    padding: 15px;
+                                                    margin: 0;
+                                                    color: #333;
+                                                }
+                                            </style>
+                                        </head>
+                                        <body>${htmlContent}</body>
+                                        </html>
+                                    `);
+                                    doc.close();
+                                    
+                                    // Ajustar altura del iframe al contenido
+                                    iframe.onload = function() {
+                                        try {
+                                            const body = iframe.contentDocument.body;
+                                            const height = body.scrollHeight + 30;
+                                            iframe.style.height = height + 'px';
+                                        } catch(e) {
+                                            console.log('No se pudo ajustar altura del iframe');
+                                        }
+                                    };
+                                })();
+                            </script>
                         </div>
                         <button onclick="copiarInformeFinal({{ preinforme.pk }})" 
                                 class="mt-3 w-full inline-flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
@@ -335,9 +419,51 @@
         <h2 class="text-xl font-semibold text-gray-900 mb-4">Preinforme Original</h2>
         
         <div class="mt-2 p-4 bg-gray-50 rounded-md">
-            <div class="ck-content text-sm text-gray-700">
-                {{ preinforme.get_informe_html_or_legacy|safe }}
-            </div>
+            <!-- Visualizador aislado con iframe cuando no hay revisión -->
+            <iframe id="informe-sin-revision-viewer" 
+                    style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
+                    frameborder="0">
+            </iframe>
+            <script>
+                // Inyectar HTML de preinforme original en iframe
+                (function() {
+                    const iframe = document.getElementById('informe-sin-revision-viewer');
+                    const htmlContent = `{{ preinforme.get_informe_html_or_legacy|escapejs }}`;
+                    const doc = iframe.contentDocument || iframe.contentWindow.document;
+                    doc.open();
+                    doc.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="UTF-8">
+                            <style>
+                                body {
+                                    font-family: Arial, sans-serif;
+                                    font-size: 12pt;
+                                    line-height: 1.6;
+                                    padding: 15px;
+                                    margin: 0;
+                                    color: #333;
+                                }
+                            </style>
+                        </head>
+                        <body>${htmlContent}</body>
+                        </html>
+                    `);
+                    doc.close();
+                    
+                    // Ajustar altura del iframe al contenido
+                    iframe.onload = function() {
+                        try {
+                            const body = iframe.contentDocument.body;
+                            const height = body.scrollHeight + 30;
+                            iframe.style.height = height + 'px';
+                        } catch(e) {
+                            console.log('No se pudo ajustar altura del iframe');
+                        }
+                    };
+                })();
+            </script>
         </div>
     </div>
     {% endif %}
@@ -378,18 +504,23 @@ function copiarInformeFinal(preinformeId) {
             if (data.informe_html) {
                 const sistemaDestino = data.sistema_destino || 'eges';
                 
+                // DEBUG: Ver qué HTML viene del backend
+                console.log('=== HTML DEL BACKEND ===');
+                console.log(data.informe_html);
+                console.log('========================');
+                
                 // Para NetTerm: copiar solo texto plano con saltos de línea preservados
                 if (sistemaDestino === 'netterm') {
                     copiarTextoPlano(data.informe_texto);
                 } else {
-                    // Para EGES: copiar HTML con formato pero sin estilos de fondo
-                    const htmlWithStyles = `<div style="font-family: Arial, sans-serif; font-size: 12pt; line-height: 1.6;">${data.informe_html}</div>`;
+                    // Para EGES: copiar HTML tal cual está guardado (solo sin backgrounds)
+                    const htmlContent = data.informe_html;
                     const plainText = data.informe_texto || data.informe_final;
                     
                     // Intentar copiar con ClipboardItem (múltiples MIME types)
                     if (navigator.clipboard && window.ClipboardItem) {
                         try {
-                            const htmlBlob = new Blob([htmlWithStyles], { type: 'text/html' });
+                            const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
                             const textBlob = new Blob([plainText], { type: 'text/plain' });
                             const clipboardItem = new ClipboardItem({
                                 'text/html': htmlBlob,
@@ -400,14 +531,14 @@ function copiarInformeFinal(preinformeId) {
                                 .then(() => mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success'))
                                 .catch(err => {
                                     console.error('Error con ClipboardItem:', err);
-                                    copiarConFallbackHTML(htmlWithStyles, plainText);
+                                    copiarConFallbackHTML(htmlContent, plainText);
                                 });
                         } catch (err) {
                             console.error('Error creando ClipboardItem:', err);
-                            copiarConFallbackHTML(htmlWithStyles, plainText);
+                            copiarConFallbackHTML(htmlContent, plainText);
                         }
                     } else {
-                        copiarConFallbackHTML(htmlWithStyles, plainText);
+                        copiarConFallbackHTML(htmlContent, plainText);
                     }
                 }
             } else {
