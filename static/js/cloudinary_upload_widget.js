@@ -58,8 +58,8 @@ function initCloudinaryVideoWidget() {
     // Crear widget de Cloudinary
     const widget = cloudinary.createUploadWidget(
         {
-            cloudName: CLOUDINARY_CONFIG.cloudName,
-            uploadPreset: CLOUDINARY_CONFIG.uploadPreset,
+            cloudName: window.CLOUDINARY_CLOUD_NAME,
+            uploadPreset: window.CLOUDINARY_UPLOAD_PRESET,
             folder: CLOUDINARY_CONFIG.folder,
             resourceType: CLOUDINARY_CONFIG.resourceType,
             maxFileSize: CLOUDINARY_CONFIG.maxFileSize,
