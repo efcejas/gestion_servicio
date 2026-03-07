@@ -158,7 +158,7 @@ function initCloudinaryVideoWidget() {
             }
 
             if (result.event === 'upload-progress') {
-                const percent = Math.round((result.data.bytes result.data.total_bytes) * 100);
+                const percent = Math.round((result.data.bytes / result.data.total_bytes) * 100);
                 updateProgress(percent, `Subiendo: ${percent}%`);
             }
 
