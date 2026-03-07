@@ -195,9 +195,18 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        # Usar CompressedManifestStaticFilesStorage sin strict mode
+        # para evitar errores de encoding en archivos CSS con caracteres especiales
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "OPTIONS": {
+            "manifest_strict": False,
+        },
     },
 }
+
+# Deshabilitar post-processing de WhiteNoise para evitar errores de encoding
+WHITENOISE_AUTOREFRESH = True
+WHITENOISE_USE_FINDERS = True
 
 # Configuración de WhiteNoise
 WHITENOISE_AUTOREFRESH = True if DEBUG else False
