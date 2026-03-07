@@ -310,7 +310,7 @@ Cuando trabajes en este proyecto:
 2. **Prioriza la seguridad**: Datos sensibles de pacientes y financieros
 3. **Optimiza queries**: El sistema maneja muchos registros históricos
 4. **Mantén consistencia**: Sigue los patrones existentes en el código
-5. **Documenta cambios importantes**: Especialmente en áreas críticas
+5. **Si hiciste cambios importantes, pregúntame si quiero que documentes**: Especialmente en áreas críticas
 6. **Tests first**: Para lógica de negocio compleja
 
 ## 📚 Referencias
