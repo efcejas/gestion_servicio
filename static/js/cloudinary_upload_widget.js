@@ -10,7 +10,7 @@ const CLOUDINARY_CONFIG = {
     uploadPreset: window.CLOUDINARY_UPLOAD_PRESET || 'clases_residentes_unsigned',
     folder: 'clases_residentes/videos',
     resourceType: 'video',
-    maxFileSize: 500000000, // 500 MB
+    maxFileSize: 1000000000, // 1 GB (1000 MB)
     maxVideoDuration: 3600, // 60 minutos
 };
 
@@ -103,7 +103,7 @@ function initCloudinaryVideoWidget() {
                     "no_results": "Sin resultados",
                     "search_placeholder": "Buscar archivos",
                     "about_uw": "Acerca del widget",
-                    "max_file_size": "Tamaño máximo: 500 MB",
+                    "max_file_size": "Tamaño máximo: 1 GB",
                     "max_video_duration": "Duración máxima: 60 minutos",
                     "unsave_video_warn": "¿Seguro que quieres cerrar? El video no se guardará.",
                     "menu": {

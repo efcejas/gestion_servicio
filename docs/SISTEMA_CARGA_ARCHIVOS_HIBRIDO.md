@@ -17,7 +17,7 @@ Resolver el error **H28 "Client Connection Idle"** de Heroku implementando un si
 │   DOCUMENTOS (S3/MinIO)  │     │   VIDEOS (Cloudinary)    │
 │                          │     │                          │
 │  • PPT, PDF, KEY         │     │  • MP4, MOV, AVI, WMV    │
-│  • Hasta 50 MB           │     │  • Hasta 500 MB          │
+│  • Hasta 50 MB           │     │  • Hasta 1 GB            │
 │  • Subida tradicional    │     │  • Subida directa        │
 │  • A través de Django    │     │  • Sin pasar por Django  │
 │  • Sin timeout           │     │  • Con barra de progreso │
@@ -102,7 +102,7 @@ python manage.py migrate clases_residentes
    - **Signing Mode:** `Unsigned` ⚠️ IMPORTANTE
    - **Folder:** `clases_residentes/videos`
    - **Resource type:** `Video`
-   - **Max file size:** `500000000` (500 MB)
+   - **Max file size:** `1000000000` (1 GB)
    - **Max video duration:** `3600` (60 minutos)
    - **Allowed formats:** `mp4,mov,avi,wmv,flv,mkv,m4v,webm`
 4. Guardar
@@ -192,7 +192,7 @@ heroku logs --tail --app gestion-colegiales
 - Costo: bajo (Stackhero)
 
 **Cloudinary (Videos):**
-- Tamaño máximo: 500 MB por archivo
+- Tamaño máximo: 1 GB por archivo
 - Duración máxima: 60 minutos
 - Plan gratuito: 10 GB almacenamiento total
 - Monitorear uso mensual
@@ -225,7 +225,7 @@ heroku logs --tail --app gestion-colegiales
 
 **Causas posibles:**
 1. Estás usando el tab "Documento" con un video (usar tab "Video")
-2. El archivo es demasiado grande (> 500 MB) - comprimir más
+2. El archivo es demasiado grande (> 1 GB) - comprimir más
 3. El upload preset no está configurado correctamente
 
 ## 📞 Soporte
