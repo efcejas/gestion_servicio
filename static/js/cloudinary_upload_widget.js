@@ -138,7 +138,7 @@ function initCloudinaryVideoWidget() {
                     }
                 }
             },
-            language: 'es',
+            language: 'es'
         },
         (error, result) => {
             if (error) {
