@@ -112,35 +112,159 @@
             {{ form.descripcion.errors }}
         </div>
 
-        <!-- Archivos -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                <label class="block text-sm font-semibold mb-1">
-                    Archivo (PPT / PDF)
-                </label>
-                {{ form.archivo }}
-                {{ form.archivo.errors }}
-
-                {% if form.instance.archivo %}
-                <p class="text-xs text-green-600 mt-1">
-                    Archivo actual cargado
-                </p>
-                {% endif %}
+        <!-- Archivos: Documentos y Videos -->
+        <div class="space-y-4">
+            <h3 class="text-sm font-semibold text-gray-900 border-b pb-2 mb-4">Archivos de la clase</h3>
+            
+            <!-- Tabs para elegir tipo de archivo -->
+            <div class="flex gap-2 border-b border-gray-200">
+                <button type="button" id="tab-documento" class="tab-btn active px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+                    <i class="fas fa-file-pdf mr-2"></i>Documento (PPT/PDF)
+                </button>
+                <button type="button" id="tab-video" class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-video mr-2"></i>Video
+                </button>
             </div>
 
-            <div>
-                <label class="block text-sm font-semibold mb-1">
-                    Imagen de portada
-                </label>
-                {{ form.archivo_thumbnail }}
-                {{ form.archivo_thumbnail.errors }}
+            <!-- Panel de Documento -->
+            <div id="panel-documento" class="tab-panel">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">
+                            Archivo de documento (PPT, PDF, KEY)
+                        </label>
+                        {{ form.archivo }}
+                        {{ form.archivo.errors }}
+                        <p class="text-xs text-gray-500 mt-1">
+                            Sube una presentación PowerPoint o PDF (hasta 50 MB)
+                        </p>
 
-                {% if form.instance.archivo_thumbnail %}
-                <img src="{{ form.instance.archivo_thumbnail.url }}"
-                     class="mt-2 rounded max-h-40">
-                {% endif %}
+                        {% if form.instance.archivo %}
+                        <p class="text-xs text-green-600 mt-1">
+                            ✓ Archivo actual cargado
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold mb-1">
+                            Imagen de portada
+                        </label>
+                        {{ form.archivo_thumbnail }}
+                        {{ form.archivo_thumbnail.errors }}
+                        <p class="text-xs text-gray-500 mt-1">
+                            Imagen de portada para la clase
+                        </p>
+
+                        {% if form.instance.archivo_thumbnail %}
+                        <img src="{{ form.instance.archivo_thumbnail.url }}"
+                             class="mt-2 rounded max-h-40">
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panel de Video -->
+            <div id="panel-video" class="tab-panel hidden">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <div class="flex gap-3">
+                        <svg class="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="text-sm text-blue-900">
+                            <p class="font-semibold mb-1">Subida optimizada para videos grandes</p>
+                            <ul class="list-disc list-inside space-y-1 text-xs">
+                                <li>Los videos se suben directamente a Cloudinary (sin pasar por el servidor)</li>
+                                <li>Máximo 500 MB, hasta 60 minutos de duración</li>
+                                <li>Formatos: MP4, MOV, AVI, WMV, FLV, MKV, WebM</li>
+                                <li>Con barra de progreso en tiempo real</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botón para abrir widget de Cloudinary -->
+                <button type="button" id="upload-video-btn" 
+                        class="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    Subir Video
+                </button>
+
+                <!-- Barra de progreso -->
+                <div id="video-upload-progress" class="hidden mt-4">
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div id="video-progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" 
+                             style="width: 0%" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <p id="video-progress-text" class="text-xs text-gray-600 mt-2">Subiendo...</p>
+                </div>
+
+                <!-- Preview del video -->
+                <div id="video-preview-container"></div>
+
+                <!-- Campos ocultos para guardar el public_id -->
+                {{ form.archivo_video }}
+                {{ form.archivo_video_public_id }}
+                <input type="hidden" name="eliminar_video" id="eliminar-video" value="0">
+
+                <!-- Imagen de portada también para videos -->
+                <div class="mt-6">
+                    <label class="block text-sm font-semibold mb-1">
+                        Imagen de portada (opcional)
+                    </label>
+                    {{ form.archivo_thumbnail }}
+                    {{ form.archivo_thumbnail.errors }}
+                    <p class="text-xs text-gray-500 mt-1">
+                        Cloudinary generará una automáticamente, pero puedes subir una personalizada
+                    </p>
+
+                    {% if form.instance.archivo_thumbnail %}
+                    <img src="{{ form.instance.archivo_thumbnail.url }}"
+                         class="mt-2 rounded max-h-40">
+                    {% endif %}
+                </div>
             </div>
         </div>
+
+        <style>
+        .tab-btn.active {
+            border-bottom-color: #2563EB;
+            color: #2563EB;
+        }
+        .tab-panel.hidden {
+            display: none;
+        }
+        </style>
+
+        <script>
+        // Lógica de tabs
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabDocumento = document.getElementById('tab-documento');
+            const tabVideo = document.getElementById('tab-video');
+            const panelDocumento = document.getElementById('panel-documento');
+            const panelVideo = document.getElementById('panel-video');
+
+            tabDocumento.addEventListener('click', function() {
+                tabDocumento.classList.add('active', 'text-blue-600', 'border-blue-600');
+                tabDocumento.classList.remove('text-gray-500', 'border-transparent');
+                tabVideo.classList.remove('active', 'text-blue-600', 'border-blue-600');
+                tabVideo.classList.add('text-gray-500', 'border-transparent');
+                panelDocumento.classList.remove('hidden');
+                panelVideo.classList.add('hidden');
+            });
+
+            tabVideo.addEventListener('click', function() {
+                tabVideo.classList.add('active', 'text-blue-600', 'border-blue-600');
+                tabVideo.classList.remove('text-gray-500', 'border-transparent');
+                tabDocumento.classList.remove('active', 'text-blue-600', 'border-blue-600');
+                tabDocumento.classList.add('text-gray-500', 'border-transparent');
+                panelVideo.classList.remove('hidden');
+                panelDocumento.classList.add('hidden');
+            });
+        });
+        </script>
 
         <!-- Tags -->
         <div>
@@ -173,5 +297,15 @@
         </div>
     </form>
 </div>
+
+<!-- Scripts de Cloudinary -->
+<script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+<script>
+    // Configuración global de Cloudinary
+    window.CLOUDINARY_CLOUD_NAME = '{{ CLOUDINARY_CLOUD_NAME }}';
+    window.CLOUDINARY_UPLOAD_PRESET = 'clases_residentes_unsigned'; // Debes crear este preset en Cloudinary
+</script>
+<script src="{% static 'js/cloudinary_upload_widget.js' %}"></script>
+
 {% endblock %}
 

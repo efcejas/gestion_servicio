@@ -15,10 +15,16 @@ class ClaseResidenteForm(forms.ModelForm):
         help_text='Selecciona los años de residencia a los que va dirigida (deja vacío para "Todos")'
     )
     
+    # Campo oculto para guardar el public_id del video subido a Cloudinary
+    archivo_video_public_id = forms.CharField(
+        widget=forms.HiddenInput(),
+        required=False
+    )
+    
     class Meta:
         model = ClaseResidente
         fields = ['titulo', 'descripcion', 'categoria', 'anios_dirigidos', 
-                  'archivo', 'archivo_thumbnail', 'fecha_clase', 'tags', 'es_destacada']
+                  'archivo', 'archivo_video', 'archivo_thumbnail', 'fecha_clase', 'tags', 'es_destacada']
         widgets = {
             'titulo': forms.TextInput(attrs={
                 'class': 'w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
@@ -34,8 +40,9 @@ class ClaseResidenteForm(forms.ModelForm):
             }),
             'archivo': forms.FileInput(attrs={
                 'class': 'w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none',
-                'accept': '.ppt,.pptx,.pdf,.key,.mp4,.mov,.avi,.webm,.mkv,.m4v'
+                'accept': '.ppt,.pptx,.pdf,.key'
             }),
+            'archivo_video': forms.HiddenInput(),  # Se maneja con widget de Cloudinary
             'archivo_thumbnail': forms.FileInput(attrs={
                 'class': 'w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none',
                 'accept': 'image/*'
@@ -66,7 +73,8 @@ class ClaseResidenteForm(forms.ModelForm):
     
     def clean_archivo(self):
         """
-        Valida que el archivo tenga una extensión permitida.
+        Valida que el archivo tenga una extensión permitida (solo documentos).
+        Los videos se manejan por separado.
         """
         archivo = self.cleaned_data.get('archivo')
         if archivo:
@@ -75,17 +83,15 @@ class ClaseResidenteForm(forms.ModelForm):
                 nombre_archivo = archivo.name.lower()
                 extension = nombre_archivo.split('.')[-1] if '.' in nombre_archivo else ''
                 
-                EXTENSIONES_VALIDAS = [
-                    # Documentos
-                    'ppt', 'pptx', 'pdf', 'key',
-                    # Videos
-                    'mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'flv', 'wmv'
+                EXTENSIONES_DOCUMENTO = [
+                    'ppt', 'pptx', 'pdf', 'key'
                 ]
                 
-                if extension not in EXTENSIONES_VALIDAS:
+                if extension not in EXTENSIONES_DOCUMENTO:
                     raise forms.ValidationError(
                         f'Formato de archivo no soportado. '
-                        f'Extensiones permitidas: {', '.join(EXTENSIONES_VALIDAS)}'
+                        f'Extensiones permitidas para documentos: {", ".join(EXTENSIONES_DOCUMENTO)}. '
+                        f'Para videos, usa el botón "Subir Video".'
                     )
         
         return archivo
@@ -96,18 +102,22 @@ class ClaseResidenteForm(forms.ModelForm):
         anios = self.cleaned_data.get('anios_dirigidos', [])
         instance.anios_dirigidos = list(anios) if anios else []
         
-        # Detectar automáticamente el tipo de archivo si hay un archivo nuevo
+        # Manejar public_id de video de Cloudinary
+        archivo_video_public_id = self.cleaned_data.get('archivo_video_public_id')
+        if archivo_video_public_id:
+            instance.archivo_video = archivo_video_public_id
+            instance.tipo_archivo = 'video'
+            # Limpiar archivo de documento si se sube video
+            instance.archivo = None
+        
+        # Detectar automáticamente el tipo de archivo si hay un archivo de documento nuevo
         archivo = self.cleaned_data.get('archivo')
         if archivo and hasattr(archivo, 'name'):
             nombre_archivo = archivo.name.lower()
             extension = nombre_archivo.split('.')[-1] if '.' in nombre_archivo else ''
-            
-            EXTENSIONES_VIDEO = ['mp4', 'mov', 'avi', 'webm', 'mkv', 'm4v', 'flv', 'wmv']
-            
-            if extension in EXTENSIONES_VIDEO:
-                instance.tipo_archivo = 'video'
-            else:
-                instance.tipo_archivo = 'documento'
+            instance.tipo_archivo = 'documento'
+            # Limpiar video si se sube documento
+            instance.archivo_video = None
 
         # Eliminar archivo si el usuario lo solicita
         request = getattr(self, 'request', None)
@@ -115,6 +125,8 @@ class ClaseResidenteForm(forms.ModelForm):
             if request.POST.get('eliminar_archivo') == '1' and instance.archivo:
                 instance.archivo.delete(save=False)
                 instance.archivo = None
+            if request.POST.get('eliminar_video') == '1' and instance.archivo_video:
+                instance.archivo_video = None
             if request.POST.get('eliminar_imagen') == '1' and instance.archivo_thumbnail:
                 instance.archivo_thumbnail = None
 

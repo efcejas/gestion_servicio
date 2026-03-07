@@ -59,13 +59,21 @@ class ClaseResidente(models.Model):
         help_text='Categoría temática de la clase'
     )
     
-    # Archivos (usando S3 para archivos pesados y Cloudinary para thumbnails)
+    # Archivos múltiples: Documentos en S3, Videos en Cloudinary
     archivo = models.FileField(
         storage=S3MediaStorage(),
         blank=True,
         null=True,
         upload_to='',  # Se guarda en la carpeta definida por location en el storage
-        help_text='Archivo de la presentación (PPT, PDF, etc.) - OPCIONAL'
+        help_text='Archivo de presentación (PPT, PDF, etc.) - almacenado en S3'
+    )
+    archivo_video = CloudinaryField(
+        'video',
+        blank=True,
+        null=True,
+        folder='clases_residentes/videos',
+        resource_type='video',
+        help_text='Archivo de video (MP4, MOV, etc.) - almacenado en Cloudinary'
     )
     archivo_thumbnail = CloudinaryField(
         'thumbnail',
@@ -147,6 +155,21 @@ class ClaseResidente(models.Model):
         if not self.anios_dirigidos:
             return "Todos los años"
         return ", ".join(str(a) for a in self.anios_dirigidos)
+    
+    def get_archivo_url(self):
+        """
+        Retorna la URL del archivo principal (documento o video).
+        Prioriza archivo_video si es tipo video, sino retorna archivo.
+        """
+        if self.tipo_archivo == 'video' and self.archivo_video:
+            return self.archivo_video.url
+        elif self.archivo:
+            return self.archivo.url
+        return None
+    
+    def tiene_archivo(self):
+        """Verifica si la clase tiene algún archivo cargado"""
+        return bool(self.archivo or self.archivo_video)
     
     def get_anios_list(self):
         """Retorna lista de años dirigidos para usar en templates"""

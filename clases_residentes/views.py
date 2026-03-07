@@ -167,6 +167,12 @@ class ClaseCreateView(LoginRequiredMixin, CreateView):
         kwargs['usuario'] = self.request.user
         return kwargs
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from django.conf import settings
+        context['CLOUDINARY_CLOUD_NAME'] = settings.CLOUDINARY_STORAGE.get('CLOUD_NAME', '')
+        return context
+    
     def form_valid(self, form):
         form.instance.autor = self.request.user
         messages.success(self.request, '✓ Clase creada exitosamente.')
@@ -194,6 +200,12 @@ class ClaseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         kwargs['usuario'] = self.request.user
         kwargs['request'] = self.request
         return kwargs
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from django.conf import settings
+        context['CLOUDINARY_CLOUD_NAME'] = settings.CLOUDINARY_STORAGE.get('CLOUD_NAME', '')
+        return context
     
     def get_success_url(self):
         return reverse_lazy('clases_residentes:detalle', kwargs={'pk': self.object.pk})

@@ -449,13 +449,11 @@ if all([CLOUDINARY_STORAGE['CLOUD_NAME'], CLOUDINARY_STORAGE['API_KEY'], CLOUDIN
         api_secret=CLOUDINARY_STORAGE['API_SECRET'],
         secure=True
     )
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
     print("✓ Cloudinary configurado correctamente")
 else:
     print("⚠ Cloudinary NO configurado - usando almacenamiento local")
 
-# Configuración de AWS S3
-
+# Configuración de AWS S3 / MinIO
 from decouple import config
 AWS_ACCESS_KEY_ID = config('STACKHERO_MINIO_ROOT_ACCESS_KEY')
 AWS_SECRET_ACCESS_KEY = config('STACKHERO_MINIO_ROOT_SECRET_KEY')
@@ -465,7 +463,16 @@ AWS_S3_REGION_NAME = 'us-east-1'  # MinIO suele usar esto por defecto
 AWS_S3_USE_SSL = True
 AWS_S3_ADDRESSING_STYLE = "path"
 
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+# STORAGES: Sistema múltiple de almacenamiento (Django 4.2+)
+# S3/MinIO para documentos (PPT, PDF) y Cloudinary para videos
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # =============================================================================
 # CONFIGURACIÓN LOCAL (no se sube a Git)
