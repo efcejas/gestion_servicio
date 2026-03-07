@@ -18,6 +18,12 @@ const CLOUDINARY_CONFIG = {
  * Inicializa el widget de Cloudinary para subida de videos
  */
 function initCloudinaryVideoWidget() {
+    console.log('[Cloudinary] Iniciando widget...', {
+        cloudName: window.CLOUDINARY_CLOUD_NAME,
+        preset: window.CLOUDINARY_UPLOAD_PRESET,
+        cloudinaryExists: typeof cloudinary !== 'undefined'
+    });
+
     const uploadBtn = document.getElementById('upload-video-btn');
     const videoProgressContainer = document.getElementById('video-upload-progress');
     const videoProgressBar = document.getElementById('video-progress-bar');
@@ -26,7 +32,28 @@ function initCloudinaryVideoWidget() {
     const videoPublicIdInput = document.getElementById('id_archivo_video_public_id');
     const archivoVideoInput = document.getElementById('id_archivo_video');
     
-    if (!uploadBtn) return;
+    if (!uploadBtn) {
+        console.warn('[Cloudinary] Botón upload-video-btn no encontrado');
+        return;
+    }
+
+    if (!window.CLOUDINARY_CLOUD_NAME) {
+        console.error('[Cloudinary] CLOUDINARY_CLOUD_NAME no configurado');
+        uploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            alert('Error: Cloudinary no está configurado. Verifica las variables de entorno.');
+        });
+        return;
+    }
+
+    if (typeof cloudinary === 'undefined') {
+        console.error('[Cloudinary] Librería cloudinary no cargada');
+        uploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            alert('Error: La librería de Cloudinary no se cargó correctamente. Verifica tu conexión a Internet.');
+        });
+        return;
+    }
 
     // Crear widget de Cloudinary
     const widget = cloudinary.createUploadWidget(

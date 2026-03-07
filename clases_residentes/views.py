@@ -189,7 +189,7 @@ class ClaseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     """
     model = ClaseResidente
     form_class = ClaseResidenteForm
-    template_name = 'clases_residentes/editar_clase.html'
+    template_name = 'clases_residentes/crear_clase.html'  # Usa mismo template que crear (tiene tabs + Cloudinary)
     
     def test_func(self):
         clase = self.get_object()
