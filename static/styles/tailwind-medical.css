@@ -1,4 +1,4 @@
-/* Tailwind CSS */
+ï»¿/* Tailwind CSS */
 @import url('https://cdn.tailwindcss.com');
 
 /* Variables CSS para colores mÃ©dicos */
@@ -241,10 +241,10 @@
     background-color: #eff6ff;
 }
 /* ========================================
-   CKEDITOR 5: Separación visual de párrafos
+   CKEDITOR 5: Separaciï¿½n visual de pï¿½rrafos
    ======================================== */
 
-/* Estilos para el área editable de CKEditor5 */
+/* Estilos para el ï¿½rea editable de CKEditor5 */
 .ck-editor__editable p,
 .ck-editor__editable_inline p,
 .ck-content p,
@@ -260,7 +260,7 @@
     margin-bottom: 0 !important;
 }
 
-/* Ocultar párrafos vacíos */
+/* Ocultar pï¿½rrafos vacï¿½os */
 .ck-editor__editable p:empty,
 .ck-content p:empty {
     display: none !important;
@@ -281,7 +281,7 @@
     display: list-item !important;
 }
 
-/* Asegurar que listas con viñetas muestren las viñetas */
+/* Asegurar que listas con viï¿½etas muestren las viï¿½etas */
 .ck-editor__editable ul,
 .ck-content ul {
     list-style-type: disc !important;
