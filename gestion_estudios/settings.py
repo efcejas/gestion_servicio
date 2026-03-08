@@ -514,7 +514,11 @@ SECURE_REFERRER_POLICY = 'same-origin'
 
 # Cookies HTTPOnly (prevenir acceso desde JavaScript - Anti-XSS)
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+
+# CSRF Cookie: False para permitir peticiones AJAX
+# Nota: El token CSRF por sí solo no compromete la sesión, 
+# y es necesario para aplicaciones modernas con fetch/AJAX
+CSRF_COOKIE_HTTPONLY = False
 
 # SameSite cookies (prevenir CSRF)
 SESSION_COOKIE_SAMESITE = 'Lax'

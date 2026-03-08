@@ -42,7 +42,10 @@ if not DEBUG:
 
 # Cookies HTTPOnly (prevenir acceso desde JavaScript)
 SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
+
+# CSRF cookie: False para permitir AJAX/fetch
+# Nota: La sesión permanece protegida con SESSION_COOKIE_HTTPONLY=True  
+CSRF_COOKIE_HTTPONLY = False
 
 # SameSite cookies (prevenir CSRF)
 SESSION_COOKIE_SAMESITE = 'Lax'
@@ -55,6 +58,7 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 - `SECURE_BROWSER_XSS_FILTER`: Activa protección XSS del navegador
 - `HSTS`: Le dice al navegador "siempre usa HTTPS con este dominio"
 - `SESSION_COOKIE_HTTPONLY`: JavaScript no puede leer cookies de sesión (previene XSS)
+- `CSRF_COOKIE_HTTPONLY`: False para aplicaciones con AJAX (necesitan `getCookie('csrftoken')`)
 - `SAMESITE`: Solo envía cookies en requests del mismo dominio
 
 ---

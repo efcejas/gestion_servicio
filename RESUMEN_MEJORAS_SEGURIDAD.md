@@ -34,10 +34,13 @@ SECURE_REFERRER_POLICY = 'same-origin'      # ✅ Privacidad mejorada
 #### Cookies Seguras:
 ```python
 SESSION_COOKIE_HTTPONLY = True              # ✅ No accesible desde JavaScript
-CSRF_COOKIE_HTTPONLY = True                 # ✅ Protección CSRF
+CSRF_COOKIE_HTTPONLY = False                # ⚠️ False para AJAX (ver nota)*
 SESSION_COOKIE_SAMESITE = 'Lax'             # ✅ Anti CSRF adicional
 CSRF_COOKIE_SAMESITE = 'Lax'                # ✅ Anti CSRF adicional
 ```
+
+**Nota sobre CSRF_COOKIE_HTTPONLY:**  
+Se configuró en `False` porque la app usa chatbots/AJAX que necesitan leer el token CSRF con JavaScript. La cookie de sesión permanece protegida con `SESSION_COOKIE_HTTPONLY = True`.
 
 #### HTTPS en Producción:
 ```python
