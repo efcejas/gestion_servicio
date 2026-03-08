@@ -150,6 +150,11 @@ class CorreccionAprendizajeAdmin(admin.ModelAdmin):
     ]
     date_hierarchy = 'fecha_creacion'
     
+    def get_queryset(self, request):
+        """Optimizar queries con select_related para evitar N+1"""
+        qs = super().get_queryset(request)
+        return qs.select_related('usuario')
+    
     fieldsets = (
         ('Información General', {
             'fields': ('usuario', 'tipo_estudio', 'fecha_creacion', 'fue_aplicada', 'votos_utilidad')

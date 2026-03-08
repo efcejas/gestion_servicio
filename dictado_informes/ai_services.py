@@ -531,6 +531,17 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                             'No se visualizan lesiones óseas.'
                         ]
                     },
+                    'ATM': {
+                        'titulo': 'RM DE ARTICULACIÓN TEMPOROMANDIBULAR [<DERECHA/IZQUIERDA>]',
+                        'seccion_tecnica': 'Se exploró la articulación temporomandibular [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
+                        'comentarios': [
+                            'Disco articular de morfología y señal normales.',
+                            'En fase de apertura, correcta translación del cóndilo mandibular y recaptura del disco.',
+                            'Músculos masticatorios sin alteraciones.',
+                            'Articulación sin signos de inflamación.',
+                            'No se visualizan lesiones óseas.'
+                        ]
+                    },
                     'TC_MSK': {
                         'titulo': 'TC DE [<REGIÓN ANATÓMICA>]',
                         'seccion_tecnica': 'Se realizó estudio tomográfico de la región solicitada con reconstrucciones multiplanares, sin contraste endovenoso.',
@@ -540,6 +551,20 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                             'Tejidos blandos sin signos de lesión.',
                             'No se observan colecciones ni masas.',
                             'No se visualizan lesiones evidentes.'
+                        ]
+                    },
+                    'ABDOMEN C/G': {
+                        'titulo': 'RM DE ABDOMEN CON GADOLINIO',
+                        'seccion_tecnica': 'Se realizó resonancia magnética de abdomen y pelvis, mediante secuencias que ponderan tiempos de relajación T1 y T2 en los diferentes planos. Se inyectó gadolinio endovenoso.',
+                        'comentarios': [
+                            'Fondos de saco pleurales libres.',
+                            'El hígado y el bazo presentan morfología e intensidad de señal respetadas.',
+                            'Vesícula biliar presente, de contenido homogéneo. No se observa dilatación de la vía biliar intra ni extra hepática.',
+                            'Páncreas bien delimitado y sin lesión visible.',
+                            'Glándulas suprarrenales de configuración habitual.',
+                            'Ambos riñones de forma y tamaño normal, sin signos de hidronefrosis.',
+                            'El retroperitoneo prevertebral se halla libre de adenomegalias.',
+                            'No se constatan procesos expansivos ni líquido libre en cavidad al momento del examen.',
                         ]
                     }
                 }

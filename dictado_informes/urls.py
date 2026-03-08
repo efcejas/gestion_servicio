@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import views_dashboard  # 🚀 FASE 4: Vistas de dashboard de métricas
 
 app_name = 'dictado_informes'
 
@@ -30,9 +31,14 @@ urlpatterns = [
     path('diccionario/<int:pk>/eliminar/', views.TerminoMedicoDeleteView.as_view(), name='termino_delete'),
     path('diccionario/<int:pk>/toggle/', views.toggle_termino_activo, name='termino_toggle'),
     
+    # 🚀 FASE 4: Dashboard de Métricas
+    path('metricas/', views_dashboard.dashboard_metricas, name='dashboard_metricas'),
+    path('metricas/api/resumen/', views_dashboard.api_metricas_resumen, name='api_metricas_resumen'),
+    path('metricas/api/anomalias/', views_dashboard.api_anomalias, name='api_anomalias'),
+    
     # API
     path('api/plantilla/<int:pk>/', views.obtener_plantilla, name='obtener_plantilla'),
-    path('api/procesar-audio/', views.procesar_audio_dictado, name='procesar_audio'),
+    # path('api/procesar-audio/', views.procesar_audio_dictado, name='procesar_audio'),  # DEPRECADA 2026-03-08: Usar transcribir_whisper + mejorar_texto
     path('api/transcribir-whisper/', views.transcribir_audio_whisper, name='transcribir_whisper'),
     path('api/mejorar-texto/', views.mejorar_texto_ia, name='mejorar_texto'),
     path('api/guardar-aprendizaje/', views.guardar_correccion_aprendizaje, name='guardar_aprendizaje'),

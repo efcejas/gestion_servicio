@@ -3,53 +3,65 @@
 
 {% block title %}Diccionario Médico - Dictado de Informes - Dr. Cejas{% endblock %}
 
-{% block page_title %}Diccionario Médico{% endblock %}
-{% block page_description %}Gestiona las correcciones automáticas para el dictado de informes médicos{% endblock %}
-
-{% block page_actions %}
-<a href="{% url 'dictado_informes:termino_create' %}" 
-   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-md flex items-center">
-    <i class="fas fa-plus mr-2"></i>Agregar Término
-</a>
-{% endblock %}
-
 {% block content %}
 
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-purple-900/50 rounded-lg">
+                <i class="fas fa-book text-xl text-purple-400"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white">Diccionario Médico</h1>
+        </div>
+        <a href="{% url 'dictado_informes:termino_create' %}" 
+           class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors flex items-center">
+            <i class="fas fa-plus mr-2"></i>Agregar Término
+        </a>
+    </div>
+
     <!-- Estadísticas -->
+    {% if total_terminos > 0 %}
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-lg p-6 text-white">
+        <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-blue-100 text-sm font-semibold">Total Términos</p>
-                    <p class="text-3xl font-bold mt-1">{{ total_terminos }}</p>
+                    <p class="text-gray-400 text-sm font-semibold">Total Términos</p>
+                    <p class="text-3xl font-bold text-white mt-1">{{ total_terminos }}</p>
                 </div>
-                <i class="fas fa-book text-4xl text-white/30"></i>
+                <div class="bg-blue-900/30 rounded-lg p-3">
+                    <i class="fas fa-book text-2xl text-blue-400"></i>
+                </div>
             </div>
         </div>
-        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg p-6 text-white">
+        <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-green-100 text-sm font-semibold">Activos</p>
-                    <p class="text-3xl font-bold mt-1">{{ terminos_activos }}</p>
+                    <p class="text-gray-400 text-sm font-semibold">Activos</p>
+                    <p class="text-3xl font-bold text-white mt-1">{{ terminos_activos }}</p>
                 </div>
-                <i class="fas fa-check-circle text-4xl text-white/30"></i>
+                <div class="bg-green-900/30 rounded-lg p-3">
+                    <i class="fas fa-check-circle text-2xl text-green-400"></i>
+                </div>
             </div>
         </div>
-        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg p-6 text-white">
+        <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-purple-100 text-sm font-semibold">Más Usado</p>
+                    <p class="text-gray-400 text-sm font-semibold">Más Usado</p>
                     {% if mas_usados %}
-                    <p class="text-lg font-bold mt-1 truncate">{{ mas_usados.0.termino_correcto }}</p>
-                    <p class="text-xs text-purple-100">{{ mas_usados.0.frecuencia_uso }} veces</p>
+                    <p class="text-lg font-bold text-white mt-1 truncate">{{ mas_usados.0.termino_correcto }}</p>
+                    <p class="text-xs text-gray-400">{{ mas_usados.0.frecuencia_uso }} veces</p>
                     {% else %}
-                    <p class="text-sm mt-1">Sin datos</p>
+                    <p class="text-sm text-gray-400 mt-1">Sin datos</p>
                     {% endif %}
                 </div>
-                <i class="fas fa-trophy text-4xl text-white/30"></i>
+                <div class="bg-purple-900/30 rounded-lg p-3">
+                    <i class="fas fa-trophy text-2xl text-purple-400"></i>
+                </div>
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Filtros -->
     <div class="bg-gray-800 rounded-xl shadow-md p-4 mb-6">

@@ -9,12 +9,16 @@ from django.db.models import Q, Count
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
-from .models import Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, EstadoInforme, TerminoMedico, CorreccionAprendizaje
+from .models import (
+    Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
+    EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado
+)
 from .forms import TerminoMedicoForm
 from .ai_services import ai_service
 import json
 import base64
 import logging
+import time  # 🚀 FASE 4: Para medir tiempos
 
 logger = logging.getLogger(__name__)
 
@@ -267,104 +271,13 @@ def firmar_informe(request, pk):
     return redirect('dictado_informes:informe_detail', pk=pk)
 
 
-# API para procesar audio dictado
-@require_POST
-def procesar_audio_dictado(request):
-    """
-    Procesa audio dictado: transcribe y mejora con IA
-    Recibe: archivo de audio en base64
-    Retorna: texto transcrito y mejorado
-    """
-    logger.info("=== INICIO procesar_audio_dictado ===")
-    logger.info(f"Usuario: {request.user.username}, Superuser: {request.user.is_superuser}")
-    
-    if not request.user.is_superuser:
-        logger.warning("Usuario no autorizado intentó acceder")
-        return JsonResponse({'error': 'No autorizado'}, status=403)
-    
-    try:
-        # Obtener datos del POST
-        logger.info("Parseando datos del request...")
-        data = json.loads(request.body)
-        audio_base64 = data.get('audio')
-        tipo_estudio = data.get('tipo_estudio', 'OTR')
-        logger.info(f"Tipo estudio: {tipo_estudio}, Audio recibido: {len(audio_base64) if audio_base64 else 0} caracteres")
-        
-        if not audio_base64:
-            logger.error("No se recibió audio en el request")
-            return JsonResponse({'error': 'No se recibió audio'}, status=400)
-        
-        # Decodificar audio de base64
-        logger.info("Decodificando audio de base64...")
-        try:
-            # Remover el prefijo "data:audio/webm;base64," si existe
-            if ',' in audio_base64:
-                audio_base64 = audio_base64.split(',')[1]
-            
-            audio_data = base64.b64decode(audio_base64)
-            logger.info(f"Audio decodificado: {len(audio_data)} bytes")
-        except Exception as e:
-            logger.error(f"Error al decodificar audio: {str(e)}")
-            return JsonResponse({'error': f'Error al decodificar audio: {str(e)}'}, status=400)
-        
-        # Validar tamaño mínimo del audio
-        MIN_AUDIO_SIZE = 500  # Mínimo 500 bytes (~0.1 segundos de audio WebM)
-        if len(audio_data) < MIN_AUDIO_SIZE:
-            logger.warning(f"Audio muy pequeño: {len(audio_data)} bytes (mínimo: {MIN_AUDIO_SIZE})")
-            return JsonResponse({
-                'success': False,
-                'error': f'Audio demasiado corto ({len(audio_data)} bytes). Mantén presionado el botón por más tiempo.',
-                'texto_original': ''
-            })
-        
-        # Crear archivo temporal
-        logger.info("Creando archivo temporal...")
-        audio_file = ContentFile(audio_data, name='dictado.webm')
-        
-        # Transcribir con Whisper
-        logger.info("Llamando a Whisper para transcripción...")
-        transcripcion_result = ai_service.transcribe_audio(audio_file)
-        logger.info(f"Resultado de Whisper: {transcripcion_result}")
-        
-        if 'error' in transcripcion_result:
-            logger.error(f"Error en transcripción: {transcripcion_result['error']}")
-            return JsonResponse({
-                'success': False,
-                'error': transcripcion_result['error'],
-                'texto_original': ''
-            })
-        
-        texto_original = transcripcion_result['text']
-        logger.info(f"Texto transcrito (primeros 100 chars): {texto_original[:100]}")
-        
-        # Mejorar con GPT
-        logger.info("Llamando a GPT-4 para mejorar texto...")
-        mejora_result = ai_service.improve_medical_text(
-            texto_original,
-            tipo_estudio,
-            usuario=request.user if request.user.is_authenticated else None
-        )
-        logger.info(f"Resultado de GPT-4: {str(mejora_result)[:200]}")
-        
-        response_data = {
-            'success': True,
-            'texto_original': texto_original,
-            'texto_mejorado': mejora_result.get('texto_mejorado', texto_original),
-            'confianza_transcripcion': transcripcion_result.get('confidence', 0.0),
-            'confianza_ia': mejora_result.get('confianza', 0.0),
-            'sugerencias': mejora_result.get('sugerencias', []),
-            'duracion': transcripcion_result.get('duration')
-        }
-        logger.info("=== FIN procesar_audio_dictado (éxito) ===")
-        return JsonResponse(response_data)
-    
-    except Exception as e:
-        logger.exception(f"Error en procesar_audio_dictado: {str(e)}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e)
-        }, status=500)
-
+# ========================================================================
+# NOTA: La función procesar_audio_dictado() fue eliminada el 2026-03-08
+# Se reemplazó por dos APIs separadas para mejor modularidad:
+#   - transcribir_audio_whisper() - Solo transcripción STT
+#   - mejorar_texto_ia() - Solo mejora con LLM
+# Esto permite usar cada servicio independientemente según necesidad.
+# ========================================================================
 
 # API para transcribir audio con Whisper (sin mejora IA)
 @require_POST
@@ -373,9 +286,16 @@ def transcribir_audio_whisper(request):
     """
     Transcribe audio usando Whisper API
     Solo transcripción, sin mejora de IA
+   🚀 FASE 4: Registra métricas de performance
     """
     if not request.user.is_superuser:
         return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    # 📊 FASE 4: Iniciar medición de tiempo
+    tiempo_inicio = time.time()
+    metrica = None
+    tuvo_error = False
+    error_detalle = ""
     
     try:
         data = json.loads(request.body)
@@ -406,10 +326,18 @@ def transcribir_audio_whisper(request):
         # Crear archivo temporal
         audio_file = ContentFile(audio_data, name='dictado.webm')
         
+        # 📊 FASE 4: Medir tiempo de transcripción
+        tiempo_transcripcion_inicio = time.time()
+        
         # Transcribir con Whisper
         transcripcion_result = ai_service.transcribe_audio(audio_file)
         
+        # 📊 FASE 4: Calcular tiempo de transcripción
+        tiempo_transcripcion_ms = int((time.time() - tiempo_transcripcion_inicio) * 1000)
+        
         if transcripcion_result.get('error'):
+            tuvo_error = True
+            error_detalle = transcripcion_result['error']
             return JsonResponse({
                 'success': False,
                 'error': transcripcion_result['error']
@@ -423,6 +351,23 @@ def transcribir_audio_whisper(request):
         logger.info(f"✅ Transcripción Whisper: {texto_transcrito[:100]}...")
         logger.info(f"✅ Texto con comandos procesados: {texto_procesado[:100]}...")
         
+        # 📊 FASE 4: Registrar métrica
+        tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
+        
+        metrica = MetricaDictado.objects.create(
+            usuario=request.user,
+            tiempo_transcripcion_ms=tiempo_transcripcion_ms,
+            tiempo_total_ms=tiempo_total_ms,
+            transcripcion_from_cache=transcripcion_result.get('from_cache', False),
+            duracion_audio_segundos=transcripcion_result.get('duration'),
+            tamanio_audio_kb=len(audio_data) // 1024,
+            longitud_transcripcion=len(texto_procesado),
+            api_transcripcion='whisper',
+            tuvo_errores=False
+        )
+        
+        logger.info(f"📊 Métrica registrada: {tiempo_total_ms}ms (transcripción: {tiempo_transcripcion_ms}ms)")
+        
         return JsonResponse({
             'success': True,
             'texto_transcrito': texto_procesado,  # Enviar texto YA con comandos procesados
@@ -432,11 +377,28 @@ def transcribir_audio_whisper(request):
         })
     
     except Exception as e:
+        tuvo_error = True
+        error_detalle = str(e)
         logger.exception(f"Error en transcribir_audio_whisper: {str(e)}")
+        
+        # 📊 FASE 4: Registrar métrica de error
+        try:
+            tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
+            MetricaDictado.objects.create(
+                usuario=request.user,
+                tiempo_total_ms=tiempo_total_ms,
+                tuvo_errores=True,
+                error_detalle=error_detalle[:500],  # Limitar longitud
+                api_transcripcion='whisper'
+            )
+        except Exception as metric_error:
+            logger.error(f"Error registrando métrica: {metric_error}")
+        
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=500)
+
 
 
 # API para mejorar texto existente
@@ -446,9 +408,15 @@ def mejorar_texto_ia(request):
     Mejora un texto ya escrito usando IA
     Útil para mejorar borradores sin dictado
     Soporta modo plantilla para respetar estructuras predefinidas
+    🚀 FASE 4: Registra métricas de performance
     """
     if not request.user.is_superuser:
         return JsonResponse({'error': 'No autorizado'}, status=403)
+    
+    # 📊 FASE 4: Iniciar medición de tiempo
+    tiempo_inicio = time.time()
+    tuvo_error = False
+    error_detalle = ""
     
     try:
         data = json.loads(request.body)
@@ -494,6 +462,9 @@ def mejorar_texto_ia(request):
             contexto['plantilla'] = plantilla
             logger.info(f"🎯 Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
         
+        # 📊 FASE 4: Medir tiempo de mejora con IA
+        tiempo_mejora_inicio = time.time()
+        
         # 3. MEJORAR CON IA
         result = ai_service.improve_medical_text(
             texto_procesado, 
@@ -502,11 +473,35 @@ def mejorar_texto_ia(request):
             usuario=request.user if request.user.is_authenticated else None
         )
         
+        # 📊 FASE 4: Calcular tiempo de mejora
+        tiempo_mejora_ms = int((time.time() - tiempo_mejora_inicio) * 1000)
+        tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
+        
+        texto_mejorado = result.get('texto_mejorado', texto_procesado)
+        
         logger.info(f"✅ Texto mejorado en modo final: {result.get('modo', modo)}")
+        
+        # 📊 FASE 4: Registrar métrica
+        try:
+            MetricaDictado.objects.create(
+                usuario=request.user,
+                tiempo_mejora_ms=tiempo_mejora_ms,
+                tiempo_total_ms=tiempo_total_ms,
+                mejora_from_cache=result.get('from_cache', False),
+                longitud_transcripcion=len(texto),  # Texto original
+                longitud_mejora=len(texto_mejorado),  # Texto mejorado
+                api_mejora=result.get('api_used', 'gpt'),
+                modo_mejora=modo,
+                tipo_estudio=tipo_estudio,
+                tuvo_errores=False
+            )
+            logger.info(f"📊 Métrica registrada: {tiempo_total_ms}ms (mejora: {tiempo_mejora_ms}ms)")
+        except Exception as metric_error:
+            logger.error(f"Error registrando métrica: {metric_error}")
         
         return JsonResponse({
             'success': True,
-            'texto_mejorado': result.get('texto_mejorado', texto_procesado),
+            'texto_mejorado': texto_mejorado,
             'confianza': result.get('confianza', 0.0),
             'sugerencias': result.get('sugerencias', []),
             'correcciones_aplicadas': correcciones,  # Enviar correcciones al frontend
@@ -514,14 +509,35 @@ def mejorar_texto_ia(request):
         })
     
     except json.JSONDecodeError as e:
+        tuvo_error = True
+        error_detalle = f"JSON decode error: {str(e)}"
         logger.error(f"❌ Error decodificando JSON: {str(e)}")
         return JsonResponse({'error': 'Datos inválidos en la solicitud'}, status=400)
     except Exception as e:
+        tuvo_error = True
+        error_detalle = str(e)
         logger.error(f"❌ Error en mejorar_texto_ia: {str(e)}", exc_info=True)
+        
+        # 📊 FASE 4: Registrar métrica de error
+        try:
+            tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
+            MetricaDictado.objects.create(
+                usuario=request.user,
+                tiempo_total_ms=tiempo_total_ms,
+                tipo_estudio=data.get('tipo_estudio', 'OTR') if 'data' in locals() else 'OTR',
+                modo_mejora=data.get('modo', 'LIBRE') if 'data' in locals() else 'LIBRE',
+                tuvo_errores=True,
+                error_detalle=error_detalle[:500],  # Limitar longitud
+                api_mejora='gpt'
+            )
+        except Exception as metric_error:
+            logger.error(f"Error registrando métrica: {metric_error}")
+        
         return JsonResponse({
             'success': False,
             'error': str(e)
         }, status=500)
+
 
 
 # ========================================

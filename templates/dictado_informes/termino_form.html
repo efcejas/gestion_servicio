@@ -3,11 +3,21 @@
 
 {% block title %}{% if object %}Editar{% else %}Agregar{% endif %} Término - Diccionario Médico - Dr. Cejas{% endblock %}
 
-{% block page_title %}{% if object %}Editar Término Médico{% else %}Agregar Nuevo Término{% endif %}{% endblock %}
-{% block page_description %}{% if object %}Modifica los datos del término médico seleccionado{% else %}Agrega un nuevo término al diccionario médico{% endif %}{% endblock %}
-
 {% block content %}
 <div class="max-w-3xl mx-auto">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-purple-900/50 rounded-lg">
+                <i class="fas fa-{% if object %}edit{% else %}plus{% endif %} text-xl text-purple-400"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white">{% if object %}Editar Término{% else %}Agregar Término{% endif %}</h1>
+        </div>
+        <a href="{% url 'dictado_informes:termino_list' %}" class="text-sm text-gray-400 hover:text-white">
+            <i class="fas fa-arrow-left mr-1"></i>Volver
+        </a>
+    </div>
 
     <!-- Formulario -->
     <div class="bg-gray-800 rounded-xl shadow-md p-6">
