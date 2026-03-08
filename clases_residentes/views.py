@@ -475,7 +475,7 @@ class GuiaPresentacionesView(LoginRequiredMixin, TemplateView):
             },
             'imagen_propia': {
                 'formato': 'Fuente: Archivo personal [o nombre de la institución]',
-                'ejemplo': 'Fuente: Archivo personal del Servicio de Diagnóstico por Imágenes, Hospital Sanatorio Colegiales',
+                'ejemplo': 'Fuente: Archivo personal del Servicio de Diagnóstico por Imágenes, Sanatorio Colegiales',
                 'explicacion': 'Para imágenes de tus casos propios o de la institución, indicá claramente el origen.',
                 'tip_memoria': '💡 Simple: "Fuente: [De dónde sale]"',
                 'cuando_usar': 'Para casos de tu institución o imágenes que sacaste vos',
