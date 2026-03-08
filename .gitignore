@@ -37,3 +37,11 @@ node_modules/
 theme/static_src/node_modules/
 
 token_for_heroku.txt
+
+# Reportes de auditoría de seguridad
+security_reports/
+.secrets.baseline
+
+# Logs
+logs/
+*.log

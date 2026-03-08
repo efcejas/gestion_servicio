@@ -143,9 +143,16 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        'OPTIONS': {
+            'user_attributes': ('username', 'email', 'first_name', 'last_name'),
+            'max_similarity': 0.7,  # Rechaza passwords similares a datos del usuario
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {
+            'min_length': 12,  # Aumentado de 8 a 12 caracteres para mayor seguridad
+        }
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -458,9 +465,9 @@ if all([CLOUDINARY_STORAGE['CLOUD_NAME'], CLOUDINARY_STORAGE['API_KEY'], CLOUDIN
         api_secret=CLOUDINARY_STORAGE['API_SECRET'],
         secure=True
     )
-    print("✓ Cloudinary configurado correctamente")
+    print("[OK] Cloudinary configurado correctamente")
 else:
-    print("⚠ Cloudinary NO configurado - usando almacenamiento local")
+    print("[WARNING] Cloudinary NO configurado - usando almacenamiento local")
 
 # Configuración de AWS S3 / MinIO
 from decouple import config
@@ -484,13 +491,58 @@ STORAGES = {
 }
 
 # =============================================================================
+# 🔒 CONFIGURACIÓN DE SEGURIDAD
+# =============================================================================
+
+# Headers de seguridad HTTP
+# --------------------------
+
+# Prevenir clickjacking (iframe embedding)
+X_FRAME_OPTIONS = 'DENY'
+
+# Prevenir MIME-type sniffing
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Activar XSS filter del navegador
+SECURE_BROWSER_XSS_FILTER = True
+
+# Referrer Policy
+SECURE_REFERRER_POLICY = 'same-origin'
+
+# Configuración de Cookies Seguras
+# ---------------------------------
+
+# Cookies HTTPOnly (prevenir acceso desde JavaScript - Anti-XSS)
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+
+# SameSite cookies (prevenir CSRF)
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Configuración HTTPS (solo en producción)
+# ----------------------------------------
+if not DEBUG:
+    # Redirigir todo el tráfico a HTTPS
+    SECURE_SSL_REDIRECT = True
+    
+    # HTTP Strict Transport Security (HSTS) - 1 año
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Cookies solo por HTTPS en producción
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# =============================================================================
 # CONFIGURACIÓN LOCAL (no se sube a Git)
 # =============================================================================
 # Importar configuración local si existe
 try:
     from .settings_local import *
-    print("✓ settings_local.py importado correctamente")
+    print("[OK] settings_local.py importado correctamente")
 except ImportError:
     # Solo mostrar warning en desarrollo local (no en Heroku)
     if not os.getenv('DYNO'):  # DYNO existe solo en Heroku
-        print("⚠ settings_local.py no encontrado - usando solo configuración base")
+        print("[WARNING] settings_local.py no encontrado - usando solo configuración base")

@@ -1,0 +1,40 @@
+# ========================================
+# 🔒 HERRAMIENTAS DE AUDITORÍA DE SEGURIDAD
+# ========================================
+# Instalar con: pip install -r requirements-security.txt
+
+# ----------------------------------------
+# ANÁLISIS Y AUDITORÍA
+# ----------------------------------------
+
+# Escaneo de vulnerabilidades en dependencias (OWASP Dependency Check)
+safety>=3.0.0
+
+# Análisis estático de seguridad (detecta problemas comunes en código Python)
+bandit>=1.7.0
+
+# Escaneo de secretos hardcodeados (API keys, passwords, tokens)
+detect-secrets>=1.4.0
+
+# ----------------------------------------
+# PROTECCIÓN Y MEJORAS
+# ----------------------------------------
+
+# Rate limiting (protección anti brute-force)
+django-ratelimit>=4.1.0
+
+# Protección automática contra login abuse
+django-defender>=0.9.7
+
+# Content Security Policy headers
+django-csp>=3.8
+
+# Sanitización de HTML (prevenir XSS)
+bleach>=6.1.0
+
+# ----------------------------------------
+# MONITORING Y LOGGING
+# ----------------------------------------
+
+# Error tracking y monitoring (opcional, pero recomendado)
+# sentry-sdk>=1.40.0  # Descomentar si usas Sentry
