@@ -50,11 +50,17 @@ class PresentacionesBot:
             self.fallback_client = None
             logger.error("❌ No hay API key configurada para el bot")
     
-    def get_system_prompt(self):
+    def get_system_prompt(self, usuario=None):
         """
         Construye el prompt del sistema con todo el contexto de la guía de presentaciones.
         """
-        return """Sos un asistente experto en presentaciones médicas académicas, especializado en ateneos clínicos y clases para residentes de diagnóstico por imágenes.
+        nombre_usuario = ""
+        if usuario:
+            nombre = usuario.get_full_name() or usuario.first_name or usuario.username
+            if nombre:
+                nombre_usuario = f"\n\nEstás conversando con {nombre}, un/a residente del servicio de diagnóstico por imágenes. Podés usar su nombre de forma natural cuando sea apropiado (especialmente al inicio de la conversación o cuando des consejos personalizados)."
+        
+        return f"""Sos un asistente experto en presentaciones médicas académicas, especializado en ateneos clínicos y clases para residentes de diagnóstico por imágenes.{nombre_usuario}
 
 Tu objetivo es ayudar a los residentes a crear mejores presentaciones respondiendo sus preguntas sobre:
 - Estructura de ateneos y clases
@@ -62,7 +68,7 @@ Tu objetivo es ayudar a los residentes a crear mejores presentaciones respondien
 - Diseño visual de diapositivas
 - Tips de presentación oral
 - Buenas prácticas académicas
-- Que acudan al Dr. Cejas o a la Dra. Avalo para consultas específicas de casos clínicos o imágenes
+- Que acudan al Dr. Cejas o a la Dra. Avalo para consultas específicas de casos clínicos o imágenes. Obviamente, que deben saber que antes cuentan con el/la instructor/a para resolver dudas generales.
 
 **CONTEXTO - ESTRUCTURA DE ATENEOS:**
 - Portada: Título, nombre, fecha, institución
@@ -113,6 +119,7 @@ Tips: Dividí el contenido claramente, usá casos reales, incluí preguntas de r
 
 **ESTILO DE RESPUESTA:**
 - Usá tono argentino (voseo): "Guardá", "Mostrá", "Dividí", "Usá", "Practicá"
+- En los saludos inciales, usa el nombre del usuario si está disponible: "¡Hola [nombre]! ¿En qué puedo ayudarte con tu presentación?"
 - Sé conciso pero completo
 - Usá emojis de vez en cuando (💡, ✅, 📊, 🎯) para hacer más amigable
 - Si te preguntan algo específico, dá el ejemplo concreto
@@ -232,7 +239,7 @@ Respondé en español argentino, de manera amigable y profesional."""
             ).order_by('-timestamp')[:10]
             
             # Construir lista de mensajes para la API (orden cronológico)
-            messages = [{"role": "system", "content": self.get_system_prompt()}]
+            messages = [{"role": "system", "content": self.get_system_prompt(usuario)}]
             
             # Agregar mensajes previos en orden cronológico
             for msg in reversed(mensajes_previos):

@@ -6,13 +6,13 @@
 {% block content %}
 <div class="container mx-auto px-4 py-2">
     <!-- Breadcrumb -->
-    <nav class="mb-4 text-sm">
+    <!-- <nav class="mb-4 text-sm">
         <ol class="flex items-center space-x-2 text-gray-600">
             <li><a href="{% url 'clases_residentes:lista' %}" class="hover:text-purple-600">Clases</a></li>
             <li><i class="fas fa-chevron-right text-xs"></i></li>
             <li class="text-purple-600 font-medium">Guía de Presentaciones</li>
         </ol>
-    </nav>
+    </nav> -->
 
     <!-- Header -->
     <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg shadow-lg p-8 mb-6">
@@ -428,7 +428,7 @@ document.getElementById('searchGuide').addEventListener('input', function(e) {
             <!-- Mensaje de bienvenida -->
             <div style="display: flex; align-items: flex-start; margin-bottom: 0.75rem;">
                 <div style="background: rgb(243, 232, 255); border-radius: 0.5rem; padding: 0.75rem; max-width: 80%;">
-                    <p style="font-size: 0.875rem; color: rgb(31, 41, 55); margin: 0; line-height: 1.5;">👋 ¡Hola! Soy tu asistente para presentaciones académicas. Preguntame sobre estructuras, citación, diseño o cualquier duda que tengas.</p>
+                    <p style="font-size: 0.875rem; color: rgb(31, 41, 55); margin: 0; line-height: 1.5;">👋 ¡Hola{% if user.get_full_name %}, {{ user.get_full_name }}{% endif %}! Soy tu asistente para presentaciones académicas. Preguntame sobre estructuras, citación, diseño o cualquier duda que tengas.</p>
                 </div>
             </div>
             
@@ -527,6 +527,9 @@ document.getElementById('searchGuide').addEventListener('input', function(e) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Nombre del usuario para personalización
+    const userName = '{{ user.get_full_name|default:user.username }}';
+    
     const botToggle = document.getElementById('botToggle');
     const chatPanel = document.getElementById('chatPanel');
     const closeBotBtn = document.getElementById('closeBotBtn');
