@@ -45,3 +45,11 @@ security_reports/
 # Logs
 logs/
 *.log
+
+# Archivos temporales del proyecto
+test_results.txt
+security_check_final.json
+*.dump
+
+# Backups locales
+backups/
