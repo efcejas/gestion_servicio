@@ -356,3 +356,200 @@ class FavoritoClase(models.Model):
     
     def __str__(self):
         return f"{self.usuario.username} - {self.clase.titulo}"
+
+
+class EjemploVisualizacion(models.Model):
+    """
+    Modelo para gestionar ejemplos visuales de buenas prácticas en presentaciones.
+    Usado en la guía de presentaciones para residentes.
+    """
+    
+    # Categorías de ejemplos
+    CATEGORIA_CHOICES = [
+        ('cita_imagen', 'Citación de Imágenes'),
+        ('bibliografia', 'Formato de Bibliografía'),
+        ('diseno', 'Diseño Visual'),
+        ('presentacion', 'Presentación Oral'),
+        ('estructura', 'Estructura de Contenido'),
+    ]
+    
+    # Información básica
+    titulo = models.CharField(
+        max_length=200,
+        help_text='Título descriptivo del ejemplo'
+    )
+    descripcion = models.TextField(
+        help_text='Descripción detallada de qué muestra este ejemplo'
+    )
+    categoria = models.CharField(
+        max_length=30,
+        choices=CATEGORIA_CHOICES,
+        help_text='Categoría del ejemplo'
+    )
+    
+    # Imagen del ejemplo (almacenada en Cloudinary)
+    imagen = CloudinaryField(
+        'image',
+        folder='clases_residentes/ejemplos_guia',
+        help_text='Imagen que muestra el ejemplo visual'
+    )
+    
+    # Control de visualización
+    orden = models.PositiveIntegerField(
+        default=0,
+        help_text='Orden de visualización (menor número = primero)'
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text='Si está activo y visible en la guía'
+    )
+    
+    # Timestamps
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Ejemplo de Visualización'
+        verbose_name_plural = 'Ejemplos de Visualización'
+        ordering = ['orden', '-fecha_creacion']
+        indexes = [
+            models.Index(fields=['categoria', 'activo']),
+            models.Index(fields=['orden']),
+        ]
+    
+    def __str__(self):
+        return f"{self.titulo} ({self.get_categoria_display()})"
+    
+    def get_imagen_url(self):
+        """Retorna la URL de la imagen"""
+        if self.imagen:
+            return self.imagen.url
+        return None
+
+
+class AccesoGuiaPresentaciones(models.Model):
+    """
+    Modelo para trackear accesos a la guía de presentaciones.
+    Permite al administrador ver qué residentes consultan la sección y con qué frecuencia.
+    """
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='accesos_guia_presentaciones',
+        help_text='Usuario que accedió a la guía'
+    )
+    fecha_acceso = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Fecha y hora del acceso'
+    )
+    user_agent = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='User agent del navegador (para análisis de dispositivos)'
+    )
+    
+    class Meta:
+        verbose_name = 'Acceso a Guía de Presentaciones'
+        verbose_name_plural = 'Accesos a Guía de Presentaciones'
+        ordering = ['-fecha_acceso']
+        indexes = [
+            models.Index(fields=['-fecha_acceso']),
+            models.Index(fields=['usuario', '-fecha_acceso']),
+        ]
+    
+    def __str__(self):
+        return f"{self.usuario.get_full_name() or self.usuario.username} - {self.fecha_acceso.strftime('%d/%m/%Y %H:%M')}"
+
+
+class ConversacionBot(models.Model):
+    """
+    Modelo para gestionar conversaciones del bot de asistencia en presentaciones.
+    Cada usuario puede tener múltiples conversaciones.
+    """
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversaciones_bot',
+        help_text='Usuario que mantiene la conversación'
+    )
+    fecha_inicio = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Fecha y hora de inicio de la conversación'
+    )
+    fecha_actualizacion = models.DateTimeField(
+        auto_now=True,
+        help_text='Última actividad en esta conversación'
+    )
+    activa = models.BooleanField(
+        default=True,
+        help_text='Si la conversación está activa'
+    )
+    
+    class Meta:
+        verbose_name = 'Conversación con Bot'
+        verbose_name_plural = 'Conversaciones con Bot'
+        ordering = ['-fecha_actualizacion']
+        indexes = [
+            models.Index(fields=['-fecha_actualizacion']),
+            models.Index(fields=['usuario', '-fecha_actualizacion']),
+        ]
+    
+    def __str__(self):
+        return f"Conversación de {self.usuario.get_full_name() or self.usuario.username} - {self.fecha_inicio.strftime('%d/%m/%Y %H:%M')}"
+    
+    def total_mensajes(self):
+        """Retorna el total de mensajes en esta conversación"""
+        return self.mensajes.count()
+
+
+class MensajeBot(models.Model):
+    """
+    Modelo para mensajes individuales dentro de una conversación con el bot.
+    """
+    ROLES = [
+        ('user', 'Usuario'),
+        ('assistant', 'Bot'),
+    ]
+    
+    FEEDBACK_CHOICES = [
+        ('positivo', 'Positivo 👍'),
+        ('negativo', 'Negativo 👎'),
+    ]
+    
+    conversacion = models.ForeignKey(
+        ConversacionBot,
+        on_delete=models.CASCADE,
+        related_name='mensajes',
+        help_text='Conversación a la que pertenece este mensaje'
+    )
+    rol = models.CharField(
+        max_length=10,
+        choices=ROLES,
+        help_text='Quién envió el mensaje'
+    )
+    contenido = models.TextField(
+        help_text='Contenido del mensaje'
+    )
+    timestamp = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Fecha y hora del mensaje'
+    )
+    feedback = models.CharField(
+        max_length=10,
+        choices=FEEDBACK_CHOICES,
+        null=True,
+        blank=True,
+        help_text='Valoración del usuario sobre la respuesta del bot'
+    )
+    
+    class Meta:
+        verbose_name = 'Mensaje de Bot'
+        verbose_name_plural = 'Mensajes de Bot'
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['conversacion', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        preview = self.contenido[:50] + '...' if len(self.contenido) > 50 else self.contenido
+        return f"{self.get_rol_display()}: {preview}"

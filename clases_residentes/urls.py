@@ -24,4 +24,11 @@ urlpatterns = [
     # Gestión (solo jefes/instructores)
     path('gestionar/', views.gestionar_clases, name='gestionar'),
     path('<int:pk>/cambiar-estado/', views.cambiar_estado_clase, name='cambiar_estado'),
+    
+    # Guía de presentaciones
+    path('guia-presentaciones/', views.GuiaPresentacionesView.as_view(), name='guia_presentaciones'),
+    
+    # Bot de asistencia
+    path('bot/chat/', views.BotChatView.as_view(), name='bot_chat'),
+    path('bot/feedback/', views.BotFeedbackView.as_view(), name='bot_feedback'),
 ]

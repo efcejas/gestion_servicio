@@ -1,0 +1,834 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Guía de Presentaciones{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-2">
+    <!-- Breadcrumb -->
+    <nav class="mb-4 text-sm">
+        <ol class="flex items-center space-x-2 text-gray-600">
+            <li><a href="{% url 'clases_residentes:lista' %}" class="hover:text-purple-600">Clases</a></li>
+            <li><i class="fas fa-chevron-right text-xs"></i></li>
+            <li class="text-purple-600 font-medium">Guía de Presentaciones</li>
+        </ol>
+    </nav>
+
+    <!-- Header -->
+    <div class="bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg shadow-lg p-8 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-white flex items-center mb-2">
+                    Guía de Buenas Prácticas para Presentaciones
+                </h1>
+                <p class="text-purple-100 text-lg">
+                    Todo lo que necesitas saber para elaborar ateneos y clases de calidad profesional
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Búsqueda rápida -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div class="flex items-center">
+            <i class="fas fa-search text-gray-400 mr-3"></i>
+            <input type="text" 
+                   id="searchGuide" 
+                   placeholder="Buscar en la guía (ej: 'citar imagen', 'vancouver', 'diseño')..."
+                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+    </div>
+
+    <!-- Navegación rápida -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <a href="#estructura" class="bg-gradient-to-br from-blue-400 to-blue-600 text-white p-4 rounded-lg shadow-md hover:shadow-xl transition duration-200 text-center">
+            <i class="fas fa-list-ol text-2xl mb-2"></i>
+            <p class="font-semibold">Estructura</p>
+        </a>
+        <a href="#citacion" class="bg-gradient-to-br from-green-400 to-green-600 text-white p-4 rounded-lg shadow-md hover:shadow-xl transition duration-200 text-center">
+            <i class="fas fa-quote-right text-2xl mb-2"></i>
+            <p class="font-semibold">Citación</p>
+        </a>
+        <a href="#diseno" class="bg-gradient-to-br from-orange-400 to-orange-600 text-white p-4 rounded-lg shadow-md hover:shadow-xl transition duration-200 text-center">
+            <i class="fas fa-palette text-2xl mb-2"></i>
+            <p class="font-semibold">Diseño</p>
+        </a>
+        <a href="#presentacion" class="bg-gradient-to-br from-pink-400 to-pink-600 text-white p-4 rounded-lg shadow-md hover:shadow-xl transition duration-200 text-center">
+            <i class="fas fa-microphone text-2xl mb-2"></i>
+            <p class="font-semibold">Presentación</p>
+        </a>
+    </div>
+
+    <!-- Sección: Estructura -->
+    <section id="estructura" class="mb-8 scroll-mt-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-list-ol text-blue-600 mr-3"></i>
+                Estructura de Presentaciones
+            </h2>
+
+            <!-- Ateneo de Caso -->
+            <details class="mb-4 border border-gray-200 rounded-lg" open>
+                <summary class="cursor-pointer bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-t-lg font-semibold text-blue-900 hover:from-blue-100 hover:to-blue-200 transition">
+                    <i class="fas fa-user-md mr-2"></i>
+                    {{ estructura_ateneo.titulo }}
+                </summary>
+                <div class="p-6">
+                    <p class="text-gray-700 mb-4 italic">{{ estructura_ateneo.descripcion }}</p>
+                    
+                    <h4 class="font-semibold text-gray-800 mb-3">Secciones recomendadas:</h4>
+                    <ol class="space-y-3 mb-6">
+                        {% for seccion in estructura_ateneo.secciones %}
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold mr-3">{{ forloop.counter }}</span>
+                            <div>
+                                <p class="font-semibold text-gray-800">{{ seccion.nombre }}</p>
+                                <p class="text-gray-600 text-sm">{{ seccion.contenido }}</p>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                        <h5 class="font-semibold text-blue-900 mb-2">💡 Tips específicos para ateneos:</h5>
+                        <ul class="list-disc list-inside space-y-1 text-blue-800">
+                            {% for tip in estructura_ateneo.tips %}
+                            <li>{{ tip }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Clase Teórica -->
+            <details class="mb-4 border border-gray-200 rounded-lg">
+                <summary class="cursor-pointer bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-t-lg font-semibold text-green-900 hover:from-green-100 hover:to-green-200 transition">
+                    <i class="fas fa-chalkboard-teacher mr-2"></i>
+                    {{ estructura_clase.titulo }}
+                </summary>
+                <div class="p-6">
+                    <p class="text-gray-700 mb-4 italic">{{ estructura_clase.descripcion }}</p>
+                    
+                    <h4 class="font-semibold text-gray-800 mb-3">Secciones recomendadas:</h4>
+                    <ol class="space-y-3 mb-6">
+                        {% for seccion in estructura_clase.secciones %}
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold mr-3">{{ forloop.counter }}</span>
+                            <div>
+                                <p class="font-semibold text-gray-800">{{ seccion.nombre }}</p>
+                                <p class="text-gray-600 text-sm">{{ seccion.contenido }}</p>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    
+                    <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                        <h5 class="font-semibold text-green-900 mb-2">💡 Tips específicos para clases:</h5>
+                        <ul class="list-disc list-inside space-y-1 text-green-800">
+                            {% for tip in estructura_clase.tips %}
+                            <li>{{ tip }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </details>
+        </div>
+    </section>
+
+    <!-- Sección: Citación -->
+    <section id="citacion" class="mb-8 scroll-mt-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-quote-right text-green-600 mr-3"></i>
+                Citación y Referencias
+            </h2>
+
+            <!-- Citación de Imágenes -->
+            <details class="mb-4 border border-gray-200 rounded-lg" open>
+                <summary class="cursor-pointer bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-t-lg font-semibold text-green-900 hover:from-green-100 hover:to-green-200 transition">
+                    <i class="fas fa-image mr-2"></i>
+                    Cómo Citar Imágenes
+                </summary>
+                <div class="p-6 space-y-6">
+                    {% for key, cita in citacion_imagenes.items %}
+                    <div class="border-l-4 border-green-500 bg-green-50 p-4 rounded">
+                        <h4 class="font-bold text-green-900 mb-2">
+                            {% if key == 'vancouver' %}
+                            📚 Imágenes de Fuentes Publicadas (Estilo Vancouver)
+                            {% elif key == 'imagen_propia' %}
+                            🏥 Imágenes Propias o Institucionales
+                            {% elif key == 'dominio_publico' %}
+                            🌐 Imágenes de Dominio Público
+                            {% endif %}
+                        </h4>
+                        
+                        <div class="bg-white p-3 rounded mb-3 font-mono text-sm text-gray-800">
+                            <strong>Formato:</strong> {{ cita.formato }}
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded mb-3">
+                            <strong class="text-gray-700">Ejemplo:</strong>
+                            <p class="text-gray-800 mt-1">{{ cita.ejemplo }}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="text-gray-700"><strong>💭 ¿Por qué este formato?</strong></p>
+                            <p class="text-gray-600 text-sm mt-1">{{ cita.explicacion }}</p>
+                        </div>
+                        
+                        <div class="bg-yellow-100 border border-yellow-300 p-3 rounded">
+                            <p class="text-yellow-900 font-semibold">{{ cita.tip_memoria }}</p>
+                        </div>
+                        
+                        {% if cita.cuando_usar %}
+                        <div class="mt-3">
+                            <p class="text-gray-700 text-sm"><strong>📌 Cuándo usar:</strong> {{ cita.cuando_usar }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+
+            <!-- Bibliografía -->
+            <details class="mb-4 border border-gray-200 rounded-lg" open>
+                <summary class="cursor-pointer bg-gradient-to-r from-teal-50 to-teal-100 p-4 rounded-t-lg font-semibold text-teal-900 hover:from-teal-100 hover:to-teal-200 transition">
+                    <i class="fas fa-book mr-2"></i>
+                    Formato de Bibliografía (Vancouver)
+                </summary>
+                <div class="p-6 space-y-6">
+                    {% for key, ref in citacion_bibliografia.items %}
+                    <div class="border-l-4 border-teal-500 bg-teal-50 p-4 rounded">
+                        <h4 class="font-bold text-teal-900 mb-2">
+                            {% if key == 'articulo_revista' %}
+                            📄 Artículo de Revista Científica
+                            {% elif key == 'libro' %}
+                            📚 Libro o Capítulo de Libro
+                            {% elif key == 'sitio_web' %}
+                            🌐 Recurso Web o Base de Datos
+                            {% endif %}
+                        </h4>
+                        
+                        <div class="bg-white p-3 rounded mb-3 font-mono text-sm text-gray-800">
+                            <strong>Formato:</strong> {{ ref.formato }}
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded mb-3">
+                            <strong class="text-gray-700">Ejemplo:</strong>
+                            <p class="text-gray-800 mt-1">{{ ref.ejemplo }}</p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <p class="text-gray-700"><strong>💭 ¿Por qué este orden?</strong></p>
+                            <p class="text-gray-600 text-sm mt-1">{{ ref.explicacion }}</p>
+                        </div>
+                        
+                        <div class="bg-yellow-100 border border-yellow-300 p-3 rounded mb-3">
+                            <p class="text-yellow-900 font-semibold">{{ ref.tip_memoria }}</p>
+                        </div>
+                        
+                        {% if ref.elementos %}
+                        <div class="bg-white p-3 rounded">
+                            <p class="font-semibold text-gray-800 mb-2">Desglose de elementos:</p>
+                            <ul class="space-y-1 text-sm text-gray-700">
+                                {% for elemento, descripcion in ref.elementos.items %}
+                                <li><strong>{{ elemento }}:</strong> {{ descripcion }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        
+                        {% if ref.cuando_usar %}
+                        <div class="mt-3">
+                            <p class="text-gray-700 text-sm"><strong>📌 Cuándo usar:</strong> {{ ref.cuando_usar }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+    </section>
+
+    <!-- Sección: Recursos Recomendados -->
+    <section id="recursos" class="mb-8 scroll-mt-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-link text-purple-600 mr-3"></i>
+                Recursos Recomendados para Buscar Información
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for recurso in recursos_recomendados %}
+                <a href="{{ recurso.url }}" target="_blank" class="border-2 border-{{ recurso.color }}-200 hover:border-{{ recurso.color }}-500 rounded-lg p-4 transition duration-200 hover:shadow-lg group">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0 w-12 h-12 bg-{{ recurso.color }}-100 rounded-full flex items-center justify-center mr-4 group-hover:bg-{{ recurso.color }}-200 transition">
+                            <i class="fas {{ recurso.icono }} text-{{ recurso.color }}-600 text-xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-bold text-gray-800 mb-1 group-hover:text-{{ recurso.color }}-600 transition">
+                                {{ recurso.nombre }}
+                                <i class="fas fa-external-link-alt text-xs ml-1"></i>
+                            </h3>
+                            <p class="text-gray-600 text-sm">{{ recurso.descripcion }}</p>
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Sección: Diseño Visual -->
+    <section id="diseno" class="mb-8 scroll-mt-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-palette text-orange-600 mr-3"></i>
+                Principios de Diseño Visual
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for key, tip in tips_diseno.items %}
+                <div class="border-l-4 border-orange-500 bg-orange-50 p-4 rounded">
+                    <h4 class="font-bold text-orange-900 mb-2">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        {{ tip.titulo }}
+                    </h4>
+                    <p class="text-gray-700 mb-2">{{ tip.descripcion }}</p>
+                    <p class="text-gray-600 text-sm mb-2"><strong>¿Por qué?</strong> {{ tip.razon }}</p>
+                    <div class="bg-yellow-100 border border-yellow-300 p-2 rounded">
+                        <p class="text-yellow-900 text-sm font-semibold">{{ tip.tip_memoria }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Ejemplos visuales si existen -->
+            {% if ejemplos %}
+            <div class="mt-6">
+                <h3 class="font-bold text-gray-800 mb-3">📸 Ejemplos Visuales:</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for ejemplo in ejemplos %}
+                    {% if ejemplo.categoria == 'diseno' %}
+                    <div class="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition">
+                        <img src="{{ ejemplo.get_imagen_url }}" alt="{{ ejemplo.titulo }}" class="w-full h-48 object-cover">
+                        <div class="p-3">
+                            <h4 class="font-semibold text-gray-800 text-sm">{{ ejemplo.titulo }}</h4>
+                            <p class="text-gray-600 text-xs mt-1">{{ ejemplo.descripcion }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Sección: Presentación Oral -->
+    <section id="presentacion" class="mb-8 scroll-mt-6">
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                <i class="fas fa-microphone text-pink-600 mr-3"></i>
+                Técnicas de Presentación Oral
+            </h2>
+            
+            <div class="space-y-4">
+                {% for grupo in tips_presentacion %}
+                <details class="border border-gray-200 rounded-lg" open>
+                    <summary class="cursor-pointer bg-gradient-to-r from-pink-50 to-pink-100 p-4 rounded-t-lg font-semibold text-pink-900 hover:from-pink-100 hover:to-pink-200 transition">
+                        <i class="fas fa-star mr-2"></i>
+                        {{ grupo.categoria }}
+                    </summary>
+                    <div class="p-4">
+                        <ul class="space-y-2">
+                            {% for tip in grupo.tips %}
+                            <li class="flex items-start">
+                                <i class="fas fa-check text-pink-600 mr-2 mt-1 flex-shrink-0"></i>
+                                <span class="text-gray-700">{{ tip }}</span>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Call to Action -->
+    <div class="bg-gradient-to-r from-purple-500 to-purple-700 rounded-lg shadow-lg p-8 text-center">
+        <h3 class="text-2xl font-bold text-white mb-3">¿Listo para crear tu presentación?</h3>
+        <p class="text-purple-100 mb-6">Aplica estos principios y crea contenido educativo de calidad</p>
+        <a href="{% url 'clases_residentes:crear' %}" class="inline-block bg-white text-purple-700 hover:bg-purple-100 font-semibold py-3 px-8 rounded-lg transition duration-200 shadow-md hover:shadow-xl">
+            <i class="fas fa-plus mr-2"></i>
+            Subir Nueva Clase
+        </a>
+    </div>
+</div>
+
+<!-- Script para búsqueda en la guía -->
+<script>
+document.getElementById('searchGuide').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const sections = document.querySelectorAll('details');
+    
+    if (searchTerm === '') {
+        // Mostrar todo si no hay búsqueda
+        sections.forEach(section => {
+            section.style.display = 'block';
+        });
+        return;
+    }
+    
+    sections.forEach(section => {
+        const text = section.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            section.style.display = 'block';
+            section.open = true; // Abrir secciones que coincidan
+        } else {
+            section.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<!-- Widget del Bot de Asistencia -->
+<div id="botWidget" style="position: fixed; bottom: 0; right: 0; z-index: 999999; pointer-events: none;">
+    <!-- Botón flotante -->
+    <button id="botToggle" 
+            aria-label="Abrir asistente de presentaciones"
+            style="position: fixed; bottom: 20px; right: 20px; width: 56px; height: 56px; background: linear-gradient(to bottom right, rgb(168, 85, 247), rgb(126, 34, 206)); color: white; border-radius: 9999px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; z-index: 999999; pointer-events: auto; transition: transform 0.2s;">
+        <i class="fas fa-robot" style="font-size: 1.5rem;"></i>
+    </button>
+    
+    <!-- Panel de chat -->
+    <div id="chatPanel" 
+         style="position: fixed; bottom: 0; right: 0; background: white; border-radius: 1rem 1rem 0 0; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); transform: translateY(100%); transition: transform 0.3s; z-index: 999999; display: flex; flex-direction: column; pointer-events: auto;">
+        <!-- Header del chat -->
+        <div style="background: linear-gradient(to bottom right, rgb(168, 85, 247), rgb(126, 34, 206)); color: white; padding: 1rem 1.5rem; border-radius: 1rem 1rem 0 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fas fa-robot" style="font-size: 1.5rem;"></i>
+                <div>
+                    <h3 style="font-weight: 700; font-size: 1.125rem; margin: 0; line-height: 1.2;">Asistente de Presentaciones</h3>
+                    <p style="font-size: 0.75rem; color: rgb(233, 213, 255); margin: 0; line-height: 1;">Preguntame sobre la guía</p>
+                </div>
+            </div>
+            <button id="closeBotBtn" 
+                    aria-label="Cerrar chat"
+                    style="color: white; background: transparent; border: none; border-radius: 9999px; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s;"
+                    onmouseover="this.style.background='rgba(126, 34, 206, 0.3)'"
+                    onmouseout="this.style.background='transparent'">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <!-- Área de mensajes -->
+        <div id="messagesArea" style="flex: 1; overflow-y: auto; padding: 1rem; background: rgb(249, 250, 251);">
+            <!-- Mensaje de bienvenida -->
+            <div style="display: flex; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div style="background: rgb(243, 232, 255); border-radius: 0.5rem; padding: 0.75rem; max-width: 80%;">
+                    <p style="font-size: 0.875rem; color: rgb(31, 41, 55); margin: 0; line-height: 1.5;">👋 ¡Hola! Soy tu asistente para presentaciones académicas. Preguntame sobre estructuras, citación, diseño o cualquier duda que tengas.</p>
+                </div>
+            </div>
+            
+            <!-- Sugerencias rápidas -->
+            <div id="quickSuggestions" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; margin-bottom: 0.75rem;">
+                <button class="suggestion-chip" style="background: white; border: 1px solid rgb(216, 180, 254); color: rgb(126, 34, 206); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="this.style.background='rgb(250, 245, 255)'" 
+                        onmouseout="this.style.background='white'">
+                    ¿Cómo citar imágenes?
+                </button>
+                <button class="suggestion-chip" style="background: white; border: 1px solid rgb(216, 180, 254); color: rgb(126, 34, 206); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="this.style.background='rgb(250, 245, 255)'" 
+                        onmouseout="this.style.background='white'">
+                    Reglas de diseño
+                </button>
+                <button class="suggestion-chip" style="background: white; border: 1px solid rgb(216, 180, 254); color: rgb(126, 34, 206); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="this.style.background='rgb(250, 245, 255)'" 
+                        onmouseout="this.style.background='white'">
+                    ¿Cómo estructurar un ateneo?
+                </button>
+                <button class="suggestion-chip" style="background: white; border: 1px solid rgb(216, 180, 254); color: rgb(126, 34, 206); padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="this.style.background='rgb(250, 245, 255)'" 
+                        onmouseout="this.style.background='white'">
+                    Tips para presentar
+                </button>
+            </div>
+            
+            <!-- Indicador de escritura (DENTRO de messagesArea) -->
+            <div id="typingIndicator" style="display: none; margin-top: 0.75rem;">
+                <div style="display: flex; align-items: flex-start;">
+                    <div style="background: rgb(243, 232, 255); border-radius: 0.5rem; padding: 0.5rem 0.75rem;">
+                        <div style="display: flex; gap: 0.25rem;">
+                            <div style="width: 0.5rem; height: 0.5rem; background: rgb(192, 132, 252); border-radius: 9999px;" class="animate-bounce"></div>
+                            <div style="width: 0.5rem; height: 0.5rem; background: rgb(192, 132, 252); border-radius: 9999px; animation-delay: 150ms;" class="animate-bounce"></div>
+                            <div style="width: 0.5rem; height: 0.5rem; background: rgb(192, 132, 252); border-radius: 9999px; animation-delay: 300ms;" class="animate-bounce"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Input de mensaje -->
+        <div style="border-top: 1px solid rgb(229, 231, 235); padding: 1rem; background: white; border-radius: 0 0 1rem 1rem; flex-shrink: 0;">
+            <div style="display: flex; align-items: flex-end; gap: 0.5rem;">
+                <textarea id="messageInput" 
+                          placeholder="Preguntame algo..."
+                          rows="1"
+                          maxlength="500"
+                          aria-label="Mensaje para el asistente"
+                          style="flex: 1; resize: none; border: 1px solid rgb(209, 213, 219); border-radius: 0.5rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; font-family: inherit; outline: none; transition: border-color 0.2s, box-shadow 0.2s;"
+                          onfocus="this.style.borderColor='rgb(168, 85, 247)'; this.style.boxShadow='0 0 0 3px rgba(168, 85, 247, 0.1)'"
+                          onblur="this.style.borderColor='rgb(209, 213, 219)'; this.style.boxShadow='none'"></textarea>
+                <button id="sendBtn" 
+                        aria-label="Enviar mensaje"
+                        style="background: rgb(147, 51, 234); color: white; border: none; border-radius: 0.5rem; padding: 0.5rem 1rem; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="if(!this.disabled) this.style.background='rgb(126, 34, 206)'"
+                        onmouseout="if(!this.disabled) this.style.background='rgb(147, 51, 234)'">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.5rem;">
+                <p id="charCount" style="font-size: 0.75rem; color: rgb(107, 114, 128); margin: 0;">0/500</p>
+                <button id="newChatBtn" style="font-size: 0.75rem; color: rgb(147, 51, 234); background: transparent; border: none; cursor: pointer; transition: color 0.2s;"
+                        onmouseover="this.style.color='rgb(126, 34, 206)'"
+                        onmouseout="this.style.color='rgb(147, 51, 234)'">
+                    <i class="fas fa-plus-circle" style="margin-right: 0.25rem;"></i>Nueva conversación
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-8px); }
+}
+.animate-bounce {
+    animation: bounce 1s ease-in-out infinite;
+}
+.feedback-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: transform 0.2s, opacity 0.2s;
+    padding: 0.25rem;
+}
+.feedback-btn:hover:not(:disabled) {
+    transform: scale(1.2);
+}
+.feedback-btn:disabled {
+    cursor: not-allowed;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const botToggle = document.getElementById('botToggle');
+    const chatPanel = document.getElementById('chatPanel');
+    const closeBotBtn = document.getElementById('closeBotBtn');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesArea = document.getElementById('messagesArea');
+    const typingIndicator = document.getElementById('typingIndicator');
+    const charCount = document.getElementById('charCount');
+    const newChatBtn = document.getElementById('newChatBtn');
+    const quickSuggestions = document.getElementById('quickSuggestions');
+    
+    // Verificar que todos los elementos existen
+    if (!botToggle) {
+        // console.error('❌ No se encontró el botón del bot (botToggle)');
+        return;
+    }
+    
+    let conversacionId = localStorage.getItem('bot_conversacion_id');
+    let isOpen = false;
+    
+    // Función para ajustar dimensiones del panel según el tamaño de pantalla
+    function adjustPanelSize() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // En móvil: fullscreen
+            chatPanel.style.width = '100vw';
+            chatPanel.style.height = '100vh';
+            chatPanel.style.maxWidth = '100vw';
+            chatPanel.style.maxHeight = '100vh';
+            chatPanel.style.right = '0';
+            chatPanel.style.bottom = '0';
+            chatPanel.style.borderRadius = '0';
+        } else {
+            // En desktop: tamaño fijo
+            chatPanel.style.width = '384px';
+            chatPanel.style.height = '600px';
+            chatPanel.style.maxWidth = '90vw';
+            chatPanel.style.maxHeight = '80vh';
+            chatPanel.style.right = '0';
+            chatPanel.style.bottom = '0';
+            chatPanel.style.borderRadius = '1rem 1rem 0 0';
+        }
+    }
+    
+    // Ajustar tamaño al cargar y al redimensionar
+    adjustPanelSize();
+    window.addEventListener('resize', adjustPanelSize);
+    
+    // Abrir/cerrar chat
+    botToggle.addEventListener('click', () => {
+        isOpen = !isOpen;
+        if (isOpen) {
+            chatPanel.style.transform = 'translateY(0)';
+            botToggle.style.display = 'none'; // Ocultar botón cuando está abierto
+        } else {
+            chatPanel.style.transform = 'translateY(100%)';
+            botToggle.style.display = 'flex';
+        }
+    });
+    
+    closeBotBtn.addEventListener('click', () => {
+        chatPanel.style.transform = 'translateY(100%)';
+        botToggle.style.display = 'flex';
+        isOpen = false;
+    });
+    
+    // Contador de caracteres
+    messageInput.addEventListener('input', () => {
+        const length = messageInput.value.length;
+        charCount.textContent = `${length}/500`;
+        
+        // Auto-expandir textarea
+        messageInput.style.height = 'auto';
+        messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    });
+    
+    // Enviar con Enter (Shift+Enter para nueva línea)
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    
+    sendBtn.addEventListener('click', sendMessage);
+    
+    // Sugerencias rápidas
+    document.querySelectorAll('.suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            messageInput.value = chip.textContent.trim();
+            sendMessage();
+            quickSuggestions.style.display = 'none';
+        });
+    });
+    
+    // Nueva conversación
+    newChatBtn.addEventListener('click', () => {
+        if (confirm('¿Iniciar una nueva conversación? Se perderá el historial actual.')) {
+            localStorage.removeItem('bot_conversacion_id');
+            conversacionId = null;
+            
+            // Limpiar mensajes excepto el de bienvenida
+            const welcomeMsg = messagesArea.querySelector('.bg-purple-100').parentElement;
+            messagesArea.innerHTML = '';
+            messagesArea.appendChild(welcomeMsg);
+            messagesArea.appendChild(quickSuggestions);
+            quickSuggestions.style.display = 'flex';
+        }
+    });
+    
+    async function sendMessage() {
+        const mensaje = messageInput.value.trim();
+        
+        if (!mensaje) return;
+        
+        // Agregar mensaje del usuario
+        addMessage(mensaje, 'user');
+        messageInput.value = '';
+        charCount.textContent = '0/500';
+        messageInput.style.height = 'auto';
+        
+        // Deshabilitar input y mostrar indicador
+        sendBtn.disabled = true;
+        sendBtn.style.opacity = '0.5';
+        sendBtn.style.cursor = 'not-allowed';
+        messageInput.disabled = true;
+        typingIndicator.style.display = 'block';
+        scrollToBottom();
+        
+        try {
+            const response = await fetch("{% url 'clases_residentes:bot_chat' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    mensaje: mensaje,
+                    conversacion_id: conversacionId
+                })
+            });
+            
+            const data = await response.json();
+            
+            typingIndicator.style.display = 'none';
+            
+            if (data.success) {
+                addMessage(data.respuesta, 'bot', data.mensaje_id, data.from_cache);
+                conversacionId = data.conversacion_id;
+                localStorage.setItem('bot_conversacion_id', conversacionId);
+            } else {
+                addMessage(`❌ Error: ${data.error}`, 'error');
+            }
+            
+        } catch (error) {
+            typingIndicator.style.display = 'none';
+            addMessage('❌ Error de conexión. Por favor, intentá de nuevo.', 'error');
+            // console.error('Error:', error);
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.style.opacity = '1';
+            sendBtn.style.cursor = 'pointer';
+            messageInput.disabled = false;
+            messageInput.focus();
+        }
+    }
+    
+    function addMessage(text, type, mensajeId = null, fromCache = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.style.display = 'flex';
+        messageDiv.style.alignItems = 'flex-start';
+        messageDiv.style.marginBottom = '0.75rem';
+        if (type === 'user') {
+            messageDiv.style.justifyContent = 'flex-end';
+        }
+        
+        const bubble = document.createElement('div');
+        bubble.style.borderRadius = '0.5rem';
+        bubble.style.padding = '0.75rem';
+        bubble.style.maxWidth = '80%';
+        bubble.style.wordWrap = 'break-word';
+        
+        if (type === 'user') {
+            bubble.style.background = 'rgb(147, 51, 234)';
+            bubble.style.color = 'white';
+        } else if (type === 'error') {
+            bubble.style.background = 'rgb(254, 226, 226)';
+            bubble.style.color = 'rgb(153, 27, 27)';
+        } else {
+            bubble.style.background = 'rgb(243, 232, 255)';
+            bubble.style.color = 'rgb(31, 41, 55)';
+        }
+        
+        // Formatear texto con markdown básico
+        let formattedText = text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+        
+        bubble.innerHTML = `<p style="font-size: 0.875rem; margin: 0; line-height: 1.5;">${formattedText}</p>`;
+        
+        // Agregar botones de feedback solo para mensajes del bot
+        if (type === 'bot' && mensajeId) {
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.style.marginTop = '0.5rem';
+            feedbackDiv.style.display = 'flex';
+            feedbackDiv.style.alignItems = 'center';
+            feedbackDiv.style.gap = '0.5rem';
+            feedbackDiv.innerHTML = `
+                <span style="font-size: 0.75rem; color: rgb(107, 114, 128);">¿Te fue útil?</span>
+                <button class="feedback-btn" data-mensaje-id="${mensajeId}" data-feedback="positivo" title="Útil">
+                    👍
+                </button>
+                <button class="feedback-btn" data-mensaje-id="${mensajeId}" data-feedback="negativo" title="No útil">
+                    👎
+                </button>
+                ${fromCache ? '<span style="font-size: 0.75rem; color: rgb(156, 163, 175); margin-left: 0.5rem;">⚡ Respuesta rápida</span>' : ''}
+            `;
+            bubble.appendChild(feedbackDiv);
+            
+            // Agregar event listeners a los botones
+            feedbackDiv.querySelectorAll('.feedback-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    sendFeedback(this.dataset.mensajeId, this.dataset.feedback, this);
+                });
+            });
+        }
+        
+        messageDiv.appendChild(bubble);
+        
+        // Insertar antes del indicador de escritura
+        messagesArea.insertBefore(messageDiv, typingIndicator);
+        scrollToBottom();
+    }
+    
+    async function sendFeedback(mensajeId, feedback, button) {
+        // Deshabilitar todos los botones de feedback de este mensaje
+        const allButtons = button.parentElement.querySelectorAll('.feedback-btn');
+        allButtons.forEach(btn => btn.disabled = true);
+        
+        try {
+            const response = await fetch("{% url 'clases_residentes:bot_feedback' %}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    mensaje_id: mensajeId,
+                    feedback: feedback
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Resaltar el botón seleccionado
+                button.style.transform = 'scale(1.3)';
+                button.style.opacity = '1';
+                allButtons.forEach(btn => {
+                    if (btn !== button) {
+                        btn.style.opacity = '0.3';
+                    }
+                });
+                
+                // Cambiar texto de confirmación
+                const txtSpan = button.parentElement.querySelector('span');
+                if (txtSpan) {
+                    txtSpan.textContent = feedback === 'positivo' ? '¡Gracias! 😊' : 'Gracias por tu feedback';
+                    txtSpan.className = 'text-xs text-green-600 font-medium';
+                }
+            } else {
+                // Re-habilitar botones si falla
+                allButtons.forEach(btn => btn.disabled = false);
+                // console.error('Error al enviar feedback:', data.error);
+            }
+        } catch (error) {
+            // Re-habilitar botones si falla
+            allButtons.forEach(btn => btn.disabled = false);
+            // console.error('Error de red al enviar feedback:', error);
+        }
+    }
+    
+    function scrollToBottom() {
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+
+{% endblock %}
