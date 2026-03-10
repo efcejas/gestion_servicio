@@ -496,6 +496,11 @@ class Preinforme(models.Model):
         blank=True, 
         related_name='preinformes_revisados'
     )
+    asignacion_compartida = models.BooleanField(
+        default=False,
+        verbose_name="Asignación compartida",
+        help_text="Si está activado, el estudio estará en el pool compartido para jefes/instructores"
+    )
     
     # Etiquetas clínicas para clasificación y búsqueda
     etiquetas = models.ManyToManyField(
@@ -613,6 +618,25 @@ class Preinforme(models.Model):
         
         # Si el mismo usuario lo está editando, puede continuar
         return self.en_edicion_por == usuario
+    
+    def puede_ser_tomado_por(self, usuario):
+        """Verifica si un estudio en pool compartido puede ser tomado por el usuario"""
+        if not self.asignacion_compartida:
+            return False
+        
+        # Solo disponible si no tiene revisor asignado
+        if self.revisor is not None:
+            return False
+        
+        # Solo jefes e instructores pueden tomar estudios compartidos
+        if usuario.rol not in ['jefe_residentes', 'instructor_residentes']:
+            return False
+        
+        # Debe estar en estado pendiente o en revisión
+        if self.estado not in ['pendiente_revision', 'en_revision']:
+            return False
+        
+        return True
 
 
 class RevisionPreinforme(models.Model):

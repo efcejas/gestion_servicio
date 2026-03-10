@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import models, IntegrityError
+from django.db import models, IntegrityError, transaction
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
@@ -323,7 +323,7 @@ def lista_revision(request):
     form = FiltroPreinformesForm(request.GET)
     
     # Filtro para mostrar diferentes categorías
-    mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'todos', 'finalizados'
+    mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'compartidos', 'todos', 'finalizados'
     
     if mostrar == 'asignados':
         # Solo mis preinformes asignados
@@ -331,11 +331,23 @@ def lista_revision(request):
             Q(revisor=request.user) & Q(estado__in=['pendiente_revision', 'en_revision'])
         )
     elif mostrar == 'sin_asignar':
-        # Preinformes sin revisor asignado
+        # Preinformes sin revisor asignado (excluir compartidos)
         preinformes = Preinforme.objects.filter(
             estado__in=['pendiente_revision', 'en_revision'],
-            revisor__isnull=True
+            revisor__isnull=True,
+            asignacion_compartida=False
         )
+    elif mostrar == 'compartidos':
+        # Pool compartido para jefes/instructores
+        if request.user.rol in ['jefe_residentes', 'instructor_residentes']:
+            preinformes = Preinforme.objects.filter(
+                asignacion_compartida=True,
+                revisor__isnull=True,
+                estado__in=['pendiente_revision', 'en_revision']
+            )
+        else:
+            # Si no tiene el rol adecuado, mostrar lista vacía
+            preinformes = Preinforme.objects.none()
     elif mostrar == 'finalizados':
         # Preinformes que ya revisé y están finalizados (solo lectura)
         preinformes = Preinforme.objects.filter(
@@ -343,11 +355,22 @@ def lista_revision(request):
             estado='finalizado',
         ).select_related('revision', 'residente', 'tipo_estudio', 'region')
     else:
-        # Todos: pendientes/en_revision sin asignar, o asignados a mí
-        preinformes = Preinforme.objects.filter(
-            Q(estado__in=['pendiente_revision', 'en_revision'], revisor__isnull=True) |
-            Q(estado__in=['pendiente_revision', 'en_revision'], revisor=request.user)
-        )
+        # Todos: pendientes/en_revision sin asignar (excluir compartidos para staff), o asignados a mí
+        base_filter = Q(estado__in=['pendiente_revision', 'en_revision'], revisor=request.user)
+        
+        # Para estudios sin asignar, depende del rol
+        if request.user.rol in ['jefe_residentes', 'instructor_residentes']:
+            # Jefes e instructores ven todos los sin asignar (incluidos compartidos)
+            base_filter |= Q(estado__in=['pendiente_revision', 'en_revision'], revisor__isnull=True)
+        else:
+            # Staff solo ve sin asignar que NO sean compartidos
+            base_filter |= Q(
+                estado__in=['pendiente_revision', 'en_revision'], 
+                revisor__isnull=True,
+                asignacion_compartida=False
+            )
+        
+        preinformes = Preinforme.objects.filter(base_filter)
     
     # Aplicar filtros
     if form.is_valid():
@@ -427,6 +450,53 @@ def asignar_revisor(request, pk):
                     messages.error(request, 'Revisor no válido.')
     
     return redirect(redirect_url)
+
+
+@login_required
+@role_required('jefe_residentes', 'instructor_residentes')
+@require_http_methods(["POST"])
+def tomar_estudio(request, pk):
+    """Tomar un estudio del pool compartido y asignarlo al usuario actual"""
+    mostrar = request.GET.get('mostrar', 'compartidos')
+    redirect_url = f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
+    
+    try:
+        # Usar transacción atómica con lock pesimista para evitar race conditions
+        with transaction.atomic():
+            # select_for_update bloquea la fila hasta que termine la transacción
+            preinforme = Preinforme.objects.select_for_update().get(pk=pk)
+            
+            # Validar que el estudio puede ser tomado
+            if not preinforme.puede_ser_tomado_por(request.user):
+                messages.error(
+                    request, 
+                    'Este estudio no está disponible para tomar. '
+                    'Puede que ya haya sido asignado a otro revisor.'
+                )
+                return redirect(redirect_url)
+            
+            # Asignar al usuario actual
+            preinforme.revisor = request.user
+            preinforme.asignacion_compartida = False  # Ya no está en el pool
+            
+            # Si está pendiente, cambiar a en_revision
+            if preinforme.estado == 'pendiente_revision':
+                preinforme.estado = 'en_revision'
+                preinforme.fecha_inicio_revision = timezone.now()
+            
+            preinforme.save()
+            
+            messages.success(
+                request, 
+                f'Has tomado el estudio #{preinforme.numero_estudio} para revisión.'
+            )
+            
+            # Redirigir directamente a la vista de revisión
+            return redirect('preinformes:revisar_preinforme', pk=preinforme.pk)
+            
+    except Preinforme.DoesNotExist:
+        messages.error(request, 'El estudio no existe.')
+        return redirect(redirect_url)
 
 
 @login_required

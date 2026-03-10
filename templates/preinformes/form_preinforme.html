@@ -186,20 +186,59 @@
                     Asignación de Revisor
                 </h2>
             </div>
-            <div class="p-4">
+            <div class="p-4 space-y-4">
                 <div class="max-w-md">
                     <label for="{{ form.revisor.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                        Asignar a (opcional)
+                        Asignar a revisor específico (opcional)
                     </label>
                     {{ form.revisor }}
                     <p class="mt-2 text-xs text-gray-500">
                         <i class="fas fa-info-circle mr-1"></i>
-                        Podés asignar el preinforme a un médico staff específico, o dejarlo sin asignar para que cualquiera lo tome.
+                        Podés asignar el preinforme a un médico staff específico.
                     </p>
                     {% if form.revisor.errors %}
                         <div class="text-red-600 text-sm mt-2">{{ form.revisor.errors.0 }}</div>
                     {% endif %}
                 </div>
+                
+                <!-- Campo de Asignación Compartida -->
+                <div class="max-w-md border-t border-gray-200 pt-4">
+                    <div class="flex items-start">
+                        <div class="flex items-center h-5">
+                            {{ form.asignacion_compartida }}
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="{{ form.asignacion_compartida.id_for_label }}" class="font-medium text-gray-700 cursor-pointer">
+                                {{ form.asignacion_compartida.label }}
+                            </label>
+                            <p class="text-xs text-gray-500 mt-1">
+                                <i class="fas fa-users mr-1"></i>
+                                {{ form.asignacion_compartida.help_text }}
+                            </p>
+                        </div>
+                    </div>
+                    {% if form.asignacion_compartida.errors %}
+                        <div class="text-red-600 text-sm mt-2">{{ form.asignacion_compartida.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                
+                {% if form.non_field_errors %}
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-exclamation-circle text-red-400"></i>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-red-800">
+                                    Error de validación
+                                </h3>
+                                <div class="mt-2 text-sm text-red-700">
+                                    {{ form.non_field_errors.0 }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -317,6 +356,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
     const regionSelect = document.getElementById('id_region');
     const plantillaSelect = document.getElementById('id_plantilla');
+    
+    // Manejo de asignación compartida vs revisor específico
+    const asignacionCompartidaCheckbox = document.getElementById('id_asignacion_compartida');
+    const revisorSelect = document.getElementById('id_revisor');
+    
+    if (asignacionCompartidaCheckbox && revisorSelect) {
+        // Función para actualizar estado de campos
+        function actualizarEstadoCampos() {
+            if (asignacionCompartidaCheckbox.checked) {
+                // Si está marcado asignación compartida, deshabilitar y limpiar revisor
+                revisorSelect.disabled = true;
+                revisorSelect.value = '';
+                revisorSelect.classList.add('bg-gray-100', 'cursor-not-allowed');
+            } else {
+                // Si no está marcado, habilitar revisor
+                revisorSelect.disabled = false;
+                revisorSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            }
+        }
+        
+        // Listener para cambios en el checkbox
+        asignacionCompartidaCheckbox.addEventListener('change', actualizarEstadoCampos);
+        
+        // Listener para cambios en el select de revisor (desmarcar checkbox si se selecciona un revisor)
+        revisorSelect.addEventListener('change', function() {
+            if (revisorSelect.value && asignacionCompartidaCheckbox.checked) {
+                asignacionCompartidaCheckbox.checked = false;
+            }
+        });
+        
+        // Inicializar estado al cargar la página
+        actualizarEstadoCampos();
+    }
     
     // Registry global para la instancia de CKEditor 5
     window.ckeditorInstance = null;

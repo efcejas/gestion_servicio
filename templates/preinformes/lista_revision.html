@@ -36,6 +36,14 @@
                 <span class="hidden sm:inline">Sin Asignar</span>
                 <span class="sm:hidden">Sin Asig.</span>
             </a>
+            {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+            <a href="{% url 'preinformes:lista_revision' %}?mostrar=compartidos" 
+               class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'compartidos' %}bg-purple-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
+                <i class="fas fa-users mr-1"></i>
+                <span class="hidden sm:inline">Pool Compartido</span>
+                <span class="sm:hidden">Compartido</span>
+            </a>
+            {% endif %}
             <a href="{% url 'preinformes:lista_revision' %}?mostrar=todos" 
                class="flex-1 sm:flex-initial px-3 sm:px-4 py-2 rounded-lg transition-colors text-center text-sm sm:text-base {% if mostrar == 'todos' %}bg-orange-600 text-white{% else %}bg-gray-100 text-gray-700 hover:bg-gray-200{% endif %}">
                 <i class="fas fa-list mr-1"></i>
@@ -140,6 +148,12 @@
                             <div class="text-sm font-medium text-gray-900">
                                 {{ preinforme.numero_estudio }}
                             </div>
+                            {% if preinforme.asignacion_compartida %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                <i class="fas fa-users mr-1"></i>
+                                Compartido
+                            </span>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-700">
@@ -202,38 +216,52 @@
                                     </a>
                                     {% endif %}
                                 {% else %}
-                                    <!-- Botón revisar -->
-                                    <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
-                                       class="inline-flex items-center justify-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors shadow-sm">
-                                        <i class="fas fa-{% if preinforme.estado == 'pendiente_revision' %}clipboard-check{% else %}arrow-right{% endif %} mr-1"></i>
-                                        {% if preinforme.estado == 'pendiente_revision' %}
-                                            Revisar
-                                        {% else %}
-                                            Continuar
+                                    <!-- Si es compartido y está disponible para tomar -->
+                                    {% if preinforme.asignacion_compartida and not preinforme.revisor %}
+                                        <form method="post" action="{% url 'preinformes:tomar_estudio' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                            {% csrf_token %}
+                                            <button type="submit" 
+                                                    class="w-full inline-flex items-center justify-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm font-semibold">
+                                                <i class="fas fa-hand-point-right mr-1"></i>
+                                                Tomar este estudio
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <!-- Botón revisar normal -->
+                                        <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
+                                           class="inline-flex items-center justify-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors shadow-sm">
+                                            <i class="fas fa-{% if preinforme.estado == 'pendiente_revision' %}clipboard-check{% else %}arrow-right{% endif %} mr-1"></i>
+                                            {% if preinforme.estado == 'pendiente_revision' %}
+                                                Revisar
+                                            {% else %}
+                                                Continuar
+                                            {% endif %}
+                                        </a>
+                                        
+                                        <!-- Botón asignar/desasignar (solo si NO es compartido) -->
+                                        {% if not preinforme.asignacion_compartida %}
+                                            {% if not preinforme.revisor %}
+                                                <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="asignarme">
+                                                    <button type="submit" 
+                                                            class="w-full inline-flex items-center justify-center px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm text-xs">
+                                                        <i class="fas fa-hand-pointer mr-1"></i>
+                                                        Asignarme
+                                                    </button>
+                                                </form>
+                                            {% elif preinforme.revisor == user %}
+                                                <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="desasignar">
+                                                    <button type="submit" 
+                                                            class="w-full inline-flex items-center justify-center px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors shadow-sm text-xs">
+                                                        <i class="fas fa-times mr-1"></i>
+                                                        Desasignar
+                                                    </button>
+                                                </form>
+                                            {% endif %}
                                         {% endif %}
-                                    </a>
-                                    
-                                    <!-- Botón asignar/desasignar -->
-                                    {% if not preinforme.revisor %}
-                                        <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="asignarme">
-                                            <button type="submit" 
-                                                    class="w-full inline-flex items-center justify-center px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                                <i class="fas fa-hand-pointer mr-1"></i>
-                                                Asignarme
-                                            </button>
-                                        </form>
-                                    {% elif preinforme.revisor == user %}
-                                        <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="desasignar">
-                                            <button type="submit" 
-                                                    class="w-full inline-flex items-center justify-center px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                                <i class="fas fa-times mr-1"></i>
-                                                Desasignar
-                                            </button>
-                                        </form>
                                     {% endif %}
                                 {% endif %}
                             </div>

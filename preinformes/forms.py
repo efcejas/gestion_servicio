@@ -22,6 +22,18 @@ class PreinformeForm(forms.ModelForm):
         })
     )
     
+    # Campo para asignación compartida
+    asignacion_compartida = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Pool compartido",
+        help_text="Enviar a pool compartido de jefes/instructores (no asignar a revisor específico)",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded',
+            'id': 'id_asignacion_compartida'
+        })
+    )
+    
     class Meta:
         model = Preinforme
         fields = [
@@ -31,6 +43,7 @@ class PreinformeForm(forms.ModelForm):
             'sistema_destino',
             'plantilla_utilizada',
             'revisor',
+            'asignacion_compartida',
             'apellido_paciente',
             'nombre_paciente',
             'dni_paciente',
@@ -147,6 +160,20 @@ class PreinformeForm(forms.ModelForm):
                 )
         
         return plantilla
+    
+    def clean(self):
+        """Validación para asegurar que asignación compartida y revisor no estén ambos activos"""
+        cleaned_data = super().clean()
+        asignacion_compartida = cleaned_data.get('asignacion_compartida')
+        revisor = cleaned_data.get('revisor')
+        
+        if asignacion_compartida and revisor:
+            raise forms.ValidationError(
+                "No puedes asignar a un revisor específico si el estudio está en pool compartido. "
+                "Desmarca 'Pool compartido' o deja el revisor vacío."
+            )
+        
+        return cleaned_data
 
 
 class FiltroPreinformesForm(forms.Form):
