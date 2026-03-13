@@ -22,6 +22,7 @@
 
     <form method="post" class="space-y-6">
         {% csrf_token %}
+        <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
 
         <!-- Información del Estudio y Paciente - Ultra Compacto -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -1569,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
             <span id="asistenteCharCount" style="font-size:.68rem;color:#9ca3af;">0/500</span>
-            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>Sin datos del paciente</span>
+            <span style="font-size:.68rem;color:#9ca3af;" title="Se envían edad, sexo y contexto del estudio, pero nunca nombre ni DNI."><i class="fas fa-lock" style="margin-right:2px;"></i>Sin nombre ni DNI del paciente</span>
         </div>
     </div>
 </div>
@@ -1621,7 +1622,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
             <span id="asistenteCharCountLateral" style="font-size:.68rem;color:#9ca3af;">0/500</span>
-            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>Sin datos del paciente</span>
+            <span style="font-size:.68rem;color:#9ca3af;" title="Se envían edad, sexo y contexto del estudio, pero nunca nombre ni DNI."><i class="fas fa-lock" style="margin-right:2px;"></i>Sin nombre ni DNI del paciente</span>
         </div>
     </div>
 </div>
@@ -1651,6 +1652,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mensajesLateral    = document.getElementById('asistenteMensajesLateral');
     const chips              = document.getElementById('asistenteChips');
     const typing             = document.getElementById('asistenteTyping');
+    const conversacionIdInput = document.getElementById('asistenteConversacionIdInput');
 
     // ── Helpers CSS ─────────────────────────────────────────
     function getCsrf() {
@@ -1670,6 +1672,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function scrollToBottom(area) {
         area.scrollTop = area.scrollHeight;
+    }
+
+    function syncConversacionId() {
+        if (conversacionIdInput) conversacionIdInput.value = conversacionId || '';
     }
 
     // ── Obtener contexto del formulario ────────────────────
@@ -1700,7 +1706,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } catch (e) { /* silencioso */ }
 
-        return { tipo_estudio, region, edad, sexo, contenido_editor };
+        return {
+            tipo_estudio,
+            region,
+            edad,
+            sexo,
+            contenido_editor,
+            preinforme_id: '{% if preinforme.pk %}{{ preinforme.pk }}{% endif %}',
+        };
     }
 
     // ── Formateo markdown básico ────────────────────────────
@@ -1831,6 +1844,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 addMessage(data.respuesta, 'bot', data.mensaje_id);
                 conversacionId = data.conversacion_id;
                 sessionStorage.setItem('asistente_preinforme_conv_id', conversacionId);
+                syncConversacionId();
                 if (chips) chips.style.display = 'none';
             } else {
                 addMessage(`❌ ${data.error || 'Error del servidor'}`, 'error');
@@ -1928,6 +1942,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!confirm('¿Iniciar nueva conversación? Se perderá el historial visible.')) return;
         conversacionId = null;
         sessionStorage.removeItem('asistente_preinforme_conv_id');
+        syncConversacionId();
         // Limpiar ambas áreas excepto bienvenida y chips
         [mensajesFlotante, mensajesLateral].forEach(area => {
             Array.from(area.childNodes).forEach(n => {
@@ -2030,14 +2045,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 return;
             }
-            {% if not request.user.es_residente %}
-            // Evaluación silenciosa en background (no bloquea el submit)
-            if (conversacionId && mensajesEnviados >= 3) {
-                solicitarEvaluacion(true);
-            }
-            {% endif %}
         });
     }
+
+    syncConversacionId();
 
     // Inputs flotante
     const inputFlotante = document.getElementById('asistenteInput');

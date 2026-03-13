@@ -70,6 +70,7 @@
             </div>
         </div>
 
+        {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' or user.rol == 'jefe_servicio' or user.is_superuser %}
         <div class="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg shadow-lg p-6">
             <div class="flex items-center justify-between">
                 <div>
@@ -85,6 +86,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Contenido principal -->
@@ -158,7 +160,7 @@
                     </div>
                 </a>
 
-                {% if user.rol in 'jefe_residentes,instructor_residentes,jefe_servicio' %}
+                {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' or user.rol == 'jefe_servicio' or user.is_superuser %}
                 <a href="{% url 'preinformes:estadisticas' %}" 
                    class="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors group">
                     <div class="p-2 bg-blue-500 text-white rounded-lg mr-4">

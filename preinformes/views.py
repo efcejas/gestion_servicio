@@ -11,6 +11,7 @@ from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 import json
+import logging
 
 from accounts.decorators import role_required
 from .models import (
@@ -24,6 +25,73 @@ from .forms import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+def _autoevaluar_sesion_mentor_al_enviar(preinforme, conversacion_id=None):
+    """
+    Intenta evaluar automáticamente la sesión del Mentor IA asociada al envío.
+
+    No bloquea el envío a revisión si falla la IA o si no hay conversación
+    evaluable. En todos los casos deja trazabilidad en logs.
+    """
+    from .models import ConversacionAsistentePreinforme
+    from .asistente_service import AsistenteRadiologicoBot
+
+    conversaciones = ConversacionAsistentePreinforme.objects.filter(
+        usuario=preinforme.residente,
+        fecha_actualizacion__gte=timezone.now() - timezone.timedelta(hours=24),
+    ).order_by('-fecha_actualizacion')
+
+    conversacion = None
+    if conversacion_id:
+        conversacion = conversaciones.filter(id=conversacion_id).first()
+
+    if conversacion is None:
+        conversacion = conversaciones.filter(
+            Q(preinforme=preinforme) | Q(preinforme__isnull=True)
+        ).first()
+
+    if conversacion is None:
+        logger.info(
+            'Mentor IA: no se encontró conversación evaluable para preinforme %s',
+            preinforme.pk,
+        )
+        return {'success': False, 'skipped': 'no_conversation'}
+
+    if conversacion.preinforme_id != preinforme.id:
+        conversacion.preinforme = preinforme
+        conversacion.save(update_fields=['preinforme'])
+
+    if conversacion.evaluada:
+        logger.info(
+            'Mentor IA: conversación %s ya estaba evaluada para preinforme %s',
+            conversacion.id,
+            preinforme.pk,
+        )
+        return {'success': True, 'skipped': 'already_evaluated'}
+
+    resultado = AsistenteRadiologicoBot().evaluar_conversacion(conversacion.id)
+    if resultado.get('success'):
+        logger.info(
+            'Mentor IA: autoevaluación generada para conversación %s (preinforme %s)',
+            conversacion.id,
+            preinforme.pk,
+        )
+    elif resultado.get('insufficient'):
+        logger.info(
+            'Mentor IA: conversación %s no reúne mensajes suficientes para evaluar',
+            conversacion.id,
+        )
+    else:
+        logger.warning(
+            'Mentor IA: fallo autoevaluación de conversación %s para preinforme %s: %s',
+            conversacion.id,
+            preinforme.pk,
+            resultado.get('error'),
+        )
+
+    return resultado
 
 
 # === VISTAS PARA RESIDENTES ===
@@ -113,6 +181,10 @@ def crear_preinforme(request):
                 return redirect('preinformes:editar_preinforme', pk=preinforme.pk)
             elif 'guardar_y_enviar' in request.POST:
                 preinforme.enviar_a_revision()
+                _autoevaluar_sesion_mentor_al_enviar(
+                    preinforme,
+                    request.POST.get('asistente_conversacion_id') or None,
+                )
                 messages.success(request, 'Preinforme enviado para revisión.')
                 return redirect('preinformes:dashboard_residente')
             else:
@@ -179,6 +251,10 @@ def editar_preinforme(request, pk):
                 return redirect('preinformes:editar_preinforme', pk=preinforme.pk)
             elif 'guardar_y_enviar' in request.POST:
                 preinforme.enviar_a_revision()
+                _autoevaluar_sesion_mentor_al_enviar(
+                    preinforme,
+                    request.POST.get('asistente_conversacion_id') or None,
+                )
                 preinforme.liberar_edicion()
                 messages.success(request, 'Preinforme enviado para revisión.')
                 return redirect('preinformes:dashboard_residente')
@@ -1382,7 +1458,8 @@ def asistente_preinforme_evaluar(request):
 
     from .asistente_service import AsistenteRadiologicoBot
     bot = AsistenteRadiologicoBot()
-    resultado = bot.evaluar_conversacion(conversacion_id, usuario=request.user)
+    # La conversación pertenece al residente, no al docente que dispara la evaluación.
+    resultado = bot.evaluar_conversacion(conversacion_id)
 
     if not resultado['success']:
         status_code = 400 if resultado.get('insufficient') else 500

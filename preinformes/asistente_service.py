@@ -158,7 +158,15 @@ Respondé en español argentino, de forma directa y sin rodeos excesivos."""
             }
 
         try:
-            from .models import ConversacionAsistentePreinforme, MensajeAsistentePreinforme
+            from .models import ConversacionAsistentePreinforme, MensajeAsistentePreinforme, Preinforme
+
+            preinforme = None
+            preinforme_id = (contexto_estudio or {}).get('preinforme_id')
+            if preinforme_id:
+                try:
+                    preinforme = Preinforme.objects.get(id=preinforme_id, residente=usuario)
+                except (Preinforme.DoesNotExist, ValueError, TypeError):
+                    preinforme = None
 
             # Obtener o crear conversación
             if conversacion_id:
@@ -168,9 +176,19 @@ Respondé en español argentino, de forma directa y sin rodeos excesivos."""
                         usuario=usuario
                     )
                 except ConversacionAsistentePreinforme.DoesNotExist:
-                    conversacion = ConversacionAsistentePreinforme.objects.create(usuario=usuario)
+                    conversacion = ConversacionAsistentePreinforme.objects.create(
+                        usuario=usuario,
+                        preinforme=preinforme,
+                    )
             else:
-                conversacion = ConversacionAsistentePreinforme.objects.create(usuario=usuario)
+                conversacion = ConversacionAsistentePreinforme.objects.create(
+                    usuario=usuario,
+                    preinforme=preinforme,
+                )
+
+            if preinforme and conversacion.preinforme_id != preinforme.id:
+                conversacion.preinforme = preinforme
+                conversacion.save(update_fields=['preinforme'])
 
             # Guardar mensaje del usuario
             mensaje_usuario = MensajeAsistentePreinforme.objects.create(
