@@ -762,3 +762,110 @@ class HistorialEstudios(models.Model):
             self.promedio_puntuacion = sum(puntuaciones) / len(puntuaciones)
         
         self.save()
+
+
+# ======================================================================
+# ASISTENTE IA PARA ELABORACIÓN DE PREINFORMES
+# ======================================================================
+
+class ConversacionAsistentePreinforme(models.Model):
+    """
+    Conversación entre un residente y el asistente IA Radiólogo Mentor
+    durante la elaboración de un preinforme.
+    """
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='conversaciones_asistente_preinforme',
+        help_text='Residente que mantiene la conversación'
+    )
+    preinforme = models.ForeignKey(
+        Preinforme,
+        on_delete=models.CASCADE,
+        related_name='conversaciones_asistente',
+        null=True,
+        blank=True,
+        help_text='Preinforme asociado a la conversación (null si aún no fue guardado)'
+    )
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+    activa = models.BooleanField(default=True)
+
+    # Scoring / evaluación de la sesión
+    evaluacion_ia = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text='Evaluación de la sesión: {razonamiento_clinico, terminologia, autonomia, receptividad, comentario}'
+    )
+    puntuacion_global = models.FloatField(
+        null=True,
+        blank=True,
+        help_text='Puntaje global de la sesión (0–10)'
+    )
+    evaluada = models.BooleanField(
+        default=False,
+        help_text='Si la conversación fue evaluada por la IA'
+    )
+    evaluacion_publicada = models.BooleanField(
+        default=False,
+        help_text='Si el docente habilitó que el residente vea su evaluación'
+    )
+
+    class Meta:
+        verbose_name = 'Conversación con Asistente de Preinforme'
+        verbose_name_plural = 'Conversaciones con Asistente de Preinforme'
+        ordering = ['-fecha_actualizacion']
+        indexes = [
+            models.Index(fields=['-fecha_actualizacion']),
+            models.Index(fields=['usuario', '-fecha_actualizacion']),
+        ]
+
+    def __str__(self):
+        nombre = self.usuario.get_full_name() or self.usuario.username
+        return f"Conversación de {nombre} — {self.fecha_inicio.strftime('%d/%m/%Y %H:%M')}"
+
+    def total_mensajes(self):
+        return self.mensajes_asistente.count()
+
+
+class MensajeAsistentePreinforme(models.Model):
+    """
+    Mensaje individual dentro de una conversación con el asistente IA.
+    """
+    ROLES = [
+        ('user', 'Residente'),
+        ('assistant', 'Asistente IA'),
+    ]
+
+    FEEDBACK_CHOICES = [
+        ('positivo', 'Positivo 👍'),
+        ('negativo', 'Negativo 👎'),
+    ]
+
+    conversacion = models.ForeignKey(
+        ConversacionAsistentePreinforme,
+        on_delete=models.CASCADE,
+        related_name='mensajes_asistente',
+        help_text='Conversación a la que pertenece este mensaje'
+    )
+    rol = models.CharField(max_length=10, choices=ROLES)
+    contenido = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    feedback = models.CharField(
+        max_length=10,
+        choices=FEEDBACK_CHOICES,
+        null=True,
+        blank=True
+    )
+
+    class Meta:
+        verbose_name = 'Mensaje del Asistente de Preinforme'
+        verbose_name_plural = 'Mensajes del Asistente de Preinforme'
+        ordering = ['timestamp']
+        indexes = [
+            models.Index(fields=['conversacion', 'timestamp']),
+        ]
+
+    def __str__(self):
+        preview = self.contenido[:50] + '...' if len(self.contenido) > 50 else self.contenido
+        return f"{self.get_rol_display()}: {preview}"

@@ -6,6 +6,7 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.core.paginator import Paginator
+from django.core.cache import cache
 from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
@@ -57,11 +58,11 @@ def dashboard_residente(request):
     preinformes_en_edicion = Preinforme.objects.filter(
         en_edicion_por__isnull=False,
         ultima_actividad_edicion__gt=tiempo_limite,
-        estado__in=['borrador', 'pendiente_revision', 'en_revision']  # Incluir más estados
+        estado__in=['borrador', 'pendiente_revision', 'en_revision']
     ).exclude(
-        en_edicion_por=request.user  # Excluir los propios del usuario
+        en_edicion_por=request.user
     ).select_related('en_edicion_por', 'tipo_estudio', 'revisor').order_by('-ultima_actividad_edicion')
-    
+
     context = {
         'historial': historial,
         'preinformes_pendientes': preinformes_pendientes,
@@ -1045,10 +1046,14 @@ def estadisticas(request):
     ).annotate(
         total_preinformes=Count('preinformes_realizados'),
         preinformes_finalizados=Count(
-            'preinformes_realizados', 
+            'preinformes_realizados',
             filter=Q(preinformes_realizados__estado='finalizado')
         ),
-        promedio_puntuacion=Avg('preinformes_realizados__revision__puntuacion')
+        promedio_puntuacion=Avg('preinformes_realizados__revision__puntuacion'),
+        promedio_scoring_ia=Avg(
+            'conversaciones_asistente_preinforme__puntuacion_global',
+            filter=Q(conversaciones_asistente_preinforme__evaluada=True)
+        ),
     ).order_by('-total_preinformes')
     
     # Estadísticas por tipo de estudio
@@ -1246,3 +1251,228 @@ def verificar_duplicado_preinforme(request):
         'duplicados': duplicados,
         'total': len(duplicados)
     })
+
+
+# ======================================================================
+# ASISTENTE IA RADIÓLOGO MENTOR
+# ======================================================================
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+@require_http_methods(["POST"])
+def asistente_preinforme_chat(request):
+    """
+    Endpoint AJAX para el asistente IA de elaboración de preinformes.
+    Recibe el mensaje del residente y el contexto del estudio actual.
+    """
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    mensaje = data.get('mensaje', '').strip()
+    conversacion_id = data.get('conversacion_id')
+    contexto_raw = data.get('contexto', {})
+
+    if not mensaje:
+        return JsonResponse({'success': False, 'error': 'El mensaje no puede estar vacío'}, status=400)
+
+    if len(mensaje) > 500:
+        return JsonResponse({'success': False, 'error': 'Mensaje demasiado largo (máx. 500 caracteres)'}, status=400)
+
+    # Rate limiting: máximo 30 mensajes por hora por usuario
+    cache_key = f'asistente_preinforme_rate_{request.user.id}'
+    mensajes_enviados = cache.get(cache_key, 0)
+    if mensajes_enviados >= 30:
+        return JsonResponse({
+            'success': False,
+            'error': 'Alcanzaste el límite de 30 mensajes por hora. Intentá más tarde.'
+        }, status=429)
+
+    # Armar contexto seguro (nunca enviar nombre ni DNI)
+    contexto_estudio = {
+        'tipo_estudio': contexto_raw.get('tipo_estudio', ''),
+        'region': contexto_raw.get('region', ''),
+        'edad': contexto_raw.get('edad', ''),
+        'sexo': contexto_raw.get('sexo', ''),
+        'contenido_editor': contexto_raw.get('contenido_editor', ''),
+    }
+
+    from .asistente_service import AsistenteRadiologicoBot
+    bot = AsistenteRadiologicoBot()
+    resultado = bot.chat(
+        usuario=request.user,
+        mensaje=mensaje,
+        conversacion_id=conversacion_id,
+        contexto_estudio=contexto_estudio
+    )
+
+    # Incrementar rate limiting solo si el request fue válido
+    cache.set(cache_key, mensajes_enviados + 1, 3600)
+
+    if resultado['success']:
+        return JsonResponse({
+            'success': True,
+            'respuesta': resultado['respuesta'],
+            'conversacion_id': resultado['conversacion_id'],
+            'mensaje_id': resultado.get('mensaje_id'),
+        })
+    else:
+        return JsonResponse({'success': False, 'error': resultado['error']}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+def asistente_preinforme_feedback(request):
+    """
+    Endpoint AJAX para registrar feedback (👍/👎) sobre respuestas del asistente.
+    """
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    mensaje_id = data.get('mensaje_id')
+    feedback = data.get('feedback')
+
+    if not mensaje_id or feedback not in ('positivo', 'negativo'):
+        return JsonResponse({'success': False, 'error': 'Parámetros inválidos'}, status=400)
+
+    from .models import MensajeAsistentePreinforme
+    try:
+        mensaje = MensajeAsistentePreinforme.objects.select_related(
+            'conversacion'
+        ).get(id=mensaje_id)
+    except MensajeAsistentePreinforme.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Mensaje no encontrado'}, status=404)
+
+    if mensaje.conversacion.usuario != request.user:
+        return JsonResponse({'success': False, 'error': 'Sin permiso'}, status=403)
+
+    if mensaje.rol != 'assistant':
+        return JsonResponse({'success': False, 'error': 'Solo se puede valorar respuestas del asistente'}, status=400)
+
+    mensaje.feedback = feedback
+    mensaje.save(update_fields=['feedback'])
+
+    return JsonResponse({'success': True})
+
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
+@require_http_methods(["POST"])
+def asistente_preinforme_evaluar(request):
+    """
+    Endpoint AJAX para evaluar la calidad del razonamiento del residente.
+    Exclusivo para roles docentes (jefe_residentes, instructor_residentes, jefe_servicio).
+    Los médicos residentes no pueden disparar evaluaciones.
+    """
+    ROLES_DOCENTES = ('jefe_residentes', 'instructor_residentes', 'jefe_servicio')
+    if not (request.user.is_superuser or request.user.rol in ROLES_DOCENTES):
+        return JsonResponse({'success': False, 'error': 'Sin permiso'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    conversacion_id = data.get('conversacion_id')
+    if not conversacion_id:
+        return JsonResponse({'success': False, 'error': 'Falta conversacion_id'}, status=400)
+
+    from .asistente_service import AsistenteRadiologicoBot
+    bot = AsistenteRadiologicoBot()
+    resultado = bot.evaluar_conversacion(conversacion_id, usuario=request.user)
+
+    if not resultado['success']:
+        status_code = 400 if resultado.get('insufficient') else 500
+        return JsonResponse(resultado, status=status_code)
+
+    return JsonResponse(resultado)
+
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+@require_http_methods(["POST"])
+def asistente_analizar_borrador(request):
+    """
+    Endpoint AJAX para análisis proactivo del borrador del preinforme.
+    La IA detecta problemas (terminología, ortografía, redundancias) y
+    retorna un mensaje socrático si encuentra algo relevante.
+    Rate limit: 1 llamada / 60s por usuario.
+    """
+    rate_key = f'analizar_borrador_{request.user.pk}'
+    if cache.get(rate_key):
+        return JsonResponse({'success': True, 'tiene_observacion': False, 'rate_limited': True})
+
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'success': False, 'error': 'JSON inválido'}, status=400)
+
+    contenido_html = data.get('contenido_html', '')
+    tipo_estudio = data.get('tipo_estudio', '')
+    region = data.get('region', '')
+
+    if not contenido_html or len(contenido_html.strip()) < 50:
+        return JsonResponse({'success': True, 'tiene_observacion': False})
+
+    cache.set(rate_key, True, timeout=60)
+
+    from .asistente_service import AsistenteRadiologicoBot
+    bot = AsistenteRadiologicoBot()
+    resultado = bot.analizar_borrador(
+        contenido_html=contenido_html,
+        tipo_estudio=tipo_estudio,
+        region=region,
+    )
+    return JsonResponse(resultado)
+
+
+@login_required
+@role_required('jefe_residentes', 'instructor_residentes', 'jefe_servicio')
+def perfil_residente_docente(request, pk):
+    """
+    Perfil de un residente con historial de evaluaciones del Asistente IA.
+    Accesible solo para roles docentes.
+    """
+    residente = get_object_or_404(User, pk=pk, rol='medico_residente')
+
+    from .models import ConversacionAsistentePreinforme
+    from django.db.models import Avg as _Avg
+
+    conversaciones_evaluadas = ConversacionAsistentePreinforme.objects.filter(
+        usuario=residente,
+        evaluada=True,
+    ).select_related('preinforme__tipo_estudio', 'preinforme__region').order_by('-fecha_actualizacion')
+
+    promedio_scoring = conversaciones_evaluadas.aggregate(
+        promedio=_Avg('puntuacion_global')
+    )['promedio']
+    if promedio_scoring is not None:
+        promedio_scoring = round(promedio_scoring, 1)
+
+    # Promedios por dimensión (calculados en Python desde el JSONField)
+    dims_acum = {'razonamiento_clinico': [], 'terminologia': [], 'autonomia': [], 'receptividad': []}
+    for conv in conversaciones_evaluadas:
+        ev = conv.evaluacion_ia or {}
+        for dim in dims_acum:
+            val = ev.get(dim)
+            if isinstance(val, (int, float)):
+                dims_acum[dim].append(val)
+
+    promedios_dims = {
+        dim: round(sum(vals) / len(vals), 1) if vals else None
+        for dim, vals in dims_acum.items()
+    }
+
+    historial = HistorialEstudios.objects.filter(residente=residente).first()
+
+    context = {
+        'residente': residente,
+        'conversaciones_evaluadas': conversaciones_evaluadas,
+        'promedio_scoring': promedio_scoring,
+        'promedios_dims': promedios_dims,
+        'historial': historial,
+    }
+    return render(request, 'preinformes/perfil_residente_docente.html', context)

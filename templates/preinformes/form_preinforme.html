@@ -291,9 +291,8 @@
                     Guardar y Continuar
                 </button>
                 
-                <button type="submit" name="guardar_y_enviar"
-                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200"
-                        onclick="return confirm('¿Está seguro de enviar el preinforme para revisión? Podrá editarlo hasta que sea tomado por el staff. Una vez en revisión, ya no se podrá modificar.')">
+                <button type="submit" name="guardar_y_enviar" id="btnEnviarRevision"
+                        class="inline-flex justify-center items-center py-3 px-6 border border-transparent rounded-lg shadow-sm bg-green-600 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-200">
                     <i class="fas fa-paper-plane mr-2"></i>
                     Enviar para Revisión
                 </button>
@@ -1317,6 +1316,843 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<!-- ============================================================
+     ASISTENTE IA RADIÓLOGO MENTOR
+     Botón flotante expandible a panel lateral
+     ============================================================ -->
+
+<!-- Estilos del asistente -->
+<style>
+/* Animación de puntos de escritura */
+@keyframes asistente-bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+}
+.asistente-bounce { animation: asistente-bounce 1s ease-in-out infinite; }
+
+/* Feedback botones */
+.asistente-feedback-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: transform .15s, opacity .15s;
+    line-height: 1;
+}
+.asistente-feedback-btn:hover:not(:disabled) { transform: scale(1.25); }
+.asistente-feedback-btn:disabled { cursor: not-allowed; opacity: .45; }
+
+/* Panel lateral (modo expandido) */
+#asistenteSidePanel {
+    position: fixed;
+    top: 0; right: -400px;
+    width: 380px;
+    height: 100vh;
+    background: white;
+    box-shadow: -4px 0 24px rgba(0,0,0,.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 9998;
+    transition: right .3s ease;
+}
+#asistenteSidePanel.abierto { right: 0; }
+
+/* En mobile el panel ocupa todo el ancho */
+@media (max-width: 640px) {
+    #asistenteSidePanel { width: 100vw; right: -100vw; }
+}
+
+/* Panel flotante (modo compacto) */
+#asistentePanelFlotante {
+    position: fixed;
+    bottom: 0; right: 0;
+    width: 360px;
+    height: 520px;
+    background: white;
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -4px 32px rgba(0,0,0,.18);
+    display: flex;
+    flex-direction: column;
+    z-index: 9998;
+    transform: translateY(100%);
+    transition: transform .3s ease;
+}
+#asistentePanelFlotante.abierto { transform: translateY(0); }
+
+@media (max-width: 640px) {
+    #asistentePanelFlotante { width: 100vw; height: 85vh; }
+}
+
+/* Header del chat */
+.asistente-header {
+    background: linear-gradient(135deg, #0d9488, #0891b2);
+    color: white;
+    padding: .875rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    border-radius: inherit;
+    border-radius: 1rem 1rem 0 0;
+}
+#asistenteSidePanel .asistente-header { border-radius: 0; }
+
+.asistente-header-title { font-weight: 700; font-size: 1rem; margin: 0; }
+.asistente-header-sub  { font-size: .7rem; opacity: .85; margin: 0; }
+
+.asistente-header-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .875rem;
+    transition: background .2s;
+    flex-shrink: 0;
+}
+.asistente-header-btn:hover { background: rgba(255,255,255,.2); }
+
+/* Área de mensajes */
+.asistente-mensajes {
+    flex: 1;
+    overflow-y: auto;
+    padding: .875rem;
+    background: #f8fafc;
+    scroll-behavior: smooth;
+}
+
+/* Chips de sugerencias */
+.asistente-chip {
+    background: white;
+    border: 1px solid #99f6e4;
+    color: #0f766e;
+    padding: .25rem .65rem;
+    border-radius: 9999px;
+    font-size: .72rem;
+    cursor: pointer;
+    transition: background .2s;
+    white-space: nowrap;
+}
+.asistente-chip:hover { background: #f0fdf4; }
+
+/* Input */
+.asistente-input-area {
+    border-top: 1px solid #e5e7eb;
+    padding: .75rem 1rem;
+    background: white;
+    flex-shrink: 0;
+}
+#asistenteInput {
+    width: 100%;
+    resize: none;
+    border: 1px solid #d1d5db;
+    border-radius: .5rem;
+    padding: .4rem .65rem;
+    font-size: .8rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    box-sizing: border-box;
+    max-height: 100px;
+    overflow-y: auto;
+}
+#asistenteInput:focus {
+    border-color: #0d9488;
+    box-shadow: 0 0 0 3px rgba(13,148,136,.12);
+}
+#asistenteSendBtn {
+    background: #0d9488;
+    color: white;
+    border: none;
+    border-radius: .5rem;
+    padding: .4rem .8rem;
+    cursor: pointer;
+    font-size: .8rem;
+    transition: background .2s;
+    flex-shrink: 0;
+}
+#asistenteSendBtn:hover:not(:disabled) { background: #0f766e; }
+#asistenteSendBtn:disabled { background: #9ca3af; cursor: not-allowed; }
+@keyframes asistente-ping {
+    75%, 100% { transform: scale(2.5); opacity: 0; }
+}
+</style>
+
+<!-- Botón flotante (se oculta cuando el chat está abierto) -->
+<button id="asistenteFloatBtn"
+        aria-label="Abrir asistente IA radiológico"
+        title="Asistente IA Radiólogo Mentor"
+        style="position:fixed;bottom:24px;right:24px;width:54px;height:54px;background:linear-gradient(135deg,#0d9488,#0891b2);color:white;border-radius:9999px;box-shadow:0 8px 28px rgba(13,148,136,.45);display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;z-index:9999;transition:transform .2s,box-shadow .2s;overflow:visible;">
+    <span id="asistenteBadgePing" style="display:none;position:absolute;top:-3px;right:-3px;width:14px;height:14px;" aria-hidden="true">
+        <span style="position:absolute;inset:0;border-radius:50%;background:#ef4444;animation:asistente-ping 1.2s ease-out infinite;opacity:.8;"></span>
+        <span style="position:absolute;inset:0;border-radius:50%;background:#ef4444;"></span>
+    </span>
+    <i class="fas fa-stethoscope" style="font-size:1.35rem;"></i>
+</button>
+
+<!-- Panel flotante (modo compacto) -->
+<div id="asistentePanelFlotante" aria-label="Asistente IA Radiólogo Mentor" role="dialog" aria-modal="true">
+    <div class="asistente-header">
+        <div style="display:flex;align-items:center;gap:.6rem;min-width:0;">
+            <i class="fas fa-stethoscope" style="font-size:1.2rem;flex-shrink:0;"></i>
+            <div style="min-width:0;">
+                <p class="asistente-header-title">Radiólogo Mentor</p>
+                <p class="asistente-header-sub">Asistente IA · Preinforme</p>
+            </div>
+        </div>
+        <div style="display:flex;gap:.35rem;flex-shrink:0;">
+            {% if not request.user.es_residente %}
+            <button class="asistente-header-btn" id="asistenteEvaluarBtnFloat" title="Evaluar esta sesión" aria-label="Evaluar sesión" style="display:none;">
+                <i class="fas fa-chart-bar"></i>
+            </button>
+            {% endif %}
+            <button class="asistente-header-btn" id="asistenteExpandirBtn" title="Expandir a panel lateral" aria-label="Expandir">
+                <i class="fas fa-expand-alt"></i>
+            </button>
+            <button class="asistente-header-btn" id="asistenteNuevoBtn" title="Nueva conversación" aria-label="Nueva conversación">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="asistente-header-btn" id="asistenteCerrarFlotante" title="Cerrar" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Área de mensajes (compartida, se mueve según modo) -->
+    <div class="asistente-mensajes" id="asistenteMensajesFlotante">
+        <!-- Mensaje de bienvenida -->
+        <div style="display:flex;align-items:flex-start;margin-bottom:.65rem;">
+            <div style="background:#ccfbf1;border-radius:.5rem;padding:.65rem .8rem;max-width:88%;">
+                <p style="font-size:.8rem;color:#134e4a;margin:0;line-height:1.5;">
+                    👋 ¡Hola{% if user.first_name %}, {{ user.first_name }}{% endif %}! Soy tu asistente mientras elaborás el informe.
+                    Podés preguntarme sobre terminología, estructura, cómo describir un hallazgo… Pero ojo — no te voy a dar las respuestas directas. Mi trabajo es que <em>vos</em> aprendas. 🔍
+                </p>
+            </div>
+        </div>
+        <!-- Sugerencias rápidas -->
+        <div id="asistenteChips" style="display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.65rem;">
+            <button class="asistente-chip">¿Qué no me puedo olvidar?</button>
+            <button class="asistente-chip">¿Terminología correcta?</button>
+            <button class="asistente-chip">¿Mi conclusión está bien?</button>
+            <button class="asistente-chip">¿Cómo describo este hallazgo?</button>
+        </div>
+        <!-- Indicador typing -->
+        <div id="asistenteTyping" style="display:none;margin-bottom:.5rem;">
+            <div style="display:flex;align-items:flex-start;">
+                <div style="background:#ccfbf1;border-radius:.5rem;padding:.45rem .7rem;">
+                    <div style="display:flex;gap:.25rem;align-items:center;">
+                        <div style="width:.45rem;height:.45rem;background:#0d9488;border-radius:50%;" class="asistente-bounce"></div>
+                        <div style="width:.45rem;height:.45rem;background:#0d9488;border-radius:50%;animation-delay:.15s;" class="asistente-bounce"></div>
+                        <div style="width:.45rem;height:.45rem;background:#0d9488;border-radius:50%;animation-delay:.3s;" class="asistente-bounce"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="asistente-input-area">
+        <div style="display:flex;align-items:flex-end;gap:.5rem;">
+            <textarea id="asistenteInput"
+                      placeholder="Preguntame algo sobre el informe…"
+                      rows="1"
+                      maxlength="500"
+                      aria-label="Mensaje para el asistente IA"></textarea>
+            <button id="asistenteSendBtn" aria-label="Enviar">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
+            <span id="asistenteCharCount" style="font-size:.68rem;color:#9ca3af;">0/500</span>
+            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>Sin datos del paciente</span>
+        </div>
+    </div>
+</div>
+
+<!-- Panel lateral (modo expandido) -->
+<div id="asistenteSidePanel" aria-label="Asistente IA Radiólogo Mentor (panel lateral)" role="dialog" aria-modal="true">
+    <div class="asistente-header" style="border-radius:0;">
+        <div style="display:flex;align-items:center;gap:.6rem;min-width:0;">
+            <i class="fas fa-stethoscope" style="font-size:1.2rem;flex-shrink:0;"></i>
+            <div style="min-width:0;">
+                <p class="asistente-header-title">Radiólogo Mentor</p>
+                <p class="asistente-header-sub">Asistente IA · Preinforme</p>
+            </div>
+        </div>
+        <div style="display:flex;gap:.35rem;flex-shrink:0;">
+            {% if not request.user.es_residente %}
+            <button class="asistente-header-btn" id="asistenteEvaluarBtnSide" title="Evaluar esta sesión" aria-label="Evaluar sesión" style="display:none;">
+                <i class="fas fa-chart-bar"></i>
+            </button>
+            {% endif %}
+            <button class="asistente-header-btn" id="asistenteColapsarBtn" title="Volver a modo flotante" aria-label="Colapsar">
+                <i class="fas fa-compress-alt"></i>
+            </button>
+            <button class="asistente-header-btn" id="asistenteNuevoBtnSide" title="Nueva conversación" aria-label="Nueva conversación">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="asistente-header-btn" id="asistenteCerrarLateral" title="Cerrar" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+    <!-- Área de mensajes del panel lateral -->
+    <div class="asistente-mensajes" id="asistenteMensajesLateral" style="display:none;">
+        <!-- Los mensajes se clonan desde el panel flotante -->
+    </div>
+    <div class="asistente-input-area">
+        <div style="display:flex;align-items:flex-end;gap:.5rem;">
+            <textarea id="asistenteInputLateral"
+                      placeholder="Preguntame algo sobre el informe…"
+                      rows="1"
+                      maxlength="500"
+                      style="width:100%;resize:none;border:1px solid #d1d5db;border-radius:.5rem;padding:.4rem .65rem;font-size:.8rem;font-family:inherit;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box;max-height:100px;overflow-y:auto;"
+                      aria-label="Mensaje para el asistente IA (panel lateral)"></textarea>
+            <button id="asistenteSendBtnLateral"
+                    style="background:#0d9488;color:white;border:none;border-radius:.5rem;padding:.4rem .8rem;cursor:pointer;font-size:.8rem;flex-shrink:0;"
+                    aria-label="Enviar">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
+            <span id="asistenteCharCountLateral" style="font-size:.68rem;color:#9ca3af;">0/500</span>
+            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>Sin datos del paciente</span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── URLs ────────────────────────────────────────────────
+    const URL_CHAT     = "{% url 'preinformes:asistente_chat' %}";
+    const URL_FEEDBACK = "{% url 'preinformes:asistente_feedback' %}";
+    const URL_EVALUAR  = "{% url 'preinformes:asistente_evaluar' %}";
+    const URL_ANALIZAR = "{% url 'preinformes:asistente_analizar' %}";
+
+    // ── Estado ──────────────────────────────────────────────
+    let conversacionId = sessionStorage.getItem('asistente_preinforme_conv_id') || null;
+    let modoLateral    = false;    // false = flotante, true = panel lateral
+    let isOpen         = false;
+    let mensajesEnviados = 0;      // contador de mensajes del residente en esta sesión
+    let pendingHintMessage = null; // sugerencia proactiva pendiente de mostrar al abrir
+
+    // ── Elementos ───────────────────────────────────────────
+    const floatBtn           = document.getElementById('asistenteFloatBtn');
+    const panelFlotante      = document.getElementById('asistentePanelFlotante');
+    const panelLateral       = document.getElementById('asistenteSidePanel');
+    const mensajesFlotante   = document.getElementById('asistenteMensajesFlotante');
+    const mensajesLateral    = document.getElementById('asistenteMensajesLateral');
+    const chips              = document.getElementById('asistenteChips');
+    const typing             = document.getElementById('asistenteTyping');
+
+    // ── Helpers CSS ─────────────────────────────────────────
+    function getCsrf() {
+        const m = document.cookie.match(/csrftoken=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
+    function activeMensajesArea() {
+        return modoLateral ? mensajesLateral : mensajesFlotante;
+    }
+
+    function activeInput() {
+        return modoLateral
+            ? document.getElementById('asistenteInputLateral')
+            : document.getElementById('asistenteInput');
+    }
+
+    function scrollToBottom(area) {
+        area.scrollTop = area.scrollHeight;
+    }
+
+    // ── Obtener contexto del formulario ────────────────────
+    function getContextoEstudio() {
+        // Tipo de estudio (texto del option seleccionado)
+        const tipoEl = document.getElementById('id_tipo_estudio');
+        const regionEl = document.getElementById('id_region');
+        const edadEl = document.getElementById('id_edad_paciente');
+        const sexoEl = document.getElementById('id_sexo_paciente');
+
+        const tipo_estudio = tipoEl
+            ? (tipoEl.options[tipoEl.selectedIndex]?.text || '')
+            : '';
+        const region = regionEl
+            ? (regionEl.options[regionEl.selectedIndex]?.text || '')
+            : '';
+        const edad = edadEl ? (edadEl.value || '') : '';
+        const sexo = sexoEl ? (sexoEl.value || '') : '';
+
+        // Contenido del editor CKEditor5 (ya tiene strip HTML en el servidor)
+        let contenido_editor = '';
+        try {
+            if (window.ckeditorInstance && typeof window.ckeditorInstance.getData === 'function') {
+                contenido_editor = window.ckeditorInstance.getData() || '';
+            } else {
+                const ta = document.getElementById('id_informe_html');
+                if (ta) contenido_editor = ta.value || '';
+            }
+        } catch (e) { /* silencioso */ }
+
+        return { tipo_estudio, region, edad, sexo, contenido_editor };
+    }
+
+    // ── Formateo markdown básico ────────────────────────────
+    function formatMd(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/\n/g, '<br>');
+    }
+
+    // ── Agregar mensaje al área activa ─────────────────────
+    function addMessage(text, type, mensajeId) {
+        const area = activeMensajesArea();
+
+        const wrap = document.createElement('div');
+        wrap.style.cssText = `display:flex;align-items:flex-start;margin-bottom:.6rem;${type === 'user' ? 'justify-content:flex-end;' : ''}`;
+
+        const bubble = document.createElement('div');
+        bubble.style.cssText = `border-radius:.5rem;padding:.6rem .8rem;max-width:88%;word-wrap:break-word;font-size:.8rem;line-height:1.55;`;
+
+        if (type === 'user') {
+            bubble.style.background = '#0d9488';
+            bubble.style.color = 'white';
+            bubble.innerHTML = `<p style="margin:0;">${text.replace(/\n/g,'<br>')}</p>`;
+        } else if (type === 'error') {
+            bubble.style.background = '#fee2e2';
+            bubble.style.color = '#991b1b';
+            bubble.innerHTML = `<p style="margin:0;">${text}</p>`;
+        } else {
+            bubble.style.background = '#ccfbf1';
+            bubble.style.color = '#134e4a';
+            bubble.innerHTML = `<p style="margin:0;">${formatMd(text)}</p>`;
+
+            // Botones de feedback
+            if (mensajeId) {
+                const fb = document.createElement('div');
+                fb.style.cssText = 'margin-top:.4rem;display:flex;align-items:center;gap:.3rem;';
+                fb.innerHTML = `
+                    <span style="font-size:.68rem;color:#6b7280;">¿Te ayudó?</span>
+                    <button class="asistente-feedback-btn" data-id="${mensajeId}" data-val="positivo" title="Sí">👍</button>
+                    <button class="asistente-feedback-btn" data-id="${mensajeId}" data-val="negativo" title="No">👎</button>`;
+                fb.querySelectorAll('.asistente-feedback-btn').forEach(btn => {
+                    btn.addEventListener('click', () => sendFeedback(btn, fb));
+                });
+                bubble.appendChild(fb);
+            }
+        }
+
+        wrap.appendChild(bubble);
+
+        // Insertar ANTES del typing indicator (que siempre es el último nodo real)
+        area.insertBefore(wrap, typing.parentNode === area ? typing : null);
+        scrollToBottom(area);
+    }
+
+    // ── Feedback ─────────────────────────────────────────────
+    async function sendFeedback(btn, container) {
+        const btns = container.querySelectorAll('.asistente-feedback-btn');
+        btns.forEach(b => b.disabled = true);
+        try {
+            await fetch(URL_FEEDBACK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ mensaje_id: btn.dataset.id, feedback: btn.dataset.val })
+            });
+            btn.style.transform = 'scale(1.3)';
+            btns.forEach(b => { if (b !== btn) b.style.opacity = '.25'; });
+            const label = container.querySelector('span');
+            if (label) label.textContent = btn.dataset.val === 'positivo' ? '¡Gracias! 😊' : 'Gracias por el feedback';
+        } catch (_) {
+            btns.forEach(b => b.disabled = false);
+        }
+    }
+
+    // ── Enviar mensaje ─────────────────────────────────────
+    async function sendMessage(inputEl) {
+        const mensaje = inputEl.value.trim();
+        if (!mensaje) return;
+
+        addMessage(mensaje, 'user');
+        mensajesEnviados++;
+        {% if not request.user.es_residente %}
+        // Mostrar botón evaluar cuando hay ≥3 mensajes
+        if (mensajesEnviados >= 3) {
+            const be1 = document.getElementById('asistenteEvaluarBtnFloat');
+            const be2 = document.getElementById('asistenteEvaluarBtnSide');
+            if (be1) be1.style.display = '';
+            if (be2) be2.style.display = '';
+        }
+        {% endif %}
+        inputEl.value = '';
+        inputEl.style.height = 'auto';
+        actualizarContador(inputEl);
+
+        // — disable inputs —
+        const sendBtns = [
+            document.getElementById('asistenteSendBtn'),
+            document.getElementById('asistenteSendBtnLateral')
+        ];
+        const inputs = [
+            document.getElementById('asistenteInput'),
+            document.getElementById('asistenteInputLateral')
+        ];
+        sendBtns.forEach(b => { if (b) b.disabled = true; });
+        inputs.forEach(i => { if (i) i.disabled = true; });
+
+        // Mover typing indicator al área activa
+        const area = activeMensajesArea();
+        area.appendChild(typing);
+        typing.style.display = 'block';
+        scrollToBottom(area);
+
+        try {
+            const resp = await fetch(URL_CHAT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({
+                    mensaje,
+                    conversacion_id: conversacionId,
+                    contexto: getContextoEstudio(),
+                })
+            });
+
+            typing.style.display = 'none';
+            const data = await resp.json();
+
+            if (data.success) {
+                addMessage(data.respuesta, 'bot', data.mensaje_id);
+                conversacionId = data.conversacion_id;
+                sessionStorage.setItem('asistente_preinforme_conv_id', conversacionId);
+                if (chips) chips.style.display = 'none';
+            } else {
+                addMessage(`❌ ${data.error || 'Error del servidor'}`, 'error');
+            }
+        } catch (_) {
+            typing.style.display = 'none';
+            addMessage('❌ Error de conexión. Reintentá en un momento.', 'error');
+        } finally {
+            sendBtns.forEach(b => { if (b) b.disabled = false; });
+            inputs.forEach(i => { if (i) i.disabled = false; });
+            inputEl.focus();
+        }
+    }
+
+    // ── Contador caracteres ────────────────────────────────
+    function actualizarContador(el) {
+        const n = el.value.length;
+        const countId = el.id === 'asistenteInput' ? 'asistenteCharCount' : 'asistenteCharCountLateral';
+        const counter = document.getElementById(countId);
+        if (counter) counter.textContent = `${n}/500`;
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+
+    // ── Clonar mensajes entre paneles ──────────────────────
+    function clonarMensajesA(destino, origen) {
+        // Copiar todos los nodos hijos excepto typing
+        Array.from(origen.childNodes).forEach(node => {
+            if (node !== typing && node.id !== 'asistenteTyping') {
+                destino.appendChild(node.cloneNode(true));
+                // Re-registrar event listeners de feedback en los clones
+                destino.querySelectorAll('.asistente-feedback-btn').forEach(btn => {
+                    const fb = btn.closest('div[style*="feedback"], div[style*="margin-top"]');
+                    btn.addEventListener('click', () => sendFeedback(btn, fb || btn.parentElement));
+                });
+            }
+        });
+        scrollToBottom(destino);
+    }
+
+    // ── Abrir / cerrar ─────────────────────────────────────
+    function abrirFlotante() {
+        modoLateral = false;
+        isOpen = true;
+        panelFlotante.classList.add('abierto');
+        panelLateral.classList.remove('abierto');
+        mensajesLateral.style.display = 'none';
+        mensajesFlotante.style.display = 'flex'; // usar flex para columna
+        mensajesFlotante.style.flexDirection = 'column';
+        floatBtn.style.display = 'none';
+        ocultarBadge();
+        // re-adjuntar typing al flotante
+        mensajesFlotante.appendChild(typing);
+        // Mostrar sugerencia proactiva pendiente si existe
+        if (pendingHintMessage) {
+            addMessage(pendingHintMessage, 'bot');
+            pendingHintMessage = null;
+        }
+    }
+
+    function abrirLateral() {
+        modoLateral = true;
+        isOpen = true;
+        panelFlotante.classList.remove('abierto');
+        panelLateral.classList.add('abierto');
+        mensajesFlotante.style.display = 'none';
+        mensajesLateral.style.display = 'block';
+        floatBtn.style.display = 'none';
+        ocultarBadge();
+        // Clonar mensajes al lateral si está vacío (primera vez)
+        if (mensajesLateral.children.length === 0) {
+            clonarMensajesA(mensajesLateral, mensajesFlotante);
+        }
+        mensajesLateral.appendChild(typing);
+        scrollToBottom(mensajesLateral);
+        // Mostrar sugerencia proactiva pendiente si existe
+        if (pendingHintMessage) {
+            addMessage(pendingHintMessage, 'bot');
+            pendingHintMessage = null;
+        }
+    }
+
+    function cerrarTodo() {
+        isOpen = false;
+        modoLateral = false;
+        panelFlotante.classList.remove('abierto');
+        panelLateral.classList.remove('abierto');
+        floatBtn.style.display = 'flex';
+        // restaurar mensajes al flotante
+        mensajesFlotante.style.display = '';
+        mensajesFlotante.appendChild(typing);
+    }
+
+    function nuevaConversacion() {
+        if (!confirm('¿Iniciar nueva conversación? Se perderá el historial visible.')) return;
+        conversacionId = null;
+        sessionStorage.removeItem('asistente_preinforme_conv_id');
+        // Limpiar ambas áreas excepto bienvenida y chips
+        [mensajesFlotante, mensajesLateral].forEach(area => {
+            Array.from(area.childNodes).forEach(n => {
+                if (n !== typing && n.id !== 'asistenteChips' && n.id !== 'asistenteTyping') {
+                    const isBienvenida = n.querySelector && n.querySelector('em');
+                    if (!isBienvenida) area.removeChild(n);
+                }
+            });
+        });
+        // Re-mostrar chips
+        if (chips) chips.style.display = 'flex';
+    }
+
+    {% if not request.user.es_residente %}
+    // ── Evaluar conversación ──────────────────────────────
+    async function solicitarEvaluacion(silencioso = false) {
+        if (!conversacionId) return;
+
+        const btns = [
+            document.getElementById('asistenteEvaluarBtnFloat'),
+            document.getElementById('asistenteEvaluarBtnSide'),
+        ];
+        btns.forEach(b => { if (b) { b.disabled = true; b.innerHTML = '<i class="fas fa-spinner fa-spin"></i>'; } });
+
+        try {
+            const resp = await fetch(URL_EVALUAR, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({ conversacion_id: parseInt(conversacionId) }),
+            });
+            const data = await resp.json();
+
+            if (!silencioso) {
+                mostrarResultadoEvaluacion(data);
+            }
+        } catch (_) {
+            if (!silencioso) addMessage('❌ No se pudo obtener la evaluación ahora. Intentá más tarde.', 'error');
+        } finally {
+            btns.forEach(b => {
+                if (b) { b.disabled = false; b.innerHTML = '<i class="fas fa-chart-bar"></i>'; }
+            });
+        }
+    }
+
+    function mostrarResultadoEvaluacion(data) {
+        if (!data.success) {
+            const msg = data.insufficient
+                ? '📊 Necesitás al menos 3 mensajes para que el mentor pueda evaluar la sesión.'
+                : '❌ ' + (data.error || 'No se pudo evaluar la sesión.');
+            addMessage(msg, 'error');
+            return;
+        }
+        const ev = data.evaluacion || {};
+        const dims = [
+            ['🧠 Razonamiento', ev.razonamiento_clinico || '?'],
+            ['📖 Terminología',  ev.terminologia || '?'],
+            ['💪 Autonomía',     ev.autonomia || '?'],
+            ['👂 Receptividad',  ev.receptividad || '?'],
+        ];
+        const dimsHtml = dims.map(([label, val]) =>
+            '<span style="display:inline-block;background:#f0fdfa;border:1px solid #99f6e4;border-radius:.4rem;padding:.15rem .5rem;font-size:.72rem;"><strong>' + label + ':</strong> ' + val + '/10</span>'
+        ).join(' ');
+        const puntaje = data.puntuacion_global || '?';
+        const color = puntaje >= 8 ? '#15803d' : puntaje >= 6 ? '#b45309' : '#dc2626';
+        const comentario = ev.comentario
+            ? '<p style="margin:.5rem 0 0;font-style:italic;font-size:.75rem;">\u201c' + ev.comentario + '\u201d</p>'
+            : '';
+        const html = '<div><p style="font-weight:700;font-size:.9rem;color:' + color + ';">⭐ Evaluación del mentor: ' + puntaje + '/10</p><div style="display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0;">' + dimsHtml + '</div>' + comentario + '<p style="font-size:.7rem;color:#6b7280;margin-top:.4rem;">Podés verlo también en tu <strong>dashboard</strong>.</p></div>';
+        const area = activeMensajesArea();
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;align-items:flex-start;margin-bottom:.6rem;';
+        const bubble = document.createElement('div');
+        bubble.style.cssText = 'background:#f0fdf4;border:1px solid #bbf7d0;border-radius:.5rem;padding:.7rem .85rem;max-width:95%;font-size:.8rem;line-height:1.5;';
+        bubble.innerHTML = html;
+        wrap.appendChild(bubble);
+        area.insertBefore(wrap, typing.parentNode === area ? typing : null);
+        scrollToBottom(area);
+    }
+    {% endif %}
+
+    // ── Event listeners ────────────────────────────────────
+    floatBtn.addEventListener('click', abrirFlotante);
+
+    document.getElementById('asistenteCerrarFlotante').addEventListener('click', cerrarTodo);
+    document.getElementById('asistenteCerrarLateral').addEventListener('click', cerrarTodo);
+    document.getElementById('asistenteExpandirBtn').addEventListener('click', abrirLateral);
+    document.getElementById('asistenteColapsarBtn').addEventListener('click', abrirFlotante);
+    document.getElementById('asistenteNuevoBtn').addEventListener('click', nuevaConversacion);
+    document.getElementById('asistenteNuevoBtnSide').addEventListener('click', nuevaConversacion);
+    {% if not request.user.es_residente %}
+    document.getElementById('asistenteEvaluarBtnFloat').addEventListener('click', () => solicitarEvaluacion(false));
+    document.getElementById('asistenteEvaluarBtnSide').addEventListener('click', () => solicitarEvaluacion(false));
+    {% endif %}
+
+    // Confirmar envío a revisión
+    const btnEnviar = document.getElementById('btnEnviarRevision');
+    if (btnEnviar) {
+        btnEnviar.addEventListener('click', function (e) {
+            if (!confirm('¿Está seguro de enviar el preinforme para revisión? Podrá editarlo hasta que sea tomado por el staff. Una vez en revisión, ya no se podrá modificar.')) {
+                e.preventDefault();
+                return;
+            }
+            {% if not request.user.es_residente %}
+            // Evaluación silenciosa en background (no bloquea el submit)
+            if (conversacionId && mensajesEnviados >= 3) {
+                solicitarEvaluacion(true);
+            }
+            {% endif %}
+        });
+    }
+
+    // Inputs flotante
+    const inputFlotante = document.getElementById('asistenteInput');
+    inputFlotante.addEventListener('input', () => actualizarContador(inputFlotante));
+    inputFlotante.addEventListener('keypress', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputFlotante); }
+    });
+    document.getElementById('asistenteSendBtn').addEventListener('click', () => sendMessage(inputFlotante));
+
+    // Inputs lateral
+    const inputLateral = document.getElementById('asistenteInputLateral');
+    inputLateral.addEventListener('input', () => actualizarContador(inputLateral));
+    inputLateral.addEventListener('keypress', e => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(inputLateral); }
+        inputLateral.style.borderColor = '#0d9488';
+        inputLateral.style.boxShadow = '0 0 0 3px rgba(13,148,136,.12)';
+    });
+    inputLateral.addEventListener('blur', () => {
+        inputLateral.style.borderColor = '#d1d5db';
+        inputLateral.style.boxShadow = 'none';
+    });
+    document.getElementById('asistenteSendBtnLateral').addEventListener('click', () => sendMessage(inputLateral));
+
+    // Chips de sugerencias
+    document.querySelectorAll('.asistente-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            inputFlotante.value = chip.textContent.trim();
+            sendMessage(inputFlotante);
+        });
+    });
+
+    // Cerrar con Escape
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && isOpen) cerrarTodo();
+    });
+
+    // Botón hover
+    floatBtn.addEventListener('mouseover', () => {
+        floatBtn.style.transform = 'scale(1.08)';
+        floatBtn.style.boxShadow = '0 10px 36px rgba(13,148,136,.6)';
+    });
+    floatBtn.addEventListener('mouseout', () => {
+        floatBtn.style.transform = 'scale(1)';
+        floatBtn.style.boxShadow = '0 8px 28px rgba(13,148,136,.45)';
+    });
+
+    // ── Badge proactivo (análisis del borrador) ─────────────
+    let ultimoContenidoAnalizado = '';
+    let ultimaLlamadaAnalisis = 0;
+    let debounceAnalisisTimer = null;
+
+    function ocultarBadge() {
+        const badge = document.getElementById('asistenteBadgePing');
+        if (badge) badge.style.display = 'none';
+    }
+
+    function mostrarBadgeProactivo(mensaje) {
+        pendingHintMessage = mensaje;
+        const badge = document.getElementById('asistenteBadgePing');
+        if (badge) badge.style.display = 'block';
+    }
+
+    async function analizarBorrador() {
+        const ahora = Date.now();
+        if (ahora - ultimaLlamadaAnalisis < 60000) return; // 60s rate limit
+
+        let contenidoHtml = '';
+        try {
+            if (window.ckeditorInstance) {
+                contenidoHtml = window.ckeditorInstance.getData();
+            }
+        } catch (_) { return; }
+
+        const textoPlano = contenidoHtml.replace(/<[^>]+>/g, '').trim();
+        if (textoPlano.length < 150) return;
+        if (textoPlano === ultimoContenidoAnalizado) return;
+
+        ultimaLlamadaAnalisis = ahora;
+        ultimoContenidoAnalizado = textoPlano;
+
+        const tipoEstudio = document.getElementById('id_tipo_estudio');
+        const region      = document.getElementById('id_region');
+
+        try {
+            const resp = await fetch(URL_ANALIZAR, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+                body: JSON.stringify({
+                    contenido_html: contenidoHtml,
+                    tipo_estudio: tipoEstudio ? tipoEstudio.options[tipoEstudio.selectedIndex]?.text || '' : '',
+                    region: region ? region.options[region.selectedIndex]?.text || '' : '',
+                }),
+            });
+            const data = await resp.json();
+            if (data.success && data.tiene_observacion && data.mensaje_sugerencia) {
+                mostrarBadgeProactivo(data.mensaje_sugerencia);
+            }
+        } catch (_) { /* silencioso */ }
+    }
+
+    function programarAnalisisBorrador() {
+        clearTimeout(debounceAnalisisTimer);
+        debounceAnalisisTimer = setTimeout(analizarBorrador, 5000);
+    }
+
+    function attachCKEditorListener() {
+        if (window.ckeditorInstance && window.ckeditorInstance.model) {
+            window.ckeditorInstance.model.document.on('change:data', programarAnalisisBorrador);
+        } else {
+            setTimeout(attachCKEditorListener, 1000);
+        }
+    }
+    attachCKEditorListener();
+
+})();
 </script>
 
 {% endblock %}

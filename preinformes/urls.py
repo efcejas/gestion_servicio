@@ -39,5 +39,11 @@ urlpatterns = [
     
     # Estadísticas
     path('estadisticas/', views.estadisticas, name='estadisticas'),
-    
+
+    # Asistente IA Radiólogo Mentor
+    path('asistente/chat/', views.asistente_preinforme_chat, name='asistente_chat'),
+    path('asistente/feedback/', views.asistente_preinforme_feedback, name='asistente_feedback'),
+    path('asistente/evaluar/', views.asistente_preinforme_evaluar, name='asistente_evaluar'),
+    path('asistente/analizar/', views.asistente_analizar_borrador, name='asistente_analizar'),
+    path('perfil-residente/<int:pk>/', views.perfil_residente_docente, name='perfil_residente_docente'),
 ]

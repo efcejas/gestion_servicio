@@ -1,0 +1,212 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Perfil IA — {{ residente.get_full_name|default:residente.username }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
+
+    <!-- Header -->
+    <div class="mb-6 bg-gradient-to-r from-teal-600 to-cyan-700 rounded-2xl shadow-lg p-8 text-white">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-16 h-16 bg-white/20 rounded-xl flex items-center justify-center text-2xl font-bold">
+                    {% if residente.first_name and residente.last_name %}
+                        {{ residente.first_name|first }}{{ residente.last_name|first }}
+                    {% else %}
+                        {{ residente.username|first|upper }}
+                    {% endif %}
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">
+                        {{ residente.get_full_name|default:residente.username }}
+                    </h1>
+                    <p class="text-teal-100 text-sm mt-0.5">
+                        <i class="fas fa-user-md mr-1"></i>Médico Residente
+                        {% if historial and historial.anio_residencia %}
+                         · Año {{ historial.anio_residencia }}
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <a href="{% url 'preinformes:estadisticas' %}"
+               class="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 transition px-4 py-2 rounded-xl text-sm font-medium">
+                <i class="fas fa-arrow-left"></i> Volver a estadísticas
+            </a>
+        </div>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <!-- Promedio IA -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Promedio IA</div>
+            {% if promedio_scoring %}
+                <div class="text-3xl font-extrabold
+                    {% if promedio_scoring >= 8 %}text-green-600{% elif promedio_scoring >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                    {{ promedio_scoring }}
+                </div>
+                <div class="text-xs text-gray-400">/10</div>
+            {% else %}
+                <div class="text-2xl text-gray-300 font-bold">—</div>
+                <div class="text-xs text-gray-400">sin datos</div>
+            {% endif %}
+        </div>
+
+        <!-- Sesiones Evaluadas -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Sesiones eval.</div>
+            <div class="text-3xl font-extrabold text-teal-600">{{ conversaciones_evaluadas|length }}</div>
+            <div class="text-xs text-gray-400">sesiones</div>
+        </div>
+
+        <!-- Razonamiento -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">🧠 Razonamiento</div>
+            {% if promedios_dims.razonamiento_clinico %}
+                <div class="text-3xl font-extrabold
+                    {% if promedios_dims.razonamiento_clinico >= 8 %}text-green-600{% elif promedios_dims.razonamiento_clinico >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                    {{ promedios_dims.razonamiento_clinico }}
+                </div>
+                <div class="text-xs text-gray-400">/10</div>
+            {% else %}
+                <div class="text-2xl text-gray-300 font-bold">—</div>
+            {% endif %}
+        </div>
+
+        <!-- Terminología -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">📖 Terminología</div>
+            {% if promedios_dims.terminologia %}
+                <div class="text-3xl font-extrabold
+                    {% if promedios_dims.terminologia >= 8 %}text-green-600{% elif promedios_dims.terminologia >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                    {{ promedios_dims.terminologia }}
+                </div>
+                <div class="text-xs text-gray-400">/10</div>
+            {% else %}
+                <div class="text-2xl text-gray-300 font-bold">—</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Segunda fila de stat cards -->
+    <div class="grid grid-cols-2 gap-4 mb-8 md:w-1/2">
+        <!-- Autonomía -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">💪 Autonomía</div>
+            {% if promedios_dims.autonomia %}
+                <div class="text-3xl font-extrabold
+                    {% if promedios_dims.autonomia >= 8 %}text-green-600{% elif promedios_dims.autonomia >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                    {{ promedios_dims.autonomia }}
+                </div>
+                <div class="text-xs text-gray-400">/10</div>
+            {% else %}
+                <div class="text-2xl text-gray-300 font-bold">—</div>
+            {% endif %}
+        </div>
+
+        <!-- Receptividad -->
+        <div class="bg-white rounded-xl shadow p-5 border border-teal-100 text-center">
+            <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">👂 Receptividad</div>
+            {% if promedios_dims.receptividad %}
+                <div class="text-3xl font-extrabold
+                    {% if promedios_dims.receptividad >= 8 %}text-green-600{% elif promedios_dims.receptividad >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                    {{ promedios_dims.receptividad }}
+                </div>
+                <div class="text-xs text-gray-400">/10</div>
+            {% else %}
+                <div class="text-2xl text-gray-300 font-bold">—</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Historial de sesiones evaluadas -->
+    <div class="bg-white rounded-2xl shadow-lg overflow-hidden mb-8 border border-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+            <i class="fas fa-history text-teal-600 text-lg"></i>
+            <h2 class="text-lg font-semibold text-gray-800">Historial de sesiones evaluadas</h2>
+        </div>
+
+        {% if conversaciones_evaluadas %}
+        <div class="divide-y divide-gray-100">
+            {% for conv in conversaciones_evaluadas %}
+            <div class="p-5 hover:bg-gray-50 transition-colors">
+                <div class="flex items-start justify-between mb-3 flex-wrap gap-2">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">
+                            <i class="fas fa-calendar-alt text-teal-500 mr-1"></i>
+                            {{ conv.fecha_actualizacion|date:"d/m/Y" }}
+                            <span class="text-gray-400 font-normal ml-1">{{ conv.fecha_actualizacion|time:"H:i" }}hs</span>
+                        </p>
+                        {% if conv.preinforme %}
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            <i class="fas fa-file-medical text-gray-400 mr-1"></i>
+                            {{ conv.preinforme.tipo_estudio.nombre }} — {{ conv.preinforme.region.nombre }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% if conv.puntuacion_global is not None %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold
+                        {% if conv.puntuacion_global >= 8 %}bg-green-100 text-green-700
+                        {% elif conv.puntuacion_global >= 6 %}bg-yellow-100 text-yellow-700
+                        {% else %}bg-red-100 text-red-700{% endif %}">
+                        <i class="fas fa-star mr-1"></i>{{ conv.puntuacion_global }}/10
+                    </span>
+                    {% endif %}
+                </div>
+
+                {% if conv.evaluacion_ia %}
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    {% with ev=conv.evaluacion_ia %}
+                    {% for label, key in dims_list|default:"" %}{% endfor %}
+                    <div class="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <div class="text-xs text-gray-500 mb-0.5">Razonamiento</div>
+                        <div class="font-bold text-sm
+                            {% if ev.razonamiento_clinico >= 8 %}text-green-600{% elif ev.razonamiento_clinico >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                            {{ ev.razonamiento_clinico|default:"—" }}
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <div class="text-xs text-gray-500 mb-0.5">Terminología</div>
+                        <div class="font-bold text-sm
+                            {% if ev.terminologia >= 8 %}text-green-600{% elif ev.terminologia >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                            {{ ev.terminologia|default:"—" }}
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <div class="text-xs text-gray-500 mb-0.5">Autonomía</div>
+                        <div class="font-bold text-sm
+                            {% if ev.autonomia >= 8 %}text-green-600{% elif ev.autonomia >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                            {{ ev.autonomia|default:"—" }}
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+                        <div class="text-xs text-gray-500 mb-0.5">Receptividad</div>
+                        <div class="font-bold text-sm
+                            {% if ev.receptividad >= 8 %}text-green-600{% elif ev.receptividad >= 6 %}text-amber-500{% else %}text-red-500{% endif %}">
+                            {{ ev.receptividad|default:"—" }}
+                        </div>
+                    </div>
+                    {% if ev.comentario %}
+                    <div class="col-span-2 sm:col-span-4 mt-1">
+                        <p class="text-xs text-gray-700 italic bg-teal-50 rounded-lg px-3 py-2 border-l-2 border-teal-400">
+                            <i class="fas fa-quote-left text-teal-400 mr-1 text-xs"></i>{{ ev.comentario }}
+                        </p>
+                    </div>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-gray-400">
+            <i class="fas fa-brain text-3xl mb-2 block opacity-30"></i>
+            <p class="text-sm">Este residente aún no tiene sesiones evaluadas.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
