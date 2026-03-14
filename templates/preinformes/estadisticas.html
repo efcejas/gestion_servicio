@@ -147,10 +147,8 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             {% if residente.promedio_scoring_ia %}
                                 <div class="flex flex-col gap-1">
-                                    <span class="inline-flex px-2 py-1 text-xs font-bold rounded-lg shadow-sm
-                                        {% if residente.promedio_scoring_ia >= 8 %}bg-gradient-to-r from-teal-400 to-teal-500 text-white
-                                        {% elif residente.promedio_scoring_ia >= 6 %}bg-gradient-to-r from-amber-400 to-amber-500 text-white
-                                        {% else %}bg-gradient-to-r from-red-400 to-red-500 text-white{% endif %}">
+                                    <span class="inline-flex items-center px-2 py-1 text-xs font-bold rounded-lg shadow-sm text-white"
+                                        style="{% if residente.promedio_scoring_ia >= 8 %}background:linear-gradient(90deg,#2dd4bf,#14b8a6);{% elif residente.promedio_scoring_ia >= 6 %}background:linear-gradient(90deg,#fbbf24,#f59e0b);{% else %}background:linear-gradient(90deg,#f87171,#ef4444);{% endif %}">
                                         <i class="fas fa-brain mr-1"></i>{{ residente.promedio_scoring_ia|floatformat:1 }}/10
                                     </span>
                                     <a href="{% url 'preinformes:perfil_residente_docente' residente.pk %}"
