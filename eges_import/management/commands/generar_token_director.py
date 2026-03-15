@@ -17,7 +17,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--etiqueta',
+            'etiqueta',
+            nargs='?',
             type=str,
             default='Director',
             help='Nombre descriptivo del token (ej: "Director 2026")',

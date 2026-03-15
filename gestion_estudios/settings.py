@@ -33,6 +33,8 @@ DEBUG = config('DEBUG', default='False').lower() in ['true', '1', 't']
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='').split(',')
 
+BASE_URL = config('BASE_URL', default='http://localhost:8000')
+
 # Administradores del sistema (reciben alertas de errores)
 ADMINS = [
     ('Enso Cejas', 'ensofermincejas@gmail.com'),
