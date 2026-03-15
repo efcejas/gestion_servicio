@@ -1,13 +1,13 @@
 {% extends "layouts/base_with_sidebar.html" %}
 {% load static %}
 
-{% block title %}Dashboard Global EGES - {{ block.super }}{% endblock %}
+{% block title %}Estadísticas EGES - {{ block.super }}{% endblock %}
 
-{% block page_title %}📊 Dashboard Global EGES{% endblock %}
-{% block page_description %}Vista consolidada de todos los lotes{% if fecha_min and fecha_max %} · Período: {{ fecha_min|date:"d/m/Y" }} - {{ fecha_max|date:"d/m/Y" }}{% endif %}{% endblock %}
+{% block page_title %}📊 Estadísticas de Productividad EGES{% endblock %}
+{% block page_description %}Análisis consolidado de todos los lotes importados{% if fecha_min and fecha_max %} · Período: {{ fecha_min|date:"d/m/Y" }} - {{ fecha_max|date:"d/m/Y" }}{% endif %}{% endblock %}
 
 {% block page_actions %}
-<a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white flex items-center gap-2">
+<a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white flex items-center gap-2" title="Volver al listado de lotes">
     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
     </svg>
@@ -53,11 +53,19 @@
                         <input type="checkbox" value="ECO" class="modalidad-check rounded text-yellow-600 mr-2" checked>
                         <span class="text-sm dark:text-gray-300">ECO</span>
                     </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" value="DX" class="modalidad-check rounded text-indigo-600 mr-2" checked>
+                        <span class="text-sm dark:text-gray-300">DX</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" value="MAM" class="modalidad-check rounded text-pink-600 mr-2" checked>
+                        <span class="text-sm dark:text-gray-300">MAM</span>
+                    </label>
                 </div>
             </div>
         </div>
         
-        <div class="mt-4 flex gap-2">
+        <div class="mt-4 flex gap-2 flex-wrap">
             <button id="btn-aplicar-filtros" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
@@ -67,10 +75,41 @@
             <button id="btn-limpiar-filtros" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg transition-colors text-sm">
                 Limpiar
             </button>
+            {# Botón exportar Excel oculto hasta definir los datos a exportar #}
+            {# <button id="btn-exportar-excel" ...>Exportar Excel</button> #}
+            <a id="btn-exportar-pdf"
+               href="{% url 'eges_import:exportar_pdf' %}"
+               class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm no-underline"
+               target="_blank">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                Descargar PDF
+            </a>
         </div>
     </div>
 
-    <!-- Métricas Globales -->
+    <!-- KPIs dinámicos (actualizados al aplicar filtros) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Promedio / Día Hábil</p>
+            <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2" id="kpi-promedio-dia">—</p>
+            <p class="text-xs text-gray-400 mt-1">sobre período filtrado</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Tasa de Conversión</p>
+            <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2" id="kpi-tasa-conversion">—</p>
+            <p class="text-xs text-gray-400 mt-1">turnos informados / total registrado</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios Pendientes</p>
+            <p class="text-2xl font-bold text-amber-500 dark:text-amber-400 mt-2" id="kpi-pendientes">—</p>
+            <p class="text-xs text-gray-400 mt-1">sin informe registrado</p>
+        </div>
+    </div>
+
+    <!-- Métricas Globales (estáticas del servidor) -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">
@@ -146,7 +185,12 @@
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Evolución Temporal Consolidada</h2>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Todos los batches importados</p>
             </div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 items-center flex-wrap">
+                <div class="flex gap-1 border-r border-gray-200 dark:border-gray-600 pr-2 mr-1">
+                    <button id="agrup-dia" class="agrup-btn px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200">Día</button>
+                    <button id="agrup-semana" class="agrup-btn px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200">Semana</button>
+                    <button id="agrup-mes" class="agrup-btn px-2 py-1 text-xs rounded bg-blue-600 text-white">Mes</button>
+                </div>
                 <button id="btn-lineas" class="px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors">
                     Líneas
                 </button>
@@ -184,6 +228,90 @@
             <div class="p-4">
                 <div class="relative" style="height: 250px;">
                     <canvas id="grafico-franja-horaria"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distribución por modalidad + Sub-tipos ECO -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Distribución por Modalidad</h2>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Participación porcentual</p>
+            </div>
+            <div class="p-4">
+                <div class="relative" style="height: 280px;">
+                    <canvas id="grafico-dona-modalidad"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Sub-tipos Ecografía</h2>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Desglose de sub-modalidades ECO</p>
+            </div>
+            <div class="p-4">
+                <div class="relative" style="height: 280px;">
+                    <canvas id="grafico-sub-eco"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productividad por Médico -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700 mb-6">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Productividad por Médico — Top 10</h2>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Estudios finalizados desglosados por modalidad</p>
+            </div>
+        </div>
+        <div class="p-4">
+            <div class="relative" style="height: 380px;">
+                <canvas id="grafico-medicos-top"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fila: Comparativa período anterior + Ranking Obras Sociales -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+        <!-- Comparativa período anterior -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Comparativa período anterior</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" id="comp-subtitulo">Período actual vs anterior de igual duración</p>
+            </div>
+            <div class="p-4 grid grid-cols-3 gap-3">
+                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Total estudios</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-total-actual">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-total-delta">cargando…</p>
+                </div>
+                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Promedio / día</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-promedio-actual">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-promedio-delta">cargando…</p>
+                </div>
+                <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Conversión</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-tasa-actual">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-tasa-delta">cargando…</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ranking Obras Sociales -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Top Obras Sociales</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Por volumen de estudios finalizados en el período</p>
+            </div>
+            <div class="p-4">
+                <div class="relative" style="height: 280px;">
+                    <canvas id="grafico-obras-sociales"></canvas>
                 </div>
             </div>
         </div>
@@ -235,134 +363,325 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    let graficoPrincipal = null;
-    let graficoDiaSemana = null;
-    let graficoFranjaHoraria = null;
+    // ── Instancias de gráficos ──────────────────────────────────────────────
+    const charts = {};
     let tipoGraficoPrincipal = 'line';
+    let agrupacion = 'mes';
+    let temporalAbortCtrl = null;  // cancela fetch anterior al cambiar agrupación/tipo
 
+    // ── Clases de botones (con dark mode explícito en todos los estados) ────
+    const CLS_AGRUP_ACTIVO   = 'agrup-btn px-2 py-1 text-xs rounded font-medium bg-blue-600 text-white transition-colors';
+    const CLS_AGRUP_INACTIVO = 'agrup-btn px-2 py-1 text-xs rounded font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors';
+    const CLS_TIPO_ACTIVO    = 'px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors';
+    const CLS_TIPO_INACTIVO  = 'px-3 py-1.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors';
+
+    // ── Helpers de estado de botones ────────────────────────────────────────
+    function actualizarBotonesAgrupacion(activoId) {
+        ['agrup-dia', 'agrup-semana', 'agrup-mes'].forEach(id => {
+            document.getElementById(id).className = (id === activoId ? CLS_AGRUP_ACTIVO : CLS_AGRUP_INACTIVO);
+        });
+    }
+
+    function actualizarBotonesTipo(tipo) {
+        document.getElementById('btn-lineas').className = (tipo === 'line' ? CLS_TIPO_ACTIVO : CLS_TIPO_INACTIVO);
+        document.getElementById('btn-barras').className = (tipo === 'bar'  ? CLS_TIPO_ACTIVO : CLS_TIPO_INACTIVO);
+    }
+
+    // ── Parámetros de filtro ─────────────────────────────────────────────────
     function obtenerParametrosFiltro() {
         const params = new URLSearchParams();
-        
         const fechaDesde = document.getElementById('fecha-desde').value;
         const fechaHasta = document.getElementById('fecha-hasta').value;
-        
         if (fechaDesde) params.append('fecha_desde', fechaDesde);
         if (fechaHasta) params.append('fecha_hasta', fechaHasta);
-        
-        // Modalidades seleccionadas
         document.querySelectorAll('.modalidad-check:checked').forEach(checkbox => {
             params.append('modalidades[]', checkbox.value);
         });
-        
         return params.toString();
     }
 
-    function cargarGraficos() {
-        const params = obtenerParametrosFiltro();
-        
-        // Gráfico Principal
-        fetch("{% url 'eges_import:dashboard_global_grafico_data' %}?" + params)
-            .then(response => response.json())
-            .then(data => {
-                if (graficoPrincipal) graficoPrincipal.destroy();
-                
-                const ctx = document.getElementById('grafico-principal').getContext('2d');
-                graficoPrincipal = new Chart(ctx, {
-                    type: tipoGraficoPrincipal,
-                    data: { labels: data.labels, datasets: data.datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: true, position: 'top' },
-                            tooltip: { mode: 'index', intersect: false }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 },
-                                title: { display: true, text: 'Cantidad de Estudios' }
-                            },
-                            x: { title: { display: true, text: 'Mes' } }
-                        }
-                    }
-                });
-            });
+    // ── Funciones de carga individuales ─────────────────────────────────────
 
-        // Día de Semana
-        fetch("{% url 'eges_import:dashboard_global_dia_semana_data' %}?" + params)
-            .then(response => response.json())
-            .then(data => {
-                if (graficoDiaSemana) graficoDiaSemana.destroy();
-                
-                const ctx = document.getElementById('grafico-dia-semana').getContext('2d');
-                graficoDiaSemana = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: data.labels, datasets: data.datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { precision: 0 } }
-                        }
-                    }
-                });
-            });
-
-        // Franja Horaria
-        fetch("{% url 'eges_import:dashboard_global_franja_horaria_data' %}?" + params)
-            .then(response => response.json())
-            .then(data => {
-                if (graficoFranjaHoraria) graficoFranjaHoraria.destroy();
-                
-                const ctx = document.getElementById('grafico-franja-horaria').getContext('2d');
-                graficoFranjaHoraria = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: data.labels, datasets: data.datasets },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, ticks: { precision: 0 } }
-                        }
-                    }
-                });
-            });
+    function cargarKPIs(params) {
+        fetch("{% url 'eges_import:kpis_data' %}?" + params)
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia;
+                document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion + '%';
+                document.getElementById('kpi-pendientes').textContent = Number(d.total_pendientes).toLocaleString('es-AR');
+            })
+            .catch(() => {});
     }
 
-    // Botones de filtro
-    document.getElementById('btn-aplicar-filtros').addEventListener('click', cargarGraficos);
-    
+    // Solo recarga el gráfico temporal — se llama al cambiar agrupacion o tipo
+    function recargarTemporal() {
+        // Cancelar fetch anterior si sigue en vuelo
+        if (temporalAbortCtrl) temporalAbortCtrl.abort();
+        temporalAbortCtrl = new AbortController();
+        const signal = temporalAbortCtrl.signal;
+
+        const params = obtenerParametrosFiltro();
+        const agrupacionActual = agrupacion;   // snapshot para el closure
+        fetch("{% url 'eges_import:analisis_temporal_data' %}?" + params + '&agrupacion=' + agrupacionActual, { signal })
+            .then(r => r.json())
+            .then(data => {
+                if (charts.principal) charts.principal.destroy();
+                charts.principal = new Chart(
+                    document.getElementById('grafico-principal').getContext('2d'), {
+                        type: tipoGraficoPrincipal,
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'top' },
+                                tooltip: { mode: 'index', intersect: false }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 },
+                                     title: { display: true, text: 'Estudios finalizados' } },
+                                x: { title: { display: true, text:
+                                    agrupacionActual === 'dia' ? 'Fecha' :
+                                    agrupacionActual === 'semana' ? 'Semana' : 'Mes' } }
+                            }
+                        }
+                    }
+                );
+            })
+            .catch(err => { if (err.name !== 'AbortError') console.error(err); });
+    }
+
+    function cargarDiaSemana(params) {
+        fetch("{% url 'eges_import:dashboard_global_dia_semana_data' %}?" + params)
+            .then(r => r.json())
+            .then(data => {
+                if (charts.diaSemana) charts.diaSemana.destroy();
+                charts.diaSemana = new Chart(
+                    document.getElementById('grafico-dia-semana').getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                        }
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    function cargarFranja(params) {
+        fetch("{% url 'eges_import:dashboard_global_franja_horaria_data' %}?" + params)
+            .then(r => r.json())
+            .then(data => {
+                if (charts.franja) charts.franja.destroy();
+                charts.franja = new Chart(
+                    document.getElementById('grafico-franja-horaria').getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                        }
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    function cargarDona(params) {
+        fetch("{% url 'eges_import:distribucion_modalidad_data' %}?" + params)
+            .then(r => r.json())
+            .then(data => {
+                if (charts.dona) charts.dona.destroy();
+                charts.dona = new Chart(
+                    document.getElementById('grafico-dona-modalidad').getContext('2d'), {
+                        type: 'doughnut',
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                                tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed.toLocaleString('es-AR')}` } }
+                            }
+                        }
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    function cargarSubEco(params) {
+        fetch("{% url 'eges_import:sub_modalidades_eco_data' %}?" + params)
+            .then(r => r.json())
+            .then(data => {
+                if (charts.subEco) charts.subEco.destroy();
+                charts.subEco = new Chart(
+                    document.getElementById('grafico-sub-eco').getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { beginAtZero: true, ticks: { precision: 0 } },
+                                y: { ticks: { font: { size: 10 } } }
+                            }
+                        }
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    function cargarComparativa(params) {
+        fetch("{% url 'eges_import:comparativa_data' %}?" + params)
+            .then(r => r.json())
+            .then(d => {
+                document.getElementById('comp-total-actual').textContent =
+                    Number(d.actual.total_finalizados).toLocaleString('es-AR');
+                document.getElementById('comp-promedio-actual').textContent = d.actual.promedio_dia;
+                document.getElementById('comp-tasa-actual').textContent = d.actual.tasa_conversion + '%';
+
+                function renderDelta(elId, val) {
+                    const el = document.getElementById(elId);
+                    if (val === null || val === undefined) {
+                        el.textContent = 'sin datos anteriores';
+                        el.className = 'text-xs mt-1 text-gray-400';
+                        return;
+                    }
+                    const sign = val >= 0 ? '+' : '';
+                    el.textContent = `${sign}${val}% vs período ant.`;
+                    el.className = `text-xs mt-1 font-semibold ${
+                        val >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
+                    }`;
+                }
+                renderDelta('comp-total-delta', d.delta.total_finalizados);
+                renderDelta('comp-promedio-delta', d.delta.promedio_dia);
+                renderDelta('comp-tasa-delta', d.delta.tasa_conversion);
+
+                if (d.periodo_actual && d.periodo_anterior) {
+                    document.getElementById('comp-subtitulo').textContent =
+                        `${d.periodo_actual.desde}–${d.periodo_actual.hasta}  vs  ${d.periodo_anterior.desde}–${d.periodo_anterior.hasta}`;
+                }
+            })
+            .catch(() => {});
+    }
+
+    function cargarObrasSociales(params) {
+        fetch("{% url 'eges_import:obras_sociales_data' %}?" + params)
+            .then(r => r.json())
+            .then(d => {
+                if (charts.obrasSociales) charts.obrasSociales.destroy();
+                charts.obrasSociales = new Chart(
+                    document.getElementById('grafico-obras-sociales').getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: d.labels, datasets: d.datasets },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString('es-AR')} estudios` } },
+                            },
+                            scales: {
+                                x: { beginAtZero: true, ticks: { precision: 0 } },
+                                y: { ticks: { font: { size: 10 } } },
+                            },
+                        },
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    function cargarMedicos(params) {
+        fetch("{% url 'eges_import:productividad_medico_data' %}?" + params)
+            .then(r => r.json())
+            .then(data => {
+                if (charts.medicos) charts.medicos.destroy();
+                charts.medicos = new Chart(
+                    document.getElementById('grafico-medicos-top').getContext('2d'), {
+                        type: 'bar',
+                        data: { labels: data.labels, datasets: data.datasets },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+                                tooltip: { mode: 'index', intersect: false }
+                            },
+                            scales: {
+                                x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+                                y: { stacked: true, ticks: { font: { size: 10 } } }
+                            }
+                        }
+                    }
+                );
+            })
+            .catch(() => {});
+    }
+
+    // Recarga todo cuando cambian los filtros (fechas / modalidades)
+    function cargarTodo() {
+        const params = obtenerParametrosFiltro();
+        cargarKPIs(params);
+        recargarTemporal();      // usa obtenerParametrosFiltro() internamente
+        cargarDiaSemana(params);
+        cargarFranja(params);
+        cargarDona(params);
+        cargarSubEco(params);
+        cargarMedicos(params);
+        cargarComparativa(params);
+        cargarObrasSociales(params);
+    }
+
+    // ── Botones de agrupación (solo recargan el temporal) ───────────────────
+    document.getElementById('agrup-dia').addEventListener('click', function() {
+        agrupacion = 'dia';
+        actualizarBotonesAgrupacion('agrup-dia');
+        recargarTemporal();
+    });
+    document.getElementById('agrup-semana').addEventListener('click', function() {
+        agrupacion = 'semana';
+        actualizarBotonesAgrupacion('agrup-semana');
+        recargarTemporal();
+    });
+    document.getElementById('agrup-mes').addEventListener('click', function() {
+        agrupacion = 'mes';
+        actualizarBotonesAgrupacion('agrup-mes');
+        recargarTemporal();
+    });
+
+    // ── Botones de tipo (solo recargan el temporal) ──────────────────────────
+    document.getElementById('btn-lineas').addEventListener('click', function() {
+        tipoGraficoPrincipal = 'line';
+        actualizarBotonesTipo('line');
+        recargarTemporal();
+    });
+    document.getElementById('btn-barras').addEventListener('click', function() {
+        tipoGraficoPrincipal = 'bar';
+        actualizarBotonesTipo('bar');
+        recargarTemporal();
+    });
+
+    // ── Botones de filtro (recargan todo) ────────────────────────────────────
+    // Botón exportar temporalmente deshabilitado
+    // document.getElementById('btn-exportar-excel').addEventListener(...);\n
+    document.getElementById('btn-aplicar-filtros').addEventListener('click', cargarTodo);
     document.getElementById('btn-limpiar-filtros').addEventListener('click', function() {
         document.getElementById('fecha-desde').value = '';
         document.getElementById('fecha-hasta').value = '';
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
-        cargarGraficos();
+        cargarTodo();
     });
 
-    // Botones de tipo de gráfico
-    document.getElementById('btn-lineas').addEventListener('click', function() {
-        tipoGraficoPrincipal = 'line';
-        cargarGraficos();
-        this.classList.add('bg-blue-600', 'text-white');
-        this.classList.remove('bg-gray-200', 'text-gray-700');
-        document.getElementById('btn-barras').classList.remove('bg-blue-600', 'text-white');
-        document.getElementById('btn-barras').classList.add('bg-gray-200', 'text-gray-700');
-    });
-
-    document.getElementById('btn-barras').addEventListener('click', function() {
-        tipoGraficoPrincipal = 'bar';
-        cargarGraficos();
-        this.classList.add('bg-blue-600', 'text-white');
-        this.classList.remove('bg-gray-200', 'text-gray-700');
-        document.getElementById('btn-lineas').classList.remove('bg-blue-600', 'text-white');
-        document.getElementById('btn-lineas').classList.add('bg-gray-200', 'text-gray-700');
-    });
-
-    // Cargar gráficos iniciales
-    cargarGraficos();
+    // ── Estado inicial ───────────────────────────────────────────────────────
+    actualizarBotonesAgrupacion('agrup-mes');
+    actualizarBotonesTipo('line');
+    cargarTodo();
 });
 </script>
 {% endblock %}

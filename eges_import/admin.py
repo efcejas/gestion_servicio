@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import ImportBatch, EgesRow
+from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial
 
 
 @admin.register(ImportBatch)
@@ -10,7 +10,7 @@ class ImportBatchAdmin(admin.ModelAdmin):
     readonly_fields = [
         'fecha_importacion', 'total_filas', 'total_ingresos_unicos',
         'total_estudios_candidatos', 'total_estudios_finalizados',
-        'total_tc', 'total_rm', 'total_rx', 'total_eco', 'total_otros'
+        'total_tc', 'total_rm', 'total_rx', 'total_dx', 'total_mam', 'total_eco', 'total_otros'
     ]
     fieldsets = (
         ('Información del Lote', {
@@ -20,33 +20,32 @@ class ImportBatchAdmin(admin.ModelAdmin):
             'fields': ('total_filas', 'total_ingresos_unicos', 'total_estudios_candidatos', 'total_estudios_finalizados')
         }),
         ('Métricas por Modalidad', {
-            'fields': ('total_tc', 'total_rm', 'total_rx', 'total_eco', 'total_otros')
+            'fields': ('total_tc', 'total_rm', 'total_rx', 'total_dx', 'total_mam', 'total_eco', 'total_otros')
         }),
     )
 
 
 @admin.register(EgesRow)
 class EgesRowAdmin(admin.ModelAdmin):
-    list_display = ['id', 'batch', 'historia_clinica', 'apellido_nombre', 'fecha_turno', 'servicio', 'modalidad', 'estado_turno', 'es_insumo']
-    list_filter = ['batch', 'modalidad', 'estado_turno', 'es_insumo']
-    search_fields = ['historia_clinica', 'apellido_nombre', 'servicio']
-    readonly_fields = ['fecha_creacion', 'modalidad', 'es_insumo']
-    date_hierarchy = 'fecha_turno'
-    
-    fieldsets = (
-        ('Lote', {
-            'fields': ('batch',)
-        }),
-        ('Identificación del Turno', {
-            'fields': ('numero_turno', 'fecha_turno', 'hora_turno', 'centro_atencion')
-        }),
-        ('Paciente', {
-            'fields': ('historia_clinica', 'apellido_nombre')
-        }),
-        ('Estudio', {
-            'fields': ('servicio', 'equipo', 'estado_turno')
-        }),
-        ('Clasificación', {
-            'fields': ('es_insumo', 'modalidad', 'fecha_creacion')
-        }),
-    )
+    list_display = ['id', 'batch', 'historia_clinica', 'apellido_nombre', 'fecha_turno',
+                    'practica', 'obra_social', 'modalidad', 'sub_modalidad', 'medico_informante',
+                    'estado_turno', 'es_insumo']
+    list_filter = ['modalidad', 'sub_modalidad', 'es_insumo', 'estado_turno', 'batch']
+    search_fields = ['historia_clinica', 'apellido_nombre', 'practica', 'servicio',
+                     'medico_informante', 'obra_social']
+
+
+@admin.register(NombreObraSocial)
+class NombreObraSocialAdmin(admin.ModelAdmin):
+    list_display = ['codigo', 'nombre']
+    search_fields = ['codigo', 'nombre']
+    ordering = ['nombre']
+
+
+@admin.register(DirectorToken)
+class DirectorTokenAdmin(admin.ModelAdmin):
+    list_display = ['nombre_etiqueta', 'token', 'activo', 'fecha_creacion', 'fecha_ultimo_acceso']
+    list_editable = ['activo']
+    list_filter = ['activo']
+    search_fields = ['nombre_etiqueta']
+    readonly_fields = ['token', 'fecha_creacion', 'fecha_ultimo_acceso']

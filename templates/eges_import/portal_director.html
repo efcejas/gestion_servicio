@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Análisis — Servicio de Diagnóstico por Imágenes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+        .kpi-card { transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-2px); }
+        .btn-activo { @apply bg-blue-600 text-white; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-full">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div>
+                <h1 class="text-xl font-bold text-gray-900">Servicio de Diagnóstico por Imágenes</h1>
+                <p class="text-sm text-gray-500 mt-0.5">Portal de análisis de productividad — Solo lectura</p>
+            </div>
+            <div class="text-right text-xs text-gray-400">
+                {% if fecha_min and fecha_max %}
+                    Datos disponibles: {{ fecha_min|date:"d/m/Y" }} — {{ fecha_max|date:"d/m/Y" }}
+                {% endif %}
+                <br>Total registros: {{ total_estudios|default:"0" }}
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ── FILTROS ─────────────────────────────────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 space-y-3">
+
+            <!-- Fila 1: Período rápido + Fechas personalizadas -->
+            <div class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Período rápido</label>
+                    <div class="flex gap-1" id="btn-periodo-group">
+                        <button data-dias="30"  class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">30 días</button>
+                        <button data-dias="90"  class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">90 días</button>
+                        <button data-dias="180" class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">6 meses</button>
+                        <button data-dias="365" class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">12 meses</button>
+                        <button data-dias="0"   class="btn-periodo px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium">Todo</button>
+                    </div>
+                </div>
+
+                <div class="w-px h-8 bg-gray-200 self-end hidden sm:block"></div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Personalizado</label>
+                    <div class="flex gap-2 items-center">
+                        <input type="date" id="fecha-desde" class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <span class="text-gray-400 text-xs">—</span>
+                        <input type="date" id="fecha-hasta" class="px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Separador -->
+            <div class="border-t border-gray-100"></div>
+
+            <!-- Fila 2: Modalidad + Agrupación + Acciones -->
+            <div class="flex flex-wrap gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Modalidad</label>
+                    <div class="flex flex-wrap gap-1" id="btn-modalidad-group">
+                        <button data-mod=""    class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium">Todas</button>
+                        <button data-mod="TC"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">TC</button>
+                        <button data-mod="RM"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">RM</button>
+                        <button data-mod="RX"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">RX</button>
+                        <button data-mod="DX"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">DX</button>
+                        <button data-mod="MAM" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">MAM</button>
+                        <button data-mod="ECO" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">ECO</button>
+                    </div>
+                </div>
+
+                <div class="w-px h-8 bg-gray-200 self-end hidden sm:block"></div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Agrupar por</label>
+                    <div class="flex gap-1" id="btn-agrupacion-group">
+                        <button data-agrupacion="dia"    class="btn-agrupacion px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">Día</button>
+                        <button data-agrupacion="semana" class="btn-agrupacion px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">Semana</button>
+                        <button data-agrupacion="mes"    class="btn-agrupacion px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium">Mes</button>
+                    </div>
+                </div>
+
+                <!-- Acciones al final -->
+                <div class="flex gap-2 ml-auto">
+                    <button id="btn-aplicar" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Actualizar
+                    </button>
+                    <a id="btn-exportar-pdf"
+                       href="{% url 'eges_import:portal_director_exportar_pdf' token=token %}"
+                       class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+                       target="_blank">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Descargar PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── KPIs ────────────────────────────────────────────────────────────── -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="kpis-container">
+            <!-- se pueblan via JS -->
+            <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Finalizados</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2" id="kpi-total">—</p>
+                <p class="text-xs text-gray-400 mt-1">estudios informados</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Promedio / Día</p>
+                <p class="text-3xl font-bold text-blue-600 mt-2" id="kpi-promedio">—</p>
+                <p class="text-xs text-gray-400 mt-1">días hábiles del período</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tasa de Conversión</p>
+                <p class="text-3xl font-bold text-green-600 mt-2" id="kpi-tasa">—</p>
+                <p class="text-xs text-gray-400 mt-1">turnos que terminan informados</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pendientes</p>
+                <p class="text-3xl font-bold text-amber-500 mt-2" id="kpi-pendientes">—</p>
+                <p class="text-xs text-gray-400 mt-1">turnos sin informe</p>
+            </div>
+        </div>
+
+        <!-- ── GRÁAFICO TEMPORAL ──────────────────────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800">Evolución temporal por modalidad</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Estudios finalizados según período y agrupación seleccionados</p>
+                </div>
+                <div class="flex gap-1">
+                    <button id="tipo-lineas" onclick="cambiarTipoTemporal('line')" class="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium">Líneas</button>
+                    <button id="tipo-barras" onclick="cambiarTipoTemporal('bar')" class="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">Barras</button>
+                </div>
+            </div>
+            <div class="p-5" style="height: 360px;">
+                <canvas id="grafico-temporal"></canvas>
+            </div>
+        </div>
+
+        <!-- ── FILA DE 3 GRÁFICOS ─────────────────────────────────────────────── -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+
+            <!-- Distribución por modalidad (dona) -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-800">Distribución por modalidad</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Participación porcentual</p>
+                </div>
+                <div class="p-4" style="height: 260px;">
+                    <canvas id="grafico-dona"></canvas>
+                </div>
+            </div>
+
+            <!-- Sub-modalidades ECO -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-800">Desglose Ecografías</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Sub-tipos del período</p>
+                </div>
+                <div class="p-4" style="height: 260px;">
+                    <canvas id="grafico-eco"></canvas>
+                </div>
+            </div>
+
+            <!-- Franja horaria -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-800">Franja horaria</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Distribución de la demanda</p>
+                </div>
+                <div class="p-4" style="height: 260px;">
+                    <canvas id="grafico-franja"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── PRODUCTIVIDAD POR MÉDICO ────────────────────────────────────────── -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800">Productividad por médico</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Top 10 según estudios finalizados en el período — desglose por modalidad</p>
+                </div>
+                <div class="flex gap-1">
+                    <button onclick="cambiarTipoMedico('bar')" class="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium" id="tipo-medico-bar">Barras</button>
+                    <button onclick="cambiarTipoMedico('horizontalBar')" class="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium" id="tipo-medico-horiz">Horizontales</button>
+                </div>
+            </div>
+            <div class="p-5" style="height: 380px;">
+                <canvas id="grafico-medicos"></canvas>
+            </div>
+        </div>
+
+        <!-- ── COMPARATIVA PERÍODO ANTERIOR + OBRAS SOCIALES ──────────────────── -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+
+            <!-- Comparativa -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-base font-semibold text-gray-800">Comparativa período anterior</h2>
+                    <p class="text-xs text-gray-500 mt-0.5" id="comp-subtitulo">Período actual vs anterior de igual duración</p>
+                </div>
+                <div class="p-5 grid grid-cols-3 gap-3">
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Total estudios</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-total-actual">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-total-delta">cargando…</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Promedio / día</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-promedio-actual">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-promedio-delta">cargando…</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Conversión</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-tasa-actual">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-tasa-delta">cargando…</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Obras Sociales -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-base font-semibold text-gray-800">Top Obras Sociales</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Por volumen de estudios finalizados</p>
+                </div>
+                <div class="p-4" style="height: 280px;">
+                    <canvas id="grafico-obras-sociales"></canvas>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center text-xs text-gray-400 py-4 border-t border-gray-200">
+        Portal de análisis — Solo lectura. Los datos se actualizan con cada importación de archivo EGES.
+    </footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado de filtros
+// ─────────────────────────────────────────────────────────────────────────────
+const TOKEN = "{{ token }}";
+const BASE = `/eges/director/${TOKEN}`;
+
+let estado = {
+    fechaDesde: '',
+    fechaHasta: '',
+    agrupacion: 'mes',
+    modalidades: new Set(),  // vacío = Todas
+};
+
+// Instancias de Chart.js
+let charts = {
+    temporal: null,
+    dona: null,
+    eco: null,
+    franja: null,
+    medicos: null,
+};
+let tipoTemporal = 'line';
+let tipoMedicos = 'bar';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function buildParams(extra = {}) {
+    const p = new URLSearchParams();
+    if (estado.fechaDesde) p.set('fecha_desde', estado.fechaDesde);
+    if (estado.fechaHasta) p.set('fecha_hasta', estado.fechaHasta);
+    estado.modalidades.forEach(m => p.append('modalidades[]', m));
+    for (const [k, v] of Object.entries(extra)) p.set(k, v);
+    return p.toString();
+}
+
+function destroyAndCreate(key, canvas, config) {
+    if (charts[key]) charts[key].destroy();
+    charts[key] = new Chart(document.getElementById(canvas).getContext('2d'), config);
+}
+
+function formatNum(n) {
+    return n === undefined || n === null ? '—' : Number(n).toLocaleString('es-AR');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KPIs
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarKPIs() {
+    const r = await fetch(`${BASE}/kpis/?${buildParams()}`);
+    const d = await r.json();
+    document.getElementById('kpi-total').textContent = formatNum(d.total_finalizados);
+    document.getElementById('kpi-promedio').textContent = d.promedio_dia;
+    document.getElementById('kpi-tasa').textContent = d.tasa_conversion + '%';
+    document.getElementById('kpi-pendientes').textContent = formatNum(d.total_pendientes);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gráfico temporal
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarTemporal() {
+    const r = await fetch(`${BASE}/analisis-temporal/?${buildParams({ agrupacion: estado.agrupacion })}`);
+    const d = await r.json();
+
+    destroyAndCreate('temporal', 'grafico-temporal', {
+        type: tipoTemporal,
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+                tooltip: { mode: 'index', intersect: false },
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: 'Estudios finalizados' } },
+                x: { title: { display: true, text: estado.agrupacion === 'dia' ? 'Fecha' : estado.agrupacion === 'semana' ? 'Semana' : 'Mes' } },
+            },
+        },
+    });
+}
+
+function cambiarTipoTemporal(tipo) {
+    tipoTemporal = tipo;
+    document.getElementById('tipo-lineas').className = tipo === 'line'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    document.getElementById('tipo-barras').className = tipo === 'bar'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    cargarTemporal();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dona — distribución por modalidad
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarDona() {
+    const r = await fetch(`${BASE}/distribucion/?${buildParams()}`);
+    const d = await r.json();
+
+    destroyAndCreate('dona', 'grafico-dona', {
+        type: 'doughnut',
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toLocaleString('es-AR')}` } },
+            },
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-modalidades ECO
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarEco() {
+    const r = await fetch(`${BASE}/eco/?${buildParams()}`);
+    const d = await r.json();
+
+    destroyAndCreate('eco', 'grafico-eco', {
+        type: 'bar',
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString('es-AR')} estudios` } },
+            },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+                y: { ticks: { font: { size: 10 } } },
+            },
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Franja horaria
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarFranja() {
+    const r = await fetch(`${BASE}/franja-horaria/?${buildParams()}`);
+    const d = await r.json();
+
+    destroyAndCreate('franja', 'grafico-franja', {
+        type: 'bar',
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { precision: 0 } },
+                x: { ticks: { font: { size: 9 } } },
+            },
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Productividad por médico
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarMedicos() {
+    const r = await fetch(`${BASE}/medicos/?${buildParams({ agrupacion: estado.agrupacion })}`);
+    const d = await r.json();
+
+    const isHoriz = tipoMedicos === 'horizontalBar';
+
+    destroyAndCreate('medicos', 'grafico-medicos', {
+        type: 'bar',
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            indexAxis: isHoriz ? 'y' : 'x',
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+                tooltip: { mode: 'index', intersect: false },
+            },
+            scales: {
+                x: { stacked: isHoriz, beginAtZero: true, ticks: { precision: 0 } },
+                y: { stacked: isHoriz, ticks: { font: { size: isHoriz ? 10 : 11 } } },
+            },
+        },
+    });
+}
+
+function cambiarTipoMedico(tipo) {
+    tipoMedicos = tipo;
+    document.getElementById('tipo-medico-bar').className = tipo === 'bar'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    document.getElementById('tipo-medico-horiz').className = tipo === 'horizontalBar'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    cargarMedicos();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Comparativa período anterior
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarComparativa() {
+    const r = await fetch(`${BASE}/comparativa/?${buildParams()}`);
+    const d = await r.json();
+
+    document.getElementById('comp-total-actual').textContent =
+        Number(d.actual.total_finalizados).toLocaleString('es-AR');
+    document.getElementById('comp-promedio-actual').textContent = d.actual.promedio_dia;
+    document.getElementById('comp-tasa-actual').textContent = d.actual.tasa_conversion + '%';
+
+    function renderDelta(elId, val) {
+        const el = document.getElementById(elId);
+        if (val === null || val === undefined) {
+            el.textContent = 'sin datos anteriores';
+            el.className = 'text-xs mt-1 text-gray-400';
+            return;
+        }
+        const sign = val >= 0 ? '+' : '';
+        el.textContent = `${sign}${val}% vs período ant.`;
+        el.className = `text-xs mt-1 font-semibold ${val >= 0 ? 'text-green-600' : 'text-red-500'}`;
+    }
+    renderDelta('comp-total-delta', d.delta.total_finalizados);
+    renderDelta('comp-promedio-delta', d.delta.promedio_dia);
+    renderDelta('comp-tasa-delta', d.delta.tasa_conversion);
+
+    if (d.periodo_actual && d.periodo_anterior) {
+        document.getElementById('comp-subtitulo').textContent =
+            `${d.periodo_actual.desde}–${d.periodo_actual.hasta}  vs  ${d.periodo_anterior.desde}–${d.periodo_anterior.hasta}`;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Obras Sociales
+// ─────────────────────────────────────────────────────────────────────────────
+async function cargarObrasSociales() {
+    const r = await fetch(`${BASE}/obras-sociales/?${buildParams()}`);
+    const d = await r.json();
+
+    destroyAndCreate('obrasSociales', 'grafico-obras-sociales', {
+        type: 'bar',
+        data: { labels: d.labels, datasets: d.datasets },
+        options: {
+            indexAxis: 'y',
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.x.toLocaleString('es-AR')} estudios` } },
+            },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } },
+                y: { ticks: { font: { size: 10 } } },
+            },
+        },
+    });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Lógica de botones de período
+// ─────────────────────────────────────────────────────────────────────────────
+function setPeriodo(dias) {
+    const hoy = new Date();
+    const hasta = hoy.toISOString().slice(0, 10);
+    if (dias === 0) {
+        estado.fechaDesde = '';
+        estado.fechaHasta = '';
+        document.getElementById('fecha-desde').value = '';
+        document.getElementById('fecha-hasta').value = '';
+    } else {
+        const desde = new Date(hoy);
+        desde.setDate(hoy.getDate() - dias);
+        estado.fechaDesde = desde.toISOString().slice(0, 10);
+        estado.fechaHasta = hasta;
+        document.getElementById('fecha-desde').value = estado.fechaDesde;
+        document.getElementById('fecha-hasta').value = estado.fechaHasta;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────────────────────────────
+function cargarTodo() {
+    Promise.all([
+        cargarKPIs(),
+        cargarTemporal(),
+        cargarDona(),
+        cargarEco(),
+        cargarFranja(),
+        cargarMedicos(),
+        cargarComparativa(),
+        cargarObrasSociales(),
+    ]).catch(err => console.error('Error al cargar datos:', err));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    // Período por defecto: mostrar todo
+    setPeriodo(0);
+
+    // Botones de período rápido
+    document.querySelectorAll('.btn-periodo').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.btn-periodo').forEach(b => {
+                b.className = 'btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+            });
+            this.className = 'btn-periodo px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium';
+            setPeriodo(parseInt(this.dataset.dias));
+        });
+    });
+
+    // Botones de modalidad — multi-selección con toggle
+    const CLASE_ON  = 'btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium';
+    const CLASE_OFF = 'btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+
+    function syncModalidadUI() {
+        document.querySelectorAll('.btn-modalidad').forEach(b => {
+            const mod = b.dataset.mod;
+            if (mod === '') {
+                // botón "Todas": activo sólo si no hay ninguna seleccionada
+                b.className = estado.modalidades.size === 0 ? CLASE_ON : CLASE_OFF;
+            } else {
+                b.className = estado.modalidades.has(mod) ? CLASE_ON : CLASE_OFF;
+            }
+        });
+    }
+
+    document.querySelectorAll('.btn-modalidad').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const mod = this.dataset.mod;
+            if (mod === '') {
+                // "Todas" limpia la selección
+                estado.modalidades.clear();
+            } else {
+                if (estado.modalidades.has(mod)) {
+                    estado.modalidades.delete(mod);
+                } else {
+                    estado.modalidades.add(mod);
+                }
+            }
+            syncModalidadUI();
+        });
+    });
+
+    syncModalidadUI();
+
+    // Botones de agrupación
+    document.querySelectorAll('.btn-agrupacion').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.btn-agrupacion').forEach(b => {
+                b.className = 'btn-agrupacion px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+            });
+            this.className = 'btn-agrupacion px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium';
+            estado.agrupacion = this.dataset.agrupacion;
+        });
+    });
+
+    // Fechas manuales
+    document.getElementById('fecha-desde').addEventListener('change', function () {
+        estado.fechaDesde = this.value;
+        // Quitar selección de período rápido
+        document.querySelectorAll('.btn-periodo').forEach(b => {
+            b.className = 'btn-periodo px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+        });
+    });
+    document.getElementById('fecha-hasta').addEventListener('change', function () {
+        estado.fechaHasta = this.value;
+    });
+
+    // Botón exportar temporalmente deshabilitado
+    // document.getElementById('btn-exportar-excel')...
+
+    // Botón Actualizar
+    function actualizarHrefPdf() {
+        const params = buildParams();
+        const base = `{% url 'eges_import:portal_director_exportar_pdf' token=token %}`;
+        document.getElementById('btn-exportar-pdf').href = params ? `${base}?${params}` : base;
+    }
+
+    document.getElementById('btn-aplicar').addEventListener('click', function () {
+        actualizarHrefPdf();
+        cargarTodo();
+    });
+
+    // Actualizar href PDF también al cambiar modalidad
+    document.querySelectorAll('.btn-modalidad').forEach(btn => {
+        btn.addEventListener('click', actualizarHrefPdf);
+    });
+
+    // Carga inicial
+    actualizarHrefPdf();
+    cargarTodo();
+});
+</script>
+</body>
+</html>

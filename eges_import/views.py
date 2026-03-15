@@ -1,15 +1,26 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.http import JsonResponse
-from django.db.models import Count, Q
-from django.db.models.functions import TruncMonth
+from django.http import JsonResponse, HttpResponseForbidden
+from django.db.models import Count, Q, Avg
+from datetime import date as date_type
 from django.utils import timezone
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 import openpyxl
 
-from .models import ImportBatch, EgesRow
+from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial
 from .forms import ImportarEGESForm
+
+# Paleta de colores consistente para todas las vistas y el portal del director
+COLORES_MODALIDAD = {
+    'TC':    {'border': 'rgb(59, 130, 246)',   'bg': 'rgba(59, 130, 246, 0.15)'},   # Azul
+    'RM':    {'border': 'rgb(147, 51, 234)',   'bg': 'rgba(147, 51, 234, 0.15)'},   # Púrpura
+    'RX':    {'border': 'rgb(34, 197, 94)',    'bg': 'rgba(34, 197, 94, 0.15)'},    # Verde
+    'DX':    {'border': 'rgb(249, 115, 22)',   'bg': 'rgba(249, 115, 22, 0.15)'},   # Naranja
+    'MAM':   {'border': 'rgb(236, 72, 153)',   'bg': 'rgba(236, 72, 153, 0.15)'},   # Rosa
+    'ECO':   {'border': 'rgb(251, 191, 36)',   'bg': 'rgba(251, 191, 36, 0.15)'},   # Amarillo
+    'OTROS': {'border': 'rgb(107, 114, 128)',  'bg': 'rgba(107, 114, 128, 0.15)'},  # Gris
+}
 
 
 def es_superuser(user):
@@ -204,7 +215,12 @@ def procesar_excel_eges(archivo, batch):
     # Mapeo de columnas (ajustar según el Excel real)
     # Buscar índices de las columnas que necesitamos
     def get_col_index(nombre_col, alternativas=[]):
-        """Busca una columna por nombre o alternativas."""
+        """Busca una columna por nombre o alternativas. Prefiere coincidencia exacta."""
+        # 1. Exacta primero (evita que 'Código Practica' gane sobre 'Practica')
+        for idx, header in enumerate(headers):
+            if header.strip().lower() == nombre_col.strip().lower():
+                return idx
+        # 2. Substring / alternativas
         for idx, header in enumerate(headers):
             if nombre_col.lower() in header.lower():
                 return idx
@@ -217,17 +233,41 @@ def procesar_excel_eges(archivo, batch):
     idx_fecha = get_col_index('Fecha Turno', ['Fecha'])
     idx_hora = get_col_index('Hora Turno', ['Hora'])
     idx_centro = get_col_index('Centro de Atención', ['Centro', 'Sucursal'])
-    idx_hc = get_col_index('Historia Clínica', ['HC', 'H.C.'])
+    idx_hc = get_col_index('Historia Clínica', ['HC', 'H.C.', 'DNI', 'Dni'])
     idx_nombre = get_col_index('Apellido y Nombre', ['Nombre', 'Paciente'])
     idx_servicio = get_col_index('Servicio', ['Prestación', 'Estudio'])
     idx_equipo = get_col_index('Equipo', ['Modalidad'])
     idx_estado = get_col_index('Estado Turno', ['Estado'])
-    
+    idx_practica = get_col_index('Practica', ['Práctica', 'Procedimiento'])
+    idx_codigo_practica = get_col_index('Código Practica', ['Cod. Practica', 'Cód Práctica', 'Codigo Practica'])
+    idx_obra_social = get_col_index('Obra Social', ['Cobertura', 'Prepaga', 'O.S.'])
+    idx_codigo_os = get_col_index('Codigo OS', ['Cód. OS', 'Cod OS', 'Código OS', 'Cod.OS'])
+    idx_nombre_os = get_col_index('Nombre OS', ['Denominacion OS', 'Denominación OS', 'Desc. OS', 'Descripcion OS', 'Descripción OS'])
+    idx_medico = get_col_index('Medico Informante', ['Médico Informante', 'Médico', 'Profesional', 'Informante'])
+    idx_medico_actuante = get_col_index('Medico Actuante', ['Médico Actuante', 'Actuante'])
+
+    if idx_medico is None:
+        print("[EGES] Aviso: columna de médico informante no encontrada — se importará como vacío. "
+              f"Columnas disponibles: {headers}")
+    else:
+        print(f"[EGES] Columna médico informante en índice {idx_medico}: '{headers[idx_medico]}'")
+    if idx_medico_actuante is not None:
+        print(f"[EGES] Columna médico actuante en índice {idx_medico_actuante}: '{headers[idx_medico_actuante]}'")
+
+    if idx_practica is None:
+        print(f"[EGES] Aviso: columna 'Practica' no encontrada — clasificación usará solo 'Servicio'.")
+    else:
+        print(f"[EGES] Columna práctica detectada en índice {idx_practica}: '{headers[idx_practica]}'")
+
+    if idx_obra_social is None:
+        print(f"[EGES] Aviso: columna 'Obra Social' no encontrada — se importará como vacío.")
+
     print(f"[EGES] Índices mapeados. Iniciando lectura de filas...")
     
     # Primero, leer TODAS las filas del Excel y crear objetos en memoria
     filas_a_crear = []
     filas_procesadas = 0
+    _nombres_os_cache: dict[str, str] = {}  # codigo → nombre, para poblar NombreObraSocial
     filas_error = 0
     
     # Leer todas las filas del Excel
@@ -284,7 +324,25 @@ def procesar_excel_eges(archivo, batch):
             servicio = str(row[idx_servicio]) if idx_servicio is not None and row[idx_servicio] else ''
             equipo = str(row[idx_equipo]) if idx_equipo is not None and row[idx_equipo] else ''
             estado = str(row[idx_estado]) if idx_estado is not None and row[idx_estado] else ''
-            
+            medico_inf = str(row[idx_medico]).strip() if idx_medico is not None and row[idx_medico] else None
+            medico_act = str(row[idx_medico_actuante]).strip() if idx_medico_actuante is not None and row[idx_medico_actuante] else None
+            # Fallback: si el informante es vacío o "No Especificado", usar el actuante
+            _NO_ESP = {'médico no especificado', 'no especificado', 'sin especificar', 'none', ''}
+            def _valido(v):
+                return bool(v and v.strip().lower() not in _NO_ESP)
+            medico = medico_inf if _valido(medico_inf) else (medico_act if _valido(medico_act) else None)
+            practica = str(row[idx_practica]).strip() if idx_practica is not None and row[idx_practica] else None
+            codigo_practica = str(row[idx_codigo_practica]).strip() if idx_codigo_practica is not None and row[idx_codigo_practica] else None
+            obra_social = str(row[idx_obra_social]).strip() if idx_obra_social is not None and row[idx_obra_social] else None
+            codigo_os = str(row[idx_codigo_os]).strip() if idx_codigo_os is not None and row[idx_codigo_os] else None
+            nombre_os = str(row[idx_nombre_os]).strip() if idx_nombre_os is not None and row[idx_nombre_os] else None
+
+            # Acumular mapeo código → nombre para auto-poblar NombreObraSocial
+            if nombre_os:
+                _clave_os = codigo_os or obra_social
+                if _clave_os:
+                    _nombres_os_cache[_clave_os] = nombre_os
+
             # Crear objeto en memoria (NO guardarlo todavía)
             fila = EgesRow(
                 batch=batch,
@@ -297,12 +355,21 @@ def procesar_excel_eges(archivo, batch):
                 servicio=servicio,
                 equipo=equipo,
                 estado_turno=estado,
+                practica=practica,
+                codigo_practica=codigo_practica,
+                obra_social=obra_social,
+                codigo_obra_social=codigo_os,
+                medico_informante=medico,
             )
-            
-            # Clasificar modalidad e insumo en memoria
+
+            # Clasificar modalidad, sub_modalidad e insumo en memoria
             fila.es_insumo = fila.clasificar_insumo()
+            if fila.es_insumo:
+                continue  # No guardar insumos en la base de datos
             fila.modalidad = fila.clasificar_modalidad()
-            
+            if fila.modalidad == 'ECO':
+                fila.sub_modalidad = fila.clasificar_sub_modalidad()
+
             filas_a_crear.append(fila)
             
         except Exception as e:
@@ -313,6 +380,14 @@ def procesar_excel_eges(archivo, batch):
     
     wb.close()
     print(f"[EGES] Workbook cerrado. Leídas {len(filas_a_crear)} filas válidas, {filas_error} errores.")
+
+    # Auto-poblar tabla de nombres de obras sociales si el Excel traía esa columna
+    if _nombres_os_cache:
+        for _codigo, _nombre in _nombres_os_cache.items():
+            NombreObraSocial.objects.update_or_create(
+                codigo=_codigo, defaults={'nombre': _nombre}
+            )
+        print(f"[EGES] {len(_nombres_os_cache)} registros actualizados en NombreObraSocial.")
     
     # Ahora verificar duplicados y crear en batch
     print(f"[EGES] Verificando duplicados y guardando en base de datos...")
@@ -320,7 +395,7 @@ def procesar_excel_eges(archivo, batch):
     # Obtener todas las combinaciones existentes para detectar duplicados
     combinaciones_existentes = set(
         EgesRow.objects.values_list(
-            'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'servicio'
+            'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'practica'
         )
     )
     
@@ -333,7 +408,7 @@ def procesar_excel_eges(archivo, batch):
             fila.fecha_turno,
             fila.hora_turno,
             fila.centro_atencion,
-            fila.servicio
+            fila.practica
         )
         
         if combinacion not in combinaciones_existentes:
@@ -380,58 +455,32 @@ def grafico_batch_data(request, batch_id):
         fecha_turno__isnull=False
     )
     
-    # Agrupar por mes y modalidad
-    datos_por_mes = estudios_finalizados.annotate(
-        mes=TruncMonth('fecha_turno')
-    ).values('mes', 'modalidad').annotate(
-        total=Count('id')
-    ).order_by('mes', 'modalidad')
-    
-    # Estructurar datos para Chart.js
-    # 1. Obtener todos los meses únicos
-    meses = sorted(set(item['mes'] for item in datos_por_mes if item['mes']))
-    labels = [mes.strftime('%Y-%m') for mes in meses]
-    
-    # 2. Preparar datasets por modalidad
-    modalidades = ['TC', 'RM', 'RX', 'ECO', 'OTROS']
-    colores = {
-        'TC': {'border': 'rgb(59, 130, 246)', 'bg': 'rgba(59, 130, 246, 0.1)'},      # Azul
-        'RM': {'border': 'rgb(147, 51, 234)', 'bg': 'rgba(147, 51, 234, 0.1)'},     # Púrpura
-        'RX': {'border': 'rgb(34, 197, 94)', 'bg': 'rgba(34, 197, 94, 0.1)'},       # Verde
-        'ECO': {'border': 'rgb(251, 191, 36)', 'bg': 'rgba(251, 191, 36, 0.1)'},    # Amarillo
-        'OTROS': {'border': 'rgb(107, 114, 128)', 'bg': 'rgba(107, 114, 128, 0.1)'} # Gris
-    }
-    
-    # 3. Crear un diccionario de datos indexado por (mes, modalidad)
+    # Agrupar en Python para evitar TruncMonth + USE_TZ=True en SQLite
+    filas = estudios_finalizados.values('fecha_turno', 'modalidad').annotate(total=Count('id'))
     datos_dict = {}
-    for item in datos_por_mes:
-        if item['mes']:
-            key = (item['mes'].strftime('%Y-%m'), item['modalidad'])
-            datos_dict[key] = item['total']
-    
-    # 4. Construir datasets
+    for item in filas:
+        periodo = date_type(item['fecha_turno'].year, item['fecha_turno'].month, 1)
+        key = (periodo.strftime('%Y-%m'), item['modalidad'])
+        datos_dict[key] = datos_dict.get(key, 0) + item['total']
+
+    meses = sorted(set(k[0] for k in datos_dict))
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    nombres = dict(EgesRow.MODALIDAD_CHOICES)
+
     datasets = []
     for modalidad in modalidades:
-        data = []
-        for label in labels:
-            key = (label, modalidad)
-            data.append(datos_dict.get(key, 0))
-        
-        # Solo agregar si tiene al menos un valor > 0
+        data = [datos_dict.get((m, modalidad), 0) for m in meses]
         if sum(data) > 0:
             datasets.append({
-                'label': modalidad,
+                'label': nombres.get(modalidad, modalidad),
                 'data': data,
-                'borderColor': colores[modalidad]['border'],
-                'backgroundColor': colores[modalidad]['bg'],
+                'borderColor': COLORES_MODALIDAD[modalidad]['border'],
+                'backgroundColor': COLORES_MODALIDAD[modalidad]['bg'],
                 'borderWidth': 2,
-                'tension': 0.3,  # Suavizado de líneas
+                'tension': 0.3,
             })
-    
-    return JsonResponse({
-        'labels': labels,
-        'datasets': datasets
-    })
+
+    return JsonResponse({'labels': meses, 'datasets': datasets})
 
 
 @login_required
@@ -565,56 +614,31 @@ def dashboard_global_grafico_data(request):
     if modalidades_seleccionadas:
         estudios = estudios.filter(modalidad__in=modalidades_seleccionadas)
     
-    # Agrupar por mes y modalidad
-    datos_por_mes = estudios.annotate(
-        mes=TruncMonth('fecha_turno')
-    ).values('mes', 'modalidad').annotate(
-        total=Count('id')
-    ).order_by('mes', 'modalidad')
-    
-    # Estructurar datos para Chart.js
-    meses = sorted(set(item['mes'] for item in datos_por_mes if item['mes']))
-    labels = [mes.strftime('%Y-%m') for mes in meses]
-    
-    # Preparar datasets por modalidad
-    modalidades = ['TC', 'RM', 'RX', 'ECO', 'OTROS']
-    colores = {
-        'TC': {'border': 'rgb(59, 130, 246)', 'bg': 'rgba(59, 130, 246, 0.1)'},
-        'RM': {'border': 'rgb(147, 51, 234)', 'bg': 'rgba(147, 51, 234, 0.1)'},
-        'RX': {'border': 'rgb(34, 197, 94)', 'bg': 'rgba(34, 197, 94, 0.1)'},
-        'ECO': {'border': 'rgb(251, 191, 36)', 'bg': 'rgba(251, 191, 36, 0.1)'},
-        'OTROS': {'border': 'rgb(107, 114, 128)', 'bg': 'rgba(107, 114, 128, 0.1)'}
-    }
-    
-    # Crear diccionario de datos
+    # Agrupar en Python para evitar TruncMonth + USE_TZ=True en SQLite
+    filas = estudios.values('fecha_turno', 'modalidad').annotate(total=Count('id'))
     datos_dict = {}
-    for item in datos_por_mes:
-        if item['mes']:
-            key = (item['mes'].strftime('%Y-%m'), item['modalidad'])
-            datos_dict[key] = item['total']
-    
-    # Construir datasets
+    for item in filas:
+        periodo = date_type(item['fecha_turno'].year, item['fecha_turno'].month, 1)
+        key = (periodo.strftime('%Y-%m'), item['modalidad'])
+        datos_dict[key] = datos_dict.get(key, 0) + item['total']
+
+    meses = sorted(set(k[0] for k in datos_dict))
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+
     datasets = []
     for modalidad in modalidades:
-        data = []
-        for label in labels:
-            key = (label, modalidad)
-            data.append(datos_dict.get(key, 0))
-        
+        data = [datos_dict.get((m, modalidad), 0) for m in meses]
         if sum(data) > 0:
             datasets.append({
                 'label': modalidad,
                 'data': data,
-                'borderColor': colores[modalidad]['border'],
-                'backgroundColor': colores[modalidad]['bg'],
+                'borderColor': COLORES_MODALIDAD[modalidad]['border'],
+                'backgroundColor': COLORES_MODALIDAD[modalidad]['bg'],
                 'borderWidth': 2,
                 'tension': 0.3,
             })
-    
-    return JsonResponse({
-        'labels': labels,
-        'datasets': datasets
-    })
+
+    return JsonResponse({'labels': meses, 'datasets': datasets})
 
 
 @login_required
@@ -734,3 +758,1078 @@ def dashboard_global_franja_horaria_data(request):
             'borderRadius': 5,
         }]
     })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers compartidos entre el dashboard del superuser y el portal del director
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _base_estudios_finalizados():
+    """QuerySet base: estudios finalizados (no insumos, estado Informado, con fecha)."""
+    return EgesRow.objects.filter(
+        es_insumo=False,
+        estado_turno__iexact='Informado',
+        fecha_turno__isnull=False,
+    )
+
+
+def _aplicar_filtros_fecha_modalidad(qs, request_params):
+    """Aplica filtros de fecha y modalidad a un QuerySet."""
+    fecha_desde = request_params.get('fecha_desde', '')
+    fecha_hasta = request_params.get('fecha_hasta', '')
+    # Acepta tanto ?modalidades[]=TC&modalidades[]=RM como ?modalidades=TC,RM
+    mods = request_params.getlist('modalidades[]') or request_params.getlist('modalidades')
+
+    if fecha_desde:
+        try:
+            qs = qs.filter(fecha_turno__gte=datetime.strptime(fecha_desde, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            qs = qs.filter(fecha_turno__lte=datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if mods:
+        qs = qs.filter(modalidad__in=mods)
+    return qs
+
+
+def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs):
+    """
+    Devuelve un dict con los 4 KPIs principales.
+    estudios_finalizados_qs: filtrado por estado Informado
+    estudios_candidatos_qs: todos los no-insumos (informados + pendientes)
+    """
+    total_finalizados = estudios_finalizados_qs.count()
+    total_candidatos = estudios_candidatos_qs.count()
+    total_pendientes = total_candidatos - total_finalizados
+
+    # Rango de fechas efectivo
+    fechas = estudios_finalizados_qs.values_list('fecha_turno', flat=True)
+    if fechas:
+        fecha_min = min(fechas)
+        fecha_max = max(fechas)
+        dias_periodo = max((fecha_max - fecha_min).days + 1, 1)
+        # Dias hábiles aproximados (excluimos domingos)
+        dias_habiles = sum(
+            1 for i in range(dias_periodo)
+            if (fecha_min + timedelta(days=i)).weekday() != 6
+        )
+        promedio_dia = round(total_finalizados / max(dias_habiles, 1), 1)
+    else:
+        promedio_dia = 0
+
+    tasa_conversion = round((total_finalizados / total_candidatos * 100), 1) if total_candidatos else 0
+
+    return {
+        'total_finalizados': total_finalizados,
+        'total_candidatos': total_candidatos,
+        'total_pendientes': total_pendientes,
+        'promedio_dia': promedio_dia,
+        'tasa_conversion': tasa_conversion,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: KPIs
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vista_kpis_data(request):
+    """Lógica interna de KPIs, reutilizable desde superuser y director."""
+    base = _base_estudios_finalizados()
+    candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
+    base = _aplicar_filtros_fecha_modalidad(base, request.GET)
+    candidatos = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
+    return JsonResponse(_calcular_kpis(base, candidatos))
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def kpis_data(request):
+    """Endpoint de KPIs para el dashboard del superuser."""
+    return _vista_kpis_data(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Análisis temporal con granularidad día / semana / mes
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _agrupar_periodo(d, agrupacion):
+    """Dado un objeto date y agrupacion (dia|semana|mes), devuelve el inicio del periodo."""
+    if agrupacion == 'dia':
+        return d
+    elif agrupacion == 'semana':
+        return d - timedelta(days=d.weekday())  # lunes de esa semana
+    else:
+        return date_type(d.year, d.month, 1)
+
+
+def _vista_analisis_temporal(request):
+    """Lógica interna compartida."""
+    agrupacion = request.GET.get('agrupacion', 'mes')  # dia | semana | mes
+
+    estudios = _base_estudios_finalizados()
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+
+    # Agrupamos en Python para evitar el error de TruncWeek/TruncDate con
+    # USE_TZ=True sobre DateField en SQLite.
+    filas = estudios.filter(
+        fecha_turno__isnull=False
+    ).values('fecha_turno', 'modalidad').annotate(total=Count('id'))
+
+    datos_dict = {}
+    for item in filas:
+        periodo = _agrupar_periodo(item['fecha_turno'], agrupacion)
+        key = (periodo, item['modalidad'])
+        datos_dict[key] = datos_dict.get(key, 0) + item['total']
+
+    periodos = sorted(set(p for p, _ in datos_dict))
+
+    if agrupacion == 'dia':
+        labels = [p.strftime('%d/%m/%Y') for p in periodos]
+    elif agrupacion == 'semana':
+        labels = [p.strftime('Sem %d/%m/%Y') for p in periodos]
+    else:
+        labels = [p.strftime('%m/%Y') for p in periodos]
+
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    nombres = dict(EgesRow.MODALIDAD_CHOICES)
+
+    datasets = []
+    for mod in modalidades:
+        data = [datos_dict.get((p, mod), 0) for p in periodos]
+        if sum(data) > 0:
+            datasets.append({
+                'label': nombres.get(mod, mod),
+                'data': data,
+                'borderColor': COLORES_MODALIDAD[mod]['border'],
+                'backgroundColor': COLORES_MODALIDAD[mod]['bg'],
+                'borderWidth': 2,
+                'tension': 0.3,
+            })
+
+    return JsonResponse({'labels': labels, 'datasets': datasets, 'agrupacion': agrupacion})
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def analisis_temporal_data(request):
+    return _vista_analisis_temporal(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Distribución porcentual por modalidad (dona)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vista_distribucion_modalidad(request):
+    estudios = _base_estudios_finalizados()
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+
+    datos = estudios.values('modalidad').annotate(total=Count('id')).order_by('-total')
+    nombres = dict(EgesRow.MODALIDAD_CHOICES)
+
+    labels = [nombres.get(d['modalidad'], d['modalidad']) for d in datos]
+    valores = [d['total'] for d in datos]
+    colores = [COLORES_MODALIDAD.get(d['modalidad'], COLORES_MODALIDAD['OTROS'])['border'] for d in datos]
+
+    return JsonResponse({
+        'labels': labels,
+        'datasets': [{
+            'data': valores,
+            'backgroundColor': colores,
+            'borderColor': '#fff',
+            'borderWidth': 2,
+        }]
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def distribucion_modalidad_data(request):
+    return _vista_distribucion_modalidad(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Sub-modalidades de ECO
+# ─────────────────────────────────────────────────────────────────────────────
+
+COLORES_SUB_ECO = [
+    'rgba(251, 191, 36, 0.8)',   # ECO_ABDOMINAL
+    'rgba(245, 158, 11, 0.8)',   # ECOCARDIO
+    'rgba(16, 185, 129, 0.8)',   # DOPPLER
+    'rgba(59, 130, 246, 0.8)',   # ECO_PELVIS
+    'rgba(139, 92, 246, 0.8)',   # ECO_MAMA
+    'rgba(236, 72, 153, 0.8)',   # ECO_OBSTETRICA
+    'rgba(249, 115, 22, 0.8)',   # ECO_TIROIDES
+    'rgba(20, 184, 166, 0.8)',   # ECO_NEONATAL
+    'rgba(107, 114, 128, 0.8)',  # ECO_PARTES_BLANDAS
+    'rgba(99, 102, 241, 0.8)',   # Resto
+]
+
+
+def _vista_sub_modalidades_eco(request):
+    estudios = _base_estudios_finalizados().filter(modalidad='ECO')
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+
+    datos = estudios.values('sub_modalidad').annotate(total=Count('id')).order_by('-total')
+    nombres = dict(EgesRow.SUB_MODALIDAD_ECO_CHOICES)
+    nombres[None] = 'ECO genérica'
+    nombres[''] = 'ECO genérica'
+
+    labels = [nombres.get(d['sub_modalidad'], d['sub_modalidad'] or 'ECO genérica') for d in datos]
+    valores = [d['total'] for d in datos]
+    bg = [COLORES_SUB_ECO[i % len(COLORES_SUB_ECO)] for i in range(len(datos))]
+
+    return JsonResponse({
+        'labels': labels,
+        'datasets': [{
+            'label': 'Ecografías',
+            'data': valores,
+            'backgroundColor': bg,
+            'borderColor': '#fff',
+            'borderWidth': 1,
+        }]
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def sub_modalidades_eco_data(request):
+    return _vista_sub_modalidades_eco(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Productividad por médico
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vista_productividad_medico(request):
+    agrupacion = request.GET.get('agrupacion', 'mes')  # semana | mes | total
+    top_n = int(request.GET.get('top', 10))
+
+    estudios = _base_estudios_finalizados().exclude(
+        Q(medico_informante__isnull=True) | Q(medico_informante='')
+    )
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+
+    # Ranking total por médico
+    ranking = (
+        estudios
+        .values('medico_informante')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:top_n]
+    )
+
+    labels = [r['medico_informante'] for r in ranking]
+    valores = [r['total'] for r in ranking]
+
+    # Desglose por modalidad para cada médico (top N)
+    medicos_top = list(labels)
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    nombres = dict(EgesRow.MODALIDAD_CHOICES)
+
+    desglose = (
+        estudios
+        .filter(medico_informante__in=medicos_top)
+        .values('medico_informante', 'modalidad')
+        .annotate(total=Count('id'))
+    )
+    desglose_dict = {}
+    for d in desglose:
+        desglose_dict[(d['medico_informante'], d['modalidad'])] = d['total']
+
+    datasets = []
+    for mod in modalidades:
+        data = [desglose_dict.get((med, mod), 0) for med in medicos_top]
+        if sum(data) > 0:
+            datasets.append({
+                'label': nombres.get(mod, mod),
+                'data': data,
+                'backgroundColor': COLORES_MODALIDAD[mod]['bg'].replace('0.15', '0.7'),
+                'borderColor': COLORES_MODALIDAD[mod]['border'],
+                'borderWidth': 1,
+            })
+
+    return JsonResponse({
+        'labels': labels,
+        'datasets': datasets,
+        'totales': valores,
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def productividad_medico_data(request):
+    return _vista_productividad_medico(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Ranking Obras Sociales
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vista_obras_sociales_data(request):
+    top_n = min(int(request.GET.get('top', 15)), 30)
+    estudios = _base_estudios_finalizados()
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+    datos = (
+        estudios
+        .exclude(Q(obra_social__isnull=True) | Q(obra_social=''))
+        .values('obra_social')
+        .annotate(total=Count('id'))
+        .order_by('-total')[:top_n]
+    )
+    # Lookup código → nombre (en memoria, tabla pequeña)
+    lookup_nombres = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
+    labels = [lookup_nombres.get(d['obra_social'], d['obra_social']) for d in datos]
+    valores = [d['total'] for d in datos]
+    return JsonResponse({
+        'labels': labels,
+        'datasets': [{
+            'label': 'Estudios',
+            'data': valores,
+            'backgroundColor': 'rgba(59, 130, 246, 0.7)',
+            'borderColor': 'rgba(37, 99, 235, 1)',
+            'borderWidth': 1,
+        }],
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def obras_sociales_data(request):
+    return _vista_obras_sociales_data(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Comparativa período actual vs anterior
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _vista_comparativa_data(request):
+    """Compara KPIs del período seleccionado vs el anterior de igual duración."""
+    from django.http import QueryDict
+
+    fecha_desde_str = request.GET.get('fecha_desde', '')
+    fecha_hasta_str = request.GET.get('fecha_hasta', '')
+    hoy = date_type.today()
+
+    if fecha_desde_str and fecha_hasta_str:
+        try:
+            fd = datetime.strptime(fecha_desde_str, '%Y-%m-%d').date()
+            fh = datetime.strptime(fecha_hasta_str, '%Y-%m-%d').date()
+        except ValueError:
+            fd = hoy - timedelta(days=30)
+            fh = hoy
+    else:
+        fd = hoy - timedelta(days=30)
+        fh = hoy
+
+    duracion = max((fh - fd).days, 1)
+    fd_prev = fd - timedelta(days=duracion + 1)
+    fh_prev = fd - timedelta(days=1)
+
+    def kpis_para_rango(desde, hasta):
+        params = QueryDict(
+            f'fecha_desde={desde.strftime("%Y-%m-%d")}&fecha_hasta={hasta.strftime("%Y-%m-%d")}'
+        )
+        base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), params)
+        candidatos = _aplicar_filtros_fecha_modalidad(
+            EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), params
+        )
+        return _calcular_kpis(base, candidatos)
+
+    actual = kpis_para_rango(fd, fh)
+    anterior = kpis_para_rango(fd_prev, fh_prev)
+
+    def delta(a, b):
+        try:
+            a, b = float(a), float(b)
+        except (TypeError, ValueError):
+            return None
+        if b == 0:
+            return None
+        return round(((a - b) / b) * 100, 1)
+
+    return JsonResponse({
+        'actual': actual,
+        'anterior': anterior,
+        'periodo_actual': {'desde': fd.strftime('%d/%m/%Y'), 'hasta': fh.strftime('%d/%m/%Y')},
+        'periodo_anterior': {'desde': fd_prev.strftime('%d/%m/%Y'), 'hasta': fh_prev.strftime('%d/%m/%Y')},
+        'delta': {
+            'total_finalizados': delta(actual['total_finalizados'], anterior['total_finalizados']),
+            'promedio_dia': delta(actual['promedio_dia'], anterior['promedio_dia']),
+            'tasa_conversion': delta(actual['tasa_conversion'], anterior['tasa_conversion']),
+        },
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def comparativa_data(request):
+    return _vista_comparativa_data(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint: Exportar Excel
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _exportar_excel(request):
+    """Genera y descarga un .xlsx con los estudios finalizados filtrados."""
+    import io
+    from django.http import HttpResponse
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    estudios = _base_estudios_finalizados()
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+    filas = estudios.order_by('fecha_turno', 'historia_clinica').values(
+        'fecha_turno', 'hora_turno', 'historia_clinica', 'practica',
+        'codigo_practica', 'obra_social', 'modalidad', 'sub_modalidad',
+        'estado_turno', 'medico_informante', 'equipo',
+    )
+
+    nombres_modalidad = dict(EgesRow.MODALIDAD_CHOICES)
+    nombres_sub = dict(EgesRow.SUB_MODALIDAD_ECO_CHOICES)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = 'Estudios'
+
+    encabezados = [
+        'Fecha', 'Hora', 'Historia Clínica', 'Práctica', 'Código Práctica',
+        'Obra Social', 'Modalidad', 'Sub-modalidad ECO', 'Estado',
+        'Médico Informante', 'Equipo',
+    ]
+    ws.append(encabezados)
+
+    header_fill = PatternFill(start_color='1E40AF', end_color='1E40AF', fill_type='solid')
+    for cell in ws[1]:
+        cell.font = Font(bold=True, color='FFFFFF')
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal='center')
+
+    for row in filas:
+        ws.append([
+            row['fecha_turno'].strftime('%d/%m/%Y') if row['fecha_turno'] else '',
+            row['hora_turno'].strftime('%H:%M') if row['hora_turno'] else '',
+            row['historia_clinica'] or '',
+            row['practica'] or '',
+            row['codigo_practica'] or '',
+            row['obra_social'] or '',
+            nombres_modalidad.get(row['modalidad'], row['modalidad'] or ''),
+            nombres_sub.get(row['sub_modalidad'], row['sub_modalidad'] or '') if row['sub_modalidad'] else '',
+            row['estado_turno'] or '',
+            row['medico_informante'] or '',
+            row['equipo'] or '',
+        ])
+
+    for col in ws.columns:
+        max_len = max((len(str(cell.value or '')) for cell in col), default=10)
+        ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 45)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    fecha_str = date_type.today().strftime('%Y%m%d')
+    filename = f'eges_estudios_{fecha_str}.xlsx'
+    response = HttpResponse(
+        buffer.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def exportar_excel(request):
+    return _exportar_excel(request)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Portal del Director (acceso por token UUID, sin login)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _verificar_token(token_str):
+    """Verifica que el token sea válido y esté activo. Retorna DirectorToken o None."""
+    try:
+        import uuid as _uuid
+        token_uuid = _uuid.UUID(str(token_str))
+        token = DirectorToken.objects.get(token=token_uuid, activo=True)
+        token.registrar_acceso()
+        return token
+    except (DirectorToken.DoesNotExist, ValueError):
+        return None
+
+
+def portal_director(request, token):
+    """
+    Portal de análisis de productividad para el director.
+    Acceso por token UUID en la URL, sin requerir login.
+    """
+    director_token = _verificar_token(token)
+    if not director_token:
+        return HttpResponseForbidden(
+            "<h1>Acceso denegado</h1><p>El enlace no es válido o ha sido desactivado.</p>"
+        )
+
+    # Métricas globales rápidas para el contexto inicial
+    total_estudios = _base_estudios_finalizados().count()
+    fecha_min_row = EgesRow.objects.filter(fecha_turno__isnull=False).order_by('fecha_turno').first()
+    fecha_max_row = EgesRow.objects.filter(fecha_turno__isnull=False).order_by('-fecha_turno').first()
+
+    return render(request, 'eges_import/portal_director.html', {
+        'token': str(director_token.token),
+        'etiqueta': director_token.nombre_etiqueta,
+        'total_estudios': total_estudios,
+        'fecha_min': fecha_min_row.fecha_turno if fecha_min_row else None,
+        'fecha_max': fecha_max_row.fecha_turno if fecha_max_row else None,
+    })
+
+
+def portal_director_kpis(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_kpis_data(request)
+
+
+def portal_director_analisis_temporal(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_analisis_temporal(request)
+
+
+def portal_director_distribucion(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_distribucion_modalidad(request)
+
+
+def portal_director_eco(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_sub_modalidades_eco(request)
+
+
+def portal_director_medicos(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_productividad_medico(request)
+
+
+def portal_director_obras_sociales(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_obras_sociales_data(request)
+
+
+def portal_director_comparativa(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_comparativa_data(request)
+
+
+def portal_director_exportar_excel(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _exportar_excel(request)
+
+
+def portal_director_franja_horaria(request, token):
+    """Franja horaria para el portal del director (reutiliza lógica del dashboard global)."""
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+
+    estudios = _base_estudios_finalizados().filter(hora_turno__isnull=False)
+    estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
+
+    franjas = [
+        '00-02', '02-04', '04-06', '06-08', '08-10', '10-12',
+        '12-14', '14-16', '16-18', '18-20', '20-22', '22-24'
+    ]
+    conteo = [0] * 12
+    for e in estudios:
+        idx = e.hora_turno.hour // 2
+        if 0 <= idx < 12:
+            conteo[idx] += 1
+
+    return JsonResponse({
+        'labels': franjas,
+        'datasets': [{
+            'label': 'Estudios Finalizados',
+            'data': conteo,
+            'backgroundColor': 'rgba(59, 130, 246, 0.6)',
+            'borderColor': 'rgb(59, 130, 246)',
+            'borderWidth': 2,
+            'borderRadius': 5,
+        }]
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exportar PDF
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _exportar_pdf(request):
+    """
+    Genera un informe PDF ejecutivo.
+    Usa matplotlib para gráficos (alta calidad) + ReportLab Platypus para layout.
+    Estructura: portada+KPIs | evolución+torta | ECO+OS | médicos+franja.
+    """
+    import io
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from django.http import HttpResponse
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+        HRFlowable, PageBreak, Image, KeepTogether,
+    )
+    PAGE_W, PAGE_H = landscape(A4)
+    USABLE_W = PAGE_W - 3 * cm  # ~784pt con márgenes de 1.5cm c/lado
+
+    # ── Paleta ────────────────────────────────────────────────────────────────
+    AZUL          = colors.HexColor('#1e40af')
+    AZUL_CLARO    = colors.HexColor('#dbeafe')
+    GRIS_CABECERA = colors.HexColor('#1e293b')
+    GRIS_FILA     = colors.HexColor('#f8fafc')
+    VERDE         = colors.HexColor('#16a34a')
+    ROJO          = colors.HexColor('#dc2626')
+    MOD_HEX = {
+        'TC': '#3b82f6', 'RM': '#9333ea', 'RX': '#22c55e',
+        'DX': '#f97316', 'MAM': '#ec4899', 'ECO': '#eab308', 'OTROS': '#6b7280',
+    }
+
+    # ── Estilos ReportLab ─────────────────────────────────────────────────────
+    styles = getSampleStyleSheet()
+    s_titulo    = ParagraphStyle('sTitulo',  parent=styles['Title'],  fontSize=22,
+                                 textColor=AZUL, spaceAfter=4, fontName='Helvetica-Bold', leading=28)
+    s_subtitulo = ParagraphStyle('sSubti',   parent=styles['Normal'], fontSize=10,
+                                 textColor=colors.HexColor('#64748b'), spaceAfter=4, fontName='Helvetica')
+    s_seccion   = ParagraphStyle('sSeccion', parent=styles['Normal'], fontSize=11,
+                                 textColor=AZUL, spaceBefore=12, spaceAfter=6, fontName='Helvetica-Bold')
+    s_pie       = ParagraphStyle('sPie',     parent=styles['Normal'], fontSize=7,
+                                 textColor=colors.HexColor('#9ca3af'), alignment=TA_CENTER)
+    s_delta     = ParagraphStyle('sDelta',   parent=styles['Normal'], fontSize=9,
+                                 fontName='Helvetica-Bold', alignment=TA_CENTER)
+
+    _TBL_BASE = [
+        ('BACKGROUND', (0, 0), (-1, 0), GRIS_CABECERA),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, -1), 9),
+        ('ALIGN',      (1, 0), (-1, -1), 'CENTER'),
+        ('ALIGN',      (0, 0), (0, -1), 'LEFT'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, GRIS_FILA]),
+        ('BOX',        (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('INNERGRID',  (0, 0), (-1, -1), 0.3, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+    ]
+
+    def _tbl_style(extra=None):
+        return TableStyle(_TBL_BASE + (extra or []))
+
+    # ── Helpers matplotlib → ReportLab Image ─────────────────────────────────
+    DPI = 150
+
+    def _fig_to_image(fig, width_pt, height_pt):
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', bbox_inches='tight', dpi=DPI,
+                    facecolor='white', edgecolor='none')
+        plt.close(fig)
+        buf.seek(0)
+        return Image(buf, width=width_pt, height=height_pt)
+
+    def _empty_image(width_pt, height_pt, msg='Sin datos'):
+        fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+        ax.text(0.5, 0.5, msg, ha='center', va='center',
+                transform=ax.transAxes, color='#9ca3af', fontsize=11)
+        ax.axis('off')
+        return _fig_to_image(fig, width_pt, height_pt)
+
+    def _chart_barras_agrupadas(periodos_labels, datasets, mod_labels, mod_colors,
+                                 width_pt, height_pt):
+        """Barras agrupadas por modalidad a lo largo del tiempo."""
+        if not periodos_labels or not datasets:
+            return _empty_image(width_pt, height_pt)
+        n_p = len(periodos_labels)
+        n_m = len(datasets)
+        fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+        x = np.arange(n_p)
+        bar_w = min(0.8 / n_m, 0.15)
+        for i, (data, label, color) in enumerate(zip(datasets, mod_labels, mod_colors)):
+            offset = (i - n_m / 2 + 0.5) * bar_w
+            ax.bar(x + offset, data, bar_w, label=label, color=color, alpha=0.88,
+                   edgecolor='white', linewidth=0.3)
+        ax.set_xticks(x)
+        ax.set_xticklabels(periodos_labels, rotation=30 if n_p > 6 else 0,
+                           ha='right', fontsize=7)
+        ax.yaxis.set_tick_params(labelsize=7)
+        ax.set_axisbelow(True)
+        ax.yaxis.grid(True, color='#e5e7eb', linewidth=0.5)
+        ax.spines[['top', 'right']].set_visible(False)
+        ax.legend(fontsize=7, loc='upper left', framealpha=0.7,
+                  ncol=min(n_m, 4), handlelength=1, columnspacing=0.8)
+        fig.tight_layout(pad=0.5)
+        return _fig_to_image(fig, width_pt, height_pt)
+
+    def _chart_donut(labels, valores, hex_colors, width_pt, height_pt):
+        """Gráfico donut de distribución por modalidad."""
+        if not valores or sum(valores) == 0:
+            return _empty_image(width_pt, height_pt)
+        fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+        wedges, _, autotexts = ax.pie(
+            valores, colors=hex_colors,
+            autopct='%1.1f%%', pctdistance=0.78,
+            wedgeprops=dict(width=0.52, edgecolor='white', linewidth=1.5),
+            startangle=90,
+        )
+        for at in autotexts:
+            at.set_fontsize(7)
+            at.set_color('white')
+            at.set_fontweight('bold')
+        ax.legend(wedges, [f'{l} ({v})' for l, v in zip(labels, valores)],
+                  loc='lower center', bbox_to_anchor=(0.5, -0.28),
+                  ncol=2, fontsize=7, framealpha=0.7, handlelength=1)
+        fig.tight_layout(pad=0.2)
+        return _fig_to_image(fig, width_pt, height_pt)
+
+    def _chart_barras_h(labels, valores, hex_color, width_pt, height_pt):
+        """Barras horizontales con etiquetas de valor."""
+        if not valores or sum(valores) == 0:
+            return _empty_image(width_pt, height_pt)
+        fig, ax = plt.subplots(figsize=(width_pt / 72, height_pt / 72))
+        y_pos = np.arange(len(labels))
+        bars = ax.barh(y_pos, valores, color=hex_color, alpha=0.85,
+                       edgecolor='white', linewidth=0.3, height=0.6)
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(labels, fontsize=7)
+        ax.xaxis.set_tick_params(labelsize=7)
+        ax.set_axisbelow(True)
+        ax.xaxis.grid(True, color='#e5e7eb', linewidth=0.5)
+        ax.spines[['top', 'right']].set_visible(False)
+        max_v = max(valores) if valores else 1
+        for bar in bars:
+            w = bar.get_width()
+            if w > 0:
+                ax.text(w + max_v * 0.01, bar.get_y() + bar.get_height() / 2,
+                        str(int(w)), va='center', ha='left', fontsize=7, color='#374151')
+        fig.tight_layout(pad=0.5)
+        return _fig_to_image(fig, width_pt, height_pt)
+
+    # ── Datos ─────────────────────────────────────────────────────────────────
+    base = _base_estudios_finalizados()
+    candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
+    base_f = _aplicar_filtros_fecha_modalidad(base, request.GET)
+    candidatos_f = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
+    kpis = _calcular_kpis(base_f, candidatos_f)
+
+    # Rango de fechas
+    fecha_desde_str = request.GET.get('fecha_desde', '')
+    fecha_hasta_str = request.GET.get('fecha_hasta', '')
+    hoy = date_type.today()
+    if fecha_desde_str and fecha_hasta_str:
+        try:
+            fd = datetime.strptime(fecha_desde_str, '%Y-%m-%d').date()
+            fh = datetime.strptime(fecha_hasta_str, '%Y-%m-%d').date()
+        except ValueError:
+            fd, fh = hoy - timedelta(days=30), hoy
+    else:
+        fechas_qs = base_f.values_list('fecha_turno', flat=True)
+        if fechas_qs.exists():
+            fd, fh = min(fechas_qs), max(fechas_qs)
+        else:
+            fd, fh = hoy - timedelta(days=30), hoy
+
+    duracion = max((fh - fd).days, 1)
+    fd_prev = fd - timedelta(days=duracion + 1)
+    fh_prev = fd - timedelta(days=1)
+
+    from django.http import QueryDict
+
+    def _kpis_rango(desde, hasta):
+        p = QueryDict(f'fecha_desde={desde.strftime("%Y-%m-%d")}&fecha_hasta={hasta.strftime("%Y-%m-%d")}')
+        return _calcular_kpis(
+            _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), p),
+            _aplicar_filtros_fecha_modalidad(
+                EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), p),
+        )
+
+    kpis_prev = _kpis_rango(fd_prev, fh_prev)
+
+    def _delta(a, b):
+        try:
+            a, b = float(a), float(b)
+            if b == 0:
+                return '—', colors.HexColor('#6b7280')
+            d = (a - b) / b * 100
+            return f'{"▲" if d >= 0 else "▼"} {abs(d):.1f}%', (VERDE if d >= 0 else ROJO)
+        except (TypeError, ValueError):
+            return '—', colors.HexColor('#6b7280')
+
+    # Distribución por modalidad
+    dist_datos  = base_f.values('modalidad').annotate(total=Count('id')).order_by('-total')
+    dist_labels = [dict(EgesRow.MODALIDAD_CHOICES).get(d['modalidad'], d['modalidad']) for d in dist_datos]
+    dist_valores = [d['total'] for d in dist_datos]
+    dist_mods   = [d['modalidad'] for d in dist_datos]
+
+    # Sub-modalidades ECO
+    sub_datos   = (base_f.filter(modalidad='ECO', sub_modalidad__isnull=False)
+                   .values('sub_modalidad').annotate(total=Count('id')).order_by('-total'))
+    sub_labels  = [dict(EgesRow.SUB_MODALIDAD_ECO_CHOICES).get(d['sub_modalidad'], d['sub_modalidad']) for d in sub_datos]
+    sub_valores = [d['total'] for d in sub_datos]
+
+    # Médicos top 10
+    med_datos = (
+        base_f.exclude(Q(medico_informante__isnull=True) | Q(medico_informante=''))
+        .values('medico_informante').annotate(total=Count('id')).order_by('-total')[:10]
+    )
+
+    # Franja horaria
+    franjas = ['00-02', '02-04', '04-06', '06-08', '08-10', '10-12',
+               '12-14', '14-16', '16-18', '18-20', '20-22', '22-24']
+    conteo_franja = [0] * 12
+    for e in base_f.filter(hora_turno__isnull=False):
+        idx_f = e.hora_turno.hour // 2
+        if 0 <= idx_f < 12:
+            conteo_franja[idx_f] += 1
+
+    # Obras sociales top 10
+    lookup_nombres = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
+    os_datos   = (base_f.exclude(Q(obra_social__isnull=True) | Q(obra_social=''))
+                  .values('obra_social').annotate(total=Count('id')).order_by('-total')[:10])
+    os_labels  = [lookup_nombres.get(d['obra_social'], d['obra_social']) for d in os_datos]
+    os_valores = [d['total'] for d in os_datos]
+
+    # Evolución mensual
+    filas_temp = (base_f.filter(fecha_turno__isnull=False)
+                  .values('fecha_turno', 'modalidad').annotate(total=Count('id')))
+    temp_dict = {}
+    for item in filas_temp:
+        p_key = date_type(item['fecha_turno'].year, item['fecha_turno'].month, 1)
+        key = (p_key, item['modalidad'])
+        temp_dict[key] = temp_dict.get(key, 0) + item['total']
+    periodos = sorted(set(p for p, _ in temp_dict))
+    temp_labels_list = [p.strftime('%m/%Y') for p in periodos]
+    mods_presentes = [m for m in ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+                      if sum(temp_dict.get((p, m), 0) for p in periodos) > 0]
+
+    # ── Generar imágenes matplotlib ─────────────────────────────────────────
+    # Gráfico de evolución temporal
+    if periodos and mods_presentes:
+        evol_data = [[temp_dict.get((p, m), 0) for p in periodos] for m in mods_presentes]
+        evol_leyendas = [dict(EgesRow.MODALIDAD_CHOICES).get(m, m) for m in mods_presentes]
+        img_evol = _chart_barras_agrupadas(
+            temp_labels_list, evol_data, evol_leyendas,
+            [MOD_HEX[m] for m in mods_presentes],
+            width_pt=USABLE_W * 0.62, height_pt=210,
+        )
+    else:
+        img_evol = _empty_image(USABLE_W * 0.62, 210)
+
+    img_donut = _chart_donut(
+        dist_labels, dist_valores,
+        [MOD_HEX.get(m, '#6b7280') for m in dist_mods],
+        width_pt=USABLE_W * 0.36, height_pt=210,
+    )
+    HALF_W  = USABLE_W / 2 - 4
+    ECO_H   = 230
+    img_eco = _chart_barras_h(sub_labels[::-1], sub_valores[::-1],
+                               '#eab308', HALF_W, ECO_H)
+    img_os  = _chart_barras_h([l[:35] for l in os_labels[::-1]], os_valores[::-1],
+                               '#3b82f6', HALF_W, ECO_H)
+    img_franja = _chart_barras_h(franjas[::-1], conteo_franja[::-1],
+                                  '#3b82f6', USABLE_W, 180)
+
+    # ── Construcción del documento ────────────────────────────────────────────
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+        topMargin=1.5 * cm, bottomMargin=1.5 * cm,
+    )
+    story = []
+
+    # ── PÁGINA 1: Portada + KPIs + Comparativa ───────────────────────────────
+    story.append(Paragraph('Informe de Estudios Realizados', s_titulo))
+    story.append(Paragraph(
+        f'Período: {fd.strftime("%d/%m/%Y")} — {fh.strftime("%d/%m/%Y")}  ·  '
+        f'Generado el {hoy.strftime("%d/%m/%Y")}  ·  Sanatorio Colegiales',
+        s_subtitulo,
+    ))
+    story.append(HRFlowable(width='100%', thickness=1, color=AZUL, spaceAfter=10))
+
+    story.append(Paragraph('Indicadores Clave', s_seccion))
+    kpi_w = USABLE_W / 4
+    kpi_data = [
+        ['Estudios Finalizados', 'Promedio / Día Hábil', 'Tasa de Conversión', 'Estudios Pendientes'],
+        [str(kpis['total_finalizados']), str(kpis['promedio_dia']),
+         f"{kpis['tasa_conversion']}%", str(kpis['total_pendientes'])],
+        ['estado = Informado', 'días hábiles del período',
+         'finalizados / candidatos', 'no informados aún'],
+    ]
+    kpi_ts = TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), GRIS_CABECERA),
+        ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 0), (-1, 0), 8),
+        ('ALIGN',      (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN',     (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME',   (0, 1), (-1, 1), 'Helvetica-Bold'),
+        ('FONTSIZE',   (0, 1), (-1, 1), 24),
+        ('TEXTCOLOR',  (0, 1), (0, 1), AZUL),
+        ('TEXTCOLOR',  (1, 1), (1, 1), colors.HexColor('#7c3aed')),
+        ('TEXTCOLOR',  (2, 1), (2, 1), VERDE),
+        ('TEXTCOLOR',  (3, 1), (3, 1), colors.HexColor('#d97706')),
+        ('BACKGROUND', (0, 1), (-1, 1), AZUL_CLARO),
+        ('BACKGROUND', (0, 2), (-1, 2), GRIS_FILA),
+        ('FONTNAME',   (0, 2), (-1, 2), 'Helvetica'),
+        ('FONTSIZE',   (0, 2), (-1, 2), 8),
+        ('TEXTCOLOR',  (0, 2), (-1, 2), colors.HexColor('#6b7280')),
+        ('BOX',        (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('INNERGRID',  (0, 0), (-1, -1), 0.3, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING',    (0, 0), (-1, 0), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('TOPPADDING',    (0, 1), (-1, 1), 14),
+        ('BOTTOMPADDING', (0, 1), (-1, 1), 14),
+        ('TOPPADDING',    (0, 2), (-1, 2), 6),
+        ('BOTTOMPADDING', (0, 2), (-1, 2), 6),
+    ])
+    story.append(Table(kpi_data, colWidths=[kpi_w] * 4,
+                       rowHeights=[24, 46, 22], style=kpi_ts))
+
+    story.append(Spacer(1, 14))
+    story.append(Paragraph('Comparativa con Período Anterior', s_seccion))
+    story.append(Paragraph(
+        f'Período actual: {fd.strftime("%d/%m/%Y")} – {fh.strftime("%d/%m/%Y")}  ·  '
+        f'Período anterior: {fd_prev.strftime("%d/%m/%Y")} – {fh_prev.strftime("%d/%m/%Y")}',
+        s_subtitulo,
+    ))
+    metricas_comp = [
+        ('Estudios Finalizados',   kpis['total_finalizados'],  kpis_prev['total_finalizados']),
+        ('Promedio / Día Hábil',   kpis['promedio_dia'],        kpis_prev['promedio_dia']),
+        ('Tasa de Conversión (%)', kpis['tasa_conversion'],     kpis_prev['tasa_conversion']),
+        ('Estudios Pendientes',    kpis['total_pendientes'],    kpis_prev['total_pendientes']),
+    ]
+    comp_rows = [['Métrica', 'Período Actual', 'Período Anterior', 'Variación']]
+    for met, act, ant in metricas_comp:
+        ds, dc = _delta(act, ant)
+        comp_rows.append([met, str(act), str(ant),
+                          Paragraph(f'<font color="{dc.hexval()}">{ds}</font>', s_delta)])
+    story.append(Table(comp_rows,
+                       colWidths=[USABLE_W * f for f in [0.40, 0.20, 0.20, 0.20]],
+                       style=_tbl_style()))
+    story.append(PageBreak())
+
+    # ── PÁGINA 2: Evolución + Distribución ───────────────────────────────────
+    story.append(Paragraph('Evolución Temporal de Estudios Finalizados', s_seccion))
+    graf_evol = Table(
+        [[img_evol, img_donut]],
+        colWidths=[USABLE_W * 0.62 + 8, USABLE_W * 0.36 + 8],
+    )
+    graf_evol.setStyle(TableStyle([
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 0),
+        ('TOPPADDING',    (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(graf_evol)
+    story.append(Spacer(1, 10))
+    story.append(Paragraph('Distribución por Modalidad', s_seccion))
+    total_global = sum(dist_valores) or 1
+    dist_rows = [['Modalidad', 'Estudios', '% del Total']]
+    for lbl, val in zip(dist_labels, dist_valores):
+        dist_rows.append([lbl, str(val), f'{val / total_global * 100:.1f}%'])
+    dist_rows.append(['TOTAL', str(sum(dist_valores)), '100%'])
+    story.append(Table(dist_rows,
+                       colWidths=[USABLE_W * f for f in [0.50, 0.25, 0.25]],
+                       style=_tbl_style([
+                           ('FONTNAME',   (0, -1), (-1, -1), 'Helvetica-Bold'),
+                           ('BACKGROUND', (0, -1), (-1, -1), AZUL_CLARO),
+                       ])))
+    story.append(PageBreak())
+
+    # ── PÁGINA 3: ECO Sub-modalidades + Top OS ───────────────────────────────
+    story.append(Paragraph('Sub-modalidades de Ecografía  ·  Top 10 Obras Sociales', s_seccion))
+    graf_p3 = Table(
+        [[img_eco, img_os]],
+        colWidths=[HALF_W + 6, HALF_W + 6],
+    )
+    graf_p3.setStyle(TableStyle([
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('TOPPADDING',    (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(graf_p3)
+    if sub_labels:
+        story.append(Spacer(1, 8))
+        story.append(Paragraph('Detalle Sub-modalidades', s_seccion))
+        total_eco = sum(sub_valores) or 1
+        sub_rows = [['Sub-modalidad', 'Estudios', '% sobre total ECO']]
+        for lbl, val in zip(sub_labels, sub_valores):
+            sub_rows.append([lbl, str(val), f'{val / total_eco * 100:.1f}%'])
+        story.append(Table(sub_rows,
+                           colWidths=[USABLE_W * f for f in [0.55, 0.20, 0.25]],
+                           style=_tbl_style()))
+    story.append(PageBreak())
+
+    # ── PÁGINA 4: Médicos + Franja Horaria ───────────────────────────────────
+    story.append(Paragraph('Productividad por Médico Informante — Top 10', s_seccion))
+    total_med = sum(d['total'] for d in med_datos) or 1
+    med_rows = [['#', 'Médico Informante', 'Estudios', '% del Total']]
+    for i, d in enumerate(med_datos, 1):
+        med_rows.append([
+            str(i),
+            d['medico_informante'] or 'Sin especificar',
+            str(d['total']),
+            f'{d["total"] / total_med * 100:.1f}%',
+        ])
+    story.append(Table(med_rows,
+                       colWidths=[USABLE_W * f for f in [0.06, 0.55, 0.20, 0.19]],
+                       style=_tbl_style()))
+    story.append(Spacer(1, 14))
+    story.append(KeepTogether([
+        Paragraph('Distribución por Franja Horaria', s_seccion),
+        img_franja,
+    ]))
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width='100%', thickness=0.5,
+                             color=colors.HexColor('#e2e8f0'), spaceAfter=4))
+    story.append(Paragraph(
+        f'Informe generado el {hoy.strftime("%d/%m/%Y")} · '
+        f'Sistema de Gestión de Servicios · '
+        f'Basado en estudios con estado "Informado"',
+        s_pie,
+    ))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    fecha_str = hoy.strftime('%Y%m%d')
+    filename = f'informe_eges_{fecha_str}.pdf'
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def exportar_pdf(request):
+    return _exportar_pdf(request)
+
+
+def portal_director_exportar_pdf(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _exportar_pdf(request)

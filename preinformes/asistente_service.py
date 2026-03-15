@@ -443,12 +443,12 @@ BORRADOR DEL RESIDENTE:
 TU TAREA: Buscá si hay alguno de estos problemas sustanciales:
 1. Terminología incorrecta para la modalidad (ej: "hiperdenso/hipodenso" en RM en lugar de "hiperintenso/hipointenso"; "señal T1/T2" en TC; "densidad" en RM)
 2. Errores ortográficos o de escritura evidentes en términos técnicos (ej: "hyperdenso", "ressonancia", "hiperintenza", "gradiente" mal escrito)
-3. Descripción muy redundante: misma estructura o concepto repetido ≥3 veces sin aportar información nueva
+3. Descripción muy redundante: misma estructura o concepto repetido ≥2 veces sin aportar información nueva
 4. Contradicción interna clara (ej: describe un órgano como "de tamaño normal" y luego "aumentado de tamaño" sin aclaración)
 
 Si encontrás al menos UN problema real y sustancial:
 OBSERVACION: SI
-SUGERENCIA: <un mensaje socrático y breve en español argentino con voseo, máximo 1 oración, que invite al residente a revisar sin decirle cuál es el error específico>
+SUGERENCIA: <un mensaje socrático y breve en español argentino con voseo, máximo 1 oración, que invite al residente a revisar orienandolo a qué mirar o qué corregir, sin dar la respuesta directa>
 
 Si el borrador está correcto o los únicos problemas son muy menores (puntuación, estilo):
 OBSERVACION: NO
@@ -490,7 +490,7 @@ Respondé SOLO con esas líneas exactas, sin explicación adicional ni texto ext
                 if match:
                     mensaje_sugerencia = match.group(1).strip()
                 else:
-                    mensaje_sugerencia = '💡 Notéalgo en tu informe que quizás vale la pena revisar. ¿Lo charlamos?'
+                    mensaje_sugerencia = '💡 Noté algo en tu informe que quizás vale la pena revisar. ¿Lo charlamos?'
 
             return {
                 'success': True,

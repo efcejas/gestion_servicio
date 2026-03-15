@@ -1,7 +1,7 @@
+import uuid
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-import re
 
 
 class ImportBatch(models.Model):
@@ -13,98 +13,135 @@ class ImportBatch(models.Model):
     archivo_nombre = models.CharField(max_length=255)
     fecha_importacion = models.DateTimeField(default=timezone.now)
     total_filas = models.IntegerField(default=0)
-    
+
     # Métricas calculadas
     total_ingresos_unicos = models.IntegerField(default=0)
     total_estudios_candidatos = models.IntegerField(default=0)  # No insumos
     total_estudios_finalizados = models.IntegerField(default=0)  # Estado = Informado
-    
-    # Contadores por modalidad
+
+    # Contadores por modalidad (finalizados)
     total_tc = models.IntegerField(default=0)
     total_rm = models.IntegerField(default=0)
     total_rx = models.IntegerField(default=0)
+    total_dx = models.IntegerField(default=0)
+    total_mam = models.IntegerField(default=0)
     total_eco = models.IntegerField(default=0)
     total_otros = models.IntegerField(default=0)
-    
+
     class Meta:
         ordering = ['-fecha_importacion']
         verbose_name = 'Lote de importación EGES'
         verbose_name_plural = 'Lotes de importación EGES'
-    
+
     def __str__(self):
         return f"Batch {self.id} - {self.archivo_nombre} ({self.fecha_importacion.strftime('%d/%m/%Y %H:%M')})"
-    
+
     def calcular_metricas(self):
         """
         Calcula todas las métricas del batch basándose en las filas importadas.
         """
         filas = self.filas.all()
         self.total_filas = filas.count()
-        
+
         # Ingresos únicos: agrupamos por HC + fecha + hora + centro
         ingresos_unicos = filas.values(
             'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion'
         ).distinct().count()
         self.total_ingresos_unicos = ingresos_unicos
-        
+
         # Estudios candidatos (no insumos)
         estudios = filas.filter(es_insumo=False)
         self.total_estudios_candidatos = estudios.count()
-        
+
         # Estudios finalizados (Estado = Informado)
         finalizados = estudios.filter(estado_turno__iexact='Informado')
         self.total_estudios_finalizados = finalizados.count()
-        
+
         # Por modalidad (entre finalizados)
         self.total_tc = finalizados.filter(modalidad='TC').count()
         self.total_rm = finalizados.filter(modalidad='RM').count()
         self.total_rx = finalizados.filter(modalidad='RX').count()
+        self.total_dx = finalizados.filter(modalidad='DX').count()
+        self.total_mam = finalizados.filter(modalidad='MAM').count()
         self.total_eco = finalizados.filter(modalidad='ECO').count()
         self.total_otros = finalizados.filter(modalidad='OTROS').count()
-        
+
         self.save()
 
 
 class EgesRow(models.Model):
     """
     Representa una fila cruda del Excel EGES.
-    Almacenamos todos los campos tal cual vienen.
-    
+
     IMPORTANTE: Usa unique_together para evitar duplicados.
     Si una fila con la misma combinación HC+Fecha+Hora+Centro+Práctica ya existe, se ignora.
     """
     MODALIDAD_CHOICES = [
-        ('TC', 'Tomografía'),
+        ('TC', 'Tomografía Computada'),
         ('RM', 'Resonancia Magnética'),
-        ('RX', 'Rayos X'),
+        ('RX', 'Rayos X / Radiología'),
+        ('DX', 'Densitometría'),
+        ('MAM', 'Mamografía'),
         ('ECO', 'Ecografía'),
         ('OTROS', 'Otros'),
     ]
-    
+
+    # Sub-modalidades para ECO (también se usa como choices en formularios/admin)
+    SUB_MODALIDAD_ECO_CHOICES = [
+        ('ECOCARDIO', 'Ecocardiograma'),
+        ('DOPPLER', 'Doppler / Dúplex'),
+        ('ECO_MAMA', 'Ecografía Mamaria'),
+        ('ECO_TIROIDES', 'Ecografía Tiroidea'),
+        ('ECO_OBSTETRICA', 'Ecografía Obstétrica'),
+        ('ECO_PELVIS', 'Ecografía Pelviana'),
+        ('ECO_ABDOMINAL', 'Ecografía Abdominal'),
+        ('ECO_NEONATAL', 'Ecografía Neonatal'),
+        ('ECO_PARTES_BLANDAS', 'Ecografía Partes Blandas'),
+    ]
+
     batch = models.ForeignKey(ImportBatch, on_delete=models.CASCADE, related_name='filas')
-    
+
     # Identificación del turno/ingreso
     numero_turno = models.CharField(max_length=50, blank=True, null=True)
     fecha_turno = models.DateField(null=True, blank=True)
     hora_turno = models.TimeField(null=True, blank=True)
     centro_atencion = models.CharField(max_length=100, blank=True, null=True)
-    
+
     # Paciente
     historia_clinica = models.CharField(max_length=50, blank=True, null=True)
     apellido_nombre = models.CharField(max_length=200, blank=True, null=True)
-    
+
     # Estudio
     servicio = models.CharField(max_length=200, blank=True, null=True)
     equipo = models.CharField(max_length=100, blank=True, null=True)
     estado_turno = models.CharField(max_length=50, blank=True, null=True)
-    
-    # Clasificación
+
+    # Práctica específica: nomenclador EGES — más específico que 'servicio'
+    practica = models.CharField(max_length=300, blank=True, null=True)
+    codigo_practica = models.CharField(max_length=30, blank=True, null=True)
+
+    # Cobertura / obra social
+    obra_social = models.CharField(max_length=200, blank=True, null=True)
+    codigo_obra_social = models.CharField(max_length=20, blank=True, null=True)
+
+    # Médico informante (capturado desde la columna del Excel si existe)
+    medico_informante = models.CharField(max_length=200, blank=True, null=True)
+
+    # Clasificación principal
     es_insumo = models.BooleanField(default=False)
     modalidad = models.CharField(max_length=10, choices=MODALIDAD_CHOICES, default='OTROS')
-    
+
+    # Sub-clasificación: solo se popula cuando modalidad == 'ECO'
+    sub_modalidad = models.CharField(
+        max_length=30,
+        choices=SUB_MODALIDAD_ECO_CHOICES,
+        blank=True,
+        null=True,
+    )
+
     # Metadata
     fecha_creacion = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['batch', 'fecha_turno', 'hora_turno']
         verbose_name = 'Fila EGES'
@@ -112,81 +149,191 @@ class EgesRow(models.Model):
         indexes = [
             models.Index(fields=['batch', 'historia_clinica', 'fecha_turno']),
             models.Index(fields=['batch', 'modalidad', 'estado_turno']),
+            models.Index(fields=['fecha_turno', 'modalidad']),
+            models.Index(fields=['medico_informante', 'fecha_turno']),
+            models.Index(fields=['obra_social', 'fecha_turno']),
+            models.Index(fields=['codigo_practica']),
         ]
-        # PROTECCIÓN CONTRA DUPLICADOS
-        # Si una fila con esta combinación ya existe (en cualquier batch), se detecta como duplicada
         unique_together = [
-            ('historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'servicio')
+            # Usamos practica (específica) en lugar de servicio (genérico) para deduplicar
+            # correctamente cuando un paciente tiene múltiples prácticas en el mismo turno
+            ('historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'practica')
         ]
-    
+
     def __str__(self):
-        return f"HC {self.historia_clinica} - {self.servicio} ({self.fecha_turno})"
-    
+        nombre_estudio = self.practica or self.servicio or 'Sin práctica'
+        return f"HC {self.historia_clinica} - {nombre_estudio} ({self.fecha_turno})"
+
     def clasificar_modalidad(self):
         """
-        Detecta la modalidad según el texto de servicio y equipo.
-        Regla simple: buscar keywords en el texto.
+        Detecta la modalidad. Usa 'practica' como fuente primaria (más específica),
+        con 'servicio' y 'equipo' como fallback.
+        Prioridad: TC > RM > MAM > DX > ECO > RX > OTROS
         """
-        texto = f"{self.servicio or ''} {self.equipo or ''}".upper()
-        
-        if any(kw in texto for kw in ['TOMOGRAF', 'TC ', ' TC', 'TAC', 'SCANNER']):
+        texto = f"{self.practica or ''} {self.servicio or ''} {self.equipo or ''}".upper()
+
+        if any(kw in texto for kw in ['TOMOGRAF', 'TC ', ' TC', 'TAC ', ' TAC', 'SCANNER']):
             return 'TC'
-        elif any(kw in texto for kw in ['RESONANCIA', 'RM ', ' RM', 'RMN', 'MAGNÉTICA']):
+        if any(kw in texto for kw in ['RESONANCIA', ' RM ', 'RMN', 'MAGNÉT']):
             return 'RM'
-        elif any(kw in texto for kw in ['RAYOS X', 'RX ', ' RX', 'RADIOGRAF']):
-            return 'RX'
-        elif any(kw in texto for kw in ['ECO', 'ECOGRAF', 'ULTRASON', 'DOPPLER']):
+        if any(kw in texto for kw in ['MAMOGRAF', 'MAMOTOM', 'BIOPSIA MAMA', 'MAMMOGRAF']):
+            return 'MAM'
+        if any(kw in texto for kw in ['DENSITOMETR', 'DENSITO', 'OSTEODENSITO', 'DXA ']):
+            return 'DX'
+        if any(kw in texto for kw in ['ECO', 'ECOGRAF', 'ULTRASON', 'DOPPLER', 'DÚPLEX', 'DUPLEX',
+                                       'ECODOPPLER']):
             return 'ECO'
-        else:
-            return 'OTROS'
-    
+        if any(kw in texto for kw in ['RAYOS X', ' RX ', 'RX-', 'RADIOGRAF', 'PLACA', 'TELE DE TORAX',
+                                       'TELERRADIOGRAF', 'COLUMNA', 'CADERA', 'PELVIS AP']):
+            return 'RX'
+        return 'OTROS'
+
+    def clasificar_sub_modalidad(self):
+        """
+        Detecta la sub-modalidad dentro de ECO.
+        Prioridad: ECOCARDIO > ECO_TIROIDES > ECO_MAMA > ECO_OBSTETRICA >
+                   ECO_PELVIS > DOPPLER (restante) > ECO_ABDOMINAL >
+                   ECO_NEONATAL > ECO_PARTES_BLANDAS (fallback)
+
+        Los estudios órgano-específicos (CARDIACO, TIROIDES, MAMA) tienen
+        prioridad sobre la técnica genérica (DOPPLER) para que
+        "ECODOPPLER CARDIACO" → ECOCARDIO y "ECODOPPLER TIROIDES" → ECO_TIROIDES.
+        """
+        texto = f"{self.practica or ''} {self.servicio or ''} {self.equipo or ''}".upper()
+
+        # 1. Corazón
+        if any(kw in texto for kw in ['ECOCARDIOGRAMA', 'ECOCARDIO', 'ECO CARDIACA',
+                                       'ECO CARDIAC', 'CARDIACO', 'CARDIACA',
+                                       'ECOESTRESS', 'TRANSESOFAGICA', 'TRANSESOFAG']):
+            return 'ECOCARDIO'
+        # 2. Tiroides — antes que DOPPLER para capturar ECODOPPLER TIROIDES
+        if any(kw in texto for kw in ['TIROIDES', 'TIROIDE']):
+            return 'ECO_TIROIDES'
+        # 3. Mama — antes que DOPPLER para capturar ECODOPPLER MAMARIO
+        if any(kw in texto for kw in ['MAMARIA', 'ECO MAMA', 'ECOGRAFIA MAMARIA']):
+            return 'ECO_MAMA'
+        # 4. Obstétrica
+        if any(kw in texto for kw in ['OBSTETR', 'EMBARAZO', 'FETAL', 'MORFOL', 'GESTACI']):
+            return 'ECO_OBSTETRICA'
+        # 5. Pelvis / ginecológica
+        if any(kw in texto for kw in ['PELVIS', 'TRANSVAGINAL', 'PELVIANA', 'TOCOGINECOL']):
+            return 'ECO_PELVIS'
+        # 6. DOPPLER genérico (todos los ECODOPPLER vasculares restantes)
+        if any(kw in texto for kw in ['DOPPLER', 'DÚPLEX', 'DUPLEX', 'ECODOPPLER']):
+            return 'DOPPLER'
+        # 7. Abdominal / renal / urológica
+        if any(kw in texto for kw in ['ABDOMINAL', 'ABDOMEN', 'HÍGADO', 'HIGADO',
+                                       'HEPATICA', 'HEPÁTICA', 'RENAL', 'VESICULAR',
+                                       'VEJIGA', 'PROSTATA', 'BILIAR']):
+            return 'ECO_ABDOMINAL'
+        # 8. Neonatal / cerebral
+        if any(kw in texto for kw in ['NEONATAL', 'NEONAT', 'CEREBRAL', 'FONTANELA']):
+            return 'ECO_NEONATAL'
+        # 9. Fallback
+        return 'ECO_PARTES_BLANDAS'
+
     def clasificar_insumo(self):
         """
-        Detecta si la fila es un insumo (contraste, medicación, etc.)
-        y no un estudio real.
+        Detecta si la fila es un insumo (contraste, medicación, consumible, etc.)
+        Usa 'codigo_practica' como primera señal (códigos 3XXXXXXX = insumos externos)
+        y luego 'practica'/'servicio' para detección por descripción.
         """
-        texto = f"{self.servicio or ''}".upper()
-        
+        import re
+        # Detección por código: en el nomenclador EGES los códigos que comienzan
+        # con 3 y tienen 7+ dígitos corresponden a insumos/materiales
+        codigo = str(self.codigo_practica or '').strip()
+        if re.match(r'^3\d{6}', codigo):
+            return True
+
+        texto = f"{self.practica or ''} {self.servicio or ''}".upper()
+
         keywords_insumo = [
             # Contrastes
             'CONTRASTE', 'GADOLINIO', 'IODO', 'XENETIX', 'OMNIPAQUE',
             'OPTIRAY', 'VISIPAQUE', 'ULTRAVIST', 'DOTAREM',
-            
             # Medicamentos
             'MEDICACI', 'SEDACI', 'ANESTESI',
             'DIFENHIDRAMINA', 'DEXAMETASONA', 'MIDAZOLAM', 'FENTANILO',
             'PROPOFOL', 'KETAMINA', 'DORMICUM', 'DIAZEPAM',
-            
             # Soluciones y expansores
             'SOL. FISIOLOGICA', 'SOLUCION FISIOLOGICA', 'SUERO FISIOLOGICO',
             'EXPANSION', 'NEBULIZAR', 'SOLUCIÓN', 'SUERO',
-            
-            # Material médico
+            # Material médico descartable
             'INSUMO', 'MATERIAL', 'LLAVE DE 3 VIAS', 'CATETER',
             'EQUIPO DE VENOCLISIS', 'JELCO', 'AGUJA', 'JERINGA',
             'TUBO', 'SONDA', 'GUIA', 'VALVULA',
-            
-            # Equipamiento
+            # Descartables específicos
+            'ABBOCATH', 'PERFUS', 'ELECTRODOS', 'JER.',
+            # Equipamiento / descartable quirúrgico
             'BOMBA', 'INYECTOR', 'E-151', 'E-152', 'E-',
-            
-            # Otros consumibles
-            'GUANTES', 'CAMPO', 'GASA', 'VENDAJE', 'TELA ADHESIVA'
+            # Ropa y elementos de cirugía/procedimiento
+            'GUANTE', 'CAMPO', 'GASA', 'VENDAJE', 'TELA ADHESIVA',
+            'CAMISOLIN', 'CAMISOLÍN', 'COFIA', 'BATA',
         ]
-        
+
         return any(kw in texto for kw in keywords_insumo)
-    
+
     def save(self, *args, **kwargs):
         """
-        Al guardar, clasificamos automáticamente modalidad e insumo.
+        Al guardar, clasificamos automáticamente modalidad, sub_modalidad e insumo.
         Solo clasifica en creación o si no se especifica update_fields.
         """
         update_fields = kwargs.get('update_fields', None)
-        
-        # Si es creación O no se está haciendo una actualización parcial
+
         if not self.pk or update_fields is None:
-            # Solo reclasificar si no estamos actualizando campos específicos
             if update_fields is None:
                 self.es_insumo = self.clasificar_insumo()
                 self.modalidad = self.clasificar_modalidad()
-        
+                if self.modalidad == 'ECO':
+                    self.sub_modalidad = self.clasificar_sub_modalidad()
+                else:
+                    self.sub_modalidad = None
+
         super().save(*args, **kwargs)
+
+
+class DirectorToken(models.Model):
+    """
+    Token de acceso para el portal del director.
+    Un token UUID en la URL otorga acceso de solo-lectura sin login.
+    """
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    nombre_etiqueta = models.CharField(
+        max_length=100,
+        default='Director',
+        help_text='Etiqueta descriptiva para identificar este token (ej: "Director 2026")',
+    )
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(default=timezone.now)
+    fecha_ultimo_acceso = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Token de Director'
+        verbose_name_plural = 'Tokens de Director'
+        ordering = ['-fecha_creacion']
+
+    def __str__(self):
+        estado = 'activo' if self.activo else 'inactivo'
+        return f"{self.nombre_etiqueta} ({estado})"
+
+    def registrar_acceso(self):
+        self.fecha_ultimo_acceso = timezone.now()
+        self.save(update_fields=['fecha_ultimo_acceso'])
+
+
+class NombreObraSocial(models.Model):
+    """
+    Tabla de lookup: código RNOS → nombre legible de la obra social.
+    Se auto-completa al importar un Excel que tenga columna 'Nombre OS'.
+    También se puede cargar/editar manualmente desde el admin.
+    """
+    codigo = models.CharField(max_length=20, unique=True, verbose_name='Código RNOS')
+    nombre = models.CharField(max_length=200, verbose_name='Nombre')
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Nombre Obra Social'
+        verbose_name_plural = 'Nombres Obras Sociales'
+
+    def __str__(self):
+        return f"{self.codigo} – {self.nombre}"

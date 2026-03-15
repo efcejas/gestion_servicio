@@ -29,6 +29,7 @@ class ImportarEGESForm(forms.Form):
         'Servicio',
         'Equipo',
         'Estado Turno',
+        'Médico / Profesional (opcional — puede variar el nombre exacto de la columna)',
     ]
     
     def clean_archivo(self):
