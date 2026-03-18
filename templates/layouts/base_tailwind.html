@@ -304,7 +304,7 @@
                         {% endif %}
                         
                         <!-- Preinformes - Para residentes -->
-                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' %}
+                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
                         {% url 'preinformes:dashboard_residente' as preinformes_url %}
                         {% if preinformes_url %}
                         <a href="{{ preinformes_url }}" 

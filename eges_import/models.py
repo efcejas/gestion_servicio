@@ -19,14 +19,18 @@ class ImportBatch(models.Model):
     total_estudios_candidatos = models.IntegerField(default=0)  # No insumos
     total_estudios_finalizados = models.IntegerField(default=0)  # Estado = Informado
 
-    # Contadores por modalidad (finalizados)
+    # Contadores por modalidad (finalizados = Informado)
     total_tc = models.IntegerField(default=0)
     total_rm = models.IntegerField(default=0)
     total_rx = models.IntegerField(default=0)
     total_dx = models.IntegerField(default=0)
     total_mam = models.IntegerField(default=0)
     total_eco = models.IntegerField(default=0)
+    total_serie = models.IntegerField(default=0)
     total_otros = models.IntegerField(default=0)
+
+    # Contadores de estados especiales
+    total_rx_sin_informe = models.IntegerField(default=0)  # Estado = Entregado Sin Informe
 
     class Meta:
         ordering = ['-fecha_importacion']
@@ -57,14 +61,21 @@ class ImportBatch(models.Model):
         finalizados = estudios.filter(estado_turno__iexact='Informado')
         self.total_estudios_finalizados = finalizados.count()
 
-        # Por modalidad (entre finalizados)
+        # Por modalidad (entre finalizados = Informado)
         self.total_tc = finalizados.filter(modalidad='TC').count()
         self.total_rm = finalizados.filter(modalidad='RM').count()
         self.total_rx = finalizados.filter(modalidad='RX').count()
         self.total_dx = finalizados.filter(modalidad='DX').count()
         self.total_mam = finalizados.filter(modalidad='MAM').count()
         self.total_eco = finalizados.filter(modalidad='ECO').count()
+        self.total_serie = finalizados.filter(modalidad='SERIE').count()
         self.total_otros = finalizados.filter(modalidad='OTROS').count()
+
+        # Estados especiales (RX entregado sin informe: cerrado pero sin reporte médico)
+        self.total_rx_sin_informe = estudios.filter(
+            modalidad='RX',
+            estado_turno__iexact='Entregado Sin Informe',
+        ).count()
 
         self.save()
 
@@ -83,6 +94,7 @@ class EgesRow(models.Model):
         ('DX', 'Densitometría'),
         ('MAM', 'Mamografía'),
         ('ECO', 'Ecografía'),
+        ('SERIE', 'Seriografía'),
         ('OTROS', 'Otros'),
     ]
 
@@ -183,7 +195,15 @@ class EgesRow(models.Model):
         if any(kw in texto for kw in ['ECO', 'ECOGRAF', 'ULTRASON', 'DOPPLER', 'DÚPLEX', 'DUPLEX',
                                        'ECODOPPLER']):
             return 'ECO'
-        if any(kw in texto for kw in ['RAYOS X', ' RX ', 'RX-', 'RADIOGRAF', 'PLACA', 'TELE DE TORAX',
+        # Seriografía: debe ir ANTES de RX para evitar que caiga en OTROS
+        # Cubre: seriógrafos digitales/CR, histerosalpingografías, salpingografías, series digestivas
+        if any(kw in texto for kw in ['SERIOGRAF', 'HISTEROSALPINGOGRAF', 'SALPINGOGRAF',
+                                       'SERIOGR', 'SERIOSCOP', 'SERIADA',
+                                       'TRANSITO DE INTESTINO', 'TRÁNSITO DE INTESTINO']):
+            return 'SERIE'
+        if any(kw in texto for kw in ['RAYOS X', 'RX.', ' RX ', 'RX ', 'RX-',
+                                       'RADIOGRAF', 'RADIOLOG',
+                                       'PLACA', 'TELE DE TORAX',
                                        'TELERRADIOGRAF', 'COLUMNA', 'CADERA', 'PELVIS AP']):
             return 'RX'
         return 'OTROS'

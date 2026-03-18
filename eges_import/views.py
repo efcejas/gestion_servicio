@@ -19,6 +19,7 @@ COLORES_MODALIDAD = {
     'DX':    {'border': 'rgb(249, 115, 22)',   'bg': 'rgba(249, 115, 22, 0.15)'},   # Naranja
     'MAM':   {'border': 'rgb(236, 72, 153)',   'bg': 'rgba(236, 72, 153, 0.15)'},   # Rosa
     'ECO':   {'border': 'rgb(251, 191, 36)',   'bg': 'rgba(251, 191, 36, 0.15)'},   # Amarillo
+    'SERIE': {'border': 'rgb(20, 184, 166)',   'bg': 'rgba(20, 184, 166, 0.15)'},   # Teal
     'OTROS': {'border': 'rgb(107, 114, 128)',  'bg': 'rgba(107, 114, 128, 0.15)'},  # Gris
 }
 
@@ -269,6 +270,10 @@ def procesar_excel_eges(archivo, batch):
     filas_procesadas = 0
     _nombres_os_cache: dict[str, str] = {}  # codigo → nombre, para poblar NombreObraSocial
     filas_error = 0
+    # Mapa de sesión → médico: propagamos el médico de filas de insumos
+    # a las filas de práctica de la misma sesión (EGES registra al médico
+    # solo en los insumos en estudios de seriografía/histerosalpingografía)
+    _session_medico: dict[tuple, str] = {}  # (hc, fecha, hora, centro) → medico
     
     # Leer todas las filas del Excel
     for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
@@ -365,7 +370,16 @@ def procesar_excel_eges(archivo, batch):
             # Clasificar modalidad, sub_modalidad e insumo en memoria
             fila.es_insumo = fila.clasificar_insumo()
             if fila.es_insumo:
+                # Aunque descartamos el insumo, guardamos su médico para propagar
+                # a las filas de práctica de la misma sesión
+                if medico:
+                    _session_medico.setdefault((hc, fecha_turno, hora_turno, centro), medico)
                 continue  # No guardar insumos en la base de datos
+            # Si la fila de práctica no tiene médico, usar el de la misma sesión
+            if not fila.medico_informante:
+                fila.medico_informante = _session_medico.get(
+                    (hc, fecha_turno, hora_turno, centro)
+                )
             fila.modalidad = fila.clasificar_modalidad()
             if fila.modalidad == 'ECO':
                 fila.sub_modalidad = fila.clasificar_sub_modalidad()
@@ -795,15 +809,18 @@ def _aplicar_filtros_fecha_modalidad(qs, request_params):
     return qs
 
 
-def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs):
+def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_qs=None):
     """
-    Devuelve un dict con los 4 KPIs principales.
-    estudios_finalizados_qs: filtrado por estado Informado
-    estudios_candidatos_qs: todos los no-insumos (informados + pendientes)
+    Devuelve un dict con los KPIs principales.
+    estudios_finalizados_qs : filtrado por estado Informado
+    estudios_candidatos_qs  : todos los no-insumos (con fecha)
+    sin_informe_qs          : RX entregados sin informe (estado cerrado pero sin reporte)
     """
     total_finalizados = estudios_finalizados_qs.count()
     total_candidatos = estudios_candidatos_qs.count()
-    total_pendientes = total_candidatos - total_finalizados
+    rx_sin_informe = sin_informe_qs.count() if sin_informe_qs is not None else 0
+    # Los "Entregado Sin Informe" son estudios cerrados, no pendientes reales
+    total_pendientes = max(total_candidatos - total_finalizados - rx_sin_informe, 0)
 
     # Rango de fechas efectivo
     fechas = estudios_finalizados_qs.values_list('fecha_turno', flat=True)
@@ -828,6 +845,7 @@ def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs):
         'total_pendientes': total_pendientes,
         'promedio_dia': promedio_dia,
         'tasa_conversion': tasa_conversion,
+        'rx_sin_informe': rx_sin_informe,
     }
 
 
@@ -835,13 +853,25 @@ def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs):
 # Endpoint: KPIs
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _base_rx_sin_informe():
+    """QuerySet base: RX entregados sin informe (cerrados pero sin reporte médico)."""
+    return EgesRow.objects.filter(
+        es_insumo=False,
+        modalidad='RX',
+        estado_turno__iexact='Entregado Sin Informe',
+        fecha_turno__isnull=False,
+    )
+
+
 def _vista_kpis_data(request):
     """Lógica interna de KPIs, reutilizable desde superuser y director."""
     base = _base_estudios_finalizados()
     candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
+    sin_informe = _base_rx_sin_informe()
     base = _aplicar_filtros_fecha_modalidad(base, request.GET)
     candidatos = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
-    return JsonResponse(_calcular_kpis(base, candidatos))
+    sin_informe = _aplicar_filtros_fecha_modalidad(sin_informe, request.GET)
+    return JsonResponse(_calcular_kpis(base, candidatos, sin_informe))
 
 
 @login_required
@@ -1135,7 +1165,8 @@ def _vista_comparativa_data(request):
         candidatos = _aplicar_filtros_fecha_modalidad(
             EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), params
         )
-        return _calcular_kpis(base, candidatos)
+        sin_informe = _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), params)
+        return _calcular_kpis(base, candidatos, sin_informe)
 
     actual = kpis_para_rango(fd, fh)
     anterior = kpis_para_rango(fd_prev, fh_prev)
@@ -1529,7 +1560,8 @@ def _exportar_pdf(request):
     candidatos = EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False)
     base_f = _aplicar_filtros_fecha_modalidad(base, request.GET)
     candidatos_f = _aplicar_filtros_fecha_modalidad(candidatos, request.GET)
-    kpis = _calcular_kpis(base_f, candidatos_f)
+    sin_informe_f = _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), request.GET)
+    kpis = _calcular_kpis(base_f, candidatos_f, sin_informe_f)
 
     # Rango de fechas
     fecha_desde_str = request.GET.get('fecha_desde', '')
@@ -1560,6 +1592,7 @@ def _exportar_pdf(request):
             _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), p),
             _aplicar_filtros_fecha_modalidad(
                 EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), p),
+            _aplicar_filtros_fecha_modalidad(_base_rx_sin_informe(), p),
         )
 
     kpis_prev = _kpis_rango(fd_prev, fh_prev)

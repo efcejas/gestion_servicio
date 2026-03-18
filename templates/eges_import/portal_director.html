@@ -75,7 +75,8 @@
                         <button data-mod="RX"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">RX</button>
                         <button data-mod="DX"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">DX</button>
                         <button data-mod="MAM" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">MAM</button>
-                        <button data-mod="ECO" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">ECO</button>
+                        <button data-mod="ECO"   class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">ECO</button>
+                        <button data-mod="SER" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">SER</button>
                     </div>
                 </div>
 
@@ -135,6 +136,13 @@
                 <p class="text-3xl font-bold text-amber-500 mt-2" id="kpi-pendientes">—</p>
                 <p class="text-xs text-gray-400 mt-1">turnos sin informe</p>
             </div>
+        </div>
+        <!-- RX sin informe: se muestra solo si > 0 -->
+        <div id="kpi-rx-sin-informe-card" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3">
+            <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            <p class="text-sm text-amber-700">RX entregados <strong>sin informe</strong>: <span id="kpi-rx-sin-informe" class="font-bold">0</span> estudio(s) — estudios cerrados sin reporte médico.</p>
         </div>
 
         <!-- ── GRÁAFICO TEMPORAL ──────────────────────────────────────────────── -->
@@ -310,6 +318,10 @@ async function cargarKPIs() {
     document.getElementById('kpi-promedio').textContent = d.promedio_dia;
     document.getElementById('kpi-tasa').textContent = d.tasa_conversion + '%';
     document.getElementById('kpi-pendientes').textContent = formatNum(d.total_pendientes);
+    // Card informativa RX sin informe
+    const rxSI = d.rx_sin_informe || 0;
+    document.getElementById('kpi-rx-sin-informe').textContent = formatNum(rxSI);
+    document.getElementById('kpi-rx-sin-informe-card').classList.toggle('hidden', rxSI === 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

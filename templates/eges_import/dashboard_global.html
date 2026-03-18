@@ -61,6 +61,10 @@
                         <input type="checkbox" value="MAM" class="modalidad-check rounded text-pink-600 mr-2" checked>
                         <span class="text-sm dark:text-gray-300">MAM</span>
                     </label>
+                    <label class="flex items-center">
+                        <input type="checkbox" value="SERIE" class="modalidad-check rounded text-teal-500 mr-2" checked>
+                        <span class="text-sm dark:text-gray-300">SER</span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -107,6 +111,13 @@
             <p class="text-2xl font-bold text-amber-500 dark:text-amber-400 mt-2" id="kpi-pendientes">—</p>
             <p class="text-xs text-gray-400 mt-1">sin informe registrado</p>
         </div>
+    </div>
+    <!-- RX sin informe: se muestra solo si > 0 -->
+    <div id="kpi-rx-sin-informe-card" class="hidden mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3 flex items-center gap-3">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        </svg>
+        <p class="text-sm text-amber-700 dark:text-amber-300">RX entregados <strong>sin informe</strong>: <span id="kpi-rx-sin-informe" class="font-bold">0</span> estudio(s) — estudios cerrados sin reporte médico.</p>
     </div>
 
     <!-- Métricas Globales (estáticas del servidor) -->
@@ -409,6 +420,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia;
                 document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion + '%';
                 document.getElementById('kpi-pendientes').textContent = Number(d.total_pendientes).toLocaleString('es-AR');
+                // Card informativa RX sin informe
+                const rxSI = d.rx_sin_informe || 0;
+                document.getElementById('kpi-rx-sin-informe').textContent = Number(rxSI).toLocaleString('es-AR');
+                document.getElementById('kpi-rx-sin-informe-card').classList.toggle('hidden', rxSI === 0);
             })
             .catch(() => {});
     }
@@ -675,6 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('fecha-desde').value = '';
         document.getElementById('fecha-hasta').value = '';
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
+        document.getElementById('kpi-rx-sin-informe-card').classList.add('hidden');
         cargarTodo();
     });
 

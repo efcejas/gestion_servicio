@@ -37,6 +37,9 @@ node_modules/
 theme/static_src/node_modules/
 
 token_for_heroku.txt
+token_limpio.txt
+token_export.txt
+token_*.txt
 
 # Reportes de auditoría de seguridad
 security_reports/
