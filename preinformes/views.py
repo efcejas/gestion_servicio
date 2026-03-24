@@ -637,7 +637,7 @@ def revisar_preinforme(request, pk):
                 historial, _ = HistorialEstudios.objects.get_or_create(residente=preinforme.residente)
                 historial.actualizar_estadisticas()
                 messages.success(request, 'Revisión finalizada exitosamente.')
-                return redirect('preinformes:dashboard_staff')
+                return redirect('preinformes:lista_revision')
             else:
                 messages.success(request, 'Revisión guardada exitosamente.')
                 return redirect('preinformes:lista_revision')
