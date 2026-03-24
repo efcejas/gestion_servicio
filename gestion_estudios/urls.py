@@ -65,6 +65,7 @@ urlpatterns = [
     path('eges/', include('eges_import.urls')),  # URLs para importación EGES
     path('preinformes/', include('preinformes.urls')),  # URLs para preinformes
     path('pedidos/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios por email
+    path('vivienda/', include('ahorro_vivienda.urls')),  # Tracker ahorro primera vivienda
 
     # CKEditor 5
     path("ckeditor5/", include('django_ckeditor_5.urls')),

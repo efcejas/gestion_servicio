@@ -1,0 +1,387 @@
+{% extends 'layouts/base_vivienda.html' %}
+
+{% block title %}Nuevo Snapshot — Mi Vivienda{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{% url 'ahorro_vivienda:dashboard' %}" class="text-gray-400 hover:text-gray-600 transition-colors">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">Nuevo snapshot de capital</h1>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="mb-4 p-4 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" id="snapshot-form">
+    {% csrf_token %}
+
+    <!-- Fecha del snapshot -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">
+        <i class="fas fa-calendar-day text-indigo-400 mr-2"></i>Fecha del registro
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fecha <span class="text-red-500">*</span></label>
+          {{ snapshot_form.fecha }}
+          {% if snapshot_form.fecha.errors %}
+          <p class="text-red-500 text-xs mt-1">{{ snapshot_form.fecha.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+          {{ snapshot_form.notas }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Cotización -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-700">
+          <i class="fas fa-dollar-sign text-green-400 mr-2"></i>Cotizaciones del día
+        </h2>
+        <button type="button" id="btn-fetch-cotizacion"
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-lg hover:bg-indigo-100 transition-colors">
+          <i class="fas fa-sync-alt" id="ico-fetch"></i> Obtener via API
+        </button>
+      </div>
+      <p id="fetch-status" class="text-xs text-gray-500 mb-3 hidden"></p>
+
+      {% if cotizacion_existente %}
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
+        <i class="fas fa-info-circle mr-1"></i>
+        Ya existe una cotización para esta fecha ({{ cotizacion_existente.fecha|date:"d/m/Y" }} — Blue venta: {{ cotizacion_existente.blue_venta }}).
+        Se usará esa cotización automáticamente si no modificás los campos.
+      </div>
+      {% endif %}
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Fecha cot.</label>
+          {{ cot_form.fecha }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Blue compra</label>
+          {{ cot_form.blue_compra }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Blue venta</label>
+          {{ cot_form.blue_venta }}
+        </div>
+        <div>
+      <!-- Alerta cotización inusual (JS) -->
+      <div id="alerta-cotizacion-inusual" class="hidden mt-3 bg-amber-50 border border-amber-300 rounded-lg p-3">
+        <div class="flex items-start gap-2">
+          <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5"></i>
+          <div>
+            <p class="text-sm font-semibold text-amber-800">¿El blue es correcto?</p>
+            <p class="text-xs text-amber-700 mt-0.5" id="alerta-cotizacion-texto"></p>
+          </div>
+        </div>
+      </div>
+
+      <input type="hidden" id="ultimo-blue-ref" value="{{ ultimo_blue|default:'0' }}">          <label class="block text-xs font-medium text-gray-600 mb-1">Oficial compra</label>
+          {{ cot_form.oficial_compra }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Oficial venta</label>
+          {{ cot_form.oficial_venta }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">MEP</label>
+          {{ cot_form.mep }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">EUR/USD</label>
+          {{ cot_form.eur_usd }}
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Fuente</label>
+          {{ cot_form.fuente }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Ítems de capital (formset) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-700">
+          <i class="fas fa-list-ul text-indigo-400 mr-2"></i>Ítems de capital
+        </h2>
+        <button type="button" id="btn-agregar-item"
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors">
+          <i class="fas fa-plus"></i> Agregar ítem
+        </button>
+      </div>
+
+      {{ formset.management_form }}
+
+      <div id="items-container" class="space-y-3">
+        {% for form in formset %}
+        <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
+          {{ form.id }}
+          {{ form.orden }}
+          {% if form.DELETE %}
+          <div class="hidden">{{ form.DELETE }}</div>
+          {% endif %}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="sm:col-span-2 lg:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
+              {{ form.nombre }}
+              {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+              {{ form.tipo }}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Moneda *</label>
+              {{ form.moneda }}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Monto *</label>
+              {{ form.monto_original }}
+              {% if form.monto_original.errors %}<p class="text-red-500 text-xs mt-1">{{ form.monto_original.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización a usar</label>
+              {{ form.cotizacion_tipo }}
+            </div>
+            <div class="cotizacion-manual-wrapper">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización manual</label>
+              {{ form.cotizacion_manual }}
+            </div>
+          </div>
+          <div class="mt-2 flex justify-end">
+            <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
+              <i class="fas fa-trash mr-1"></i>Eliminar ítem
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Template para nuevos ítems (oculto, clonado por JS) -->
+      <div id="item-template" class="hidden">
+        <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div class="sm:col-span-2 lg:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
+              <input type="text" name="items-__prefix__-nombre" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Ej: Efectivo USD, Cuenta Galicia">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+              <select name="items-__prefix__-tipo" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                <option value="efectivo">Efectivo</option>
+                <option value="cuenta_bancaria">Cuenta Bancaria</option>
+                <option value="billetera_virtual">Billetera Virtual</option>
+                <option value="cripto">Criptomonedas</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Moneda *</label>
+              <select name="items-__prefix__-moneda" class="moneda-select w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                <option value="ARS">Pesos Argentinos (ARS)</option>
+                <option value="USD">Dólares (USD)</option>
+                <option value="EUR">Euros (EUR)</option>
+                <option value="BRL">Reales (BRL)</option>
+                <option value="otro">Otra moneda</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Monto *</label>
+              <input type="number" name="items-__prefix__-monto_original" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización a usar</label>
+              <select name="items-__prefix__-cotizacion_tipo" class="cotizacion-tipo-select w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                <option value="blue_venta">Dólar Blue (venta)</option>
+                <option value="blue_compra">Dólar Blue (compra)</option>
+                <option value="oficial_venta">Dólar Oficial (venta)</option>
+                <option value="oficial_compra">Dólar Oficial (compra)</option>
+                <option value="mep">Dólar MEP</option>
+                <option value="manual">Cotización manual</option>
+                <option value="uno_a_uno">1:1 (ya está en USD)</option>
+              </select>
+            </div>
+            <div class="cotizacion-manual-wrapper">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización manual</label>
+              <input type="number" name="items-__prefix__-cotizacion_manual" class="cotizacion-manual-input w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" step="0.01" min="0" placeholder="Solo si elegís manual">
+            </div>
+            <input type="hidden" name="items-__prefix__-orden" value="0">
+          </div>
+          <div class="mt-2 flex justify-end">
+            <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
+              <i class="fas fa-trash mr-1"></i>Eliminar ítem
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <a href="{% url 'ahorro_vivienda:dashboard' %}"
+         class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="px-5 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+        <i class="fas fa-save mr-2"></i>Guardar snapshot
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ─── Obtener cotización via API ───
+document.getElementById('btn-fetch-cotizacion').addEventListener('click', function () {
+  const ico = document.getElementById('ico-fetch');
+  const status = document.getElementById('fetch-status');
+  ico.classList.add('fa-spin');
+  status.textContent = 'Consultando API...';
+  status.classList.remove('hidden', 'text-red-500', 'text-green-600');
+  status.classList.add('text-gray-500');
+
+  fetch('{% url "ahorro_vivienda:api_cotizacion_hoy" %}')
+    .then(r => r.json())
+    .then(data => {
+      ico.classList.remove('fa-spin');
+      if (data.ok) {
+        document.querySelector('[name="cot-blue_compra"]').value = data.blue_compra;
+        document.querySelector('[name="cot-blue_venta"]').value = data.blue_venta;
+        document.querySelector('[name="cot-oficial_compra"]').value = data.oficial_compra;
+        document.querySelector('[name="cot-oficial_venta"]').value = data.oficial_venta;
+        if (data.mep) document.querySelector('[name="cot-mep"]').value = data.mep;
+        document.querySelector('[name="cot-fuente"]').value = 'api';
+        status.textContent = '✓ Cotizaciones cargadas desde Bluelytics. Podés editarlas si lo necesitás.';
+        status.classList.remove('hidden', 'text-gray-500', 'text-red-500');
+        status.classList.add('text-green-600');
+      } else {
+        status.textContent = '⚠ No se pudo conectar con la API. Ingresá las cotizaciones manualmente.';
+        status.classList.remove('hidden', 'text-gray-500', 'text-green-600');
+        status.classList.add('text-red-500');
+      }
+    })
+    .catch(() => {
+      ico.classList.remove('fa-spin');
+      status.textContent = '⚠ Error de red. Ingresá las cotizaciones manualmente.';
+      status.classList.remove('hidden', 'text-gray-500', 'text-green-600');
+      status.classList.add('text-red-500');
+    });
+});
+
+// ─── Agregar ítems dinámicamente ───
+let itemCount = document.querySelectorAll('.item-form').length;
+const totalFormsInput = document.querySelector('[name="items-TOTAL_FORMS"]');
+
+document.getElementById('btn-agregar-item').addEventListener('click', () => {
+  const template = document.getElementById('item-template').innerHTML;
+  const newItem = template.replace(/__prefix__/g, itemCount);
+  const container = document.getElementById('items-container');
+  const div = document.createElement('div');
+  div.innerHTML = newItem;
+  container.appendChild(div.firstElementChild);
+  itemCount++;
+  totalFormsInput.value = itemCount;
+  bindEliminarBtns();
+  bindCotizacionManualVis();
+});
+
+// ─── Eliminar ítem ───
+function bindEliminarBtns() {
+  document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
+    btn.onclick = function () {
+      const itemDiv = btn.closest('.item-form');
+      const deleteInput = itemDiv.querySelector('[name$="-DELETE"]');
+      if (deleteInput) {
+        deleteInput.checked = true;
+        itemDiv.style.opacity = '0.3';
+        itemDiv.querySelectorAll('input, select').forEach(el => el.disabled = true);
+        btn.textContent = 'Eliminado';
+        btn.disabled = true;
+      } else {
+        itemDiv.remove();
+        itemCount--;
+        totalFormsInput.value = itemCount;
+      }
+    };
+  });
+}
+
+// ─── Mostrar/ocultar cotización manual ───
+function bindCotizacionManualVis() {
+  document.querySelectorAll('.cotizacion-tipo-select').forEach(sel => {
+    const wrapper = sel.closest('.item-form').querySelector('.cotizacion-manual-wrapper');
+    function toggle() {
+      if (sel.value === 'manual') {
+        wrapper.style.display = '';
+      } else {
+        wrapper.style.display = 'none';
+      }
+    }
+    toggle();
+    sel.addEventListener('change', toggle);
+  });
+
+  // Para moneda USD: ocultar tipo cotización
+  document.querySelectorAll('.moneda-select').forEach(sel => {
+    const itemForm = sel.closest('.item-form');
+    if (!itemForm) return;
+    function toggleCot() {
+      const cotWrapper = itemForm.querySelector('.cotizacion-tipo-select');
+      const manualWrapper = itemForm.querySelector('.cotizacion-manual-wrapper');
+      if (sel.value === 'USD') {
+        if (cotWrapper) cotWrapper.closest('div').style.opacity = '0.4';
+      } else {
+        if (cotWrapper) cotWrapper.closest('div').style.opacity = '1';
+      }
+    }
+    toggleCot();
+    sel.addEventListener('change', toggleCot);
+  });
+}
+
+bindEliminarBtns();
+bindCotizacionManualVis();
+
+// ─── Alerta cotización inusual ───
+const ultimoBlue = parseFloat(document.getElementById('ultimo-blue-ref').value) || 0;
+const blueVentaInput = document.querySelector('[name="cot-blue_venta"]');
+if (blueVentaInput && ultimoBlue > 0) {
+  function verificarBlue() {
+    const ingresado = parseFloat(blueVentaInput.value) || 0;
+    const alerta = document.getElementById('alerta-cotizacion-inusual');
+    const texto = document.getElementById('alerta-cotizacion-texto');
+    if (ingresado > 0) {
+      const diff = Math.abs(ingresado - ultimoBlue) / ultimoBlue;
+      if (diff > 0.10) {
+        const pct = (diff * 100).toFixed(0);
+        const dir = ingresado > ultimoBlue ? 'sube' : 'baja';
+        texto.textContent = `El valor ingresado ($${ingresado}) ${dir} un ${pct}% respecto al último blue registrado ($${ultimoBlue.toFixed(0)}). Confirmá que es correcto antes de guardar.`;
+        alerta.classList.remove('hidden');
+      } else {
+        alerta.classList.add('hidden');
+      }
+    } else {
+      alerta.classList.add('hidden');
+    }
+  }
+  blueVentaInput.addEventListener('input', verificarBlue);
+  blueVentaInput.addEventListener('change', verificarBlue);
+}
+</script>
+{% endblock %}

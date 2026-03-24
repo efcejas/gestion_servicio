@@ -1,0 +1,418 @@
+﻿{% extends 'layouts/base_vivienda.html' %}
+{% load vivienda_tags %}
+
+{% block title %}Mi Vivienda — Dashboard{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+  <!-- Título + acciones -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+        <i class="fas fa-house text-emerald-600"></i>
+        {% if config %}{{ config.nombre }}{% else %}Mi Primera Vivienda{% endif %}
+      </h1>
+      <p class="text-sm text-gray-500 mt-0.5">Seguimiento de ahorro en dólares</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'ahorro_vivienda:nuevo_snapshot' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+        <i class="fas fa-plus"></i> Nuevo snapshot
+      </a>
+      <a href="{% url 'ahorro_vivienda:nueva_conversion' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors shadow-sm">
+        <i class="fas fa-exchange-alt"></i> Conversión
+      </a>
+      <a href="{% url 'ahorro_vivienda:export_csv' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+        <i class="fas fa-file-csv"></i> Exportar CSV
+      </a>
+    </div>
+  </div>
+
+  {% if not config %}
+  <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6">
+    <div class="flex items-start gap-3">
+      <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 text-lg"></i>
+      <div>
+        <p class="text-amber-800 font-semibold">Todavía no configuraste la meta</p>
+        <p class="text-amber-700 text-sm mt-1">Definí el monto objetivo en USD para empezar a trackear el progreso.</p>
+        <a href="{% url 'ahorro_vivienda:configuracion' %}" class="mt-3 inline-flex items-center text-sm text-amber-800 font-bold hover:underline">
+          Configurar meta <i class="fas fa-arrow-right ml-1"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if alerta_meta %}
+  <div class="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-5 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-trophy text-emerald-600 text-xl"></i>
+      </div>
+      <div>
+        <p class="text-emerald-800 font-bold text-lg">¡Casi llegaron! 🎉</p>
+        <p class="text-emerald-700 text-sm">Ya superaron el 90% de la meta. El crédito hipotecario está al alcance.</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
+      <div class="absolute top-3 right-3 w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center">
+        <i class="fas fa-wallet text-emerald-600 text-sm"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Capital actual</p>
+      <p class="text-2xl font-bold text-gray-900">
+        {% if ultimo %}USD {{ ultimo.total_usd_calculado|floatformat:0 }}{% else %}<span class="text-gray-400">—</span>{% endif %}
+      </p>
+      {% if ultimo %}<p class="text-xs text-gray-400 mt-1"><i class="fas fa-calendar-alt mr-1"></i>{{ ultimo.fecha|date:"d/m/Y" }}</p>{% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
+      <div class="absolute top-3 right-3 w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center">
+        <i class="fas fa-bullseye text-amber-600 text-sm"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Meta</p>
+      <p class="text-2xl font-bold text-gray-900">
+        {% if config %}USD {{ config.meta_usd|floatformat:0 }}{% else %}<span class="text-gray-400">—</span>{% endif %}
+      </p>
+      {% if config.fecha_objetivo %}<p class="text-xs text-gray-400 mt-1"><i class="fas fa-flag mr-1"></i>{{ config.fecha_objetivo|date:"M Y" }}</p>{% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
+      <div class="absolute top-3 right-3 w-9 h-9 bg-red-100 rounded-full flex items-center justify-center">
+        <i class="fas fa-hourglass-half text-red-500 text-sm"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Falta</p>
+      <p class="text-2xl font-bold text-gray-900">
+        {% if falta_usd is not None %}USD {{ falta_usd|floatformat:0 }}{% else %}<span class="text-gray-400">—</span>{% endif %}
+      </p>
+      {% if progreso_pct is not None %}<p class="text-xs text-gray-400 mt-1"><i class="fas fa-chart-pie mr-1"></i>{{ progreso_pct|floatformat:1 }}% completado</p>{% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 relative">
+      <div class="absolute top-3 right-3 w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center">
+        <i class="fas fa-chart-line text-blue-600 text-sm"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Proyección</p>
+      {% if proyeccion_meses is not None %}
+        <p class="text-2xl font-bold text-gray-900">~{{ proyeccion_meses }} meses</p>
+        {% if proyeccion_fecha %}<p class="text-xs text-gray-400 mt-1"><i class="fas fa-calendar-check mr-1"></i>{{ proyeccion_fecha|date:"M Y" }}</p>{% endif %}
+      {% else %}
+        <p class="text-lg font-semibold text-gray-400 mt-1">Sin datos</p>
+        <p class="text-xs text-gray-400">Necesitás 2+ snapshots</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Barra de progreso -->
+  {% if progreso_pct is not None %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-sm font-semibold text-gray-700">Progreso hacia la meta</span>
+      <span class="text-sm font-bold {% if progreso_pct >= 90 %}text-emerald-600{% elif progreso_pct >= 50 %}text-teal-600{% else %}text-amber-600{% endif %}">
+        {{ progreso_pct|floatformat:1 }}%
+      </span>
+    </div>
+    <div class="w-full bg-gray-100 rounded-full h-5 overflow-hidden">
+      <div class="h-5 rounded-full transition-all duration-700 flex items-center justify-end pr-2
+        {% if progreso_pct >= 90 %}bg-gradient-to-r from-emerald-400 to-emerald-600
+        {% elif progreso_pct >= 50 %}bg-gradient-to-r from-teal-400 to-emerald-500
+        {% else %}bg-gradient-to-r from-amber-300 to-teal-400{% endif %}"
+        style="width: {{ progreso_pct|floatformat:1 }}%">
+        {% if progreso_pct > 15 %}<span class="text-white text-xs font-bold">{{ progreso_pct|floatformat:0 }}%</span>{% endif %}
+      </div>
+    </div>
+    <div class="flex justify-between text-xs text-gray-400 mt-1.5">
+      <span>USD 0</span>
+      {% if falta_usd and falta_usd > 0 %}<span class="text-gray-500 font-medium">Faltan USD {{ falta_usd|floatformat:0 }}</span>{% endif %}
+      <span>USD {{ config.meta_usd|floatformat:0 }}</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Gráficos + panel derecho -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+
+    <!-- Gráficos con tabs -->
+    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
+      <div class="flex border-b border-gray-100 px-4 pt-4">
+        <button id="tab-evolucion" onclick="showTab('evolucion')"
+                class="tab-btn active px-4 py-2 text-sm font-semibold text-emerald-700 border-b-2 border-emerald-600 mr-2 transition-colors">
+          <i class="fas fa-chart-area mr-1"></i>Evolución
+        </button>
+        <button id="tab-composicion" onclick="showTab('composicion')"
+                class="tab-btn px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent mr-2 hover:text-gray-700 transition-colors">
+          <i class="fas fa-chart-bar mr-1"></i>Composición por moneda
+        </button>
+      </div>
+
+      <div id="panel-evolucion" class="p-4">
+        {% if snapshots|length > 0 %}
+        <div style="height: 260px;"><canvas id="grafico-evolucion"></canvas></div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center h-52 text-gray-400">
+          <i class="fas fa-chart-line text-5xl mb-3 text-gray-200"></i>
+          <p class="text-sm font-medium">Sin snapshots todavía</p>
+          <a href="{% url 'ahorro_vivienda:nuevo_snapshot' %}" class="mt-3 text-emerald-600 text-sm hover:underline font-medium">Crear el primero →</a>
+        </div>
+        {% endif %}
+      </div>
+
+      <div id="panel-composicion" class="p-4 hidden">
+        {% if snapshots|length > 0 %}
+        <div style="height: 260px;"><canvas id="grafico-composicion"></canvas></div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center h-52 text-gray-400">
+          <i class="fas fa-chart-bar text-5xl mb-3 text-gray-200"></i>
+          <p class="text-sm">Sin datos</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Panel derecho -->
+    <div class="flex flex-col gap-4">
+      {% if desglose_moneda %}
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <i class="fas fa-coins text-amber-400"></i>Composición actual
+        </h2>
+        <ul class="space-y-2">
+          {% for moneda, monto_usd in desglose_moneda.items %}
+          <li class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full
+                {% if moneda == 'USD' %}bg-emerald-400
+                {% elif moneda == 'ARS' %}bg-amber-400
+                {% elif moneda == 'EUR' %}bg-blue-400
+                {% else %}bg-gray-400{% endif %}"></span>
+              <span class="text-sm text-gray-600 font-medium">{{ moneda }}</span>
+            </div>
+            <span class="text-sm text-gray-900 font-semibold">≈ USD {{ monto_usd|floatformat:0 }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex-1">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+            <i class="fas fa-exchange-alt text-teal-500"></i>Últimas conversiones
+          </h2>
+          <a href="{% url 'ahorro_vivienda:lista_conversiones' %}" class="text-xs text-emerald-600 hover:underline font-medium">Ver todas</a>
+        </div>
+        {% if conversiones_recientes %}
+        <ul class="space-y-2">
+          {% for conv in conversiones_recientes %}
+          <li class="text-xs border-b border-gray-50 pb-2 last:border-0 last:pb-0">
+            <span class="font-semibold text-gray-700">{{ conv.fecha|date:"d/m/Y" }}</span>
+            <span class="text-gray-500 ml-1">
+              {{ conv.moneda_origen }} {{ conv.monto_origen|floatformat:0 }}
+              <i class="fas fa-arrow-right text-gray-400 mx-1"></i>
+              {{ conv.moneda_destino }} {{ conv.monto_destino|floatformat:0 }}
+            </span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-xs text-gray-400">Sin conversiones registradas</p>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Simulador -->
+  <div class="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-5 mb-6">
+    <h2 class="text-sm font-bold text-emerald-800 mb-4 flex items-center gap-2">
+      <i class="fas fa-calculator text-emerald-600"></i>Simulador: ¿Cuándo llego a la meta?
+    </h2>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+      <div>
+        <label class="block text-xs font-semibold text-emerald-700 mb-1">Ahorro mensual estimado</label>
+        <div class="flex rounded-lg border border-emerald-200 bg-white overflow-hidden focus-within:ring-2 focus-within:ring-emerald-400">
+          <span class="flex items-center px-3 bg-emerald-50 text-emerald-700 text-sm font-semibold border-r border-emerald-200 select-none">USD</span>
+          <input type="number" id="sim-ahorro-mensual" min="1" step="50"
+                 value="{{ var_prom_mensual|default:500 }}"
+                 class="flex-1 px-3 py-2.5 bg-white text-gray-900 font-semibold focus:outline-none text-sm">
+        </div>
+        {% if var_prom_mensual %}
+        <p class="text-xs text-emerald-600 mt-1"><i class="fas fa-info-circle mr-1"></i>Promedio histórico: USD {{ var_prom_mensual|floatformat:0 }}/mes</p>
+        {% elif not ultimo %}
+        <p class="text-xs text-amber-600 mt-1"><i class="fas fa-info-circle mr-1"></i>Sin snapshots — calculando desde USD 0</p>
+        {% endif %}
+      </div>
+      <div class="sm:col-span-2 grid grid-cols-2 gap-3">
+        <div class="bg-white rounded-lg border border-emerald-200 p-3">
+          <p class="text-xs text-gray-500 mb-0.5">Tiempo estimado</p>
+          <p id="sim-resultado-meses" class="text-xl font-bold text-emerald-700">—</p>
+        </div>
+        <div class="bg-white rounded-lg border border-emerald-200 p-3">
+          <p class="text-xs text-gray-500 mb-0.5">Fecha estimada</p>
+          <p id="sim-resultado-fecha" class="text-xl font-bold text-emerald-700">—</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  {% if snapshots %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+        <i class="fas fa-history text-emerald-500"></i>Historial de snapshots
+      </h2>
+      <a href="{% url 'ahorro_vivienda:lista_snapshots' %}" class="text-xs text-emerald-600 hover:underline font-medium">Ver todos →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium text-gray-400 uppercase border-b border-gray-100">
+            <th class="pb-2 pr-4">Fecha</th>
+            <th class="pb-2 pr-4 text-right">Total USD</th>
+            <th class="pb-2 pr-4 text-right hidden sm:table-cell">Variación</th>
+            <th class="pb-2 pr-4 hidden md:table-cell">Notas</th>
+            <th class="pb-2"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for snap in snapshots reversed %}
+          {% if forloop.counter0 < 8 %}
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="py-2.5 pr-4 font-medium text-gray-800">{{ snap.fecha|date:"d/m/Y" }}</td>
+            <td class="py-2.5 pr-4 text-right font-bold text-gray-900">USD {{ snap.total_usd_calculado|floatformat:0 }}</td>
+            <td class="py-2.5 pr-4 text-right text-xs font-semibold hidden sm:table-cell">
+              {% with v=variaciones|get_item:snap.pk %}
+                {% if v is not None %}
+                  {% if v > 0 %}<span class="text-emerald-600"><i class="fas fa-arrow-up mr-0.5"></i>+{{ v|floatformat:0 }}</span>
+                  {% elif v < 0 %}<span class="text-red-500"><i class="fas fa-arrow-down mr-0.5"></i>{{ v|floatformat:0 }}</span>
+                  {% else %}<span class="text-gray-400">=</span>{% endif %}
+                {% else %}<span class="text-gray-300">—</span>{% endif %}
+              {% endwith %}
+            </td>
+            <td class="py-2.5 pr-4 hidden md:table-cell">
+              {% if snap.notas %}
+              <span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full" title="{{ snap.notas }}">
+                <i class="fas fa-sticky-note text-amber-400 flex-shrink-0"></i>
+                <span class="max-w-xs truncate">{{ snap.notas|truncatechars:35 }}</span>
+              </span>
+              {% endif %}
+            </td>
+            <td class="py-2.5 text-right">
+              <a href="{% url 'ahorro_vivienda:detalle_snapshot' snap.pk %}"
+                 class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold">Ver →</a>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% load l10n %}
+<script>
+{% localize off %}
+const labels = {{ chart_labels|safe }};
+const dataEvolucion = {{ chart_data|safe }};
+const metaValue = {{ chart_meta|safe }};
+const desgloseDatasets = {{ chart_desglose_datasets|safe }};
+const capitalActual = {{ ultimo.total_usd_calculado|default:0 }};
+const metaUSD = {{ config.meta_usd|default:"null" }};
+// faltaUSD: preferimos el valor calculado en el backend; si no hay snapshot, lo derivamos de la meta
+const faltaUSD = {% if falta_usd is not None %}{{ falta_usd }}{% else %}(metaUSD !== null ? metaUSD - capitalActual : null){% endif %};
+{% endlocalize %}
+const hoy = new Date();
+
+function showTab(tab) {
+  document.getElementById('panel-evolucion').classList.toggle('hidden', tab !== 'evolucion');
+  document.getElementById('panel-composicion').classList.toggle('hidden', tab !== 'composicion');
+  const activeClass = 'tab-btn px-4 py-2 text-sm font-semibold text-emerald-700 border-b-2 border-emerald-600 mr-2 transition-colors';
+  const inactiveClass = 'tab-btn px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent mr-2 hover:text-gray-700 transition-colors';
+  document.getElementById('tab-evolucion').className = tab === 'evolucion' ? activeClass : inactiveClass;
+  document.getElementById('tab-composicion').className = tab === 'composicion' ? activeClass : inactiveClass;
+}
+
+if (labels.length > 0) {
+  const ctx = document.getElementById('grafico-evolucion').getContext('2d');
+  const datasets = [{
+    label: 'Capital (USD)',
+    data: dataEvolucion,
+    borderColor: 'rgb(16, 185, 129)',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    fill: true, tension: 0.35,
+    pointRadius: 5, pointHoverRadius: 7,
+    pointBackgroundColor: 'rgb(16, 185, 129)', borderWidth: 2.5,
+  }];
+  if (metaValue) {
+    datasets.push({
+      label: 'Meta', data: Array(labels.length).fill(metaValue),
+      borderColor: 'rgba(251, 191, 36, 0.9)', borderDash: [8, 4],
+      borderWidth: 2, pointRadius: 0, fill: false,
+    });
+  }
+  new Chart(ctx, {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: { label: c => ` USD ${Number(c.parsed.y).toLocaleString('es-AR', { minimumFractionDigits: 0 })}` } }
+      },
+      scales: {
+        y: { beginAtZero: false, grid: { color: 'rgba(0,0,0,0.04)' },
+             ticks: { callback: v => 'USD ' + Number(v).toLocaleString('es-AR', { maximumFractionDigits: 0 }), font: { size: 10 } } },
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+if (labels.length > 0 && desgloseDatasets.length > 0) {
+  const ctx2 = document.getElementById('grafico-composicion').getContext('2d');
+  new Chart(ctx2, {
+    type: 'bar', data: { labels, datasets: desgloseDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: USD ${Number(c.parsed.y).toLocaleString('es-AR', { minimumFractionDigits: 0 })}` } }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: true, grid: { color: 'rgba(0,0,0,0.04)' },
+             ticks: { callback: v => 'USD ' + Number(v).toLocaleString('es-AR', { maximumFractionDigits: 0 }), font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+const MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function actualizarSimulador() {
+  const ahorro = parseFloat(document.getElementById('sim-ahorro-mensual').value) || 0;
+  const resMeses = document.getElementById('sim-resultado-meses');
+  const resFecha = document.getElementById('sim-resultado-fecha');
+  if (!faltaUSD || ahorro <= 0) { resMeses.textContent = '—'; resFecha.textContent = '—'; return; }
+  const meses = Math.ceil(faltaUSD / ahorro);
+  const fecha = new Date(hoy);
+  fecha.setMonth(fecha.getMonth() + meses);
+  resMeses.textContent = meses === 1 ? '1 mes' : `~${meses} meses`;
+  resFecha.textContent = `${MESES_ES[fecha.getMonth()]} ${fecha.getFullYear()}`;
+}
+document.getElementById('sim-ahorro-mensual').addEventListener('input', actualizarSimulador);
+actualizarSimulador();
+</script>
+{% endblock %}

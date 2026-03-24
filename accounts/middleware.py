@@ -32,6 +32,7 @@ class ProfileRequiredMiddleware:
         '/static/',
         '/media/',
         '/admin/',
+        '/vivienda/',  # App personal de ahorro vivienda (acceso independiente del perfil médico)
     ]
     
     def __init__(self, get_response):

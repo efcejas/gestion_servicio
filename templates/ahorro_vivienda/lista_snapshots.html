@@ -1,0 +1,98 @@
+{% extends 'layouts/base_vivienda.html' %}
+{% load vivienda_tags %}
+
+{% block title %}Snapshots — Mi Vivienda{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-3">
+      <a href="{% url 'ahorro_vivienda:dashboard' %}" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <i class="fas fa-arrow-left"></i>
+      </a>
+      <h1 class="text-xl font-bold text-gray-900">Historial de snapshots</h1>
+    </div>
+    <div class="flex gap-2">
+      <a href="{% url 'ahorro_vivienda:export_csv' %}"
+         class="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+        <i class="fas fa-file-csv"></i> CSV
+      </a>
+      <a href="{% url 'ahorro_vivienda:nuevo_snapshot' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+        <i class="fas fa-plus"></i> Nuevo
+      </a>
+    </div>
+  </div>
+
+  {% if snapshots %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50">
+        <tr class="text-left text-xs font-medium text-gray-500 uppercase">
+          <th class="px-5 py-3">Fecha</th>
+          <th class="px-5 py-3 text-right">Total USD</th>
+          <th class="px-5 py-3 text-right hidden sm:table-cell">Variación</th>
+          {% if config %}<th class="px-5 py-3 text-right hidden md:table-cell">Progreso</th>{% endif %}
+          <th class="px-5 py-3 hidden lg:table-cell">Notas</th>
+          <th class="px-5 py-3 text-right hidden xl:table-cell">Ítems</th>
+          <th class="px-5 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for snap in snapshots %}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-5 py-3 font-medium text-gray-800">{{ snap.fecha|date:"d/m/Y" }}</td>
+          <td class="px-5 py-3 text-right font-bold text-gray-900">USD {{ snap.total_usd_calculado|floatformat:0 }}</td>
+          <td class="px-5 py-3 text-right text-xs font-semibold hidden sm:table-cell">
+            {% with v=variaciones|get_item:snap.pk %}
+              {% if v is not None %}
+                {% if v > 0 %}<span class="text-emerald-600"><i class="fas fa-arrow-up mr-0.5"></i>+{{ v|floatformat:0 }}</span>
+                {% elif v < 0 %}<span class="text-red-500"><i class="fas fa-arrow-down mr-0.5"></i>{{ v|floatformat:0 }}</span>
+                {% else %}<span class="text-gray-400">=</span>{% endif %}
+              {% else %}<span class="text-gray-300">—</span>{% endif %}
+            {% endwith %}
+          </td>
+          {% if config %}
+          <td class="px-5 py-3 text-right hidden md:table-cell">
+            {% if config.meta_usd > 0 %}
+            <div class="flex items-center justify-end gap-2">
+              <div class="w-20 bg-gray-200 rounded-full h-2">
+                <div class="h-2 rounded-full bg-emerald-500" style="width: {% widthratio snap.total_usd_calculado config.meta_usd 100 %}%"></div>
+              </div>
+              <span class="text-xs text-gray-600 w-10 text-right">{% widthratio snap.total_usd_calculado config.meta_usd 100 %}%</span>
+            </div>
+            {% endif %}
+          </td>
+          {% endif %}
+          <td class="px-5 py-3 hidden lg:table-cell">
+            {% if snap.notas %}
+            <span class="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full max-w-xs" title="{{ snap.notas }}">
+              <i class="fas fa-sticky-note text-amber-400 flex-shrink-0"></i>
+              <span class="truncate">{{ snap.notas|truncatechars:45 }}</span>
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-right text-gray-500 hidden xl:table-cell">{{ snap.items.count }}</td>
+          <td class="px-5 py-3 text-right">
+            <a href="{% url 'ahorro_vivienda:detalle_snapshot' snap.pk %}"
+               class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold">Ver →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+    <i class="fas fa-calendar-times text-4xl text-gray-300 mb-4"></i>
+    <p class="text-gray-500 font-medium">Todavía no hay snapshots</p>
+    <a href="{% url 'ahorro_vivienda:nuevo_snapshot' %}"
+       class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+      <i class="fas fa-plus"></i> Crear el primero
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
