@@ -308,12 +308,20 @@ function bindEliminarBtns() {
       const itemDiv = btn.closest('.item-form');
       const deleteInput = itemDiv.querySelector('[name$="-DELETE"]');
       if (deleteInput) {
+        // IMPORTANTE: NO deshabilitar campos. Los campos disabled no se envían
+        // en el POST, por lo que Django nunca recibe DELETE=checked y además
+        // falla la validación de los campos vacíos.
+        // Solo marcamos visualmente y dejamos que Django maneje el DELETE.
         deleteInput.checked = true;
-        itemDiv.style.opacity = '0.3';
-        itemDiv.querySelectorAll('input, select').forEach(el => el.disabled = true);
-        btn.textContent = 'Eliminado';
+        itemDiv.style.opacity = '0.35';
+        itemDiv.style.pointerEvents = 'none';
+        btn.style.pointerEvents = 'auto';
+        btn.innerHTML = '<i class="fas fa-check mr-1"></i>Marcado para eliminar';
+        btn.classList.remove('text-red-400', 'hover:text-red-600');
+        btn.classList.add('text-gray-400');
         btn.disabled = true;
       } else {
+        // Ítem nuevo (sin id en BD): simplemente quitar del DOM
         itemDiv.remove();
         itemCount--;
         totalFormsInput.value = itemCount;
