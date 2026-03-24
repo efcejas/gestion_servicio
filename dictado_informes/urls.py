@@ -38,7 +38,6 @@ urlpatterns = [
     
     # API
     path('api/plantilla/<int:pk>/', views.obtener_plantilla, name='obtener_plantilla'),
-    # path('api/procesar-audio/', views.procesar_audio_dictado, name='procesar_audio'),  # DEPRECADA 2026-03-08: Usar transcribir_whisper + mejorar_texto
     path('api/transcribir-whisper/', views.transcribir_audio_whisper, name='transcribir_whisper'),
     path('api/mejorar-texto/', views.mejorar_texto_ia, name='mejorar_texto'),
     path('api/guardar-aprendizaje/', views.guardar_correccion_aprendizaje, name='guardar_aprendizaje'),

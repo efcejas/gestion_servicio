@@ -118,6 +118,30 @@ class PlantillaInforme(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_estudio_display()} - {self.nombre}"
+    
+    def clean(self):
+        """Validación de campos HTML antes de guardar"""
+        from django.core.exceptions import ValidationError
+        import re
+        
+        # Tags peligrosos que no permitimos
+        dangerous_tags = ['script', 'iframe', 'object', 'embed', 'link', 'meta']
+        
+        # El campo 'contenido' puede tener HTML básico
+        if self.contenido:
+            # Buscar tags peligrosos (case-insensitive)
+            for tag in dangerous_tags:
+                pattern = re.compile(f'<{tag}[^>]*>', re.IGNORECASE)
+                if pattern.search(self.contenido):
+                    raise ValidationError({
+                        'contenido': f"No se permite el tag <{tag}> por seguridad. Usa solo texto plano o HTML básico (p, br, strong, em)."
+                    })
+            
+            # Validar que los tags estén balanceados básicamente
+            if self.contenido.count('<') != self.contenido.count('>'):
+                raise ValidationError({
+                    'contenido': "HTML malformado: los tags no están balanceados (cantidad de < y > no coincide)."
+                })
 
 
 class Informe(models.Model):
@@ -389,6 +413,41 @@ class TerminoMedico(models.Model):
         return texto_corregido, correcciones_aplicadas
 
     @staticmethod
+    def procesar_texto_completo(texto):
+        """
+        🎯 OPTIMIZACIÓN: Método unificado que procesa comandos de voz Y aplica correcciones
+        del diccionario médico en el orden correcto.
+        
+        Orden de procesamiento:
+        1. Comandos de voz ("nueva línea" → "\n", "punto" → ".", etc.)
+        2. Diccionario médico ("Jofa" → "Hoffa", "oligamentaria" → "ligamentaria", etc.)
+        
+        Args:
+            texto (str): Texto transcrito con Whisper
+        
+        Returns:
+            tuple: (texto_procesado, correcciones_aplicadas)
+        
+        Ejemplo:
+            >>> texto = "paciente sin Jofa punto nueva línea"
+            >>> texto_final, correcciones = TerminoMedico.procesar_texto_completo(texto)
+            >>> print(texto_final)
+            "Paciente sin Hoffa.\nSin alteraciones..."
+            >>> print(correcciones)
+            [{'de': 'Jofa', 'a': 'Hoffa'}]
+        """
+        if not texto or not texto.strip():
+            return texto, []
+        
+        # PASO 1: Procesar comandos de voz (convierte comandos literales a formato)
+        texto_con_comandos = TerminoMedico.procesar_comandos_voz(texto)
+        
+        # PASO 2: Aplicar diccionario médico (corrige términos específicos)
+        texto_final, correcciones = TerminoMedico.aplicar_correcciones(texto_con_comandos)
+        
+        return texto_final, correcciones
+
+    @staticmethod
     def procesar_comandos_voz(texto):
         """
         🚀 OPTIMIZADO FASE 3: Procesa comandos de voz usando regex precompilados (30-50% más rápido)
@@ -599,6 +658,7 @@ class CorreccionAprendizaje(models.Model):
         """
         🚀 MEJORADO: Calcula diferencias con análisis semántico
         Detecta patrones, categoriza correcciones y asigna scores
+        ⭐ NUEVO: Detecta eliminaciones de líneas normales cuando hay patología
         """
         import difflib
         from collections import Counter
@@ -617,6 +677,14 @@ class CorreccionAprendizaje(models.Model):
             'presencia': ['se observa', 'se visualiza', 'se identifica', 'se evidencia'],
             'ausencia': ['no se observa', 'sin evidencia', 'ausencia de']
         }
+        
+        # 🏗️ NUEVO: Analizar por líneas para detectar eliminaciones de plantilla
+        lineas_ia = self.texto_ia.split('\n')
+        lineas_final = self.texto_final.split('\n')
+        
+        # 🔍 Detectar líneas de plantilla "normal" que fueron eliminadas
+        lineas_eliminadas_normales = self._detectar_conflictos_plantilla_patologia(lineas_ia, lineas_final)
+        cambios.extend(lineas_eliminadas_normales)
         
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             if tag == 'replace':
@@ -657,6 +725,109 @@ class CorreccionAprendizaje(models.Model):
         
         self.cambios_detectados = cambios
         logger.info(f"📊 Análisis semántico: {len(cambios)} cambios detectados")
+        return cambios
+    
+    def _detectar_conflictos_plantilla_patologia(self, lineas_ia, lineas_final):
+        """
+        🎯 NUEVO: Detecta cuando el usuario elimina líneas "normales" porque mencionó patología
+        
+        Ejemplo:
+        - IA genera: "Manguito rotador de morfología conservada."
+        - Usuario dicta: "Tendinopatía del supraespinoso e infraespinoso"
+        - Usuario elimina la línea normal
+        → Sistema aprende: Si hay patología en manguito rotador, NO generar línea normal
+        
+        Returns:
+            list: Cambios detectados con reglas de conflicto
+        """
+        cambios = []
+        
+        # 🏥 Estructuras anatómicas y sus palabras clave de "normalidad"
+        estructuras_anatomicas = {
+            'manguito rotador': {
+                'normalidad': ['morfología conservada', 'sin alteraciones visibles', 'sin lesiones evidentes'],
+                'patologia': ['tendinopatía', 'desgarro', 'lesión', 'ruptura', 'rotura']
+            },
+            'supraespinoso': {
+                'normalidad': ['conservado', 'normal', 'sin alteraciones'],
+                'patologia': ['tendinopatía', 'desgarro', 'lesión', 'ruptura']
+            },
+            'infraespinoso': {
+                'normalidad': ['conservado', 'normal', 'sin alteraciones'],
+                'patologia': ['tendinopatía', 'desgarro', 'lesión', 'ruptura']
+            },
+            'menisco': {
+                'normalidad': ['morfología normal', 'altura y señal normales', 'conservado'],
+                'patologia': ['desgarro', 'lesión', 'adelgazamiento', 'extrusión']
+            },
+            'ligamento': {
+                'normalidad': ['trayecto y morfología conservados', 'sin alteraciones'],
+                'patologia': ['desgarro', 'ruptura', 'lesión', 'distensión']
+            },
+            'bíceps': {
+                'normalidad': ['ubicado en su corredera', 'sin alteraciones', 'conservado'],
+                'patologia': ['tenosinovitis', 'tendinopatía', 'subluxación', 'luxación']
+            },
+            'bursa': {
+                'normalidad': ['sin distensión', 'sin alteraciones'],
+                'patologia': ['distensión', 'bursitis', 'líquido']
+            },
+            'tendón': {
+                'normalidad': ['sin alteraciones', 'conservado'],
+                'patologia': ['tendinopatía', 'desgarro', 'rotura']
+            },
+            'cartílago': {
+                'normalidad': ['conservado', 'sin lesiones'],
+                'patologia': ['condropatía', 'adelgazamiento', 'lesión']
+            },
+            'hueso': {
+                'normalidad': ['sin lesiones', 'sin alteraciones'],
+                'patologia': ['fractura', 'lesión', 'edema', 'contusión']
+            }
+        }
+        
+        # Convertir listas a conjuntos para búsqueda eficiente
+        lineas_ia_set = set([l.strip() for l in lineas_ia if l.strip()])
+        lineas_final_set = set([l.strip() for l in lineas_final if l.strip()])
+        
+        # Detectar líneas eliminadas
+        lineas_eliminadas = lineas_ia_set - lineas_final_set
+        
+        # 🔍 Para cada línea eliminada, verificar si es una línea "normal" de plantilla
+        for linea_eliminada in lineas_eliminadas:
+            linea_lower = linea_eliminada.lower()
+            
+            # Verificar cada estructura anatómica
+            for estructura, patrones in estructuras_anatomicas.items():
+                # ¿La línea eliminada contiene esta estructura?
+                if estructura in linea_lower:
+                    # ¿La línea eliminada dice que la estructura está "normal"?
+                    es_linea_normal = any(normalidad in linea_lower for normalidad in patrones['normalidad'])
+                    
+                    if es_linea_normal:
+                        # ¿En el texto final hay patología de esta estructura?
+                        texto_final_completo = '\n'.join(lineas_final).lower()
+                        
+                        tiene_patologia = any(patologia in texto_final_completo for patologia in patrones['patologia'])
+                        
+                        if tiene_patologia:
+                            # 🎯 BINGO! Usuario eliminó línea normal porque hay patología
+                            # Extraer el término de patología específico
+                            patologia_encontrada = next((p for p in patrones['patologia'] if p in texto_final_completo), 'patología')
+                            
+                            cambios.append({
+                                'tipo': 'regla_conflicto',
+                                'de': linea_eliminada,
+                                'a': f'NO GENERAR - Hay {patologia_encontrada} en {estructura}',
+                                'estructura': estructura,
+                                'patologia': patologia_encontrada,
+                                'categoria': 'estructural_critico',
+                                'score': 95,  # MUY ALTA PRIORIDAD
+                                'regla': f'⚠️ Si hay {patologia_encontrada} en {estructura} → NO generar línea normal'
+                            })
+                            
+                            logger.info(f"⚠️ CONFLICTO DETECTADO: {estructura} - eliminada línea normal porque hay {patologia_encontrada}")
+        
         return cambios
     
     def _categorizar_cambio(self, texto_de, texto_a, terminologia):
@@ -765,7 +936,7 @@ class CorreccionAprendizaje(models.Model):
         from django.core.cache import cache
         
         # 🚀 CACHÉ: Verificar si ya tenemos esto en caché
-        cache_key = f'aprendizaje_ejemplos_v2_{usuario.id if usuario else "global"}_{limite}'
+        cache_key = f'aprendizaje_ejemplos_v3_{usuario.id if usuario else "global"}_{limite}'
         cached_ejemplos = cache.get(cache_key)
         if cached_ejemplos:
             return cached_ejemplos
@@ -783,27 +954,39 @@ class CorreccionAprendizaje(models.Model):
         
         # 📊 Recolectar y puntuar todos los cambios
         cambios_con_score = []
+        reglas_conflicto = []  # ⭐ NUEVO: Separar reglas de conflicto
+        
         for corr in correcciones:
             if corr.cambios_detectados:
                 for cambio in corr.cambios_detectados:
                     # Obtener score del análisis semántico (default 50 si no existe)
                     score = cambio.get('score', 50)
                     categoria = cambio.get('categoria', 'otro')
+                    tipo = cambio.get('tipo', '')
                     
-                    if cambio['tipo'] == 'reemplazo':
+                    # ⚠️ PRIORIDAD MÁXIMA: Reglas de conflicto plantilla-patología
+                    if tipo == 'regla_conflicto':
+                        reglas_conflicto.append({
+                            'texto': cambio.get('regla', f"⚠️ {cambio['a']}"),
+                            'score': score,
+                            'categoria': 'estructural_critico',
+                            'estructura': cambio.get('estructura', ''),
+                            'patologia': cambio.get('patologia', '')
+                        })
+                    elif tipo == 'reemplazo':
                         cambios_con_score.append({
                             'texto': f"❌ {cambio['de']} → ✅ {cambio['a']}",
                             'score': score,
                             'categoria': categoria
                         })
-                    elif cambio['tipo'] == 'agregado' and score > 60:  # Solo agregados importantes
+                    elif tipo == 'agregado' and score > 60:  # Solo agregados importantes
                         cambios_con_score.append({
                             'texto': f"✅ Agregar: {cambio['texto']}",
                             'score': score,
                             'categoria': categoria
                         })
         
-        if not cambios_con_score:
+        if not cambios_con_score and not reglas_conflicto:
             return ""
         
         # 🎯 Ordenar por score (más importantes primero)
@@ -821,9 +1004,18 @@ class CorreccionAprendizaje(models.Model):
         # Limitar a los N ejemplos más importantes
         ejemplos_top = ejemplos_unicos[:limite * 2]  # Doble límite para tener más diversidad
         
-        # Formatear resultado con indicador de prioridad
+        # ⭐ FORMATEAR RESULTADO: Reglas de conflicto PRIMERO
         lineas = []
-        for i, cambio in enumerate(ejemplos_top[:20], 1):  # Máximo 20 líneas
+        
+        # 1️⃣ PRIMERO: Reglas críticas de conflicto (máxima prioridad)
+        if reglas_conflicto:
+            lineas.append("🚨 REGLAS CRÍTICAS (APLICAR SIEMPRE):")
+            for regla in reglas_conflicto[:5]:  # Máximo 5 reglas
+                lineas.append(f"   {regla['texto']}")
+            lineas.append("")  # Línea en blanco separadora
+        
+        # 2️⃣ SEGUNDO: Correcciones normales priorizadas
+        for i, cambio in enumerate(ejemplos_top[:15], 1):  # Máximo 15 líneas normales
             # Emoji según categoría
             emoji_categoria = {
                 'terminologia': '🔬',
@@ -831,6 +1023,7 @@ class CorreccionAprendizaje(models.Model):
                 'ortografia': '✏️',
                 'semantico': '💭',
                 'estructural': '🏗️',
+                'estructural_critico': '🚨',
                 'otro': '📝'
             }
             emoji = emoji_categoria.get(cambio['categoria'], '📝')

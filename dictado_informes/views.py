@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse_lazy
 from django.http import JsonResponse, HttpResponse
@@ -281,12 +282,15 @@ def firmar_informe(request, pk):
 
 # API para transcribir audio con Whisper (sin mejora IA)
 @require_POST
-@csrf_exempt  # Temporal para testing, agregar CSRF después
+@require_http_methods(["POST"])
+@login_required
 def transcribir_audio_whisper(request):
     """
     Transcribe audio usando Whisper API
     Solo transcripción, sin mejora de IA
-   🚀 FASE 4: Registra métricas de performance
+    🚀 FASE 4: Registra métricas de performance
+    
+    Seguridad: CSRF protegido, requiere autenticación y superuser
     """
     if not request.user.is_superuser:
         return JsonResponse({'error': 'No autorizado'}, status=403)
@@ -345,11 +349,16 @@ def transcribir_audio_whisper(request):
         
         texto_transcrito = transcripcion_result.get('text', '')
         
-        # PROCESAR COMANDOS DE VOZ: "punto" → ".", "nueva línea" → "\n", etc.
-        texto_procesado = TerminoMedico.procesar_comandos_voz(texto_transcrito)
+        # 🎯 PROCESAMIENTO UNIFICADO: Comandos de voz + diccionario médico en orden correcto
+        texto_procesado, correcciones = TerminoMedico.procesar_texto_completo(texto_transcrito)
+        
+        if correcciones:
+            logger.info(f"✅ Texto procesado: {len(correcciones)} correcciones aplicadas")
+            for i, corr in enumerate(correcciones[:5], 1):  # Mostrar max 5 en log
+                logger.info(f"   {i}. {corr['de']} → {corr['a']}")
         
         logger.info(f"✅ Transcripción Whisper: {texto_transcrito[:100]}...")
-        logger.info(f"✅ Texto con comandos procesados: {texto_procesado[:100]}...")
+        logger.info(f"✅ Texto procesado final: {texto_procesado[:100]}...")
         
         # 📊 FASE 4: Registrar métrica
         tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
@@ -372,8 +381,10 @@ def transcribir_audio_whisper(request):
             'success': True,
             'texto_transcrito': texto_procesado,  # Enviar texto YA con comandos procesados
             'texto_original': texto_transcrito,  # Por si se necesita el original
+            'correcciones': correcciones,  # 🆕 Incluir correcciones del diccionario médico
             'confianza': transcripcion_result.get('confidence', 0.95),
-            'duracion': transcripcion_result.get('duration')
+            'duracion': transcripcion_result.get('duration'),
+            'from_cache': transcripcion_result.get('from_cache', False)
         })
     
     except Exception as e:
@@ -434,15 +445,18 @@ def mejorar_texto_ia(request):
         
         logger.info(f"📝 Mejorando texto ({len(texto)} caracteres) en modo {modo} para campo '{field_name}'")
         
-        # 1. APLICAR CORRECCIONES DEL DICCIONARIO MÉDICO
-        texto_corregido, correcciones = TerminoMedico.aplicar_correcciones(texto)
-        if correcciones:
-            logger.info(f"✅ Aplicadas {len(correcciones)} correcciones del diccionario")
-            for corr in correcciones:
-                logger.debug(f"   • {corr['de']} → {corr['a']}")
+        # Inicializar correcciones como lista vacía
+        correcciones = []
         
-        # 2. NO procesar comandos de voz aquí (ya vienen procesados de Whisper)
-        texto_procesado = texto_corregido
+        # El texto ya viene con diccionario médico aplicado desde la transcripción
+        # Si viene de edición manual, aplicar diccionario ahora
+        if data.get('from_manual_edit', False):
+            texto_procesado, correcciones = TerminoMedico.aplicar_correcciones(texto)
+            if correcciones:
+                logger.info(f"✅ Diccionario aplicado (edición manual): {len(correcciones)} correcciones")
+        else:
+            # Ya viene procesado de transcripción
+            texto_procesado = texto
         
         # Construir contexto con modo y campo específico
         contexto = {
@@ -723,3 +737,4 @@ def info_aprendizaje(request):
         return JsonResponse({
             'error': str(e)
         }, status=500)
+

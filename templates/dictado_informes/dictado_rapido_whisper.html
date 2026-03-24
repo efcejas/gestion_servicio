@@ -121,6 +121,7 @@
                         <option value="ABDOMEN C/G">RM de abdomen con gadolinio</option>
                         <option value="TC_MSK">TC Genérica MSK</option>
                         <option value="ANTEBRAZO">RM de Antebrazo</option>
+                        <option value="TORAX_SG">RM de Tórax sin Contraste</option>
                     </select>
                 </div>
             </div>
@@ -389,7 +390,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({
                         texto_original: textoOriginal,
                         texto_ia: textoMejorado,
-                        texto_usuario: textoFinal
+                        texto_final: textoFinal,
+                        tipo_estudio: ''
                     })
                 });
                 const data = await response.json();
@@ -654,8 +656,11 @@ function detenerGrabacion() {
                     textoPreview.style.opacity = '0.5';
                     const label = contenedorPreview.querySelector('label');
                     if (label) {
-                        label.querySelector('.text-blue-300').innerHTML = 
-                            '<i class="fas fa-sync fa-spin text-purple-400 mr-2"></i>⏳ Refinando con Whisper AI...';
+                        const spanTexto = label.querySelector('.text-blue-300');
+                        if (spanTexto) {
+                            spanTexto.innerHTML = 
+                                '<i class="fas fa-sync fa-spin text-purple-400 mr-2"></i>⏳ Refinando con Whisper AI...';
+                        }
                     }
                 }
             } catch (error) {
@@ -762,8 +767,21 @@ async function procesarAudio() {
             const textoTranscrito = dataTranscripcion.texto_transcrito;
             const fromCache = dataTranscripcion.from_cache;
             
+            // 🔍 LOGGING DETALLADO: Mostrar texto procesado y correcciones
+            console.group('📝 Procesamiento de texto');
+            console.log('Texto transcrito (Whisper):', textoTranscrito);
+            if (dataTranscripcion.correcciones && dataTranscripcion.correcciones.length > 0) {
+                console.log(`✅ Diccionario médico: ${dataTranscripcion.correcciones.length} correcciones aplicadas`);
+                dataTranscripcion.correcciones.forEach((c, i) => {
+                    console.log(`  ${i+1}. "${c.de}" → "${c.a}"`);
+                });
+            } else {
+                console.log('ℹ️ Diccionario médico: Sin correcciones aplicadas');
+            }
+            console.groupEnd();
+            
             if (fromCache) {
-                console.log('✅ Transcripción recuperada del caché - ¡Súper rápido!');
+                console.log('⚡ Transcripción recuperada del caché');
             }
             
             // 🚀 OCULTAR PREVIEW y mostrar resultado final
@@ -934,9 +952,9 @@ let textoIAGlobal = '';
 async function guardarAprendizajeAutomatico() {
     const textoFinal = document.getElementById('textoMejorado').textContent;
     
-    // Solo guardar si hay texto válido
-    if (!textoFinal || textoFinal.trim().length < 50) {
-        console.log('📝 Texto muy corto para aprendizaje automático');
+    // Solo guardar si hay texto válido (mínimo 20 caracteres)
+    if (!textoFinal || textoFinal.trim().length < 20) {
+        console.log('📝 Texto muy corto para aprendizaje automático (mín: 20 chars)');
         return;
     }
     

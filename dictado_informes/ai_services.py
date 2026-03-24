@@ -233,15 +233,19 @@ class AIService:
                 'error': error_msg
             }
     
-    def improve_medical_text(self, texto_original, tipo_estudio, contexto=None, usuario=None):
+    def improve_medical_text(self, texto_original, tipo_estudio, contexto=None, usuario=None, custom_prompt=None):
         """
         Mejora el texto dictado usando GPT-4 para darle formato médico profesional
         🚀 OPTIMIZADO: Caché multicapa con hash inteligente
+        🤖 FASE 2: Soporte para custom_prompt (sistema conversacional)
         
         Args:
             texto_original: Texto transcrito del audio
             tipo_estudio: Tipo de estudio (RES, TOM, etc.)
             contexto: Contexto adicional (dict con datos del paciente, plantilla, etc.)
+            usuario: Usuario que realiza la solicitud
+            custom_prompt: (Opcional) Prompt personalizado pre-construido. Si se provee, 
+                          se usa en lugar de generar el prompt internamente.
         
         Returns:
             dict: {'texto_mejorado': str, 'confianza': float, 'sugerencias': list}
@@ -259,22 +263,27 @@ class AIService:
         modo = contexto.get('modo', 'LIBRE')
         
         # 🚀 CACHÉ: Generar hash único para esta mejora
-        cache_key_parts = [
-            texto_original,
-            tipo_estudio,
-            modo,
-            str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo')
-        ]
-        cache_key_str = '|'.join(cache_key_parts)
-        cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
-        cache_key = f'mejora_texto_{cache_hash}'
-        
-        # Verificar caché
-        cached_result = cache.get(cache_key)
-        if cached_result:
-            logger.info(f"⚡ Texto mejorado recuperado del caché (hash: {cache_hash[:8]}...)")
-            cached_result['from_cache'] = True
-            return cached_result
+        # NOTA: Si usa custom_prompt, NO usar caché (siempre único en modo conversacional)
+        if custom_prompt:
+            cache_key = None  # Deshabilitar caché en modo conversacional
+            logger.info("🤖 Modo conversacional activo - caché deshabilitado")
+        else:
+            cache_key_parts = [
+                texto_original,
+                tipo_estudio,
+                modo,
+                str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo')
+            ]
+            cache_key_str = '|'.join(cache_key_parts)
+            cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
+            cache_key = f'mejora_texto_{cache_hash}'
+            
+            # Verificar caché
+            cached_result = cache.get(cache_key)
+            if cached_result:
+                logger.info(f"⚡ Texto mejorado recuperado del caché (hash: {cache_hash[:8]}...)")
+                cached_result['from_cache'] = True
+                return cached_result
         
         # Mapeo de tipos de estudio
         tipos_estudios = {
@@ -436,12 +445,10 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                         'titulo': 'RM DE HOMBRO [<DERECHO/IZQUIERDO>]',
                         'seccion_tecnica': 'Se exploró el hombro [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.',
                         'comentarios': [
-                            'Manguito rotador de grosor y señal conservados.',
-                            'Tendón del bíceps de trayecto y grosor normal.',
-                            'Labrum glenoideo de morfología conservada.',
-                            'Articulación acromioclavicular sin alteraciones.',
-                            'No se observa aumento del líquido articular.',
-                            'Estructuras óseas sin lesiones evidentes.'
+                            'No se observan alteraciones en los tendones que conforman el manguito rotador ni en el tendón de la porción larga del bíceps.',
+                            'Labrum de forma y señal normales.',
+                            'No se visualiza aumento del liquido articular glenohumeral ni bursal.',
+                            'Articulación acromioclavicular sin alteraciones.'
                         ]
                     },
                     'CODO': {
@@ -564,7 +571,16 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                             'Glándulas suprarrenales de configuración habitual.',
                             'Ambos riñones de forma y tamaño normal, sin signos de hidronefrosis.',
                             'El retroperitoneo prevertebral se halla libre de adenomegalias.',
-                            'No se constatan procesos expansivos ni líquido libre en cavidad al momento del examen.',
+                            'No se constatan procesos expansivos ni líquido libre en cavidad al momento del examen.'
+                        ]
+                    },
+                    'TORAX S/G': {
+                        'titulo': 'RM DE TÓRAX SIN CONTRASTE',
+                        'seccion_tecnica': 'Se realizó resonancia magnética de tórax, mediante secuencias que ponderan tiempos de relajación T1 y T2 en los diferentes planos, sin administración de contraste endovenoso.',
+                        'comentarios': [
+                            'No se identifican procesos ocupantes ni áreas de consolidación parenquimatosa, dentro de las limitaciones del método.',
+                            'Mediastino, hilios y axilas libres de imágenes adenomegálicas.',
+                            'No se observa derrame pleural ni pericárdico.'
                         ]
                     }
                 }
@@ -789,11 +805,26 @@ Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica
                 prompt += "\n\nGenera el informe profesional en texto plano:"
 
         try:
-            # 🎯 System message dinámico según modo
-            if modo == 'FIEL':
-                system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
+            # 🤖 FASE 2: Si hay custom_prompt, usarlo directamente (modo conversacional)
+            if custom_prompt:
+                prompt = custom_prompt
+                logger.info("🤖 Usando prompt conversacional personalizado")
+                # En modo conversacional, usar system message genérico
+                system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. Sé preciso, profesional y conciso."
             else:
-                system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+                # 🎯 System message dinámico según modo
+                if modo == 'FIEL':
+                    system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
+                else:
+                    system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+            
+            # 🎯 Temperature dinámico según modo
+            if modo == 'FIEL':
+                temperature = 0.05  # Máxima fidelidad - solo correcciones ortográficas
+            elif custom_prompt:
+                temperature = 0.2  # Modo conversacional - algo de flexibilidad
+            else:
+                temperature = 0.3  # Modo estructurado - permite creatividad en redacción
             
             response = self.llm_client.chat.completions.create(
                 model=self.llm_model,
@@ -807,7 +838,7 @@ Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica
                         "content": prompt
                     }
                 ],
-                temperature=0.2,  # Optimizado para modo FIEL: permite puntuación inteligente manteniendo fidelidad
+                temperature=temperature,
                 max_tokens=1500
             )
             
@@ -828,9 +859,10 @@ Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica
                 'from_cache': False
             }
             
-            # 🚀 GUARDAR EN CACHÉ (30 minutos)
-            cache.set(cache_key, result, timeout=1800)
-            logger.info(f"💾 Resultado guardado en caché (hash: {cache_hash[:8]}...)")
+            # 🚀 GUARDAR EN CACHÉ (30 minutos) - SOLO si NO es modo conversacional
+            if cache_key:  # cache_key es None en modo conversacional
+                cache.set(cache_key, result, timeout=1800)
+                logger.info(f"💾 Resultado guardado en caché (hash: {cache_hash[:8]}...)")
             
             return result
         

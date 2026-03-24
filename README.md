@@ -139,6 +139,7 @@ La documentación completa está organizada en:
 
 ### Documentos Importantes
 
+- **[Configuración de APIs de IA](docs/CONFIGURACION_APIS_IA.md)** - Setup OpenAI Whisper y GPT para dictado
 - [Sistema de Perfiles](docs/SISTEMA_PERFILES_README.md) - Gestión de usuarios y roles
 - [Sistema de Protocolos](docs/README_PROTOCOLOS.md) - Protocolos radiológicos
 - [Despliegue en Heroku](docs/README_colegiales_deploy.md) - Guía de deployment
