@@ -1,81 +1,86 @@
 {% extends 'layouts/base_vivienda.html' %}
+{% load l10n %}
 
 {% block title %}Snapshot {{ snapshot.fecha|date:"d/m/Y" }} — Mi Vivienda{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-  <div class="flex items-center gap-3 mb-6">
-    <a href="{% url 'ahorro_vivienda:lista_snapshots' %}" class="text-gray-400 hover:text-gray-600 transition-colors">
-      <i class="fas fa-arrow-left"></i>
+  <!-- Encabezado -->
+  <div class="flex items-center gap-3 mb-8">
+    <a href="{% url 'ahorro_vivienda:lista_snapshots' %}" class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors">
+      <i class="fas fa-arrow-left text-sm"></i>
     </a>
     <div>
-      <h1 class="text-xl font-bold text-gray-900">
+      <h1 class="text-2xl font-bold text-gray-900">
         Snapshot del {{ snapshot.fecha|date:"d \d\e F \d\e Y" }}
       </h1>
-      <p class="text-xs text-gray-500 mt-0.5">Registrado por {{ snapshot.creado_por }}</p>
+      <p class="text-sm text-gray-500 mt-0.5">Registrado por {{ snapshot.creado_por }}</p>
     </div>
   </div>
 
   <!-- Total + progreso -->
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-    <div class="bg-indigo-600 rounded-xl p-5 text-white">
-      <p class="text-xs font-medium text-indigo-200 uppercase tracking-wide">Total en USD</p>
-      <p class="text-3xl font-bold mt-1">USD {{ snapshot.total_usd_calculado|floatformat:2 }}</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+    <div class="bg-emerald-600 rounded-2xl p-6 text-white shadow-sm">
+      <p class="text-xs font-semibold text-emerald-200 uppercase tracking-widest mb-2">Total en USD</p>
+      <p class="text-4xl font-bold">USD {{ snapshot.total_usd_calculado|floatformat:2 }}</p>
       {% if snapshot.cotizacion %}
-      <p class="text-xs text-indigo-200 mt-2">
+      <p class="text-sm text-emerald-200 mt-3">
         Blue venta: ${{ snapshot.cotizacion.blue_venta }} | Oficial: ${{ snapshot.cotizacion.oficial_venta }}
       </p>
       {% endif %}
     </div>
     {% if progreso_pct is not None %}
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Progreso hacia la meta</p>
-      <p class="text-2xl font-bold text-gray-900 mb-3">{{ progreso_pct|floatformat:1 }}%</p>
-      <div class="w-full bg-gray-200 rounded-full h-3">
-        <div class="h-3 rounded-full {% if progreso_pct >= 90 %}bg-green-500{% elif progreso_pct >= 50 %}bg-indigo-500{% else %}bg-amber-400{% endif %}"
-             style="width: {{ progreso_pct|floatformat:1 }}%"></div>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">Progreso hacia la meta</p>
+      <p class="text-4xl font-bold text-gray-900 mb-4">{{ progreso_pct|floatformat:1 }}%</p>
+      <div class="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
+        <div class="h-4 rounded-full transition-all duration-500 {% if progreso_pct >= 90 %}bg-green-500{% elif progreso_pct >= 50 %}bg-emerald-500{% else %}bg-amber-400{% endif %}"
+             style="width: {{ progreso_pct|unlocalize }}%"></div>
       </div>
-      <p class="text-xs text-gray-400 mt-1">Meta: USD {{ config.meta_usd|floatformat:0 }}</p>
+      <p class="text-sm text-gray-400 mt-2">Meta: USD {{ config.meta_usd|floatformat:0 }}</p>
     </div>
     {% endif %}
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
     <!-- Ítems detallados -->
-    <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-      <h2 class="text-sm font-semibold text-gray-700 mb-4">
-        <i class="fas fa-list-ul text-indigo-400 mr-2"></i>Ítems de capital
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <h2 class="text-sm font-semibold text-gray-700 mb-5 flex items-center gap-2">
+        <span class="flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100 text-emerald-600">
+          <i class="fas fa-list-ul text-xs"></i>
+        </span>
+        Ítems de capital
       </h2>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left text-xs font-medium text-gray-500 uppercase border-b border-gray-100">
-              <th class="pb-2 pr-3">Descripción</th>
-              <th class="pb-2 pr-3">Tipo</th>
-              <th class="pb-2 pr-3 text-right">Monto original</th>
-              <th class="pb-2 text-right">≈ USD</th>
+            <tr class="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100">
+              <th class="pb-3 pr-4">Descripción</th>
+              <th class="pb-3 pr-4">Tipo</th>
+              <th class="pb-3 pr-4 text-right">Monto original</th>
+              <th class="pb-3 text-right">≈ USD</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
             {% for item in snapshot.items.all %}
-            <tr>
-              <td class="py-2 pr-3 font-medium text-gray-800">{{ item.nombre }}</td>
-              <td class="py-2 pr-3 text-gray-500 text-xs">{{ item.get_tipo_display }}</td>
-              <td class="py-2 pr-3 text-right text-gray-700">
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="py-3 pr-4 font-medium text-gray-800">{{ item.nombre }}</td>
+              <td class="py-3 pr-4 text-gray-500 text-xs">{{ item.get_tipo_display }}</td>
+              <td class="py-3 pr-4 text-right text-gray-600">
                 {{ item.moneda }} {{ item.monto_original|floatformat:2 }}
               </td>
-              <td class="py-2 text-right font-semibold text-gray-900">{{ item.monto_usd|floatformat:2 }}</td>
+              <td class="py-3 text-right font-semibold text-gray-900">{{ item.monto_usd|floatformat:2 }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="4" class="py-4 text-center text-gray-400 text-xs">Sin ítems registrados</td></tr>
+            <tr><td colspan="4" class="py-6 text-center text-gray-400 text-sm">Sin ítems registrados</td></tr>
             {% endfor %}
           </tbody>
           <tfoot>
-            <tr class="border-t-2 border-indigo-100">
-              <td colspan="3" class="pt-3 pr-3 text-right text-sm font-bold text-gray-700">TOTAL</td>
-              <td class="pt-3 text-right text-sm font-bold text-indigo-700">USD {{ snapshot.total_usd_calculado|floatformat:2 }}</td>
+            <tr class="border-t-2 border-emerald-100">
+              <td colspan="3" class="pt-4 pr-4 text-right text-sm font-bold text-gray-700">TOTAL</td>
+              <td class="pt-4 text-right text-sm font-bold text-emerald-700">USD {{ snapshot.total_usd_calculado|floatformat:2 }}</td>
             </tr>
           </tfoot>
         </table>
@@ -83,19 +88,22 @@
     </div>
 
     <!-- Panel lateral -->
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-6">
 
       <!-- Desglose por moneda -->
       {% if desglose %}
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-3">
-          <i class="fas fa-coins text-amber-400 mr-2"></i>Por moneda (en USD)
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <span class="flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-500">
+            <i class="fas fa-coins text-xs"></i>
+          </span>
+          Por moneda (en USD)
         </h2>
-        <ul class="space-y-2">
+        <ul class="space-y-3">
           {% for moneda, monto in desglose.items %}
-          <li class="flex justify-between text-sm">
+          <li class="flex justify-between items-center text-sm">
             <span class="text-gray-500">{{ moneda }}</span>
-            <span class="font-semibold">≈ USD {{ monto|floatformat:2 }}</span>
+            <span class="font-semibold text-gray-800">≈ USD {{ monto|floatformat:2 }}</span>
           </li>
           {% endfor %}
         </ul>
@@ -104,61 +112,66 @@
 
       <!-- Cotizaciones usadas -->
       {% if snapshot.cotizacion %}
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 class="text-sm font-semibold text-gray-700 mb-3">
-          <i class="fas fa-info-circle text-blue-400 mr-2"></i>Cotizaciones usadas
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <span class="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-500">
+            <i class="fas fa-info-circle text-xs"></i>
+          </span>
+          Cotizaciones usadas
         </h2>
-        <ul class="space-y-1.5 text-xs">
+        <ul class="space-y-2 text-sm">
           <li class="flex justify-between">
             <span class="text-gray-500">Blue compra</span>
-            <span class="font-medium">${{ snapshot.cotizacion.blue_compra }}</span>
+            <span class="font-medium text-gray-800">${{ snapshot.cotizacion.blue_compra }}</span>
           </li>
           <li class="flex justify-between">
             <span class="text-gray-500">Blue venta</span>
-            <span class="font-medium">${{ snapshot.cotizacion.blue_venta }}</span>
+            <span class="font-medium text-gray-800">${{ snapshot.cotizacion.blue_venta }}</span>
           </li>
           <li class="flex justify-between">
             <span class="text-gray-500">Oficial compra</span>
-            <span class="font-medium">${{ snapshot.cotizacion.oficial_compra }}</span>
+            <span class="font-medium text-gray-800">${{ snapshot.cotizacion.oficial_compra }}</span>
           </li>
           <li class="flex justify-between">
             <span class="text-gray-500">Oficial venta</span>
-            <span class="font-medium">${{ snapshot.cotizacion.oficial_venta }}</span>
+            <span class="font-medium text-gray-800">${{ snapshot.cotizacion.oficial_venta }}</span>
           </li>
           {% if snapshot.cotizacion.mep %}
           <li class="flex justify-between">
             <span class="text-gray-500">MEP</span>
-            <span class="font-medium">${{ snapshot.cotizacion.mep }}</span>
+            <span class="font-medium text-gray-800">${{ snapshot.cotizacion.mep }}</span>
           </li>
           {% endif %}
           <li class="flex justify-between">
             <span class="text-gray-500">EUR/USD</span>
-            <span class="font-medium">{{ snapshot.cotizacion.eur_usd }}</span>
+            <span class="font-medium text-gray-800">{{ snapshot.cotizacion.eur_usd }}</span>
           </li>
-          <li class="text-gray-400 mt-2">Fuente: {{ snapshot.cotizacion.get_fuente_display }}</li>
+          <li class="pt-1 text-xs text-gray-400">Fuente: {{ snapshot.cotizacion.get_fuente_display }}</li>
         </ul>
       </div>
       {% endif %}
 
       <!-- Notas -->
       {% if snapshot.notas %}
-      <div class="bg-amber-50 border border-amber-100 rounded-xl p-4">
-        <p class="text-xs font-semibold text-amber-700 mb-1"><i class="fas fa-sticky-note mr-1"></i>Notas</p>
-        <p class="text-xs text-amber-800">{{ snapshot.notas }}</p>
+      <div class="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+        <p class="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-1.5">
+          <i class="fas fa-sticky-note"></i> Notas
+        </p>
+        <p class="text-sm text-amber-800">{{ snapshot.notas }}</p>
       </div>
       {% endif %}
 
     </div>
   </div>
 
-  <div class="mt-6 flex justify-between">
+  <div class="mt-8 flex justify-between">
     <a href="{% url 'ahorro_vivienda:lista_snapshots' %}"
-       class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+       class="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors">
       <i class="fas fa-list"></i> Todos los snapshots
     </a>
     <a href="{% url 'ahorro_vivienda:dashboard' %}"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
-      <i class="fas fa-home"></i> Dashboard
+       class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">
+      <i class="fas fa-house"></i> Dashboard
     </a>
   </div>
 

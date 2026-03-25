@@ -11,6 +11,7 @@ from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Max
 
+from django.forms import inlineformset_factory
 from .decorators import vivienda_required
 from .models import ConfiguracionMeta, Cotizacion, Snapshot, CapitalItem, Conversion
 from .forms import (
@@ -18,6 +19,7 @@ from .forms import (
     CotizacionForm,
     SnapshotForm,
     CapitalItemFormSet,
+    CapitalItemForm,
     ConversionForm,
 )
 
@@ -236,7 +238,16 @@ def nuevo_snapshot(request):
                 snapshot.cotizacion = cotizacion
                 snapshot.save()
             else:
-                snapshot.save()
+                # Sin cotización válida: no guardar el snapshot
+                messages.error(request, 'Ingresá las cotizaciones del día o buscalas con la API antes de guardar.')
+                formset = CapitalItemFormSet(request.POST)
+                return render(request, 'ahorro_vivienda/nuevo_snapshot.html', {
+                    'snapshot_form': snapshot_form,
+                    'cot_form': cot_form,
+                    'formset': formset,
+                    'cotizacion_existente': cotizacion_existente,
+                    'ultimo_blue': ultimo_blue,
+                })
 
             formset = CapitalItemFormSet(request.POST, instance=snapshot)
             if formset.is_valid():
@@ -253,7 +264,7 @@ def nuevo_snapshot(request):
                 snapshot.delete()
                 messages.error(request, 'Revisá los datos de los ítems.')
         else:
-            formset = CapitalItemFormSet(request.POST, prefix=None)
+            formset = CapitalItemFormSet(request.POST)
     else:
         snapshot_form = SnapshotForm(initial={'fecha': hoy})
         if cotizacion_existente:
@@ -261,11 +272,10 @@ def nuevo_snapshot(request):
                                       initial={'fecha': hoy})
         else:
             cot_form = CotizacionForm(prefix='cot', initial={'fecha': hoy})
-        formset = CapitalItemFormSet()
-
-        # Pre-poblar con los ítems del último snapshot (para facilitar edición mensual)
+        # Pre-poblar con los ítems del último snapshot
+        # inlineformset_factory(extra=0) ignora initial=[]; necesitamos extra=N dinámico
         ultimo = Snapshot.objects.order_by('-fecha').first()
-        if ultimo and not formset.initial_form_count():
+        if ultimo:
             initial_data = [
                 {
                     'nombre': item.nombre,
@@ -276,9 +286,21 @@ def nuevo_snapshot(request):
                     'cotizacion_manual': item.cotizacion_manual,
                     'orden': item.orden,
                 }
-                for item in ultimo.items.all()
+                for item in ultimo.items.order_by('orden')
             ]
-            formset = CapitalItemFormSet(initial=initial_data)
+            PreloadFormSet = inlineformset_factory(
+                Snapshot, CapitalItem, form=CapitalItemForm,
+                extra=len(initial_data), can_delete=True,
+                min_num=0, validate_min=False,
+            )
+            formset = PreloadFormSet(initial=initial_data)
+        else:
+            PreloadFormSet = inlineformset_factory(
+                Snapshot, CapitalItem, form=CapitalItemForm,
+                extra=1, can_delete=True,
+                min_num=1, validate_min=True,
+            )
+            formset = PreloadFormSet()
 
     return render(request, 'ahorro_vivienda/nuevo_snapshot.html', {
         'snapshot_form': snapshot_form,

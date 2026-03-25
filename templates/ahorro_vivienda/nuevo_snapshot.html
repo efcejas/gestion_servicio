@@ -57,7 +57,7 @@
       <p id="fetch-status" class="text-xs text-gray-500 mb-3 hidden"></p>
 
       {% if cotizacion_existente %}
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-5 text-sm text-blue-700">
         <i class="fas fa-info-circle mr-1"></i>
         Ya existe una cotización para esta fecha ({{ cotizacion_existente.fecha|date:"d/m/Y" }} — Blue venta: {{ cotizacion_existente.blue_venta }}).
         Se usará esa cotización automáticamente si no modificás los campos.
@@ -78,18 +78,7 @@
           {{ cot_form.blue_venta }}
         </div>
         <div>
-      <!-- Alerta cotización inusual (JS) -->
-      <div id="alerta-cotizacion-inusual" class="hidden mt-3 bg-amber-50 border border-amber-300 rounded-lg p-3">
-        <div class="flex items-start gap-2">
-          <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5"></i>
-          <div>
-            <p class="text-sm font-semibold text-amber-800">¿El blue es correcto?</p>
-            <p class="text-xs text-amber-700 mt-0.5" id="alerta-cotizacion-texto"></p>
-          </div>
-        </div>
-      </div>
-
-      <input type="hidden" id="ultimo-blue-ref" value="{{ ultimo_blue|default:'0' }}">          <label class="block text-xs font-medium text-gray-600 mb-1">Oficial compra</label>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Oficial compra</label>
           {{ cot_form.oficial_compra }}
         </div>
         <div>
@@ -109,6 +98,18 @@
           {{ cot_form.fuente }}
         </div>
       </div>
+
+      <!-- Alerta cotización inusual — fuera del grid para no romper layout -->
+      <div id="alerta-cotizacion-inusual" class="hidden mt-4 bg-amber-50 border border-amber-300 rounded-lg p-4">
+        <div class="flex items-start gap-2">
+          <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5"></i>
+          <div>
+            <p class="text-sm font-semibold text-amber-800">¿El blue es correcto?</p>
+            <p class="text-xs text-amber-700 mt-0.5" id="alerta-cotizacion-texto"></p>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" id="ultimo-blue-ref" value="{{ ultimo_blue|default:'0' }}">
     </div>
 
     <!-- Ítems de capital (formset) -->
@@ -125,7 +126,7 @@
 
       {{ formset.management_form }}
 
-      <div id="items-container" class="space-y-3">
+      <div id="items-container" class="space-y-4">
         {% for form in formset %}
         <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
           {{ form.id }}
@@ -133,7 +134,7 @@
           {% if form.DELETE %}
           <div class="hidden">{{ form.DELETE }}</div>
           {% endif %}
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div class="sm:col-span-2 lg:col-span-1">
               <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
               {{ form.nombre }}
@@ -161,7 +162,7 @@
               {{ form.cotizacion_manual }}
             </div>
           </div>
-          <div class="mt-2 flex justify-end">
+          <div class="mt-3 flex justify-end">
             <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
               <i class="fas fa-trash mr-1"></i>Eliminar ítem
             </button>
@@ -173,7 +174,7 @@
       <!-- Template para nuevos ítems (oculto, clonado por JS) -->
       <div id="item-template" class="hidden">
         <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div class="sm:col-span-2 lg:col-span-1">
               <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
               <input type="text" name="items-__prefix__-nombre" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm" placeholder="Ej: Efectivo USD, Cuenta Galicia">
@@ -220,7 +221,7 @@
             </div>
             <input type="hidden" name="items-__prefix__-orden" value="0">
           </div>
-          <div class="mt-2 flex justify-end">
+          <div class="mt-3 flex justify-end">
             <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
               <i class="fas fa-trash mr-1"></i>Eliminar ítem
             </button>
@@ -230,7 +231,7 @@
 
     </div>
 
-    <div class="flex justify-end gap-3">
+    <div class="flex justify-end gap-3 mt-6">
       <a href="{% url 'ahorro_vivienda:dashboard' %}"
          class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
         Cancelar
@@ -284,34 +285,49 @@ document.getElementById('btn-fetch-cotizacion').addEventListener('click', functi
     });
 });
 
-// ─── Agregar ítems dinámicamente ───
-let itemCount = document.querySelectorAll('.item-form').length;
+// ─── Gestión de ítems ───
+const itemsContainer = document.getElementById('items-container');
 const totalFormsInput = document.querySelector('[name="items-TOTAL_FORMS"]');
 
+// Re-numera todos los ítems del DOM para que sus índices sean 0..N-1 consecutivos.
+// Esto evita colisiones cuando se elimina un ítem nuevo del medio.
+function renumberItems() {
+  const forms = itemsContainer.querySelectorAll('.item-form');
+  forms.forEach((form, idx) => {
+    form.querySelectorAll('[name]').forEach(el => {
+      el.name = el.name.replace(/^items-\d+-/, 'items-' + idx + '-');
+    });
+    form.querySelectorAll('[id]').forEach(el => {
+      el.id = el.id.replace(/^id_items-\d+-/, 'id_items-' + idx + '-');
+    });
+  });
+  totalFormsInput.value = forms.length;
+}
+
+// Sincronizar TOTAL_FORMS con los ítems reales al cargar (pre-cargados del snapshot anterior)
+renumberItems();
+
 document.getElementById('btn-agregar-item').addEventListener('click', () => {
+  const currentCount = itemsContainer.querySelectorAll('.item-form').length;
   const template = document.getElementById('item-template').innerHTML;
-  const newItem = template.replace(/__prefix__/g, itemCount);
-  const container = document.getElementById('items-container');
+  const newItem = template.replace(/__prefix__/g, currentCount);
   const div = document.createElement('div');
   div.innerHTML = newItem;
-  container.appendChild(div.firstElementChild);
-  itemCount++;
-  totalFormsInput.value = itemCount;
+  itemsContainer.appendChild(div.firstElementChild);
+  totalFormsInput.value = currentCount + 1;
   bindEliminarBtns();
   bindCotizacionManualVis();
 });
 
 // ─── Eliminar ítem ───
 function bindEliminarBtns() {
-  document.querySelectorAll('.btn-eliminar-item').forEach(btn => {
+  itemsContainer.querySelectorAll('.btn-eliminar-item').forEach(btn => {
     btn.onclick = function () {
       const itemDiv = btn.closest('.item-form');
       const deleteInput = itemDiv.querySelector('[name$="-DELETE"]');
       if (deleteInput) {
-        // IMPORTANTE: NO deshabilitar campos. Los campos disabled no se envían
-        // en el POST, por lo que Django nunca recibe DELETE=checked y además
-        // falla la validación de los campos vacíos.
-        // Solo marcamos visualmente y dejamos que Django maneje el DELETE.
+        // Ítem existente en BD: marcar DELETE. NO deshabilitar campos — los
+        // campos disabled no se incluyen en el POST y Django no recibe el DELETE.
         deleteInput.checked = true;
         itemDiv.style.opacity = '0.35';
         itemDiv.style.pointerEvents = 'none';
@@ -321,10 +337,9 @@ function bindEliminarBtns() {
         btn.classList.add('text-gray-400');
         btn.disabled = true;
       } else {
-        // Ítem nuevo (sin id en BD): simplemente quitar del DOM
+        // Ítem nuevo (no existe en BD): quitar del DOM y re-numerar todos
         itemDiv.remove();
-        itemCount--;
-        totalFormsInput.value = itemCount;
+        renumberItems();
       }
     };
   });
@@ -332,7 +347,7 @@ function bindEliminarBtns() {
 
 // ─── Mostrar/ocultar cotización manual ───
 function bindCotizacionManualVis() {
-  document.querySelectorAll('.cotizacion-tipo-select').forEach(sel => {
+  itemsContainer.querySelectorAll('.cotizacion-tipo-select').forEach(sel => {
     const wrapper = sel.closest('.item-form').querySelector('.cotizacion-manual-wrapper');
     function toggle() {
       if (sel.value === 'manual') {
@@ -346,7 +361,7 @@ function bindCotizacionManualVis() {
   });
 
   // Para moneda USD: ocultar tipo cotización
-  document.querySelectorAll('.moneda-select').forEach(sel => {
+  itemsContainer.querySelectorAll('.moneda-select').forEach(sel => {
     const itemForm = sel.closest('.item-form');
     if (!itemForm) return;
     function toggleCot() {
