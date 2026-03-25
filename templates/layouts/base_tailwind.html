@@ -189,8 +189,8 @@
                 {% endif %}
                 {% endif %}
 
-                <!-- Pedidos de Estudios - Para administrativos y coordinadores -->
-                {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <!-- Pedidos de Estudios - Para coordinadores -->
+                {% if user.is_superuser or user.rol == 'jefe_servicio' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
                 {% url 'pedidos_estudios:dashboard' as pedidos_url %}
                 {% if pedidos_url %}
                 <a href="{{ pedidos_url }}" 
@@ -364,7 +364,7 @@
                         <!-- ========== NAVEGACIÓN SEGÚN CARGO DEL USUARIO ========== -->
                         
                         <!-- ADMINISTRATIVOS / JEFE ADMINISTRATIVO -->
-                        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' %}
+                        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' or user.rol == 'administrativo' %}
                             <!-- Novedades -->
                             {% url 'gestion_eventos:lista_eventos' as eventos_url %}
                             {% if eventos_url %}
@@ -372,6 +372,18 @@
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                                 <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                                 {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+
+                            <!-- Guía de Ateneos -->
+                            {% url 'clases_residentes:guia_presentaciones' as guia_url %}
+                            {% if guia_url %}
+                            <a href="{{ guia_url }}" 
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-lightbulb mr-2 group-hover:scale-110 transition-transform"></i>Guía de Ateneos
+                                {% if request.resolver_match.url_name == 'guia_presentaciones' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
                             </a>

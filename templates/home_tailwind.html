@@ -373,13 +373,17 @@
             </div>
         </div>
 
-        <!-- ADMINISTRATIVOS (cargo legacy - mantener compatibilidad) -->
+        <!-- ADMINISTRATIVOS -->
         {% elif user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' or user.rol == 'administrativo' %}
+        <div class="container mx-auto mt-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+                <!-- Novedades -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                     <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
                         <i class="fas fa-bell text-2xl text-white"></i>
                     </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades recientes</h5>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades</h5>
                     <p class="text-gray-600 mb-4">Consulta las últimas novedades reportadas en el sistema.</p>
                     <div class="flex justify-end">
                         <a href="{% url 'gestion_eventos:lista_eventos' %}" 
@@ -389,35 +393,21 @@
                     </div>
                 </div>
 
-                <!-- Novedades Resueltas -->
+                <!-- Guía de Ateneos -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mb-4">
-                        <i class="fas fa-check-circle text-2xl text-white"></i>
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl mb-4">
+                        <i class="fas fa-lightbulb text-2xl text-white"></i>
                     </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Novedades resueltas</h5>
-                    <p class="text-gray-600 mb-4">Revisa las novedades que ya han sido resueltas.</p>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Guía de Ateneos</h5>
+                    <p class="text-gray-600 mb-4">Consulta la guía para la preparación y presentación de ateneos.</p>
                     <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:historial_eventos' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
-                            Ver resueltas
+                        <a href="{% url 'clases_residentes:guia_presentaciones' %}" 
+                           class="inline-flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
+                            Ver guía
                         </a>
                     </div>
                 </div>
 
-                <!-- Registrar Novedades -->
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
-                        <i class="fas fa-exclamation-triangle text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar novedades</h5>
-                    <p class="text-gray-600 mb-4">Si necesitas registrar una nueva novedad, hazlo aquí.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'gestion_eventos:evento_nuevo' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
-                            Registrar
-                        </a>
-                    </div>
-                </div>
             </div>
         </div>
 
