@@ -181,20 +181,25 @@ class ClaseResidente(models.Model):
         """
         Verifica si un usuario puede ver esta clase.
         - Jefes e instructores pueden ver todas
+        - Administrativos de Docencia pueden ver todas (solo lectura)
         - Residentes solo ven las de su año o inferiores
         """
         # Jefes, instructores y staff pueden ver todo
         if usuario.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio', 'medico_staff']:
             return True
-        
+
+        # Administrativos de Docencia pueden ver todas las clases
+        if usuario.groups.filter(name='Administrativo - Docencia').exists():
+            return True
+
         # Si es para todos los años
         if not self.anios_dirigidos:
             return True
-        
+
         # Si es residente, verificar su año
         if usuario.rol == 'medico_residente' and usuario.anio_residencia:
             return usuario.anio_residencia in self.anios_dirigidos
-        
+
         return False
     
     def puede_editar(self, usuario):

@@ -472,6 +472,10 @@ if all([CLOUDINARY_STORAGE['CLOUD_NAME'], CLOUDINARY_STORAGE['API_KEY'], CLOUDIN
 else:
     print("[WARNING] Cloudinary NO configurado - usando almacenamiento local")
 
+# URL de la plantilla base para ateneos (archivo PPTX en Cloudinary)
+# Para actualizar: subir el nuevo archivo a Cloudinary y actualizar esta variable en el .env
+PLANTILLA_ATENEO_URL = config('PLANTILLA_ATENEO_URL', default='')
+
 # Configuración de AWS S3 / MinIO
 from decouple import config
 AWS_ACCESS_KEY_ID = config('STACKHERO_MINIO_ROOT_ACCESS_KEY')

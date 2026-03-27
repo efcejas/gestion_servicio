@@ -94,12 +94,17 @@ class ClaseListView(LoginRequiredMixin, ListView):
         context['form_busqueda'] = BuscarClaseForm(self.request.GET)
         context['total_clases'] = len(self.get_queryset())
         context['categorias'] = ClaseResidente.CATEGORIA_CHOICES
-        
-        # Estadísticas adicionales
-        if self.request.user.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio']:
+
+        user = self.request.user
+
+        # Estadísticas adicionales (gestión: jefes e instructores)
+        if user.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio']:
             context['puede_gestionar'] = True
             context['clases_pendientes'] = ClaseResidente.objects.filter(activa=False).count()
-        
+
+        # Administrativos de Docencia: solo lectura, sin gestión
+        context['es_admin_docencia'] = user.groups.filter(name='Administrativo - Docencia').exists()
+
         return context
 
 
@@ -423,6 +428,10 @@ class GuiaPresentacionesView(LoginRequiredMixin, TemplateView):
         
         # Consultar ejemplos visuales activos, agrupados por categoría
         context['ejemplos'] = EjemploVisualizacion.objects.filter(activo=True).order_by('orden')
+        
+        # URL de la plantilla base para ateneos (desde settings/env)
+        from django.conf import settings
+        context['plantilla_ateneo_url'] = getattr(settings, 'PLANTILLA_ATENEO_URL', '')
         
         # Estructura de Ateneo (Caso Clínico)
         context['estructura_ateneo'] = {
