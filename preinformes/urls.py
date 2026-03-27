@@ -39,6 +39,7 @@ urlpatterns = [
     
     # Estadísticas
     path('estadisticas/', views.estadisticas, name='estadisticas'),
+    path('panel-docencia/', views.panel_docencia, name='panel_docencia'),
 
     # Asistente IA Radiólogo Mentor
     path('asistente/chat/', views.asistente_preinforme_chat, name='asistente_chat'),

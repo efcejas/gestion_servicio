@@ -1154,6 +1154,64 @@ def estadisticas(request):
 
 
 @login_required
+def panel_docencia(request):
+    """
+    Panel de actividad docente para administrativos del grupo 'Administrativo - Docencia'.
+    Solo lectura — no expone contenido clínico de los informes.
+    """
+    if not (request.user.is_superuser or
+            request.user.groups.filter(name='Administrativo - Docencia').exists()):
+        messages.error(request, 'No tenés permisos para acceder a esta sección.')
+        return redirect('home')
+
+    residentes = User.objects.filter(
+        rol='medico_residente',
+        perfil_completo=True,
+    ).annotate(
+        total_preinformes=Count('preinformes_realizados', distinct=True),
+        preinformes_finalizados=Count(
+            'preinformes_realizados',
+            filter=Q(preinformes_realizados__estado='finalizado'),
+            distinct=True,
+        ),
+        preinformes_pendientes=Count(
+            'preinformes_realizados',
+            filter=Q(preinformes_realizados__estado__in=['borrador', 'pendiente_revision']),
+            distinct=True,
+        ),
+        promedio_puntuacion=Avg('preinformes_realizados__revision__puntuacion'),
+        promedio_ia=Avg(
+            'conversaciones_asistente_preinforme__puntuacion_global',
+            filter=Q(conversaciones_asistente_preinforme__evaluada=True),
+        ),
+        clases_subidas=Count('clases_creadas', distinct=True),
+    ).order_by('anio_residencia', 'last_name', 'first_name')
+
+    # Última actividad por residente (calculada en Python para compatibilidad con SQLite)
+    ultima_actividad = {}
+    for p in Preinforme.objects.filter(
+        residente__in=residentes
+    ).order_by('residente_id', '-fecha_modificacion'):
+        if p.residente_id not in ultima_actividad:
+            ultima_actividad[p.residente_id] = p.fecha_modificacion
+
+    residentes_data = []
+    for r in residentes:
+        r.ultima_actividad = ultima_actividad.get(r.pk)
+        if r.promedio_puntuacion:
+            r.promedio_puntuacion = round(float(r.promedio_puntuacion), 1)
+        if r.promedio_ia:
+            r.promedio_ia = round(float(r.promedio_ia), 1)
+        residentes_data.append(r)
+
+    context = {
+        'residentes': residentes_data,
+        'total_residentes': len(residentes_data),
+    }
+    return render(request, 'preinformes/panel_docencia.html', context)
+
+
+@login_required
 def ver_comparacion_revision(request, pk):
     """Vista para que el residente vea la comparación entre su versión y la del staff"""
     preinforme = get_object_or_404(Preinforme, pk=pk)
@@ -1507,12 +1565,18 @@ def asistente_analizar_borrador(request):
 
 
 @login_required
-@role_required('jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def perfil_residente_docente(request, pk):
     """
     Perfil de un residente con historial de evaluaciones del Asistente IA.
-    Accesible solo para roles docentes.
+    Accesible para roles docentes y el grupo 'Administrativo - Docencia'.
     """
+    roles_docentes = ['jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+    es_admin_docencia = request.user.groups.filter(name='Administrativo - Docencia').exists()
+    if not (request.user.is_superuser or
+            request.user.rol in roles_docentes or
+            es_admin_docencia):
+        messages.error(request, 'No tenés permisos para acceder a esta sección.')
+        return redirect('home')
     residente = get_object_or_404(User, pk=pk, rol='medico_residente')
 
     from .models import ConversacionAsistentePreinforme

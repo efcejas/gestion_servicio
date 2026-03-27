@@ -1,5 +1,6 @@
 {% extends 'layouts/base_tailwind.html' %}
 {% load static %}
+{% load user_permissions %}
 
 {% block title %}Perfil IA — {{ residente.get_full_name|default:residente.username }}{% endblock %}
 
@@ -29,10 +30,17 @@
                     </p>
                 </div>
             </div>
+            {% if user|has_group:"Administrativo - Docencia" %}
+            <a href="{% url 'preinformes:panel_docencia' %}"
+               class="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 transition px-4 py-2 rounded-xl text-sm font-medium">
+                <i class="fas fa-arrow-left"></i> Volver al panel
+            </a>
+            {% else %}
             <a href="{% url 'preinformes:estadisticas' %}"
                class="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 transition px-4 py-2 rounded-xl text-sm font-medium">
                 <i class="fas fa-arrow-left"></i> Volver a estadísticas
             </a>
+            {% endif %}
         </div>
     </div>
 

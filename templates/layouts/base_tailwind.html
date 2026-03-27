@@ -389,7 +389,7 @@
                             </a>
                             {% endif %}
 
-                            <!-- Clases (solo grupo Administrativo - Docencia) -->
+                            <!-- Clases y Panel Docente (solo grupo Administrativo - Docencia) -->
                             {% if user|has_group:"Administrativo - Docencia" %}
                             {% url 'clases_residentes:lista' as clases_admin_url %}
                             {% if clases_admin_url %}
@@ -397,6 +397,16 @@
                                class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                                 <i class="fas fa-graduation-cap mr-2 group-hover:scale-110 transition-transform"></i>Clases
                                 {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}
+                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                                {% endif %}
+                            </a>
+                            {% endif %}
+                            {% url 'preinformes:panel_docencia' as panel_doc_url %}
+                            {% if panel_doc_url %}
+                            <a href="{{ panel_doc_url }}"
+                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'panel_docencia' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                                <i class="fas fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Panel Docente
+                                {% if request.resolver_match.url_name == 'panel_docencia' %}
                                 <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                                 {% endif %}
                             </a>
