@@ -1,0 +1,74 @@
+{% extends "layouts/base_tailwind.html" %}
+
+{% block title %}Recuperar nombre de usuario - Dr. Cejas{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-md w-full">
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <div class="flex items-center justify-center w-20 h-20 mx-auto bg-gradient-to-br from-teal-500 via-cyan-500 to-blue-500 rounded-2xl mb-4 shadow-lg">
+                <i class="fas fa-user-tag text-3xl text-white"></i>
+            </div>
+            <h2 class="text-3xl font-bold text-gray-900">Recuperar usuario</h2>
+            <p class="mt-2 text-sm text-gray-600">Te enviaremos tu nombre de usuario por correo</p>
+        </div>
+
+        <!-- Card -->
+        <div class="bg-white py-8 px-6 shadow-lg rounded-2xl border border-gray-200">
+
+            <!-- Info -->
+            <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-500"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-blue-700">
+                            Ingresa el correo electrónico asociado a tu cuenta y te enviaremos tu nombre de usuario.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario -->
+            <form method="post" class="space-y-6">
+                {% csrf_token %}
+
+                <div>
+                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-envelope mr-1 text-gray-400"></i>Correo electrónico
+                    </label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <p class="mt-1 text-xs text-red-600">{{ form.email.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <button type="submit"
+                            class="w-full flex justify-center items-center gap-2 py-2.5 px-4 text-sm font-semibold rounded-lg text-white bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition-all shadow-md hover:shadow-lg">
+                        <i class="fas fa-paper-plane"></i>
+                        Enviar nombre de usuario
+                    </button>
+                </div>
+            </form>
+
+            <!-- Link de vuelta -->
+            <div class="mt-6 text-center">
+                <a href="{% url 'login' %}"
+                   class="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1">
+                    <i class="fas fa-arrow-left text-xs"></i>Volver al inicio de sesión
+                </a>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center">
+            <p class="text-xs text-gray-500">
+                © 2025 Dr. Enso Fermín Cejas. Sistema de Gestión Médica.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

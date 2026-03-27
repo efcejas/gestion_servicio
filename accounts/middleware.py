@@ -1,9 +1,12 @@
 """
-Middleware para verificación de perfil completo.
+Middleware para verificación de perfil completo y timeout de sesión por inactividad.
 """
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.contrib import messages
+from django.contrib.auth import logout
+from django.utils import timezone
+from django.conf import settings
 
 
 class ProfileRequiredMiddleware:
@@ -29,6 +32,7 @@ class ProfileRequiredMiddleware:
         '/accounts/logout/',
         '/accounts/register/',
         '/accounts/password_reset/',
+        '/accounts/recuperar-usuario/',
         '/static/',
         '/media/',
         '/admin/',
@@ -65,4 +69,39 @@ class ProfileRequiredMiddleware:
                 )
                 return redirect('accounts:completar_perfil')
         
+        return self.get_response(request)
+
+
+class SessionTimeoutMiddleware:
+    """
+    Cierra la sesión del usuario si estuvo inactivo más de SESSION_INACTIVITY_TIMEOUT
+    segundos (default: 30 minutos). Solo afecta a usuarios autenticados.
+    URLs de archivos estáticos y de autenticación están exentas.
+    """
+
+    EXEMPT_PREFIXES = ('/static/', '/media/', '/accounts/login/', '/accounts/logout/')
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        self.timeout = getattr(settings, 'SESSION_INACTIVITY_TIMEOUT', 30 * 60)
+
+    def __call__(self, request):
+        if (
+            request.user.is_authenticated
+            and not any(request.path.startswith(p) for p in self.EXEMPT_PREFIXES)
+        ):
+            last_activity = request.session.get('_last_activity')
+            now = timezone.now().timestamp()
+
+            if last_activity is not None and (now - last_activity) > self.timeout:
+                logout(request)
+                messages.warning(
+                    request,
+                    'Tu sesión se cerró automáticamente por inactividad. '
+                    'Por favor, inicia sesión nuevamente.',
+                )
+                return redirect(settings.LOGIN_URL)
+
+            request.session['_last_activity'] = now
+
         return self.get_response(request)

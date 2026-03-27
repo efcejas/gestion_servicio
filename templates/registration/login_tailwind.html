@@ -97,6 +97,12 @@
                         </a>
                     </div>
                     <div>
+                        <a href="{% url 'accounts:username_recovery' %}"
+                           class="text-blue-600 hover:text-blue-700 text-sm font-medium inline-flex items-center gap-1">
+                            <i class="fas fa-user-tag text-xs"></i>¿No recuerdas tu usuario?
+                        </a>
+                    </div>
+                    <div>
                         <span class="text-gray-600 text-sm">¿No tienes cuenta? </span>
                         <a href="{% url 'accounts:register' %}" 
                            class="text-blue-600 hover:text-blue-700 text-sm font-medium">

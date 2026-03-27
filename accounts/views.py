@@ -1,7 +1,10 @@
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView, UpdateView
 from django.urls import reverse_lazy
-from .forms import CustomUserCreationForm, CompletarPerfilForm, CustomUserChangeForm
+from django.core.mail import send_mail
+from django.conf import settings as django_settings
+from .forms import CustomUserCreationForm, CompletarPerfilForm, CustomUserChangeForm, UsernameRecoveryForm
+from .models import CustomUser
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -69,4 +72,47 @@ def editar_perfil(request):
     
     return render(request, 'accounts/editar_perfil.html', {
         'form': form,
+    })
+
+
+def username_recovery(request):
+    """
+    Vista pública para recuperar el nombre de usuario olvidado.
+    Envía el username por email sin revelar si la cuenta existe (anti-enumeración).
+    """
+    if request.method == 'POST':
+        form = UsernameRecoveryForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email'].lower().strip()
+            try:
+                user = CustomUser.objects.get(email__iexact=email)
+                send_mail(
+                    subject='Recuperación de nombre de usuario',
+                    message=(
+                        f'Hola {user.get_full_name() or user.username},\n\n'
+                        f'Tu nombre de usuario es: {user.username}\n\n'
+                        'Si no solicitaste este correo, puedes ignorarlo.\n\n'
+                        'Equipo de Gestión Médica'
+                    ),
+                    from_email=django_settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=True,
+                )
+            except CustomUser.DoesNotExist:
+                pass  # No revelar si el email existe o no
+            # Siempre redirigir a la misma página de confirmación
+            return redirect('accounts:username_recovery_done')
+    else:
+        form = UsernameRecoveryForm()
+
+    return render(request, 'accounts/recuperar_usuario.html', {
+        'form': form,
+        'hide_navbar': True,
+    })
+
+
+def username_recovery_done(request):
+    """Página de confirmación tras solicitar recuperación de usuario."""
+    return render(request, 'accounts/recuperar_usuario_done.html', {
+        'hide_navbar': True,
     })

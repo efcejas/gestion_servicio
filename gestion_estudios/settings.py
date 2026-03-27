@@ -104,6 +104,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',  # Debe estar antes de ProfileRequiredMiddleware
     'accounts.middleware.ProfileRequiredMiddleware',  # Verificar perfil completo
+    'accounts.middleware.SessionTimeoutMiddleware',  # Cerrar sesión por inactividad
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -520,6 +521,10 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # ---------------------------------
 
 # Cookies HTTPOnly (prevenir acceso desde JavaScript - Anti-XSS)
+# Tiempo de inactividad antes de cerrar sesión automáticamente (segundos)
+# Valor por defecto: 30 minutos. Ajustar con SESSION_INACTIVITY_TIMEOUT en .env
+SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=30 * 60))
+
 SESSION_COOKIE_HTTPONLY = True
 
 # CSRF Cookie: False para permitir peticiones AJAX
