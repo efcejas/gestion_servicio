@@ -864,6 +864,20 @@ async function registrar(tipo) {
   let unidad = p.unidad_medida;
   let stockMin = p.stock_minimo;
 
+  // Validar fecha de vencimiento obligatoria en entradas
+  if (tipo === 'entrada') {
+    const fechaVenc = document.getElementById('inputFechaVencimiento').value;
+    if (!fechaVenc) {
+      mostrarToast('⚠️ Ingresá la fecha de vencimiento antes de registrar la entrada', 'warning');
+      document.getElementById('inputFechaVencimiento').focus();
+      document.getElementById('inputFechaVencimiento').classList.add('ring-2', 'ring-amber-400', 'border-amber-400');
+      setTimeout(() => {
+        document.getElementById('inputFechaVencimiento').classList.remove('ring-2', 'ring-amber-400', 'border-amber-400');
+      }, 3000);
+      return;
+    }
+  }
+
   if (productoActual.es_nuevo) {
     nombre = document.getElementById('inputNombre').value.trim();
     if (!nombre) { mostrarToast('Ingresá el nombre del producto', 'warning'); return; }

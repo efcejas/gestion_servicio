@@ -220,8 +220,8 @@
 {% if puede_descartar %}
 <!-- ══ Modal descarte masivo (Opción C) ══════════════════════════════════ -->
 <div id="modalDescarteMasivo" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
           <i class="fas fa-trash-alt text-red-600 text-sm"></i>
@@ -232,7 +232,7 @@
         <i class="fas fa-times text-sm"></i>
       </button>
     </div>
-    <div class="p-5 space-y-4">
+    <div class="flex-1 overflow-y-auto p-5 space-y-4">
       <div class="bg-red-50 border border-red-200 rounded-xl p-3">
         <p class="text-sm text-red-700 font-semibold" id="masivoCantLabel"></p>
         <div id="masivoListaLotes" class="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs text-gray-600"></div>
@@ -247,7 +247,7 @@
         <p class="text-xs text-gray-400 mt-1">Se aplica a todos los lotes seleccionados.</p>
       </div>
     </div>
-    <div class="px-5 pb-5 flex gap-3">
+    <div class="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
       <button onclick="cerrarDescarteMasivo()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">Cancelar</button>
       <button onclick="confirmarDescarteMasivo()" id="btnConfirmarMasivo"
               class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors">
@@ -260,8 +260,8 @@
 
 <!-- ══ Modal reportar (Opción B) — todos los usuarios ═══════════════════ -->
 <div id="modalReportar" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col">
+    <div class="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
           <i class="fas fa-flag text-blue-600 text-sm"></i>
@@ -272,13 +272,13 @@
         <i class="fas fa-times text-sm"></i>
       </button>
     </div>
-    <div class="p-5 space-y-3">
+    <div class="flex-1 overflow-y-auto p-5 space-y-3">
       <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
         <p id="reportarNombre" class="font-semibold text-gray-800 text-sm"></p>
         <p class="text-xs text-gray-500 mt-1">Al reportar, un usuario autorizado recibirá el aviso para proceder con el descarte.</p>
       </div>
     </div>
-    <div class="px-5 pb-5 flex gap-3">
+    <div class="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
       <button onclick="cerrarReportar()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">Cancelar</button>
       <button onclick="confirmarReportar()" id="btnConfirmarReportar"
               class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors">
@@ -288,9 +288,9 @@
   </div>
 </div>
 <div id="modalDescartar" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
     <!-- Header -->
-    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+    <div class="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-100">
       <div class="flex items-center gap-2">
         <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
           <i class="fas fa-trash-alt text-red-600 text-sm"></i>
@@ -302,7 +302,7 @@
       </button>
     </div>
     <!-- Body -->
-    <div class="p-5 space-y-4">
+    <div class="flex-1 overflow-y-auto p-5 space-y-4">
       <!-- Info del lote -->
       <div class="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
         <p id="descartarNombre" class="font-semibold text-gray-800 text-sm"></p>
@@ -337,7 +337,7 @@
       </div>
     </div>
     <!-- Footer -->
-    <div class="px-5 pb-5 flex gap-3">
+    <div class="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
       <button onclick="cerrarDescartar()"
               class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">
         Cancelar
@@ -356,7 +356,6 @@
   <i id="toastVencIcon" class="fas mt-0.5 flex-shrink-0"></i>
   <span id="toastVencMsg" class="leading-snug"></span>
 </div>
-{% endif %}
 
 {% endblock %}
 
@@ -578,7 +577,7 @@ async function confirmarDescarte() {
     const resp = await fetch(URL_MOV_V, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_V },
-      body: JSON.stringify({ lote_id: descartarLoteId, tipo: 'descarte', cantidad, observacion: motivo, area_id: 0, codigo_barras: '' }),
+      body: JSON.stringify({ lote_id: descartarLoteId, tipo: 'descarte', cantidad, observacion: motivo }),  
     });
     const data = await resp.json();
     if (!resp.ok || data.error) { mostrarToastV(data.error || 'Error al descartar.', 'error'); }

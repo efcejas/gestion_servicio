@@ -252,6 +252,7 @@ def vencimientos(request):
     lotes = LoteEnArea.objects.filter(
         stock__in=stock_qs,
         activo=True,
+        cantidad__gt=0,
         fecha_vencimiento__isnull=False,
         fecha_vencimiento__lte=fecha_limite,
     ).select_related('stock__producto', 'stock__area').order_by('fecha_vencimiento')
