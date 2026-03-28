@@ -169,10 +169,16 @@
        class="inline-flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-50 transition-colors">
       <i class="fas fa-list"></i> Todos los snapshots
     </a>
-    <a href="{% url 'ahorro_vivienda:dashboard' %}"
-       class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">
-      <i class="fas fa-house"></i> Dashboard
-    </a>
+    <div class="flex gap-3">
+      <a href="{% url 'ahorro_vivienda:editar_snapshot' snapshot.pk %}"
+         class="inline-flex items-center gap-2 px-5 py-2.5 border border-emerald-300 text-emerald-700 text-sm font-medium rounded-xl hover:bg-emerald-50 transition-colors">
+        <i class="fas fa-pen"></i> Editar
+      </a>
+      <a href="{% url 'ahorro_vivienda:dashboard' %}"
+         class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-xl hover:bg-emerald-700 transition-colors shadow-sm">
+        <i class="fas fa-house"></i> Dashboard
+      </a>
+    </div>
   </div>
 
 </div>

@@ -1,0 +1,262 @@
+{% extends 'layouts/base_vivienda.html' %}
+
+{% block title %}Editar Snapshot {{ snapshot.fecha|date:"d/m/Y" }} — Mi Vivienda{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+  <div class="flex items-center gap-3 mb-6">
+    <a href="{% url 'ahorro_vivienda:detalle_snapshot' snapshot.pk %}" class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors">
+      <i class="fas fa-arrow-left text-sm"></i>
+    </a>
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Editar snapshot del {{ snapshot.fecha|date:"d \d\e F \d\e Y" }}</h1>
+      <p class="text-xs text-gray-500 mt-0.5">Modificá los montos y agregá o eliminá ítems</p>
+    </div>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="mb-4 p-4 rounded-lg {% if msg.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif msg.tags == 'warning' %}bg-amber-50 text-amber-700 border border-amber-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Cotización del snapshot (info, no editable) -->
+  {% if snapshot.cotizacion %}
+  <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 text-sm text-blue-700 flex items-start gap-3">
+    <i class="fas fa-info-circle mt-0.5 flex-shrink-0"></i>
+    <div>
+      <p class="font-semibold">Cotización del {{ snapshot.cotizacion.fecha|date:"d/m/Y" }}</p>
+      <p class="text-xs mt-1 text-blue-600">
+        Blue venta: ${{ snapshot.cotizacion.blue_venta }} | Oficial: ${{ snapshot.cotizacion.oficial_venta }} | MEP: ${{ snapshot.cotizacion.mep|default:"—" }}
+      </p>
+      <p class="text-xs mt-0.5 text-blue-500">Los montos en USD se recalcularán automáticamente al guardar.</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="post" id="editar-snapshot-form">
+    {% csrf_token %}
+
+    <!-- Fecha y notas -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">
+        <i class="fas fa-calendar-day text-emerald-400 mr-2"></i>Datos del registro
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Fecha <span class="text-red-500">*</span></label>
+          {{ snapshot_form.fecha }}
+          {% if snapshot_form.fecha.errors %}
+          <p class="text-red-500 text-xs mt-1">{{ snapshot_form.fecha.errors.0 }}</p>
+          {% endif %}
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+          {{ snapshot_form.notas }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Ítems de capital (formset) -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-5">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-700">
+          <i class="fas fa-list-ul text-emerald-400 mr-2"></i>Ítems de capital
+        </h2>
+        <button type="button" id="btn-agregar-item"
+                class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 text-xs font-medium rounded-lg hover:bg-green-100 transition-colors">
+          <i class="fas fa-plus"></i> Agregar ítem
+        </button>
+      </div>
+
+      {{ formset.management_form }}
+
+      <div id="items-container" class="space-y-4">
+        {% for form in formset %}
+        <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
+          {{ form.id }}
+          {{ form.orden }}
+          {% if form.DELETE %}
+          <div class="hidden">{{ form.DELETE }}</div>
+          {% endif %}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="sm:col-span-2 lg:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
+              {{ form.nombre }}
+              {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+              {{ form.tipo }}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Moneda *</label>
+              {{ form.moneda }}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Monto *</label>
+              {{ form.monto_original }}
+              {% if form.monto_original.errors %}<p class="text-red-500 text-xs mt-1">{{ form.monto_original.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización a usar</label>
+              {{ form.cotizacion_tipo }}
+            </div>
+            <div class="cotizacion-manual-wrapper">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización manual</label>
+              {{ form.cotizacion_manual }}
+            </div>
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
+              <i class="fas fa-trash mr-1"></i>Eliminar ítem
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Template para nuevos ítems (oculto, clonado por JS) -->
+      <div id="item-template" class="hidden">
+        <div class="item-form bg-gray-50 rounded-lg p-4 border border-gray-100">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="sm:col-span-2 lg:col-span-1">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Descripción *</label>
+              <input type="text" name="items-__prefix__-nombre" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm" placeholder="Ej: Efectivo USD, Cuenta Galicia">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+              <select name="items-__prefix__-tipo" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                <option value="efectivo">Efectivo</option>
+                <option value="cuenta_bancaria">Cuenta Bancaria</option>
+                <option value="billetera_virtual">Billetera Virtual</option>
+                <option value="cripto">Criptomonedas</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Moneda *</label>
+              <select name="items-__prefix__-moneda" class="moneda-select w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                <option value="ARS">Pesos Argentinos (ARS)</option>
+                <option value="USD">Dólares (USD)</option>
+                <option value="EUR">Euros (EUR)</option>
+                <option value="BRL">Reales (BRL)</option>
+                <option value="otro">Otra moneda</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Monto *</label>
+              <input type="number" name="items-__prefix__-monto_original" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm" step="0.01" min="0" placeholder="0.00">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización a usar</label>
+              <select name="items-__prefix__-cotizacion_tipo" class="cotizacion-tipo-select w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                <option value="blue_venta">Dólar Blue (venta)</option>
+                <option value="blue_compra">Dólar Blue (compra)</option>
+                <option value="oficial_venta">Dólar Oficial (venta)</option>
+                <option value="oficial_compra">Dólar Oficial (compra)</option>
+                <option value="mep">Dólar MEP</option>
+                <option value="manual">Cotización manual</option>
+                <option value="uno_a_uno">1:1 (ya está en USD)</option>
+              </select>
+            </div>
+            <div class="cotizacion-manual-wrapper">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Cotización manual</label>
+              <input type="number" name="items-__prefix__-cotizacion_manual" class="cotizacion-manual-input w-full rounded-lg border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm" step="0.01" min="0" placeholder="Solo si elegís manual">
+            </div>
+            <input type="hidden" name="items-__prefix__-orden" value="0">
+          </div>
+          <div class="mt-3 flex justify-end">
+            <button type="button" class="btn-eliminar-item text-red-400 hover:text-red-600 text-xs transition-colors">
+              <i class="fas fa-trash mr-1"></i>Eliminar ítem
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex justify-between gap-3 mt-6">
+      <a href="{% url 'ahorro_vivienda:detalle_snapshot' snapshot.pk %}"
+         class="px-5 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="px-5 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+        <i class="fas fa-check mr-2"></i>Guardar cambios
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const itemsContainer = document.getElementById('items-container');
+const totalFormsInput = document.querySelector('[name="items-TOTAL_FORMS"]');
+
+function renumberItems() {
+  const forms = itemsContainer.querySelectorAll('.item-form');
+  forms.forEach((form, idx) => {
+    form.querySelectorAll('[name]').forEach(el => {
+      el.name = el.name.replace(/^items-\d+-/, 'items-' + idx + '-');
+    });
+    form.querySelectorAll('[id]').forEach(el => {
+      el.id = el.id.replace(/^id_items-\d+-/, 'id_items-' + idx + '-');
+    });
+  });
+  totalFormsInput.value = forms.length;
+}
+
+document.getElementById('btn-agregar-item').addEventListener('click', () => {
+  const currentCount = itemsContainer.querySelectorAll('.item-form').length;
+  const template = document.getElementById('item-template').innerHTML;
+  const newItem = template.replace(/__prefix__/g, currentCount);
+  const div = document.createElement('div');
+  div.innerHTML = newItem;
+  itemsContainer.appendChild(div.firstElementChild);
+  totalFormsInput.value = currentCount + 1;
+  bindEliminarBtns();
+  bindCotizacionManualVis();
+});
+
+function bindEliminarBtns() {
+  itemsContainer.querySelectorAll('.btn-eliminar-item').forEach(btn => {
+    btn.onclick = function () {
+      const itemDiv = btn.closest('.item-form');
+      const deleteInput = itemDiv.querySelector('[name$="-DELETE"]');
+      if (deleteInput) {
+        deleteInput.checked = true;
+        itemDiv.style.opacity = '0.35';
+        itemDiv.style.pointerEvents = 'none';
+        btn.style.pointerEvents = 'auto';
+        btn.innerHTML = '<i class="fas fa-check mr-1"></i>Marcado para eliminar';
+        btn.classList.remove('text-red-400', 'hover:text-red-600');
+        btn.classList.add('text-gray-400');
+        btn.disabled = true;
+      } else {
+        itemDiv.remove();
+        renumberItems();
+      }
+    };
+  });
+}
+
+function bindCotizacionManualVis() {
+  itemsContainer.querySelectorAll('.cotizacion-tipo-select').forEach(sel => {
+    const wrapper = sel.closest('.item-form').querySelector('.cotizacion-manual-wrapper');
+    function toggle() {
+      wrapper.style.display = sel.value === 'manual' ? '' : 'none';
+    }
+    toggle();
+    sel.addEventListener('change', toggle);
+  });
+}
+
+bindEliminarBtns();
+bindCotizacionManualVis();
+</script>
+{% endblock %}

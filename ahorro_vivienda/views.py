@@ -211,7 +211,7 @@ def nuevo_snapshot(request):
         snapshot_form = SnapshotForm(request.POST)
         cot_form = CotizacionForm(request.POST, prefix='cot')
 
-        # Si la cotización ya existe para esa fecha, usarla y no validar el form de cotización
+        # Si ya existe un snapshot para esa fecha, redirigir a editar
         snapshot_fecha = request.POST.get('fecha')
         cot_existente_para_fecha = None
         if snapshot_fecha:
@@ -219,6 +219,10 @@ def nuevo_snapshot(request):
                 from datetime import date as date_cls
                 fecha_obj = date_cls.fromisoformat(snapshot_fecha)
                 cot_existente_para_fecha = Cotizacion.objects.filter(fecha=fecha_obj).first()
+                snapshot_existente = Snapshot.objects.filter(fecha=fecha_obj).first()
+                if snapshot_existente:
+                    messages.warning(request, f'Ya existe un snapshot del {fecha_obj.strftime("%d/%m/%Y")}. Te redirigimos para editarlo.')
+                    return redirect('ahorro_vivienda:editar_snapshot', pk=snapshot_existente.pk)
             except ValueError:
                 pass
 
@@ -308,6 +312,35 @@ def nuevo_snapshot(request):
         'formset': formset,
         'cotizacion_existente': cotizacion_existente,
         'ultimo_blue': ultimo_blue,
+    })
+
+
+@vivienda_required
+def editar_snapshot(request, pk):
+    snapshot = get_object_or_404(Snapshot, pk=pk)
+
+    if request.method == 'POST':
+        snapshot_form = SnapshotForm(request.POST, instance=snapshot)
+        formset = CapitalItemFormSet(request.POST, instance=snapshot)
+
+        if snapshot_form.is_valid() and formset.is_valid():
+            snapshot_form.save()
+            items = formset.save(commit=False)
+            for item in items:
+                item.save()
+            for deleted in formset.deleted_objects:
+                deleted.delete()
+            snapshot.recalcular_total()
+            messages.success(request, f'Snapshot del {snapshot.fecha.strftime("%d/%m/%Y")} actualizado. Total: USD {snapshot.total_usd_calculado:,.2f}')
+            return redirect('ahorro_vivienda:detalle_snapshot', pk=snapshot.pk)
+    else:
+        snapshot_form = SnapshotForm(instance=snapshot)
+        formset = CapitalItemFormSet(instance=snapshot)
+
+    return render(request, 'ahorro_vivienda/editar_snapshot.html', {
+        'snapshot': snapshot,
+        'snapshot_form': snapshot_form,
+        'formset': formset,
     })
 
 

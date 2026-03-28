@@ -75,8 +75,12 @@
           </td>
           <td class="px-5 py-3 text-right text-gray-500 hidden xl:table-cell">{{ snap.items.count }}</td>
           <td class="px-5 py-3 text-right">
-            <a href="{% url 'ahorro_vivienda:detalle_snapshot' snap.pk %}"
-               class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold">Ver →</a>
+            <div class="flex items-center justify-end gap-3">
+              <a href="{% url 'ahorro_vivienda:editar_snapshot' snap.pk %}"
+                 class="text-gray-400 hover:text-emerald-600 text-xs" title="Editar"><i class="fas fa-pen"></i></a>
+              <a href="{% url 'ahorro_vivienda:detalle_snapshot' snap.pk %}"
+                 class="text-emerald-600 hover:text-emerald-800 text-xs font-semibold">Ver →</a>
+            </div>
           </td>
         </tr>
         {% endfor %}

@@ -8,6 +8,7 @@ urlpatterns = [
     path('snapshots/', views.lista_snapshots, name='lista_snapshots'),
     path('snapshots/nuevo/', views.nuevo_snapshot, name='nuevo_snapshot'),
     path('snapshots/<int:pk>/', views.detalle_snapshot, name='detalle_snapshot'),
+    path('snapshots/<int:pk>/editar/', views.editar_snapshot, name='editar_snapshot'),
     path('conversiones/', views.lista_conversiones, name='lista_conversiones'),
     path('conversiones/nueva/', views.nueva_conversion, name='nueva_conversion'),
     path('configuracion/', views.configuracion, name='configuracion'),
