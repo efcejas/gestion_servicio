@@ -1,0 +1,110 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}Control de Stock{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-2">
+
+  <!-- Encabezado -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-medical-primary">Control de Stock</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ total_areas }} área{{ total_areas|pluralize:"s" }} activa{{ total_areas|pluralize:"s" }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a href="{% url 'control_stock:buscar' %}"
+         class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-600 font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+        <i class="fas fa-search"></i> Buscar
+      </a>
+      <a href="{% url 'control_stock:vencimientos' %}"
+         class="inline-flex items-center gap-2 bg-white border border-amber-200 text-amber-600 font-semibold px-4 py-2.5 rounded-xl hover:bg-amber-50 transition-colors shadow-sm">
+        <i class="fas fa-calendar-times"></i> Vencimientos
+      </a>
+      <a href="{% url 'control_stock:scanner' %}"
+         class="inline-flex items-center gap-2 bg-medical-primary text-white font-semibold px-4 py-2.5 rounded-xl hover:bg-medical-secondary transition-colors shadow">
+        <i class="fas fa-barcode"></i> Escáner
+      </a>
+      <a href="{% url 'control_stock:historial' %}"
+         class="inline-flex items-center gap-2 bg-white border border-gray-200 text-medical-primary font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+        <i class="fas fa-history"></i> Historial
+      </a>
+    </div>
+  </div>
+
+  <!-- Grid de áreas -->
+  {% if areas_data %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for d in areas_data %}
+    <div class="bg-white rounded-2xl shadow-sm border {% if d.tiene_alertas %}border-red-200{% else %}border-gray-100{% endif %} hover:shadow-md transition-shadow">
+      <div class="p-5">
+        <!-- Header de la tarjeta -->
+        <div class="flex items-start justify-between mb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-medical-primary/10 flex items-center justify-center">
+              <i class="fas fa-box-open text-medical-primary text-lg"></i>
+            </div>
+            <div>
+              <h2 class="font-bold text-gray-800 text-base leading-tight">{{ d.area.nombre }}</h2>
+              {% if d.area.responsable %}
+              <p class="text-xs text-gray-400">{{ d.area.responsable.get_full_name }}</p>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Badges de alerta -->
+          {% if d.tiene_alertas %}
+          <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
+            <i class="fas fa-exclamation-triangle text-xs"></i> Alerta
+          </span>
+          {% endif %}
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="grid grid-cols-3 gap-2 mt-4">
+          <div class="text-center">
+            <p class="text-xl font-bold text-gray-700">{{ d.items_total }}</p>
+            <p class="text-xs text-gray-400">Ítems</p>
+          </div>
+          <div class="text-center">
+            <p class="text-xl font-bold {% if d.bajo_minimo_count > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ d.bajo_minimo_count }}</p>
+            <p class="text-xs text-gray-400">Stock bajo</p>
+          </div>
+          <div class="text-center">
+            {% if d.vencimientos_proximos > 0 %}
+            <a href="{% url 'control_stock:vencimientos' %}?area_id={{ d.area.id }}&dias=30"
+               class="block">
+              <p class="text-xl font-bold text-amber-500 hover:text-amber-600">{{ d.vencimientos_proximos }}</p>
+            </a>
+            {% else %}
+            <p class="text-xl font-bold text-gray-700">{{ d.vencimientos_proximos }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-400">Vence pronto</p>
+          </div>
+        </div>
+
+        <!-- Acciones -->
+        <div class="flex gap-2 mt-4 pt-4 border-t border-gray-100">
+          <a href="{% url 'control_stock:detalle_area' d.area.id %}"
+             class="flex-1 text-center text-sm font-medium text-medical-primary hover:text-medical-secondary py-1.5 rounded-lg hover:bg-medical-primary/5 transition-colors">
+            <i class="fas fa-eye mr-1"></i> Ver stock
+          </a>
+          <a href="{% url 'control_stock:scanner_area' d.area.id %}"
+             class="flex-1 text-center text-sm font-medium bg-medical-primary text-white py-1.5 rounded-lg hover:bg-medical-secondary transition-colors">
+            <i class="fas fa-barcode mr-1"></i> Escanear
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-box-open text-2xl text-gray-400"></i>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-600 mb-2">No hay áreas configuradas</h3>
+    <p class="text-gray-400 text-sm">Un administrador debe crear las áreas de servicio desde el panel de administración.</p>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

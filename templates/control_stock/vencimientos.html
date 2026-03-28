@@ -1,0 +1,335 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load static %}
+{% block title %}Vencimientos Próximos{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-4">
+
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <a href="{% url 'control_stock:dashboard' %}"
+         class="text-sm text-gray-400 hover:text-medical-primary mb-1 inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left text-xs"></i> Volver
+      </a>
+      <h1 class="text-2xl font-bold text-medical-primary">Vencimientos próximos</h1>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <form method="get" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-6">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Área</label>
+        <select name="area_id"
+                class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-medical-primary focus:ring-medical-primary">
+          <option value="">Todas las áreas</option>
+          {% for area in areas %}
+          <option value="{{ area.id }}" {% if area_filtro and area_filtro.id == area.id %}selected{% endif %}>
+            {{ area.nombre }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 mb-1">Período</label>
+        <select name="dias"
+                class="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:border-medical-primary focus:ring-medical-primary">
+          <option value="7"  {% if dias == 7  %}selected{% endif %}>Próximos 7 días</option>
+          <option value="30" {% if dias == 30 %}selected{% endif %}>Próximos 30 días</option>
+          <option value="60" {% if dias == 60 %}selected{% endif %}>Próximos 60 días</option>
+          <option value="90" {% if dias == 90 %}selected{% endif %}>Próximos 90 días</option>
+        </select>
+      </div>
+      <button type="submit"
+              class="inline-flex items-center gap-2 bg-medical-primary text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-medical-secondary transition-colors">
+        <i class="fas fa-filter"></i> Filtrar
+      </button>
+      <a href="{% url 'control_stock:vencimientos' %}"
+         class="inline-flex items-center gap-2 bg-gray-100 text-gray-600 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-gray-200 transition-colors">
+        <i class="fas fa-times"></i> Limpiar
+      </a>
+    </div>
+  </form>
+
+  <!-- Resultados -->
+  {% if items %}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold">Producto</th>
+            <th class="text-left px-4 py-3 font-semibold hidden sm:table-cell">Área</th>
+            <th class="text-left px-4 py-3 font-semibold hidden md:table-cell">Lote</th>
+            <th class="text-center px-4 py-3 font-semibold">Cant.</th>
+            <th class="text-center px-4 py-3 font-semibold">Vence el</th>
+            <th class="text-center px-4 py-3 font-semibold">Estado</th>
+            {% if puede_descartar %}<th class="text-center px-4 py-3 font-semibold">Acción</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for item in items %}
+          <tr class="hover:bg-gray-50 transition-colors {% if item.vencido %}bg-red-50/40{% endif %}">
+            <td class="px-4 py-3">
+              <p class="font-semibold text-gray-800">{{ item.stock.producto.nombre }}</p>
+              <p class="text-xs text-gray-400">{{ item.stock.producto.get_categoria_display }}</p>
+              <p class="text-xs text-gray-400 sm:hidden mt-0.5">{{ item.stock.area.nombre }}</p>
+            </td>
+            <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ item.stock.area.nombre }}</td>
+            <td class="px-4 py-3 hidden md:table-cell">
+              {% if item.lote.numero_lote %}
+              <span class="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ item.lote.numero_lote }}</span>
+              {% else %}
+              <span class="text-xs text-gray-400">—</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-center">
+              <span class="font-bold {% if item.stock.bajo_minimo %}text-red-600{% else %}text-gray-700{% endif %}">
+                {{ item.lote.cantidad }}
+              </span>
+              <span class="text-xs text-gray-400 ml-1">{{ item.stock.producto.get_unidad_medida_display }}</span>
+            </td>
+            <td class="px-4 py-3 text-center font-semibold {% if item.vencido %}text-red-600{% elif item.vence_hoy %}text-red-500{% elif item.vence_semana %}text-orange-500{% else %}text-amber-500{% endif %}">
+              {{ item.vencimiento|date:"d/m/Y" }}
+            </td>
+            <td class="px-4 py-3 text-center">
+              {% if item.vencido %}
+              <span class="inline-flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-times-circle text-xs"></i> Vencido
+              </span>
+              {% elif item.vence_hoy %}
+              <span class="inline-flex items-center gap-1 bg-red-100 text-red-600 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-exclamation-circle text-xs"></i> Hoy
+              </span>
+              {% elif item.vence_semana %}
+              <span class="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-exclamation-triangle text-xs"></i> Esta semana
+              </span>
+              {% else %}
+              <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+                <i class="fas fa-clock text-xs"></i> Este mes
+              </span>
+              {% endif %}
+            </td>
+            {% if puede_descartar %}
+            <td class="px-4 py-3 text-center">
+              <button onclick="abrirDescartar({{ item.lote.id }}, '{{ item.stock.producto.nombre|escapejs }}', '{{ item.stock.area.nombre|escapejs }}', '{{ item.lote.numero_lote|default:''|escapejs }}', '{{ item.vencimiento|date:'Y-m-d' }}', {{ item.lote.cantidad }}, '{{ item.stock.producto.get_unidad_medida_display|escapejs }}')"
+                      class="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg border border-red-200 transition-colors">
+                <i class="fas fa-trash-alt text-xs"></i> Descartar
+              </button>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-4 py-3 bg-gray-50 text-xs text-gray-400 border-t border-gray-100">
+      {{ items|length }} lote{{ items|length|pluralize }} con vencimiento en los próximos {{ dias }} días.
+    </div>
+  </div>
+
+  {% else %}
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-check-circle text-2xl text-green-500"></i>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-700 mb-1">Sin vencimientos próximos</h3>
+    <p class="text-gray-400 text-sm">
+      No hay productos que venzan en los próximos {{ dias }} días
+      {% if area_filtro %}en {{ area_filtro.nombre }}{% endif %}.
+    </p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% if puede_descartar %}
+<!-- ══ Modal de descarte ══════════════════════════════════════════ -->
+<div id="modalDescartar" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+          <i class="fas fa-trash-alt text-red-600 text-sm"></i>
+        </div>
+        <h3 class="font-bold text-gray-800">Descartar lote</h3>
+      </div>
+      <button onclick="cerrarDescartar()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+        <i class="fas fa-times text-sm"></i>
+      </button>
+    </div>
+    <!-- Body -->
+    <div class="p-5 space-y-4">
+      <!-- Info del lote -->
+      <div class="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+        <p id="descartarNombre" class="font-semibold text-gray-800 text-sm"></p>
+        <p id="descartarArea" class="text-xs text-gray-500"></p>
+        <div class="flex items-center gap-3 mt-1.5">
+          <span id="descartarLote" class="text-xs font-mono bg-white border border-gray-200 text-gray-600 px-2 py-0.5 rounded"></span>
+          <span id="descartarVence" class="text-xs text-red-600 font-semibold"></span>
+        </div>
+      </div>
+      <!-- Cantidad -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">Cantidad a descartar</label>
+        <div class="flex items-center gap-3">
+          <button onclick="ajustarDescarte(-1)" type="button"
+                  class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xl font-bold flex items-center justify-center">−</button>
+          <input type="number" id="descartarCantidad" value="1" min="1"
+                 class="w-20 text-center text-xl font-bold border-2 border-gray-200 rounded-xl py-2 focus:border-red-400 focus:ring-red-400">
+          <button onclick="ajustarDescarte(1)" type="button"
+                  class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xl font-bold flex items-center justify-center">+</button>
+          <span id="descartarDisponible" class="text-xs text-gray-400 ml-auto"></span>
+        </div>
+      </div>
+      <!-- Motivo (obligatorio) -->
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">
+          Motivo del descarte <span class="text-red-500">*</span>
+        </label>
+        <textarea id="descartarMotivo" rows="2"
+                  placeholder="Ej: Lote vencido, deterioro de packaging, contaminación..."
+                  class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm resize-none focus:border-red-400 focus:ring-red-400"></textarea>
+        <p class="text-xs text-gray-400 mt-1">El motivo queda registrado en el historial de auditoría.</p>
+      </div>
+    </div>
+    <!-- Footer -->
+    <div class="px-5 pb-5 flex gap-3">
+      <button onclick="cerrarDescartar()"
+              class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">
+        Cancelar
+      </button>
+      <button onclick="confirmarDescarte()" id="btnConfirmarDescarte"
+              class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors">
+        <i class="fas fa-trash-alt mr-1.5"></i> Descartar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toastVenc"
+     class="hidden fixed z-[999] min-w-[260px] max-w-xs flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white">
+  <i id="toastVencIcon" class="fas mt-0.5 flex-shrink-0"></i>
+  <span id="toastVencMsg" class="leading-snug"></span>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if puede_descartar %}
+<script>
+const CSRF_TOKEN_V = '{{ csrf_token }}';
+const URL_MOV_V    = '{% url "control_stock:api_movimiento" %}';
+
+let descartarLoteId  = null;
+let descartarMaxCant = 1;
+
+function abrirDescartar(loteId, nombre, area, lote, vence, cantidad, unidad) {
+  descartarLoteId  = loteId;
+  descartarMaxCant = cantidad;
+  document.getElementById('descartarNombre').textContent    = nombre;
+  document.getElementById('descartarArea').textContent      = `Área: ${area}`;
+  document.getElementById('descartarLote').textContent      = lote ? `Lote ${lote}` : 'Sin nro. de lote';
+  const fechaStr = vence
+    ? new Date(vence + 'T12:00:00').toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    : '';
+  document.getElementById('descartarVence').textContent     = fechaStr ? `Vence: ${fechaStr}` : '';
+  const inp = document.getElementById('descartarCantidad');
+  inp.value = 1;
+  inp.max   = cantidad;
+  document.getElementById('descartarDisponible').textContent = `Disponible: ${cantidad} ${unidad}`;
+  document.getElementById('descartarMotivo').value = '';
+  document.getElementById('modalDescartar').classList.remove('hidden');
+}
+
+function cerrarDescartar() {
+  document.getElementById('modalDescartar').classList.add('hidden');
+  descartarLoteId = null;
+}
+
+function ajustarDescarte(delta) {
+  const inp  = document.getElementById('descartarCantidad');
+  const nuevo = Math.max(1, Math.min(descartarMaxCant, (parseInt(inp.value) || 1) + delta));
+  inp.value = nuevo;
+}
+
+async function confirmarDescarte() {
+  const cantidad = parseInt(document.getElementById('descartarCantidad').value);
+  const motivo   = document.getElementById('descartarMotivo').value.trim();
+  if (!motivo) {
+    mostrarToastV('El motivo es obligatorio para descartar.', 'warning');
+    document.getElementById('descartarMotivo').focus();
+    return;
+  }
+  if (cantidad < 1 || cantidad > descartarMaxCant) {
+    mostrarToastV('Cantidad inválida.', 'warning');
+    return;
+  }
+
+  const btn = document.getElementById('btnConfirmarDescarte');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Descartando...';
+
+  try {
+    const resp = await fetch(URL_MOV_V, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_V },
+      body: JSON.stringify({
+        lote_id:     descartarLoteId,
+        tipo:        'descarte',
+        cantidad,
+        observacion: motivo,
+        // Los siguientes campos son requeridos por la API pero el lote ya lleva la info
+        area_id:     0,   // la API los ignora si lote_id está presente
+        codigo_barras: '', // ídem
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      mostrarToastV(data.error || 'Error al descartar.', 'error');
+    } else {
+      cerrarDescartar();
+      mostrarToastV('Lote descartado correctamente.', 'success');
+      // Recargar la página tras un breve delay para reflejar el cambio
+      setTimeout(() => location.reload(), 1500);
+    }
+  } catch {
+    mostrarToastV('Error de conexión.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash-alt mr-1.5"></i> Descartar';
+  }
+}
+
+function mostrarToastV(msg, tipo) {
+  const el = document.getElementById('toastVenc');
+  const ico = document.getElementById('toastVencIcon');
+  const txt = document.getElementById('toastVencMsg');
+  const tipos = {
+    success: { bg: 'bg-green-500', icon: 'fa-check-circle' },
+    error:   { bg: 'bg-red-500',   icon: 'fa-times-circle' },
+    warning: { bg: 'bg-amber-500', icon: 'fa-exclamation-triangle' },
+  };
+  const t = tipos[tipo] || tipos.success;
+  el.className = `fixed z-[999] min-w-[260px] max-w-xs flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white ${t.bg}`;
+  el.style.top   = '5rem';
+  el.style.right = '1rem';
+  ico.className  = `fas ${t.icon} mt-0.5 flex-shrink-0`;
+  txt.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 3500);
+}
+
+// Cerrar modal al clic en backdrop
+document.getElementById('modalDescartar').addEventListener('click', function(e) {
+  if (e.target === this) cerrarDescartar();
+});
+</script>
+{% endif %}
+{% endblock %}

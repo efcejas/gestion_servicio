@@ -1,0 +1,139 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}Buscar Producto{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-4">
+
+  <!-- Encabezado -->
+  <div class="mb-6">
+    <a href="{% url 'control_stock:dashboard' %}"
+       class="text-sm text-gray-400 hover:text-medical-primary mb-1 inline-flex items-center gap-1">
+      <i class="fas fa-arrow-left text-xs"></i> Volver
+    </a>
+    <h1 class="text-2xl font-bold text-medical-primary">Buscar producto</h1>
+    <p class="text-sm text-gray-500 mt-1">Encontrá un producto en todas las áreas activas.</p>
+  </div>
+
+  <!-- Input de búsqueda -->
+  <div class="relative mb-6">
+    <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+      <i class="fas fa-search text-gray-400"></i>
+    </div>
+    <input
+      type="text"
+      id="inputBuscar"
+      placeholder="Escribí el nombre del producto..."
+      autofocus
+      class="w-full pl-11 pr-4 py-4 text-base border-2 border-gray-200 focus:border-medical-primary rounded-2xl outline-none transition-colors shadow-sm bg-white"
+    >
+    <div id="spinnerBuscar" class="hidden absolute inset-y-0 right-4 flex items-center">
+      <i class="fas fa-spinner fa-spin text-gray-400"></i>
+    </div>
+  </div>
+
+  <!-- Resultados -->
+  <div id="resultados"></div>
+
+  <!-- Estado inicial -->
+  <div id="estadoInicial" class="text-center py-16">
+    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-search text-2xl text-gray-300"></i>
+    </div>
+    <p class="text-gray-500 font-medium">Escribí al menos 2 caracteres para buscar</p>
+    <p class="text-gray-400 text-sm mt-1">La búsqueda es en tiempo real en todas las áreas</p>
+  </div>
+
+  <!-- Sin resultados -->
+  <div id="sinResultados" class="hidden text-center py-16">
+    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-box-open text-2xl text-gray-300"></i>
+    </div>
+    <p class="text-gray-500 font-medium">No se encontraron productos</p>
+    <p class="text-gray-400 text-sm mt-1" id="sinResultadosTexto"></p>
+  </div>
+
+</div>
+
+<script>
+const URL_BUSCAR_GLOBAL = '{% url "control_stock:api_buscar_global" %}';
+let debounceTimer = null;
+
+document.getElementById('inputBuscar').addEventListener('input', function () {
+  const q = this.value.trim();
+  clearTimeout(debounceTimer);
+  document.getElementById('estadoInicial').classList.add('hidden');
+  document.getElementById('sinResultados').classList.add('hidden');
+  document.getElementById('resultados').innerHTML = '';
+
+  if (q.length < 2) {
+    document.getElementById('estadoInicial').classList.remove('hidden');
+    return;
+  }
+
+  debounceTimer = setTimeout(() => buscar(q), 300);
+});
+
+async function buscar(q) {
+  const spinner = document.getElementById('spinnerBuscar');
+  spinner.classList.remove('hidden');
+
+  try {
+    const resp = await fetch(`${URL_BUSCAR_GLOBAL}?q=${encodeURIComponent(q)}`);
+    const data = await resp.json();
+    renderResultados(data.resultados, q);
+  } catch {
+    document.getElementById('resultados').innerHTML =
+      '<p class="text-center text-red-500 text-sm py-8">Error de conexión. Intentá de nuevo.</p>';
+  } finally {
+    spinner.classList.add('hidden');
+  }
+}
+
+function renderResultados(resultados, q) {
+  const container = document.getElementById('resultados');
+
+  if (!resultados.length) {
+    document.getElementById('sinResultadosTexto').textContent =
+      `No hay stock registrado para "${q}"`;
+    document.getElementById('sinResultados').classList.remove('hidden');
+    return;
+  }
+
+  container.innerHTML = resultados.map(p => {
+    const stockTotal = p.stocks.reduce((s, a) => s + a.cantidad, 0);
+    const hayBajoMin = p.stocks.some(a => a.bajo_minimo);
+
+    const areasHtml = p.stocks.map(a => `
+      <a href="/stock/area/${a.area_id}/"
+         class="flex items-center justify-between px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors group">
+        <span class="text-sm text-gray-600 group-hover:text-medical-primary transition-colors">
+          <i class="fas fa-map-marker-alt text-xs text-gray-300 mr-1"></i>${a.area_nombre}
+        </span>
+        <span class="text-sm font-bold ${a.bajo_minimo ? 'text-red-600' : 'text-gray-800'}">
+          ${a.cantidad} <span class="font-normal text-gray-400 text-xs">${p.unidad}</span>
+          ${a.bajo_minimo ? '<i class="fas fa-exclamation-triangle text-xs text-red-400 ml-1"></i>' : ''}
+        </span>
+      </a>
+    `).join('');
+
+    return `
+      <div class="bg-white rounded-2xl shadow-sm border ${hayBajoMin ? 'border-red-100' : 'border-gray-100'} mb-3 overflow-hidden">
+        <div class="px-4 py-3 flex items-start justify-between gap-3 border-b border-gray-50">
+          <div>
+            <p class="font-bold text-gray-800 leading-tight">${p.nombre}</p>
+            <p class="text-xs text-gray-400 mt-0.5">${p.categoria} &middot; ${p.codigo_barras}</p>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <p class="text-xl font-bold ${hayBajoMin ? 'text-red-600' : 'text-gray-700'}">${stockTotal}</p>
+            <p class="text-xs text-gray-400">${p.unidad} total</p>
+          </div>
+        </div>
+        <div class="px-2 py-1 divide-y divide-gray-50">
+          ${areasHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+</script>
+{% endblock %}

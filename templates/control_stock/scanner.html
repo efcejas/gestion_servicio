@@ -1,0 +1,1063 @@
+{% extends "layouts/base_tailwind.html" %}
+{% load static %}
+{% block title %}Escáner de Stock{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto px-4 py-2">
+
+  <!-- Encabezado -->
+  <div class="flex items-center justify-between mb-4">
+    <div>
+      <a href="{% url 'control_stock:dashboard' %}" class="text-sm text-gray-400 hover:text-medical-primary inline-flex items-center gap-1">
+        <i class="fas fa-arrow-left text-xs"></i> Volver
+      </a>
+      <h1 class="text-xl font-bold text-medical-primary mt-0.5">Escáner de Stock</h1>
+    </div>
+  </div>
+
+  <!-- Selector de área -->
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4">
+    <label class="block text-sm font-semibold text-gray-700 mb-2">
+      <i class="fas fa-map-marker-alt text-medical-primary mr-1"></i> Área de trabajo
+    </label>
+    <select id="selectArea"
+            class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm text-gray-900 focus:border-medical-primary focus:ring-medical-primary">
+      <option value="">— Seleccioná un área —</option>
+      {% for area in areas %}
+      <option value="{{ area.id }}" {% if area_seleccionada and area.id == area_seleccionada.id %}selected{% endif %}>
+        {{ area.nombre }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Modos de captura -->
+  <div class="grid grid-cols-2 gap-3 mb-4">
+    <!-- Modo escáner -->
+    <button id="btnModoScanner"
+            onclick="activarModo('scanner')"
+            class="flex flex-col items-center gap-2 py-4 rounded-2xl border-2 border-medical-primary bg-medical-primary/5 text-medical-primary font-semibold text-sm transition-all">
+      <i class="fas fa-barcode text-2xl"></i>
+      Código de barras
+    </button>
+    <!-- Modo IA -->
+    <button id="btnModoIA"
+            onclick="activarModo('ia')"
+            class="flex flex-col items-center gap-2 py-4 rounded-2xl border-2 border-gray-200 bg-white text-gray-500 font-semibold text-sm transition-all hover:border-purple-400 hover:text-purple-600">
+      <i class="fas fa-camera text-2xl"></i>
+      Foto con IA
+    </button>
+  </div>
+
+  <!-- Visor del escáner de código de barras -->
+  <div id="panelScanner" class="bg-black rounded-2xl overflow-hidden mb-4" style="min-height:240px;">
+    <div id="reader" class="w-full"></div>
+    <div id="scannerPlaceholder" class="flex flex-col items-center justify-center py-16 text-gray-400">
+      <i class="fas fa-barcode text-5xl mb-3"></i>
+      <p class="text-sm">Seleccioná un área para activar la cámara</p>
+    </div>
+  </div>
+
+  <!-- Panel IA: visor de cámara en vivo -->
+  <div id="panelIA" class="hidden mb-4 space-y-3">
+
+    <!-- Visor de cámara / preview -->
+    <div class="bg-black rounded-2xl overflow-hidden relative" style="min-height:240px;">
+      <!-- Video en vivo -->
+      <video id="iaVideo" autoplay playsinline muted
+             class="w-full rounded-2xl" style="display:none;"></video>
+      <!-- Canvas oculto para captura -->
+      <canvas id="iaCanvas" class="hidden"></canvas>
+      <!-- Preview de la foto capturada -->
+      <img id="fotoPreview" src="" alt="" class="hidden w-full rounded-2xl object-contain">
+      <!-- Placeholder inicial -->
+      <div id="iaPlaceholder" class="flex flex-col items-center justify-center py-16 text-gray-400">
+        <i class="fas fa-camera text-5xl mb-3"></i>
+        <p class="text-sm">Activá la cámara para analizar el producto</p>
+      </div>
+    </div>
+
+    <!-- Controles IA -->
+    <div id="iaControlesInicio" class="flex flex-col gap-2">
+      <button type="button" id="btnActivarCamaraIA"
+              class="w-full flex items-center justify-center gap-2 bg-purple-600 text-white font-semibold py-3 rounded-xl hover:bg-purple-700 transition-colors">
+        <i class="fas fa-video"></i> Activar cámara
+      </button>
+      <!-- Fallback: elegir imagen del dispositivo -->
+      <button type="button" id="btnElegirArchivo"
+              class="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-semibold py-2.5 rounded-xl hover:bg-gray-200 transition-colors text-sm">
+        <i class="fas fa-image"></i> O elegir imagen del dispositivo
+      </button>
+      <input type="file" id="inputFoto" accept="image/*"
+             style="position:absolute;left:-9999px;opacity:0;width:1px;height:1px;">
+    </div>
+
+    <!-- Controles cuando la cámara está activa -->
+    <div id="iaControlesCamara" class="hidden flex gap-2">
+      <button type="button" id="btnCapturar"
+              class="flex-1 flex items-center justify-center gap-2 bg-purple-600 text-white font-bold py-4 rounded-xl hover:bg-purple-700 transition-colors text-base">
+        <i class="fas fa-camera text-lg"></i> Capturar y analizar
+      </button>
+      <button type="button" id="btnDetenerCamaraIA"
+              class="flex items-center justify-center gap-2 bg-gray-200 text-gray-600 font-semibold px-4 py-4 rounded-xl hover:bg-gray-300 transition-colors">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Controles tras capturar (nueva foto / analizar) -->
+    <div id="iaControlesCaptura" class="hidden flex gap-2">
+      <button type="button" id="btnNuevaFoto"
+              class="flex-1 flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-colors">
+        <i class="fas fa-redo"></i> Nueva foto
+      </button>
+    </div>
+
+    <!-- Estado de análisis IA -->
+    <div id="iaEstado" class="hidden bg-purple-50 border border-purple-200 rounded-xl p-4 text-sm text-purple-700">
+      <i class="fas fa-spinner fa-spin mr-2"></i> Analizando imagen con IA...
+    </div>
+  </div>
+
+  <!-- Estado de escaneo -->
+  <div id="estadoEscaneo" class="hidden mb-3 text-center">
+    <div class="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-sm font-medium">
+      <i class="fas fa-spinner fa-spin"></i> Buscando producto...
+    </div>
+  </div>
+
+  <!-- Buscar por nombre (toggle) -->
+  <div id="btnBuscarNombreToggle" class="hidden text-center mb-3">
+    <button onclick="toggleBuscarNombre(true)"
+            class="inline-flex items-center gap-1.5 text-sm text-medical-primary hover:text-medical-secondary font-medium underline underline-offset-2 transition-colors">
+      <i class="fas fa-search text-xs"></i> ¿No encontrás el código? Buscá por nombre
+    </button>
+  </div>
+
+  <!-- Panel de búsqueda por nombre -->
+  <div id="seccionBuscarNombre" class="hidden mb-4">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      <div class="flex items-center gap-2 mb-3">
+        <i class="fas fa-search text-medical-primary text-sm"></i>
+        <p class="text-sm font-semibold text-gray-700 flex-1">Buscar por nombre</p>
+        <button onclick="toggleBuscarNombre(false)"
+                class="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-400 transition-colors">
+          <i class="fas fa-times text-xs"></i>
+        </button>
+      </div>
+      <input type="text" id="inputBuscarNombre" autocomplete="off"
+             placeholder="Escribí el nombre del producto..."
+             class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm focus:border-medical-primary focus:ring-medical-primary">
+      <div id="buscarNombreSpinner" class="hidden text-center py-3">
+        <i class="fas fa-spinner fa-spin text-gray-400 text-sm"></i>
+      </div>
+      <div id="resultadosBuscarNombre" class="hidden mt-3 space-y-2"></div>
+      <p id="buscarNombreVacio" class="hidden text-center text-xs text-gray-400 py-4 mt-2">
+        Sin resultados. Intentá con otro término.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ==================== MODAL DE PRODUCTO ==================== -->
+<div id="modalProducto" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+
+    <!-- Header del modal -->
+    <div class="flex-shrink-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between rounded-t-2xl">
+      <h2 class="font-bold text-gray-800 text-base" id="modalTitulo">Producto detectado</h2>
+      <button onclick="cerrarModal()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors">
+        <i class="fas fa-times text-sm"></i>
+      </button>
+    </div>
+
+    <div class="flex-1 overflow-y-auto">
+    <div class="p-5 space-y-4">
+
+      <!-- Info del producto -->
+      <div id="bloqueProducto" class="flex items-start gap-3">
+        <img id="imgProducto" src="" alt="" class="w-16 h-16 rounded-xl object-cover border border-gray-100 hidden flex-shrink-0">
+        <div class="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0" id="imgPlaceholder">
+          <i class="fas fa-box text-gray-300 text-xl"></i>
+        </div>
+        <div class="flex-1">
+          <p id="nombreProducto" class="font-bold text-gray-800 text-base leading-tight"></p>
+          <p id="codigoProducto" class="text-xs text-gray-400 mt-0.5"></p>
+          <p id="categoriaProducto" class="text-xs text-gray-500 mt-0.5"></p>
+          <span id="badgeNuevo" class="hidden inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+            <i class="fas fa-star text-xs"></i> Producto nuevo
+          </span>
+          <span id="badgeIa" class="hidden inline-flex items-center gap-1 bg-purple-100 text-purple-700 text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+            <i class="fas fa-robot text-xs"></i> Extraído por IA
+          </span>
+          <span id="badgeStock" class="hidden inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+            <i class="fas fa-layer-group text-xs"></i>
+            <span id="badgeStockTexto"></span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Datos extraídos por IA (fecha de vencimiento, lote) -->
+      <div id="datosFechaSuperior" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
+        <div class="flex items-center gap-2 text-amber-700 font-semibold mb-1">
+          <i class="fas fa-calendar-alt"></i> Datos del packaging
+        </div>
+        <div id="textoFechaVenceIa" class="text-amber-600 text-xs"></div>
+        <div id="textoLoteIa" class="text-amber-600 text-xs"></div>
+      </div>
+
+      <!-- Formulario de nombre (solo si es producto nuevo) -->
+      <div id="formNuevoProducto" class="hidden space-y-3 border border-blue-100 rounded-xl p-4 bg-blue-50/50">
+        <p class="text-xs font-semibold text-blue-700 flex items-center gap-1">
+          <i class="fas fa-info-circle"></i> Completá los datos del producto nuevo
+        </p>
+        <!-- Código de barras editable (importante si la IA no lo detectó) -->
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Código de barras</label>
+          <div class="flex gap-2">
+            <input type="text" id="inputCodigoEditable"
+                   class="flex-1 block rounded-xl border border-gray-300 bg-white p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+                   placeholder="Escáneo ingresá manualmente">
+            <button type="button" onclick="generarCodigoInterno()"
+                    class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold rounded-xl transition-colors whitespace-nowrap">
+              Auto
+            </button>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Si no tiene código, pulsá <strong>Auto</strong> para generar uno interno.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Nombre *</label>
+          <input type="text" id="inputNombre"
+                 class="block w-full rounded-xl border border-gray-300 bg-white p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500"
+                 placeholder="Ej: Jeringa descartable 5ml">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Categoría</label>
+            <select id="inputCategoria" class="block w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs focus:border-blue-500 focus:ring-blue-500">
+              <option value="descartable">Descartable</option>
+              <option value="medicamento">Medicamento</option>
+              <option value="material_procedimiento">Material procedimiento</option>
+              <option value="material_limpieza">Limpieza</option>
+              <option value="instrumental">Instrumental</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Unidad</label>
+            <select id="inputUnidad" class="block w-full rounded-xl border border-gray-300 bg-white p-2.5 text-xs focus:border-blue-500 focus:ring-blue-500">
+              <option value="unidad">Unidad</option>
+              <option value="caja">Caja</option>
+              <option value="frasco">Frasco</option>
+              <option value="ampolla">Ampolla</option>
+              <option value="bolsa">Bolsa</option>
+              <option value="par">Par</option>
+              <option value="litro">Litro</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Stock mínimo de alerta</label>
+          <input type="number" id="inputStockMinimo" value="0" min="0"
+                 class="block w-full rounded-xl border border-gray-300 bg-white p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Lotes activos (solo para productos existentes) -->
+      <div id="bloqueLotes" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Lotes en esta área</p>
+          <span id="lotesTotal" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"></span>
+        </div>
+        <div id="listaLotes" class="space-y-2"></div>
+        <p id="lotesVacios" class="hidden text-xs text-gray-400 text-center py-3">
+          Sin lotes registrados. Usá "Reponer" para agregar stock.
+        </p>
+      </div>
+
+      <!-- Datos del movimiento -->
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Fecha de vencimiento</label>
+            <input type="date" id="inputFechaVencimiento"
+                   class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Nro. de lote</label>
+            <input type="text" id="inputLote" placeholder="Opcional"
+                   class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1">Observación</label>
+          <input type="text" id="inputObservacion" placeholder="Opcional"
+                 class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-2.5 text-sm focus:border-blue-500 focus:ring-blue-500">
+        </div>
+      </div>
+
+      <!-- Cantidad + botones de acción -->
+      <div class="border-t border-gray-100 pt-4">
+        <label class="block text-sm font-semibold text-gray-700 mb-2 text-center">Cantidad</label>
+        <div class="flex items-center justify-center gap-4 mb-5">
+          <button onclick="ajustarCantidad(-1)"
+                  class="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xl font-bold flex items-center justify-center transition-colors">
+            −
+          </button>
+          <input type="number" id="inputCantidad" value="1" min="1"
+                 class="w-20 text-center text-2xl font-bold border-2 border-gray-200 rounded-xl py-2 focus:border-medical-primary focus:ring-medical-primary">
+          <button onclick="ajustarCantidad(1)"
+                  class="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 text-xl font-bold flex items-center justify-center transition-colors">
+            +
+          </button>
+        </div>
+
+        <!-- Botones según si es producto nuevo o existente -->
+        <div id="botonesNuevo" class="hidden">
+          <button onclick="registrar('entrada')"
+                  class="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 active:scale-[.98] text-white font-bold py-4 rounded-xl transition-all text-base shadow">
+            <i class="fas fa-plus text-lg"></i> Registrar entrada
+          </button>
+        </div>
+        <div id="botonesExistente" class="hidden space-y-2">
+          <button onclick="registrar('entrada')"
+                  class="w-full flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 active:scale-[.98] text-white font-bold py-3 rounded-xl transition-all shadow">
+            <i class="fas fa-plus"></i> Reponer stock
+          </button>
+          <button onclick="registrar('uso')"
+                  class="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 active:scale-[.98] text-white font-bold py-3 rounded-xl transition-all shadow">
+            <i class="fas fa-hand-paper"></i> Registrar uso
+          </button>
+        </div>
+      </div>
+
+    </div>
+    </div><!-- /flex-1 overflow-y-auto -->
+
+    <!-- ── Panel de confirmación post-registro ── -->
+    <div id="panelConfirmacion"
+         class="hidden absolute inset-0 bg-white rounded-2xl flex flex-col items-center justify-center p-8 text-center">
+      <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-5">
+        <i class="fas fa-check text-green-500 text-4xl"></i>
+      </div>
+      <p id="confirmNombre" class="font-bold text-gray-800 text-lg mb-2 leading-tight"></p>
+      <p id="confirmDetalle" class="text-gray-500 text-sm mb-8"></p>
+      <div class="w-48 bg-gray-100 rounded-full h-1.5 overflow-hidden mb-2">
+        <div id="confirmBarra" class="bg-green-500 h-full rounded-full" style="width:0%"></div>
+      </div>
+      <p class="text-xs text-gray-400 mb-5">Volviendo a la cámara...</p>
+      <button onclick="cerrarModal()"
+              class="text-sm text-gray-400 hover:text-gray-700 underline underline-offset-2 transition-colors">
+        Cerrar ahora
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast de notificación -->
+<div id="toast"
+     class="hidden fixed top-5 right-5 z-[999] min-w-[260px] max-w-xs
+            flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl
+            text-sm font-medium text-white">
+  <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-white/20">
+    <i id="toastIcon" class="fas text-xs"></i>
+  </div>
+  <span id="toastMsg" class="leading-snug"></span>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- html5-qrcode CDN -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<script>
+const AREA_SELECT = document.getElementById('selectArea');
+const PANEL_SCANNER = document.getElementById('panelScanner');
+const PANEL_IA = document.getElementById('panelIA');
+const BTN_SCANNER = document.getElementById('btnModoScanner');
+const BTN_IA = document.getElementById('btnModoIA');
+const READER_DIV = document.getElementById('reader');
+const SCANNER_PLACEHOLDER = document.getElementById('scannerPlaceholder');
+const ESTADO = document.getElementById('estadoEscaneo');
+
+const CSRF_TOKEN = '{{ csrf_token }}';
+const URL_BUSCAR = '{% url "control_stock:api_buscar" %}';
+const URL_ANALIZAR = '{% url "control_stock:api_analizar_foto" %}';
+const URL_MOVIMIENTO = '{% url "control_stock:api_movimiento" %}';
+const URL_LOTES = '{% url "control_stock:api_lotes_producto" %}';
+const URL_BUSCAR_NOMBRE = '{% url "control_stock:api_buscar_nombre" %}';
+
+let html5QrScanner = null;
+let modoActivo = 'scanner';
+let productoActual = null;
+let pausadoPorModal = false;
+let iaCameraStream = null;  // stream de la cámara en modo IA
+
+// ── Cambio de modo ──────────────────────────────────────────────
+function activarModo(modo) {
+  modoActivo = modo;
+  if (modo === 'scanner') {
+    PANEL_SCANNER.classList.remove('hidden');
+    PANEL_IA.classList.add('hidden');
+    // Apagar cámara IA si estaba activa
+    if (iaCameraStream) { iaCameraStream.getTracks().forEach(t => t.stop()); iaCameraStream = null; }
+    BTN_SCANNER.classList.replace('border-gray-200', 'border-medical-primary');
+    BTN_SCANNER.classList.replace('bg-white', 'bg-medical-primary/5');
+    BTN_SCANNER.classList.replace('text-gray-500', 'text-medical-primary');
+    BTN_IA.classList.replace('border-medical-primary', 'border-gray-200');
+    BTN_IA.classList.replace('bg-medical-primary/5', 'bg-white');
+    BTN_IA.classList.replace('text-medical-primary', 'text-gray-500');
+    iniciarScanner();
+  } else {
+    PANEL_IA.classList.remove('hidden');
+    PANEL_SCANNER.classList.add('hidden');
+    BTN_IA.classList.replace('border-gray-200', 'border-purple-500');
+    BTN_IA.classList.replace('bg-white', 'bg-purple-50');
+    BTN_IA.classList.replace('text-gray-500', 'text-purple-600');
+    BTN_SCANNER.classList.replace('border-medical-primary', 'border-gray-200');
+    BTN_SCANNER.classList.replace('bg-medical-primary/5', 'bg-white');
+    BTN_SCANNER.classList.replace('text-medical-primary', 'text-gray-500');
+    detenerScanner();
+  }
+}
+
+// ── Escáner de código de barras ────────────────────────────────
+function iniciarScanner() {
+  const areaId = AREA_SELECT.value;
+  if (!areaId) {
+    SCANNER_PLACEHOLDER.classList.remove('hidden');
+    READER_DIV.innerHTML = '';
+    return;
+  }
+  SCANNER_PLACEHOLDER.classList.add('hidden');
+
+  if (html5QrScanner) {
+    html5QrScanner.clear().catch(() => {});
+    html5QrScanner = null;
+    READER_DIV.innerHTML = '';
+  }
+
+  html5QrScanner = new Html5Qrcode('reader');
+  html5QrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 130 } },
+    onCodigoDetectado,
+    () => {}
+  ).catch(err => {
+    READER_DIV.innerHTML = `<div class="text-white text-center py-12 text-sm">
+      <i class="fas fa-camera-slash text-3xl mb-2 block"></i>
+      No se pudo acceder a la cámara.<br>Verificá los permisos del navegador.
+    </div>`;
+    console.error('Scanner error:', err);
+  });
+}
+
+function detenerScanner() {
+  if (html5QrScanner) {
+    html5QrScanner.stop().catch(() => {}).finally(() => {
+      html5QrScanner.clear().catch(() => {});
+      html5QrScanner = null;
+    });
+  }
+}
+
+async function onCodigoDetectado(codigo) {
+  if (pausadoPorModal) return;
+  pausadoPorModal = true;
+  mostrarEstado(true);
+
+  try {
+    const areaParam = AREA_SELECT.value ? `&area_id=${AREA_SELECT.value}` : '';
+    const resp = await fetch(`${URL_BUSCAR}?codigo=${encodeURIComponent(codigo)}${areaParam}`);
+    const data = await resp.json();
+    if (data.error) { mostrarToast(data.error, 'error'); pausadoPorModal = false; return; }
+    abrirModal(data);
+  } catch {
+    mostrarToast('Error al buscar el producto.', 'error');
+    pausadoPorModal = false;
+  } finally {
+    mostrarEstado(false);
+  }
+}
+
+// ── Análisis de foto con IA ────────────────────────────────────
+
+const iaVideo     = document.getElementById('iaVideo');
+const iaCanvas    = document.getElementById('iaCanvas');
+const fotoPreview = document.getElementById('fotoPreview');
+
+// Activar cámara en el panel IA
+document.getElementById('btnActivarCamaraIA').addEventListener('click', iniciarCamaraIA);
+document.getElementById('btnDetenerCamaraIA').addEventListener('click', detenerCamaraIA);
+document.getElementById('btnCapturar').addEventListener('click', capturarYAnalizar);
+document.getElementById('btnNuevaFoto').addEventListener('click', reiniciarIA);
+
+// Fallback: elegir desde galería/archivos
+document.getElementById('btnElegirArchivo').addEventListener('click', () => document.getElementById('inputFoto').click());
+document.getElementById('inputFoto').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  this.value = '';
+  const base64 = await fileToBase64(file);
+  // Mostrar preview
+  fotoPreview.src = base64;
+  fotoPreview.classList.remove('hidden');
+  iaVideo.style.display = 'none';
+  document.getElementById('iaPlaceholder').classList.add('hidden');
+  document.getElementById('iaControlesInicio').classList.add('hidden');
+  document.getElementById('iaControlesCaptura').classList.remove('hidden');
+  await procesarBase64IA(base64);
+});
+
+async function iniciarCamaraIA() {
+  try {
+    iaCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    iaVideo.srcObject = iaCameraStream;
+    iaVideo.style.display = 'block';
+    document.getElementById('iaPlaceholder').classList.add('hidden');
+    fotoPreview.classList.add('hidden');
+    document.getElementById('iaControlesInicio').classList.add('hidden');
+    document.getElementById('iaControlesCamara').classList.remove('hidden');
+  } catch(err) {
+    mostrarToast('No se pudo acceder a la cámara. Usá "Elegir imagen".', 'warning');
+    console.warn('getUserMedia error:', err);
+  }
+}
+
+function detenerCamaraIA() {
+  if (iaCameraStream) {
+    iaCameraStream.getTracks().forEach(t => t.stop());
+    iaCameraStream = null;
+  }
+  iaVideo.srcObject = null;
+  iaVideo.style.display = 'none';
+  fotoPreview.classList.add('hidden');
+  document.getElementById('iaPlaceholder').classList.remove('hidden');
+  document.getElementById('iaControlesCamara').classList.add('hidden');
+  document.getElementById('iaControlesCaptura').classList.add('hidden');
+  document.getElementById('iaControlesInicio').classList.remove('hidden');
+}
+
+function reiniciarIA() {
+  detenerCamaraIA();
+}
+
+async function capturarYAnalizar() {
+  // Tomar snapshot del video redimensionado (máx 1024px) para ahorrar tokens de IA
+  const MAX_PX = 1024;
+  const vw = iaVideo.videoWidth  || 640;
+  const vh = iaVideo.videoHeight || 480;
+  const scale = Math.min(1, MAX_PX / Math.max(vw, vh));
+  iaCanvas.width  = Math.round(vw * scale);
+  iaCanvas.height = Math.round(vh * scale);
+  iaCanvas.getContext('2d').drawImage(iaVideo, 0, 0, iaCanvas.width, iaCanvas.height);
+  const base64 = iaCanvas.toDataURL('image/jpeg', 0.82);
+
+  // Mostrar preview de lo capturado
+  fotoPreview.src = base64;
+  fotoPreview.classList.remove('hidden');
+  iaVideo.style.display = 'none';
+  detenerCamaraIA();
+  document.getElementById('iaControlesInicio').classList.add('hidden');
+  document.getElementById('iaControlesCamara').classList.add('hidden');
+  document.getElementById('iaControlesCaptura').classList.remove('hidden');
+
+  await procesarBase64IA(base64);
+}
+
+async function procesarBase64IA(base64) {
+  const areaId = AREA_SELECT.value;
+  if (!areaId) { mostrarToast('Seleccioná un área primero', 'warning'); return; }
+
+  const iaEstado = document.getElementById('iaEstado');
+  iaEstado.classList.remove('hidden');
+  mostrarEstado(true);
+
+  try {
+    const resp = await fetch(URL_ANALIZAR, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify({ imagen_base64: base64, area_id: parseInt(areaId) }),
+    });
+    const data = await resp.json();
+    if (data.error) { mostrarToast(data.error, 'error'); return; }
+
+    const ia = data.ia_resultado;
+    const local = data.producto_local;
+    const productoData = local || {
+      id: null,
+      codigo_barras: ia.codigo_barras || '',
+      nombre: ia.nombre || '',
+      descripcion: ia.descripcion || '',
+      categoria: ia.categoria_sugerida || 'descartable',
+      unidad_medida: ia.unidad_medida || 'unidad',
+      stock_minimo: 0,
+      imagen_url: '',
+    };
+
+    abrirModal({
+      encontrado: !!local,
+      es_nuevo: !local,
+      fuente: 'ia',
+      producto: productoData,
+      stock_en_area: local ? (local.stock_en_area ?? null) : null,
+      fecha_vencimiento_ia: ia.fecha_vencimiento,
+      numero_lote_ia: ia.numero_lote,
+      error_ia: ia.error,
+    });
+
+    if (ia.error) mostrarToast('IA: ' + ia.error, 'warning');
+
+  } catch {
+    mostrarToast('Error al analizar la imagen.', 'error');
+  } finally {
+    iaEstado.classList.add('hidden');
+    mostrarEstado(false);
+  }
+}
+
+// Detener cámara IA al cerrar modal o cambiar de modo — ya manejado con iaCameraStream en activarModo()
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Modal ──────────────────────────────────────────────────────
+function abrirModal(data) {
+  productoActual = data;
+  const p = data.producto;
+
+  document.getElementById('nombreProducto').textContent = p.nombre || '(sin nombre)';
+  document.getElementById('codigoProducto').textContent = p.codigo_barras ? `Código: ${p.codigo_barras}` : '';
+  document.getElementById('categoriaProducto').textContent = p.categoria ? `Categoría: ${p.categoria.replace(/_/g, ' ')}` : '';
+
+  const img = document.getElementById('imgProducto');
+  const imgPlaceholder = document.getElementById('imgPlaceholder');
+  if (p.imagen_url) {
+    img.src = p.imagen_url;
+    img.classList.remove('hidden');
+    imgPlaceholder.classList.add('hidden');
+  } else {
+    img.classList.add('hidden');
+    imgPlaceholder.classList.remove('hidden');
+  }
+
+  document.getElementById('badgeNuevo').classList.toggle('hidden', !data.es_nuevo);
+  document.getElementById('badgeIa').classList.toggle('hidden', data.fuente !== 'ia');
+  document.getElementById('formNuevoProducto').classList.toggle('hidden', !data.es_nuevo);
+
+  // Badge de stock total en el área
+  const badgeStock = document.getElementById('badgeStock');
+  const stockVal = data.stock_en_area;
+  if (stockVal !== undefined && stockVal !== null) {
+    document.getElementById('badgeStockTexto').textContent = `Disp.: ${stockVal}`;
+    badgeStock.classList.remove('hidden');
+  } else {
+    badgeStock.classList.add('hidden');
+  }
+
+  if (data.es_nuevo) {
+    document.getElementById('inputNombre').value = p.nombre || '';
+    document.getElementById('inputCodigoEditable').value = p.codigo_barras || '';
+    if (p.categoria) document.getElementById('inputCategoria').value = p.categoria;
+    if (p.unidad_medida) document.getElementById('inputUnidad').value = p.unidad_medida;
+    document.getElementById('inputStockMinimo').value = p.stock_minimo || 0;
+  }
+
+  // Datos de fecha/lote de IA
+  const fechaIa = data.fecha_vencimiento_ia;
+  const loteIa  = data.numero_lote_ia;
+  const bloqueIa = document.getElementById('datosFechaSuperior');
+  if (fechaIa || loteIa) {
+    bloqueIa.classList.remove('hidden');
+    document.getElementById('textoFechaVenceIa').textContent = fechaIa ? `Vencimiento detectado: ${fechaIa}` : '';
+    document.getElementById('textoLoteIa').textContent = loteIa ? `Lote detectado: ${loteIa}` : '';
+    if (fechaIa) document.getElementById('inputFechaVencimiento').value = fechaIa;
+    if (loteIa)  document.getElementById('inputLote').value = loteIa;
+  } else {
+    bloqueIa.classList.add('hidden');
+    document.getElementById('inputFechaVencimiento').value = '';
+    document.getElementById('inputLote').value = '';
+  }
+
+  document.getElementById('inputCantidad').value = 1;
+  document.getElementById('inputObservacion').value = '';
+
+  // Botones según si es nuevo o existente
+  document.getElementById('botonesNuevo').classList.toggle('hidden', !data.es_nuevo);
+  document.getElementById('botonesExistente').classList.toggle('hidden', data.es_nuevo);
+
+  // Lotes: solo para productos ya registrados
+  const bloqueLotes = document.getElementById('bloqueLotes');
+  if (!data.es_nuevo && p.id && AREA_SELECT.value) {
+    bloqueLotes.classList.remove('hidden');
+    cargarLotes(p.id, AREA_SELECT.value);
+  } else {
+    bloqueLotes.classList.add('hidden');
+  }
+
+  document.getElementById('modalProducto').classList.remove('hidden');
+}
+
+function cargarLotes(productoId, areaId) {
+  const lista  = document.getElementById('listaLotes');
+  const vacios = document.getElementById('lotesVacios');
+  const total  = document.getElementById('lotesTotal');
+  lista.innerHTML = '<div class="text-center text-gray-400 text-xs py-2"><i class="fas fa-spinner fa-spin mr-1"></i> Cargando lotes...</div>';
+  vacios.classList.add('hidden');
+
+  fetch(`${URL_LOTES}?producto_id=${productoId}&area_id=${areaId}`)
+    .then(r => r.json())
+    .then(data => {
+      total.textContent = `Total: ${data.stock_total} ${data.unidad || ''}`;
+      if (!data.lotes || !data.lotes.length) {
+        lista.innerHTML = '';
+        vacios.classList.remove('hidden');
+        return;
+      }
+      lista.innerHTML = data.lotes.map(l => {
+        const venceStr = l.fecha_vencimiento
+          ? new Date(l.fecha_vencimiento + 'T12:00:00').toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })
+          : 'Sin fecha';
+        const loteStr = l.numero_lote || 'Sin nro. de lote';
+        let badgeCss = 'bg-gray-100 text-gray-500';
+        let badgeTxt = venceStr;
+        if (l.vencido)      { badgeCss = 'bg-red-100 text-red-600'; badgeTxt = `Vencido · ${venceStr}`; }
+        else if (l.vence_hoy)   { badgeCss = 'bg-red-100 text-red-500'; badgeTxt = `Hoy · ${venceStr}`; }
+        else if (l.vence_pronto){ badgeCss = 'bg-amber-100 text-amber-600'; badgeTxt = `Pronto · ${venceStr}`; }
+        return `<div class="flex items-center justify-between gap-2 bg-gray-50 rounded-xl px-3 py-2">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-gray-700 truncate">${loteStr}</p>
+            <span class="inline-flex items-center ${badgeCss} text-xs px-2 py-0.5 rounded-full mt-0.5">${badgeTxt}</span>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-sm font-bold text-gray-700">${l.cantidad}</span>
+            <button onclick="usarLote(${l.id}, ${l.cantidad})"
+                    ${l.vencido || l.cantidad < 1 ? 'disabled' : ''}
+                    class="px-2.5 py-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
+              Usar
+            </button>
+          </div>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => {
+      lista.innerHTML = '<p class="text-xs text-red-500 text-center py-2">Error al cargar lotes.</p>';
+    });
+}
+
+let loteSeleccionadoId = null;
+
+function usarLote(loteId, cantDisponible) {
+  loteSeleccionadoId = loteId;
+  // Ajusta la cantidad máxima al disponible en ese lote
+  const inp = document.getElementById('inputCantidad');
+  inp.max = cantDisponible;
+  if (parseInt(inp.value) > cantDisponible) inp.value = cantDisponible;
+  // Hacer scroll al botón de confirmar
+  document.getElementById('botonesExistente').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  // Highlight rápido del botón "Registrar uso"
+  const btn = document.querySelector('#botonesExistente button:last-child');
+  btn.classList.add('ring-2', 'ring-orange-300');
+  setTimeout(() => btn.classList.remove('ring-2', 'ring-orange-300'), 1500);
+}
+
+function cerrarModal() {
+  const panel = document.getElementById('panelConfirmacion');
+  clearTimeout(panel._t);
+  panel.classList.add('hidden');
+  document.getElementById('confirmBarra').style.transition = 'none';
+  document.getElementById('confirmBarra').style.width = '0%';
+  document.getElementById('modalProducto').classList.add('hidden');
+  productoActual = null;
+  pausadoPorModal = false;
+  loteSeleccionadoId = null;
+}
+
+function mostrarConfirmacion(nombre, detalle) {
+  document.getElementById('confirmNombre').textContent = nombre;
+  document.getElementById('confirmDetalle').textContent = detalle;
+  const barra = document.getElementById('confirmBarra');
+  barra.style.transition = 'none';
+  barra.style.width = '0%';
+  const panel = document.getElementById('panelConfirmacion');
+  panel.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      barra.style.transition = 'width 2.5s linear';
+      barra.style.width = '100%';
+    });
+  });
+  clearTimeout(panel._t);
+  panel._t = setTimeout(() => cerrarModal(), 2500);
+}
+
+function ajustarCantidad(delta) {
+  const input = document.getElementById('inputCantidad');
+  const nuevo = Math.max(1, (parseInt(input.value) || 1) + delta);
+  input.value = nuevo;
+}
+
+// ── Registrar movimiento ───────────────────────────────────────
+async function registrar(tipo) {
+  const areaId = AREA_SELECT.value;
+  if (!areaId) { mostrarToast('Seleccioná un área primero', 'warning'); return; }
+  if (!productoActual) return;
+
+  const p = productoActual.producto;
+  const cantidad = parseInt(document.getElementById('inputCantidad').value);
+  if (!cantidad || cantidad < 1) { mostrarToast('La cantidad debe ser mayor a 0', 'warning'); return; }
+
+  // Si es producto nuevo, tomar el nombre del input
+  let nombre = p.codigo_barras ? p.nombre : '';
+  let codigoFinal = p.codigo_barras;
+  let categoria = p.categoria;
+  let unidad = p.unidad_medida;
+  let stockMin = p.stock_minimo;
+
+  if (productoActual.es_nuevo) {
+    nombre = document.getElementById('inputNombre').value.trim();
+    if (!nombre) { mostrarToast('Ingresá el nombre del producto', 'warning'); return; }
+    // Si el código está vacío, leer del campo editable
+    const codigoEditable = document.getElementById('inputCodigoEditable').value.trim();
+    codigoFinal = codigoEditable || p.codigo_barras;
+    // Si sigue vacío, generar código interno automáticamente
+    if (!codigoFinal) {
+      codigoFinal = generarCodigoInterno(true);
+    }
+    categoria = document.getElementById('inputCategoria').value;
+    unidad = document.getElementById('inputUnidad').value;
+    stockMin = parseInt(document.getElementById('inputStockMinimo').value) || 0;
+  }
+
+  const payload = {
+    codigo_barras: codigoFinal,
+    area_id: parseInt(areaId),
+    tipo,
+    cantidad,
+    observacion: document.getElementById('inputObservacion').value.trim(),
+    fecha_vencimiento: document.getElementById('inputFechaVencimiento').value || null,
+    numero_lote: document.getElementById('inputLote').value.trim(),
+    nombre,
+    descripcion: p.descripcion || '',
+    categoria,
+    unidad_medida: unidad,
+    stock_minimo: stockMin,
+    imagen_url: p.imagen_url || '',
+  };
+  if (loteSeleccionadoId) payload.lote_id = loteSeleccionadoId;
+
+  try {
+    const resp = await fetch(URL_MOVIMIENTO, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      mostrarToast(data.error || 'Error al registrar', 'error');
+      return;
+    }
+
+    const nombreDisplay = nombre || p.nombre || 'Producto';
+    const cantDisplay   = `${cantidad} ${unidad || p.unidad_medida || ''}`;
+    mostrarConfirmacion(
+      nombreDisplay,
+      `${cantDisplay} registrada${cantidad > 1 ? 's' : ''}. Stock actual: ${data.stock_actual}`
+    );
+
+    if (data.bajo_minimo) {
+      setTimeout(() => mostrarToast('Stock por debajo del mínimo. Se notificó al responsable.', 'warning'), 600);
+    }
+
+  } catch {
+    mostrarToast('Error de conexión.', 'error');
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function mostrarEstado(visible) {
+  ESTADO.classList.toggle('hidden', !visible);
+}
+
+function generarCodigoInterno(soloRetornar = false) {
+  const codigo = 'INT-' + Date.now();
+  if (!soloRetornar) {
+    const input = document.getElementById('inputCodigoEditable');
+    if (input) input.value = codigo;
+  }
+  return codigo;
+}
+
+function mostrarToast(msg, tipo = 'success') {
+  const el   = document.getElementById('toast');
+  const icon = document.getElementById('toastIcon');
+  const txt  = document.getElementById('toastMsg');
+  txt.textContent = msg;
+
+  const base = 'fixed top-5 right-5 z-[999] min-w-[260px] max-w-xs flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white';
+  if (tipo === 'success') {
+    el.className = base + ' bg-emerald-600';
+    icon.className = 'fas fa-check';
+  } else if (tipo === 'error') {
+    el.className = base + ' bg-red-500';
+    icon.className = 'fas fa-xmark';
+  } else {
+    el.className = base + ' bg-amber-500';
+    icon.className = 'fas fa-triangle-exclamation';
+  }
+
+  el.style.opacity = '0';
+  el.style.transform = 'translateX(1rem)';
+  el.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      el.style.transition = 'opacity .25s ease, transform .25s ease';
+      el.style.opacity = '1';
+      el.style.transform = 'translateX(0)';
+    });
+  });
+
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateX(1rem)';
+    setTimeout(() => el.classList.add('hidden'), 280);
+  }, 3500);
+}
+
+// ── Búsqueda por nombre ────────────────────────────────────────
+let buscarNombreTimer = null;
+
+function toggleBuscarNombre(mostrar) {
+  document.getElementById('seccionBuscarNombre').classList.toggle('hidden', !mostrar);
+  if (mostrar) {
+    document.getElementById('inputBuscarNombre').focus();
+  } else {
+    document.getElementById('inputBuscarNombre').value = '';
+    document.getElementById('resultadosBuscarNombre').innerHTML = '';
+    document.getElementById('resultadosBuscarNombre').classList.add('hidden');
+    document.getElementById('buscarNombreVacio').classList.add('hidden');
+    document.getElementById('buscarNombreSpinner').classList.add('hidden');
+  }
+}
+
+document.getElementById('inputBuscarNombre').addEventListener('input', () => {
+  clearTimeout(buscarNombreTimer);
+  const q = document.getElementById('inputBuscarNombre').value.trim();
+  const res = document.getElementById('resultadosBuscarNombre');
+  const vacio = document.getElementById('buscarNombreVacio');
+  const spinner = document.getElementById('buscarNombreSpinner');
+  if (q.length < 2) {
+    res.innerHTML = ''; res.classList.add('hidden');
+    vacio.classList.add('hidden');
+    spinner.classList.add('hidden');
+    return;
+  }
+  spinner.classList.remove('hidden');
+  res.classList.add('hidden'); vacio.classList.add('hidden');
+  buscarNombreTimer = setTimeout(() => _ejecutarBuscarNombre(q), 320);
+});
+
+async function _ejecutarBuscarNombre(q) {
+  const spinner = document.getElementById('buscarNombreSpinner');
+  const res = document.getElementById('resultadosBuscarNombre');
+  const vacio = document.getElementById('buscarNombreVacio');
+  try {
+    const areaId = AREA_SELECT.value;
+    const areaParam = areaId ? `&area_id=${areaId}` : '';
+    const r = await fetch(`${URL_BUSCAR_NOMBRE}?q=${encodeURIComponent(q)}${areaParam}`);
+    const data = await r.json();
+    spinner.classList.add('hidden');
+    if (!data.resultados || !data.resultados.length) {
+      res.innerHTML = ''; res.classList.add('hidden');
+      vacio.classList.remove('hidden');
+      return;
+    }
+    vacio.classList.add('hidden');
+    res.innerHTML = data.resultados.map(p => {
+      const stockBadge = p.stock_en_area !== null
+        ? `<span class="ml-auto flex-shrink-0 text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">${p.stock_en_area} disp.</span>`
+        : '';
+      const cat = p.categoria ? p.categoria.replace(/_/g, ' ') : '';
+      // Serializar JSON de forma segura para el atributo data-
+      const dataAttr = JSON.stringify(p).replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+      return `<button data-producto="${dataAttr}"
+                      onclick="seleccionarPorNombre(this)"
+                      class="w-full flex items-center gap-3 text-left bg-gray-50 hover:bg-blue-50 border border-gray-100 hover:border-blue-200 rounded-xl px-3 py-2.5 transition-colors">
+        <div class="w-9 h-9 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+          <i class="fas fa-box text-gray-400 text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-gray-800 truncate">${p.nombre}</p>
+          <p class="text-xs text-gray-400 truncate">${cat} · ${p.unidad_medida || ''}</p>
+        </div>
+        ${stockBadge}
+      </button>`;
+    }).join('');
+    res.classList.remove('hidden');
+  } catch {
+    spinner.classList.add('hidden');
+    mostrarToast('Error al buscar productos.', 'error');
+  }
+}
+
+function seleccionarPorNombre(btn) {
+  const p = JSON.parse(btn.dataset.producto);
+  toggleBuscarNombre(false);
+  abrirModal({
+    encontrado: true,
+    es_nuevo: false,
+    fuente: 'local',
+    stock_en_area: p.stock_en_area,
+    fecha_vencimiento_ia: null,
+    numero_lote_ia: null,
+    producto: {
+      id: p.id,
+      codigo_barras: p.codigo_barras,
+      nombre: p.nombre,
+      descripcion: '',
+      categoria: p.categoria,
+      unidad_medida: p.unidad_medida,
+      stock_minimo: 0,
+      imagen_url: p.imagen_url || '',
+    },
+  });
+}
+
+// ── Init ───────────────────────────────────────────────────────
+AREA_SELECT.addEventListener('change', () => {
+  if (modoActivo === 'scanner') iniciarScanner();
+  document.getElementById('btnBuscarNombreToggle').classList.toggle('hidden', !AREA_SELECT.value);
+  toggleBuscarNombre(false);
+});
+
+// Si ya hay un área seleccionada (desde URL), iniciar el scanner y mostrar el botón
+if (AREA_SELECT.value && modoActivo === 'scanner') {
+  iniciarScanner();
+  document.getElementById('btnBuscarNombreToggle').classList.remove('hidden');
+}
+
+// Cerrar modal al tocar backdrop
+document.getElementById('modalProducto').addEventListener('click', function(e) {
+  if (e.target === this) cerrarModal();
+});
+
+// Detener cámara IA si el usuario cambia de pestaña o bloquea la pantalla
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && iaCameraStream) detenerCamaraIA();
+});
+</script>
+{% endblock %}

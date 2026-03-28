@@ -87,6 +87,7 @@ INSTALLED_APPS = [
     'consultorios.apps.ConsultoriosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',  # Sistema de pedidos por email
     'ahorro_vivienda.apps.AhorroViviendaConfig',  # Tracker ahorro primera vivienda
+    'control_stock.apps.ControlStockConfig',  # Control de stock con escáner + IA
     
     # Tailwind CSS
     'tailwind',

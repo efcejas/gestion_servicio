@@ -1,0 +1,66 @@
+{% extends "layouts/base_tailwind.html" %}
+{% block title %}{% if editando %}Editar{% else %}Nuevo{% endif %} Producto{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-4">
+
+  <div class="mb-6">
+    <a href="{% url 'control_stock:dashboard' %}" class="text-sm text-gray-400 hover:text-medical-primary mb-1 inline-flex items-center gap-1">
+      <i class="fas fa-arrow-left text-xs"></i> Volver
+    </a>
+    <h1 class="text-2xl font-bold text-medical-primary">
+      {% if editando %}Editar Producto{% else %}Registrar Nuevo Producto{% endif %}
+    </h1>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Código de barras *</label>
+          {{ form.codigo_barras }}
+          {% if form.codigo_barras.errors %}<p class="text-xs text-red-500 mt-1">{{ form.codigo_barras.errors|join:", " }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre *</label>
+          {{ form.nombre }}
+          {% if form.nombre.errors %}<p class="text-xs text-red-500 mt-1">{{ form.nombre.errors|join:", " }}</p>{% endif %}
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Descripción</label>
+          {{ form.descripcion }}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Categoría</label>
+          {{ form.categoria }}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Unidad de medida</label>
+          {{ form.unidad_medida }}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Stock mínimo de alerta</label>
+          {{ form.stock_minimo }}
+          <p class="text-xs text-gray-400 mt-1">Se enviará alerta cuando el stock baje de este valor.</p>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">URL de imagen</label>
+          {{ form.imagen_url }}
+        </div>
+      </div>
+
+      <div class="flex gap-3 pt-4 border-t border-gray-100">
+        <button type="submit"
+                class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-medical-primary text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-medical-secondary transition-colors">
+          <i class="fas fa-save"></i> Guardar
+        </button>
+        <a href="{% url 'control_stock:dashboard' %}"
+           class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-600 font-semibold px-6 py-2.5 rounded-xl hover:bg-gray-200 transition-colors">
+          Cancelar
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

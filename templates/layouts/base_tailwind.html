@@ -249,6 +249,18 @@
                     </a>
                     {% endif %}
 
+                    <!-- Stock (superusuario) -->
+                    {% url 'control_stock:dashboard' as stock_url %}
+                    {% if stock_url %}
+                    <a href="{{ stock_url }}"
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
+                        {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
                     <!-- Panel de Administración -->
                     {% url 'admin_dashboard' as admin_url %}
                     {% if admin_url %}
@@ -317,6 +329,18 @@
                         {% endif %}
                         {% endif %}
                         
+                        <!-- Stock (todos los médicos) -->
+                        {% url 'control_stock:dashboard' as stock_url %}
+                        {% if stock_url %}
+                        <a href="{{ stock_url }}"
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
+                            {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+
                         <!-- Revisión - Para staff -->
                         {% if user.rol == 'medico_staff' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' or user.rol == 'jefe_servicio' %}
                         {% url 'preinformes:dashboard_staff' as revision_url %}
@@ -340,6 +364,18 @@
                            class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                             <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
                             {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+
+                        <!-- Stock (técnicos) -->
+                        {% url 'control_stock:dashboard' as stock_url %}
+                        {% if stock_url %}
+                        <a href="{{ stock_url }}"
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
+                            {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
                             <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                             {% endif %}
                         </a>
