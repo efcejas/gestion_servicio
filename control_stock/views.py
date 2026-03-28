@@ -298,7 +298,7 @@ def historial_producto_area(request, area_id, producto_id):
         'id': mov.id,
         'tipo': mov.tipo,
         'cantidad': mov.cantidad,
-        'fecha': mov.fecha.strftime('%d/%m/%Y %H:%M'),
+        'fecha': mov.fecha.isoformat(),
         'usuario': mov.usuario.get_full_name() or mov.usuario.username,
         'observacion': mov.observacion or '',
         'anulado': mov.anulado,

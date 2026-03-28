@@ -212,6 +212,14 @@ def api_registrar_movimiento(request):
     tipo          = (body.get('tipo') or '').strip()
     cantidad_raw  = body.get('cantidad')
 
+    # Para ajuste: si no viene codigo_barras pero sí lote_id, resolver el producto desde el lote
+    if not codigo_barras and tipo == 'ajuste' and body.get('lote_id'):
+        try:
+            _lote_ref = LoteEnArea.objects.select_related('stock__producto').get(pk=body.get('lote_id'))
+            codigo_barras = _lote_ref.stock.producto.codigo_barras
+        except LoteEnArea.DoesNotExist:
+            return JsonResponse({'error': 'Lote no encontrado.'}, status=404)
+
     if not codigo_barras:
         return JsonResponse({'error': 'Se requiere codigo_barras'}, status=400)
 
