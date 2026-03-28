@@ -205,7 +205,7 @@ def exportar_historial_csv(request):
     for mov in movimientos.iterator():
         writer.writerow([
             mov.fecha.strftime('%d/%m/%Y %H:%M'),
-            'Entrada' if mov.tipo == 'entrada' else 'Salida',
+            mov.get_tipo_display(),
             mov.producto.nombre,
             mov.producto.codigo_barras,
             mov.area.nombre,
@@ -286,7 +286,7 @@ def vencimientos(request):
 
 
 # ── Fase 4: historial de un producto en un área (JSON) ────────
-@login_required
+@role_required(*ROLES_STOCK)
 def historial_producto_area(request, area_id, producto_id):
     area = get_object_or_404(AreaServicio, pk=area_id, activa=True)
     producto = get_object_or_404(Producto, pk=producto_id)

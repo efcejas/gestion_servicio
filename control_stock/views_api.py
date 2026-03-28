@@ -15,8 +15,8 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.db import models, transaction
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
-from django.views.decorators.csrf import csrf_exempt
 
 from django.db.models import Sum
 from .models import Producto, AreaServicio, StockPorArea, LoteEnArea, MovimientoStock

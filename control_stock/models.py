@@ -221,7 +221,11 @@ class LoteEnArea(models.Model):
         return self.fecha_vencimiento < timezone.now().date()
 
     @property
-    def vence_pronto(self, dias=30):
+    def vence_pronto(self):
+        """Vence en los próximos 30 días. Usar vence_en_dias(n) para otro período."""
+        return self.vence_en_dias(30)
+
+    def vence_en_dias(self, dias):
         if not self.fecha_vencimiento or self.vencido:
             return False
         return self.fecha_vencimiento <= timezone.now().date() + timezone.timedelta(days=dias)

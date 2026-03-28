@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import AreaServicio, Producto, StockPorArea, MovimientoStock
+from .models import AreaServicio, LoteEnArea, Producto, StockPorArea, MovimientoStock
 
 
 @admin.register(AreaServicio)
@@ -18,27 +18,31 @@ class ProductoAdmin(admin.ModelAdmin):
     readonly_fields = ('creado_en', 'actualizado_en')
 
 
-class StockPorAreaInline(admin.TabularInline):
-    model = StockPorArea
-    extra = 0
-    readonly_fields = ('cantidad',)
-
-
 @admin.register(StockPorArea)
 class StockPorAreaAdmin(admin.ModelAdmin):
     list_display = ('producto', 'area', 'cantidad', 'bajo_minimo')
     list_filter = ('area',)
     search_fields = ('producto__nombre', 'area__nombre')
+    readonly_fields = ('cantidad',)
 
     @admin.display(boolean=True, description='Bajo mínimo')
     def bajo_minimo(self, obj):
         return obj.bajo_minimo
 
 
+@admin.register(LoteEnArea)
+class LoteEnAreaAdmin(admin.ModelAdmin):
+    list_display = ('stock', 'numero_lote', 'cantidad', 'fecha_vencimiento', 'activo', 'reportado_para_descarte')
+    list_filter = ('activo', 'reportado_para_descarte', 'stock__area')
+    search_fields = ('stock__producto__nombre', 'numero_lote')
+    readonly_fields = ('creado_en',)
+    date_hierarchy = 'fecha_vencimiento'
+
+
 @admin.register(MovimientoStock)
 class MovimientoStockAdmin(admin.ModelAdmin):
-    list_display = ('tipo', 'producto', 'area', 'cantidad', 'usuario', 'fecha', 'numero_lote', 'fecha_vencimiento')
-    list_filter = ('tipo', 'area', 'fecha')
+    list_display = ('tipo', 'producto', 'area', 'cantidad', 'usuario', 'fecha', 'numero_lote', 'fecha_vencimiento', 'anulado')
+    list_filter = ('tipo', 'anulado', 'area', 'fecha')
     search_fields = ('producto__nombre', 'numero_lote')
     readonly_fields = ('fecha',)
     date_hierarchy = 'fecha'
