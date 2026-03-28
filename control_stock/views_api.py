@@ -154,29 +154,52 @@ def api_analizar_foto(request):
     # Si se detectó un código de barras, buscar también en la DB local
     area_id_body = body.get('area_id')
     producto_local = None
+
+    def _build_producto_local(p, es_sugerencia=False):
+        stock_en_area = None
+        if area_id_body:
+            try:
+                s = StockPorArea.objects.get(producto=p, area_id=int(area_id_body))
+                stock_en_area = s.cantidad
+            except (StockPorArea.DoesNotExist, ValueError):
+                stock_en_area = 0
+        return {
+            'id': p.id,
+            'codigo_barras': p.codigo_barras,
+            'nombre': p.nombre,
+            'descripcion': p.descripcion,
+            'categoria': p.categoria,
+            'unidad_medida': p.unidad_medida,
+            'stock_minimo': p.stock_minimo,
+            'imagen_url': p.imagen_url,
+            'stock_en_area': stock_en_area,
+            'es_sugerencia': es_sugerencia,
+        }
+
     if resultado.get('codigo_barras'):
         try:
             p = Producto.objects.get(codigo_barras=resultado['codigo_barras'])
-            stock_en_area = None
-            if area_id_body:
-                try:
-                    s = StockPorArea.objects.get(producto=p, area_id=int(area_id_body))
-                    stock_en_area = s.cantidad
-                except (StockPorArea.DoesNotExist, ValueError):
-                    stock_en_area = 0
-            producto_local = {
-                'id': p.id,
-                'codigo_barras': p.codigo_barras,
-                'nombre': p.nombre,
-                'descripcion': p.descripcion,
-                'categoria': p.categoria,
-                'unidad_medida': p.unidad_medida,
-                'stock_minimo': p.stock_minimo,
-                'imagen_url': p.imagen_url,
-                'stock_en_area': stock_en_area,
-            }
+            producto_local = _build_producto_local(p, es_sugerencia=False)
         except Producto.DoesNotExist:
             pass
+
+    # Fallback: buscar por nombre si la IA no detectó código o no lo encontró en DB
+    if not producto_local and resultado.get('nombre'):
+        nombre_ia = resultado['nombre'].strip()
+        if nombre_ia:
+            from django.db.models import Q
+            # Búsqueda exacta por nombre completo
+            p = Producto.objects.filter(nombre__icontains=nombre_ia).first()
+            if not p:
+                # Búsqueda por las palabras significativas (≥4 chars)
+                palabras = [w for w in nombre_ia.split() if len(w) >= 4]
+                if palabras:
+                    q = Q()
+                    for palabra in palabras[:3]:
+                        q |= Q(nombre__icontains=palabra)
+                    p = Producto.objects.filter(q).first()
+            if p:
+                producto_local = _build_producto_local(p, es_sugerencia=True)
 
     return JsonResponse({
         'ia_resultado': resultado,

@@ -194,6 +194,9 @@
             <i class="fas fa-layer-group text-xs"></i>
             <span id="badgeStockTexto"></span>
           </span>
+          <span id="badgeSugerencia" class="hidden inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+            <i class="fas fa-search text-xs"></i> Coincidencia por nombre
+          </span>
         </div>
       </div>
 
@@ -429,7 +432,7 @@ function activarModo(modo) {
 }
 
 // ── Escáner de código de barras ────────────────────────────────
-function iniciarScanner() {
+async function iniciarScanner() {
   const areaId = AREA_SELECT.value;
   if (!areaId) {
     SCANNER_PLACEHOLDER.classList.remove('hidden');
@@ -438,10 +441,13 @@ function iniciarScanner() {
   }
   SCANNER_PLACEHOLDER.classList.add('hidden');
 
-  if (html5QrScanner) {
-    html5QrScanner.clear().catch(() => {});
-    html5QrScanner = null;
-    READER_DIV.innerHTML = '';
+  // Guardar referencia y limpiar ANTES de crear la nueva instancia (evita race conditions)
+  const prev = html5QrScanner;
+  html5QrScanner = null;
+  READER_DIV.innerHTML = '';
+  if (prev) {
+    try { await prev.stop(); }  catch(_) {}
+    try { await prev.clear(); } catch(_) {}
   }
 
   html5QrScanner = new Html5Qrcode('reader');
@@ -523,12 +529,21 @@ async function iniciarCamaraIA() {
         facingMode: 'environment',
         width:  { ideal: 3840 },
         height: { ideal: 2160 },
-        focusMode:        { ideal: 'continuous' },
-        exposureMode:     { ideal: 'continuous' },
-        whiteBalanceMode: { ideal: 'continuous' },
       },
       audio: false,
     });
+
+    // Intentar activar autofocus/exposición continua post-stream (ChromeMobile)
+    const track = iaCameraStream.getVideoTracks()[0];
+    if (track && track.applyConstraints) {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      const advanced = [];
+      if (caps.focusMode?.includes('continuous'))        advanced.push({ focusMode: 'continuous' });
+      if (caps.exposureMode?.includes('continuous'))     advanced.push({ exposureMode: 'continuous' });
+      if (caps.whiteBalanceMode?.includes('continuous')) advanced.push({ whiteBalanceMode: 'continuous' });
+      if (advanced.length) track.applyConstraints({ advanced }).catch(() => {});
+    }
+
     iaVideo.srcObject = iaCameraStream;
     iaVideo.style.display = 'block';
     document.getElementById('iaPlaceholder').classList.add('hidden');
@@ -677,6 +692,7 @@ function abrirModal(data) {
 
   document.getElementById('badgeNuevo').classList.toggle('hidden', !data.es_nuevo);
   document.getElementById('badgeIa').classList.toggle('hidden', data.fuente !== 'ia');
+  document.getElementById('badgeSugerencia').classList.toggle('hidden', !data.producto?.es_sugerencia);
   document.getElementById('formNuevoProducto').classList.toggle('hidden', !data.es_nuevo);
 
   // Badge de stock total en el área
