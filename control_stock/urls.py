@@ -27,4 +27,6 @@ urlpatterns = [
     path('api/movimiento/', views_api.api_registrar_movimiento, name='api_movimiento'),
     path('api/anular/<int:mov_id>/', views_api.api_anular_movimiento, name='api_anular'),
     path('api/salida-rapida/', views_api.api_salida_rapida, name='api_salida_rapida'),
+    path('api/reportar-lote/', views_api.api_reportar_lote, name='api_reportar_lote'),
+    path('api/descarte-masivo/', views_api.api_descarte_masivo, name='api_descarte_masivo'),
 ]

@@ -264,6 +264,7 @@ def vencimientos(request):
             'vencido': lote.fecha_vencimiento < hoy,
             'vence_hoy': lote.fecha_vencimiento == hoy,
             'vence_semana': hoy <= lote.fecha_vencimiento <= hoy + timezone.timedelta(days=7),
+            'reportado': lote.reportado_para_descarte,
         }
         for lote in lotes
     ]

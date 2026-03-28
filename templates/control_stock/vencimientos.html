@@ -53,28 +53,87 @@
   </form>
 
   <!-- Resultados -->
+  <!-- Tabs A: filtro visual -->
+  <div class="flex items-center gap-2 mb-4 bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5 w-fit">
+    <button onclick="filtrarTab('todos')" id="tabTodos"
+            class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold transition-colors bg-medical-primary text-white">
+      Todos <span class="ml-1 bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full" id="cntTodos">{{ items|length }}</span>
+    </button>
+    <button onclick="filtrarTab('vencido')" id="tabVencido"
+            class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-gray-500 hover:bg-red-50 hover:text-red-600">
+      Vencidos <span class="ml-1 bg-red-100 text-red-600 text-xs font-bold px-1.5 py-0.5 rounded-full" id="cntVencidos">0</span>
+    </button>
+    <button onclick="filtrarTab('proximo')" id="tabProximo"
+            class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-gray-500 hover:bg-amber-50 hover:text-amber-600">
+      Por vencer <span class="ml-1 bg-amber-100 text-amber-600 text-xs font-bold px-1.5 py-0.5 rounded-full" id="cntProximos">0</span>
+    </button>
+    {% if not puede_descartar %}
+    <button onclick="filtrarTab('reportado')" id="tabReportado"
+            class="tab-btn px-4 py-2 rounded-xl text-sm font-semibold transition-colors text-gray-500 hover:bg-blue-50 hover:text-blue-600">
+      Reportados <span class="ml-1 bg-blue-100 text-blue-600 text-xs font-bold px-1.5 py-0.5 rounded-full" id="cntReportados">0</span>
+    </button>
+    {% endif %}
+  </div>
+
   {% if items %}
+  <!-- Barra descarte masivo (Option C) - solo autorizados -->
+  {% if puede_descartar %}
+  <div id="barraDescarteMasivo" class="hidden sticky top-4 z-30 mb-4 bg-red-600 text-white rounded-2xl shadow-lg px-4 py-3 flex items-center justify-between gap-3">
+    <span class="text-sm font-semibold"><span id="cntSeleccionados">0</span> lote(s) seleccionados</span>
+    <div class="flex items-center gap-2">
+      <button onclick="deseleccionarTodos()" class="text-xs underline opacity-80 hover:opacity-100">Limpiar</button>
+      <button onclick="abrirDescarteMasivo()"
+              class="inline-flex items-center gap-1.5 bg-white text-red-600 text-sm font-bold px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+        <i class="fas fa-trash-alt"></i> Descartar seleccionados
+      </button>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
           <tr>
+            {% if puede_descartar %}
+            <th class="px-3 py-3">
+              <input type="checkbox" id="checkTodos" onchange="toggleTodos(this)"
+                     class="rounded border-gray-300 text-red-600 focus:ring-red-400">
+            </th>
+            {% endif %}
             <th class="text-left px-4 py-3 font-semibold">Producto</th>
             <th class="text-left px-4 py-3 font-semibold hidden sm:table-cell">Área</th>
             <th class="text-left px-4 py-3 font-semibold hidden md:table-cell">Lote</th>
             <th class="text-center px-4 py-3 font-semibold">Cant.</th>
             <th class="text-center px-4 py-3 font-semibold">Vence el</th>
             <th class="text-center px-4 py-3 font-semibold">Estado</th>
-            {% if puede_descartar %}<th class="text-center px-4 py-3 font-semibold">Acción</th>{% endif %}
+            <th class="text-center px-4 py-3 font-semibold">Acción</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-100">
+        <tbody class="divide-y divide-gray-100" id="tbodyVenc">
           {% for item in items %}
-          <tr class="hover:bg-gray-50 transition-colors {% if item.vencido %}bg-red-50/40{% endif %}">
+          <tr class="hover:bg-gray-50 transition-colors {% if item.vencido %}bg-red-50/40{% endif %}"
+              data-vencido="{{ item.vencido|yesno:'1,0' }}"
+              data-reportado="{{ item.reportado|yesno:'1,0' }}">
+            {% if puede_descartar %}
+            <td class="px-3 py-3 text-center">
+              <input type="checkbox" name="loteCheck"
+                     value="{{ item.lote.id }}"
+                     data-nombre="{{ item.stock.producto.nombre|escapejs }}"
+                     data-cantidad="{{ item.lote.cantidad }}"
+                     onchange="actualizarSeleccion()"
+                     class="rounded border-gray-300 text-red-600 focus:ring-red-400">
+            </td>
+            {% endif %}
             <td class="px-4 py-3">
               <p class="font-semibold text-gray-800">{{ item.stock.producto.nombre }}</p>
               <p class="text-xs text-gray-400">{{ item.stock.producto.get_categoria_display }}</p>
               <p class="text-xs text-gray-400 sm:hidden mt-0.5">{{ item.stock.area.nombre }}</p>
+              {% if item.reportado %}
+              <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-600 text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+                <i class="fas fa-flag text-xs"></i> Reportado para descarte
+              </span>
+              {% endif %}
             </td>
             <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ item.stock.area.nombre }}</td>
             <td class="px-4 py-3 hidden md:table-cell">
@@ -112,14 +171,27 @@
               </span>
               {% endif %}
             </td>
-            {% if puede_descartar %}
             <td class="px-4 py-3 text-center">
+              {% if puede_descartar %}
+              <!-- Opción C: botón individual (se complementa con el bulk) -->
               <button onclick="abrirDescartar({{ item.lote.id }}, '{{ item.stock.producto.nombre|escapejs }}', '{{ item.stock.area.nombre|escapejs }}', '{{ item.lote.numero_lote|default:''|escapejs }}', '{{ item.vencimiento|date:'Y-m-d' }}', {{ item.lote.cantidad }}, '{{ item.stock.producto.get_unidad_medida_display|escapejs }}')"
                       class="inline-flex items-center gap-1 px-2.5 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-lg border border-red-200 transition-colors">
                 <i class="fas fa-trash-alt text-xs"></i> Descartar
               </button>
+              {% else %}
+              <!-- Opción B: reportar para no-autorizados -->
+              {% if item.reportado %}
+              <span class="inline-flex items-center gap-1 text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50">
+                <i class="fas fa-check text-xs"></i> Reportado
+              </span>
+              {% else %}
+              <button onclick="reportarLote({{ item.lote.id }}, '{{ item.stock.producto.nombre|escapejs }}', this)"
+                      class="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg border border-blue-200 transition-colors">
+                <i class="fas fa-flag text-xs"></i> Reportar
+              </button>
+              {% endif %}
+              {% endif %}
             </td>
-            {% endif %}
           </tr>
           {% endfor %}
         </tbody>
@@ -146,7 +218,75 @@
 </div>
 
 {% if puede_descartar %}
-<!-- ══ Modal de descarte ══════════════════════════════════════════ -->
+<!-- ══ Modal descarte masivo (Opción C) ══════════════════════════════════ -->
+<div id="modalDescarteMasivo" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+          <i class="fas fa-trash-alt text-red-600 text-sm"></i>
+        </div>
+        <h3 class="font-bold text-gray-800">Descarte masivo</h3>
+      </div>
+      <button onclick="cerrarDescarteMasivo()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+        <i class="fas fa-times text-sm"></i>
+      </button>
+    </div>
+    <div class="p-5 space-y-4">
+      <div class="bg-red-50 border border-red-200 rounded-xl p-3">
+        <p class="text-sm text-red-700 font-semibold" id="masivoCantLabel"></p>
+        <div id="masivoListaLotes" class="mt-2 space-y-1 max-h-32 overflow-y-auto text-xs text-gray-600"></div>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-600 mb-1">
+          Motivo del descarte <span class="text-red-500">*</span>
+        </label>
+        <textarea id="masivoMotivo" rows="2"
+                  placeholder="Ej: Lotes vencidos, auditoría mensual..."
+                  class="block w-full rounded-xl border border-gray-300 bg-gray-50 p-3 text-sm resize-none focus:border-red-400 focus:ring-red-400"></textarea>
+        <p class="text-xs text-gray-400 mt-1">Se aplica a todos los lotes seleccionados.</p>
+      </div>
+    </div>
+    <div class="px-5 pb-5 flex gap-3">
+      <button onclick="cerrarDescarteMasivo()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">Cancelar</button>
+      <button onclick="confirmarDescarteMasivo()" id="btnConfirmarMasivo"
+              class="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors">
+        <i class="fas fa-trash-alt mr-1.5"></i> Descartar todos
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ══ Modal reportar (Opción B) — todos los usuarios ═══════════════════ -->
+<div id="modalReportar" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+          <i class="fas fa-flag text-blue-600 text-sm"></i>
+        </div>
+        <h3 class="font-bold text-gray-800">Reportar lote</h3>
+      </div>
+      <button onclick="cerrarReportar()" class="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
+        <i class="fas fa-times text-sm"></i>
+      </button>
+    </div>
+    <div class="p-5 space-y-3">
+      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+        <p id="reportarNombre" class="font-semibold text-gray-800 text-sm"></p>
+        <p class="text-xs text-gray-500 mt-1">Al reportar, un usuario autorizado recibirá el aviso para proceder con el descarte.</p>
+      </div>
+    </div>
+    <div class="px-5 pb-5 flex gap-3">
+      <button onclick="cerrarReportar()" class="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold rounded-xl transition-colors">Cancelar</button>
+      <button onclick="confirmarReportar()" id="btnConfirmarReportar"
+              class="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors">
+        <i class="fas fa-flag mr-1.5"></i> Reportar
+      </button>
+    </div>
+  </div>
+</div>
 <div id="modalDescartar" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 px-4 pb-4 sm:pb-0">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
     <!-- Header -->
@@ -221,11 +361,183 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if puede_descartar %}
 <script>
-const CSRF_TOKEN_V = '{{ csrf_token }}';
-const URL_MOV_V    = '{% url "control_stock:api_movimiento" %}';
+const CSRF_TOKEN_V     = '{{ csrf_token }}';
+const URL_MOV_V        = '{% url "control_stock:api_movimiento" %}';
+const URL_REPORTAR_V   = '{% url "control_stock:api_reportar_lote" %}';
+const URL_MASIVO_V     = '{% url "control_stock:api_descarte_masivo" %}';
 
+// ── Opción A: tabs ─────────────────────────────────────────────
+(function initContadores() {
+  const rows = document.querySelectorAll('#tbodyVenc tr');
+  let venc = 0, prox = 0, rep = 0;
+  rows.forEach(r => {
+    if (r.dataset.vencido === '1') venc++; else prox++;
+    if (r.dataset.reportado === '1') rep++;
+  });
+  document.getElementById('cntVencidos').textContent  = venc;
+  document.getElementById('cntProximos').textContent  = prox;
+  const cntRep = document.getElementById('cntReportados');
+  if (cntRep) cntRep.textContent = rep;
+})();
+
+let tabActivo = 'todos';
+function filtrarTab(tab) {
+  tabActivo = tab;
+  const rows = document.querySelectorAll('#tbodyVenc tr');
+  rows.forEach(r => {
+    let show = true;
+    if (tab === 'vencido')   show = r.dataset.vencido === '1';
+    if (tab === 'proximo')   show = r.dataset.vencido === '0';
+    if (tab === 'reportado') show = r.dataset.reportado === '1';
+    r.style.display = show ? '' : 'none';
+  });
+  // Estilos de tabs
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.remove('bg-medical-primary', 'text-white', 'bg-red-500', 'bg-amber-500', 'bg-blue-500');
+    b.classList.add('text-gray-500');
+  });
+  const activos = {
+    todos:     ['bg-medical-primary', 'text-white'],
+    vencido:   ['bg-red-500',   'text-white'],
+    proximo:   ['bg-amber-500', 'text-white'],
+    reportado: ['bg-blue-500',  'text-white'],
+  };
+  const btn = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+  if (btn) { btn.classList.remove('text-gray-500'); activos[tab].forEach(c => btn.classList.add(c)); }
+  // Deseleccionar checkboxes ocultos
+  actualizarSeleccion();
+}
+
+// ── Opción C: selección masiva ────────────────────────────────
+function actualizarSeleccion() {
+  const checks = [...document.querySelectorAll('input[name=loteCheck]:checked')].filter(c => {
+    return c.closest('tr').style.display !== 'none';
+  });
+  const n = checks.length;
+  document.getElementById('cntSeleccionados').textContent = n;
+  const barra = document.getElementById('barraDescarteMasivo');
+  if (barra) barra.classList.toggle('hidden', n === 0);
+}
+
+function toggleTodos(master) {
+  document.querySelectorAll('input[name=loteCheck]').forEach(c => {
+    const fila = c.closest('tr');
+    if (fila.style.display !== 'none') c.checked = master.checked;
+  });
+  actualizarSeleccion();
+}
+
+function deseleccionarTodos() {
+  document.querySelectorAll('input[name=loteCheck]').forEach(c => c.checked = false);
+  const master = document.getElementById('checkTodos');
+  if (master) master.checked = false;
+  actualizarSeleccion();
+}
+
+function abrirDescarteMasivo() {
+  const checks = [...document.querySelectorAll('input[name=loteCheck]:checked')].filter(c => {
+    return c.closest('tr').style.display !== 'none';
+  });
+  if (!checks.length) return;
+  const n = checks.length;
+  document.getElementById('masivoCantLabel').textContent = `Se descartarán ${n} lote${n > 1 ? 's' : ''}:`;
+  document.getElementById('masivoListaLotes').innerHTML = checks.map(c =>
+    `<p>• ${c.dataset.nombre} (${c.dataset.cantidad} u.)</p>`
+  ).join('');
+  document.getElementById('masivoMotivo').value = '';
+  document.getElementById('modalDescarteMasivo').classList.remove('hidden');
+}
+
+function cerrarDescarteMasivo() {
+  document.getElementById('modalDescarteMasivo').classList.add('hidden');
+}
+
+async function confirmarDescarteMasivo() {
+  const motivo = document.getElementById('masivoMotivo').value.trim();
+  if (!motivo) {
+    mostrarToastV('El motivo es obligatorio.', 'warning');
+    document.getElementById('masivoMotivo').focus();
+    return;
+  }
+  const loteIds = [...document.querySelectorAll('input[name=loteCheck]:checked')]
+    .filter(c => c.closest('tr').style.display !== 'none')
+    .map(c => parseInt(c.value));
+
+  const btn = document.getElementById('btnConfirmarMasivo');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Procesando...';
+  try {
+    const resp = await fetch(URL_MASIVO_V, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_V },
+      body: JSON.stringify({ lote_ids: loteIds, observacion: motivo }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      mostrarToastV(data.error || 'Error al descartar.', 'error');
+    } else {
+      cerrarDescarteMasivo();
+      mostrarToastV(`${data.descartados} lote${data.descartados > 1 ? 's' : ''} descartado${data.descartados > 1 ? 's' : ''} correctamente.`, 'success');
+      setTimeout(() => location.reload(), 1600);
+    }
+  } catch {
+    mostrarToastV('Error de conexión.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-trash-alt mr-1.5"></i> Descartar todos';
+  }
+}
+document.getElementById('modalDescarteMasivo')?.addEventListener('click', function(e) { if (e.target === this) cerrarDescarteMasivo(); });
+
+// ── Opción B: reportar ────────────────────────────────────────
+let _reportarLoteId   = null;
+let _reportarBtnOrig  = null;
+
+function reportarLote(loteId, nombre, btn) {
+  _reportarLoteId  = loteId;
+  _reportarBtnOrig = btn;
+  document.getElementById('reportarNombre').textContent = nombre;
+  document.getElementById('modalReportar').classList.remove('hidden');
+}
+function cerrarReportar() {
+  document.getElementById('modalReportar').classList.add('hidden');
+  _reportarLoteId = null; _reportarBtnOrig = null;
+}
+async function confirmarReportar() {
+  const btn = document.getElementById('btnConfirmarReportar');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Reportando...';
+  try {
+    const resp = await fetch(URL_REPORTAR_V, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_V },
+      body: JSON.stringify({ lote_id: _reportarLoteId }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      mostrarToastV(data.error || 'Error al reportar.', 'error');
+    } else {
+      cerrarReportar();
+      mostrarToastV('Lote reportado. Un responsable procederá con el descarte.', 'success');
+      // Actualizar el botón en el DOM sin recargar
+      if (_reportarBtnOrig) {
+        _reportarBtnOrig.outerHTML = `<span class="inline-flex items-center gap-1 text-blue-600 text-xs font-semibold px-2.5 py-1 rounded-lg border border-blue-200 bg-blue-50"><i class="fas fa-check text-xs"></i> Reportado</span>`;
+      }
+      const fila = document.querySelector(`tr [value="${_reportarLoteId}"]`)?.closest('tr') ||
+                   document.querySelector(`button[onclick*="${_reportarLoteId}"]`)?.closest('tr');
+      if (fila) fila.dataset.reportado = '1';
+    }
+  } catch {
+    mostrarToastV('Error de conexión.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-flag mr-1.5"></i> Reportar';
+  }
+}
+document.getElementById('modalReportar').addEventListener('click', function(e) { if (e.target === this) cerrarReportar(); });
+
+// ── Modal descarte individual (Opción C individual) ─────────
 let descartarLoteId  = null;
 let descartarMaxCant = 1;
 
@@ -240,96 +552,54 @@ function abrirDescartar(loteId, nombre, area, lote, vence, cantidad, unidad) {
     : '';
   document.getElementById('descartarVence').textContent     = fechaStr ? `Vence: ${fechaStr}` : '';
   const inp = document.getElementById('descartarCantidad');
-  inp.value = 1;
-  inp.max   = cantidad;
+  inp.value = 1; inp.max = cantidad;
   document.getElementById('descartarDisponible').textContent = `Disponible: ${cantidad} ${unidad}`;
   document.getElementById('descartarMotivo').value = '';
   document.getElementById('modalDescartar').classList.remove('hidden');
 }
-
 function cerrarDescartar() {
   document.getElementById('modalDescartar').classList.add('hidden');
   descartarLoteId = null;
 }
-
 function ajustarDescarte(delta) {
-  const inp  = document.getElementById('descartarCantidad');
-  const nuevo = Math.max(1, Math.min(descartarMaxCant, (parseInt(inp.value) || 1) + delta));
-  inp.value = nuevo;
+  const inp = document.getElementById('descartarCantidad');
+  inp.value = Math.max(1, Math.min(descartarMaxCant, (parseInt(inp.value) || 1) + delta));
 }
-
 async function confirmarDescarte() {
   const cantidad = parseInt(document.getElementById('descartarCantidad').value);
   const motivo   = document.getElementById('descartarMotivo').value.trim();
-  if (!motivo) {
-    mostrarToastV('El motivo es obligatorio para descartar.', 'warning');
-    document.getElementById('descartarMotivo').focus();
-    return;
-  }
-  if (cantidad < 1 || cantidad > descartarMaxCant) {
-    mostrarToastV('Cantidad inválida.', 'warning');
-    return;
-  }
+  if (!motivo) { mostrarToastV('El motivo es obligatorio para descartar.', 'warning'); document.getElementById('descartarMotivo').focus(); return; }
+  if (cantidad < 1 || cantidad > descartarMaxCant) { mostrarToastV('Cantidad inválida.', 'warning'); return; }
 
   const btn = document.getElementById('btnConfirmarDescarte');
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1.5"></i> Descartando...';
-
   try {
     const resp = await fetch(URL_MOV_V, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN_V },
-      body: JSON.stringify({
-        lote_id:     descartarLoteId,
-        tipo:        'descarte',
-        cantidad,
-        observacion: motivo,
-        // Los siguientes campos son requeridos por la API pero el lote ya lleva la info
-        area_id:     0,   // la API los ignora si lote_id está presente
-        codigo_barras: '', // ídem
-      }),
+      body: JSON.stringify({ lote_id: descartarLoteId, tipo: 'descarte', cantidad, observacion: motivo, area_id: 0, codigo_barras: '' }),
     });
     const data = await resp.json();
-    if (!resp.ok || data.error) {
-      mostrarToastV(data.error || 'Error al descartar.', 'error');
-    } else {
-      cerrarDescartar();
-      mostrarToastV('Lote descartado correctamente.', 'success');
-      // Recargar la página tras un breve delay para reflejar el cambio
-      setTimeout(() => location.reload(), 1500);
-    }
-  } catch {
-    mostrarToastV('Error de conexión.', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-trash-alt mr-1.5"></i> Descartar';
-  }
+    if (!resp.ok || data.error) { mostrarToastV(data.error || 'Error al descartar.', 'error'); }
+    else { cerrarDescartar(); mostrarToastV('Lote descartado correctamente.', 'success'); setTimeout(() => location.reload(), 1500); }
+  } catch { mostrarToastV('Error de conexión.', 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt mr-1.5"></i> Descartar'; }
 }
+document.getElementById('modalDescartar').addEventListener('click', function(e) { if (e.target === this) cerrarDescartar(); });
 
+// ── Toast ─────────────────────────────────────────────────────
 function mostrarToastV(msg, tipo) {
   const el = document.getElementById('toastVenc');
-  const ico = document.getElementById('toastVencIcon');
-  const txt = document.getElementById('toastVencMsg');
-  const tipos = {
-    success: { bg: 'bg-green-500', icon: 'fa-check-circle' },
-    error:   { bg: 'bg-red-500',   icon: 'fa-times-circle' },
-    warning: { bg: 'bg-amber-500', icon: 'fa-exclamation-triangle' },
-  };
-  const t = tipos[tipo] || tipos.success;
-  el.className = `fixed z-[999] min-w-[260px] max-w-xs flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white ${t.bg}`;
-  el.style.top   = '5rem';
-  el.style.right = '1rem';
-  ico.className  = `fas ${t.icon} mt-0.5 flex-shrink-0`;
-  txt.textContent = msg;
+  const tipos = { success: ['bg-green-500', 'fa-check-circle'], error: ['bg-red-500', 'fa-times-circle'], warning: ['bg-amber-500', 'fa-exclamation-triangle'] };
+  const [bg, icon] = tipos[tipo] || tipos.success;
+  el.className = `fixed z-[999] min-w-[260px] max-w-xs flex items-start gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white ${bg}`;
+  el.style.top = '5rem'; el.style.right = '1rem';
+  document.getElementById('toastVencIcon').className = `fas ${icon} mt-0.5 flex-shrink-0`;
+  document.getElementById('toastVencMsg').textContent = msg;
   el.classList.remove('hidden');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.add('hidden'), 3500);
 }
-
-// Cerrar modal al clic en backdrop
-document.getElementById('modalDescartar').addEventListener('click', function(e) {
-  if (e.target === this) cerrarDescartar();
-});
 </script>
-{% endif %}
 {% endblock %}

@@ -185,6 +185,19 @@ class LoteEnArea(models.Model):
         verbose_name='Activo',
         help_text='False cuando el lote fue descartado o agotado.',
     )
+    reportado_para_descarte = models.BooleanField(
+        default=False,
+        verbose_name='Reportado para descarte',
+        help_text='Un usuario sin permisos lo marcó como vencido/a descartar.',
+    )
+    reportado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='lotes_reportados',
+        verbose_name='Reportado por',
+    )
+    reportado_en = models.DateTimeField(null=True, blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 

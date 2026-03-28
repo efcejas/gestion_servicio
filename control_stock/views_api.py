@@ -755,3 +755,109 @@ def api_buscar_por_nombre(request):
         })
 
     return JsonResponse({'resultados': resultados})
+
+
+@require_POST
+@login_required
+def api_reportar_lote(request):
+    """
+    POST /stock/api/reportar-lote/
+    Cualquier usuario autenticado puede reportar un lote como candidato a descarte.
+    Body JSON: {lote_id: int}
+    """
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    lote_id = body.get('lote_id')
+    if not lote_id:
+        return JsonResponse({'error': 'Se requiere lote_id'}, status=400)
+
+    try:
+        lote = LoteEnArea.objects.select_related('stock__producto', 'stock__area').get(pk=lote_id)
+    except LoteEnArea.DoesNotExist:
+        return JsonResponse({'error': 'Lote no encontrado'}, status=404)
+
+    lote.reportado_para_descarte = True
+    lote.reportado_por = request.user
+    lote.reportado_en = timezone.now()
+    lote.save(update_fields=['reportado_para_descarte', 'reportado_por', 'reportado_en'])
+
+    return JsonResponse({
+        'ok': True,
+        'mensaje': f'Lote de {lote.stock.producto.nombre} reportado para descarte.',
+    })
+
+
+@require_POST
+@login_required
+def api_descarte_masivo(request):
+    """
+    POST /stock/api/descarte-masivo/
+    Descarta múltiples lotes en una sola operación.
+    Body JSON: {lote_ids: [int, ...], observacion: str}
+    Solo roles autorizados (misma lógica que api_registrar_movimiento para descarte).
+    """
+    if not _check_rol(request):
+        return JsonResponse({'error': 'Sin permisos'}, status=403)
+
+    rol = getattr(request.user, 'rol', None)
+    if not request.user.is_superuser and rol not in MovimientoStock.ROLES_PUEDEN_DESCARTAR:
+        return JsonResponse({'error': 'Sin permisos para descartar inventario'}, status=403)
+
+    try:
+        body = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'JSON inválido'}, status=400)
+
+    lote_ids = body.get('lote_ids', [])
+    observacion = (body.get('observacion') or '').strip()
+
+    if not lote_ids:
+        return JsonResponse({'error': 'Se requiere al menos un lote_id'}, status=400)
+    if not observacion:
+        return JsonResponse({'error': 'Se requiere un motivo para el descarte'}, status=400)
+    if len(lote_ids) > 50:
+        return JsonResponse({'error': 'Máximo 50 lotes por operación'}, status=400)
+
+    descartados = 0
+    errores = []
+
+    with transaction.atomic():
+        for lote_id in lote_ids:
+            try:
+                lote = LoteEnArea.objects.select_for_update().select_related(
+                    'stock__producto', 'stock__area'
+                ).get(pk=lote_id, activo=True)
+
+                cantidad = lote.cantidad
+                lote.cantidad = 0
+                lote.activo = False
+                lote.reportado_para_descarte = False
+                lote.save(update_fields=['cantidad', 'activo', 'reportado_para_descarte'])
+
+                stock = lote.stock
+                stock.recalcular()
+
+                MovimientoStock.objects.create(
+                    producto=stock.producto,
+                    area=stock.area,
+                    tipo=MovimientoStock.TIPO_DESCARTE,
+                    cantidad=cantidad,
+                    lote=lote,
+                    numero_lote=lote.numero_lote,
+                    fecha_vencimiento=lote.fecha_vencimiento,
+                    usuario=request.user,
+                    observacion=observacion,
+                )
+                descartados += 1
+
+            except LoteEnArea.DoesNotExist:
+                errores.append(f'Lote {lote_id} no encontrado o ya inactivo')
+
+    return JsonResponse({
+        'ok': True,
+        'descartados': descartados,
+        'errores': errores,
+    })
