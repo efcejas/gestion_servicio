@@ -14,6 +14,10 @@ urlpatterns = [
     path('mis-preinformes/', views.mis_preinformes, name='mis_preinformes'),
     path('ver/<int:pk>/', views.ver_preinforme, name='ver_preinforme'),
     
+    # Banco de Informes (pool compartido de finalizados)
+    path('banco/', views.lista_banco_informes, name='lista_banco_informes'),
+    path('banco/<int:pk>/', views.ver_banco_preinforme, name='ver_banco_preinforme'),
+    
     # Revisión - Staff
     path('revision/', views.lista_revision, name='lista_revision'),
     path('revisar/<int:pk>/', views.revisar_preinforme, name='revisar_preinforme'),

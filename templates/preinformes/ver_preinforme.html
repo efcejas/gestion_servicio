@@ -132,8 +132,8 @@
             <span class="flex items-center gap-2 px-4 py-1.5">
                 <i class="fas fa-user text-gray-400 text-xs"></i>
                 <span class="font-medium text-gray-900">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</span>
-                <span class="text-gray-400 text-xs">· DNI {{ preinforme.dni_paciente|default:"S/D" }}</span>
-                <span class="text-gray-400 text-xs">· {{ preinforme.edad_paciente }} a. {{ preinforme.get_sexo_paciente_display }}</span>
+                {% if preinforme.dni_paciente %}<span class="text-gray-400 text-xs">· DNI {{ preinforme.dni_paciente }}</span>{% endif %}
+                {% if preinforme.edad_paciente or preinforme.sexo_paciente %}<span class="text-gray-400 text-xs">·{% if preinforme.edad_paciente %} {{ preinforme.edad_paciente }} a.{% endif %}{% if preinforme.sexo_paciente %} {{ preinforme.get_sexo_paciente_display }}{% endif %}</span>{% endif %}
             </span>
             <span class="flex items-center gap-2 px-4 py-1.5 border-r border-gray-200">
                 <i class="fas fa-stethoscope text-green-500 text-xs"></i>

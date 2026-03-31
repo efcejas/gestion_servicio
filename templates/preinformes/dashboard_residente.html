@@ -141,9 +141,8 @@
                                 <div class="text-xs text-gray-600">
                                     <span class="font-medium">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</span>
                                     <span class="mx-1">•</span>
-                                    <span>DNI: {{ preinforme.dni_paciente|default:"S/D" }}</span>
-                                    <span class="mx-1">•</span>
-                                    <span>{{ preinforme.edad_paciente }} años</span>
+                                    {% if preinforme.dni_paciente %}<span>DNI: {{ preinforme.dni_paciente }}</span><span class="mx-1">•</span>{% endif %}
+                                    {% if preinforme.edad_paciente %}<span>{{ preinforme.edad_paciente }} años</span>{% endif %}
                                 </div>
                             </div>
                         </div>

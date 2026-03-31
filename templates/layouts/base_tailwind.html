@@ -249,6 +249,18 @@
                     </a>
                     {% endif %}
 
+                    <!-- Banco de Informes (superusuario) -->
+                    {% url 'preinformes:lista_banco_informes' as banco_url_su %}
+                    {% if banco_url_su %}
+                    <a href="{{ banco_url_su }}"
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'banco' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-archive mr-2 group-hover:scale-110 transition-transform"></i>Banco
+                        {% if 'banco' in request.resolver_match.url_name|default:'' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
                     <!-- Stock (superusuario) -->
                     {% url 'control_stock:dashboard' as stock_url %}
                     {% if stock_url %}
@@ -264,13 +276,13 @@
                     <!-- Panel de Administración -->
                     {% url 'admin_dashboard' as admin_url %}
                     {% if admin_url %}
-                    <a href="{{ admin_url }}" 
+                    <!-- <a href="{{ admin_url }}" 
                        class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'admin_dashboard' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                         <i class="fas fa-cog mr-2 group-hover:scale-110 transition-transform"></i>Administración
                         {% if request.resolver_match.url_name == 'admin_dashboard' %}
                         <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                         {% endif %}
-                    </a>
+                    </a> -->
                     {% endif %}
 
                 <!-- ========== NAVEGACIÓN PARA USUARIOS NO SUPERUSER ========== -->
@@ -320,12 +332,26 @@
                         {% url 'preinformes:dashboard_residente' as preinformes_url %}
                         {% if preinformes_url %}
                         <a href="{{ preinformes_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' and 'banco' not in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
                             <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Preinformes
-                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' %}
+                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' and 'banco' not in request.resolver_match.url_name|default:'' %}
                             <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
                             {% endif %}
                         </a>
+                        {% endif %}
+
+                        <!-- Banco de Informes - Solo residentes -->
+                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                        {% url 'preinformes:lista_banco_informes' as banco_url %}
+                        {% if banco_url %}
+                        <a href="{{ banco_url }}"
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'banco' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-archive mr-2 group-hover:scale-110 transition-transform"></i>Banco
+                            {% if 'banco' in request.resolver_match.url_name|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
                         {% endif %}
                         {% endif %}
                         

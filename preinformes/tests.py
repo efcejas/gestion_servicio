@@ -17,7 +17,8 @@ class PreinformeModelTest(TestCase):
             password='testpass123',
             rol='medico_residente',
             first_name='Juan',
-            last_name='Pérez'
+            last_name='Pérez',
+            perfil_completo=True
         )
         
         self.staff = User.objects.create_user(
@@ -26,7 +27,8 @@ class PreinformeModelTest(TestCase):
             password='testpass123',
             rol='medico_staff',
             first_name='Dr.',
-            last_name='García'
+            last_name='García',
+            perfil_completo=True
         )
         
         # Crear tipo de estudio y región
@@ -140,7 +142,7 @@ class PreinformeModelTest(TestCase):
                 RevisionPreinforme.objects.create(
                     preinforme=preinforme,
                     revisor=self.staff,
-                    informe_final='Informe final test',
+                    informe_final_html='<p>Informe final test</p>',
                     puntuacion=8 + i  # 8 y 9
                 )
         
@@ -159,14 +161,16 @@ class PreinformeViewTest(TestCase):
             username='residente1',
             email='residente1@test.com',
             password='testpass123',
-            rol='medico_residente'
+            rol='medico_residente',
+            perfil_completo=True
         )
         
         self.staff = User.objects.create_user(
             username='staff1',
             email='staff1@test.com',
             password='testpass123',
-            rol='medico_staff'
+            rol='medico_staff',
+            perfil_completo=True
         )
         
         self.tipo_estudio = TipoEstudio.objects.create(nombre='RX Tórax')
@@ -182,7 +186,7 @@ class PreinformeViewTest(TestCase):
         self.client.login(username='residente1', password='testpass123')
         response = self.client.get(reverse('preinformes:dashboard_residente'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Dashboard de Preinformes')
+        self.assertContains(response, 'Dashboard - Preinformes')
 
     def test_crear_preinforme_get(self):
         """Test GET del formulario de creación"""
@@ -199,13 +203,10 @@ class PreinformeViewTest(TestCase):
             'numero_estudio': '2024-001234',
             'tipo_estudio': self.tipo_estudio.id,
             'region': self.region.id,
+            'sistema_destino': 'eges',
             'apellido_paciente': 'González',
             'nombre_paciente': 'María',
-            'edad_paciente': 45,
-            'sexo_paciente': 'F',
-            'tecnica': 'Radiografía de tórax PA y lateral.',
-            'hallazgos': 'Sin hallazgos patológicos.',
-            'conclusion': 'Radiografía normal.'
+            'informe_html': '<p>TÉCNICA: Radiografía de tórax PA y lateral.</p><p>HALLAZGOS: Sin hallazgos patológicos.</p>',
         }
         
         response = self.client.post(reverse('preinformes:crear_preinforme'), data)

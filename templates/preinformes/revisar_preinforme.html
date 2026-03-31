@@ -118,18 +118,24 @@
                         <span class="text-sm font-medium text-gray-600">Nombre:</span>
                         <span class="text-sm text-gray-900 font-semibold">{{ preinforme.nombre_paciente }}</span>
                     </div>
+                    {% if preinforme.dni_paciente %}
                     <div class="flex justify-between py-2 border-b border-gray-100">
                         <span class="text-sm font-medium text-gray-600">DNI:</span>
                         <span class="text-sm text-gray-900">{{ preinforme.dni_paciente }}</span>
                     </div>
+                    {% endif %}
+                    {% if preinforme.edad_paciente %}
                     <div class="flex justify-between py-2 border-b border-gray-100">
                         <span class="text-sm font-medium text-gray-600">Edad:</span>
                         <span class="text-sm text-gray-900">{{ preinforme.edad_paciente }} años</span>
                     </div>
+                    {% endif %}
+                    {% if preinforme.sexo_paciente %}
                     <div class="flex justify-between py-2">
                         <span class="text-sm font-medium text-gray-600">Sexo:</span>
                         <span class="text-sm text-gray-900">{{ preinforme.get_sexo_paciente_display }}</span>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 

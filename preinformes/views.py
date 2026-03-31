@@ -339,6 +339,76 @@ def ver_preinforme(request, pk):
     return render(request, 'preinformes/ver_preinforme.html', context)
 
 
+# === BANCO DE INFORMES (pool compartido de finalizados) ===
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+def lista_banco_informes(request):
+    """Lista de todos los preinformes finalizados del equipo residente.
+    Permite que el residente A busque y copie el informe definitivo del residente B.
+    No muestra datos de evaluación (puntuación, comentarios del revisor).
+    """
+    qs = Preinforme.objects.filter(
+        estado='finalizado',
+        residente__rol='medico_residente',
+    ).select_related('residente', 'tipo_estudio', 'region', 'revision').order_by('-fecha_finalizacion')
+
+    # Filtros GET
+    q_numero = request.GET.get('numero_estudio', '').strip()
+    q_paciente = request.GET.get('paciente', '').strip()
+    q_tipo = request.GET.get('tipo_estudio', '')
+    q_region = request.GET.get('region', '')
+
+    if q_numero:
+        qs = qs.filter(numero_estudio__icontains=q_numero)
+    if q_paciente:
+        qs = qs.filter(
+            Q(apellido_paciente__icontains=q_paciente) |
+            Q(nombre_paciente__icontains=q_paciente)
+        )
+    if q_tipo:
+        qs = qs.filter(tipo_estudio_id=q_tipo)
+    if q_region:
+        qs = qs.filter(region_id=q_region)
+
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    from .models import TipoEstudio, Region
+    context = {
+        'page_obj': page_obj,
+        'tipos_estudio': TipoEstudio.objects.all().order_by('nombre'),
+        'regiones': Region.objects.all().order_by('nombre'),
+        'q_numero': q_numero,
+        'q_paciente': q_paciente,
+        'q_tipo': q_tipo,
+        'q_region': q_region,
+        'title': 'Banco de Informes',
+    }
+    return render(request, 'preinformes/lista_banco_informes.html', context)
+
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+def ver_banco_preinforme(request, pk):
+    """Vista limpia del informe final para el pool del equipo.
+    Solo muestra el informe definitivo y el botón de copia.
+    Sin datos de la evaluación (puntuación, comentarios al residente).
+    """
+    preinforme = get_object_or_404(
+        Preinforme,
+        pk=pk,
+        estado='finalizado',
+        residente__rol='medico_residente',
+    )
+    context = {
+        'preinforme': preinforme,
+        'title': f'Informe {preinforme.numero_estudio}',
+    }
+    return render(request, 'preinformes/ver_banco_preinforme.html', context)
+
+
 # === VISTAS PARA STAFF ===
 
 @login_required
@@ -1018,7 +1088,9 @@ def copiar_informe_final(request, pk):
     if not (
         request.user == preinforme.residente or 
         request.user == preinforme.revisor or
-        request.user.rol in ['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+        request.user.rol in ['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'] or
+        # Banco de informes: cualquier residente puede copiar un informe finalizado de un compañero
+        (request.user.rol == 'medico_residente' and preinforme.estado == 'finalizado')
     ):
         return JsonResponse({'error': 'Sin permisos para ver este informe'}, status=403)
     

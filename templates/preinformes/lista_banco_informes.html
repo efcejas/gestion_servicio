@@ -1,0 +1,198 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-0">
+
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg overflow-hidden mb-4">
+        <div class="px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                    <i class="fas fa-archive text-lg text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-white leading-tight">Banco de Informes</h1>
+                    <p class="text-teal-100 text-xs mt-0.5">Informes definitivos del equipo — para buscar y copiar cuando sea necesario</p>
+                </div>
+            </div>
+            <a href="{% url 'preinformes:dashboard_residente' %}"
+               class="inline-flex items-center px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white text-sm font-medium rounded-xl transition-all">
+                <i class="fas fa-arrow-left mr-1.5"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <form method="get" class="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-4 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">N° Estudio</label>
+                <input type="text" name="numero_estudio" value="{{ q_numero }}"
+                       placeholder="Ej: TEST-2026-010"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Paciente</label>
+                <input type="text" name="paciente" value="{{ q_paciente }}"
+                       placeholder="Apellido o nombre"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo de estudio</label>
+                <select name="tipo_estudio"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    <option value="">Todos</option>
+                    {% for tipo in tipos_estudio %}
+                    <option value="{{ tipo.id }}" {% if q_tipo == tipo.id|stringformat:"s" %}selected{% endif %}>{{ tipo.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Región</label>
+                <select name="region"
+                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    <option value="">Todas</option>
+                    {% for region in regiones %}
+                    <option value="{{ region.id }}" {% if q_region == region.id|stringformat:"s" %}selected{% endif %}>{{ region.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="flex gap-2 mt-3">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors">
+                <i class="fas fa-search mr-1.5"></i>Buscar
+            </button>
+            {% if q_numero or q_paciente or q_tipo or q_region %}
+            <a href="{% url 'preinformes:lista_banco_informes' %}"
+               class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                <i class="fas fa-times mr-1.5"></i>Limpiar
+            </a>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- Tabla + Paginación -->
+    {% if page_obj.object_list %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+
+        <!-- Contador -->
+        <div class="px-6 py-3 border-b border-gray-100 bg-gray-50">
+            <p class="text-sm text-gray-500">
+                <span class="font-semibold text-gray-700">{{ page_obj.paginator.count }}</span>
+                informe{{ page_obj.paginator.count|pluralize }} encontrado{{ page_obj.paginator.count|pluralize }}
+            </p>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full divide-y divide-gray-200">
+                <thead class="bg-gradient-to-r from-teal-50 to-cyan-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">N° Estudio</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Paciente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Tipo / Región</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Residente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Fecha</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Sistema</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for preinforme in page_obj %}
+                    <tr class="hover:bg-teal-50/40 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-medium text-gray-900">{{ preinforme.numero_estudio }}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</div>
+                            {% if preinforme.dni_paciente %}
+                            <div class="text-xs text-gray-400">DNI {{ preinforme.dni_paciente }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</div>
+                            <div class="text-xs text-gray-500">{{ preinforme.region.nombre }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
+                                    <i class="fas fa-user-graduate text-teal-600 text-xs"></i>
+                                </div>
+                                <span class="text-sm text-gray-700">{{ preinforme.residente.get_full_name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{ preinforme.fecha_finalizacion|date:"d/m/Y" }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if preinforme.sistema_destino == 'netterm' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                                <i class="fas fa-terminal mr-1"></i>NetTerm
+                            </span>
+                            {% elif preinforme.sistema_destino == 'eges' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                <i class="fas fa-database mr-1"></i>EGES
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <a href="{% url 'preinformes:ver_banco_preinforme' preinforme.pk %}"
+                               class="inline-flex items-center px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                                <i class="fas fa-eye mr-1.5"></i>Ver y Copiar
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        {% if page_obj.has_other_pages %}
+        <div class="bg-white px-6 py-3 flex items-center justify-between border-t border-gray-200">
+            <p class="text-sm text-gray-600">
+                Mostrando <span class="font-medium">{{ page_obj.start_index }}</span>–<span class="font-medium">{{ page_obj.end_index }}</span>
+                de <span class="font-medium">{{ page_obj.paginator.count }}</span> resultados
+            </p>
+            <nav class="inline-flex rounded-md shadow-sm -space-x-px">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                   class="relative inline-flex items-center px-3 py-2 rounded-l-md border border-gray-300 bg-white text-sm text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-chevron-left text-xs"></i>
+                </a>
+                {% endif %}
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <span class="relative inline-flex items-center px-4 py-2 border border-teal-400 bg-teal-50 text-sm font-semibold text-teal-700">{{ num }}</span>
+                    {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <a href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                       class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm text-gray-700 hover:bg-gray-50">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}"
+                   class="relative inline-flex items-center px-3 py-2 rounded-r-md border border-gray-300 bg-white text-sm text-gray-500 hover:bg-gray-50">
+                    <i class="fas fa-chevron-right text-xs"></i>
+                </a>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+
+    </div>
+
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+        <div class="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-archive text-3xl text-gray-400"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-700 mb-1">Sin resultados</h3>
+        <p class="text-gray-400 text-sm">No se encontraron informes finalizados con los filtros aplicados.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

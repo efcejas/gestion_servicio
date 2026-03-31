@@ -159,9 +159,11 @@
                             <div class="text-sm text-gray-700">
                                 {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
                             </div>
+                            {% if preinforme.edad_paciente or preinforme.sexo_paciente %}
                             <div class="text-sm text-gray-500">
-                                {{ preinforme.edad_paciente }} años - {{ preinforme.get_sexo_paciente_display }}
+                                {% if preinforme.edad_paciente %}{{ preinforme.edad_paciente }} años{% endif %}{% if preinforme.edad_paciente and preinforme.sexo_paciente %} - {% endif %}{% if preinforme.sexo_paciente %}{{ preinforme.get_sexo_paciente_display }}{% endif %}
                             </div>
+                            {% endif %}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
