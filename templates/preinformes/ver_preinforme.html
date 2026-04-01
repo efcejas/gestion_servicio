@@ -249,62 +249,62 @@
             </div>
         </div>
 
-        <!-- Columna Derecha: Informe Final (sin metadatos para alinear con columna izquierda) -->
+        <!-- Columna Derecha: Informe Final -->
         <div class="sticky-column">
             <div class="bg-white shadow-md rounded-lg p-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
-                    <i class="fas fa-user-md text-green-600 mr-2"></i>
-                    Informe Final Corregido
-                </h2>
-                    
-                    <div>
-                        <div class="p-4 bg-green-50 border border-green-200 rounded-md">
-                            <!-- Visualizador aislado con iframe para mostrar HTML exactamente como está guardado -->
-                            <iframe id="informe-final-viewer" 
-                                    style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
-                                    frameborder="0">
-                            </iframe>
-                            <script>
-                                // Inyectar HTML en iframe para aislarlo del CSS del sitio
-                                (function() {
-                                    const iframe = document.getElementById('informe-final-viewer');
-                                    const htmlContent = `{{ preinforme.revision.informe_final_html|escapejs }}`;
-                                    const doc = iframe.contentDocument || iframe.contentWindow.document;
-                                    doc.open();
-                                    doc.write(`
-                                        <!DOCTYPE html>
-                                        <html>
-                                        <head>
-                                            <meta charset="UTF-8">
-                                            <style>
-                                                body {
-                                                    font-family: Arial, sans-serif;
-                                                    font-size: 12pt;
-                                                    line-height: 1.6;
-                                                    padding: 15px;
-                                                    margin: 0;
-                                                    color: #333;
-                                                }
-                                            </style>
-                                        </head>
-                                        <body>${htmlContent}</body>
-                                        </html>
-                                    `);
-                                    doc.close();
-                                    
-                                    // Ajustar altura del iframe al contenido
-                                    iframe.onload = function() {
-                                        try {
-                                            const body = iframe.contentDocument.body;
-                                            const height = body.scrollHeight + 30;
-                                            iframe.style.height = height + 'px';
-                                        } catch(e) {
-                                            console.log('No se pudo ajustar altura del iframe');
-                                        }
-                                    };
-                                })();
-                            </script>
+                <!-- Header con botón toggle diff -->
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                        <i class="fas fa-user-md text-green-600 mr-2"></i>
+                        Informe Final Corregido
+                    </h2>
+                    <button id="btn-toggle-diff"
+                            onclick="toggleDiffMode()"
+                            class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100">
+                        <i class="fas fa-code-branch mr-1.5"></i>Ver cambios
+                    </button>
+                </div>
+
+                <div>
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-md">
+
+                        <!-- Vista limpia (iframe) -->
+                        <iframe id="informe-final-viewer"
+                                style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
+                                frameborder="0">
+                        </iframe>
+                        <script>
+                            (function() {
+                                const iframe = document.getElementById('informe-final-viewer');
+                                const htmlContent = `{{ preinforme.revision.informe_final_html|escapejs }}`;
+                                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                                doc.open();
+                                doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.6;padding:15px;margin:0;color:#333;}</style></head><body>${htmlContent}</body></html>`);
+                                doc.close();
+                                iframe.onload = function() {
+                                    try {
+                                        const h = iframe.contentDocument.body.scrollHeight + 30;
+                                        iframe.style.height = h + 'px';
+                                    } catch(e) {}
+                                };
+                            })();
+                        </script>
+
+                        <!-- Vista diff (oculta por defecto) -->
+                        <div id="diff-view"
+                             style="display:none; width:100%; min-height:400px; background:white; border-radius:4px; padding:15px; font-family:Arial,sans-serif; font-size:12pt; line-height:1.8; color:#333;">
                         </div>
+
+                        <!-- Leyenda diff (oculta por defecto) -->
+                        <div id="diff-leyenda" class="hidden mt-3 flex items-center gap-4 text-xs text-gray-500 border-t border-gray-100 pt-2">
+                            <span class="flex items-center gap-1">
+                                <span style="background:#d1fae5;border-radius:3px;padding:1px 6px;color:#065f46;font-weight:600;">Texto agregado</span>
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <span style="background:#fee2e2;border-radius:3px;padding:1px 6px;color:#991b1b;text-decoration:line-through;">Texto eliminado</span>
+                            </span>
+                        </div>
+                    </div>
                         <button onclick="copiarInformeFinal({{ preinforme.pk }})" 
                                 class="mt-3 w-full inline-flex items-center justify-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
                             <i class="fas fa-copy mr-2"></i>
@@ -456,6 +456,175 @@
 </div>
 
 <script>
+// =====================================================================
+// DIFF: comparación visual word-level entre versión original y final
+// =====================================================================
+const _originalHtml = `{{ preinforme.get_informe_html_or_legacy|escapejs }}`;
+const _finalHtml    = `{{ preinforme.revision.informe_final_html|escapejs }}`;
+
+let _diffModeActive  = false;
+let _diffCalculated  = false;
+
+/** Diff word-level sin dependencias externas — algoritmo LCS */
+function _wordDiff(oldText, newText) {
+    // Tokenizar: palabras + espacios/saltos como tokens separados
+    const tok = s => s.match(/[^\s]+|\s+/g) || [];
+    const a = tok(oldText);
+    const b = tok(newText);
+    const m = a.length, n = b.length;
+    if (m === 0 && n === 0) return [];
+
+    // Tabla LCS con Int32Array para eficiencia de memoria
+    const dp = [];
+    for (let i = 0; i <= m; i++) dp[i] = new Int32Array(n + 1);
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            dp[i][j] = a[i-1] === b[j-1]
+                ? dp[i-1][j-1] + 1
+                : Math.max(dp[i-1][j], dp[i][j-1]);
+        }
+    }
+    // Backtrack
+    const ops = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+        if (i > 0 && j > 0 && a[i-1] === b[j-1]) {
+            ops.unshift([0, a[i-1]]);
+            i--; j--;
+        } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+            ops.unshift([1, b[j-1]]);   // INSERT
+            j--;
+        } else {
+            ops.unshift([-1, a[i-1]]);  // DELETE
+            i--;
+        }
+    }
+    return ops;
+}
+
+/** Calcula y renderiza el diff en #diff-view — LCS a nivel párrafo + word-level dentro de cada par */
+function _calcularDiff() {
+    const parser  = new DOMParser();
+    const docOrig = parser.parseFromString(_originalHtml, 'text/html');
+    const docFin  = parser.parseFromString(_finalHtml,    'text/html');
+
+    // Extrae párrafos como { text, html } — text para comparar, html para renderizar
+    function getParagraphs(doc) {
+        const ps = doc.querySelectorAll('p');
+        if (ps.length) {
+            return Array.from(ps)
+                .map(p => ({ text: p.textContent.replace(/\s+/g, ' ').trim(), html: p.innerHTML }))
+                .filter(p => p.text);
+        }
+        const t = doc.body.textContent.replace(/\s+/g, ' ').trim();
+        return t ? [{ text: t, html: doc.body.innerHTML }] : [];
+    }
+
+    const origParas = getParagraphs(docOrig);
+    const finParas  = getParagraphs(docFin);
+
+    // LCS a nivel párrafo (compara por .text)
+    function paraLCS(a, b) {
+        const m = a.length, n = b.length;
+        const dp = [];
+        for (let i = 0; i <= m; i++) dp[i] = new Int32Array(n + 1);
+        for (let i = 1; i <= m; i++)
+            for (let j = 1; j <= n; j++)
+                dp[i][j] = a[i-1].text === b[j-1].text
+                    ? dp[i-1][j-1] + 1
+                    : Math.max(dp[i-1][j], dp[i][j-1]);
+        const ops = [];
+        let i = m, j = n;
+        while (i > 0 || j > 0) {
+            if (i > 0 && j > 0 && a[i-1].text === b[j-1].text) {
+                ops.unshift({ t: 0, o: a[i-1], f: b[j-1] }); i--; j--;
+            } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+                ops.unshift({ t: 1, f: b[j-1] }); j--;
+            } else {
+                ops.unshift({ t: -1, o: a[i-1] }); i--;
+            }
+        }
+        return ops;
+    }
+
+    function renderWordDiff(txtO, txtF) {
+        const diffs = _wordDiff(txtO, txtF);
+        let out = '';
+        for (const [op, text] of diffs) {
+            const soloEsp = /^\s+$/.test(text);
+            const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            if (soloEsp) { if (op !== -1) out += safe; }
+            else if (op ===  1) out += `<span style="background:#d1fae5;color:#065f46;border-radius:3px;padding:0 3px">${safe}</span>`;
+            else if (op === -1) out += `<span style="background:#fee2e2;color:#991b1b;text-decoration:line-through;border-radius:3px;padding:0 3px">${safe}</span>`;
+            else out += safe;
+        }
+        return out;
+    }
+
+    function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    const ops = paraLCS(origParas, finParas);
+    let outHtml = '';
+    let idx = 0;
+
+    while (idx < ops.length) {
+        if (ops[idx].t === 0) {
+            // Párrafos idénticos → HTML final (preserva negrita/cursiva)
+            outHtml += `<p style="margin-bottom:0.6em">${ops[idx].f.html}</p>`;
+            idx++;
+        } else {
+            // Bloque de deletes seguido de inserts → alinearlos y hacer word-diff
+            const dels = [], ins = [];
+            while (idx < ops.length && ops[idx].t === -1) { dels.push(ops[idx].o); idx++; }
+            while (idx < ops.length && ops[idx].t ===  1) { ins.push(ops[idx].f);  idx++; }
+
+            const pairs = Math.max(dels.length, ins.length);
+            for (let p = 0; p < pairs; p++) {
+                const d = dels[p], s_ = ins[p];
+                if (d && s_) {
+                    // Párrafo editado → word-level diff
+                    outHtml += `<p style="margin-bottom:0.6em">${renderWordDiff(d.text, s_.text)}</p>`;
+                } else if (d) {
+                    // Párrafo eliminado en la versión final
+                    outHtml += `<p style="margin-bottom:0.6em"><span style="background:#fee2e2;color:#991b1b;text-decoration:line-through;border-radius:3px;padding:0 3px">${esc(d.text)}</span></p>`;
+                } else {
+                    // Párrafo nuevo en la versión final
+                    outHtml += `<p style="margin-bottom:0.6em"><span style="background:#d1fae5;color:#065f46;border-radius:3px;padding:0 3px">${esc(s_.text)}</span></p>`;
+                }
+            }
+        }
+    }
+
+    const view = document.getElementById('diff-view');
+    view.innerHTML = outHtml || '<p class="italic text-gray-400">Sin diferencias detectadas.</p>';
+    view.style.minHeight = document.getElementById('informe-final-viewer').style.height || '';
+}
+
+/** Alterna entre Vista Final limpia y Vista Diff */
+function toggleDiffMode() {
+    _diffModeActive = !_diffModeActive;
+    const btn    = document.getElementById('btn-toggle-diff');
+    const iframe = document.getElementById('informe-final-viewer');
+    const divDiff = document.getElementById('diff-view');
+    const leyenda = document.getElementById('diff-leyenda');
+
+    if (_diffModeActive) {
+        if (!_diffCalculated) { _calcularDiff(); _diffCalculated = true; }
+        iframe.style.display   = 'none';
+        divDiff.style.display  = 'block';
+        leyenda.classList.remove('hidden');
+        btn.innerHTML = '<i class="fas fa-eye mr-1.5"></i>Ver versión final';
+        btn.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
+    } else {
+        iframe.style.display   = 'block';
+        divDiff.style.display  = 'none';
+        leyenda.classList.add('hidden');
+        btn.innerHTML = '<i class="fas fa-code-branch mr-1.5"></i>Ver cambios';
+        btn.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100';
+    }
+}
+// =====================================================================
+
 /**
  * Copia el informe final con formato HTML enriquecido usando AJAX
  */
@@ -675,4 +844,6 @@ function guardarEtiquetas() {
     });
 }
 </script>
+
+{% block extra_js %}{% endblock %}
 {% endblock %}
