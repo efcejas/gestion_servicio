@@ -1036,6 +1036,114 @@ Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica
         
         return sugerencias
 
+    def analizar_resultados_encuesta(self, datos_agregados: dict) -> dict:
+        """
+        Analiza los resultados de la encuesta de experiencia de residentes con IA.
+        Genera texto listo para usar en un abstract de congreso (CADI 2026).
+
+        Args:
+            datos_agregados: dict con estructura:
+                {
+                  'n_respuestas': int,
+                  'promedios': {p1..p10: float},
+                  'promedio_global': float,
+                  'respuestas_abiertas': {
+                      'contexto_previo': [str, ...],
+                      'util': [str, ...],
+                      'mejora': [str, ...]
+                  }
+                }
+
+        Returns:
+            dict: {
+                'resumen_ejecutivo': str,
+                'hallazgos_por_dimension': dict,
+                'cruce_contexto_vs_mejora': str,
+                'citas_relevantes': [str],
+                'texto_resultados_abstract': str,
+                'texto_conclusiones_sugerido': str,
+                'error': str|None
+            }
+        """
+        if not self.llm_enabled:
+            return {'error': 'API de LLM no configurada'}
+
+        n = datos_agregados.get('n_respuestas', 0)
+        promedios = datos_agregados.get('promedios', {})
+        promedio_global = datos_agregados.get('promedio_global', 0)
+        respuestas_abiertas = datos_agregados.get('respuestas_abiertas', {})
+
+        contextos = respuestas_abiertas.get('contexto_previo', [])
+        utiles = respuestas_abiertas.get('util', [])
+        mejoras = respuestas_abiertas.get('mejora', [])
+
+        # Construir resumen de respuestas abiertas para el prompt (máx 5 por cada una)
+        def resumir_lista(lista, max_items=5):
+            items = [r for r in lista if r and r.strip()][:max_items]
+            return "\n".join(f"- \"{r}\"" for r in items) if items else "(sin respuestas)"
+
+        prompt = f"""Sos un metodólogo médico experto en educación radiológica. 
+        Analizá los resultados de la siguiente encuesta de satisfacción realizada a {n} residentes de diagnóstico por imágenes sobre un sistema digital de gestión de preinformes. El objetivo es preparar material para un E-Poster en el CADI 2026.
+
+DATOS CUANTITATIVOS (escala 1-5):
+- Usabilidad general: {promedios.get('p1', 0):.2f}
+- Comodidad de acceso: {promedios.get('p2', 0):.2f}
+- Utilidad del feedback del staff: {promedios.get('p3', 0):.2f}
+- Oportunidad del feedback: {promedios.get('p4', 0):.2f}
+- Mejora en redacción de informes: {promedios.get('p5', 0):.2f}
+- Utilidad del banco de informes: {promedios.get('p6', 0):.2f}
+- Mejora respecto al método anterior: {promedios.get('p7', 0):.2f}
+- Utilidad del asistente IA: {promedios.get('p8', 0):.2f}
+- Supervisión más estructurada: {promedios.get('p9', 0):.2f}
+- Recomendaría a otros servicios: {promedios.get('p10', 0):.2f}
+- PROMEDIO GLOBAL: {promedio_global:.2f}/5
+
+FLUJO PREVIO AL SISTEMA (descripción de residentes):
+{resumir_lista(contextos)}
+
+LO MÁS ÚTIL DEL SISTEMA:
+{resumir_lista(utiles)}
+
+SUGERENCIAS DE MEJORA:
+{resumir_lista(mejoras)}
+
+Generá un análisis estructurado en formato JSON con las siguientes claves exactas:
+{{
+  "resumen_ejecutivo": "3-4 oraciones que resumen los hallazgos más importantes",
+  "hallazgos_por_dimension": {{
+    "usabilidad": "frase con el hallazgo",
+    "feedback": "frase con el hallazgo",
+    "aprendizaje": "frase con el hallazgo",
+    "comparacion": "frase analizando el cruce entre el flujo previo descrito y la mejora percibida",
+    "ia_y_supervision": "frase con el hallazgo",
+    "recomendacion": "frase con el hallazgo"
+  }},
+  "cruce_contexto_vs_mejora": "Párrafo de 2-3 oraciones analizando la relación entre el flujo de trabajo previo descrito y la mejora percibida (pregunta 7)",
+  "citas_relevantes": ["cita textual 1", "cita textual 2", "cita textual 3"],
+  "texto_resultados_abstract": "Párrafo listo para la sección Resultados de un abstract de congreso médico (150-200 palabras, estilo científico en español)",
+  "texto_conclusiones_sugerido": "Párrafo listo para la sección Conclusiones del abstract (60-80 palabras)"
+}}
+
+Respondé ÚNICAMENTE con el JSON válido, sin texto adicional."""
+
+        try:
+            response = self.llm_client.chat.completions.create(
+                model=self.llm_model,
+                messages=[
+                    {"role": "system", "content": "Sos un metodólogo médico experto. Respondés siempre en JSON válido, en español argentino."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=1500,
+                response_format={"type": "json_object"}
+            )
+            resultado = response.choices[0].message.content
+            import json as _json
+            return _json.loads(resultado)
+        except Exception as e:
+            logger.error(f"Error en analizar_resultados_encuesta: {e}")
+            return {'error': str(e)}
+
 
 # Instancia global del servicio
 ai_service = AIService()

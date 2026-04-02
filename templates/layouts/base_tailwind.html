@@ -261,6 +261,18 @@
                     </a>
                     {% endif %}
 
+                    <!-- Encuesta CADI 2026 (superusuario) -->
+                    {% url 'preinformes:resultados_encuesta' as encuesta_url_su %}
+                    {% if encuesta_url_su %}
+                    <a href="{{ encuesta_url_su }}"
+                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'resultados_encuesta' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                        <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>CADI 2026
+                        {% if 'resultados_encuesta' in request.resolver_match.url_name|default:'' %}
+                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                        {% endif %}
+                    </a>
+                    {% endif %}
+
                     <!-- Stock (superusuario) -->
                     {% url 'control_stock:dashboard' as stock_url %}
                     {% if stock_url %}

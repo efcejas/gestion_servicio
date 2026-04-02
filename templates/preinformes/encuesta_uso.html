@@ -1,0 +1,223 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Encuesta CADI 2026 — Preinformes{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4">
+
+  <!-- Breadcrumb -->
+  <nav class="text-sm font-medium text-gray-600 mb-4" aria-label="Breadcrumb">
+    <ol class="list-reset flex">
+      <li>
+        <a href="{% url 'preinformes:dashboard_residente' %}" class="text-gray-600 hover:text-gray-800">
+          <i class="fas fa-file-medical mr-1"></i> Preinformes
+        </a>
+      </li>
+      <li><span class="mx-2">/</span></li>
+      <li class="text-gray-800 font-semibold">
+        <i class="fas fa-clipboard-list mr-1"></i> Encuesta CADI 2026
+      </li>
+    </ol>
+  </nav>
+
+  <!-- Header principal -->
+  <div class="bg-gradient-to-br from-teal-600 to-cyan-700 rounded-lg shadow-md p-8 mb-6 text-white flex items-center gap-5">
+    <div class="hidden sm:flex w-14 h-14 bg-white/20 rounded-lg items-center justify-center flex-shrink-0 mr-4">
+      <i class="fas fa-clipboard-list text-3xl"></i>
+    </div>
+    <div>
+      <h1 class="text-2xl font-bold">Encuesta de experiencia del sistema</h1>
+      <p class="text-teal-100 mt-1 text-sm">
+        Trabajo de investigación educativa para el <strong class="text-white">CADI 2026</strong>
+        — Congreso Argentino-Mexicano de Radiología. Tus respuestas
+        son completamente confidenciales y ayudan a documentar el impacto del sistema en tu formación.
+      </p>
+      <p class="text-teal-200 text-xs mt-2">
+        <i class="fas fa-clock mr-1"></i>Tiempo estimado: 3-5 minutos &nbsp;·&nbsp;
+        <i class="fas fa-lock mr-1"></i>Una respuesta por residente
+      </p>
+    </div>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mb-5 flex items-center gap-2">
+    <i class="fas fa-exclamation-circle"></i> {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <form method="post" id="encuesta-form">
+    {% csrf_token %}
+
+    <!-- ── SECCIÓN 1: Usabilidad y Feedback ───────────────────────────── -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-5">
+      <div class="flex items-center gap-3 mb-1">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-teal-100 text-teal-700 text-xs font-bold flex-shrink-0">1</span>
+        <h3 class="text-base font-semibold text-gray-800">Usabilidad y Feedback del staff</h3>
+      </div>
+      <p class="text-xs text-gray-400 mb-5 ml-10">Valorá del 1 (muy en desacuerdo) al 5 (muy de acuerdo)</p>
+
+      {% for campo, texto in preguntas_likert %}
+        {% if campo != 'p7_comparacion' and campo != 'p8_ia_asistente' and campo != 'p9_supervision' and campo != 'p10_recomendacion' %}
+        <div class="py-4 border-b border-gray-100 last:border-0">
+          <p class="text-sm font-medium text-gray-700 mb-3">{{ texto }}</p>
+          <div class="flex items-center gap-1 sm:gap-2">
+            <span class="text-xs text-gray-400 mr-2 hidden sm:block w-32 text-right leading-tight">Muy en<br>desacuerdo</span>
+            {% for v in "12345" %}
+            <label class="cursor-pointer">
+              <input type="radio" name="{{ campo }}" value="{{ v }}" class="sr-only likert-radio" data-color="teal" required>
+              <span class="flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-200 bg-white text-gray-500 font-semibold text-sm transition-all hover:border-teal-400 hover:bg-teal-50 hover:text-teal-600 select-none">{{ v }}</span>
+            </label>
+            {% endfor %}
+            <span class="text-xs text-gray-400 ml-2 hidden sm:block w-32 leading-tight">Muy de<br>acuerdo</span>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- ── SECCIÓN 2: Contexto previo ────────────────────────────────── -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-5">
+      <div class="flex items-center gap-3 mb-1">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-amber-100 text-amber-700 text-xs font-bold flex-shrink-0">2</span>
+        <h3 class="text-base font-semibold text-gray-800">Contexto previo <span class="text-xs font-normal text-gray-400">(clave para interpretar resultados)</span></h3>
+      </div>
+      <p class="text-xs text-gray-400 mb-4 ml-10">Esta info nos permite cruzar tu respuesta comparativa con tu experiencia real previa.</p>
+      <label class="block text-sm font-medium text-gray-700 mb-2 ml-10">
+        ¿Cómo era tu flujo de trabajo con los preinformes <strong>antes</strong> de usar este sistema?
+        <span class="text-gray-400 font-normal ml-1">(si empezaste directo, describí cómo imaginás que sería sin él)</span>
+      </label>
+      <textarea name="p_contexto_previo" rows="3"
+                class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+                placeholder="Ej: Mandaba los preinformes por WhatsApp y esperaba días el feedback...">{{ post_data.p_contexto_previo|default:'' }}</textarea>
+
+      <!-- Pregunta comparativa anclada al contexto -->
+      <div class="mt-5 pt-4 border-t border-amber-100">
+        <p class="text-sm font-medium text-gray-700 mb-3">
+          Teniendo en cuenta lo que describiste, este sistema mejoró mi proceso de trabajo
+        </p>
+        <div class="flex items-center gap-1 sm:gap-2">
+          <span class="text-xs text-gray-400 mr-2 hidden sm:block w-32 text-right leading-tight">Muy en<br>desacuerdo</span>
+          {% for v in "12345" %}
+          <label class="cursor-pointer">
+            <input type="radio" name="p7_comparacion" value="{{ v }}" class="sr-only likert-radio" data-color="amber" required>
+            <span class="flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-200 bg-white text-gray-500 font-semibold text-sm transition-all hover:border-amber-400 hover:bg-amber-50 hover:text-amber-600 select-none">{{ v }}</span>
+          </label>
+          {% endfor %}
+          <span class="text-xs text-gray-400 ml-2 hidden sm:block w-32 leading-tight">Muy de<br>acuerdo</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SECCIÓN 3: IA, Supervisión y Recomendación ─────────────────── -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-5">
+      <div class="flex items-center gap-3 mb-1">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex-shrink-0">3</span>
+        <h3 class="text-base font-semibold text-gray-800">IA, supervisión y valoración global</h3>
+      </div>
+      <p class="text-xs text-gray-400 mb-5 ml-10">Valorá del 1 (muy en desacuerdo) al 5 (muy de acuerdo)</p>
+
+      {% for campo, texto in preguntas_likert %}
+        {% if campo == 'p8_ia_asistente' or campo == 'p9_supervision' or campo == 'p10_recomendacion' %}
+        <div class="py-4 border-b border-gray-100 last:border-0">
+          <p class="text-sm font-medium text-gray-700 mb-3">{{ texto }}</p>
+          <div class="flex items-center gap-1 sm:gap-2">
+            <span class="text-xs text-gray-400 mr-2 hidden sm:block w-32 text-right leading-tight">Muy en<br>desacuerdo</span>
+            {% for v in "12345" %}
+            <label class="cursor-pointer">
+              <input type="radio" name="{{ campo }}" value="{{ v }}" class="sr-only likert-radio" data-color="purple" required>
+              <span class="flex items-center justify-center w-10 h-10 rounded-full border-2 border-gray-200 bg-white text-gray-500 font-semibold text-sm transition-all hover:border-purple-400 hover:bg-purple-50 hover:text-purple-600 select-none">{{ v }}</span>
+            </label>
+            {% endfor %}
+            <span class="text-xs text-gray-400 ml-2 hidden sm:block w-32 leading-tight">Muy de<br>acuerdo</span>
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- ── SECCIÓN 4: Opiniones libres ───────────────────────────────── -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-5">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex-shrink-0">4</span>
+        <h3 class="text-base font-semibold text-gray-800">Opiniones libres <span class="text-xs font-normal text-gray-400">(opcionales)</span></h3>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">¿Qué fue lo más útil del sistema?</label>
+        <textarea name="p_util" rows="3"
+                  class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
+                  placeholder="Escribí libremente...">{{ post_data.p_util|default:'' }}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">¿Qué cambiarías o agregarías?</label>
+        <textarea name="p_mejora" rows="3"
+                  class="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
+                  placeholder="Cualquier sugerencia es bienvenida...">{{ post_data.p_mejora|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <!-- ── ANONIMATO + ENVÍO ──────────────────────────────────────────── -->
+    <div class="bg-white rounded-lg shadow-md p-5 mb-6">
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" name="anonimizar" id="anonimizar"
+               class="mt-1 w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+               {% if post_data.anonimizar %}checked{% endif %}>
+        <div>
+          <p class="text-sm font-semibold text-gray-800">Anonimizar mis respuestas en el reporte</p>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Tus datos se guardan identificados para análisis interno, pero en los reportes y trabajos académicos tu nombre no aparecerá.
+          </p>
+        </div>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-3 mb-8">
+      <a href="{% url 'preinformes:dashboard_residente' %}"
+         class="px-5 py-2.5 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all font-medium">
+        Cancelar
+      </a>
+      <button type="submit"
+              class="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg shadow transition-all flex items-center gap-2 text-sm">
+        <i class="fas fa-paper-plane"></i> Enviar encuesta
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const COLORS = {
+  teal:   { border: 'border-teal-500',   bg: 'bg-teal-500',   text: 'text-white' },
+  amber:  { border: 'border-amber-500',  bg: 'bg-amber-500',  text: 'text-white' },
+  purple: { border: 'border-purple-500', bg: 'bg-purple-500', text: 'text-white' },
+};
+
+document.querySelectorAll('.likert-radio').forEach(radio => {
+  radio.addEventListener('change', function () {
+    const name = this.name;
+    const color = this.dataset.color || 'teal';
+    const c = COLORS[color];
+
+    // Resetear todos del mismo grupo
+    document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+      const span = r.nextElementSibling;
+      span.classList.remove(
+        'border-teal-500', 'bg-teal-500',
+        'border-amber-500', 'bg-amber-500',
+        'border-purple-500', 'bg-purple-500',
+        'text-white'
+      );
+      span.classList.add('border-gray-200', 'bg-white', 'text-gray-500');
+    });
+
+    // Activar seleccionado
+    const span = this.nextElementSibling;
+    span.classList.remove('border-gray-200', 'bg-white', 'text-gray-500');
+    span.classList.add(c.border, c.bg, c.text);
+  });
+});
+</script>
+{% endblock %}

@@ -869,3 +869,122 @@ class MensajeAsistentePreinforme(models.Model):
     def __str__(self):
         preview = self.contenido[:50] + '...' if len(self.contenido) > 50 else self.contenido
         return f"{self.get_rol_display()}: {preview}"
+
+
+class EncuestaResidente(models.Model):
+    """
+    Encuesta de experiencia de uso del sistema de preinformes.
+    Una única respuesta por residente. Datos para el trabajo del CADI 2026.
+    """
+    residente = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='encuesta_preinformes',
+    )
+    fecha_respuesta = models.DateTimeField(auto_now_add=True)
+    anonimizar = models.BooleanField(
+        default=False,
+        verbose_name="Anonimizar mis respuestas en el reporte",
+        help_text="Si marcás esta opción, tus respuestas aparecerán sin tu nombre en los resultados."
+    )
+
+    # ── Bloque 1: Usabilidad ────────────────────────────────────────────
+    p1_usabilidad = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="El sistema es fácil de usar"
+    )
+    p2_acceso = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="Acceder desde mi dispositivo es cómodo"
+    )
+
+    # ── Bloque 2: Feedback ──────────────────────────────────────────────
+    p3_feedback_util = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="Los comentarios del staff fueron útiles para mi aprendizaje"
+    )
+    p4_feedback_oportuno = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="El feedback fue oportuno (llegó en tiempo razonable)"
+    )
+
+    # ── Bloque 3: Aprendizaje ───────────────────────────────────────────
+    p5_mejora_redaccion = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="Siento que mejoré mi redacción de informes usando el sistema"
+    )
+    p6_banco_informes = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="El banco de informes me ayudó como referencia"
+    )
+
+    # ── Pregunta abierta de contexto (antes de la comparación) ─────────
+    p_contexto_previo = models.TextField(
+        verbose_name="¿Cómo era tu flujo de trabajo con los preinformes antes de usar este sistema?",
+        help_text="Si ingresaste directo al sistema, describí cómo imaginás que sería sin él.",
+        blank=True,
+        default=''
+    )
+
+    # ── Bloque 4: Comparación ───────────────────────────────────────────
+    p7_comparacion = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="Comparando con lo que describiste, este sistema mejoró mi proceso de trabajo"
+    )
+
+    # ── Bloque 5: IA y supervisión ──────────────────────────────────────
+    p8_ia_asistente = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="El asistente IA (Radiólogo Mentor) fue útil"
+    )
+    p9_supervision = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="La supervisión del staff se volvió más estructurada"
+    )
+
+    # ── Bloque 6: Global ────────────────────────────────────────────────
+    p10_recomendacion = models.IntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        verbose_name="Recomendaría este sistema a otros servicios de residencia"
+    )
+
+    # ── Preguntas abiertas ──────────────────────────────────────────────
+    p_util = models.TextField(
+        verbose_name="¿Qué fue lo más útil del sistema?",
+        blank=True,
+        default=''
+    )
+    p_mejora = models.TextField(
+        verbose_name="¿Qué cambiarías o agregarías?",
+        blank=True,
+        default=''
+    )
+
+    # ── Análisis IA (se almacena para no regenerar siempre) ─────────────
+    analisis_ia = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="Análisis IA del conjunto de encuestas",
+        help_text="Se guarda el último análisis generado por IA para los resultados globales."
+    )
+
+    class Meta:
+        verbose_name = "Encuesta de uso del sistema"
+        verbose_name_plural = "Encuestas de uso del sistema"
+        ordering = ['-fecha_respuesta']
+
+    def __str__(self):
+        nombre = "Anónimo" if self.anonimizar else self.residente.get_full_name()
+        return f"Encuesta de {nombre} ({self.fecha_respuesta.strftime('%d/%m/%Y')})"
+
+    @property
+    def promedio_likert(self):
+        """Promedio de todas las preguntas Likert"""
+        valores = [
+            self.p1_usabilidad, self.p2_acceso,
+            self.p3_feedback_util, self.p4_feedback_oportuno,
+            self.p5_mejora_redaccion, self.p6_banco_informes,
+            self.p7_comparacion, self.p8_ia_asistente,
+            self.p9_supervision, self.p10_recomendacion,
+        ]
+        return sum(valores) / len(valores)

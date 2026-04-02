@@ -51,4 +51,8 @@ urlpatterns = [
     path('asistente/evaluar/', views.asistente_preinforme_evaluar, name='asistente_evaluar'),
     path('asistente/analizar/', views.asistente_analizar_borrador, name='asistente_analizar'),
     path('perfil-residente/<int:pk>/', views.perfil_residente_docente, name='perfil_residente_docente'),
+
+    # Encuesta CADI 2026
+    path('encuesta/', views.encuesta_uso, name='encuesta_uso'),
+    path('encuesta/resultados/', views.resultados_encuesta, name='resultados_encuesta'),
 ]

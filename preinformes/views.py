@@ -16,7 +16,8 @@ import logging
 from accounts.decorators import role_required
 from .models import (
     Preinforme, TipoEstudio, Region, PlantillaPreinforme, 
-    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme
+    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
+    EncuestaResidente
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
@@ -131,12 +132,15 @@ def dashboard_residente(request):
         en_edicion_por=request.user
     ).select_related('en_edicion_por', 'tipo_estudio', 'revisor').order_by('-ultima_actividad_edicion')
 
+    encuesta_completada = EncuestaResidente.objects.filter(residente=request.user).exists()
+
     context = {
         'historial': historial,
         'preinformes_pendientes': preinformes_pendientes,
         'preinformes_en_revision': preinformes_en_revision,
         'ultimos_preinformes': ultimos_preinformes,
         'preinformes_en_edicion': preinformes_en_edicion,
+        'encuesta_completada': encuesta_completada,
     }
     
     return render(request, 'preinformes/dashboard_residente.html', context)
@@ -1689,3 +1693,185 @@ def perfil_residente_docente(request, pk):
         'historial': historial,
     }
     return render(request, 'preinformes/perfil_residente_docente.html', context)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENCUESTA CADI 2026
+# ─────────────────────────────────────────────────────────────────────────────
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+def encuesta_uso(request):
+    """Formulario de encuesta de experiencia para residentes. Una sola vez por residente."""
+    # Si ya respondió, redirigir a su dashboard
+    if EncuestaResidente.objects.filter(residente=request.user).exists():
+        messages.info(request, 'Ya completaste la encuesta. ¡Gracias por tu participación!')
+        return redirect('preinformes:dashboard_residente')
+
+    PREGUNTAS_LIKERT = [
+        ('p1_usabilidad',       'El sistema es fácil de usar'),
+        ('p2_acceso',           'Acceder desde mi dispositivo es cómodo'),
+        ('p3_feedback_util',    'Los comentarios del staff fueron útiles para mi aprendizaje'),
+        ('p4_feedback_oportuno','El feedback fue oportuno (llegó en tiempo razonable)'),
+        ('p5_mejora_redaccion', 'Siento que mejoré mi redacción de informes usando el sistema'),
+        ('p6_banco_informes',   'El banco de informes me ayudó como referencia'),
+        ('p7_comparacion',      'Comparando con lo que describiste arriba, este sistema mejoró mi proceso de trabajo'),
+        ('p8_ia_asistente',     'El asistente IA (Radiólogo Mentor) fue útil'),
+        ('p9_supervision',      'La supervisión del staff se volvió más estructurada'),
+        ('p10_recomendacion',   'Recomendaría este sistema a otros servicios de residencia'),
+    ]
+
+    if request.method == 'POST':
+        errores = []
+        datos = {}
+
+        # Validar Likert (1-5)
+        for campo, _ in PREGUNTAS_LIKERT:
+            if campo == 'p7_comparacion':
+                continue  # se valida por separado después de la abierta
+            val = request.POST.get(campo)
+            if not val or not val.isdigit() or not (1 <= int(val) <= 5):
+                errores.append(f"Respondé la pregunta requerida ({campo}).")
+            else:
+                datos[campo] = int(val)
+
+        # p7 comparación
+        val7 = request.POST.get('p7_comparacion')
+        if not val7 or not val7.isdigit() or not (1 <= int(val7) <= 5):
+            errores.append("Respondé la pregunta de comparación.")
+        else:
+            datos['p7_comparacion'] = int(val7)
+
+        # Campos abiertos (no obligatorios)
+        datos['p_contexto_previo'] = request.POST.get('p_contexto_previo', '').strip()
+        datos['p_util']   = request.POST.get('p_util', '').strip()
+        datos['p_mejora'] = request.POST.get('p_mejora', '').strip()
+        datos['anonimizar'] = request.POST.get('anonimizar') == 'on'
+
+        if errores:
+            messages.error(request, 'Por favor completá todas las preguntas obligatorias.')
+            return render(request, 'preinformes/encuesta_uso.html', {
+                'preguntas_likert': PREGUNTAS_LIKERT,
+                'post_data': request.POST,
+            })
+
+        EncuestaResidente.objects.create(residente=request.user, **datos)
+        messages.success(request, '¡Gracias por completar la encuesta! Tu opinión es muy valiosa.')
+        return redirect('preinformes:dashboard_residente')
+
+    return render(request, 'preinformes/encuesta_uso.html', {
+        'preguntas_likert': PREGUNTAS_LIKERT,
+        'post_data': {},
+    })
+
+
+@login_required
+def resultados_encuesta(request):
+    """Panel de resultados de la encuesta — visible para staff y superusuarios."""
+    from django.db.models import Avg
+    from dictado_informes.ai_services import ai_service
+
+    if not (request.user.is_superuser or request.user.rol in [
+        'medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'
+    ]):
+        messages.error(request, 'No tenés permisos para ver esta sección.')
+        return redirect('preinformes:dashboard_residente')
+
+    encuestas = EncuestaResidente.objects.select_related('residente').all()
+    n = encuestas.count()
+
+    if n == 0:
+        return render(request, 'preinformes/resultados_encuesta.html', {
+            'n': 0, 'promedios': {}, 'encuestas': [], 'analisis_ia': None
+        })
+
+    # Calcular promedios
+    agg = encuestas.aggregate(
+        p1=Avg('p1_usabilidad'), p2=Avg('p2_acceso'),
+        p3=Avg('p3_feedback_util'), p4=Avg('p4_feedback_oportuno'),
+        p5=Avg('p5_mejora_redaccion'), p6=Avg('p6_banco_informes'),
+        p7=Avg('p7_comparacion'), p8=Avg('p8_ia_asistente'),
+        p9=Avg('p9_supervision'), p10=Avg('p10_recomendacion'),
+    )
+    promedios = {k: round(v, 2) if v else 0 for k, v in agg.items()}
+    promedio_global = round(sum(promedios.values()) / len(promedios), 2)
+
+    # Respuestas abiertas (se anonimiza el nombre si el residente lo pidió)
+    def get_abiertas(campo):
+        return [
+            getattr(e, campo)
+            for e in encuestas
+            if getattr(e, campo, '').strip()
+        ]
+
+    respuestas_abiertas = {
+        'contexto_previo': get_abiertas('p_contexto_previo'),
+        'util':   get_abiertas('p_util'),
+        'mejora': get_abiertas('p_mejora'),
+    }
+
+    analisis_ia = None
+    regenerar = request.GET.get('regenerar') == '1'
+
+    if regenerar or request.method == 'POST':
+        datos_para_ia = {
+            'n_respuestas': n,
+            'promedios': promedios,
+            'promedio_global': promedio_global,
+            'respuestas_abiertas': respuestas_abiertas,
+        }
+        analisis_ia = ai_service.analizar_resultados_encuesta(datos_para_ia)
+        # Normalizar etiquetas de hallazgos para el template
+        _LABELS_HALLAZGOS = {
+            'usabilidad': 'Usabilidad',
+            'feedback': 'Feedback del staff',
+            'aprendizaje': 'Aprendizaje',
+            'comparacion': 'Comparación',
+            'ia_y_supervision': 'IA y Supervisión',
+            'recomendacion': 'Recomendación',
+        }
+        if analisis_ia and 'error' not in analisis_ia and 'hallazgos_por_dimension' in analisis_ia:
+            analisis_ia['hallazgos_por_dimension'] = {
+                _LABELS_HALLAZGOS.get(k, k.replace('_', ' ').title()): v
+                for k, v in analisis_ia['hallazgos_por_dimension'].items()
+            }
+        # Guardar en la última encuesta (referencia global)
+        if analisis_ia and 'error' not in analisis_ia:
+            encuestas.last().encuesta_set if False else None  # no-op
+            # Guardamos en la propia instancia del modelo para persistencia
+            EncuestaResidente.objects.filter(pk=encuestas.last().pk).update(analisis_ia=analisis_ia)
+
+    # Tabla de respuestas individuales (respetando anonimato)
+    tabla = []
+    for e in encuestas:
+        tabla.append({
+            'nombre': 'Anónimo' if e.anonimizar else e.residente.get_full_name(),
+            'anio': getattr(e.residente, 'anio_residencia', '—'),
+            'promedio': round(e.promedio_likert, 2),
+            'fecha': e.fecha_respuesta,
+        })
+
+    LABELS = {
+        'p1': 'Usabilidad general',
+        'p2': 'Comodidad de acceso',
+        'p3': 'Utilidad del feedback del staff',
+        'p4': 'Oportunidad del feedback',
+        'p5': 'Mejora en redacción de informes',
+        'p6': 'Banco de informes como referencia',
+        'p7': 'Mejora respecto al método anterior',
+        'p8': 'Utilidad del asistente IA',
+        'p9': 'Supervisión más estructurada',
+        'p10': 'Recomendaría a otros servicios',
+    }
+    promedios_lista = [(LABELS.get(k, k), k, v) for k, v in promedios.items()]
+
+    context = {
+        'n': n,
+        'promedios': promedios,
+        'promedios_lista': promedios_lista,
+        'promedio_global': promedio_global,
+        'tabla': tabla,
+        'analisis_ia': analisis_ia,
+        'respuestas_abiertas': respuestas_abiertas,
+    }
+    return render(request, 'preinformes/resultados_encuesta.html', context)
