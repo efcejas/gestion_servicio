@@ -50,7 +50,7 @@ CONFIG_COLEGIALES = {
     'MODULOS_ACTIVOS': {
         'equipos': True,       # ✅ Activo - empezamos por aquí
         'eventos': False,      # ❌ Desactivado por ahora
-        'guardias': False,     # ❌ Desactivado por ahora
+        'guardias': True,      # ✅ Activo - Control de guardias de residentes
         'liquidacion': False,  # ❌ Desactivado por ahora
         'dictado': False,      # ❌ Desactivado por ahora
         'protocolos': True,    # ✅ Activo - Protocolos radiológicos

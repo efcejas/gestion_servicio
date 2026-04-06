@@ -1,453 +1,889 @@
-from datetime import date
-
-from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.messages.views import SuccessMessageMixin
+from django.db import models
 from django.http import JsonResponse
-from django.db import OperationalError
-from django.shortcuts import redirect
-from django.urls import reverse, reverse_lazy
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse_lazy, reverse
 from django.utils import timezone
-from django.utils.decorators import method_decorator
-from django.views import View
-from django.views.generic import ListView, TemplateView
-from django.views.generic.edit import CreateView, UpdateView, DeleteView
-from django.http import HttpResponse
-import openpyxl
-from openpyxl.styles import Alignment, Font
-from django.contrib.auth import get_user_model
+from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
-from .forms import FiltroGuardiasPorMedicoForm, FiltroMisGuardiasForm, GuardiaForm
-from .models import Guardia
+from .forms import (
+    ConfiguracionTipoGuardiaForm,
+    CuotaMensualGuardiaForm,
+    FeriadoForm,
+    GenerarDistribucionForm,
+    AusenciaResidenteForm,
+    SolicitudCambioGuardiaForm,
+    NotasRechazoForm,
+)
+from .models import (
+    AsignacionGuardia,
+    AusenciaResidente,
+    ConfiguracionTipoGuardia,
+    CuotaMensualGuardia,
+    Feriado,
+    NotificacionGuardia,
+    SolicitudCambioGuardia,
+)
+from .services import (
+    CambioGuardiaError,
+    DistribucionError,
+    aceptar_cambio_receptor,
+    aprobar_cambio,
+    cancelar_borrador,
+    cancelar_cambio,
+    generar_distribucion,
+    obtener_metricas_mes,
+    publicar_borrador,
+    rechazar_cambio_jefe,
+    rechazar_cambio_receptor,
+    reportar_ausencia,
+    resolver_ausencia,
+    solicitar_cambio,
+)
 
-# Redirige a la nueva URL del portal público
-class GuardiaListView(View):
+
+class JefeInstructorMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Acceso exclusivo para jefe_residentes, instructor_residentes y superusuarios."""
+    login_url = 'login'
+
+    def test_func(self):
+        user = self.request.user
+        return user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
+
+
+class GuardiasIndexView(LoginRequiredMixin, TemplateView):
     """
-    Vista heredada que redirige a la nueva URL del portal público.
-    Mantiene compatibilidad con enlaces antiguos.
+    Vista de índice principal del módulo de guardias.
+    Muestra contenido diferente según el rol del usuario.
     """
-    def get(self, request, *args, **kwargs):
-        return redirect('control_guardias:portal_coberturas_semanal', permanent=True)
+    login_url = 'login'
 
-
-class ResumenGuardiasView(TemplateView):
-    template_name = 'control_guardias/resumen_guardias.html'
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/index.html']
+        return ['control_guardias/portal/index.html']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
+        hoy = timezone.now().date()
 
-        form = FiltroGuardiasPorMedicoForm(self.request.GET or None)
-        context['form'] = form
+        # Notificaciones no leídas (todos los roles)
+        context['notificaciones_no_leidas'] = (
+            NotificacionGuardia.objects
+            .filter(destinatario=user, leida=False)
+            .count()
+        )
 
-        if form.is_valid():
-            medico = form.cleaned_data.get('medico')
-            mes = form.cleaned_data.get('mes')
-            año = form.cleaned_data.get('año')
-
-            guardias = Guardia.objects.filter(cubierta=True, fecha__lte=timezone.now())
-            if medico:
-                guardias = guardias.filter(medico=medico)
-            if mes and año:
-                guardias = guardias.filter(fecha__year=año, fecha__month=mes)
-
-            franja_horaria_horas = {
-                'NOCHE': 12, 'DIA_COMPLETO': 24, 'DIA': 12,
-                'NOCHE_FIN_SEMANA': 12, 'DIA_FIN_SEMANA': 12
-            }
-            resumen_guardias = {}
-            for guardia in guardias:
-                medico_obj = guardia.medico
-                horas = franja_horaria_horas.get(guardia.franja_horaria, 0)
-
-                if medico_obj not in resumen_guardias:
-                    resumen_guardias[medico_obj] = {
-                        'total_guardias': 0,
-                        'total_horas': 0,
-                        'detalles': []
-                    }
-
-                resumen_guardias[medico_obj]['total_guardias'] += 1
-                resumen_guardias[medico_obj]['total_horas'] += horas
-                resumen_guardias[medico_obj]['detalles'].append({
-                    'fecha': guardia.fecha,
-                    'franja_horaria': guardia.get_franja_horaria_display(),
-                    'horas': horas
-                })
-
-            for medico_data in resumen_guardias.values():
-                medico_data['detalles'].sort(key=lambda x: x['fecha'])
-
-            context['resumen_guardias'] = resumen_guardias
-
+        if user.es_residente():
+            proximas = (
+                AsignacionGuardia.objects
+                .filter(residente=user, fecha__gte=hoy, estado='PUBLICADA')
+                .select_related('tipo_guardia')
+                .order_by('fecha')[:5]
+            )
+            context['proximas_guardias'] = proximas
+            context['ausencias_pendientes_residente'] = (
+                AusenciaResidente.objects
+                .filter(residente=user, estado='PENDIENTE')
+                .count()
+            )
+            context['cambios_pendientes_residente'] = (
+                SolicitudCambioGuardia.objects
+                .filter(receptor=user, estado='PENDIENTE_RECEPTOR')
+                .count()
+            )
+        elif user.rol in ('jefe_residentes', 'instructor_residentes') or user.is_superuser:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            context['total_residentes'] = User.objects.filter(rol='medico_residente', is_active=True).count()
+            context['ausencias_pendientes'] = AusenciaResidente.objects.filter(estado='PENDIENTE').count()
+            context['cambios_pendiente_jefe'] = SolicitudCambioGuardia.objects.filter(estado='PENDIENTE_JEFE').count()
+            context['guardias_borrador'] = AsignacionGuardia.objects.filter(estado='BORRADOR').count()
+            context['guardias_publicadas_mes'] = (
+                AsignacionGuardia.objects
+                .filter(estado='PUBLICADA', fecha__month=hoy.month, fecha__year=hoy.year)
+                .count()
+            )
+            context['proximas_sin_asignar'] = (
+                AsignacionGuardia.objects
+                .filter(fecha__gte=hoy, estado='PUBLICADA')
+                .select_related('tipo_guardia', 'residente')
+                .order_by('fecha')[:8]
+            )
         return context
-
-# Quiero crear la vista que le permita ver a cada usuario que hace guardias, las que tiene asignadas y las que ha hecho
 
 
 class MisGuardiasView(LoginRequiredMixin, ListView):
-    model = Guardia
-    template_name = 'control_guardias/mis_guardias.html'
-    context_object_name = 'mis_guardias'
+    """Vista personal del residente: sus guardias asignadas."""
+    model = AsignacionGuardia
+    context_object_name = 'guardias'
     login_url = 'login'
 
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/mis_guardias.html']
+        return ['control_guardias/portal/mis_guardias.html']
+
     def get_queryset(self):
-        return Guardia.objects.filter(medico__user=self.request.user).order_by('fecha')
+        return (
+            AsignacionGuardia.objects
+            .filter(residente=self.request.user)
+            .select_related('tipo_guardia')
+            .order_by('fecha')
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         hoy = timezone.now().date()
-        queryset = self.get_queryset()
-
-        # Procesar el formulario de filtro
-        form = FiltroMisGuardiasForm(self.request.GET or None)
-        if form.is_valid():
-            mes = form.cleaned_data.get('mes') or hoy.month
-            año = form.cleaned_data.get('año') or hoy.year
-        else:
-            mes = hoy.month
-            año = hoy.year
-
-        # Guardias pasadas del mes/año seleccionado
-        guardias_mes = queryset.filter(
-            fecha__lt=hoy,
-            fecha__month=mes,
-            fecha__year=año
-        ).order_by('-fecha')
-
-        context['guardias_mes'] = guardias_mes
-        context['mes_actual'] = int(mes)
-        context['año_actual'] = int(año)
-        context['filtro_form'] = form
-
-        # Próximas guardias (sin filtro)
-        context['proximas_guardias'] = queryset.filter(fecha__gte=hoy)
-
+        qs = self.get_queryset()
+        context['proximas_guardias'] = qs.filter(fecha__gte=hoy, estado='PUBLICADA')
+        context['guardias_pasadas'] = qs.filter(fecha__lt=hoy).order_by('-fecha')
         return context
 
-# Esto es de uso exclusivo de los administradores
 
-
-class TailwindCalendarView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    template_name = 'control_guardias/fullcalendar_tw.html'
+class NotificacionesGuardiaView(LoginRequiredMixin, ListView):
+    """Inbox interno de notificaciones de guardias."""
+    model = NotificacionGuardia
+    context_object_name = 'notificaciones'
     login_url = 'login'
-    
-    def test_func(self):
-        """Solo permite acceso a superusuarios"""
-        return self.request.user.is_superuser
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/notificaciones.html']
+        return ['control_guardias/portal/notificaciones.html']
+
+    def get_queryset(self):
+        return (
+            NotificacionGuardia.objects
+            .filter(destinatario=self.request.user)
+            .order_by('-fecha')
+        )
+
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        # Marcar todas como leídas al abrir el inbox
+        NotificacionGuardia.objects.filter(
+            destinatario=request.user, leida=False
+        ).update(leida=True)
+        return response
 
 
-class GuardiaEventsView(View):
-    def get(self, request):
-        eventos = []
+class GuardiasApiView(LoginRequiredMixin, TemplateView):
+    """
+    Endpoint JSON para FullCalendar.
+    - Residentes: solo sus propias guardias PUBLICADAS.
+    - Jefes/instructores/superusuarios: todas las guardias (PUBLICADA + BORRADOR),
+      con filtro opcional por ?residente_id=<pk>.
+    """
+    login_url = 'login'
 
-        # Filtrado por rango de fechas si FullCalendar manda start/end
-        start_param = request.GET.get('start')
-        end_param = request.GET.get('end')
-        guardias_qs = Guardia.objects.all()
+    # Colores por estado y condición
+    _COLOR_PUBLICADA = '#3b82f6'       # azul
+    _COLOR_FERIADO = '#f59e0b'         # ámbar
+    _COLOR_BORRADOR = '#6b7280'        # gris
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        es_gestor = (
+            user.rol in ['jefe_residentes', 'instructor_residentes']
+            or user.is_superuser
+        )
+
+        start_param = request.GET.get('start', '')
+        end_param = request.GET.get('end', '')
+        residente_id = request.GET.get('residente_id', '')
+
+        if es_gestor:
+            qs = (
+                AsignacionGuardia.objects
+                .filter(estado__in=['PUBLICADA', 'BORRADOR'])
+                .select_related('residente', 'tipo_guardia')
+            )
+            if residente_id:
+                qs = qs.filter(residente_id=residente_id)
+        else:
+            qs = (
+                AsignacionGuardia.objects
+                .filter(residente=user, estado='PUBLICADA')
+                .select_related('residente', 'tipo_guardia')
+            )
+
         if start_param and end_param:
-            # FullCalendar manda ISO con posible zona: YYYY-MM-DDTHH:MM:SS... -> nos quedamos con la fecha
             try:
                 start_date = start_param.split('T')[0]
                 end_date = end_param.split('T')[0]
-                guardias_qs = guardias_qs.filter(fecha__gte=start_date, fecha__lte=end_date)
-            except ValueError:
-                pass  # si algo falla, ignoramos y devolvemos todo
+                qs = qs.filter(fecha__gte=start_date, fecha__lt=end_date)
+            except (ValueError, IndexError):
+                pass
 
-        # Optimizar acceso a medico y su user
-        guardias_qs = guardias_qs.select_related('medico__user')
+        eventos = []
+        for asignacion in qs:
+            nombre = asignacion.residente.get_full_name()
+            if asignacion.estado == 'BORRADOR':
+                color = self._COLOR_BORRADOR
+            elif asignacion.es_feriado:
+                color = self._COLOR_FERIADO
+            else:
+                color = self._COLOR_PUBLICADA
 
-        try:
-            for g in guardias_qs:
-                medico_obj = g.medico
-                user_obj = getattr(medico_obj, 'user', None) if medico_obj else None
-                medico_nombre = user_obj.get_full_name() if user_obj else ''
-
-                # Una guardia realmente "cubierta" sólo si tiene bandera cubierta y un médico asociado con user
-                cubierta_real = bool(g.cubierta and medico_obj and user_obj)
-
-                base_evento = {
-                    'id': str(g.pk),
-                    'start': g.fecha.isoformat(),
-                    'allDay': True,
-                    'display': 'block',
-                    'extendedProps': {
-                        'cubierta': cubierta_real,
-                        'medico': medico_nombre if medico_nombre else 'Sin asignar',
-                        'franja': g.get_franja_horaria_display(),
-                        'franja_key': g.franja_horaria,
-                        'editUrl': reverse('control_guardias:editar_guardia', args=[g.pk]),
-                        'deleteUrl': reverse('control_guardias:eliminar_guardia', args=[g.pk]),
-                    }
+            eventos.append({
+                'id': str(asignacion.pk),
+                'title': f'{nombre} – {asignacion.tipo_guardia.nombre}',
+                'start': asignacion.fecha.isoformat(),
+                'allDay': True,
+                'backgroundColor': color,
+                'borderColor': color,
+                'textColor': '#fff',
+                'extendedProps': {
+                    'residente': nombre,
+                    'tipo_guardia': asignacion.tipo_guardia.nombre,
+                    'hora_inicio': asignacion.tipo_guardia.hora_inicio.strftime('%H:%M'),
+                    'hora_fin': asignacion.tipo_guardia.hora_fin.strftime('%H:%M'),
+                    'es_feriado': asignacion.es_feriado,
+                    'estado': asignacion.estado,
                 }
-
-                if cubierta_real:
-                    base_evento.update({
-                        'title': f'🕒 {g.get_franja_horaria_display()}\n👨‍⚕️ {medico_nombre}',
-                        'backgroundColor': '#d9eaff',
-                        'borderColor': '#164569',
-                        'textColor': '#000',
-                    })
-                else:
-                    base_evento.update({
-                        'title': '⚠️ Guardia no cubierta',
-                        'backgroundColor': '#fff3cd',
-                        'borderColor': '#ffc107',
-                        'textColor': '#000',
-                    })
-
-                eventos.append(base_evento)
-        except OperationalError:
-            # Si hubo un problema de conexión con la BD, devolvemos lista vacía con un flag
-            return JsonResponse({'error': 'db_connection', 'events': []}, status=500)
+            })
 
         return JsonResponse(eventos, safe=False)
 
 
-class GuardiaCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
-    model = Guardia
-    form_class = GuardiaForm
-    template_name = 'control_guardias/crear_guardia.html'
-    success_url = reverse_lazy('control_guardias:calendario_guardias_full_tw')
-    success_message = "Guardia creada con éxito."
+# ---------------------------------------------------------------------------
+# Fase 4: Calendario interactivo FullCalendar
+# ---------------------------------------------------------------------------
 
-    def get_initial(self):
-        initial = super().get_initial()
-        fecha_param = self.request.GET.get('fecha')
-        if fecha_param:
-            initial['fecha'] = fecha_param
-        return initial
+class CalendarioView(LoginRequiredMixin, TemplateView):
+    """
+    Vista del calendario mensual con FullCalendar.
+    - Residentes: solo ven sus propias guardias.
+    - Jefes/instructores/superusuarios: ven todas las guardias con selector de residente.
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/calendario.html']
+        return ['control_guardias/portal/calendario.html']
+
+    def get_context_data(self, **kwargs):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        es_gestor = (
+            user.rol in ['jefe_residentes', 'instructor_residentes']
+            or user.is_superuser
+        )
+        context['es_gestor'] = es_gestor
+        context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.filter(activo=True)
+        if es_gestor:
+            context['residentes'] = (
+                User.objects
+                .filter(rol='medico_residente', is_active=True)
+                .order_by('last_name', 'first_name')
+            )
+        return context
+
+
+# ---------------------------------------------------------------------------
+# Fase 2: Módulo de Configuración (jefes/instructores)
+# ---------------------------------------------------------------------------
+
+class ConfiguracionView(JefeInstructorMixin, TemplateView):
+    """Página principal de configuración del módulo de guardias."""
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/configuracion.html']
+        return ['control_guardias/portal/configuracion.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.select_related('creado_por')
+        # Pasar todas las filas R1-R4 siempre, con cuota o sin ella
+        cuotas_map = {c.anio_residencia: c for c in CuotaMensualGuardia.objects.all()}
+        context['cuotas_filas'] = [
+            {'anio': anio, 'cuota': cuotas_map.get(anio)}
+            for anio in ['R1', 'R2', 'R3', 'R4']
+        ]
+        context['feriados'] = Feriado.objects.order_by('fecha')
+        context['feriado_form'] = FeriadoForm()
+        return context
+
+
+class TipoGuardiaCreateView(JefeInstructorMixin, CreateView):
+    model = ConfiguracionTipoGuardia
+    form_class = ConfiguracionTipoGuardiaForm
+    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/tipo_guardia_form.html']
+        return ['control_guardias/portal/tipo_guardia_form.html']
 
     def form_valid(self, form):
-        response = super().form_valid(form)
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return HttpResponse(status=200)
-        return response
+        form.instance.creado_por = self.request.user
+        messages.success(self.request, 'Tipo de guardia creado correctamente.')
+        return super().form_valid(form)
 
-    def form_invalid(self, form):
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            # Devolver el HTML con errores pero con status 400 para que el JS no cierre el modal
-            return self.render_to_response(self.get_context_data(form=form), status=400)
-        return super().form_invalid(form)
-
-
-class GuardiaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
-    model = Guardia
-    form_class = GuardiaForm
-    template_name = 'control_guardias/editar_guardia.html'
-    success_url = reverse_lazy('control_guardias:calendario_guardias_full_tw')
-    success_message = "Guardia actualizada con éxito."
-
-    def form_invalid(self, form):
-        if self.request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return self.render_to_response(self.get_context_data(form=form), status=400)
-        return super().form_invalid(form)
-
-
-class GuardiaDeleteView(LoginRequiredMixin, DeleteView):
-    model = Guardia
-    template_name = 'control_guardias/guardia_confirm_delete.html'
-    success_url = reverse_lazy('control_guardias:calendario_guardias_full_tw')
-
-    def delete(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        self.object.delete()
-        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-            return HttpResponse(status=200)
-        return super().delete(request, *args, **kwargs)
-
-
-# Vista pública del portal de guardias (sin autenticación requerida)
-class CoberturasSemanalesPortalView(TemplateView):
-    """
-    Vista pública para mostrar las coberturas de guardias semanales.
-    Accesible sin autenticación para permitir que la jefa de guardia
-    y otros usuarios vean quién está de guardia.
-    """
-    template_name = 'control_guardias/coberturas_semanal_portal.html'
-    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Obtener todas las guardias futuras ordenadas por fecha
-        context['guardias'] = Guardia.objects.filter(
-            fecha__gte=timezone.now()
-        ).select_related('medico__user').order_by('fecha')
+        context['titulo'] = 'Nuevo tipo de guardia'
         return context
 
 
-class ResumenGuardiasPortalView(TemplateView):
-    """
-    Vista pública para mostrar el resumen de guardias por médico.
-    Accesible desde el portal de liquidación sin autenticación.
-    """
-    template_name = 'control_guardias/resumen_guardias_portal.html'
+class TipoGuardiaUpdateView(JefeInstructorMixin, UpdateView):
+    model = ConfiguracionTipoGuardia
+    form_class = ConfiguracionTipoGuardiaForm
+    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/tipo_guardia_form.html']
+        return ['control_guardias/portal/tipo_guardia_form.html']
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Tipo de guardia actualizado correctamente.')
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['titulo'] = f'Editar: {self.object.nombre}'
+        return context
 
-        form = FiltroGuardiasPorMedicoForm(self.request.GET or None)
-        context['form'] = form
 
+class TipoGuardiaDeleteView(JefeInstructorMixin, DeleteView):
+    model = ConfiguracionTipoGuardia
+    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/tipo_guardia_confirm_delete.html']
+        return ['control_guardias/portal/tipo_guardia_confirm_delete.html']
+
+    def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+            messages.success(self.request, 'Tipo de guardia eliminado.')
+            return response
+        except Exception:
+            messages.error(self.request, 'No se puede eliminar: tiene asignaciones asociadas.')
+            return self.handle_no_permission()
+
+
+class CuotaMensualFormView(JefeInstructorMixin, TemplateView):
+    """Crea o edita la cuota mensual de un año de residencia (R1-R4)."""
+
+    ANIOS_VALIDOS = ['R1', 'R2', 'R3', 'R4']
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/cuota_mensual_form.html']
+        return ['control_guardias/portal/cuota_mensual_form.html']
+
+    def _get_or_create_cuota(self, anio):
+        if anio not in self.ANIOS_VALIDOS:
+            from django.http import Http404
+            raise Http404(f"Año de residencia inválido: {anio}")
+        obj, created = CuotaMensualGuardia.objects.get_or_create(
+            anio_residencia=anio,
+            defaults={'guardias_por_mes': 4, 'atenuante_porcentaje': 0},
+        )
+        return obj, created
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        anio = self.kwargs['anio']
+        obj, created = self._get_or_create_cuota(anio)
+        context['object'] = obj
+        context['is_new'] = created
+        context['form'] = kwargs.get('form', CuotaMensualGuardiaForm(instance=obj))
+        return context
+
+    def post(self, request, anio, *args, **kwargs):
+        obj, _ = self._get_or_create_cuota(anio)
+        form = CuotaMensualGuardiaForm(request.POST, instance=obj)
         if form.is_valid():
-            medico = form.cleaned_data.get('medico')
-            mes = form.cleaned_data.get('mes')
-            año = form.cleaned_data.get('año')
+            form.save()
+            messages.success(request, f'Cuota de {obj.get_anio_residencia_display()} guardada correctamente.')
+            return redirect(reverse_lazy('control_guardias:configuracion'))
+        return self.render_to_response(self.get_context_data(form=form))
 
-            guardias = Guardia.objects.filter(cubierta=True, fecha__lte=timezone.now())
-            if medico:
-                guardias = guardias.filter(medico=medico)
-            if mes and año:
-                guardias = guardias.filter(fecha__year=año, fecha__month=mes)
 
-            franja_horaria_horas = {
-                'NOCHE': 12, 'DIA_COMPLETO': 24, 'DIA': 12,
-                'NOCHE_FIN_SEMANA': 12, 'DIA_FIN_SEMANA': 12
-            }
-            resumen_guardias = {}
-            for guardia in guardias:
-                medico_obj = guardia.medico
-                horas = franja_horaria_horas.get(guardia.franja_horaria, 0)
+class FeriadoCreateView(JefeInstructorMixin, CreateView):
+    model = Feriado
+    form_class = FeriadoForm
+    success_url = reverse_lazy('control_guardias:configuracion')
 
-                if medico_obj not in resumen_guardias:
-                    resumen_guardias[medico_obj] = {
-                        'total_guardias': 0,
-                        'total_horas': 0,
-                        'detalles': []
-                    }
+    def form_valid(self, form):
+        messages.success(self.request, 'Feriado agregado correctamente.')
+        return super().form_valid(form)
 
-                resumen_guardias[medico_obj]['total_guardias'] += 1
-                resumen_guardias[medico_obj]['total_horas'] += horas
-                resumen_guardias[medico_obj]['detalles'].append({
-                    'fecha': guardia.fecha,
-                    'franja_horaria': guardia.get_franja_horaria_display(),
-                    'horas': horas
-                })
+    def form_invalid(self, form):
+        messages.error(self.request, 'Error al agregar feriado. Verificá los datos.')
+        return self.render_to_response(self.get_context_data(feriado_form=form))
 
-            for medico_data in resumen_guardias.values():
-                medico_data['detalles'].sort(key=lambda x: x['fecha'])
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/configuracion.html']
+        return ['control_guardias/portal/configuracion.html']
 
-            context['resumen_guardias'] = resumen_guardias
+    def get_context_data(self, **kwargs):
+        cuotas_map = {c.anio_residencia: c for c in CuotaMensualGuardia.objects.all()}
+        return {
+            'tipos_guardia': ConfiguracionTipoGuardia.objects.select_related('creado_por'),
+            'cuotas_filas': [
+                {'anio': anio, 'cuota': cuotas_map.get(anio)}
+                for anio in ['R1', 'R2', 'R3', 'R4']
+            ],
+            'feriados': Feriado.objects.order_by('fecha'),
+            'feriado_form': kwargs.get('feriado_form', FeriadoForm()),
+        }
 
+
+class FeriadoDeleteView(JefeInstructorMixin, DeleteView):
+    model = Feriado
+    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get(self, request, *args, **kwargs):
+        """No mostramos página de confirmación — elimina directamente vía POST desde el template."""
+        return self.post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Feriado eliminado.')
+        return super().form_valid(form)
+
+
+# ---------------------------------------------------------------------------
+# Fase 3: Distribución automática
+# ---------------------------------------------------------------------------
+
+class DistribucionView(JefeInstructorMixin, TemplateView):
+    """
+    GET:  Muestra el formulario para generar una distribución de guardias.
+    POST: Ejecuta el algoritmo y redirige al borrador generado.
+    """
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/distribucion_form.html']
+        return ['control_guardias/portal/distribucion_form.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = GenerarDistribucionForm()
+        # Mostrar borradores activos para que el jefe sepa qué meses tienen borrador
+        from django.db.models import Min, Max
+        borradores = (
+            AsignacionGuardia.objects
+            .filter(estado='BORRADOR')
+            .values('fecha__year', 'fecha__month')
+            .annotate(total=models.Count('id'), min_fecha=Min('fecha'), max_fecha=Max('fecha'))
+            .order_by('fecha__year', 'fecha__month')
+        )
+        context['borradores_activos'] = borradores
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = GenerarDistribucionForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+
+        mes = int(form.cleaned_data['mes'])
+        anio = form.cleaned_data['anio']
+        tipos_guardia = form.cleaned_data['tipos_guardia']
+        reemplazar = form.cleaned_data.get('reemplazar_borradores', False)
+
+        try:
+            resultado = generar_distribucion(
+                mes=mes,
+                anio=anio,
+                tipos_guardia=tipos_guardia,
+                creado_por=request.user,
+                reemplazar_borradores=reemplazar,
+            )
+        except DistribucionError as e:
+            messages.error(request, str(e))
+            context = self.get_context_data()
+            context['form'] = form
+            return self.render_to_response(context)
+
+        n = resultado['asignaciones_creadas']
+        messages.success(request, f"Distribución generada: {n} asignación(es) en borrador.")
+        for adv in resultado.get('advertencias', []):
+            messages.warning(request, adv)
+
+        return redirect('control_guardias:distribucion_borrador', mes=mes, anio=anio)
+
+    def get_context_data(self, **kwargs):
+        context = super(TemplateView, self).get_context_data(**kwargs)
+        if 'form' not in kwargs:
+            context['form'] = GenerarDistribucionForm()
+        else:
+            context['form'] = kwargs['form']
+        # Borradores activos
+        borradores = (
+            AsignacionGuardia.objects
+            .filter(estado='BORRADOR')
+            .values('fecha__year', 'fecha__month')
+            .annotate(
+                total=models.Count('id'),
+                min_fecha=models.Min('fecha'),
+            )
+            .order_by('fecha__year', 'fecha__month')
+        )
+        context['borradores_activos'] = list(borradores)
         return context
 
 
-def exportar_excel_guardias(request):
+class BorradorView(JefeInstructorMixin, TemplateView):
     """
-    Vista para exportar las guardias por médico a un archivo Excel.
-    Aplica los mismos filtros que ResumenGuardiasPortalView.
+    Vista del borrador de distribución para un mes/año específico.
+    Permite publicar o cancelar.
     """
-    User = get_user_model()
-    
-    # Obtener los filtros de la URL
-    medico_id = request.GET.get('medico')
-    mes = request.GET.get('mes')
-    año = request.GET.get('año')
-    
-    # Filtrar guardias (misma lógica que en ResumenGuardiasPortalView)
-    guardias = Guardia.objects.filter(cubierta=True, fecha__lte=timezone.now())
-    
-    if medico_id:
-        guardias = guardias.filter(medico_id=medico_id)
-        medico = User.objects.get(id=medico_id)
-        nombre_medico = f"{medico.first_name}_{medico.last_name}"
-    else:
-        nombre_medico = "todos_los_medicos"
-    
-    if mes and año:
-        guardias = guardias.filter(fecha__year=int(año), fecha__month=int(mes))
-    
-    # Mapeo de franjas horarias a horas
-    franja_horaria_horas = {
-        'NOCHE': 12, 'DIA_COMPLETO': 24, 'DIA': 12,
-        'NOCHE_FIN_SEMANA': 12, 'DIA_FIN_SEMANA': 12
-    }
-    
-    # Calcular resumen por médico
-    resumen_guardias = {}
-    for guardia in guardias:
-        medico_obj = guardia.medico
-        horas = franja_horaria_horas.get(guardia.franja_horaria, 0)
-        
-        if medico_obj not in resumen_guardias:
-            resumen_guardias[medico_obj] = {
-                'total_guardias': 0,
-                'total_horas': 0,
-                'detalles': []
-            }
-        
-        resumen_guardias[medico_obj]['total_guardias'] += 1
-        resumen_guardias[medico_obj]['total_horas'] += horas
-        resumen_guardias[medico_obj]['detalles'].append({
-            'fecha': guardia.fecha,
-            'franja_horaria': guardia.get_franja_horaria_display(),
-            'horas': horas
-        })
-    
-    # Ordenar detalles por fecha
-    for medico_data in resumen_guardias.values():
-        medico_data['detalles'].sort(key=lambda x: x['fecha'])
-    
-    # Crear un libro de Excel
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Guardias por Médico"
-    
-    # Establecer la fila de encabezados
-    headers = [
-        "Médico", "Total Guardias", "Total Horas", "Fecha", "Franja Horaria", "Horas"
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/distribucion_borrador.html']
+        return ['control_guardias/portal/distribucion_borrador.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        mes = self.kwargs['mes']
+        anio = self.kwargs['anio']
+        from datetime import date
+        import calendar as cal_module
+        primer_dia = date(anio, mes, 1)
+        ultimo_dia = date(anio, mes, cal_module.monthrange(anio, mes)[1])
+
+        asignaciones = (
+            AsignacionGuardia.objects
+            .filter(fecha__gte=primer_dia, fecha__lte=ultimo_dia, estado='BORRADOR')
+            .select_related('residente', 'tipo_guardia')
+            .order_by('fecha', 'tipo_guardia__nombre')
+        )
+        context['asignaciones'] = asignaciones
+        context['mes'] = mes
+        context['anio'] = anio
+        context['nombre_mes'] = _nombre_mes_view(mes)
+        context['metricas'] = obtener_metricas_mes(mes, anio)
+        context['hay_borradores'] = asignaciones.exists()
+        return context
+
+
+class PublicarBorradorView(JefeInstructorMixin, TemplateView):
+    """POST: Publica todas las asignaciones BORRADOR del mes/año."""
+    template_name = None  # solo POST
+
+    def post(self, request, mes, anio):
+        count = publicar_borrador(mes, anio)
+        if count:
+            messages.success(request, f"{count} guardia(s) publicada(s) correctamente.")
+        else:
+            messages.warning(request, "No había asignaciones en borrador para publicar.")
+        return redirect('control_guardias:index')
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:distribucion_borrador',
+                        mes=kwargs['mes'], anio=kwargs['anio'])
+
+
+class CancelarBorradorView(JefeInstructorMixin, TemplateView):
+    """POST: Elimina todas las asignaciones BORRADOR del mes/año."""
+    template_name = None
+
+    def post(self, request, mes, anio):
+        count = cancelar_borrador(mes, anio)
+        if count:
+            messages.success(request, f"Borrador cancelado: {count} asignación(es) eliminada(s).")
+        else:
+            messages.warning(request, "No había asignaciones en borrador para cancelar.")
+        return redirect('control_guardias:distribucion')
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:distribucion_borrador',
+                        mes=kwargs['mes'], anio=kwargs['anio'])
+
+
+def _nombre_mes_view(mes):
+    MESES = [
+        '', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
     ]
-    ws.append(headers)
-    
-    # Aplicar estilo a los encabezados
-    for cell in ws[1]:
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-    
-    # Agregar los datos
-    for medico_obj, data in resumen_guardias.items():
-        nombre_completo = f"Dr/a. {medico_obj.user.get_full_name()}"
-        total_guardias = data['total_guardias']
-        total_horas = data['total_horas']
-        
-        # Primera fila con los totales y el primer detalle
-        if data['detalles']:
-            primer_detalle = data['detalles'][0]
-            ws.append([
-                nombre_completo,
-                total_guardias,
-                total_horas,
-                primer_detalle['fecha'].strftime("%d/%m/%Y"),
-                primer_detalle['franja_horaria'],
-                primer_detalle['horas']
-            ])
-            
-            # Filas adicionales con los demás detalles
-            for detalle in data['detalles'][1:]:
-                ws.append([
-                    "",  # Médico (vacío en filas adicionales)
-                    "",  # Total Guardias (vacío)
-                    "",  # Total Horas (vacío)
-                    detalle['fecha'].strftime("%d/%m/%Y"),
-                    detalle['franja_horaria'],
-                    detalle['horas']
-                ])
-    
-    # Ajustar ancho de columnas automáticamente
-    for column in ws.columns:
-        max_length = 0
-        column_letter = column[0].column_letter
-        for cell in column:
-            try:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            except:
-                pass
-        adjusted_width = min(max_length + 2, 50)
-        ws.column_dimensions[column_letter].width = adjusted_width
-    
-    # Preparar respuesta HTTP
-    response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-    response["Content-Disposition"] = f'attachment; filename="guardias_{nombre_medico}.xlsx"'
-    wb.save(response)
-    return response
+    return MESES[mes]
+
+
+# ---------------------------------------------------------------------------
+# Fase 5: Ausencias
+# ---------------------------------------------------------------------------
+
+class AusenciasView(LoginRequiredMixin, TemplateView):
+    """
+    Lista de ausencias.
+    - Residentes: solo las propias.
+    - Gestores: todas, ordenadas por más recientes primero.
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/ausencias.html']
+        return ['control_guardias/portal/ausencias.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        es_gestor = user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
+        context['es_gestor'] = es_gestor
+        if es_gestor:
+            qs = (
+                AusenciaResidente.objects
+                .select_related('residente', 'resuelta_por')
+                .prefetch_related('guardias_afectadas')
+                .order_by('estado', '-reportada_en')
+            )
+        else:
+            qs = (
+                AusenciaResidente.objects
+                .filter(residente=user)
+                .select_related('resuelta_por')
+                .prefetch_related('guardias_afectadas')
+                .order_by('-reportada_en')
+            )
+        context['ausencias'] = qs
+        return context
+
+
+class ReportarAusenciaView(LoginRequiredMixin, TemplateView):
+    """
+    GET: muestra el formulario para reportar une ausencia.
+    POST: crea la ausencia y vincula guardias afectadas.
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/reportar_ausencia_form.html']
+        return ['control_guardias/portal/reportar_ausencia_form.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = kwargs.get('form', AusenciaResidenteForm())
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = AusenciaResidenteForm(request.POST)
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        try:
+            ausencia = reportar_ausencia(
+                residente=request.user,
+                fecha_inicio=form.cleaned_data['fecha_inicio'],
+                fecha_fin=form.cleaned_data['fecha_fin'],
+                motivo=form.cleaned_data['motivo'],
+                descripcion=form.cleaned_data.get('descripcion', ''),
+            )
+            n = ausencia.guardias_afectadas.count()
+            messages.success(
+                request,
+                f"Ausencia reportada. Se detectaron {n} guardia(s) afectada(s). "
+                "El jefe/instructor fue notificado."
+            )
+            return redirect('control_guardias:ausencias')
+        except Exception as e:
+            messages.error(request, str(e))
+            return self.render_to_response(self.get_context_data(form=form))
+
+
+class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
+    """POST: jefe/instructor marca una ausencia como resuelta."""
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        ausencia = get_object_or_404(AusenciaResidente, pk=pk)
+        if ausencia.estado == 'RESUELTA':
+            messages.warning(request, "Esta ausencia ya fue resuelta.")
+        else:
+            resolver_ausencia(ausencia, request.user)
+            messages.success(request, f"Ausencia de {ausencia.residente.get_full_name()} marcada como resuelta.")
+        return redirect('control_guardias:ausencias')
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:ausencias')
+
+
+# ---------------------------------------------------------------------------
+# Fase 5: Cambios de guardia
+# ---------------------------------------------------------------------------
+
+class CambiosGuardiaView(LoginRequiredMixin, TemplateView):
+    """
+    Lista de solicitudes de cambio de guardia.
+    - Residentes: ven sus solicitudes enviadas y recibidas.
+    - Gestores: ven todas pendientes de su validación + historial.
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/cambios.html']
+        return ['control_guardias/portal/cambios.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        es_gestor = user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
+        context['es_gestor'] = es_gestor
+
+        base_qs = (
+            SolicitudCambioGuardia.objects
+            .select_related(
+                'solicitante', 'receptor',
+                'guardia_solicitante__tipo_guardia',
+                'guardia_receptor__tipo_guardia',
+                'revisado_por',
+            )
+        )
+
+        if es_gestor:
+            context['pendientes_jefe'] = base_qs.filter(estado='PENDIENTE_JEFE').order_by('-fecha_solicitud')
+            context['historial'] = base_qs.exclude(estado__in=['PENDIENTE_RECEPTOR', 'PENDIENTE_JEFE']).order_by('-fecha_resolucion')
+        else:
+            context['enviadas'] = base_qs.filter(solicitante=user).order_by('-fecha_solicitud')
+            context['recibidas'] = base_qs.filter(receptor=user, estado='PENDIENTE_RECEPTOR').order_by('-fecha_solicitud')
+        return context
+
+
+class SolicitarCambioView(LoginRequiredMixin, TemplateView):
+    """
+    GET: muestra el formulario para solicitar cambio de una guardia propia.
+    POST: crea la SolicitudCambioGuardia.
+    URL: /guardias/<guardia_pk>/solicitar-cambio/
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/solicitar_cambio_form.html']
+        return ['control_guardias/portal/solicitar_cambio_form.html']
+
+    def _get_guardia(self, guardia_pk):
+        return get_object_or_404(
+            AsignacionGuardia,
+            pk=guardia_pk,
+            residente=self.request.user,
+            estado='PUBLICADA',
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        guardia = self._get_guardia(self.kwargs['guardia_pk'])
+        context['guardia'] = guardia
+        context['form'] = kwargs.get('form', SolicitudCambioGuardiaForm(solicitante=self.request.user))
+        return context
+
+    def post(self, request, guardia_pk, *args, **kwargs):
+        guardia_sol = self._get_guardia(guardia_pk)
+        form = SolicitudCambioGuardiaForm(request.POST, solicitante=request.user)
+        if not form.is_valid():
+            return self.render_to_response(
+                self.get_context_data(form=form)
+            )
+        try:
+            solicitar_cambio(
+                solicitante=request.user,
+                guardia_solicitante=guardia_sol,
+                guardia_receptor=form.cleaned_data['guardia_receptor'],
+            )
+            messages.success(request, "Solicitud de cambio enviada. El receptor fue notificado.")
+            return redirect('control_guardias:cambios')
+        except CambioGuardiaError as e:
+            messages.error(request, str(e))
+            return self.render_to_response(self.get_context_data(form=form))
+
+
+class ResponderCambioView(LoginRequiredMixin, TemplateView):
+    """
+    POST: receptor acepta o rechaza una solicitud de cambio.
+    ?accion=aceptar|rechazar
+    """
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        solicitud = get_object_or_404(SolicitudCambioGuardia, pk=pk)
+        accion = request.POST.get('accion', '')
+        try:
+            if accion == 'aceptar':
+                aceptar_cambio_receptor(solicitud, request.user)
+                messages.success(request, "Aceptaste el cambio. Queda pendiente de validación por el jefe/instructor.")
+            elif accion == 'rechazar':
+                rechazar_cambio_receptor(solicitud, request.user)
+                messages.success(request, "Rechazaste la solicitud de cambio.")
+            else:
+                messages.error(request, "Acción no válida.")
+        except CambioGuardiaError as e:
+            messages.error(request, str(e))
+        return redirect('control_guardias:cambios')
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:cambios')
+
+
+class RevisarCambioView(JefeInstructorMixin, TemplateView):
+    """
+    GET: muestra formulario de notas para aprobar/rechazar.
+    POST: jefe aprueba (?accion=aprobar) o rechaza (?accion=rechazar) el cambio.
+    """
+    login_url = 'login'
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/revisar_cambio_form.html']
+        return ['control_guardias/portal/revisar_cambio_form.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['solicitud'] = get_object_or_404(SolicitudCambioGuardia, pk=self.kwargs['pk'])
+        context['form'] = kwargs.get('form', NotasRechazoForm())
+        return context
+
+    def post(self, request, pk, *args, **kwargs):
+        solicitud = get_object_or_404(SolicitudCambioGuardia, pk=pk)
+        form = NotasRechazoForm(request.POST)
+        accion = request.POST.get('accion', '')
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+        notas = form.cleaned_data.get('notas', '')
+        try:
+            if accion == 'aprobar':
+                aprobar_cambio(solicitud, request.user, notas=notas)
+                messages.success(request, "Cambio de guardia aprobado. Las asignaciones fueron actualizadas.")
+            elif accion == 'rechazar':
+                rechazar_cambio_jefe(solicitud, request.user, notas=notas)
+                messages.success(request, "Cambio de guardia rechazado.")
+            else:
+                messages.error(request, "Acción no válida.")
+        except CambioGuardiaError as e:
+            messages.error(request, str(e))
+        return redirect('control_guardias:cambios')
+
+
+class CancelarCambioView(LoginRequiredMixin, TemplateView):
+    """POST: solicitante cancela su propia solicitud (solo PENDIENTE_RECEPTOR)."""
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        solicitud = get_object_or_404(SolicitudCambioGuardia, pk=pk)
+        try:
+            cancelar_cambio(solicitud, request.user)
+            messages.success(request, "Solicitud cancelada.")
+        except CambioGuardiaError as e:
+            messages.error(request, str(e))
+        return redirect('control_guardias:cambios')
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:cambios')

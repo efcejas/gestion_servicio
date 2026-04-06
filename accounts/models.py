@@ -98,12 +98,8 @@ class CustomUser(AbstractUser):
             return 'R2'
         elif meses_transcurridos < 36:
             return 'R3'
-        elif meses_transcurridos < 48:
-            return 'R4'
-        elif meses_transcurridos < 60:
-            return 'R5'
         else:
-            return 'R5+'  # Residentes que llevan más de 5 años
+            return 'R4'
     
     def actualizar_anio_residencia(self):
         """Actualiza el año de residencia si es residente y tiene fecha de ingreso"""

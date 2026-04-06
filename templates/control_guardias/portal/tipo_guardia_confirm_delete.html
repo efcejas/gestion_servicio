@@ -1,0 +1,33 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Confirmar eliminación - Guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto px-4 py-10">
+    <div class="bg-white border border-red-200 rounded-xl p-6 text-center shadow-sm">
+        <div class="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-triangle-exclamation text-2xl text-red-500"></i>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900 mb-2">¿Eliminar tipo de guardia?</h2>
+        <p class="text-gray-600 text-sm mb-1">
+            Estás por eliminar: <strong class="text-gray-900">{{ object.nombre }}</strong>
+        </p>
+        <p class="text-gray-400 text-xs mb-6">
+            Esta acción no se puede deshacer. Solo es posible si no hay asignaciones asociadas.
+        </p>
+        <div class="flex gap-3">
+            <a href="{% url 'control_guardias:configuracion' %}"
+               class="flex-1 px-4 py-2.5 border border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 transition-colors text-sm text-center bg-white">
+                Cancelar
+            </a>
+            <form method="post" class="flex-1">
+                {% csrf_token %}
+                <button type="submit"
+                        class="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    Eliminar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

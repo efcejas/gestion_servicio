@@ -1,33 +1,73 @@
 from django.urls import path
-from .views import exportar_excel_guardias
 
-app_name = 'control_guardias'
 from .views import (
-    TailwindCalendarView,
-    GuardiaCreateView,
-    GuardiaUpdateView,
-    GuardiaDeleteView,
-    GuardiaEventsView,
-    GuardiaListView,
-    ResumenGuardiasView,
+    AusenciasView,
+    BorradorView,
+    CalendarioView,
+    CancelarBorradorView,
+    CancelarCambioView,
+    CambiosGuardiaView,
+    ConfiguracionView,
+    CuotaMensualFormView,
+    DistribucionView,
+    FeriadoCreateView,
+    FeriadoDeleteView,
+    GuardiasApiView,
+    GuardiasIndexView,
     MisGuardiasView,
-    CoberturasSemanalesPortalView,
-    ResumenGuardiasPortalView,
+    NotificacionesGuardiaView,
+    PublicarBorradorView,
+    ReportarAusenciaView,
+    ResolverAusenciaView,
+    ResponderCambioView,
+    RevisarCambioView,
+    SolicitarCambioView,
+    TipoGuardiaCreateView,
+    TipoGuardiaDeleteView,
+    TipoGuardiaUpdateView,
 )
 
+app_name = 'control_guardias'
+
 urlpatterns = [
-    # Portal público (sin autenticación requerida)
-    path('portal/coberturas-semanal/', CoberturasSemanalesPortalView.as_view(), name='portal_coberturas_semanal'),
-    path('portal/resumen-guardias/', ResumenGuardiasPortalView.as_view(), name='portal_resumen_guardias'),
-    path('exportar-excel-guardias/', exportar_excel_guardias, name='exportar_excel_guardias'),
-    
-    # Vistas con autenticación
-    path('coberturas-semanal/', GuardiaListView.as_view(), name='coberturas_semanal'),
-    path('coberturas-medico/', ResumenGuardiasView.as_view(), name='coberturas_medico'),
-    path('calendario-full-tw/', TailwindCalendarView.as_view(), name='calendario_guardias_full_tw'),
-    path('api/guardias/', GuardiaEventsView.as_view(), name='guardias_api'),
-    path('crear-guardia/', GuardiaCreateView.as_view(), name='crear_guardia'),
-    path('editar-guardia/<int:pk>/', GuardiaUpdateView.as_view(), name='editar_guardia'),
-    path('eliminar-guardia/<int:pk>/', GuardiaDeleteView.as_view(), name='eliminar_guardia'),
+    # -- Vistas generales --
+    path('', GuardiasIndexView.as_view(), name='index'),
+    path('calendario/', CalendarioView.as_view(), name='calendario'),
     path('mis-guardias/', MisGuardiasView.as_view(), name='mis_guardias'),
+    path('notificaciones/', NotificacionesGuardiaView.as_view(), name='notificaciones'),
+    path('api/guardias/', GuardiasApiView.as_view(), name='guardias_api'),
+
+    # -- Configuración (jefes/instructores) --
+    path('configuracion/', ConfiguracionView.as_view(), name='configuracion'),
+
+    # Tipos de guardia
+    path('configuracion/tipos/nuevo/', TipoGuardiaCreateView.as_view(), name='tipo_guardia_crear'),
+    path('configuracion/tipos/<int:pk>/editar/', TipoGuardiaUpdateView.as_view(), name='tipo_guardia_editar'),
+    path('configuracion/tipos/<int:pk>/eliminar/', TipoGuardiaDeleteView.as_view(), name='tipo_guardia_eliminar'),
+
+    # Cuotas mensuales
+    path('configuracion/cuotas/<str:anio>/editar/', CuotaMensualFormView.as_view(), name='cuota_editar'),
+
+    # Feriados
+    path('configuracion/feriados/nuevo/', FeriadoCreateView.as_view(), name='feriado_crear'),
+    path('configuracion/feriados/<int:pk>/eliminar/', FeriadoDeleteView.as_view(), name='feriado_eliminar'),
+
+    # -- Distribución automática (Fase 3) --
+    path('configuracion/distribucion/', DistribucionView.as_view(), name='distribucion'),
+    path('configuracion/distribucion/<int:mes>/<int:anio>/', BorradorView.as_view(), name='distribucion_borrador'),
+    path('configuracion/distribucion/<int:mes>/<int:anio>/publicar/', PublicarBorradorView.as_view(), name='distribucion_publicar'),
+    path('configuracion/distribucion/<int:mes>/<int:anio>/cancelar/', CancelarBorradorView.as_view(), name='distribucion_cancelar'),
+
+    # -- Ausencias (Fase 5) --
+    path('ausencias/', AusenciasView.as_view(), name='ausencias'),
+    path('ausencias/reportar/', ReportarAusenciaView.as_view(), name='ausencia_reportar'),
+    path('ausencias/<int:pk>/resolver/', ResolverAusenciaView.as_view(), name='ausencia_resolver'),
+
+    # -- Cambios de guardia (Fase 5) --
+    path('cambios/', CambiosGuardiaView.as_view(), name='cambios'),
+    path('guardias/<int:guardia_pk>/solicitar-cambio/', SolicitarCambioView.as_view(), name='solicitar_cambio'),
+    path('cambios/<int:pk>/responder/', ResponderCambioView.as_view(), name='cambio_responder'),
+    path('cambios/<int:pk>/revisar/', RevisarCambioView.as_view(), name='cambio_revisar'),
+    path('cambios/<int:pk>/cancelar/', CancelarCambioView.as_view(), name='cambio_cancelar'),
 ]
+

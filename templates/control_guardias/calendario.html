@@ -1,0 +1,285 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}Calendario de Guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Calendario de Guardias</h1>
+            <p class="text-gray-400 mt-0.5 text-sm">Vista mensual de las guardias asignadas</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            {% if es_gestor and residentes %}
+            <select id="filtroResidente"
+                    class="bg-gray-800 border border-gray-600 text-gray-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Todos los residentes</option>
+                {% for r in residentes %}
+                <option value="{{ r.pk }}">{{ r.get_full_name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <a href="{% url 'control_guardias:index' %}"
+               class="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:border-gray-400 transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    <!-- Leyenda de colores -->
+    <div class="flex flex-wrap items-center gap-5 mb-4 text-xs font-medium text-gray-400">
+        <div class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-blue-500 shrink-0"></span>
+            Guardia publicada
+        </div>
+        <div class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0"></span>
+            Guardia en feriado
+        </div>
+        {% if es_gestor %}
+        <div class="flex items-center gap-1.5">
+            <span class="h-2.5 w-2.5 rounded-full bg-gray-500 shrink-0"></span>
+            Borrador (no publicado)
+        </div>
+        {% endif %}
+        {% if tipos_guardia %}
+        <span class="text-gray-600 select-none">|</span>
+        {% for tipo in tipos_guardia %}
+        <div class="flex items-center gap-1.5 text-gray-500">
+            <i class="fas fa-clock text-gray-600"></i>
+            {{ tipo.nombre }}: {{ tipo.hora_inicio|time:"H:i" }}–{{ tipo.hora_fin|time:"H:i" }}
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+
+    <!-- Calendario -->
+    <div class="relative bg-gray-900 border border-gray-700 rounded-xl shadow-lg p-3">
+        <!-- Spinner de carga -->
+        <div id="calendarLoading"
+             class="hidden absolute inset-0 z-40 flex items-center justify-center rounded-xl bg-gray-900/70 backdrop-blur-sm">
+            <div class="flex items-center gap-2 text-sm font-medium text-gray-200">
+                <svg class="h-5 w-5 animate-spin text-blue-400" viewBox="0 0 24 24" fill="none">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                Cargando guardias…
+            </div>
+        </div>
+        <div id="calendar"></div>
+    </div>
+
+    <!-- Tooltip flotante de detalle -->
+    <div id="guardiaTooltip"
+         class="fixed z-50 hidden max-w-xs rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl text-sm text-gray-200"
+         role="tooltip">
+        <p id="tooltipResidente" class="font-semibold text-white text-sm mb-0.5"></p>
+        <p id="tooltipTipo" class="text-gray-400 text-xs mb-1"></p>
+        <p id="tooltipHorario" class="text-gray-300 text-xs"></p>
+        <p id="tooltipEstado" class="mt-1 text-xs font-medium"></p>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* FullCalendar dark-mode overrides */
+  #calendar .fc-theme-standard .fc-scrollgrid { border-color: rgb(55 65 81); }
+  #calendar .fc .fc-daygrid-day-number { color: rgb(209 213 219); text-decoration: none; }
+  #calendar .fc .fc-col-header-cell-cushion { color: rgb(156 163 175); text-decoration: none; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  #calendar .fc .fc-toolbar-title { color: rgb(243 244 246); font-size: 1.1rem; font-weight: 600; }
+  #calendar .fc .fc-button { background-color: rgb(31 41 55); color: rgb(209 213 219); border-color: rgb(55 65 81); font-size: .8rem; padding: .3rem .75rem; }
+  #calendar .fc .fc-button:hover { background-color: rgb(55 65 81); }
+  #calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
+  #calendar .fc .fc-button-primary:not(:disabled):active { background-color: rgb(59 130 246); border-color: rgb(59 130 246); }
+  #calendar .fc .fc-button-primary:disabled { background-color: rgb(31 41 55); border-color: rgb(55 65 81); color: rgb(107 114 128); }
+  #calendar .fc .fc-daygrid-more-link { color: rgb(147 197 253); font-size: .7rem; }
+  #calendar .fc .fc-daygrid-day-frame { background: transparent; min-height: 80px; }
+  #calendar .fc .fc-daygrid-day.fc-day-today { background: rgba(59,130,246,.08); }
+  #calendar .fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number { color: rgb(96 165 250); font-weight: 700; }
+  #calendar .fc .fc-highlight { background: rgba(59,130,246,.15); }
+  #calendar .fc .fc-scrollgrid-section > td { border-color: rgb(55 65 81); }
+  #calendar .fc .fc-daygrid-day { border-color: rgb(55 65 81); }
+  /* Event chips */
+  #calendar .fc .fc-daygrid-event { background: transparent !important; border: none !important; padding: 0 !important; border-radius: 0 !important; }
+  #calendar .fc .fc-daygrid-event .fc-event-main { padding: 0 !important; }
+  /* Lista */
+  #calendar .fc .fc-list { border-color: rgb(55 65 81); }
+  #calendar .fc .fc-list-day-cushion { background: rgb(31 41 55); }
+  #calendar .fc .fc-list-day-text, #calendar .fc .fc-list-day-side-text { color: rgb(209 213 219); }
+  #calendar .fc .fc-list-event:hover td { background: rgb(31 41 55); }
+  #calendar .fc .fc-list-event td { border-color: rgb(55 65 81); color: rgb(229 231 235); }
+  #calendar .fc .fc-list-event-title a { color: rgb(229 231 235); text-decoration: none; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/index.global.min.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  const calendarEl   = document.getElementById('calendar');
+  const loadingEl    = document.getElementById('calendarLoading');
+  const tooltip      = document.getElementById('guardiaTooltip');
+  const filtroEl     = document.getElementById('filtroResidente');
+  const apiUrl       = "{% url 'control_guardias:guardias_api' %}";
+
+  let calendar = null;
+
+  // ── Tooltip ──────────────────────────────────────────────────────────────
+
+  function showTooltip(info) {
+    const ev = info.event;
+    const ex = ev.extendedProps || {};
+    const rect = info.el.getBoundingClientRect();
+    const scrollY = window.scrollY || 0;
+    const scrollX = window.scrollX || 0;
+
+    document.getElementById('tooltipResidente').textContent = ex.residente || ev.title;
+    document.getElementById('tooltipTipo').textContent = ex.tipo_guardia || '';
+    document.getElementById('tooltipHorario').textContent =
+      ex.hora_inicio && ex.hora_fin ? `${ex.hora_inicio} – ${ex.hora_fin}` : '';
+
+    const estadoEl = document.getElementById('tooltipEstado');
+    if (ex.estado === 'BORRADOR') {
+      estadoEl.textContent = 'Borrador';
+      estadoEl.className = 'mt-1 text-xs font-medium text-gray-400';
+    } else if (ex.es_feriado) {
+      estadoEl.textContent = 'Feriado';
+      estadoEl.className = 'mt-1 text-xs font-medium text-amber-400';
+    } else {
+      estadoEl.textContent = 'Publicada';
+      estadoEl.className = 'mt-1 text-xs font-medium text-blue-400';
+    }
+
+    // Posicionamiento
+    tooltip.classList.remove('hidden');
+    const tw = tooltip.offsetWidth;
+    const th = tooltip.offsetHeight;
+    let top  = rect.top + scrollY - th - 10;
+    let left = rect.left + scrollX;
+
+    if (top < scrollY + 8) top = rect.bottom + scrollY + 8;
+    const maxLeft = scrollX + window.innerWidth - tw - 8;
+    if (left > maxLeft) left = maxLeft;
+    if (left < scrollX + 8) left = scrollX + 8;
+
+    tooltip.style.top  = top + 'px';
+    tooltip.style.left = left + 'px';
+  }
+
+  function hideTooltip() {
+    tooltip.classList.add('hidden');
+  }
+
+  // ── eventContent — chip por guardia ──────────────────────────────────────
+
+  function buildEventContent(arg) {
+    const ev = arg.event;
+    const ex = ev.extendedProps || {};
+    const bgColor = ev.backgroundColor || '#3b82f6';
+    const nombre  = ex.residente || '';
+
+    // Abreviar nombre: primera palabra + último token
+    const tokens = nombre.trim().split(/\s+/).filter(Boolean);
+    const abrev  = tokens.length > 1
+      ? `${tokens[0]} ${tokens[tokens.length - 1]}`
+      : (tokens[0] || nombre);
+    const labelText = abrev.length > 18 ? abrev.slice(0, 17) + '…' : abrev;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'guardia-fc-chip flex items-center gap-1 rounded px-1.5 py-0.5 mb-0.5 w-full truncate cursor-default';
+    wrap.style.backgroundColor = bgColor + '22'; // fondo muy tenue en tono del color
+    wrap.style.borderLeft = `2px solid ${bgColor}`;
+
+    const dot = document.createElement('span');
+    dot.className = 'shrink-0 h-1.5 w-1.5 rounded-full';
+    dot.style.backgroundColor = bgColor;
+
+    const label = document.createElement('span');
+    label.className = 'truncate text-[10px] font-medium text-gray-100 leading-tight';
+    label.textContent = labelText;
+    if (abrev.length > 18) label.title = nombre;
+
+    wrap.appendChild(dot);
+    wrap.appendChild(label);
+    return { domNodes: [wrap] };
+  }
+
+  // ── Inicializar FullCalendar ──────────────────────────────────────────────
+
+  function buildEventsSource(residenteId) {
+    return {
+      url: apiUrl,
+      extraParams: residenteId ? { residente_id: residenteId } : {},
+      loading: (isLoading) => {
+        if (isLoading) loadingEl.classList.remove('hidden');
+        else loadingEl.classList.add('hidden');
+      },
+      failure: () => console.error('Error al cargar guardias desde la API'),
+    };
+  }
+
+  function initCalendar(residenteId) {
+    if (calendar) {
+      calendar.destroy();
+    }
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      locale: 'es',
+      allDaySlot: false,
+      displayEventTime: false,
+      navLinks: false,
+      showNonCurrentDates: true,
+      dayMaxEventRows: 4,
+      eventContent: buildEventContent,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,listMonth',
+      },
+      buttonText: {
+        today: 'Hoy',
+        month: 'Mes',
+        list: 'Lista',
+      },
+      views: {
+        listMonth: { buttonText: 'Lista' },
+      },
+      eventMouseEnter: showTooltip,
+      eventMouseLeave: hideTooltip,
+      eventDidMount: (info) => {
+        // Quitar el title nativo para evitar tooltip doble
+        if (info.el.hasAttribute('title')) info.el.removeAttribute('title');
+      },
+      events: buildEventsSource(residenteId),
+    });
+
+    calendar.render();
+  }
+
+  // ── Inicialización ────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', function () {
+    initCalendar('');
+
+    if (filtroEl) {
+      filtroEl.addEventListener('change', function () {
+        hideTooltip();
+        initCalendar(this.value);
+      });
+    }
+
+    // Ocultar tooltip al hacer scroll
+    document.addEventListener('scroll', hideTooltip, true);
+  });
+
+}());
+</script>
+{% endblock %}

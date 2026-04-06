@@ -392,6 +392,20 @@
                         </a>
                         {% endif %}
                         {% endif %}
+
+                        <!-- Guardias - Para residentes, jefes e instructores -->
+                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                        {% url 'control_guardias:index' as guardias_navbar_url %}
+                        {% if guardias_navbar_url %}
+                        <a href="{{ guardias_navbar_url }}"
+                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
+                            <i class="fas fa-shield-alt mr-2 group-hover:scale-110 transition-transform"></i>Guardias
+                            {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                            {% endif %}
+                        </a>
+                        {% endif %}
+                        {% endif %}
                     
                     <!-- TÉCNICOS -->
                     {% elif user.rol == 'tecnico' %}

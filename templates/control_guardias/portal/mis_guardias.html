@@ -1,0 +1,109 @@
+{% extends 'layouts/base_tailwind.html' %}
+{% load static %}
+
+{% block title %}Mis Guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Mis Guardias</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">Tus guardias asignadas</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'control_guardias:ausencias' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                <i class="fas fa-user-minus"></i>Mis ausencias
+            </a>
+            <a href="{% url 'control_guardias:cambios' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                <i class="fas fa-exchange-alt"></i>Cambios de guardia
+            </a>
+            <a href="{% url 'control_guardias:index' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Próximas Guardias -->
+    <div class="mb-6 rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+            <i class="fas fa-calendar-check text-emerald-500"></i>
+            <h2 class="text-lg font-semibold text-gray-900">Próximas Guardias</h2>
+            {% if proximas_guardias %}
+            <span class="ml-auto bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ proximas_guardias|length }}</span>
+            {% endif %}
+        </div>
+        <div class="divide-y divide-gray-50">
+            {% for guardia in proximas_guardias %}
+            <div class="px-6 py-4 flex flex-wrap items-center gap-3 hover:bg-gray-50 transition-colors">
+                <div class="flex-1 min-w-0">
+                    <p class="text-gray-900 font-medium">{{ guardia.fecha|date:"d/m/Y" }} &mdash; {{ guardia.fecha|date:"l" }}</p>
+                    <p class="text-gray-500 text-sm">{{ guardia.tipo_guardia }} &bull; {{ guardia.get_franja_horaria_display }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    {% if guardia.es_feriado %}
+                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded">
+                        <i class="fas fa-star"></i>Feriado
+                    </span>
+                    {% endif %}
+                    <a href="{% url 'control_guardias:solicitar_cambio' guardia.pk %}"
+                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors">
+                        <i class="fas fa-exchange-alt"></i>Solicitar cambio
+                    </a>
+                </div>
+            </div>
+            {% empty %}
+            <div class="px-6 py-12 text-center">
+                <i class="fas fa-calendar-times text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-500">No tenés próximas guardias programadas.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Historial de Guardias -->
+    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
+            <i class="fas fa-history text-blue-500"></i>
+            <h2 class="text-lg font-semibold text-gray-900">Historial</h2>
+            {% if guardias_pasadas %}
+            <span class="ml-auto bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{{ guardias_pasadas|length }}</span>
+            {% endif %}
+        </div>
+        <div class="max-h-96 overflow-y-auto divide-y divide-gray-50">
+            {% for guardia in guardias_pasadas %}
+            <div class="px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
+                <div class="flex-1">
+                    <p class="text-gray-700 text-sm font-medium">{{ guardia.fecha|date:"d/m/Y" }} &mdash; {{ guardia.fecha|date:"l" }}</p>
+                    <p class="text-gray-400 text-xs">{{ guardia.tipo_guardia }} &bull; {{ guardia.get_franja_horaria_display }}</p>
+                </div>
+                {% if guardia.es_feriado %}
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded">
+                    <i class="fas fa-star"></i>Feriado
+                </span>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="px-6 py-12 text-center">
+                <p class="text-gray-400">No hay guardias previas registradas.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

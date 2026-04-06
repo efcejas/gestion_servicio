@@ -1,0 +1,120 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Ausencias{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Ausencias</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">
+                {% if es_gestor %}Gestión de ausencias de todos los residentes
+                {% else %}Tus ausencias reportadas{% endif %}
+            </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            {% if not es_gestor %}
+            <a href="{% url 'control_guardias:ausencia_reportar' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                <i class="fas fa-plus"></i>Reportar ausencia
+            </a>
+            {% endif %}
+            <a href="{% url 'control_guardias:index' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+                <i class="fas fa-arrow-left"></i>Volver
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if ausencias %}
+    <div class="space-y-3">
+        {% for ausencia in ausencias %}
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="space-y-1">
+                    {% if es_gestor %}
+                    <p class="font-semibold text-gray-900">{{ ausencia.residente.get_full_name }}</p>
+                    {% endif %}
+                    <div class="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600 text-xs font-medium">
+                            <i class="fas fa-calendar-xmark text-xs"></i>
+                            {{ ausencia.fecha_inicio|date:"d/m/Y" }} – {{ ausencia.fecha_fin|date:"d/m/Y" }}
+                        </span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                            {% if ausencia.motivo == 'ENFERMEDAD' %}bg-red-100 text-red-700
+                            {% elif ausencia.motivo == 'VACACIONES' %}bg-blue-100 text-blue-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ ausencia.get_motivo_display }}
+                        </span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                            {% if ausencia.estado == 'PENDIENTE' %}bg-yellow-100 text-yellow-700
+                            {% else %}bg-green-100 text-green-700{% endif %}">
+                            {% if ausencia.estado == 'PENDIENTE' %}<i class="fas fa-clock text-xs"></i>{% else %}<i class="fas fa-check text-xs"></i>{% endif %}
+                            {{ ausencia.get_estado_display }}
+                        </span>
+                    </div>
+                    {% if ausencia.descripcion %}
+                    <p class="text-gray-500 text-sm">{{ ausencia.descripcion }}</p>
+                    {% endif %}
+                    {% with n=ausencia.guardias_afectadas.count %}
+                    {% if n %}
+                    <p class="text-xs text-gray-400 mt-1">
+                        <i class="fas fa-shield-halved mr-1"></i>{{ n }} guardia{{ n|pluralize }} afectada{{ n|pluralize }}
+                    </p>
+                    {% endif %}
+                    {% endwith %}
+                    {% if ausencia.resuelta_por %}
+                    <p class="text-xs text-gray-400 mt-1">
+                        Resuelta por {{ ausencia.resuelta_por.get_full_name }}
+                    </p>
+                    {% endif %}
+                </div>
+                {% if es_gestor and ausencia.estado == 'PENDIENTE' %}
+                <form method="post" action="{% url 'control_guardias:ausencia_resolver' ausencia.pk %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors">
+                        <i class="fas fa-check"></i>Marcar resuelta
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="bg-white border border-dashed border-gray-300 rounded-xl p-8 text-center shadow-sm">
+        <i class="fas fa-calendar-check text-4xl text-gray-300 mb-3"></i>
+        <p class="text-gray-500 font-medium">No hay ausencias registradas.</p>
+        {% if not es_gestor %}
+        <a href="{% url 'control_guardias:ausencia_reportar' %}"
+           class="mt-3 inline-block text-sm text-blue-600 hover:text-blue-700 transition-colors">
+            Reportar una ausencia →
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="mt-6">
+        <a href="{% url 'control_guardias:index' %}"
+           class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            ← Volver al inicio
+        </a>
+    </div>
+
+</div>
+{% endblock %}

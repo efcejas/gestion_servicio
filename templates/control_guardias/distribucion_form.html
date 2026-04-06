@@ -1,0 +1,169 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+
+{% block title %}Distribución automática de guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-white">Distribución automática</h1>
+            <p class="text-gray-400 mt-1 text-sm">
+                Generá el borrador de guardias para un mes. El jefe/instructor lo valida antes de publicar.
+            </p>
+        </div>
+        <a href="{% url 'control_guardias:configuracion' %}"
+           class="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:border-gray-400 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i> Configuración
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm
+            {% if message.tags == 'success' %}bg-green-900 border border-green-700 text-green-300
+            {% elif message.tags == 'error' %}bg-red-900 border border-red-700 text-red-300
+            {% elif message.tags == 'warning' %}bg-yellow-900 border border-yellow-700 text-yellow-300
+            {% else %}bg-blue-900 border border-blue-700 text-blue-300{% endif %}">
+            <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-circle-exclamation{% else %}fa-triangle-exclamation{% endif %} mr-2"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Formulario de generación -->
+        <div class="lg:col-span-2">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-6">
+                <h2 class="text-base font-semibold text-white mb-5">
+                    <i class="fas fa-wand-magic-sparkles mr-2 text-blue-400"></i>Generar distribución
+                </h2>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                    <div class="mb-4 px-4 py-3 rounded-lg bg-red-900 border border-red-700 text-red-300 text-sm">
+                        {{ form.non_field_errors }}
+                    </div>
+                    {% endif %}
+
+                    <!-- Mes y año -->
+                    <div class="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">
+                                Mes <span class="text-red-400">*</span>
+                            </label>
+                            {{ form.mes }}
+                            {% if form.mes.errors %}
+                            <p class="text-red-400 text-xs mt-1">{{ form.mes.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-1">
+                                Año <span class="text-red-400">*</span>
+                            </label>
+                            {{ form.anio }}
+                            {% if form.anio.errors %}
+                            <p class="text-red-400 text-xs mt-1">{{ form.anio.errors|join:", " }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Tipos de guardia -->
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">
+                            Tipos de guardia a distribuir <span class="text-red-400">*</span>
+                        </label>
+                        {% if form.tipos_guardia.field.queryset.exists %}
+                        <div class="space-y-2 p-3 bg-gray-800 rounded-lg">
+                            {% for checkbox in form.tipos_guardia %}
+                            <label class="flex items-center gap-3 cursor-pointer">
+                                {{ checkbox.tag }}
+                                <span class="text-sm text-gray-300">{{ checkbox.choice_label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="p-4 bg-yellow-950 border border-yellow-800 rounded-lg text-yellow-300 text-sm">
+                            <i class="fas fa-triangle-exclamation mr-2"></i>
+                            No hay tipos de guardia activos. Configuralos primero en
+                            <a href="{% url 'control_guardias:configuracion' %}" class="underline">Configuración</a>.
+                        </div>
+                        {% endif %}
+                        {% if form.tipos_guardia.errors %}
+                        <p class="text-red-400 text-xs mt-1">{{ form.tipos_guardia.errors|join:", " }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Opciones -->
+                    <div class="mb-6 p-4 bg-gray-800 rounded-lg">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            {{ form.reemplazar_borradores }}
+                            <div>
+                                <span class="text-sm font-medium text-gray-300">{{ form.reemplazar_borradores.label }}</span>
+                                <p class="text-xs text-gray-500 mt-0.5">
+                                    Si ya existe un borrador para ese mes, lo eliminará y generará uno nuevo.
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <button type="submit"
+                            class="w-full px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        Generar borrador
+                    </button>
+                </form>
+            </div>
+
+            <!-- Cómo funciona el algoritmo -->
+            <div class="mt-4 bg-gray-900 border border-gray-700 rounded-xl p-5">
+                <h3 class="text-sm font-semibold text-gray-300 mb-3">
+                    <i class="fas fa-circle-info mr-2 text-blue-400"></i>Cómo funciona el algoritmo
+                </h3>
+                <ul class="text-xs text-gray-400 space-y-1.5 list-none">
+                    <li><i class="fas fa-check text-green-500 mr-2"></i>Respeta la cuota mensual configurada por año de residencia (R1–R4)</li>
+                    <li><i class="fas fa-check text-green-500 mr-2"></i>Ningún residente tiene guardias en días consecutivos</li>
+                    <li><i class="fas fa-check text-green-500 mr-2"></i>Para feriados: prioriza a los que tienen menos feriados históricos</li>
+                    <li><i class="fas fa-check text-green-500 mr-2"></i>Distribución equitativa con elección al azar entre empatados</li>
+                    <li><i class="fas fa-check text-green-500 mr-2"></i>Las asignaciones se crean en estado <strong>Borrador</strong> para revisión</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Borradores activos -->
+        <div>
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+                <h3 class="text-base font-semibold text-white mb-4">
+                    <i class="fas fa-file-pen mr-2 text-yellow-400"></i>Borradores activos
+                </h3>
+
+                {% if borradores_activos %}
+                <div class="space-y-2">
+                    {% for b in borradores_activos %}
+                    <a href="{% url 'control_guardias:distribucion_borrador' b.fecha__month b.fecha__year %}"
+                       class="flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors">
+                        <div>
+                            <p class="text-sm font-medium text-white">
+                                {{ b.fecha__month }}/{{ b.fecha__year }}
+                            </p>
+                            <p class="text-xs text-gray-400">{{ b.total }} asignación(es)</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-500"></i>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-500 text-sm text-center py-4">
+                    No hay borradores pendientes de publicar.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

@@ -113,14 +113,51 @@
             {% if SANATORIO_MODULOS.guardias %}
             <!-- Guardias -->
             <li>
-                <a href="{% url 'control_guardias:calendario_guardias_full_tw' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.app_name == 'control_guardias' %}bg-blue-900{% endif %}">
-                    <!-- Ícono: escudo/guardia -->
+                <a href="{% url 'control_guardias:index' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.app_name == 'control_guardias' %}bg-blue-900{% endif %}">
                     <svg class="w-5 h-5 {% if request.resolver_match.app_name == 'control_guardias' %}text-blue-400{% else %}text-gray-400{% endif %} group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
                     </svg>
                     <span class="flex-1 ms-3 whitespace-nowrap">Control Guardias</span>
                 </a>
             </li>
+            {% if request.resolver_match.app_name == 'control_guardias' %}
+            <li>
+                <a href="{% url 'control_guardias:calendario' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'calendario' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-calendar-days w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'calendario' %}text-blue-400{% else %}text-gray-500{% endif %} group-hover:text-blue-400 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Calendario</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'control_guardias:distribucion' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'distribucion' or request.resolver_match.url_name == 'distribucion_borrador' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-wand-magic-sparkles w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'distribucion' %}text-emerald-400{% else %}text-gray-500{% endif %} group-hover:text-emerald-400 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Distribución</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'control_guardias:ausencias' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'ausencias' or request.resolver_match.url_name == 'ausencia_reportar' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-user-minus w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'ausencias' %}text-yellow-400{% else %}text-gray-500{% endif %} group-hover:text-yellow-400 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Ausencias</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'control_guardias:cambios' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'cambios' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-exchange-alt w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'cambios' %}text-indigo-400{% else %}text-gray-500{% endif %} group-hover:text-indigo-400 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Cambios</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'control_guardias:configuracion' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'configuracion' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-gear w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'configuracion' %}text-gray-300{% else %}text-gray-500{% endif %} group-hover:text-gray-300 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Configuración</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'control_guardias:notificaciones' %}" class="flex items-center p-2 ml-3 text-sm text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name == 'notificaciones' %}bg-gray-700{% endif %}">
+                    <i class="fas fa-bell w-4 h-4 mr-2 {% if request.resolver_match.url_name == 'notificaciones' %}text-yellow-400{% else %}text-gray-500{% endif %} group-hover:text-yellow-400 transition-colors"></i>
+                    <span class="text-gray-300 group-hover:text-white">Notificaciones</span>
+                </a>
+            </li>
+            {% endif %}{# fin sub-nav control_guardias #}
             {% endif %}
 
             {% if SANATORIO_MODULOS.eventos %}

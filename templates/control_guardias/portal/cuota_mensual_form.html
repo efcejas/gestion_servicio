@@ -1,0 +1,76 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}{% if is_new %}Configurar cuota{% else %}Editar cuota{% endif %} - {{ object.get_anio_residencia_display }}{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto px-4 sm:px-6 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">{% if is_new %}Configurar cuota{% else %}Editar cuota{% endif %}</h1>
+            <p class="text-gray-500 mt-1 text-sm">{{ object.get_anio_residencia_display }}</p>
+        </div>
+        <a href="{% url 'control_guardias:configuracion' %}"
+           class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left mr-2"></i> Cancelar
+        </a>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <!-- Guardias base por mes -->
+            <div class="mb-5">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Guardias base por mes <span class="text-red-500">*</span>
+                </label>
+                {{ form.guardias_por_mes }}
+                {% if form.guardias_por_mes.help_text %}
+                <p class="text-gray-400 text-xs mt-1">{{ form.guardias_por_mes.help_text }}</p>
+                {% endif %}
+                {% if form.guardias_por_mes.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.guardias_por_mes.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Atenuante -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Atenuante de antigüedad (%)
+                </label>
+                {{ form.atenuante_porcentaje }}
+                {% if form.atenuante_porcentaje.help_text %}
+                <p class="text-gray-400 text-xs mt-1">{{ form.atenuante_porcentaje.help_text }}</p>
+                {% endif %}
+                {% if form.atenuante_porcentaje.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.atenuante_porcentaje.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Preview cuota efectiva -->
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p class="text-sm text-blue-800">
+                    <i class="fas fa-calculator mr-2 text-blue-500"></i>
+                    Con los valores actuales, la cuota efectiva es:
+                    <strong class="text-blue-900 text-lg ml-1">{{ object.guardias_efectivas }}</strong>
+                    guardias/mes.
+                </p>
+            </div>
+
+            <!-- Botones -->
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <a href="{% url 'control_guardias:configuracion' %}"
+                   class="px-5 py-2.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                    Guardar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

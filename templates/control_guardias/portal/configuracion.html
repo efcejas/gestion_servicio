@@ -1,0 +1,321 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Configuración de Guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Configuración de Guardias</h1>
+            <p class="text-gray-500 mt-1">Tipos de guardia, cuotas mensuales y feriados</p>
+        </div>
+        <a href="{% url 'control_guardias:index' %}"
+           class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left mr-2"></i> Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Tabs -->
+    <div class="mb-6 border-b border-gray-200">
+        <ul class="flex flex-wrap -mb-px text-sm font-medium" id="configTabs" data-tabs-active-classes="text-blue-600 border-blue-600" data-tabs-inactive-classes="text-gray-500 border-transparent hover:text-gray-700" role="tablist">
+            <li class="me-2" role="presentation">
+                <button class="inline-block py-3 px-4 border-b-2 rounded-t-lg" id="tab-tipos" data-tabs-target="#panel-tipos" type="button" role="tab">
+                    <i class="fas fa-shield-halved mr-2"></i>Tipos de Guardia
+                </button>
+            </li>
+            <li class="me-2" role="presentation">
+                <button class="inline-block py-3 px-4 border-b-2 rounded-t-lg" id="tab-cuotas" data-tabs-target="#panel-cuotas" type="button" role="tab">
+                    <i class="fas fa-chart-bar mr-2"></i>Cuotas Mensuales
+                </button>
+            </li>
+            <li class="me-2" role="presentation">
+                <button class="inline-block py-3 px-4 border-b-2 rounded-t-lg" id="tab-feriados" data-tabs-target="#panel-feriados" type="button" role="tab">
+                    <i class="fas fa-calendar-xmark mr-2"></i>Feriados
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Panel: Tipos de guardia -->
+    <div id="panel-tipos" role="tabpanel">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-gray-900">Tipos de guardia</h2>
+            <a href="{% url 'control_guardias:tipo_guardia_crear' %}"
+               class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                <i class="fas fa-plus mr-2"></i>Nuevo tipo
+            </a>
+        </div>
+
+        {% if tipos_guardia %}
+        <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <table class="w-full text-sm text-left text-gray-700">
+                <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3">Nombre</th>
+                        <th class="px-6 py-3">Horario</th>
+                        <th class="px-6 py-3">Duración</th>
+                        <th class="px-6 py-3">Días</th>
+                        <th class="px-6 py-3">Feriados</th>
+                        <th class="px-6 py-3">Estado</th>
+                        <th class="px-6 py-3 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for tipo in tipos_guardia %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ tipo.nombre }}</td>
+                        <td class="px-6 py-4">{{ tipo.hora_inicio|time:"H:i" }} – {{ tipo.hora_fin|time:"H:i" }}</td>
+                        <td class="px-6 py-4">{{ tipo.duracion_horas|floatformat:1 }}h</td>
+                        <td class="px-6 py-4">
+                            <span class="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{{ tipo.dias_semana }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if tipo.aplica_feriados %}
+                                <span class="text-green-500"><i class="fas fa-check"></i></span>
+                            {% else %}
+                                <span class="text-gray-300"><i class="fas fa-minus"></i></span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if tipo.activo %}
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>
+                            {% else %}
+                                <span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-xs">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-right space-x-2">
+                            <a href="{% url 'control_guardias:tipo_guardia_editar' tipo.pk %}"
+                               class="text-blue-500 hover:text-blue-700 transition-colors" title="Editar">
+                                <i class="fas fa-pen-to-square"></i>
+                            </a>
+                            <button onclick="confirmarEliminar('{% url 'control_guardias:tipo_guardia_eliminar' tipo.pk %}', '{{ tipo.nombre }}')"
+                                    class="text-red-400 hover:text-red-600 transition-colors ml-2" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <i class="fas fa-shield-halved text-4xl text-gray-300 mb-3"></i>
+            <p class="text-gray-500">No hay tipos de guardia configurados.</p>
+            <a href="{% url 'control_guardias:tipo_guardia_crear' %}"
+               class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+                <i class="fas fa-plus mr-2"></i>Crear el primero
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Panel: Cuotas mensuales -->
+    <div id="panel-cuotas" class="hidden" role="tabpanel">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Cuotas mensuales por año de residencia</h2>
+        <p class="text-gray-500 text-sm mb-4">
+            Configurá cuántas guardias debe cumplir cada año de residencia por mes.
+            El atenuante reduce la cuota base (ej: 25% → el R4 hace 25% menos guardias).
+        </p>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <table class="w-full text-sm text-left text-gray-700">
+                <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3">Año</th>
+                        <th class="px-6 py-3">Guardias base / mes</th>
+                        <th class="px-6 py-3">Atenuante (%)</th>
+                        <th class="px-6 py-3">Guardias efectivas</th>
+                        <th class="px-6 py-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for fila in cuotas_filas %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 font-medium text-gray-900">
+                            {{ fila.anio }}
+                            {% if not fila.cuota %}<span class="ml-1 text-xs font-normal text-yellow-600">Sin configurar</span>{% endif %}
+                        </td>
+                        <td class="px-6 py-4">{% if fila.cuota %}{{ fila.cuota.guardias_por_mes }}{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+                        <td class="px-6 py-4">
+                            {% if fila.cuota and fila.cuota.atenuante_porcentaje > 0 %}
+                                <span class="text-yellow-600">{{ fila.cuota.atenuante_porcentaje }}%</span>
+                            {% else %}
+                                <span class="text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 font-semibold text-blue-600">{% if fila.cuota %}{{ fila.cuota.guardias_efectivas }}{% else %}<span class="text-gray-300">—</span>{% endif %}</td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="{% url 'control_guardias:cuota_editar' fila.anio %}"
+                               class="text-blue-500 hover:text-blue-700 transition-colors"
+                               title="{% if fila.cuota %}Editar{% else %}Configurar{% endif %}">
+                                {% if fila.cuota %}
+                                <i class="fas fa-pen-to-square"></i>
+                                {% else %}
+                                <i class="fas fa-plus"></i>
+                                {% endif %}
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Panel: Feriados -->
+    <div id="panel-feriados" class="hidden" role="tabpanel">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Formulario de nuevo feriado -->
+            <div class="lg:col-span-1">
+                <div class="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
+                    <h3 class="text-base font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-plus-circle mr-2 text-blue-500"></i>Agregar feriado
+                    </h3>
+                    <form method="post" action="{% url 'control_guardias:feriado_crear' %}">
+                        {% csrf_token %}
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                                {{ feriado_form.fecha }}
+                                {% if feriado_form.fecha.errors %}
+                                    <p class="text-red-600 text-xs mt-1">{{ feriado_form.fecha.errors|join:", " }}</p>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                                {{ feriado_form.descripcion }}
+                                {% if feriado_form.descripcion.errors %}
+                                    <p class="text-red-600 text-xs mt-1">{{ feriado_form.descripcion.errors|join:", " }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <button type="submit"
+                                class="mt-4 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                            Agregar feriado
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Listado de feriados -->
+            <div class="lg:col-span-2">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Feriados registrados</h2>
+                {% if feriados %}
+                <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+                    <table class="w-full text-sm text-left text-gray-700">
+                        <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3">Fecha</th>
+                                <th class="px-6 py-3">Descripción</th>
+                                <th class="px-6 py-3 text-right">Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            {% for feriado in feriados %}
+                            <tr class="hover:bg-gray-50 transition-colors">
+                                <td class="px-6 py-4 font-mono text-blue-600">{{ feriado.fecha|date:"d/m/Y" }}</td>
+                                <td class="px-6 py-4">{{ feriado.descripcion|default:"—" }}</td>
+                                <td class="px-6 py-4 text-right">
+                                    <form method="post" action="{% url 'control_guardias:feriado_eliminar' feriado.pk %}"
+                                          onsubmit="return confirm('¿Eliminar {{ feriado.descripcion|default:'este feriado' }}?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="text-red-400 hover:text-red-600 transition-colors" title="Eliminar">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+                    <i class="fas fa-calendar-xmark text-4xl text-gray-300 mb-3"></i>
+                    <p class="text-gray-500">No hay feriados registrados. Usá el formulario para agregar.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal de confirmación para eliminar tipo de guardia -->
+<div id="modal-eliminar" class="hidden fixed inset-0 bg-black bg-opacity-30 z-50 flex items-center justify-center">
+    <div class="bg-white border border-gray-200 rounded-xl p-6 max-w-sm w-full mx-4 shadow-xl">
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">Confirmar eliminación</h3>
+        <p class="text-gray-500 text-sm mb-4">
+            ¿Eliminar el tipo de guardia <strong id="modal-nombre" class="text-gray-900"></strong>?
+            Solo es posible si no tiene asignaciones activas.
+        </p>
+        <div class="flex space-x-3">
+            <button onclick="document.getElementById('modal-eliminar').classList.add('hidden')"
+                    class="flex-1 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:border-gray-400 transition-colors">
+                Cancelar
+            </button>
+            <form id="form-eliminar" method="post">
+                {% csrf_token %}
+                <button type="submit"
+                        class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                    Eliminar
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function confirmarEliminar(url, nombre) {
+        document.getElementById('modal-nombre').textContent = nombre;
+        document.getElementById('form-eliminar').action = url;
+        document.getElementById('modal-eliminar').classList.remove('hidden');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const tabEls = document.querySelectorAll('[data-tabs-target]');
+        const panels = document.querySelectorAll('[role="tabpanel"]');
+
+        function activateTab(btn) {
+            tabEls.forEach(t => {
+                t.classList.remove('text-blue-600', 'border-blue-600');
+                t.classList.add('text-gray-500', 'border-transparent');
+            });
+            panels.forEach(p => p.classList.add('hidden'));
+
+            btn.classList.add('text-blue-600', 'border-blue-600');
+            btn.classList.remove('text-gray-500', 'border-transparent');
+            const target = btn.getAttribute('data-tabs-target');
+            document.querySelector(target).classList.remove('hidden');
+        }
+
+        tabEls.forEach(btn => {
+            btn.addEventListener('click', () => activateTab(btn));
+        });
+
+        if (tabEls.length > 0) activateTab(tabEls[0]);
+
+        {% if feriado_form.errors %}
+            activateTab(document.getElementById('tab-feriados'));
+        {% endif %}
+    });
+</script>
+{% endblock %}

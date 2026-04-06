@@ -1,0 +1,139 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Cambios de guardia{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Cambios de guardia</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">
+                {% if es_gestor %}Solicitudes pendientes de validación y historial
+                {% else %}Tus solicitudes enviadas y recibidas{% endif %}
+            </p>
+        </div>
+        <a href="{% url 'control_guardias:index' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- VISTA GESTOR -->
+    {% if es_gestor %}
+
+    <div class="space-y-6">
+
+        <!-- Pendientes de validación -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-hourglass-half text-yellow-500"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Pendientes de validación</h2>
+                {% if pendientes_jefe %}
+                <span class="inline-flex items-center justify-center w-5 h-5 text-xs bg-yellow-500 text-white rounded-full ml-1">
+                    {{ pendientes_jefe|length }}
+                </span>
+                {% endif %}
+            </div>
+            {% if pendientes_jefe %}
+            <div class="p-4 space-y-3">
+                {% for sol in pendientes_jefe %}
+                {% include "control_guardias/portal/_solicitud_card.html" with solicitud=sol gestor=True %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <i class="fas fa-circle-check text-4xl text-green-300 mb-3"></i>
+                <p class="text-gray-500 text-sm font-medium">Todo al día</p>
+                <p class="text-gray-400 text-xs mt-1">No hay cambios pendientes de validación.</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Historial reciente -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-clock-rotate-left text-gray-400"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Historial reciente</h2>
+            </div>
+            {% if historial %}
+            <div class="p-4 space-y-3">
+                {% for sol in historial|slice:":20" %}
+                {% include "control_guardias/portal/_solicitud_card.html" with solicitud=sol gestor=True %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <i class="fas fa-clock-rotate-left text-4xl text-gray-200 mb-3"></i>
+                <p class="text-gray-400 text-sm">No hay historial de cambios.</p>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- VISTA RESIDENTE -->
+    {% else %}
+
+    <div class="space-y-6">
+
+        {% if recibidas %}
+        <!-- Solicitudes recibidas -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-inbox text-blue-500"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Solicitudes recibidas</h2>
+                <span class="inline-flex items-center justify-center w-5 h-5 text-xs bg-blue-500 text-white rounded-full ml-1">
+                    {{ recibidas|length }}
+                </span>
+            </div>
+            <div class="p-4 space-y-3">
+                {% for sol in recibidas %}
+                {% include "control_guardias/portal/_solicitud_card.html" with solicitud=sol gestor=False %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Solicitudes enviadas -->
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-paper-plane text-gray-400"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Solicitudes enviadas</h2>
+            </div>
+            {% if enviadas %}
+            <div class="p-4 space-y-3">
+                {% for sol in enviadas %}
+                {% include "control_guardias/portal/_solicitud_card.html" with solicitud=sol gestor=False %}
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <i class="fas fa-arrows-rotate text-4xl text-gray-200 mb-3"></i>
+                <p class="text-gray-500 text-sm font-medium">Sin solicitudes enviadas</p>
+                <a href="{% url 'control_guardias:mis_guardias' %}"
+                   class="mt-3 inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors">
+                    <i class="fas fa-calendar-check text-xs"></i>Ir a mis guardias para solicitar un cambio
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    {% endif %}
+
+</div>
+{% endblock %}

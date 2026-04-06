@@ -154,6 +154,23 @@
                     </div>
                 </div>
 
+                <!-- Guardias -->
+                {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-teal-500 to-teal-600 rounded-2xl mb-4">
+                        <i class="fas fa-shield-alt text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Guardias</h5>
+                    <p class="text-gray-600 mb-4">Consultá tu calendario de guardias, ausencias y cambios.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'control_guardias:index' %}"
+                           class="inline-flex items-center px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">
+                            Ver guardias
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Crear preinforme -->
                 {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">

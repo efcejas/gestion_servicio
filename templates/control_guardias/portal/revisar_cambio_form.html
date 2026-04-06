@@ -1,0 +1,148 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Revisar cambio de guardia{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Revisar cambio de guardia</h1>
+            <p class="text-gray-500 mt-1 text-sm">Aprobá o rechazá el intercambio entre los dos residentes.</p>
+        </div>
+        <a href="{% url 'control_guardias:cambios' %}"
+           class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left mr-2"></i>Cambios
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Detalle del intercambio -->
+        <div class="lg:col-span-2 space-y-4">
+
+            <!-- Comparación lado a lado -->
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-700">
+                        <i class="fas fa-arrows-rotate mr-2 text-gray-400"></i>Guardias a intercambiar
+                    </h2>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+                    <!-- Solicitante -->
+                    <div class="p-5">
+                        <p class="text-xs font-medium text-blue-500 uppercase tracking-wider mb-3">Solicitante</p>
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center mt-0.5">
+                                <i class="fas fa-user text-blue-600 text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 text-sm">{{ solicitud.solicitante.get_full_name }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ solicitud.solicitante.anio_residencia|default:"" }}</p>
+                                <div class="mt-2 space-y-1">
+                                    <p class="text-sm text-gray-700">
+                                        <i class="fas fa-calendar-day text-gray-300 mr-1.5"></i>
+                                        {{ solicitud.guardia_solicitante.fecha|date:"d/m/Y" }}
+                                        — {{ solicitud.guardia_solicitante.fecha|date:"l" }}
+                                    </p>
+                                    <p class="text-sm text-gray-700">
+                                        <i class="fas fa-shield-halved text-gray-300 mr-1.5"></i>
+                                        {{ solicitud.guardia_solicitante.tipo_guardia.nombre }}
+                                    </p>
+                                    <p class="text-xs text-gray-400">
+                                        {{ solicitud.guardia_solicitante.tipo_guardia.hora_inicio|time:"H:i" }} – {{ solicitud.guardia_solicitante.tipo_guardia.hora_fin|time:"H:i" }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Receptor -->
+                    <div class="p-5">
+                        <p class="text-xs font-medium text-indigo-500 uppercase tracking-wider mb-3">Receptor</p>
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center mt-0.5">
+                                <i class="fas fa-user text-indigo-600 text-sm"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-900 text-sm">{{ solicitud.receptor.get_full_name }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ solicitud.receptor.anio_residencia|default:"" }}</p>
+                                <div class="mt-2 space-y-1">
+                                    <p class="text-sm text-gray-700">
+                                        <i class="fas fa-calendar-day text-gray-300 mr-1.5"></i>
+                                        {{ solicitud.guardia_receptor.fecha|date:"d/m/Y" }}
+                                        — {{ solicitud.guardia_receptor.fecha|date:"l" }}
+                                    </p>
+                                    <p class="text-sm text-gray-700">
+                                        <i class="fas fa-shield-halved text-gray-300 mr-1.5"></i>
+                                        {{ solicitud.guardia_receptor.tipo_guardia.nombre }}
+                                    </p>
+                                    <p class="text-xs text-gray-400">
+                                        {{ solicitud.guardia_receptor.tipo_guardia.hora_inicio|time:"H:i" }} – {{ solicitud.guardia_receptor.tipo_guardia.hora_fin|time:"H:i" }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notas del solicitante -->
+            {% if solicitud.notas_solicitante %}
+            <div class="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p class="text-xs font-medium text-blue-500 uppercase tracking-wider mb-1">Nota del solicitante</p>
+                <p class="text-sm text-blue-800 italic">"{{ solicitud.notas_solicitante }}"</p>
+            </div>
+            {% endif %}
+
+            <!-- Metadatos -->
+            <p class="text-xs text-gray-400 px-1">
+                <i class="fas fa-clock mr-1"></i>Solicitado el {{ solicitud.fecha_solicitud|date:"d/m/Y" }} a las {{ solicitud.fecha_solicitud|time:"H:i" }}
+            </p>
+        </div>
+
+        <!-- Panel de decisión -->
+        <div class="lg:col-span-1">
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 bg-gray-50 border-b border-gray-100">
+                    <h2 class="text-sm font-semibold text-gray-700">
+                        <i class="fas fa-gavel mr-2 text-yellow-500"></i>Decisión
+                    </h2>
+                </div>
+                <div class="p-5">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                                Notas / motivo <span class="text-gray-400 font-normal">(opcional)</span>
+                            </label>
+                            {{ form.notas }}
+                        </div>
+                        <div class="space-y-2">
+                            <button type="submit" name="accion" value="aprobar"
+                                    class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                                <i class="fas fa-check"></i>Aprobar cambio
+                            </button>
+                            <button type="submit" name="accion" value="rechazar"
+                                    class="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-red-300 text-red-600 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors">
+                                <i class="fas fa-xmark"></i>Rechazar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

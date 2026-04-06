@@ -1,0 +1,299 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Control de Guardias{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-2">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Control de Guardias</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">
+                {% if request.user.rol == 'medico_residente' %}
+                    Tus guardias y novedades
+                {% else %}
+                    Panel de gestión de guardias
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'control_guardias:notificaciones' %}"
+               class="relative inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+                <i class="fas fa-bell"></i>Notificaciones
+                {% if notificaciones_no_leidas %}
+                <span class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {{ notificaciones_no_leidas }}
+                </span>
+                {% endif %}
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════ #}
+    {# VISTA RESIDENTE                                             #}
+    {# ═══════════════════════════════════════════════════════════ #}
+    {% if request.user.rol == 'medico_residente' %}
+
+    <!-- Stats rápidas -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Próximas guardias</p>
+            <p class="text-2xl font-bold text-gray-900">{{ proximas_guardias|length }}</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Ausencias pendientes</p>
+            <p class="text-2xl font-bold {% if ausencias_pendientes_residente %}text-yellow-600{% else %}text-gray-900{% endif %}">
+                {{ ausencias_pendientes_residente }}
+            </p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Cambios por responder</p>
+            <p class="text-2xl font-bold {% if cambios_pendientes_residente %}text-indigo-600{% else %}text-gray-900{% endif %}">
+                {{ cambios_pendientes_residente }}
+            </p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Notificaciones</p>
+            <p class="text-2xl font-bold {% if notificaciones_no_leidas %}text-red-600{% else %}text-gray-900{% endif %}">
+                {{ notificaciones_no_leidas }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Accesos rápidos residente -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <a href="{% url 'control_guardias:mis_guardias' %}"
+           class="bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                <i class="fas fa-calendar-check text-blue-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Mis Guardias</p>
+            <p class="text-sm text-gray-500 mt-0.5">Ver y gestionar tus turnos</p>
+        </a>
+
+        <a href="{% url 'control_guardias:ausencias' %}"
+           class="bg-white border border-gray-200 hover:border-yellow-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-yellow-200 transition-colors">
+                <i class="fas fa-user-minus text-yellow-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Mis Ausencias</p>
+            <p class="text-sm text-gray-500 mt-0.5">Reportar o ver tus ausencias</p>
+            {% if ausencias_pendientes_residente %}
+            <span class="mt-2 inline-block bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">
+                {{ ausencias_pendientes_residente }} pendiente(s)
+            </span>
+            {% endif %}
+        </a>
+
+        <a href="{% url 'control_guardias:cambios' %}"
+           class="bg-white border border-gray-200 hover:border-indigo-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-indigo-200 transition-colors">
+                <i class="fas fa-exchange-alt text-indigo-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Cambios de Guardia</p>
+            <p class="text-sm text-gray-500 mt-0.5">Solicitar o responder cambios</p>
+            {% if cambios_pendientes_residente %}
+            <span class="mt-2 inline-block bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                {{ cambios_pendientes_residente }} por responder
+            </span>
+            {% endif %}
+        </a>
+
+        <a href="{% url 'control_guardias:calendario' %}"
+           class="bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gray-200 transition-colors">
+                <i class="fas fa-calendar-days text-gray-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Calendario</p>
+            <p class="text-sm text-gray-500 mt-0.5">Vista mensual de guardias</p>
+        </a>
+    </div>
+
+    <!-- Próximas guardias del residente -->
+    {% if proximas_guardias %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-900"><i class="fas fa-clock text-blue-500 mr-2"></i>Próximas guardias</h2>
+            <a href="{% url 'control_guardias:mis_guardias' %}" class="text-sm text-blue-600 hover:text-blue-700 transition-colors">Ver todas →</a>
+        </div>
+        <div class="space-y-2">
+            {% for guardia in proximas_guardias %}
+            <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg border border-gray-100">
+                <div>
+                    <span class="font-medium text-gray-900">{{ guardia.fecha|date:"d/m/Y" }}</span>
+                    <span class="text-gray-500 text-sm ml-2">{{ guardia.tipo_guardia.nombre }}</span>
+                    {% if guardia.es_feriado %}
+                    <span class="ml-2 px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">Feriado</span>
+                    {% endif %}
+                </div>
+                <a href="{% url 'control_guardias:solicitar_cambio' guardia.pk %}"
+                   class="text-xs text-gray-400 hover:text-indigo-600 transition-colors">
+                    <i class="fas fa-exchange-alt mr-1"></i>Cambio
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white border border-dashed border-gray-300 rounded-xl p-8 text-center shadow-sm">
+        <i class="fas fa-calendar-times text-4xl text-gray-300 mb-3"></i>
+        <p class="text-gray-500">No tenés guardias publicadas próximas.</p>
+        <p class="text-gray-400 text-sm mt-1">Consultá la <a href="{% url 'control_guardias:calendario' %}" class="text-blue-600 hover:underline">vista de calendario</a> para más detalle.</p>
+    </div>
+    {% endif %}
+
+    {# ═══════════════════════════════════════════════════════════ #}
+    {# VISTA JEFE / INSTRUCTOR                                     #}
+    {# ═══════════════════════════════════════════════════════════ #}
+    {% else %}
+
+    <!-- Stats del gestor -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Residentes activos</p>
+            <p class="text-2xl font-bold text-gray-900">{{ total_residentes }}</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Guardias este mes</p>
+            <p class="text-2xl font-bold text-gray-900">{{ guardias_publicadas_mes }}</p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">En borrador</p>
+            <p class="text-2xl font-bold {% if guardias_borrador %}text-yellow-600{% else %}text-gray-900{% endif %}">
+                {{ guardias_borrador }}
+            </p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Ausencias pendientes</p>
+            <p class="text-2xl font-bold {% if ausencias_pendientes %}text-orange-600{% else %}text-gray-900{% endif %}">
+                {{ ausencias_pendientes }}
+            </p>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Cambios a validar</p>
+            <p class="text-2xl font-bold {% if cambios_pendiente_jefe %}text-indigo-600{% else %}text-gray-900{% endif %}">
+                {{ cambios_pendiente_jefe }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Acciones rápidas del gestor -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <a href="{% url 'control_guardias:distribucion' %}"
+           class="bg-white border border-gray-200 hover:border-emerald-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
+                <i class="fas fa-wand-magic-sparkles text-emerald-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Distribución automática</p>
+            <p class="text-sm text-gray-500 mt-0.5">Generar y publicar guardias del mes</p>
+        </a>
+
+        <a href="{% url 'control_guardias:ausencias' %}"
+           class="bg-white border border-gray-200 hover:border-yellow-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-yellow-200 transition-colors">
+                <i class="fas fa-user-minus text-yellow-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Ausencias</p>
+            <p class="text-sm text-gray-500 mt-0.5">Gestionar ausencias reportadas</p>
+            {% if ausencias_pendientes %}
+            <span class="mt-2 inline-block bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full">
+                {{ ausencias_pendientes }} pendiente(s)
+            </span>
+            {% endif %}
+        </a>
+
+        <a href="{% url 'control_guardias:cambios' %}"
+           class="bg-white border border-gray-200 hover:border-indigo-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-indigo-200 transition-colors">
+                <i class="fas fa-exchange-alt text-indigo-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Cambios de guardia</p>
+            <p class="text-sm text-gray-500 mt-0.5">Validar solicitudes pendientes</p>
+            {% if cambios_pendiente_jefe %}
+            <span class="mt-2 inline-block bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                {{ cambios_pendiente_jefe }} esperando validación
+            </span>
+            {% endif %}
+        </a>
+
+        <a href="{% url 'control_guardias:calendario' %}"
+           class="bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
+                <i class="fas fa-calendar-days text-blue-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Calendario</p>
+            <p class="text-sm text-gray-500 mt-0.5">Vista mensual interactiva</p>
+        </a>
+
+        <a href="{% url 'control_guardias:notificaciones' %}"
+           class="bg-white border border-gray-200 hover:border-gray-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gray-200 transition-colors">
+                <i class="fas fa-bell text-gray-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Notificaciones</p>
+            <p class="text-sm text-gray-500 mt-0.5">
+                {% if notificaciones_no_leidas %}<span class="text-yellow-600 font-medium">{{ notificaciones_no_leidas }} sin leer</span>
+                {% else %}Sin notificaciones nuevas{% endif %}
+            </p>
+        </a>
+
+        <a href="{% url 'control_guardias:configuracion' %}"
+           class="bg-white border border-gray-200 hover:border-gray-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
+            <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gray-200 transition-colors">
+                <i class="fas fa-gear text-gray-600"></i>
+            </div>
+            <p class="font-semibold text-gray-900">Configuración</p>
+            <p class="text-sm text-gray-500 mt-0.5">Tipos de guardia, cuotas, feriados</p>
+        </a>
+    </div>
+
+    <!-- Guardias próximas publicadas -->
+    {% if proximas_sin_asignar %}
+    <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-gray-900"><i class="fas fa-list-check text-blue-500 mr-2"></i>Próximas guardias publicadas</h2>
+            <a href="{% url 'control_guardias:calendario' %}" class="text-sm text-blue-600 hover:text-blue-700 transition-colors">Ver calendario →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="text-xs text-gray-400 uppercase border-b border-gray-100">
+                    <tr>
+                        <th class="pb-2">Fecha</th>
+                        <th class="pb-2">Tipo</th>
+                        <th class="pb-2">Residente</th>
+                        <th class="pb-2"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for g in proximas_sin_asignar %}
+                    <tr>
+                        <td class="py-2 text-gray-900 font-medium">{{ g.fecha|date:"d/m/Y" }}</td>
+                        <td class="py-2 text-gray-600">{{ g.tipo_guardia.nombre }}</td>
+                        <td class="py-2 text-gray-600">{{ g.residente.get_full_name }}</td>
+                        <td class="py-2">
+                            {% if g.es_feriado %}<span class="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded">Feriado</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}{# fin switch rol #}
+
+</div>
+{% endblock %}

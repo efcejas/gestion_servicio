@@ -20,7 +20,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from control_guardias.models import Guardia, MedicoGuardia
+from control_guardias.models import AsignacionGuardia
 from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
 from agenda.models import AgendaItem, NotaPersonal
@@ -369,26 +369,23 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     # ------------------------ GUARDIAS ------------------------
 
     def get_guardias_context(self, fecha_hoy):
-        """Versión simplificada: obtiene las 2 guardias más próximas desde hoy hacia el futuro."""
-        
-        # Obtener las 2 guardias más próximas (desde hoy hacia el futuro)
-        guardias_proximas = Guardia.objects.filter(
-            fecha__gte=fecha_hoy,  # Desde hoy en adelante
-            cubierta=True,
-            medico__isnull=False
-        ).select_related('medico').order_by('fecha', 'franja_horaria')[:2]
-        
-        # Si hay guardias, tomar la primera como "actual" y la segunda como "próxima"
+        """Obtiene las 2 asignaciones publicadas más próximas desde hoy."""
+        guardias_proximas = (
+            AsignacionGuardia.objects
+            .filter(fecha__gte=fecha_hoy, estado='PUBLICADA')
+            .select_related('residente', 'tipo_guardia')
+            .order_by('fecha', 'tipo_guardia__nombre')[:2]
+        )
+
         if guardias_proximas:
             guardia_actual = guardias_proximas[0]
-            nombre_guardia = self.formatear_nombre_medico(guardia_actual.medico)
-            franja_guardia = guardia_actual.get_franja_horaria_display()
-            
-            # Si hay una segunda guardia, usarla como "próxima"
+            nombre_guardia = f"Dr. {guardia_actual.residente.get_full_name()}"
+            franja_guardia = guardia_actual.tipo_guardia.nombre
+
             if len(guardias_proximas) > 1:
                 guardia_proxima = guardias_proximas[1]
-                nombre_proximo = self.formatear_nombre_medico(guardia_proxima.medico)
-                fecha_proxima = f"{guardia_proxima.fecha.strftime('%d/%m')} • {guardia_proxima.get_franja_horaria_display()}"
+                nombre_proximo = f"Dr. {guardia_proxima.residente.get_full_name()}"
+                fecha_proxima = f"{guardia_proxima.fecha.strftime('%d/%m')} • {guardia_proxima.tipo_guardia.nombre}"
             else:
                 nombre_proximo = "No programado"
                 fecha_proxima = "Sin más guardias"
@@ -403,28 +400,9 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             'franja_horaria_guardia': franja_guardia,
             'nombre_proximo_medico': nombre_proximo,
             'fecha_proxima_guardia': fecha_proxima,
-            'guardias_proximas': guardias_proximas,  # Para usar en el template si quieres
-            'total_guardias': Guardia.objects.filter(cubierta=True).count(),
+            'guardias_proximas': guardias_proximas,
+            'total_guardias': AsignacionGuardia.objects.filter(estado='PUBLICADA').count(),
         }
-
-    def formatear_nombre_medico(self, medico_obj):
-        # Si es un MedicoGuardia
-        if hasattr(medico_obj, 'user') and medico_obj.user:
-            nombre = medico_obj.user.get_full_name()
-            if nombre.strip():
-                return f"Dr. {nombre}"
-            else:
-                return f"Dr. {medico_obj.user.username}"
-        # Si es un User directamente
-        elif hasattr(medico_obj, 'get_full_name'):
-            nombre = medico_obj.get_full_name()
-            if nombre.strip():
-                return f"Dr. {nombre}"
-            else:
-                return f"Dr. {medico_obj.username}"
-        # Fallback
-        else:
-            return f"Dr. {str(medico_obj)}"
 
     # ------------------------ AGENDA Y NOTAS ------------------------
 

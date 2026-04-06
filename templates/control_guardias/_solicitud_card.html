@@ -1,0 +1,92 @@
+{% comment %}
+Partial: _solicitud_card.html
+Variables: solicitud, gestor (bool)
+{% endcomment %}
+
+<div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+
+        <!-- Info principal -->
+        <div class="space-y-2 flex-1 min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="font-semibold text-white text-sm">
+                    {{ solicitud.solicitante.get_full_name }}
+                </span>
+                <i class="fas fa-arrows-rotate text-gray-500 text-xs"></i>
+                <span class="font-semibold text-white text-sm">
+                    {{ solicitud.receptor.get_full_name }}
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                    {% if solicitud.estado == 'PENDIENTE_RECEPTOR' %}bg-blue-900 text-blue-300
+                    {% elif solicitud.estado == 'PENDIENTE_JEFE' %}bg-yellow-900 text-yellow-300
+                    {% elif solicitud.estado == 'APROBADA' %}bg-green-900 text-green-300
+                    {% elif solicitud.estado == 'RECHAZADA' %}bg-red-900 text-red-300
+                    {% else %}bg-gray-700 text-gray-400{% endif %}">
+                    {{ solicitud.get_estado_display }}
+                </span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-400">
+                <div class="flex items-center gap-1.5">
+                    <i class="fas fa-shield-halved text-gray-600"></i>
+                    <span class="text-gray-500">{{ solicitud.solicitante.first_name }}:</span>
+                    {{ solicitud.guardia_solicitante.fecha|date:"d/m/Y" }}
+                    — {{ solicitud.guardia_solicitante.tipo_guardia.nombre }}
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <i class="fas fa-shield-halved text-gray-600"></i>
+                    <span class="text-gray-500">{{ solicitud.receptor.first_name }}:</span>
+                    {{ solicitud.guardia_receptor.fecha|date:"d/m/Y" }}
+                    — {{ solicitud.guardia_receptor.tipo_guardia.nombre }}
+                </div>
+            </div>
+
+            {% if solicitud.notas_solicitante %}
+            <p class="text-xs text-gray-500 italic">"{{ solicitud.notas_solicitante }}"</p>
+            {% endif %}
+            {% if solicitud.notas_jefe %}
+            <p class="text-xs text-gray-500">
+                <span class="text-gray-600">Jefe/instructor:</span> {{ solicitud.notas_jefe }}
+            </p>
+            {% endif %}
+            <p class="text-xs text-gray-600">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</p>
+        </div>
+
+        <!-- Acciones -->
+        <div class="flex flex-col gap-2 shrink-0">
+
+            {% if gestor and solicitud.estado == 'PENDIENTE_JEFE' %}
+            <a href="{% url 'control_guardias:cambio_revisar' solicitud.pk %}"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-700 hover:bg-yellow-600 text-white text-xs font-medium rounded-lg transition-colors">
+                <i class="fas fa-gavel"></i>Revisar
+            </a>
+
+            {% elif not gestor %}
+                {% if solicitud.estado == 'PENDIENTE_RECEPTOR' and solicitud.receptor == request.user %}
+                <form method="post" action="{% url 'control_guardias:cambio_responder' solicitud.pk %}">
+                    {% csrf_token %}
+                    <div class="flex gap-1.5">
+                        <button name="accion" value="aceptar" type="submit"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors">
+                            <i class="fas fa-check"></i>Aceptar
+                        </button>
+                        <button name="accion" value="rechazar" type="submit"
+                                class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-700 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors">
+                            <i class="fas fa-xmark"></i>Rechazar
+                        </button>
+                    </div>
+                </form>
+                {% elif solicitud.estado == 'PENDIENTE_RECEPTOR' and solicitud.solicitante == request.user %}
+                <form method="post" action="{% url 'control_guardias:cambio_cancelar' solicitud.pk %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs font-medium rounded-lg transition-colors">
+                        <i class="fas fa-ban"></i>Cancelar
+                    </button>
+                </form>
+                {% endif %}
+            {% endif %}
+
+        </div>
+    </div>
+</div>

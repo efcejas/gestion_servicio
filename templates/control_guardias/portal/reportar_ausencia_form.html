@@ -1,0 +1,88 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Reportar ausencia{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-6">
+
+    <div class="mb-6">
+        <a href="{% url 'control_guardias:ausencias' %}" class="text-sm text-gray-400 hover:text-gray-600 transition-colors">← Ausencias</a>
+        <h1 class="text-2xl font-bold text-gray-900 mt-2">Reportar ausencia</h1>
+        <p class="text-gray-500 mt-1 text-sm">
+            El sistema detectará automáticamente las guardias publicadas afectadas en el período indicado
+            y notificará al jefe/instructor.
+        </p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="space-y-5">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Fecha de inicio</label>
+                        {{ form.fecha_inicio }}
+                        {% if form.fecha_inicio.errors %}
+                        <p class="text-red-600 text-xs mt-1">{{ form.fecha_inicio.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Fecha de fin</label>
+                        {{ form.fecha_fin }}
+                        {% if form.fecha_fin.errors %}
+                        <p class="text-red-600 text-xs mt-1">{{ form.fecha_fin.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">Motivo</label>
+                    {{ form.motivo }}
+                    {% if form.motivo.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.motivo.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Descripción <span class="text-gray-400 font-normal">(opcional)</span>
+                    </label>
+                    {{ form.descripcion }}
+                    {% if form.descripcion.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.descripcion.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                {% if form.non_field_errors %}
+                <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                    {{ form.non_field_errors.0 }}
+                </div>
+                {% endif %}
+
+            </div>
+
+            <div class="flex items-center justify-between mt-6">
+                <a href="{% url 'control_guardias:ausencias' %}"
+                   class="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancelar</a>
+                <button type="submit"
+                        class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                    <i class="fas fa-paper-plane"></i>Reportar ausencia
+                </button>
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
