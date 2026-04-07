@@ -186,7 +186,6 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     random.shuffle(residentes)
 
     guardias_en_borrador = defaultdict(int)   # residente_pk → guardias generadas en esta corrida
-    ultima_fecha_asignada = {}                # residente_pk → última fecha asignada
     anio_por_fecha = defaultdict(set)         # fecha → set de anio_residencia ya asignados ese día
 
     # Pre-cargar fechas ya asignadas en BD para el período (publicadas o borradores restantes)
@@ -206,11 +205,14 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     for fecha, tipo, es_feriado_slot in slots:
         # Candidatos elegibles: cuota disponible, sin guardia ese día (ningún tipo), sin día consecutivo
+        dia_anterior = fecha - timedelta(days=1)
+        dia_siguiente = fecha + timedelta(days=1)
         candidatos = [
             r for r in residentes
             if cuota_disponible[r.pk] > 0
             and fecha not in fechas_ocupadas[r.pk]
-            and not _es_consecutivo(fecha, ultima_fecha_asignada.get(r.pk))
+            and dia_anterior not in fechas_ocupadas[r.pk]
+            and dia_siguiente not in fechas_ocupadas[r.pk]
         ]
 
         if not candidatos:
@@ -256,8 +258,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         # Actualizar contadores
         guardias_en_borrador[elegido.pk] += 1
         cuota_disponible[elegido.pk] -= 1
-        ultima_fecha_asignada[elegido.pk] = fecha
-        fechas_asignadas[elegido.pk].add((fecha, tipo.pk))
+        fechas_asignadas[elegido.pk].add((fecha, tipo.pk))  # reservado para posible uso futuro
         fechas_ocupadas[elegido.pk].add(fecha)
         anio_por_fecha[fecha].add(elegido.anio_residencia)
         if es_feriado_slot:
