@@ -191,23 +191,25 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     # Pre-cargar fechas ya asignadas en BD para el período (publicadas o borradores restantes)
     # Evita IntegrityError por violación del unique_together (residente, fecha, tipo_guardia)
-    fechas_asignadas = defaultdict(set)       # residente_pk → set de fechas asignadas en el período
+    fechas_asignadas = defaultdict(set)   # residente_pk → set(fecha, tipo_guardia_id)
+    fechas_ocupadas = defaultdict(set)    # residente_pk → set(fecha) — un residente no puede tener 2 guardias el mismo día
     for asig in AsignacionGuardia.objects.filter(
         fecha__gte=primer_dia,
         fecha__lte=ultimo_dia,
     ).select_related('residente').values('residente_id', 'fecha', 'tipo_guardia_id', 'residente__anio_residencia'):
         fechas_asignadas[asig['residente_id']].add((asig['fecha'], asig['tipo_guardia_id']))
+        fechas_ocupadas[asig['residente_id']].add(asig['fecha'])
         anio_por_fecha[asig['fecha']].add(asig['residente__anio_residencia'])
 
     asignaciones_a_crear = []
     slots_sin_cubrir = []
 
     for fecha, tipo, es_feriado_slot in slots:
-        # Candidatos elegibles: cuota disponible, sin esa guardia exacta, sin día consecutivo
+        # Candidatos elegibles: cuota disponible, sin guardia ese día (ningún tipo), sin día consecutivo
         candidatos = [
             r for r in residentes
             if cuota_disponible[r.pk] > 0
-            and (fecha, tipo.pk) not in fechas_asignadas[r.pk]
+            and fecha not in fechas_ocupadas[r.pk]
             and not _es_consecutivo(fecha, ultima_fecha_asignada.get(r.pk))
         ]
 
@@ -256,6 +258,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         cuota_disponible[elegido.pk] -= 1
         ultima_fecha_asignada[elegido.pk] = fecha
         fechas_asignadas[elegido.pk].add((fecha, tipo.pk))
+        fechas_ocupadas[elegido.pk].add(fecha)
         anio_por_fecha[fecha].add(elegido.anio_residencia)
         if es_feriado_slot:
             feriados_historicos[elegido.pk] += 1  # actualizar para próximos feriados en la misma corrida
