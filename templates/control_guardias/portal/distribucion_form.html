@@ -99,16 +99,28 @@
                     </div>
 
                     <!-- Opciones -->
-                    <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            {{ form.reemplazar_borradores }}
-                            <div>
-                                <span class="text-sm font-medium text-gray-700">{{ form.reemplazar_borradores.label }}</span>
-                                <p class="text-xs text-gray-400 mt-0.5">
-                                    Si ya existe un borrador para ese mes, lo eliminará y generará uno nuevo.
-                                </p>
-                            </div>
-                        </label>
+                    <div class="mb-6 space-y-3">
+                        <p class="text-sm font-medium text-gray-700">Opciones</p>
+                        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                {{ form.reemplazar_borradores }}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-700">{{ form.reemplazar_borradores.label }}</span>
+                                    <p class="text-xs text-gray-400 mt-0.5">
+                                        Si ya existe un borrador para ese mes, lo eliminará y generará uno nuevo.
+                                    </p>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                {{ form.restricciones_anio }}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-700">{{ form.restricciones_anio.label }}</span>
+                                    <p class="text-xs text-gray-400 mt-0.5">{{ form.restricciones_anio.help_text }}</p>
+                                </div>
+                            </label>
+                        </div>
                     </div>
 
                     <button type="submit"

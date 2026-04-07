@@ -23,7 +23,7 @@ class DistribucionError(Exception):
     pass
 
 
-def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False):
+def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False, restricciones_anio=False):
     """
     Genera asignaciones en estado BORRADOR para el periodo mes/año indicado.
 
@@ -202,8 +202,10 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     asignaciones_a_crear = []
     slots_sin_cubrir = []
+    slots_fallback_anio = 0   # contador de slots cubiertos fuera de restricción de año
 
     for fecha, tipo, es_feriado_slot in slots:
+        weekday = fecha.weekday()  # 0=Lunes … 6=Domingo
         # Candidatos elegibles: cuota disponible, sin guardia ese día (ningún tipo), sin día consecutivo
         dia_anterior = fecha - timedelta(days=1)
         dia_siguiente = fecha + timedelta(days=1)
@@ -218,6 +220,17 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         if not candidatos:
             slots_sin_cubrir.append({'fecha': fecha, 'tipo': tipo.nombre})
             continue
+
+        # Restricciones por año (opcional): R1→V/D/Feriados, R2→S, R3/R4→L-J
+        if restricciones_anio:
+            candidatos_restringidos = [
+                r for r in candidatos
+                if _anio_puede_cubrir_slot(r.anio_residencia, weekday, es_feriado_slot)
+            ]
+            if candidatos_restringidos:
+                candidatos = candidatos_restringidos
+            else:
+                slots_fallback_anio += 1  # fallback suave: usa el pool general
 
         # Diversidad de año: si ya hay residentes de algún año asignados ese día,
         # preferir candidatos de un año distinto. Solo aplica si existen candidatos
@@ -269,6 +282,13 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     # ------------------------------------------------------------------
     with transaction.atomic():
         AsignacionGuardia.objects.bulk_create(asignaciones_a_crear)
+
+    advertencias = []
+    if slots_fallback_anio:
+        advertencias.append(
+            f"{slots_fallback_anio} slot(s) cubierto(s) por residentes fuera de las restricciones "
+            "de año por falta de candidatos disponibles."
+        )
 
     # ------------------------------------------------------------------
     # 9. Construir métricas de equidad
@@ -392,6 +412,25 @@ def _es_consecutivo(fecha, ultima):
     if ultima is None:
         return False
     return abs((fecha - ultima).days) == 1
+
+
+def _anio_puede_cubrir_slot(anio_residencia, weekday, es_feriado):
+    """
+    Restricciones opcionales por año de residencia:
+      R1  → solo Viernes (4), Domingos (6), o cualquier Feriado
+      R2  → solo Sábados no feriado (5)
+      R3/R4 → solo Lunes–Jueves no feriado (0–3)
+      Otros → sin restricción (True)
+
+    weekday: int 0=Lunes … 6=Domingo (fecha.weekday())
+    """
+    if anio_residencia == 'R1':
+        return weekday in (4, 6) or es_feriado
+    if anio_residencia == 'R2':
+        return weekday == 5 and not es_feriado
+    if anio_residencia in ('R3', 'R4'):
+        return weekday in (0, 1, 2, 3) and not es_feriado
+    return True
 
 
 def _desviacion_std(valores):

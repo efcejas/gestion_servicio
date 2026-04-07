@@ -175,6 +175,12 @@ class GenerarDistribucionForm(forms.Form):
         widget=forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
         label='Reemplazar borrador existente si ya hay uno para ese mes',
     )
+    restricciones_anio = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
+        label='Aplicar guardias condicionales por año',
+        help_text='R1: Viernes, Domingos y Feriados · R2: Sábados · R3/R4: Lunes a Jueves',
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

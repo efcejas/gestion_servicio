@@ -494,6 +494,7 @@ class DistribucionView(JefeInstructorMixin, TemplateView):
         anio = form.cleaned_data['anio']
         tipos_guardia = form.cleaned_data['tipos_guardia']
         reemplazar = form.cleaned_data.get('reemplazar_borradores', False)
+        restricciones = form.cleaned_data.get('restricciones_anio', False)
 
         try:
             resultado = generar_distribucion(
@@ -502,6 +503,7 @@ class DistribucionView(JefeInstructorMixin, TemplateView):
                 tipos_guardia=tipos_guardia,
                 creado_por=request.user,
                 reemplazar_borradores=reemplazar,
+                restricciones_anio=restricciones,
             )
         except DistribucionError as e:
             messages.error(request, str(e))
