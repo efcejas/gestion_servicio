@@ -143,8 +143,23 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             "No hay slots a cubrir: ningún tipo de guardia aplica a las fechas del período."
         )
 
-    # Ordenar cronológicamente (mantiene feriados en su fecha natural)
-    slots.sort(key=lambda x: x[0])
+    # Reordenar slots por "ronda de cobertura" con fechas aleatorizadas dentro de cada ronda:
+    # Ronda 1 → 1er slot de cada fecha (garantiza que todos los días queden cubiertos primero)
+    # Ronda 2 → 2do slot de la misma fecha (doble cobertura solo si queda cuota)
+    # Las fechas se mezclan dentro de cada ronda para que el día "inicial" sea aleatorio
+    # en cada corrida y evitar concentrar residentes en las primeras semanas.
+    date_occurrence: dict = {}
+    slots_por_ronda: dict = {}
+    for fecha, tipo, es_feriado in slots:
+        date_occurrence[fecha] = date_occurrence.get(fecha, 0) + 1
+        ronda = date_occurrence[fecha]
+        slots_por_ronda.setdefault(ronda, []).append((fecha, tipo, es_feriado))
+
+    slots = []
+    for ronda in sorted(slots_por_ronda):
+        grupo = slots_por_ronda[ronda]
+        random.shuffle(grupo)   # fechas en orden aleatorio dentro de la ronda
+        slots.extend(grupo)
 
     # ------------------------------------------------------------------
     # 5. Contadores históricos de feriados (para trato equitativo)
@@ -166,8 +181,13 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     # ------------------------------------------------------------------
     # 7. Algoritmo de asignación greedy equitativo
     # ------------------------------------------------------------------
+    # Mezclar la lista de residentes al inicio para romper cualquier sesgo
+    # de orden (alfabético, fecha de ingreso, etc.) en los grupos de empate.
+    random.shuffle(residentes)
+
     guardias_en_borrador = defaultdict(int)   # residente_pk → guardias generadas en esta corrida
     ultima_fecha_asignada = {}                # residente_pk → última fecha asignada
+    anio_por_fecha = defaultdict(set)         # fecha → set de anio_residencia ya asignados ese día
 
     # Pre-cargar fechas ya asignadas en BD para el período (publicadas o borradores restantes)
     # Evita IntegrityError por violación del unique_together (residente, fecha, tipo_guardia)
@@ -175,8 +195,9 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     for asig in AsignacionGuardia.objects.filter(
         fecha__gte=primer_dia,
         fecha__lte=ultimo_dia,
-    ).values('residente_id', 'fecha', 'tipo_guardia_id'):
+    ).select_related('residente').values('residente_id', 'fecha', 'tipo_guardia_id', 'residente__anio_residencia'):
         fechas_asignadas[asig['residente_id']].add((asig['fecha'], asig['tipo_guardia_id']))
+        anio_por_fecha[asig['fecha']].add(asig['residente__anio_residencia'])
 
     asignaciones_a_crear = []
     slots_sin_cubrir = []
@@ -193,6 +214,18 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         if not candidatos:
             slots_sin_cubrir.append({'fecha': fecha, 'tipo': tipo.nombre})
             continue
+
+        # Diversidad de año: si ya hay residentes de algún año asignados ese día,
+        # preferir candidatos de un año distinto. Solo aplica si existen candidatos
+        # de otro año (si no, se usa la lista completa como fallback).
+        anios_en_fecha = anio_por_fecha[fecha]
+        if anios_en_fecha:
+            candidatos_otros_anios = [
+                r for r in candidatos
+                if r.anio_residencia not in anios_en_fecha
+            ]
+            if candidatos_otros_anios:
+                candidatos = candidatos_otros_anios
 
         # Ordenar candidatos según equidad
         if es_feriado_slot:
@@ -223,6 +256,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         cuota_disponible[elegido.pk] -= 1
         ultima_fecha_asignada[elegido.pk] = fecha
         fechas_asignadas[elegido.pk].add((fecha, tipo.pk))
+        anio_por_fecha[fecha].add(elegido.anio_residencia)
         if es_feriado_slot:
             feriados_historicos[elegido.pk] += 1  # actualizar para próximos feriados en la misma corrida
 
