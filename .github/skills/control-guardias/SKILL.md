@@ -9,7 +9,7 @@ description: "Skill para desarrollar y rediseñar el módulo control_guardias. U
 
 ## Estado del módulo
 
-- **Tests**: 70 pasando, 0 errores (`python manage.py test control_guardias`)
+- **Tests**: 85 pasando, 0 errores (`python manage.py test control_guardias`)
 - **Migraciones**: 7 aplicadas (todas `[X]`)
 - **Branch activa**: `feature/colegiales`
 
@@ -112,7 +112,7 @@ class JefeInstructorMixin(LoginRequiredMixin, UserPassesTestMixin):
 | `MisGuardiasView` | `mis_guardias` | Login | `mis_guardias.html` (super) / `portal/mis_guardias.html` |
 | `AusenciasView` | `ausencias` | Login | `portal/ausencias.html` |
 | `ReportarAusenciaView` | `reportar_ausencia` | Login | `portal/reportar_ausencia_form.html` |
-| `ResolverAusenciaView` | `resolver_ausencia` | Jefe | `portal/resolver_ausencia_form.html` |
+| `ResolverAusenciaView` | `ausencia_resolver` | Jefe | GET+POST — muestra guardias afectadas con sugerencias de reemplazo; confirma reasignaciones |
 | `CambiosView` | `cambios` | Login | `portal/cambios.html` |
 | `SolicitarCambioView` | `solicitar_cambio` | Login | `portal/solicitar_cambio_form.html` |
 | `RevisarCambioView` | `revisar_cambio` | Login | `portal/revisar_cambio_form.html` |
@@ -141,6 +141,40 @@ context['feriado_form']    # FeriadoForm()
 ## Servicio de distribución (`services.py`)
 
 > Última revisión: 07/04/2026
+
+---
+
+### `sugerir_reemplazo(guardia)` (07/04/2026)
+
+Sugiere el mejor candidato para cubrir una guardia por ausencia.
+
+```python
+candidatos, sugerido = sugerir_reemplazo(guardia)
+# candidatos: [{'residente': obj, 'guardias_mes': int}] — ordenados por menor carga mensual
+# sugerido: primero de la lista o None
+```
+
+**Criterios de elegibilidad** (mismas reglas que `generar_distribucion`):
+- Excluye al residente ausente (`guardia.residente_id`)
+- No tiene guardia PUBLICADA/CUMPLIDA ese mismo día
+- No tiene guardia el día anterior ni el siguiente (días consecutivos)
+- Ordenados: menor `guardias_mes` primero; empate → alfabético (estable, predecible en la UI)
+
+---
+
+### `resolver_ausencia(ausencia, jefe, reasignaciones=None)` (actualizado 07/04/2026)
+
+**Nueva firma** — `reasignaciones` dict opcional `{guardia_pk (int): residente_pk (int)}`.
+
+| Caso | Resultado |
+|---|---|
+| `reasig[guardia.pk]` existe | guardia original → `REASIGNADA` + nueva `AsignacionGuardia` `PUBLICADA` para reemplazante + notificaciones a ambos |
+| guardia no está en `reasig` | guardia → `AUSENTE` |
+| `reasignaciones=None` | todas las guardias → `AUSENTE` (comportamiento anterior, retrocompatible) |
+
+Siempre cierra la ausencia (`estado=RESUELTA`, `resuelta_por=jefe`) y envía notificación al residente. Todo dentro de `transaction.atomic()`.
+
+---
 
 ### `generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False, restricciones_anio=False)`
 
@@ -244,6 +278,55 @@ Todos los templates tienen botón "← Volver" apuntando a `control_guardias:ind
 
 ---
 
+## Calendario FullCalendar (`views.py` + templates)
+
+### `GuardiasApiView` (`/api/guardias/`)
+- Residentes: solo sus guardias PUBLICADAS
+- Jefes/superuser: PUBLICADAS + BORRADOR, con filtro `?residente_id=<pk>`
+- **Color por residente**: `_RESIDENTE_PALETTE[residente.pk % 10]` — paleta de 10 colores (blue, emerald, violet, red, pink, teal, orange, indigo, cyan, lime), estable entre sesiones
+- Borradores siempre grises: `#6b7280`
+- `extendedProps`: `residente`, `tipo_guardia`, `hora_inicio`, `hora_fin`, `es_feriado`, `estado`
+
+```python
+# Paleta en views.py (módulo-level)
+_RESIDENTE_PALETTE = ['#3b82f6','#10b981','#8b5cf6','#ef4444','#ec4899',
+                      '#14b8a6','#f97316','#6366f1','#06b6d4','#84cc16']
+```
+
+### `CalendarioView`
+- Pasa `feriados_json` (JSON de fechas `"YYYY-MM-DD"`, 6 meses atrás–12 meses adelante) para colorear casilleros
+- Pasa `residentes_con_color` (lista `{residente, color}`) a gestores para la leyenda
+- Pasa `mi_color` al residente para su leyenda personal
+
+### Templates `calendario.html` (portal + superuser)
+
+**Leyenda dinámica**: chips con color por residente (no estados fijos). Solo gestores ven "Borrador" gris.
+
+**Coloreado de casilleros** (`dayCellDidMount`):
+```javascript
+// ⚠️ NUNCA usar toISOString() ni getUTCDay() — dan el día equivocado en UTC-3
+// Siempre usar fecha local:
+const d = info.date;
+const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+// Fin de semana: detectar por clase CSS que pone FullCalendar (no por getUTCDay)
+if (el.classList.contains('fc-day-sat') || el.classList.contains('fc-day-sun')) {
+  el.style.backgroundColor = 'rgba(99,102,241,.08)'; // índigo suave
+}
+// Feriado: comparar con Set de fechas locales
+if (FERIADOS.has(ds)) {
+  el.style.backgroundColor = 'rgba(245,158,11,.14)'; // ámbar
+}
+```
+
+> **Truco clave**: usar `el.style.backgroundColor` (inline style) en lugar de clases CSS — los inline styles tienen mayor especificidad que los estilos de FullCalendar y no pueden ser sobreescritos.
+
+> **`|safe` obligatorio**: `{{ feriados_json|safe }}` — sin `|safe`, Django escapa las comillas a `&quot;` y rompe el `new Set(...)` silenciosamente (el calendario no renderiza).
+
+**Chips de eventos** (`buildEventContent`): fondo `bgColor + '18'` (tenue), borde izquierdo del color del residente, punto de color, nombre abreviado.
+
+---
+
 ## Integración con `CustomUser`
 
 ```python
@@ -320,7 +403,7 @@ Agregado `min_fecha=Min('fecha')` al queryset de borradores. Template usa `{{ b.
 | `MisGuardiasView` | `/mis-guardias/` | Login | Vista personal de guardias del residente |
 | `AusenciasView` | `/ausencias/` | Login | Lista/reporta ausencias |
 | `ReportarAusenciaView` | `/ausencias/reportar/` | Login | Formulario de ausencia |
-| `ResolverAusenciaView` | `/ausencias/<id>/resolver/` | Jefe/Instructor | Acepta o rechaza ausencia |
+| `ResolverAusenciaView` | `/ausencias/<id>/resolver/` | Jefe/Instructor | GET: muestra guardias afectadas con sugerencias de reemplazo (llama `sugerir_reemplazo()` por guardia). POST: confirma `reemplazante_<pk>` → `resolver_ausencia(..., reasignaciones=)` |
 | `CambiosView` | `/cambios/` | Login | Lista de solicitudes de cambio |
 | `SolicitarCambioView` | `/cambios/solicitar/<guardia_id>/` | Residente | Crea solicitud |
 | `RevisarCambioView` | `/cambios/<id>/revisar/` | Login | Acepta/rechaza como receptor o jefe |
@@ -451,12 +534,13 @@ Ver [referencia de integración](./references/integracion_liquidacion.md)
 
 Ubicación: `control_guardias/tests.py`
 
-Cobertura actual (70 tests, todos OK):
-- Modelos: `AsignacionGuardia`, `TipoGuardia`, `ConfiguracionGuardias`, `CuotaMensual`
-- `services.py`: distribución automática, ausencias, cambios de guardia
+Cobertura actual (85 tests, todos OK):
+- Modelos: `AsignacionGuardia`, `ConfiguracionTipoGuardia`, `CuotaMensualGuardia`, `Feriado`
+- `services.py`: distribución automática, ausencias (con y sin reasignaciones), cambios de guardia
+- `SugerirReemplazoTest` (8): excluye al ausente, conflictos mismo día/anterior/siguiente, orden por carga, sin candidatos, `guardias_mes` correcto
+- `ResolverAusenciaConReasignacionTest` (7): estado REASIGNADA, nueva guardia PUBLICADA, AUSENTE sin reasignación, cierre ausencia, notificaciones a ausente y reemplazante
 - Flujo completo de `SolicitudCambioGuardia` (PENDIENTE_RECEPTOR → PENDIENTE_JEFE → APROBADA/RECHAZADA)
-- `AusenciaResidente`: reportar e resolver
-- `GuardiasApiView`: segmentación por rol
+- `CalendarioViewTests` + `GuardiasApiView`: colores por residente, segmentación por rol
 
 ---
 

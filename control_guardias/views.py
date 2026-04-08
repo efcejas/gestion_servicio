@@ -54,6 +54,7 @@ from .services import (
     reportar_ausencia,
     resolver_ausencia,
     solicitar_cambio,
+    sugerir_reemplazo,
 )
 
 
@@ -732,21 +733,72 @@ class ReportarAusenciaView(LoginRequiredMixin, TemplateView):
 
 
 class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
-    """POST: jefe/instructor marca una ausencia como resuelta."""
-    template_name = None
+    """
+    GET:  muestra las guardias afectadas con sugerencias de reemplazo.
+    POST: confirma reasignaciones y cierra la ausencia.
+    """
     login_url = 'login'
 
-    def post(self, request, pk, *args, **kwargs):
-        ausencia = get_object_or_404(AusenciaResidente, pk=pk)
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/resolver_ausencia_form.html']
+        return ['control_guardias/portal/resolver_ausencia_form.html']
+
+    def _get_ausencia(self, pk):
+        return get_object_or_404(AusenciaResidente, pk=pk)
+
+    def get(self, request, pk, *args, **kwargs):
+        ausencia = self._get_ausencia(pk)
         if ausencia.estado == 'RESUELTA':
-            messages.warning(request, "Esta ausencia ya fue resuelta.")
-        else:
-            resolver_ausencia(ausencia, request.user)
-            messages.success(request, f"Ausencia de {ausencia.residente.get_full_name()} marcada como resuelta.")
+            messages.warning(request, 'Esta ausencia ya fue resuelta.')
+            return redirect('control_guardias:ausencias')
+        return self.render_to_response(self._build_context(ausencia))
+
+    def post(self, request, pk, *args, **kwargs):
+        ausencia = self._get_ausencia(pk)
+        if ausencia.estado == 'RESUELTA':
+            messages.warning(request, 'Esta ausencia ya fue resuelta.')
+            return redirect('control_guardias:ausencias')
+
+        # Leer reasignaciones del formulario: reemplazante_<guardia_pk>
+        reasignaciones = {}
+        for guardia in ausencia.guardias_afectadas.all():
+            val = request.POST.get(f'reemplazante_{guardia.pk}', '').strip()
+            if val:
+                try:
+                    reasignaciones[guardia.pk] = int(val)
+                except ValueError:
+                    pass
+
+        resolver_ausencia(ausencia, request.user, reasignaciones=reasignaciones)
+
+        n_total = ausencia.guardias_afectadas.count()
+        n_reasig = len(reasignaciones)
+        n_ausente = n_total - n_reasig
+        partes = []
+        if n_reasig:
+            partes.append(f'{n_reasig} guardia(s) reasignada(s)')
+        if n_ausente:
+            partes.append(f'{n_ausente} marcada(s) como ausente')
+        resumen = ' · '.join(partes) if partes else 'sin guardias afectadas'
+        messages.success(
+            request,
+            f'Ausencia de {ausencia.residente.get_full_name()} resuelta — {resumen}.'
+        )
         return redirect('control_guardias:ausencias')
 
-    def get(self, request, *args, **kwargs):
-        return redirect('control_guardias:ausencias')
+    def _build_context(self, ausencia):
+        guardias_data = []
+        for guardia in ausencia.guardias_afectadas.select_related(
+            'tipo_guardia', 'residente'
+        ).order_by('fecha'):
+            candidatos, sugerido = sugerir_reemplazo(guardia)
+            guardias_data.append({
+                'guardia': guardia,
+                'candidatos': candidatos,   # lista de {'residente': obj, 'guardias_mes': int}
+                'sugerido': sugerido,
+            })
+        return {'ausencia': ausencia, 'guardias_data': guardias_data}
 
 
 # ---------------------------------------------------------------------------

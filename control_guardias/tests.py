@@ -684,6 +684,155 @@ class ResolverAusenciaServiceTest(TestCase):
         )
 
 
+class SugerirReemplazoTest(TestCase):
+    """Tests de la función sugerir_reemplazo()."""
+
+    def setUp(self):
+        from .services import sugerir_reemplazo
+        self.sugerir = sugerir_reemplazo
+        self.jefe = crear_jefe()
+        self.ausente = crear_residente('ausente', 'R1')
+        self.candidato1 = crear_residente('candidato1', 'R2')
+        self.candidato2 = crear_residente('candidato2', 'R3')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        self.hoy = datetime.date(2026, 6, 15)  # fecha fija para reproducibilidad
+
+    def _guardia(self, residente, fecha):
+        return crear_guardia_publicada(residente, fecha, tipo=self.tipo)
+
+    def test_excluye_al_residente_ausente(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        candidatos, _ = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertNotIn(self.ausente.pk, pks)
+
+    def test_incluye_candidatos_disponibles(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        candidatos, sugerido = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertIn(self.candidato1.pk, pks)
+        self.assertIn(self.candidato2.pk, pks)
+        self.assertIsNotNone(sugerido)
+
+    def test_excluye_candidato_con_guardia_mismo_dia(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        self._guardia(self.candidato1, self.hoy)  # candidato1 ocupado
+        candidatos, _ = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertNotIn(self.candidato1.pk, pks)
+        self.assertIn(self.candidato2.pk, pks)
+
+    def test_excluye_candidato_con_guardia_dia_anterior(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        self._guardia(self.candidato1, self.hoy - datetime.timedelta(days=1))
+        candidatos, _ = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertNotIn(self.candidato1.pk, pks)
+
+    def test_excluye_candidato_con_guardia_dia_siguiente(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        self._guardia(self.candidato1, self.hoy + datetime.timedelta(days=1))
+        candidatos, _ = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertNotIn(self.candidato1.pk, pks)
+
+    def test_candidatos_ordenados_por_menor_carga(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        # candidato2 tiene una guardia extra ese mes → aparece segundo
+        for delta in (-5, -10):
+            self._guardia(self.candidato2, self.hoy + datetime.timedelta(days=delta))
+        candidatos, sugerido = self.sugerir(guardia)
+        pks = [c['residente'].pk for c in candidatos]
+        self.assertEqual(pks[0], self.candidato1.pk)  # menos carga
+        self.assertEqual(sugerido.pk, self.candidato1.pk)
+
+    def test_retorna_listas_vacias_cuando_no_hay_candidatos(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        # Bloquear a todos los candidatos el mismo día
+        self._guardia(self.candidato1, self.hoy)
+        self._guardia(self.candidato2, self.hoy)
+        candidatos, sugerido = self.sugerir(guardia)
+        self.assertEqual(candidatos, [])
+        self.assertIsNone(sugerido)
+
+    def test_guardias_mes_count_correcto(self):
+        guardia = self._guardia(self.ausente, self.hoy)
+        self._guardia(self.candidato1, self.hoy - datetime.timedelta(days=5))
+        self._guardia(self.candidato1, self.hoy - datetime.timedelta(days=10))
+        candidatos, _ = self.sugerir(guardia)
+        info_c1 = next(c for c in candidatos if c['residente'].pk == self.candidato1.pk)
+        self.assertEqual(info_c1['guardias_mes'], 2)
+
+
+class ResolverAusenciaConReasignacionTest(TestCase):
+    """Tests de resolver_ausencia() con el parámetro reasignaciones."""
+
+    def setUp(self):
+        from .services import reportar_ausencia, resolver_ausencia
+        self.reportar = reportar_ausencia
+        self.resolver = resolver_ausencia
+        self.jefe = crear_jefe()
+        self.ausente = crear_residente('ausente_r', 'R1')
+        self.reemplazante = crear_residente('reemplazante_r', 'R2')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        self.hoy = datetime.date.today()
+
+    def _ausencia_con_guardia(self):
+        guardia = crear_guardia_publicada(self.ausente, self.hoy, tipo=self.tipo)
+        ausencia = self.reportar(self.ausente, self.hoy, self.hoy, 'ENFERMEDAD')
+        ausencia.guardias_afectadas.add(guardia)
+        return ausencia, guardia
+
+    def test_guardia_original_queda_reasignada(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.estado, 'REASIGNADA')
+
+    def test_crea_nueva_guardia_publicada_para_reemplazante(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
+        nueva = AsignacionGuardia.objects.filter(
+            residente=self.reemplazante,
+            fecha=self.hoy,
+            tipo_guardia=self.tipo,
+            estado='PUBLICADA',
+        )
+        self.assertTrue(nueva.exists())
+
+    def test_sin_reasignacion_guardia_queda_ausente(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={})
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.estado, 'AUSENTE')
+
+    def test_reasignaciones_none_marca_guardia_como_ausente(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe)  # reasignaciones=None
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.estado, 'AUSENTE')
+
+    def test_ausencia_queda_resuelta(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
+        ausencia.refresh_from_db()
+        self.assertEqual(ausencia.estado, 'RESUELTA')
+
+    def test_notifica_al_reemplazante(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
+        self.assertTrue(
+            NotificacionGuardia.objects.filter(destinatario=self.reemplazante).exists()
+        )
+
+    def test_notifica_al_ausente(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
+        self.assertTrue(
+            NotificacionGuardia.objects.filter(destinatario=self.ausente).exists()
+        )
+
+
 class SolicitarCambioServiceTest(TestCase):
     """Tests de la función solicitar_cambio()."""
 

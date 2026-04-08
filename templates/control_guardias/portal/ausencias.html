@@ -83,13 +83,10 @@
                     {% endif %}
                 </div>
                 {% if es_gestor and ausencia.estado == 'PENDIENTE' %}
-                <form method="post" action="{% url 'control_guardias:ausencia_resolver' ausencia.pk %}">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors">
-                        <i class="fas fa-check"></i>Marcar resuelta
-                    </button>
-                </form>
+                <a href="{% url 'control_guardias:ausencia_resolver' ausencia.pk %}"
+                   class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors">
+                    <i class="fas fa-people-arrows"></i>Gestionar reasignación
+                </a>
                 {% endif %}
             </div>
         </div>

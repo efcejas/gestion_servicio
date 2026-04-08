@@ -1,0 +1,145 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Resolver ausencia{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Resolver ausencia</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">
+                Asigná reemplazantes para las guardias afectadas
+            </p>
+        </div>
+        <a href="{% url 'control_guardias:ausencias' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Datos de la ausencia -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <p class="font-semibold text-gray-900">{{ ausencia.residente.get_full_name }}</p>
+        <div class="flex flex-wrap items-center gap-2 mt-1.5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                <i class="fas fa-calendar-xmark text-xs"></i>
+                {{ ausencia.fecha_inicio|date:"d/m/Y" }} – {{ ausencia.fecha_fin|date:"d/m/Y" }}
+            </span>
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
+                {% if ausencia.motivo == 'ENFERMEDAD' %}bg-red-100 text-red-700
+                {% elif ausencia.motivo == 'VACACIONES' %}bg-blue-100 text-blue-700
+                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                {{ ausencia.get_motivo_display }}
+            </span>
+        </div>
+        {% if ausencia.descripcion %}
+        <p class="text-sm text-gray-600 mt-2">{{ ausencia.descripcion }}</p>
+        {% endif %}
+    </div>
+
+    {% if not guardias_data %}
+    <!-- Sin guardias afectadas: solo confirmar cierre -->
+    <div class="bg-white border border-gray-200 rounded-xl p-8 text-center shadow-sm">
+        <i class="fas fa-calendar-check text-4xl text-gray-300 mb-3"></i>
+        <p class="text-gray-500 font-medium">Esta ausencia no tiene guardias afectadas.</p>
+        <form method="post" class="mt-4">
+            {% csrf_token %}
+            <button type="submit"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                <i class="fas fa-check"></i>Marcar como resuelta
+            </button>
+        </form>
+    </div>
+
+    {% else %}
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="space-y-4 mb-6">
+            {% for item in guardias_data %}
+            <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+                <!-- Info guardia -->
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <p class="font-semibold text-gray-900">
+                            {{ item.guardia.fecha|date:"l d/m/Y" }}
+                            &mdash; {{ item.guardia.tipo_guardia.nombre }}
+                        </p>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            {{ item.guardia.tipo_guardia.hora_inicio|time:"H:i" }}
+                            – {{ item.guardia.tipo_guardia.hora_fin|time:"H:i" }}
+                            · {{ item.guardia.tipo_guardia.duracion_horas|floatformat:0 }}h
+                        </p>
+                    </div>
+
+                    {% if item.sugerido %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-medium">
+                        <i class="fas fa-robot text-xs"></i>
+                        Sugerido: {{ item.sugerido.get_full_name }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Select reemplazante -->
+                <div class="mt-4">
+                    <label for="reemplazante_{{ item.guardia.pk }}"
+                           class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Reemplazante
+                    </label>
+                    <select name="reemplazante_{{ item.guardia.pk }}"
+                            id="reemplazante_{{ item.guardia.pk }}"
+                            class="w-full sm:w-96 px-4 py-2.5 border border-gray-300 rounded-lg text-sm
+                                   focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                        <option value="">— Sin reasignación (marcar ausente) —</option>
+                        {% for candidato in item.candidatos %}
+                        <option value="{{ candidato.residente.pk }}"
+                                {% if item.sugerido and candidato.residente.pk == item.sugerido.pk %}selected{% endif %}>
+                            {{ candidato.residente.get_full_name }}
+                            ({{ candidato.guardias_mes }} guardia{{ candidato.guardias_mes|pluralize }} este mes)
+                            {% if candidato.residente.anio_residencia %}
+                            · Año {{ candidato.residente.anio_residencia }}
+                            {% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+
+                    {% if not item.candidatos %}
+                    <p class="mt-1.5 text-xs text-amber-600">
+                        <i class="fas fa-triangle-exclamation mr-1"></i>
+                        No hay candidatos disponibles para esta guardia.
+                        Quedará marcada como ausente.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-3">
+            <a href="{% url 'control_guardias:ausencias' %}"
+               class="inline-flex items-center gap-2 px-4 py-2.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+                Cancelar
+            </a>
+            <button type="submit"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                <i class="fas fa-check"></i>Confirmar reasignaciones
+            </button>
+        </div>
+    </form>
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -534,20 +534,145 @@ def reportar_ausencia(residente, fecha_inicio, fecha_fin, motivo, descripcion=''
     return ausencia
 
 
-def resolver_ausencia(ausencia, jefe):
+def sugerir_reemplazo(guardia):
     """
-    Marca la ausencia como RESUELTA y notifica al residente.
-    """
-    ausencia.estado = 'RESUELTA'
-    ausencia.resuelta_por = jefe
-    ausencia.save(update_fields=['estado', 'resuelta_por'])
+    Sugiere el mejor candidato para cubrir una guardia por ausencia.
 
-    crear_notificacion(
-        ausencia.residente,
-        'AUSENCIA_RESUELTA',
-        f"Tu ausencia del {ausencia.fecha_inicio.strftime('%d/%m')} "
-        f"al {ausencia.fecha_fin.strftime('%d/%m/%Y')} fue procesada por el jefe/instructor.",
+    Usa las mismas reglas del algoritmo de distribución:
+      - No tiene otra guardia ese mismo día.
+      - No tiene guardia en días consecutivos (anterior ni siguiente).
+      - Preferencia: quien menos guardias tiene publicadas/cumplidas en el mismo mes.
+      - Empate: orden alfabético (estable, no aleatorio para que la UI sea predecible).
+
+    Retorna:
+        (candidatos, sugerido)
+        - candidatos: lista de dicts {'residente': obj, 'guardias_mes': int}
+          ordenada de menor a mayor carga mensual.
+        - sugerido: el primer residente de esa lista, o None si no hay candidatos.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    fecha = guardia.fecha
+    mes, anio = fecha.month, fecha.year
+    dia_anterior = fecha - timedelta(days=1)
+    dia_siguiente = fecha + timedelta(days=1)
+
+    primer_dia = date(anio, mes, 1)
+    ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
+
+    residentes = list(
+        User.objects.filter(rol='medico_residente', perfil_completo=True, is_active=True)
+        .exclude(pk=guardia.residente_id)
+        .order_by('last_name', 'first_name')
     )
+
+    fechas_ocupadas = defaultdict(set)
+    guardias_mes_count = defaultdict(int)
+    for asig in AsignacionGuardia.objects.filter(
+        fecha__gte=primer_dia, fecha__lte=ultimo_dia,
+        estado__in=['PUBLICADA', 'CUMPLIDA'],
+    ).values('residente_id', 'fecha'):
+        fechas_ocupadas[asig['residente_id']].add(asig['fecha'])
+        guardias_mes_count[asig['residente_id']] += 1
+
+    elegibles = [
+        r for r in residentes
+        if fecha not in fechas_ocupadas[r.pk]
+        and dia_anterior not in fechas_ocupadas[r.pk]
+        and dia_siguiente not in fechas_ocupadas[r.pk]
+    ]
+
+    # Ordenar: menor carga mensual primero; empate → alfabético (ya viene así)
+    elegibles.sort(key=lambda r: guardias_mes_count[r.pk])
+
+    candidatos = [
+        {'residente': r, 'guardias_mes': guardias_mes_count[r.pk]}
+        for r in elegibles
+    ]
+    sugerido = elegibles[0] if elegibles else None
+    return candidatos, sugerido
+
+
+def resolver_ausencia(ausencia, jefe, reasignaciones=None):
+    """
+    Resuelve una ausencia y gestiona las guardias afectadas.
+
+    reasignaciones: dict opcional {guardia_pk (int): residente_pk (int)}
+      - Si residente_pk para una guardia: guardia original → REASIGNADA
+        + nueva AsignacionGuardia PUBLICADA para el reemplazante.
+      - Si guardia_pk no está en el dict (o valor es falso): guardia → AUSENTE.
+      - Si reasignaciones=None: todas las guardias → AUSENTE.
+
+    Notifica al ausente y a cada reemplazante elegido.
+    """
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    reasig = reasignaciones or {}
+
+    with transaction.atomic():
+        for guardia in ausencia.guardias_afectadas.select_related('tipo_guardia', 'residente'):
+            reemplazante_pk = reasig.get(guardia.pk)
+            if reemplazante_pk:
+                reemplazante = User.objects.get(pk=reemplazante_pk)
+
+                # Guardia original → REASIGNADA
+                guardia.estado = 'REASIGNADA'
+                guardia.notas = (
+                    f"Reasignada por ausencia. "
+                    f"Reemplazante: {reemplazante.get_full_name()}"
+                )
+                guardia.save(update_fields=['estado', 'notas', 'fecha_actualizacion'])
+
+                # Nueva guardia PUBLICADA para el reemplazante
+                nueva = AsignacionGuardia.objects.create(
+                    residente=reemplazante,
+                    tipo_guardia=guardia.tipo_guardia,
+                    fecha=guardia.fecha,
+                    estado='PUBLICADA',
+                    creada_por=jefe,
+                    notas=(
+                        f"Cobertura por ausencia de "
+                        f"{guardia.residente.get_full_name()}"
+                    ),
+                )
+
+                # Notificar al reemplazante
+                crear_notificacion(
+                    reemplazante,
+                    'GUARDIA_REASIGNADA',
+                    f"Se te asignó una guardia el {guardia.fecha.strftime('%d/%m/%Y')} "
+                    f"({guardia.tipo_guardia.nombre}) por ausencia de "
+                    f"{guardia.residente.get_full_name()}.",
+                    asignacion=nueva,
+                )
+                # Notificar al residente ausente (por cada guardia cubierta)
+                crear_notificacion(
+                    ausencia.residente,
+                    'GUARDIA_REASIGNADA',
+                    f"Tu guardia del {guardia.fecha.strftime('%d/%m/%Y')} "
+                    f"({guardia.tipo_guardia.nombre}) fue cubierta por "
+                    f"{reemplazante.get_full_name()}.",
+                    asignacion=guardia,
+                )
+            else:
+                # Sin reemplazante: marcar como ausente
+                guardia.estado = 'AUSENTE'
+                guardia.save(update_fields=['estado', 'fecha_actualizacion'])
+
+        # Cerrar la ausencia
+        ausencia.estado = 'RESUELTA'
+        ausencia.resuelta_por = jefe
+        ausencia.save(update_fields=['estado', 'resuelta_por'])
+
+        crear_notificacion(
+            ausencia.residente,
+            'AUSENCIA_RESUELTA',
+            f"Tu ausencia del {ausencia.fecha_inicio.strftime('%d/%m')} "
+            f"al {ausencia.fecha_fin.strftime('%d/%m/%Y')} fue procesada por "
+            f"{jefe.get_full_name()}.",
+        )
 
 
 # --------------------------------------------------------------------------
