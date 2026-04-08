@@ -286,6 +286,16 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         )
         context['es_gestor'] = es_gestor
         context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.filter(activo=True)
+        # Feriados del rango visible (±6 meses) para colorear casilleros en el JS
+        import json as _json
+        from datetime import date as _date, timedelta as _td
+        hoy = _date.today()
+        feriados = list(
+            Feriado.objects
+            .filter(fecha__gte=hoy - _td(days=180), fecha__lte=hoy + _td(days=365))
+            .values_list('fecha', flat=True)
+        )
+        context['feriados_json'] = _json.dumps([f.isoformat() for f in feriados])
         if es_gestor:
             residentes_qs = (
                 User.objects

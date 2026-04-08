@@ -117,6 +117,10 @@
   #calendar .fc .fc-highlight { background: rgba(59,130,246,.08); }
   #calendar .fc .fc-scrollgrid-section > td { border-color: rgb(229 231 235); }
   #calendar .fc .fc-daygrid-day { border-color: rgb(229 231 235); }
+  /* Fondo diferenciado para fines de semana y feriados (aplicado vía dayCellDidMount) */
+  #calendar .fc .fc-daygrid-day.fc-day-feriado { background-color: rgba(245,158,11,.10) !important; }
+  #calendar .fc .fc-daygrid-day.fc-day-feriado .fc-daygrid-day-number { color: rgb(161,87,0); font-weight: 600; }
+  #calendar .fc .fc-daygrid-day.fc-day-feriado .fc-daygrid-day-number::after { content: ' ★'; font-size: .6rem; vertical-align: super; color: rgb(245,158,11); }
   #calendar .fc .fc-daygrid-event { background: transparent !important; border: none !important; padding: 0 !important; border-radius: 0 !important; }
   #calendar .fc .fc-daygrid-event .fc-event-main { padding: 0 !important; }
   #calendar .fc .fc-list { border-color: rgb(229 231 235); }
@@ -139,6 +143,7 @@
   const tooltip     = document.getElementById('guardiaTooltip');
   const filtroEl    = document.getElementById('filtroResidente');
   const apiUrl      = "{% url 'control_guardias:guardias_api' %}";
+  const FERIADOS    = new Set({{ feriados_json|safe }});
 
   let calendar = null;
 
@@ -242,6 +247,21 @@
       eventMouseEnter: showTooltip,
       eventMouseLeave: hideTooltip,
       eventDidMount: (info) => { if (info.el.hasAttribute('title')) info.el.removeAttribute('title'); },
+      dayCellDidMount: (info) => {
+        const el = info.el;
+        // Fin de semana: FullCalendar ya pone fc-day-sat / fc-day-sun en el <td>
+        if (el.classList.contains('fc-day-sat') || el.classList.contains('fc-day-sun')) {
+          el.style.backgroundColor = 'rgba(99,102,241,.08)';
+        }
+        // Feriado: usar fecha local para evitar desfase UTC (ej. UTC-3)
+        const d = info.date;
+        const ds = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (FERIADOS.has(ds)) {
+          el.style.backgroundColor = 'rgba(245,158,11,.14)';
+          const numEl = el.querySelector('.fc-daygrid-day-number');
+          if (numEl) { numEl.style.color = 'rgb(146,64,14)'; numEl.style.fontWeight = '700'; }
+        }
+      },
       events: buildEventsSource(residenteId),
     });
     calendar.render();
