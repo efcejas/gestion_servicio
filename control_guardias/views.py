@@ -407,14 +407,18 @@ class CuotaMensualFormView(JefeInstructorMixin, TemplateView):
         if form.is_valid():
             form.save()
             messages.success(request, f'Cuota de {obj.get_anio_residencia_display()} guardada correctamente.')
-            return redirect(reverse_lazy('control_guardias:configuracion'))
+            from django.urls import reverse
+            return redirect(reverse('control_guardias:configuracion') + '?tab=cuotas')
         return self.render_to_response(self.get_context_data(form=form))
 
 
 class FeriadoCreateView(JefeInstructorMixin, CreateView):
     model = Feriado
     form_class = FeriadoForm
-    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get_success_url(self):
+        from django.urls import reverse
+        return reverse('control_guardias:configuracion') + '?tab=feriados'
 
     def form_valid(self, form):
         messages.success(self.request, 'Feriado agregado correctamente.')
@@ -444,7 +448,10 @@ class FeriadoCreateView(JefeInstructorMixin, CreateView):
 
 class FeriadoDeleteView(JefeInstructorMixin, DeleteView):
     model = Feriado
-    success_url = reverse_lazy('control_guardias:configuracion')
+
+    def get_success_url(self):
+        from django.urls import reverse
+        return reverse('control_guardias:configuracion') + '?tab=feriados'
 
     def get(self, request, *args, **kwargs):
         """No mostramos página de confirmación — elimina directamente vía POST desde el template."""
@@ -584,7 +591,7 @@ class PublicarBorradorView(JefeInstructorMixin, TemplateView):
             messages.success(request, f"{count} guardia(s) publicada(s) correctamente.")
         else:
             messages.warning(request, "No había asignaciones en borrador para publicar.")
-        return redirect('control_guardias:index')
+        return redirect('control_guardias:calendario')
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:distribucion_borrador',

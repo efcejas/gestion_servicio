@@ -232,9 +232,10 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             else:
                 slots_fallback_anio += 1  # fallback suave: usa el pool general
 
-        # Diversidad de año: si ya hay residentes de algún año asignados ese día,
-        # preferir candidatos de un año distinto. Solo aplica si existen candidatos
-        # de otro año (si no, se usa la lista completa como fallback).
+        # Diversidad de año:
+        # - Con restricciones_anio=True: hard constraint (no dos del mismo año el mismo día).
+        #   Si todos los candidatos son del año ya asignado, el slot queda sin cubrir.
+        # - Sin restricciones_anio: preferencia suave (prefiere otro año si hay, si no usa todos).
         anios_en_fecha = anio_por_fecha[fecha]
         if anios_en_fecha:
             candidatos_otros_anios = [
@@ -243,6 +244,11 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             ]
             if candidatos_otros_anios:
                 candidatos = candidatos_otros_anios
+            elif restricciones_anio:
+                # Hard constraint: no se asigna un segundo residente del mismo año
+                slots_sin_cubrir.append({'fecha': fecha, 'tipo': tipo.nombre})
+                continue
+            # else: fallback suave sin restricciones → usa candidatos original
 
         # Ordenar candidatos según equidad
         if es_feriado_slot:

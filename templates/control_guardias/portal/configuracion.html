@@ -311,7 +311,13 @@
             btn.addEventListener('click', () => activateTab(btn));
         });
 
-        if (tabEls.length > 0) activateTab(tabEls[0]);
+        if (tabEls.length > 0) {
+            // Activar tab según parámetro URL ?tab=feriados|cuotas|tipos
+            const tabParam = new URLSearchParams(window.location.search).get('tab');
+            const tabMap = { tipos: 'tab-tipos', cuotas: 'tab-cuotas', feriados: 'tab-feriados' };
+            const targetId = tabParam && tabMap[tabParam] ? tabMap[tabParam] : 'tab-tipos';
+            activateTab(document.getElementById(targetId));
+        }
 
         {% if feriado_form.errors %}
             activateTab(document.getElementById('tab-feriados'));

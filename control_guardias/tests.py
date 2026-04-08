@@ -242,14 +242,14 @@ class FeriadoCRUDTest(TestCase):
         url = reverse('control_guardias:feriado_crear')
         data = {'fecha': '2026-10-12', 'descripcion': 'Día de la Hispanidad'}
         response = self.client.post(url, data)
-        self.assertRedirects(response, reverse('control_guardias:configuracion'))
+        self.assertRedirects(response, reverse('control_guardias:configuracion') + '?tab=feriados')
         self.assertTrue(Feriado.objects.filter(fecha=datetime.date(2026, 10, 12)).exists())
 
     def test_eliminar_feriado(self):
         feriado = Feriado.objects.create(fecha=datetime.date(2026, 11, 20), descripcion='Test')
         url = reverse('control_guardias:feriado_eliminar', kwargs={'pk': feriado.pk})
         response = self.client.post(url)
-        self.assertRedirects(response, reverse('control_guardias:configuracion'))
+        self.assertRedirects(response, reverse('control_guardias:configuracion') + '?tab=feriados')
         self.assertFalse(Feriado.objects.filter(pk=feriado.pk).exists())
 
     def test_crear_feriado_duplicado_falla(self):
@@ -274,7 +274,7 @@ class CuotaMensualUpdateTest(TestCase):
         url = reverse('control_guardias:cuota_editar', kwargs={'anio': self.cuota.anio_residencia})
         data = {'guardias_por_mes': 5, 'atenuante_porcentaje': '10.00'}
         response = self.client.post(url, data)
-        self.assertRedirects(response, reverse('control_guardias:configuracion'))
+        self.assertRedirects(response, reverse('control_guardias:configuracion') + '?tab=cuotas')
         self.cuota.refresh_from_db()
         self.assertEqual(self.cuota.guardias_por_mes, 5)
         self.assertEqual(self.cuota.guardias_efectivas, 4)  # 5 * (1 - 0.10) = 4.5 → int = 4
