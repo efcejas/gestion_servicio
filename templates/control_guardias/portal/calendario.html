@@ -31,18 +31,25 @@
 
     <!-- Leyenda -->
     <div class="flex flex-wrap items-center gap-2 mb-4">
-        <!-- Estados con color -->
+        <!-- Colores por residente -->
         <div class="flex flex-wrap items-center gap-2 text-xs">
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>Publicada
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full font-medium">
-                <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>Feriado
-            </span>
             {% if es_gestor %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-600 rounded-full font-medium">
-                <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>Borrador
-            </span>
+                {% for item in residentes_con_color %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium"
+                      style="background-color: {{ item.color }}18; color: {{ item.color }};">
+                    <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{ item.color }};"></span>
+                    {{ item.residente.get_full_name }}
+                </span>
+                {% endfor %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full font-medium">
+                    <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>Borrador
+                </span>
+            {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium"
+                      style="background-color: {{ mi_color }}18; color: {{ mi_color }};">
+                    <span class="w-2 h-2 rounded-full shrink-0" style="background-color: {{ mi_color }};"></span>
+                    Publicada
+                </span>
             {% endif %}
         </div>
         <!-- Tipos de guardia -->

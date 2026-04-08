@@ -507,15 +507,17 @@ class CalendarioViewTests(TestCase):
         self.assertNotIn(str(guardia_otro.pk), ids)
 
     def test_api_colores_por_estado(self):
-        """BORRADOR es gris, PUBLICADA feriado es ámbar, PUBLICADA normal es azul."""
+        """BORRADOR es gris, PUBLICADA usa color de paleta según pk del residente."""
+        from .views import _RESIDENTE_PALETTE
         self.client.force_login(self.jefe)
         response = self.client.get(reverse('control_guardias:guardias_api'))
         data = response.json()
         por_id = {ev['id']: ev for ev in data}
-        # Borrador → gris
+        # Borrador → siempre gris
         self.assertEqual(por_id[str(self.guardia_bor.pk)]['backgroundColor'], '#6b7280')
-        # Publicada normal → azul
-        self.assertEqual(por_id[str(self.guardia_pub.pk)]['backgroundColor'], '#3b82f6')
+        # Publicada → color de paleta según pk del residente
+        color_esperado = _RESIDENTE_PALETTE[self.residente.pk % len(_RESIDENTE_PALETTE)]
+        self.assertEqual(por_id[str(self.guardia_pub.pk)]['backgroundColor'], color_esperado)
 
     def test_api_requiere_autenticacion(self):
         """API redirige si no autenticado."""

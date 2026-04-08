@@ -25,6 +25,20 @@ from .models import (
     NotificacionGuardia,
     SolicitudCambioGuardia,
 )
+# Paleta de colores por residente (estable: residente.pk % len(_RESIDENTE_PALETTE))
+_RESIDENTE_PALETTE = [
+    '#3b82f6',  # blue-500
+    '#10b981',  # emerald-500
+    '#8b5cf6',  # violet-500
+    '#ef4444',  # red-500
+    '#ec4899',  # pink-500
+    '#14b8a6',  # teal-500
+    '#f97316',  # orange-500
+    '#6366f1',  # indigo-500
+    '#06b6d4',  # cyan-500
+    '#84cc16',  # lime-500
+]
+
 from .services import (
     CambioGuardiaError,
     DistribucionError,
@@ -179,10 +193,7 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
     """
     login_url = 'login'
 
-    # Colores por estado y condición
-    _COLOR_PUBLICADA = '#3b82f6'       # azul
-    _COLOR_FERIADO = '#f59e0b'         # ámbar
-    _COLOR_BORRADOR = '#6b7280'        # gris
+    _COLOR_BORRADOR = '#6b7280'        # gris (borradores no publicados)
 
     def get(self, request, *args, **kwargs):
         user = request.user
@@ -223,10 +234,8 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
             nombre = asignacion.residente.get_full_name()
             if asignacion.estado == 'BORRADOR':
                 color = self._COLOR_BORRADOR
-            elif asignacion.es_feriado:
-                color = self._COLOR_FERIADO
             else:
-                color = self._COLOR_PUBLICADA
+                color = _RESIDENTE_PALETTE[asignacion.residente_id % len(_RESIDENTE_PALETTE)]
 
             eventos.append({
                 'id': str(asignacion.pk),
@@ -278,11 +287,18 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         context['es_gestor'] = es_gestor
         context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.filter(activo=True)
         if es_gestor:
-            context['residentes'] = (
+            residentes_qs = (
                 User.objects
                 .filter(rol='medico_residente', is_active=True)
                 .order_by('last_name', 'first_name')
             )
+            context['residentes'] = residentes_qs
+            context['residentes_con_color'] = [
+                {'residente': r, 'color': _RESIDENTE_PALETTE[r.pk % len(_RESIDENTE_PALETTE)]}
+                for r in residentes_qs
+            ]
+        else:
+            context['mi_color'] = _RESIDENTE_PALETTE[user.pk % len(_RESIDENTE_PALETTE)]
         return context
 
 

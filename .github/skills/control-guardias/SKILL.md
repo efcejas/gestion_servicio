@@ -5,7 +5,7 @@ description: "Skill para desarrollar y rediseñar el módulo control_guardias. U
 
 # Skill: Control de Guardias Médicas
 
-> Última actualización: 06/04/2026
+> Última actualización: 07/04/2026
 
 ## Estado del módulo
 
@@ -140,25 +140,77 @@ context['feriado_form']    # FeriadoForm()
 
 ## Servicio de distribución (`services.py`)
 
-### `generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False)`
+> Última revisión: 07/04/2026
 
-**Algoritmo greedy equitativo (7 pasos):**
+### `generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False, restricciones_anio=False)`
+
+**Algoritmo greedy equitativo (9 pasos):**
 1. Validaciones (mes válido, tipos activos, residentes con perfil completo)
 2. Cuotas por `anio_residencia` desde `CuotaMensualGuardia`
 3. Feriados del período
-4. Construir slots: `(fecha, tipo_guardia, es_feriado)` — 1 slot = 1 posible asignación
+4. Construir slots: `(fecha, tipo_guardia, es_feriado)` — ordenados por "ronda" (ronda 1 = 1er slot de cada fecha, ronda 2 = 2do, etc.) con fechas mezcladas dentro de cada ronda (`random.shuffle`)
 5. Contadores históricos de feriados por residente
 6. Eliminar borradores previos si `reemplazar_borradores=True`
-7. Loop greedy: para cada slot, elegir residente con menor carga; empate → `random.choice`
+7. Pre-cargar `fechas_asignadas` y `fechas_ocupadas` desde BD (evita IntegrityError y guardia doble mismo día)
+8. Loop greedy: para cada slot, filtrar candidatos → aplicar restricciones → elegir con menor carga; empate → `random.choice`
+9. Persistir en `bulk_create` dentro de `transaction.atomic()`
 
-**Restricciones por candidato:**
+**Restricciones por candidato (en orden):**
 - `cuota_disponible[r.pk] > 0`
-- `(fecha, tipo.pk) not in fechas_asignadas[r.pk]` (pre-cargado desde BD)
-- `not _es_consecutivo(fecha, ultima_fecha_asignada[r.pk])` — no dos días seguidos
+- `fecha not in fechas_ocupadas[r.pk]` — no dos guardias el mismo día (cualquier tipo)
+- `dia_anterior not in fechas_ocupadas[r.pk]` y `dia_siguiente not in fechas_ocupadas[r.pk]` — no días consecutivos
+- *(si `restricciones_anio=True`)* `_anio_puede_cubrir_slot(r.anio_residencia, weekday, es_feriado)` — soft: si no quedan candidatos del año correcto, usa pool general (fallback) y registra en `slots_fallback_anio`
+- Diversidad de año: si ya hay un residente de año X asignado ese día, **no asignar otro del mismo año**
+  - Con `restricciones_anio=True`: **hard constraint** — si no queda otro año disponible, el slot va a `slots_sin_cubrir`
+  - Con `restricciones_anio=False`: **soft constraint** — si no queda otro año, usa todos igualmente
+
+**Estructura de datos clave en el loop:**
+```python
+fechas_ocupadas   # defaultdict(set): residente_pk → set(fecha) de todas sus guardias
+fechas_asignadas  # defaultdict(set): residente_pk → set((fecha, tipo_id)) — para UniqueConstraint
+anio_por_fecha    # defaultdict(set): fecha → set(anio_residencia) ya asignados ese día
+```
+
+**Helper `_anio_puede_cubrir_slot(anio_residencia, weekday, es_feriado)`:**
+```python
+if anio_residencia == 'R1':
+    return weekday in (4, 6) or es_feriado      # Viernes (4), Domingos (6), Feriados
+if anio_residencia == 'R2':
+    return weekday == 5 and not es_feriado       # Sábados
+if anio_residencia in ('R3', 'R4'):
+    return weekday in (0, 1, 2, 3) and not es_feriado  # Lunes–Jueves
+return True
+```
 
 **Para cobertura doble el mismo día**: configurar 2 tipos con los mismos días/horario (ej: "Día de semana" + "Día de semana (2)"). El jefe los selecciona en el formulario de distribución según la cuota total del mes.
 
 **Retorna** dict con: `asignaciones_creadas`, `slots_sin_cubrir`, `metricas`, `advertencias`
+
+---
+
+### Reversibilidad de restricciones_anio + diversidad de año (07/04/2026)
+
+Si la combinación de restricciones produce demasiados `slots_sin_cubrir` en producción:
+
+**Opción A — solo desactivar diversidad dura (1 línea en `services.py`):**
+
+Buscar en el loop greedy este bloque y quitar la rama `elif restricciones_anio`:
+```python
+# ACTUAL (hard constraint con restricciones_anio):
+if candidatos_otros_anios:
+    candidatos = candidatos_otros_anios
+elif restricciones_anio:
+    slots_sin_cubrir.append(...)
+    continue
+# else: fallback suave
+
+# REVERTIDO (siempre soft):
+if candidatos_otros_anios:
+    candidatos = candidatos_otros_anios
+# else: usa todos (fallback suave siempre)
+```
+
+**Opción B — desactivar feature completo:** simplemente no tildar el checkbox "Aplicar guardias condicionales por año" en el formulario. No hay cambio de código necesario.
 
 ---
 
