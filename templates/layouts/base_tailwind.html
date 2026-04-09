@@ -144,466 +144,8 @@
         </div>
     </header>
 
-    <!-- Navigation Menu para usuarios autenticados -->
-    <nav class="bg-white/95 backdrop-blur-sm shadow-lg border-t border-white/20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex space-x-1 overflow-x-auto scrollbar-hide">
-                
-                <!-- Dashboard - Todos los usuarios -->
-                {% url 'home' as home_url %}
-                {% if home_url %}
-                <a href="{{ home_url }}" 
-                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'home' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                    <i class="fas fa-home mr-2 group-hover:scale-110 transition-transform"></i>Dashboard
-                    {% if request.resolver_match.url_name == 'home' %}
-                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                    {% endif %}
-                </a>
-                {% endif %}
-
-                <!-- Registro de estudios - Para médicos -->
-                {% if user.is_superuser %}
-                {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}
-                {% if nuevo_estudio_url %}
-                <a href="{{ nuevo_estudio_url }}" 
-                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'liquidacion' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name == 'registroestudios_nuevo' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                    <i class="fas fa-notes-medical mr-2 group-hover:scale-110 transition-transform"></i>Registro de Estudios
-                    {% if 'liquidacion' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name == 'registroestudios_nuevo' %}
-                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                    {% endif %}
-                </a>
-                {% endif %}
-                {% endif %}
-
-                <!-- Protocolos - Para usuarios con acceso (residentes, médicos, técnicos) -->
-                {% if user.puede_acceder_protocolos %}
-                {% url 'protocolos:elegir' as protocolos_url %}
-                {% if protocolos_url %}
-                <a href="{{ protocolos_url }}" 
-                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'protocolos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                    <i class="fas fa-book-medical mr-2 group-hover:scale-110 transition-transform"></i>Protocolos
-                    {% if 'protocolos' in request.resolver_match.namespace|default:'' %}
-                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                    {% endif %}
-                </a>
-                {% endif %}
-                {% endif %}
-
-                <!-- Pedidos de Estudios - Para coordinadores -->
-                {% if user.is_superuser or user.rol == 'jefe_servicio' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                {% url 'pedidos_estudios:dashboard' as pedidos_url %}
-                {% if pedidos_url %}
-                <a href="{{ pedidos_url }}" 
-                   class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                    <i class="fas fa-clipboard-list mr-2 group-hover:scale-110 transition-transform"></i>Pedidos de Estudios
-                    {% if 'pedidos_estudios' in request.resolver_match.namespace|default:'' %}
-                    <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                    {% endif %}
-                </a>
-                {% endif %}
-                {% endif %}
-
-                <!-- ========== NAVEGACIÓN POR SUPERUSUARIO ========== -->
-                {% if user.is_superuser %}
-                    <!-- Estudios por Profesional -->
-                    {% url 'liquidacion:informados_por_medico_por_mes' as estudios_url %}
-                    {% if estudios_url %}
-                    <!-- <a href="{{ estudios_url }}" 
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                        <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>Estudios por Profesional
-                    </a> -->
-                    {% endif %}
-
-                    <!-- Calendario de Guardias (solo superusuarios) -->
-                    {% if user.is_superuser %}
-                    {% url 'control_guardias:calendario_guardias_full_tw' as guardias_url %}
-                    {% if guardias_url %}
-                    <!-- <a href="{{ guardias_url }}" 
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                        <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Calendario de Guardias
-                    </a> -->
-                    {% endif %}
-                    {% endif %}
-
-                    <!-- Eventos del Servicio -->
-                    {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                    {% if eventos_url %}
-                    <a href="{{ eventos_url }}" 
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-exclamation-triangle mr-2 group-hover:scale-110 transition-transform"></i>Eventos
-                        {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a>
-                    {% endif %}
-
-                    <!-- Preinformes - dashboard staff -->
-                    {% url 'preinformes:dashboard_staff' as preinformes_staff_url %}
-                    {% if preinformes_staff_url %}
-                    <a href="{{ preinformes_staff_url }}" 
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-user-md mr-2 group-hover:scale-110 transition-transform"></i>Revisión de Preinformes
-                        {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a>
-                    {% endif %}
-
-                    <!-- Banco de Informes (superusuario) -->
-                    {% url 'preinformes:lista_banco_informes' as banco_url_su %}
-                    {% if banco_url_su %}
-                    <a href="{{ banco_url_su }}"
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'banco' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-archive mr-2 group-hover:scale-110 transition-transform"></i>Banco
-                        {% if 'banco' in request.resolver_match.url_name|default:'' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a>
-                    {% endif %}
-
-                    <!-- Encuesta CADI 2026 (superusuario) -->
-                    {% url 'preinformes:resultados_encuesta' as encuesta_url_su %}
-                    {% if encuesta_url_su %}
-                    <a href="{{ encuesta_url_su }}"
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'resultados_encuesta' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-chart-bar mr-2 group-hover:scale-110 transition-transform"></i>CADI 2026
-                        {% if 'resultados_encuesta' in request.resolver_match.url_name|default:'' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a>
-                    {% endif %}
-
-                    <!-- Stock (superusuario) -->
-                    {% url 'control_stock:dashboard' as stock_url %}
-                    {% if stock_url %}
-                    <a href="{{ stock_url }}"
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
-                        {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a>
-                    {% endif %}
-
-                    <!-- Panel de Administración -->
-                    {% url 'admin_dashboard' as admin_url %}
-                    {% if admin_url %}
-                    <!-- <a href="{{ admin_url }}" 
-                       class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'admin_dashboard' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                        <i class="fas fa-cog mr-2 group-hover:scale-110 transition-transform"></i>Administración
-                        {% if request.resolver_match.url_name == 'admin_dashboard' %}
-                        <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                        {% endif %}
-                    </a> -->
-                    {% endif %}
-
-                <!-- ========== NAVEGACIÓN PARA USUARIOS NO SUPERUSER ========== -->
-                {% elif user.is_authenticated and not user.is_superuser %}
-
-                    <!-- ========== NAVEGACIÓN POR ROL (NUEVO SISTEMA) ========== -->
-                    
-                    <!-- MÉDICOS (Residentes, Staff, Jefes, Instructores) -->
-                    {% if user.es_medico or user.is_superuser %}
-                        {% url 'clases_residentes:lista' as clases_url %}
-                        {% if clases_url %}
-                        <a href="{{ clases_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-graduation-cap mr-2 group-hover:scale-110 transition-transform"></i>Clases
-                            {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        
-                        <!-- Guía de Presentaciones -->
-                        {% url 'clases_residentes:guia_presentaciones' as guia_url %}
-                        {% if guia_url %}
-                        <a href="{{ guia_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-lightbulb mr-2 group-hover:scale-110 transition-transform"></i>Guía de Presentaciones
-                            {% if request.resolver_match.url_name == 'guia_presentaciones' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        
-                        <!-- Novedades -->
-                        {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                        {% if eventos_url %}
-                        <a href="{{ eventos_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                            {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        
-                        <!-- Preinformes - Para residentes -->
-                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                        {% url 'preinformes:dashboard_residente' as preinformes_url %}
-                        {% if preinformes_url %}
-                        <a href="{{ preinformes_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' and 'banco' not in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Preinformes
-                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' not in request.resolver_match.url_name|default:'' and 'revision' not in request.resolver_match.url_name|default:'' and 'banco' not in request.resolver_match.url_name|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-
-                        <!-- Banco de Informes - Solo residentes -->
-                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                        {% url 'preinformes:lista_banco_informes' as banco_url %}
-                        {% if banco_url %}
-                        <a href="{{ banco_url }}"
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'banco' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-archive mr-2 group-hover:scale-110 transition-transform"></i>Banco
-                            {% if 'banco' in request.resolver_match.url_name|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        {% endif %}
-                        {% endif %}
-                        
-                        <!-- Stock (todos los médicos) -->
-                        {% url 'control_stock:dashboard' as stock_url %}
-                        {% if stock_url %}
-                        <a href="{{ stock_url }}"
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
-                            {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-
-                        <!-- Revisión - Para staff -->
-                        {% if user.rol == 'medico_staff' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' or user.rol == 'jefe_servicio' %}
-                        {% url 'preinformes:dashboard_staff' as revision_url %}
-                        {% if revision_url %}
-                        <a href="{{ revision_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-user-md mr-2 group-hover:scale-110 transition-transform"></i>Revisión
-                            {% if 'preinformes' in request.resolver_match.namespace|default:'' and 'staff' in request.resolver_match.url_name|default:'' or 'revision' in request.resolver_match.url_name|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        {% endif %}
-
-                        <!-- Guardias - Para residentes, jefes e instructores -->
-                        {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                        {% url 'control_guardias:index' as guardias_navbar_url %}
-                        {% if guardias_navbar_url %}
-                        <a href="{{ guardias_navbar_url }}"
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-shield-alt mr-2 group-hover:scale-110 transition-transform"></i>Guardias
-                            {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                        {% endif %}
-                    
-                    <!-- TÉCNICOS -->
-                    {% elif user.rol == 'tecnico' %}
-                        <!-- Novedades -->
-                        {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                        {% if eventos_url %}
-                        <a href="{{ eventos_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                            {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-
-                        <!-- Stock (técnicos) -->
-                        {% url 'control_stock:dashboard' as stock_url %}
-                        {% if stock_url %}
-                        <a href="{{ stock_url }}"
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_stock' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                            <i class="fas fa-boxes mr-2 group-hover:scale-110 transition-transform"></i>Stock
-                            {% if 'control_stock' in request.resolver_match.namespace|default:'' %}
-                            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                            {% endif %}
-                        </a>
-                        {% endif %}
-                    
-                    {% endif %}  <!-- Cierre del bloque if user.es_medico / elif user.rol == 'tecnico' -->
-
-                    <!-- ========== NAVEGACIÓN POR GRUPOS (SISTEMA ANTIGUO - FALLBACK) ========== -->
-
-                    <!-- ========== ADMINISTRATIVO - SANATORIO (PEDIDOS) ========== -->
-                    {% if user|has_group:"Administrativo - Sanatorio (pedidos)" %}
-                        <!-- Reportes -->
-                        {% url 'gestion_eventos:eventos_administrativos' as reportes_url %}
-                        {% if reportes_url %}
-                        <a href="{{ reportes_url }}" 
-                           class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                            <i class="fas fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Reportes
-                        </a>
-                        {% endif %}
-
-                    {% else %}
-                        <!-- ========== NAVEGACIÓN SEGÚN CARGO DEL USUARIO ========== -->
-                        
-                        <!-- ADMINISTRATIVOS / JEFE ADMINISTRATIVO -->
-                        {% if user.cargo == 'administrativo' or user.cargo == 'jefe administrativo' or user.rol == 'administrativo' %}
-                            <!-- Novedades -->
-                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                            {% if eventos_url %}
-                            <a href="{{ eventos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                            <!-- Guía de Ateneos -->
-                            {% url 'clases_residentes:guia_presentaciones' as guia_url %}
-                            {% if guia_url %}
-                            <a href="{{ guia_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-lightbulb mr-2 group-hover:scale-110 transition-transform"></i>Guía de Ateneos
-                                {% if request.resolver_match.url_name == 'guia_presentaciones' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                            <!-- Clases y Panel Docente (solo grupo Administrativo - Docencia) -->
-                            {% if user|has_group:"Administrativo - Docencia" %}
-                            {% url 'clases_residentes:lista' as clases_admin_url %}
-                            {% if clases_admin_url %}
-                            <a href="{{ clases_admin_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-graduation-cap mr-2 group-hover:scale-110 transition-transform"></i>Clases
-                                {% if 'clases_residentes' in request.resolver_match.namespace|default:'' and request.resolver_match.url_name != 'guia_presentaciones' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-                            {% url 'preinformes:panel_docencia' as panel_doc_url %}
-                            {% if panel_doc_url %}
-                            <a href="{{ panel_doc_url }}"
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if request.resolver_match.url_name == 'panel_docencia' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-chart-line mr-2 group-hover:scale-110 transition-transform"></i>Panel Docente
-                                {% if request.resolver_match.url_name == 'panel_docencia' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-                            {% endif %}
-
-                        <!-- TÉCNICO RADIÓLOGO / JEFE TÉCNICO -->
-                        {% elif user.cargo == 'técnico radiólogo' or user.cargo == 'jefe tecnico' %}
-                            <!-- Novedades -->
-                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                            {% if eventos_url %}
-                            <a href="{{ eventos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                        <!-- ENFERMEROS / JEFE DE ENFERMERÍA -->
-                        {% elif user|has_group:"Médicos de staff - informes" %}
-                            <!-- Registrar Estudios -->
-                            {% url 'liquidacion:registroestudios_nuevo' as nuevo_estudio_url %}
-                            {% if nuevo_estudio_url %}
-                            <a href="{{ nuevo_estudio_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Estudios
-                            </a>
-                            {% endif %}
-
-                            <!-- Estudios Registrados -->
-                            {% url 'liquidacion:registroestudios_list' as lista_estudios_url %}
-                            {% if lista_estudios_url %}
-                            <a href="{{ lista_estudios_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fas fa-list mr-2 group-hover:scale-110 transition-transform"></i>Estudios Registrados
-                            </a>
-                            {% endif %}
-
-                            <!-- Mis Guardias -->
-                            {% url 'control_guardias:mis_guardias' as mis_guardias_url %}
-                            {% if mis_guardias_url %}
-                            <a href="{{ mis_guardias_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-calendar-alt mr-2 group-hover:scale-110 transition-transform"></i>Mis Guardias
-                                {% if 'control_guardias' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                            <!-- Novedades -->
-                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                            {% if eventos_url %}
-                            <a href="{{ eventos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                        <!-- MÉDICOS DE STAFF (solo procedimientos) -->
-                        {% elif user|has_group:"Médicos de staff" %}
-                            <!-- Registrar Procedimientos -->
-                            {% url 'liquidacion:procedimientos_intervensionismo' as procedimientos_url %}
-                            {% if procedimientos_url %}
-                            <a href="{{ procedimientos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-plus-circle mr-2 group-hover:scale-110 transition-transform"></i>Registrar Procedimientos
-                                {% if 'liquidacion' in request.resolver_match.namespace|default:'' and 'procedimientos' in request.resolver_match.url_name|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                            <!-- Mis Procedimientos -->
-                            {% url 'liquidacion:mis_procedimientos' as mis_procedimientos_url %}
-                            {% if mis_procedimientos_url %}
-                            <a href="{{ mis_procedimientos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap">
-                                <i class="fas fa-file-medical mr-2 group-hover:scale-110 transition-transform"></i>Mis Procedimientos
-                            </a>
-                            {% endif %}
-
-                            <!-- Novedades -->
-                            {% url 'gestion_eventos:lista_eventos' as eventos_url %}
-                            {% if eventos_url %}
-                            <a href="{{ eventos_url }}" 
-                               class="group relative text-medical-primary hover:text-medical-secondary px-4 py-4 text-sm font-semibold transition-all duration-300 flex items-center whitespace-nowrap {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg{% endif %}">
-                                <i class="fas fa-bell mr-2 group-hover:scale-110 transition-transform"></i>Novedades
-                                {% if 'gestion_eventos' in request.resolver_match.namespace|default:'' %}
-                                <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
-                                {% endif %}
-                            </a>
-                            {% endif %}
-
-                        <!-- MÉDICOS SIN GRUPO ASIGNADO - Sin enlaces específicos en navbar -->
-                        {% elif user.cargo == 'médico' or user.cargo == 'médico residente' %}
-                            <!-- No se muestran enlaces específicos para médicos sin grupos asignados -->
-
-                        {% endif %}
-                    {% endif %}
-                {% endif %}
-            </div>
-        </div>
-    </nav>
+    <!-- Navigation Menu -->
+    {% include 'includes/_nav.html' %}
 
     {% else %}
     <!-- Header para usuarios no autenticados -->
@@ -703,6 +245,45 @@
                     }
                 });
             }
+
+            // Nav dropdowns
+            (function () {
+                var allItems = [];
+                document.querySelectorAll('[data-nav-group]').forEach(function (btn) {
+                    var id = btn.getAttribute('data-nav-group');
+                    var menu = document.getElementById('nav-group-' + id);
+                    var chevron = btn.querySelector('.nav-chevron');
+                    if (menu) {
+                        allItems.push({ btn: btn, menu: menu, chevron: chevron });
+                        btn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            var isHidden = menu.classList.contains('hidden');
+                            allItems.forEach(function (x) {
+                                x.menu.classList.add('hidden');
+                                if (x.chevron) x.chevron.classList.remove('rotate-180');
+                            });
+                            if (isHidden) {
+                                menu.classList.remove('hidden');
+                                if (chevron) chevron.classList.add('rotate-180');
+                            }
+                        });
+                    }
+                });
+                document.addEventListener('click', function () {
+                    allItems.forEach(function (x) {
+                        x.menu.classList.add('hidden');
+                        if (x.chevron) x.chevron.classList.remove('rotate-180');
+                    });
+                });
+                var mobileToggle = document.getElementById('mobile-nav-toggle');
+                var mobileMenu = document.getElementById('mobile-nav-menu');
+                if (mobileToggle && mobileMenu) {
+                    mobileToggle.addEventListener('click', function (e) {
+                        e.stopPropagation();
+                        mobileMenu.classList.toggle('hidden');
+                    });
+                }
+            })();
 
             // Sistema de Toast Moderno para Mensajes Django
             {% if messages %}

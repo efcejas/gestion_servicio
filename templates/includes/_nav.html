@@ -1,0 +1,101 @@
+<!-- Navigation Menu — generado desde accounts/context_processors.navbar_links -->
+<nav class="bg-white/95 backdrop-blur-sm shadow-lg border-t border-white/20 relative z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        <!-- ── Desktop ─────────────────────────────────────────────────────── -->
+        <div class="hidden sm:flex items-center">
+
+            <!-- Dashboard (siempre visible) -->
+            <a href="{% url 'home' %}"
+               class="group relative flex items-center whitespace-nowrap px-4 py-4 text-sm font-semibold transition-all duration-300
+                      {% if request.resolver_match.url_name == 'home' %}
+                          text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg
+                      {% else %}
+                          text-medical-primary hover:text-medical-secondary
+                      {% endif %}">
+                <i class="fas fa-home mr-2 group-hover:scale-110 transition-transform"></i>
+                Dashboard
+                {% if request.resolver_match.url_name == 'home' %}
+                <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                {% endif %}
+            </a>
+
+            <!-- Grupos desplegables -->
+            {% for grp in nav_groups %}
+            <div class="relative">
+                <button type="button"
+                        data-nav-group="{{ forloop.counter }}"
+                        class="group relative flex items-center whitespace-nowrap px-4 py-4 text-sm font-semibold transition-all duration-300
+                               {% if grp.active %}
+                                   text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/10 rounded-lg
+                               {% else %}
+                                   text-medical-primary hover:text-medical-secondary
+                               {% endif %}">
+                    <i class="fas {{ grp.icon }} mr-2 group-hover:scale-110 transition-transform"></i>
+                    {{ grp.label }}
+                    <i class="fas fa-chevron-down ml-1.5 text-xs nav-chevron transition-transform duration-200"></i>
+                    {% if grp.active %}
+                    <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-medical-primary to-medical-secondary rounded-full"></div>
+                    {% endif %}
+                </button>
+
+                <!-- Panel dropdown -->
+                <div id="nav-group-{{ forloop.counter }}"
+                     class="hidden absolute left-0 top-full mt-0 w-56 bg-white rounded-xl shadow-2xl ring-1 ring-gray-200 z-50 overflow-hidden">
+                    {% for link in grp.items %}
+                    <a href="{{ link.url }}"
+                       class="flex items-center px-4 py-2.5 text-sm transition-colors
+                              {% if link.active %}
+                                  text-medical-secondary font-semibold border-l-2 border-medical-secondary bg-gradient-to-r from-medical-primary/5 to-transparent
+                              {% else %}
+                                  text-gray-700 hover:bg-gradient-to-r hover:from-medical-primary/10 hover:to-medical-secondary/10 font-medium
+                              {% endif %}">
+                        <i class="fas {{ link.icon }} w-5 mr-3 text-sm
+                                  {% if link.active %}text-medical-secondary{% else %}text-gray-400{% endif %}"></i>
+                        {{ link.label }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <!-- ── Mobile: cabecera con hamburger ─────────────────────────────── -->
+        <div class="sm:hidden flex items-center justify-between py-2">
+            <a href="{% url 'home' %}" class="flex items-center text-sm font-semibold text-medical-primary">
+                <i class="fas fa-home mr-2"></i>Dashboard
+            </a>
+            <button type="button" id="mobile-nav-toggle"
+                    class="p-2 rounded-lg text-medical-primary hover:bg-gray-100 transition-colors"
+                    aria-label="Abrir menú">
+                <i class="fas fa-bars"></i>
+            </button>
+        </div>
+
+        <!-- ── Mobile: menú expandible ────────────────────────────────────── -->
+        <div id="mobile-nav-menu" class="hidden sm:hidden pb-3 border-t border-gray-100 pt-2">
+            {% for grp in nav_groups %}
+            <div class="mb-2">
+                <p class="px-3 py-1 text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    <i class="fas {{ grp.icon }} mr-1"></i>{{ grp.label }}
+                </p>
+                {% for link in grp.items %}
+                <a href="{{ link.url }}"
+                   class="flex items-center px-4 py-2 text-sm rounded-lg mx-1 mb-0.5
+                          {% if link.active %}
+                              text-medical-secondary bg-gradient-to-r from-medical-primary/10 to-medical-secondary/5 font-semibold
+                          {% else %}
+                              text-gray-700 hover:bg-gray-50 font-medium
+                          {% endif %}">
+                    <i class="fas {{ link.icon }} w-5 mr-3
+                              {% if link.active %}text-medical-secondary{% else %}text-gray-400{% endif %}"></i>
+                    {{ link.label }}
+                </a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</nav>
