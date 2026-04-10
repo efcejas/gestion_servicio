@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
