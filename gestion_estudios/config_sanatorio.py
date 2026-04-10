@@ -49,7 +49,7 @@ CONFIG_COLEGIALES = {
     'MODO': 'Modo herramientas internas — Jefatura y seguimiento',
     'MODULOS_ACTIVOS': {
         'equipos': True,       # ✅ Activo - empezamos por aquí
-        'eventos': False,      # ❌ Desactivado por ahora
+        'eventos': True,       # ✅ Activo - Reportes de eventos del servicio
         'guardias': True,      # ✅ Activo - Control de guardias de residentes
         'liquidacion': False,  # ❌ Desactivado por ahora
         'dictado': False,      # ❌ Desactivado por ahora

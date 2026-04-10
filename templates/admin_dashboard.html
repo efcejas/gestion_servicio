@@ -37,577 +37,337 @@
                 {% endif %}
             </div>
 
-            <!-- Grid: Agenda y Notas (compacto, arriba) -->
+            <!-- Grid: Agenda y Notas -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+
                 {% if SANATORIO_MODULOS.agenda %}
-                <!-- Panel de Agenda del Jefe de Servicio -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                            <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                            Agenda
-                        </h3>
+                <!-- Panel Agenda con tabs Hoy / Próximos 7 días -->
+                <div class="bg-gray-800 border border-gray-700 rounded-xl" x-data="{ tab: 'hoy' }">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-700">
                         <div class="flex items-center gap-2">
-                            <a href="{% url 'agenda:agenda_nuevo' %}" 
-                               class="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                </svg>
-                                Nuevo
-                            </a>
-                            <a href="{% url 'admin:agenda_agendaitem_changelist' %}" target="_blank" 
-                               class="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                </svg>
-                                Admin
+                            <i class="fas fa-calendar-days text-blue-400"></i>
+                            <span class="font-semibold text-white text-sm">Agenda</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- Tabs -->
+                            <div class="flex rounded-lg overflow-hidden border border-gray-600 text-xs">
+                                <button onclick="agendaTab('hoy', this)"
+                                        id="tab-hoy"
+                                        class="agenda-tab px-3 py-1.5 bg-blue-600 text-white font-medium transition-colors">
+                                    Hoy
+                                </button>
+                                <button onclick="agendaTab('proximos', this)"
+                                        id="tab-proximos"
+                                        class="agenda-tab px-3 py-1.5 bg-gray-700 text-gray-300 hover:bg-gray-600 font-medium transition-colors">
+                                    7 días
+                                </button>
+                            </div>
+                            <a href="{% url 'agenda:agenda_nuevo' %}"
+                               class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">
+                                <i class="fas fa-plus text-[0.65rem]"></i>Nuevo
                             </a>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3">
-                        <!-- Eventos de Hoy -->
-                        <div class="bg-gray-700 rounded-lg p-3">
-                            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                Hoy ({{ fecha_actual }})
-                            </h4>
-                            {% if agenda_hoy %}
-                                <div class="space-y-1.5 max-h-64 overflow-y-auto">
-                                    {% for item in agenda_hoy %}
-                                    <div class="bg-gray-800 rounded p-2 {% if item.es_importante %}border-l-2 border-yellow-500{% endif %}">
-                                        <div class="flex items-start gap-2">
-                                            {% if item.tipo == 'CITA' %}
-                                                <svg class="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                                </svg>
-                                            {% elif item.tipo == 'REUNION' %}
-                                                <svg class="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                                </svg>
-                                            {% elif item.tipo == 'LLAMADA' %}
-                                                <svg class="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                                                </svg>
-                                            {% elif item.tipo == 'RECORDATORIO' %}
-                                                <svg class="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                                                </svg>
-                                            {% else %}
-                                                <svg class="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                                </svg>
-                                            {% endif %}
-                                            <div class="flex-1 min-w-0">
-                                                <p class="text-xs font-medium text-white truncate">
-                                                    {{ item.titulo }}
-                                                    {% if item.es_importante %}<span class="ml-1 text-yellow-400">★</span>{% endif %}
-                                                    {% if item.completado %}<span class="ml-1 text-green-400">✓</span>{% endif %}
-                                                </p>
-                                                <p class="text-xs text-gray-400">
-                                                    {% if item.hora_inicio %}{{ item.hora_inicio|time:"H:i" }}{% endif %}
-                                                    {% if item.hora_fin %} - {{ item.hora_fin|time:"H:i" }}{% endif %}
-                                                    <span class="text-gray-500">•</span> {{ item.get_tipo_display }}
-                                                </p>
-                                            </div>
-                                            <div class="flex-shrink-0 flex items-center gap-1">
-                                                <form method="post" action="{% url 'agenda:agenda_toggle_completado' item.pk %}" class="inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" 
-                                                            title="{% if item.completado %}Marcar como pendiente{% else %}Marcar como completado{% endif %}"
-                                                            class="p-1 text-xs rounded hover:bg-gray-700 transition-colors {% if item.completado %}text-green-400 hover:text-green-300{% else %}text-gray-500 hover:text-gray-400{% endif %}">
-                                                        {% if item.completado %}✓{% else %}⏺{% endif %}
-                                                    </button>
-                                                </form>
-                                                <a href="{% url 'agenda:agenda_editar' item.pk %}" 
-                                                   class="text-xs text-blue-400 hover:text-blue-300 transition-colors px-1">
-                                                    Editar
-                                                </a>
-                                            </div>
-                                        </div>
+                    <!-- Tab: Hoy -->
+                    <div id="agenda-hoy" class="p-3">
+                        <p class="text-xs text-gray-500 mb-2">{{ fecha_actual }}</p>
+                        {% if agenda_hoy %}
+                        <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {% for item in agenda_hoy %}
+                            <div class="flex items-start gap-3 bg-gray-750 rounded-lg p-2.5 border border-gray-700 {% if item.es_importante %}border-l-2 border-l-yellow-500{% endif %}">
+                                <!-- Hora -->
+                                <div class="flex-shrink-0 text-center min-w-[2.5rem]">
+                                    {% if item.hora_inicio %}
+                                    <div class="text-xs font-bold text-white leading-tight">{{ item.hora_inicio|time:"H:i" }}</div>
+                                    <div class="text-[0.6rem] text-gray-500 uppercase">
+                                        {% if item.hora_inicio.hour < 12 %}AM{% else %}PM{% endif %}
                                     </div>
-                                    {% endfor %}
+                                    {% else %}
+                                    <div class="text-xs text-gray-600">—</div>
+                                    {% endif %}
                                 </div>
-                            {% else %}
-                                <div class="text-center py-4">
-                                    <svg class="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                    <p class="text-gray-400 text-xs">No tenés eventos para hoy</p>
+                                <!-- Contenido -->
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-medium text-white truncate">
+                                        {{ item.titulo }}
+                                        {% if item.es_importante %}<i class="fas fa-star text-yellow-400 text-[0.6rem] ml-1"></i>{% endif %}
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-medium
+                                            {% if item.completado %}bg-green-900 text-green-300
+                                            {% elif item.tipo == 'CITA' %}bg-blue-900 text-blue-300
+                                            {% elif item.tipo == 'REUNION' %}bg-purple-900 text-purple-300
+                                            {% elif item.tipo == 'LLAMADA' %}bg-teal-900 text-teal-300
+                                            {% elif item.tipo == 'RECORDATORIO' %}bg-yellow-900 text-yellow-300
+                                            {% else %}bg-gray-700 text-gray-300{% endif %}">
+                                            {% if item.completado %}LISTO{% else %}{{ item.get_tipo_display|upper }}{% endif %}
+                                        </span>
+                                    </div>
                                 </div>
-                            {% endif %}
+                                <!-- Acciones -->
+                                <div class="flex-shrink-0 flex items-center gap-1">
+                                    <form method="post" action="{% url 'agenda:agenda_toggle_completado' item.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit"
+                                                title="{% if item.completado %}Pendiente{% else %}Completar{% endif %}"
+                                                class="w-6 h-6 flex items-center justify-center rounded transition-colors
+                                                    {% if item.completado %}text-green-400 hover:text-green-300{% else %}text-gray-500 hover:text-gray-300{% endif %}">
+                                            <i class="fas {% if item.completado %}fa-circle-check{% else %}fa-circle{% endif %} text-xs"></i>
+                                        </button>
+                                    </form>
+                                    <a href="{% url 'agenda:agenda_editar' item.pk %}"
+                                       class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-400 transition-colors">
+                                        <i class="fas fa-pen text-[0.6rem]"></i>
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <i class="fas fa-circle-check text-3xl text-gray-700 mb-2"></i>
+                            <p class="text-gray-500 text-xs">No tenés eventos para hoy</p>
+                        </div>
+                        {% endif %}
+                    </div>
 
-                        <!-- Próximos Días -->
-                        <div class="bg-gray-700 rounded-lg p-3">
-                            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                                </svg>
-                                Próximos 7 días
-                            </h4>
-                            {% if agenda_proximos %}
-                                <div class="space-y-1.5 max-h-48 overflow-y-auto">
-                                    {% for item in agenda_proximos %}
-                                    <div class="bg-gray-800 rounded p-2 mb-2 {% if item.es_importante %}border-l-2 border-yellow-500{% endif %}">
-                                        <div class="flex items-start gap-2">
-                                            <div class="flex-1 min-w-0">
-                                                <p class="text-xs font-medium text-white truncate">
-                                                    {{ item.titulo }}
-                                                    {% if item.es_importante %}<span class="ml-1 text-yellow-400">★</span>{% endif %}
-                                                    {% if item.completado %}<span class="ml-1 text-green-400">✓</span>{% endif %}
-                                                </p>
-                                                <p class="text-xs text-gray-400">
-                                                    {{ item.fecha|date:"d/m/Y" }}
-                                                    {% if item.hora_inicio %} • {{ item.hora_inicio|time:"H:i" }}{% endif %}
-                                                    <span class="text-gray-500">•</span> {{ item.get_tipo_display }}
-                                                </p>
-                                            </div>
-                                            <div class="flex-shrink-0 flex items-center gap-1">
-                                                <form method="post" action="{% url 'agenda:agenda_toggle_completado' item.pk %}" class="inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" 
-                                                            title="{% if item.completado %}Marcar como pendiente{% else %}Marcar como completado{% endif %}"
-                                                            class="p-1 text-xs rounded hover:bg-gray-700 transition-colors {% if item.completado %}text-green-400 hover:text-green-300{% else %}text-gray-500 hover:text-gray-400{% endif %}">
-                                                        {% if item.completado %}✓{% else %}⏺{% endif %}
-                                                    </button>
-                                                </form>
-                                                <a href="{% url 'agenda:agenda_editar' item.pk %}" 
-                                                   class="text-xs text-blue-400 hover:text-blue-300 transition-colors px-1">
-                                                    Editar
-                                                </a>
-                                            </div>
-                                        </div>
+                    <!-- Tab: Próximos 7 días (oculto por defecto) -->
+                    <div id="agenda-proximos" class="p-3 hidden">
+                        {% if agenda_proximos %}
+                        <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                            {% for item in agenda_proximos %}
+                            <div class="flex items-start gap-3 bg-gray-750 rounded-lg p-2.5 border border-gray-700 {% if item.es_importante %}border-l-2 border-l-yellow-500{% endif %}">
+                                <!-- Fecha -->
+                                <div class="flex-shrink-0 text-center min-w-[2.5rem]">
+                                    <div class="text-xs font-bold text-white leading-tight">{{ item.fecha|date:"d" }}</div>
+                                    <div class="text-[0.6rem] text-gray-500 uppercase">{{ item.fecha|date:"M" }}</div>
+                                </div>
+                                <!-- Contenido -->
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-medium text-white truncate">
+                                        {{ item.titulo }}
+                                        {% if item.es_importante %}<i class="fas fa-star text-yellow-400 text-[0.6rem] ml-1"></i>{% endif %}
+                                    </p>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        {% if item.hora_inicio %}
+                                        <span class="text-[0.6rem] text-gray-500">{{ item.hora_inicio|time:"H:i" }}</span>
+                                        <span class="text-gray-700">·</span>
+                                        {% endif %}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[0.6rem] font-medium
+                                            {% if item.tipo == 'CITA' %}bg-blue-900 text-blue-300
+                                            {% elif item.tipo == 'REUNION' %}bg-purple-900 text-purple-300
+                                            {% elif item.tipo == 'LLAMADA' %}bg-teal-900 text-teal-300
+                                            {% elif item.tipo == 'RECORDATORIO' %}bg-yellow-900 text-yellow-300
+                                            {% else %}bg-gray-700 text-gray-300{% endif %}">
+                                            {{ item.get_tipo_display|upper }}
+                                        </span>
                                     </div>
-                                    {% endfor %}
                                 </div>
-                            {% else %}
-                                <div class="text-center py-4">
-                                    <svg class="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                    <p class="text-gray-400 text-xs">No hay eventos próximos</p>
-                                </div>
-                            {% endif %}
+                                <a href="{% url 'agenda:agenda_editar' item.pk %}"
+                                   class="flex-shrink-0 w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-400 transition-colors">
+                                    <i class="fas fa-pen text-[0.6rem]"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <i class="fas fa-calendar-days text-3xl text-gray-700 mb-2"></i>
+                            <p class="text-gray-500 text-xs">No hay eventos en los próximos 7 días</p>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
 
                 {% if SANATORIO_MODULOS.notas %}
-                <!-- Panel de Notas del Servicio -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                            <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
-                            Notas
-                        </h3>
+                <!-- Panel Notas -->
+                <div class="bg-gray-800 border border-gray-700 rounded-xl">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-700">
                         <div class="flex items-center gap-2">
-                            <a href="{% url 'agenda:nota_nueva' %}" 
-                               class="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 transition-colors">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                </svg>
-                                Nueva
-                            </a>
-                            <a href="{% url 'admin:agenda_notapersonal_changelist' %}" target="_blank" 
-                               class="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-yellow-600 rounded hover:bg-yellow-700 transition-colors">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                </svg>
-                                Admin
+                            <i class="fas fa-bookmark text-yellow-400"></i>
+                            <span class="font-semibold text-white text-sm">Notas</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <a href="{% url 'agenda:nota_nueva' %}"
+                               class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors">
+                                <i class="fas fa-plus text-[0.65rem]"></i>Nueva
                             </a>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 gap-3">
-                        <!-- Notas Fijadas -->
-                        <div class="bg-gray-700 rounded-lg p-3">
-                            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
-                                </svg>
-                                Fijadas
-                            </h4>
-                            {% if notas_fijadas %}
-                                <div class="space-y-2 max-h-64 overflow-y-auto">
-                                    {% for nota in notas_fijadas %}
-                                    <div class="bg-gray-800 rounded p-2 border-l-2 border-yellow-500">
-                                        <div class="flex items-start justify-between gap-2 mb-1">
-                                            <p class="text-xs font-medium text-white flex-1">
-                                                {% if nota.titulo %}{{ nota.titulo }}{% else %}<span class="text-gray-400">(Sin título)</span>{% endif %}
-                                            </p>
-                                            <div class="flex items-center gap-1 flex-shrink-0">
-                                                <form method="post" action="{% url 'agenda:nota_toggle_fijada' nota.pk %}" class="inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" 
-                                                            title="Desfijar nota"
-                                                            class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-yellow-500 text-gray-900 rounded hover:bg-yellow-600 transition-colors">
-                                                        ★
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                        <p class="text-xs text-gray-400 line-clamp-2 mb-1">{{ nota.contenido|truncatewords:15 }}</p>
-                                        <div class="flex items-center justify-between">
-                                            <p class="text-xs text-gray-500">{{ nota.actualizado_en|date:"d/m/Y H:i" }}</p>
-                                            <a href="{% url 'agenda:nota_editar' nota.pk %}" 
-                                               class="text-xs text-yellow-400 hover:text-yellow-300 transition-colors">
-                                                Editar
-                                            </a>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                <div class="text-center py-4">
-                                    <svg class="w-8 h-8 text-gray-600 mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/>
-                                    </svg>
-                                    <p class="text-gray-400 text-xs">No hay notas fijadas</p>
-                                </div>
-                            {% endif %}
-                        </div>
+                    <div class="p-3 space-y-2 max-h-80 overflow-y-auto">
 
-                        <!-- Notas Recientes -->
-                        <div class="bg-gray-700 rounded-lg p-3">
-                            <h4 class="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                Recientes
-                            </h4>
-                            {% if notas_recientes %}
-                                <div class="space-y-2 max-h-48 overflow-y-auto">
-                                    {% for nota in notas_recientes %}
-                                    <div class="bg-gray-800 rounded p-2">
-                                        <div class="flex items-start justify-between gap-2 mb-1">
-                                            <p class="text-xs font-medium text-white flex-1">
-                                                {% if nota.titulo %}{{ nota.titulo }}{% else %}<span class="text-gray-400">(Sin título)</span>{% endif %}
-                                            </p>
-                                            {% if not nota.fijada %}
-                                            <form method="post" action="{% url 'agenda:nota_toggle_fijada' nota.pk %}" class="inline">
-                                                {% csrf_token %}
-                                                <button type="submit" 
-                                                        title="Fijar nota"
-                                                        class="p-1 text-xs text-gray-500 hover:text-yellow-400 transition-colors">
-                                                    📍
-                                                </button>
-                                            </form>
-                                            {% endif %}
-                                        </div>
-                                        <p class="text-xs text-gray-400 line-clamp-2 mb-1">{{ nota.contenido|truncatewords:15 }}</p>
-                                        <div class="flex items-center justify-between">
-                                            <p class="text-xs text-gray-500">{{ nota.actualizado_en|date:"d/m/Y H:i" }}</p>
-                                            <a href="{% url 'agenda:nota_editar' nota.pk %}" 
-                                               class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                                                Editar
-                                            </a>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
+                        <!-- Notas fijadas -->
+                        {% if notas_fijadas %}
+                        <p class="text-[0.65rem] font-semibold text-gray-500 uppercase tracking-wider px-1 mt-1">
+                            <i class="fas fa-thumbtack text-yellow-500 mr-1"></i>Fijadas
+                        </p>
+                        {% for nota in notas_fijadas %}
+                        <div class="rounded-lg p-3 border border-yellow-700/40 bg-yellow-900/10 border-l-2 border-l-yellow-500">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-white truncate">
+                                        {% if nota.titulo %}{{ nota.titulo }}{% else %}<span class="text-gray-500">(Sin título)</span>{% endif %}
+                                    </p>
+                                    <p class="text-[0.7rem] text-gray-400 mt-0.5 line-clamp-2">{{ nota.contenido|truncatewords:20 }}</p>
+                                    <p class="text-[0.6rem] text-gray-600 mt-1">{{ nota.actualizado_en|timesince }} atrás</p>
                                 </div>
-                            {% else %}
-                                <div class="text-center py-4">
-                                    <svg class="w-8 h-8 text-gray-600 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                                    </svg>
-                                    <p class="text-gray-400 text-xs">No hay notas recientes</p>
-                                    <p class="text-gray-500 text-xs mt-1">Agregá desde el admin</p>
+                                <div class="flex-shrink-0 flex items-center gap-1">
+                                    <form method="post" action="{% url 'agenda:nota_toggle_fijada' nota.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" title="Desfijar"
+                                                class="w-6 h-6 flex items-center justify-center text-yellow-500 hover:text-yellow-300 transition-colors">
+                                            <i class="fas fa-thumbtack text-xs"></i>
+                                        </button>
+                                    </form>
+                                    <a href="{% url 'agenda:nota_editar' nota.pk %}"
+                                       class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-400 transition-colors">
+                                        <i class="fas fa-pen text-[0.6rem]"></i>
+                                    </a>
                                 </div>
-                            {% endif %}
+                            </div>
                         </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        <!-- Notas recientes -->
+                        {% if notas_recientes %}
+                        <p class="text-[0.65rem] font-semibold text-gray-500 uppercase tracking-wider px-1 mt-2">
+                            <i class="fas fa-clock text-gray-600 mr-1"></i>Recientes
+                        </p>
+                        {% for nota in notas_recientes %}
+                        <div class="rounded-lg p-3 border border-gray-700 bg-gray-750 hover:border-gray-600 transition-colors">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-xs font-semibold text-white truncate">
+                                        {% if nota.titulo %}{{ nota.titulo }}{% else %}<span class="text-gray-500">(Sin título)</span>{% endif %}
+                                    </p>
+                                    <p class="text-[0.7rem] text-gray-400 mt-0.5 line-clamp-2">{{ nota.contenido|truncatewords:20 }}</p>
+                                    <p class="text-[0.6rem] text-gray-600 mt-1">{{ nota.actualizado_en|timesince }} atrás</p>
+                                </div>
+                                <div class="flex-shrink-0 flex items-center gap-1">
+                                    {% if not nota.fijada %}
+                                    <form method="post" action="{% url 'agenda:nota_toggle_fijada' nota.pk %}" class="inline">
+                                        {% csrf_token %}
+                                        <button type="submit" title="Fijar"
+                                                class="w-6 h-6 flex items-center justify-center text-gray-600 hover:text-yellow-400 transition-colors">
+                                            <i class="fas fa-thumbtack text-xs"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                    <a href="{% url 'agenda:nota_editar' nota.pk %}"
+                                       class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-blue-400 transition-colors">
+                                        <i class="fas fa-pen text-[0.6rem]"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+
+                        {% if not notas_fijadas and not notas_recientes %}
+                        <div class="flex flex-col items-center justify-center py-8 text-center">
+                            <i class="fas fa-note-sticky text-3xl text-gray-700 mb-2"></i>
+                            <p class="text-gray-500 text-xs">No hay notas todavía</p>
+                        </div>
+                        {% endif %}
+
                     </div>
                 </div>
                 {% endif %}
+
             </div>
 
-            <!-- Cards de estadísticas principales -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+            <!-- Stats cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+
                 {% if SANATORIO_MODULOS.eventos %}
                 <!-- Card: Eventos del Servicio -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 cursor-pointer hover:bg-gray-750 transition-colors group" onclick="openEventsModal()">
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2 group-hover:text-blue-300 transition-colors">Eventos del Servicio</h3>
-                            
-                            <div class="text-2xl md:text-3xl font-bold {% if cantidad_eventos_abiertos > 0 %}text-red-400{% elif cantidad_eventos_en_revision > 0 %}text-yellow-400{% else %}text-green-400{% endif %}">
-                                {{ cantidad_eventos_abiertos|add:cantidad_eventos_en_revision|default:0 }}
-                            </div>
-                            <p class="text-sm text-gray-400 mt-1">
-                                {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}
-                                    Eventos abiertos
-                                {% else %}
-                                    Todo bajo control
-                                {% endif %}
-                            </p>
+                <a href="{% url 'gestion_eventos:lista_eventos' %}"
+                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-gray-500 transition-colors group overflow-hidden block">
+                    <i class="fas fa-triangle-exclamation absolute -right-3 -bottom-3 text-7xl
+                        {% if cantidad_eventos_abiertos > 0 %}text-red-500/10
+                        {% elif cantidad_eventos_en_revision > 0 %}text-yellow-500/10
+                        {% else %}text-green-500/10{% endif %}
+                        group-hover:scale-110 transition-transform origin-bottom-right"></i>
+                    <div class="relative">
+                        <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Eventos del Servicio</p>
+                        <div class="text-4xl font-bold
+                            {% if cantidad_eventos_abiertos > 0 %}text-red-400
+                            {% elif cantidad_eventos_en_revision > 0 %}text-yellow-400
+                            {% else %}text-green-400{% endif %}">
+                            {{ cantidad_eventos_abiertos|add:cantidad_eventos_en_revision|default:0 }}
                         </div>
-                        <div class="flex-shrink-0 {% if cantidad_eventos_abiertos > 0 %}bg-red-500{% elif cantidad_eventos_en_revision > 0 %}bg-yellow-500{% else %}bg-green-500{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                                {% else %}
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                {% endif %}
-                            </svg>
+                        <p class="text-xs text-gray-500 mt-1">
+                            {% if cantidad_eventos_abiertos > 0 %}{{ cantidad_eventos_abiertos }} abierto{{ cantidad_eventos_abiertos|pluralize }}
+                            {% if cantidad_eventos_en_revision > 0 %} &middot; {{ cantidad_eventos_en_revision }} en revisi&oacute;n{% endif %}
+                            {% elif cantidad_eventos_en_revision > 0 %}{{ cantidad_eventos_en_revision }} en revisi&oacute;n
+                            {% else %}Sin eventos activos{% endif %}
+                        </p>
+                        {% if ultimo_evento_abierto %}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <p class="text-xs text-red-300 font-medium truncate">{{ ultimo_evento_abierto.get_tipo_evento_display }}</p>
+                            <p class="text-[0.65rem] text-gray-500 mt-0.5">Hace {{ ultimo_evento_abierto.fecha_creacion|timesince }}</p>
                         </div>
-                    </div>
-                    
-                    {% if ultimo_evento_abierto %}
-                        <div class="mt-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
-                            <div class="text-sm text-red-300 font-medium break-words">{{ ultimo_evento_abierto.get_tipo_evento_display }}</div>
-                            <div class="text-xs text-red-400 mt-1 break-words">{{ ultimo_evento_abierto.descripcion|truncatechars:60 }}</div>
-                            <div class="text-xs text-red-500 mt-2 flex items-center">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                                Hace {{ ultimo_evento_abierto.fecha_creacion|timesince }}
-                            </div>
-                        </div>
-                    {% endif %}
-                    
-                    <!-- Botón Ver todos -->
-                    <div class="mt-4 pt-4 border-t border-gray-600">
-                        <div class="flex justify-end">
-                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
-                                <span class="text-xs font-medium">Ver todos</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Card: Novedades del Servicio -->
-                <a href="{% url 'gestion_eventos:lista_eventos' %}" 
-                   class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 hover:bg-gray-750 transition-colors group">
-                    <div class="flex items-start justify-between gap-3 md:gap-4">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Novedades del Servicio</h3>
-                            <div class="text-2xl md:text-3xl font-bold text-orange-400">
-                                {{ cantidad_eventos_abiertos|add:cantidad_eventos_en_revision|default:0 }}
-                            </div>
-                            <p class="text-sm text-gray-400 mt-1">
-                                {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}
-                                    Eventos activos
-                                {% else %}
-                                    No hay novedades nuevas
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="flex-shrink-0 {% if cantidad_eventos_abiertos > 0 or cantidad_eventos_en_revision > 0 %}bg-orange-500{% else %}bg-gray-600{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    <!-- Botón Ver todos -->
-                    <div class="mt-4 pt-4 border-t border-gray-600">
-                        <div class="flex justify-end">
-                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
-                                <span class="text-xs font-medium">Ver todas las novedades</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-
-                {% if SANATORIO_MODULOS.preinformes %}
-                <!-- Card: Revisión de Preinformes -->
-                <a href="{% url 'preinformes:lista_revision' %}" 
-                   class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6 hover:bg-gray-750 transition-colors group">
-                    <div class="flex items-start justify-between gap-3 md:gap-4">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Preinformes Pendientes</h3>
-                            <div class="text-2xl md:text-3xl font-bold text-pink-400">
-                                {{ preinformes_pendientes_count|default:0 }}
-                            </div>
-                            <p class="text-sm text-gray-400 mt-1">
-                                {% if preinformes_pendientes_count > 0 %}
-                                    Pendientes de revisión
-                                {% else %}
-                                    No hay preinformes pendientes
-                                {% endif %}
-                            </p>
-                        </div>
-                        <div class="flex-shrink-0 {% if preinformes_pendientes_count > 0 %}bg-pink-500{% else %}bg-gray-600{% endif %} rounded-full p-3 group-hover:scale-105 transition-transform">
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    {% if preinformes_en_revision_count > 0 %}
-                        <div class="mt-4 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
-                            <div class="text-sm text-yellow-300 font-medium">{{ preinformes_en_revision_count }} en revisión actualmente</div>
-                            <div class="text-xs text-yellow-400 mt-1">Siendo revisados por otros médicos</div>
-                        </div>
-                    {% endif %}
-                    
-                    <!-- Botón Ver todos -->
-                    <div class="mt-4 pt-4 border-t border-gray-600">
-                        <div class="flex justify-end">
-                            <div class="flex items-center space-x-1 text-blue-300 group-hover:text-blue-200">
-                                <span class="text-xs font-medium">Ir a revisión</span>
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                                </svg>
-                            </div>
-                        </div>
+                        {% endif %}
+                        <p class="text-[0.65rem] text-blue-400 mt-3 group-hover:text-blue-300 transition-colors">Ver todos &rarr;</p>
                     </div>
                 </a>
                 {% endif %}
 
-                {% if SANATORIO_MODULOS.guardias %}
+                <!-- Card: Preinformes Pendientes -->
+                <a href="{% url 'preinformes:lista_revision' %}"
+                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-gray-500 transition-colors group overflow-hidden block">
+                    <i class="fas fa-file-medical absolute -right-3 -bottom-3 text-7xl
+                        {% if preinformes_pendientes_count > 0 %}text-pink-500/10{% else %}text-gray-600/20{% endif %}
+                        group-hover:scale-110 transition-transform origin-bottom-right"></i>
+                    <div class="relative">
+                        <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Preinformes Pendientes</p>
+                        <div class="text-4xl font-bold {% if preinformes_pendientes_count > 0 %}text-pink-400{% else %}text-green-400{% endif %}">
+                            {{ preinformes_pendientes_count|default:0 }}
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">
+                            {% if preinformes_pendientes_count > 0 %}Pendientes de revisión
+                            {% else %}Sin pendientes{% endif %}
+                        </p>
+                        {% if preinformes_en_revision_count > 0 %}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <p class="text-xs text-yellow-300">{{ preinformes_en_revision_count }} en revisión actualmente</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </a>
+
                 <!-- Card: Médico de Guardia -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
-                    <div class="flex items-start justify-between gap-3 md:gap-4">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Médico de Guardia</h3>
-                            <div class="text-base md:text-lg font-bold {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-400{% else %}text-green-400{% endif %} break-words">
-                                {{ nombre_medico_guardia|default:"No asignado" }}
-                            </div>
-                            {% if franja_horaria_guardia %}
-                                <p class="text-sm text-blue-300 mt-1 break-words">{{ franja_horaria_guardia }}</p>
-                            {% else %}
-                                <p class="text-sm text-gray-400 mt-1">Guardia de hoy</p>
-                            {% endif %}
+                <div class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 overflow-hidden">
+                    <i class="fas fa-user-doctor absolute -right-3 -bottom-3 text-7xl
+                        {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-500/10{% else %}text-green-500/10{% endif %}"></i>
+                    <div class="relative">
+                        <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Médico de Guardia</p>
+                        <div class="text-lg font-bold {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-400{% else %}text-green-400{% endif %} break-words leading-tight">
+                            {{ nombre_medico_guardia|default:"No asignado" }}
                         </div>
-                        <div class="flex-shrink-0 {% if 'Sin cubrir' in nombre_medico_guardia %}bg-red-500{% else %}bg-green-500{% endif %} rounded-full p-3">
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                {% if 'Sin cubrir' in nombre_medico_guardia %}
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                                {% else %}
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                                {% endif %}
-                            </svg>
+                        {% if franja_horaria_guardia %}
+                        <p class="text-xs text-blue-300 mt-1">{{ franja_horaria_guardia }}</p>
+                        {% else %}
+                        <p class="text-xs text-gray-500 mt-1">Guardia de hoy</p>
+                        {% endif %}
+                        {% if nombre_proximo_medico %}
+                        <div class="mt-3 pt-3 border-t border-gray-700">
+                            <p class="text-[0.65rem] text-gray-500 mb-0.5">Próximo de guardia</p>
+                            <p class="text-xs text-gray-300 font-medium">{{ nombre_proximo_medico }}</p>
+                            <p class="text-[0.65rem] text-gray-600">{{ fecha_proxima_guardia }}</p>
                         </div>
+                        {% endif %}
                     </div>
-                    {% if nombre_proximo_medico %}
-                        <div class="mt-4 pt-3 border-t border-gray-600">
-                            <div class="text-xs text-gray-400 mb-1">Próximo de guardia</div>
-                            <div class="text-sm text-gray-300 font-medium break-words">{{ nombre_proximo_medico }}</div>
-                            <div class="text-xs text-gray-500 break-words">{{ fecha_proxima_guardia }}</div>
-                        </div>
-                    {% endif %}
                 </div>
-                {% endif %}
 
-                {% if SANATORIO_MODULOS.liquidacion %}
-                <!-- Card: Regiones del Mes -->
-                <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 md:p-6">
-                    <div class="flex items-center justify-between">
-                        <div class="flex-1 min-w-0">
-                            <h3 class="text-base md:text-lg font-semibold text-white mb-2">Regiones - {{ mes_actual|default:"Mes Actual" }}</h3>
-                            <div class="text-2xl md:text-3xl font-bold text-yellow-400">
-                                {{ total_regiones_mes|default:0 }}
-                            </div>
-                            <p class="text-sm text-gray-400 mt-1">Total de regiones registradas</p>
-                        </div>
-                        <div class="flex-shrink-0 bg-yellow-500 rounded-full p-3">
-                            <svg class="w-5 h-5 md:w-6 md:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                            </svg>
-                        </div>
-                    </div>
-                    <div class="mt-4 grid grid-cols-2 gap-3">
-                        <div class="text-sm">
-                            <span class="text-gray-400">Estudios registrados:</span>
-                            <div class="text-blue-400 font-semibold text-lg">{{ total_estudios_mes|default:0 }}</div>
-                        </div>
-                        <div class="text-sm">
-                            <span class="text-gray-400">Médicos activos:</span>
-                            <div class="text-green-400 font-semibold text-lg">{{ medicos_activos_semana|default:0 }}</div>
-                        </div>
-                    </div>
-                    {% if estudios_hoy > 0 %}
-                        <div class="mt-3 pt-3 border-t border-gray-600">
-                            <div class="flex items-center text-sm">
-                                <svg class="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                                </svg>
-                                <span class="text-green-300 font-medium">{{ estudios_hoy }} registros hoy</span>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-                {% endif %}
             </div>
 
-            <!-- Navegación Rápida -->
-            <!-- <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
-                <h3 class="text-xl font-semibold text-white mb-4">Acceso Rápido</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {% if SANATORIO_MODULOS.guardias %}
-                    <a href="{% url 'control_guardias:index' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
-                        <div class="flex items-center">
-                            <svg class="w-6 h-6 text-blue-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                            </svg>
-                            <div>
-                                <h4 class="font-medium text-white">Guardias</h4>
-                                <p class="text-sm text-gray-300">Control semanal</p>
-                            </div>
-                        </div>
-                    </a>
-                    {% endif %}
-                    
-                    {% if SANATORIO_MODULOS.eventos %}
-                    <a href="{% url 'gestion_eventos:lista_eventos' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
-                        <div class="flex items-center">
-                            <svg class="w-6 h-6 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.888-.833-2.598 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
-                            </svg>
-                            <div>
-                                <h4 class="font-medium text-white">Eventos</h4>
-                                <p class="text-sm text-gray-300">Gestión de eventos</p>
-                            </div>
-                        </div>
-                    </a>
-                    {% endif %}
-                    
-                    {% if SANATORIO_MODULOS.liquidacion %}
-                    <a href="{% url 'liquidacion:informados_por_medico_por_mes' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
-                        <div class="flex items-center">
-                            <svg class="w-6 h-6 text-green-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            <div>
-                                <h4 class="font-medium text-white">Liquidación</h4>
-                                <p class="text-sm text-gray-300">Informes médicos</p>
-                            </div>
-                        </div>
-                    </a>
-                    
-                    <a href="{% url 'liquidacion:carga-masiva' %}" class="block p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
-                        <div class="flex items-center">
-                            <svg class="w-6 h-6 text-purple-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                            </svg>
-                            <div>
-                                <h4 class="font-medium text-white">Carga Masiva</h4>
-                                <p class="text-sm text-gray-300">Importar estudios</p>
-                            </div>
-                        </div>
-                    </a>
-                    {% endif %}
-                </div>
-            </div> -->
-
-            {% if SANATORIO_MODULOS.equipos %}
             <!-- Panel de Equipos de Imágenes -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-4">
@@ -710,342 +470,26 @@
                 </div>
                 {% endif %}
             </div>
-            {% endif %}
-
-            {% if SANATORIO_MODULOS.liquidacion %}
-            <!-- Últimos médicos que registraron -->
-            <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-4">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-semibold text-white">Actividad Reciente de Médicos</h3>
-                    <span class="text-xs text-gray-400">Médicos que registraron hoy y en los últimos días</span>
-                </div>
-                {% if ultimos_medicos_activos %}
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left text-gray-300">
-                            <thead class="text-xs text-gray-400 uppercase bg-gray-700">
-                                <tr>
-                                    <th class="px-4 py-3 min-w-[200px]">Médico</th>
-                                    <th class="px-4 py-3 hidden sm:table-cell min-w-[180px]">Último Paciente</th>
-                                    <th class="px-4 py-3 text-center min-w-[120px]">Total Estudios</th>
-                                    <th class="px-4 py-3 text-center min-w-[120px]">Total Regiones</th>
-                                    <th class="px-4 py-3 text-center min-w-[140px]">Última Actividad</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for medico_data in ultimos_medicos_activos %}
-                                <tr class="bg-gray-800 border-b border-gray-700 hover:bg-gray-750 {% if medico_data.es_hoy %}bg-green-900/20{% endif %}">
-                                    <td class="px-4 py-3 font-medium text-white">
-                                        <div class="flex items-center">
-                                            <div class="w-10 h-10 {% if medico_data.es_hoy %}bg-green-600{% else %}bg-blue-600{% endif %} rounded-full flex items-center justify-center mr-3 flex-shrink-0">
-                                                <span class="text-white text-sm font-medium">
-                                                    {{ medico_data.medico.first_name|first|default:medico_data.medico.username|first }}{{ medico_data.medico.last_name|first|default:"" }}
-                                                </span>
-                                            </div>
-                                            <div class="min-w-0 flex-1">
-                                                <div class="font-medium text-base break-words">
-                                                    {{ medico_data.medico.first_name|default:medico_data.medico.username }} {{ medico_data.medico.last_name }}
-                                                    {% if medico_data.es_hoy %}
-                                                        <span class="ml-2 inline-flex items-center px-2 py-0.5 text-xs font-medium bg-green-500 text-white rounded-full">HOY</span>
-                                                    {% endif %}
-                                                </div>
-                                                <!-- Mostrar último paciente en móvil -->
-                                                <div class="sm:hidden text-xs text-gray-400 mt-1 break-words">
-                                                    {{ medico_data.nombre_paciente }} - DNI: {{ medico_data.ultimo_registro.dni_paciente }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 hidden sm:table-cell">
-                                        <div>
-                                            <div class="font-medium break-words">{{ medico_data.nombre_paciente }}</div>
-                                            <div class="text-xs text-gray-400 break-words">DNI: {{ medico_data.ultimo_registro.dni_paciente }}</div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span class="{% if medico_data.es_hoy %}bg-green-900 text-green-300{% else %}bg-blue-900 text-blue-300{% endif %} px-3 py-1 rounded-full text-sm font-bold inline-block">
-                                            {{ medico_data.total_estudios }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <span class="{% if medico_data.es_hoy %}bg-green-900 text-green-300{% else %}bg-blue-900 text-blue-300{% endif %} px-3 py-1 rounded-full text-sm font-bold inline-block">
-                                            {{ medico_data.total_regiones }}
-                                        </span>
-                                    </td>
-                                    <td class="px-4 py-3 text-gray-400 text-center">
-                                        <div>
-                                            <div class="text-sm font-medium {% if medico_data.es_hoy %}text-green-400{% else %}text-white{% endif %}">
-                                                {% if medico_data.es_hoy %}
-                                                    Hoy {{ medico_data.ultima_fecha|date:"H:i" }}
-                                                {% else %}
-                                                    {{ medico_data.ultima_fecha|date:"d/m/Y" }}
-                                                {% endif %}
-                                            </div>
-                                            {% if not medico_data.es_hoy %}
-                                                <div class="text-xs text-gray-500">{{ medico_data.ultima_fecha|date:"H:i" }}</div>
-                                            {% endif %}
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="flex items-center justify-center h-32">
-                        <div class="text-center">
-                            <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-white">Sin actividad reciente</h3>
-                            <p class="mt-1 text-sm text-gray-400">No hay médicos con registros recientes</p>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
-            {% endif %}
 
         </div>
     </div>
-
-    <!-- Modal de Eventos -->
-    {% if SANATORIO_MODULOS.eventos %}
-    <div id="eventos-modal" tabindex="-1" aria-hidden="true" class="hidden overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 justify-center items-center w-full md:inset-0 h-[calc(100%-1rem)] max-h-full">
-        <div class="relative p-4 w-full max-w-4xl max-h-full">
-            <!-- Modal content -->
-            <div class="relative bg-gray-800 rounded-lg shadow border border-gray-700">
-                <!-- Modal header -->
-                <div class="flex items-center justify-between p-4 md:p-5 border-b border-gray-600">
-                    <h3 class="text-xl font-semibold text-white">
-                        Eventos del Servicio
-                    </h3>
-                    <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-700 hover:text-white rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center" onclick="closeEventsModal()">
-                        <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                        </svg>
-                        <span class="sr-only">Cerrar modal</span>
-                    </button>
-                </div>
-                <!-- Modal body -->
-                <div id="eventos-modal-content" class="p-4 md:p-5">
-                    <div class="flex justify-center items-center h-32">
-                        <div class="text-center">
-                            <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p class="text-gray-400 mt-2">Cargando eventos...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Flowbite JS local (no CDN) -->
     <script src="{% static 'js/flowbite.min.js' %}"></script>
-    
+
     <!-- JavaScript personalizado -->
     <script>
-        function openEventsModal(estado = 'abierto') {
-            console.log('Abriendo modal de eventos con filtro:', estado);
-            
-            // Mostrar el modal
-            const modal = document.getElementById('eventos-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            
-            // Cargar contenido del modal con filtro
-            fetch(`/dashboard/eventos/modal/?estado=${estado}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Error al cargar eventos');
-                    }
-                    return response.text();
-                })
-                .then(html => {
-                    document.getElementById('eventos-modal-content').innerHTML = html;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('eventos-modal-content').innerHTML = `
-                        <div class="text-center py-8">
-                            <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <h3 class="mt-2 text-sm font-medium text-white">Error al cargar eventos</h3>
-                            <p class="mt-1 text-sm text-gray-400">No se pudieron cargar los eventos. Intenta nuevamente.</p>
-                            <button onclick="openEventsModal('${estado}')" class="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md">
-                                Reintentar
-                            </button>
-                        </div>
-                    `;
-                });
-        }
-
-        function filtrarEventos(estado) {
-            console.log('Filtrando eventos por estado:', estado);
-            
-            // Mostrar loading
-            document.getElementById('eventos-modal-content').innerHTML = `
-                <div class="flex justify-center items-center h-32">
-                    <div class="text-center">
-                        <svg class="animate-spin h-8 w-8 text-blue-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="text-gray-400 mt-2">Cargando eventos...</p>
-                    </div>
-                </div>
-            `;
-            
-            // Cargar eventos filtrados
-            fetch(`/dashboard/eventos/modal/?estado=${estado}`)
-                .then(response => response.text())
-                .then(html => {
-                    document.getElementById('eventos-modal-content').innerHTML = html;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showNotification('Error al filtrar eventos', 'error');
-                });
-        }
-
-        function closeEventsModal() {
-            const modal = document.getElementById('eventos-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
-
-        function resolverEvento(eventoId) {
-            if (confirm('¿Estás seguro de que quieres marcar este evento como resuelto?')) {
-                cambiarEstadoEvento(eventoId, 'resuelto');
-            }
-        }
-
-        function cambiarEstadoEvento(eventoId, nuevoEstado) {
-            // Mostrar indicador de carga
-            const selectElement = document.querySelector(`select[onchange*="${eventoId}"]`);
-            if (selectElement) {
-                selectElement.disabled = true;
-            }
-
-            fetch(`/dashboard/eventos/${eventoId}/cambiar-estado/`, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `estado=${nuevoEstado}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Mostrar mensaje de éxito
-                    showNotification(`Estado cambiado a: ${data.nuevo_estado_display}`, 'success');
-                    
-                    // Si se resolvió, recargar el modal para actualizar la lista
-                    if (nuevoEstado === 'resuelto') {
-                        setTimeout(() => {
-                            openEventsModal();
-                        }, 1500);
-                    }
-                } else {
-                    showNotification(`Error: ${data.error}`, 'error');
-                    // Restaurar el valor anterior si hay error
-                    if (selectElement) {
-                        selectElement.value = selectElement.getAttribute('data-original-value') || 'abierto';
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Error al cambiar el estado del evento', 'error');
-                // Restaurar el valor anterior si hay error
-                if (selectElement) {
-                    selectElement.value = selectElement.getAttribute('data-original-value') || 'abierto';
-                }
-            })
-            .finally(() => {
-                // Rehabilitar el select
-                if (selectElement) {
-                    selectElement.disabled = false;
-                }
+        function agendaTab(tab, btn) {
+            document.getElementById('agenda-hoy').classList.add('hidden');
+            document.getElementById('agenda-proximos').classList.add('hidden');
+            document.getElementById('agenda-' + tab).classList.remove('hidden');
+            document.querySelectorAll('.agenda-tab').forEach(function(b) {
+                b.classList.remove('bg-blue-600', 'text-white');
+                b.classList.add('bg-gray-700', 'text-gray-300');
             });
+            btn.classList.remove('bg-gray-700', 'text-gray-300');
+            btn.classList.add('bg-blue-600', 'text-white');
         }
-
-        function showNotification(message, type = 'info') {
-            // Crear elemento de notificación
-            const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 transform translate-x-full`;
-            
-            if (type === 'success') {
-                notification.className += ' bg-green-800 border border-green-600 text-green-100';
-            } else if (type === 'error') {
-                notification.className += ' bg-red-800 border border-red-600 text-red-100';
-            } else {
-                notification.className += ' bg-blue-800 border border-blue-600 text-blue-100';
-            }
-            
-            notification.innerHTML = `
-                <div class="flex items-center">
-                    <div class="flex-1">
-                        <p class="text-sm font-medium">${message}</p>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(notification);
-            
-            // Animar entrada
-            setTimeout(() => {
-                notification.classList.remove('translate-x-full');
-                notification.classList.add('translate-x-0');
-            }, 100);
-            
-            // Auto remover después de 3 segundos
-            setTimeout(() => {
-                notification.classList.add('translate-x-full');
-                setTimeout(() => {
-                    if (notification.parentElement) {
-                        notification.remove();
-                    }
-                }, 300);
-            }, 3000);
-        }
-
-        // Función para obtener el CSRF token
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-
-        // Cerrar modal con tecla Escape
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                const modal = document.getElementById('eventos-modal');
-                if (!modal.classList.contains('hidden')) {
-                    closeEventsModal();
-                }
-            }
-        });
-
-        // Cerrar modal al hacer clic fuera de él
-        document.getElementById('eventos-modal').addEventListener('click', function(event) {
-            if (event.target === this) {
-                closeEventsModal();
-            }
-        });
     </script>
 </body>
 </html>
