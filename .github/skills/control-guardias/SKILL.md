@@ -424,7 +424,10 @@ Agregado `min_fecha=Min('fecha')` al queryset de borradores. Template usa `{{ b.
 ## Navegación
 
 - **Superuser**: sidebar (`includes/sidebar.html`) — link "Control Guardias" + sub-nav expandido cuando `app_name == 'control_guardias'`
-- **Jefe/Instructor/Residente**: navbar `base_tailwind.html` — link "Guardias" con ícono `fa-shield-alt` (agregado 05/04/2026)
+- **Jefe/Instructor/Residente**: navbar dinámico `includes/_nav.html` — grupo **Guardias** `fa-shield-alt`, ítem generado desde `accounts/context_processors.navbar_links`
+- **medico_residente** → label "Mis Guardias" → `control_guardias:index`
+- **jefe_residentes / instructor_residentes** → label "Portal de Guardias" → `control_guardias:index`
+- **NO aparece** en navbar para `medico_staff` (pendiente vista consulta)
 
 ## Formularios (`forms.py`)
 - `GuardiaForm`: Crear/editar guardia (franja, médico, fecha)
@@ -456,7 +459,8 @@ Agregado `min_fecha=Min('fecha')` al queryset de borradores. Template usa `{{ b.
 ## Navegación
 
 - **Superuser**: sidebar (`includes/sidebar.html`) — link "Control Guardias" → `control_guardias:index` + sub-nav expandido cuando `app_name == 'control_guardias'` (Calendario, Distribución, Ausencias, Cambios, Configuración, Notificaciones)
-- **Jefe/Instructor/Residente**: navbar `base_tailwind.html` — link "Guardias" con ícono `fa-shield-alt` en la rama `{% if user.es_medico %}`
+- **Jefe/Instructor/Residente**: navbar dinámico `includes/_nav.html` — grupo "Guardias" `fa-shield-alt`, generado en `accounts/context_processors.navbar_links`
+- Para agregar/quitar el link de guardias en el navbar: editar `accounts/context_processors.py`, **no** el HTML
 - **Módulo activo en Colegiales**: `guardias: True` en `gestion_estudios/config_sanatorio.py` > `CONFIG_COLEGIALES`
 
 ## Problemas conocidos resueltos

@@ -10,6 +10,14 @@ import openpyxl
 
 from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial
 from .forms import ImportarEGESForm
+from .services import (
+    get_base_estudios_finalizados as _base_estudios_finalizados,
+    get_base_rx_sin_informe as _base_rx_sin_informe,
+    aplicar_filtros_fecha_modalidad as _aplicar_filtros_fecha_modalidad,
+    calcular_kpis as _calcular_kpis,
+    agrupar_periodo as _agrupar_periodo,
+    verificar_token as _verificar_token,
+)
 
 # Paleta de colores consistente para todas las vistas y el portal del director
 COLORES_MODALIDAD = {
@@ -775,93 +783,15 @@ def dashboard_global_franja_horaria_data(request):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Helpers compartidos entre el dashboard del superuser y el portal del director
+# Helpers de datos movidos a services.py:
+# get_base_estudios_finalizados, get_base_rx_sin_informe,
+# aplicar_filtros_fecha_modalidad, calcular_kpis, agrupar_periodo, verificar_token
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _base_estudios_finalizados():
-    """QuerySet base: estudios finalizados (no insumos, estado Informado, con fecha)."""
-    return EgesRow.objects.filter(
-        es_insumo=False,
-        estado_turno__iexact='Informado',
-        fecha_turno__isnull=False,
-    )
-
-
-def _aplicar_filtros_fecha_modalidad(qs, request_params):
-    """Aplica filtros de fecha y modalidad a un QuerySet."""
-    fecha_desde = request_params.get('fecha_desde', '')
-    fecha_hasta = request_params.get('fecha_hasta', '')
-    # Acepta tanto ?modalidades[]=TC&modalidades[]=RM como ?modalidades=TC,RM
-    mods = request_params.getlist('modalidades[]') or request_params.getlist('modalidades')
-
-    if fecha_desde:
-        try:
-            qs = qs.filter(fecha_turno__gte=datetime.strptime(fecha_desde, '%Y-%m-%d').date())
-        except ValueError:
-            pass
-    if fecha_hasta:
-        try:
-            qs = qs.filter(fecha_turno__lte=datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
-        except ValueError:
-            pass
-    if mods:
-        qs = qs.filter(modalidad__in=mods)
-    return qs
-
-
-def _calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_qs=None):
-    """
-    Devuelve un dict con los KPIs principales.
-    estudios_finalizados_qs : filtrado por estado Informado
-    estudios_candidatos_qs  : todos los no-insumos (con fecha)
-    sin_informe_qs          : RX entregados sin informe (estado cerrado pero sin reporte)
-    """
-    total_finalizados = estudios_finalizados_qs.count()
-    total_candidatos = estudios_candidatos_qs.count()
-    rx_sin_informe = sin_informe_qs.count() if sin_informe_qs is not None else 0
-    # Los "Entregado Sin Informe" son estudios cerrados, no pendientes reales
-    total_pendientes = max(total_candidatos - total_finalizados - rx_sin_informe, 0)
-
-    # Rango de fechas efectivo
-    fechas = estudios_finalizados_qs.values_list('fecha_turno', flat=True)
-    if fechas:
-        fecha_min = min(fechas)
-        fecha_max = max(fechas)
-        dias_periodo = max((fecha_max - fecha_min).days + 1, 1)
-        # Dias hábiles aproximados (excluimos domingos)
-        dias_habiles = sum(
-            1 for i in range(dias_periodo)
-            if (fecha_min + timedelta(days=i)).weekday() != 6
-        )
-        promedio_dia = round(total_finalizados / max(dias_habiles, 1), 1)
-    else:
-        promedio_dia = 0
-
-    tasa_conversion = round((total_finalizados / total_candidatos * 100), 1) if total_candidatos else 0
-
-    return {
-        'total_finalizados': total_finalizados,
-        'total_candidatos': total_candidatos,
-        'total_pendientes': total_pendientes,
-        'promedio_dia': promedio_dia,
-        'tasa_conversion': tasa_conversion,
-        'rx_sin_informe': rx_sin_informe,
-    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: KPIs
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _base_rx_sin_informe():
-    """QuerySet base: RX entregados sin informe (cerrados pero sin reporte médico)."""
-    return EgesRow.objects.filter(
-        es_insumo=False,
-        modalidad='RX',
-        estado_turno__iexact='Entregado Sin Informe',
-        fecha_turno__isnull=False,
-    )
-
 
 def _vista_kpis_data(request):
     """Lógica interna de KPIs, reutilizable desde superuser y director."""
@@ -884,16 +814,6 @@ def kpis_data(request):
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: Análisis temporal con granularidad día / semana / mes
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _agrupar_periodo(d, agrupacion):
-    """Dado un objeto date y agrupacion (dia|semana|mes), devuelve el inicio del periodo."""
-    if agrupacion == 'dia':
-        return d
-    elif agrupacion == 'semana':
-        return d - timedelta(days=d.weekday())  # lunes de esa semana
-    else:
-        return date_type(d.year, d.month, 1)
-
 
 def _vista_analisis_temporal(request):
     """Lógica interna compartida."""
@@ -1279,18 +1199,6 @@ def exportar_excel(request):
 # ─────────────────────────────────────────────────────────────────────────────
 # Portal del Director (acceso por token UUID, sin login)
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _verificar_token(token_str):
-    """Verifica que el token sea válido y esté activo. Retorna DirectorToken o None."""
-    try:
-        import uuid as _uuid
-        token_uuid = _uuid.UUID(str(token_str))
-        token = DirectorToken.objects.get(token=token_uuid, activo=True)
-        token.registrar_acceso()
-        return token
-    except (DirectorToken.DoesNotExist, ValueError):
-        return None
-
 
 def portal_director(request, token):
     """

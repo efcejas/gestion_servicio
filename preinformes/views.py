@@ -28,71 +28,8 @@ from .forms import (
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-
-def _autoevaluar_sesion_mentor_al_enviar(preinforme, conversacion_id=None):
-    """
-    Intenta evaluar automáticamente la sesión del Mentor IA asociada al envío.
-
-    No bloquea el envío a revisión si falla la IA o si no hay conversación
-    evaluable. En todos los casos deja trazabilidad en logs.
-    """
-    from .models import ConversacionAsistentePreinforme
-    from .asistente_service import AsistenteRadiologicoBot
-
-    conversaciones = ConversacionAsistentePreinforme.objects.filter(
-        usuario=preinforme.residente,
-        fecha_actualizacion__gte=timezone.now() - timezone.timedelta(hours=24),
-    ).order_by('-fecha_actualizacion')
-
-    conversacion = None
-    if conversacion_id:
-        conversacion = conversaciones.filter(id=conversacion_id).first()
-
-    if conversacion is None:
-        conversacion = conversaciones.filter(
-            Q(preinforme=preinforme) | Q(preinforme__isnull=True)
-        ).first()
-
-    if conversacion is None:
-        logger.info(
-            'Mentor IA: no se encontró conversación evaluable para preinforme %s',
-            preinforme.pk,
-        )
-        return {'success': False, 'skipped': 'no_conversation'}
-
-    if conversacion.preinforme_id != preinforme.id:
-        conversacion.preinforme = preinforme
-        conversacion.save(update_fields=['preinforme'])
-
-    if conversacion.evaluada:
-        logger.info(
-            'Mentor IA: conversación %s ya estaba evaluada para preinforme %s',
-            conversacion.id,
-            preinforme.pk,
-        )
-        return {'success': True, 'skipped': 'already_evaluated'}
-
-    resultado = AsistenteRadiologicoBot().evaluar_conversacion(conversacion.id)
-    if resultado.get('success'):
-        logger.info(
-            'Mentor IA: autoevaluación generada para conversación %s (preinforme %s)',
-            conversacion.id,
-            preinforme.pk,
-        )
-    elif resultado.get('insufficient'):
-        logger.info(
-            'Mentor IA: conversación %s no reúne mensajes suficientes para evaluar',
-            conversacion.id,
-        )
-    else:
-        logger.warning(
-            'Mentor IA: fallo autoevaluación de conversación %s para preinforme %s: %s',
-            conversacion.id,
-            preinforme.pk,
-            resultado.get('error'),
-        )
-
-    return resultado
+from .services import evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar
+from .selectors import get_asignados_de, get_pendientes_sin_revisor
 
 
 # === VISTAS PARA RESIDENTES ===
@@ -420,16 +357,10 @@ def ver_banco_preinforme(request, pk):
 def dashboard_staff(request):
     """Dashboard para médicos de staff"""
     # Preinformes asignados a mí (pendientes o en revisión)
-    mis_asignados = Preinforme.objects.filter(
-        revisor=request.user,
-        estado__in=['pendiente_revision', 'en_revision']
-    ).count()
+    mis_asignados = get_asignados_de(request.user).count()
     
     # Preinformes sin asignar (pendientes de revisión sin revisor)
-    pendientes_revision = Preinforme.objects.filter(
-        estado='pendiente_revision',
-        revisor__isnull=True
-    ).count()
+    pendientes_revision = get_pendientes_sin_revisor().count()
     
     # Preinformes en revisión por este usuario
     en_revision = Preinforme.objects.filter(
@@ -444,16 +375,10 @@ def dashboard_staff(request):
     ).count()
     
     # Últimos preinformes asignados a mí
-    mis_ultimos_asignados = Preinforme.objects.filter(
-        revisor=request.user,
-        estado__in=['pendiente_revision', 'en_revision']
-    ).order_by('-fecha_envio_revision')[:5]
+    mis_ultimos_asignados = get_asignados_de(request.user).order_by('-fecha_envio_revision')[:5]
     
     # Últimos preinformes pendientes sin asignar
-    ultimos_pendientes = Preinforme.objects.filter(
-        estado='pendiente_revision',
-        revisor__isnull=True
-    ).order_by('-fecha_envio_revision')[:5]
+    ultimos_pendientes = get_pendientes_sin_revisor().order_by('-fecha_envio_revision')[:5]
     
     context = {
         'mis_asignados': mis_asignados,

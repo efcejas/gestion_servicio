@@ -1,152 +1,85 @@
 # Tests del Proyecto - Gestión de Servicios
 
+> Última actualización: 10/04/2026 | Branch: feature/colegiales
+
 ## 📋 Resumen
 
-Se han creado **57 tests completos** para las siguientes aplicaciones:
+**187 tests** corriendo en SQLite local vía `run_tests.bat`.
 
-### ✅ Accounts (13 tests)
-- Modelo `CustomUser`: creación, validación de campos, opciones de cargo
-- Formulario `CustomUserCreationForm`: validación, campos requeridos
-- Vista `UserRegisterView`: registro de usuarios, redirecciones
-- Autenticación: login, logout, protección de rutas
+### Estado actual por app
 
-### ✅ Control Guardias (11 tests)
-- Modelo `MedicoGuardia`: creación, unicidad de DNI y matrícula
-- Modelo `Guardia`: franjas horarias, cobertura, médicos asignados
-- Vistas: autenticación requerida, coberturas semanales
-
-### ✅ Gestión Eventos (16 tests)
-- Modelo `EventoServicio`: tipos de evento, estados, historial automático
-- Modelo `NotaEvento`: comentarios, última nota
-- Modelo `HistorialEvento`: tracking de cambios de estado
-- Vistas: lista de eventos, creación, filtrado por estado
-
-### ✅ Liquidación (17 tests)
-- Modelo `Estudios`: tipos, conteo de regiones, unicidad
-- Modelo `RegistroEstudiosPorMedico`: cálculo de regiones totales
-- Modelo `DiaSinPacientes`: unicidad por médico y fecha
-- Modelo `RegistroProcedimientosIntervensionismo`: procedimientos
-- Vistas: informes por médico, autenticación
+| App | Tests | Estado |
+|---|---|---|
+| `control_guardias` | ~70 | ✅ |
+| `control_stock` | ~40 | ✅ |
+| `consultorios` | ~30 | ✅ |
+| `preinformes` | ~30 | ✅ |
+| `liquidacion` | ~17 | ✅ |
+| `protocolos` | 3 | ✅ smoke tests |
+| `eges_import` | 0 | ⚠️ sin tests formales |
+| `dictado_informes` | 6 | ✅ `tests/test_utils.py` |
+| `accounts` | ~13 | ✅ |
 
 ---
 
-## ⚠️ Problema Actual: Incompatibilidad de Migraciones con SQLite
+## Cómo ejecutar
 
-### El Problema
-Las migraciones del proyecto fueron creadas para **PostgreSQL** (usada en Heroku) y tienen incompatibilidades con **SQLite** que impiden ejecutar los tests localmente.
-
-**Error específico**: `OperationalError: near "None": syntax error`
-
-Esto ocurre porque:
-1. El proyecto usa PostgreSQL en producción (Heroku)
-2. Las migraciones contienen operaciones específicas de PostgreSQL
-3. SQLite tiene limitaciones al procesar ciertos `ALTER TABLE`
-
-### ✅ Los Tests Están Correctos
-El código de los tests es válido y funcional. El problema está en la infraestructura de la base de datos para testing, no en los tests mismos.
-
----
-
-## 🔧 Soluciones Propuestas
-
-### Opción 1: Usar PostgreSQL Local (Recomendado para CI/CD)
-
-1. Instalar PostgreSQL localmente
-2. Crear una base de datos de test:
 ```bash
-createdb test_gestion_servicio
-```
-3. Actualizar `.env.test` con la URL de PostgreSQL:
-```
-DATABASE_URL=postgresql://usuario:password@localhost/test_gestion_servicio
-```
-4. Ejecutar tests:
-```bash
+# Tests de todas las apps principales
+python manage.py test control_guardias control_stock consultorios preinformes liquidacion protocolos eges_import
+
+# Solo utils de dictado_informes (conflicto de directorio — ver aviso)
+python manage.py test dictado_informes.tests.test_utils
+
+# Todo el proyecto (usa .env.test con SQLite)
 .\run_tests.bat
 ```
 
-### Opción 2: Recrear Migraciones para SQLite
-
-1. Hacer backup de las migraciones actuales
-2. Eliminar todas las migraciones excepto `__init__.py`
-3. Recrear migraciones desde cero:
-```bash
-python manage.py makemigrations
-```
-4. Ejecutar tests
-
-**⚠️ ADVERTENCIA**: Esto podría causar problemas con la base de datos de producción en Heroku.
-
-### Opción 3: Usar Docker para Tests
-
-1. Crear un contenedor con PostgreSQL
-2. Ejecutar tests dentro del contenedor
-3. Esto aísla completamente el entorno de testing
-
-### Opción 4: CI/CD con GitHub Actions (Recomendado)
-
-Configurar GitHub Actions para ejecutar tests automáticamente con PostgreSQL:
-
-```yaml
-name: Tests
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-    steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.11
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-      - name: Run tests
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@postgres/test_db
-        run: python manage.py test
-```
+### `run_tests.bat`
+Intercambia `.env` ↔ `.env.test` antes de correr los tests para apuntar a SQLite en lugar de PostgreSQL de producción.
 
 ---
 
-## 📁 Archivos de Test Creados
+## ⚠️ Avisos conocidos
 
-Todos los archivos de test han sido actualizados con tests completos:
+### Conflicto dictado_informes
+`dictado_informes` tiene tanto `tests.py` (2 líneas, placeholder) como `tests/` directory.
+- `python manage.py test dictado_informes` → **falla** con `ImportError`
+- `python manage.py test dictado_informes.tests.test_utils` → **OK**
+- Para resolver definitivamente: eliminar `dictado_informes/tests.py`
 
-- `accounts/tests.py` - 13 tests
-- `control_guardias/tests.py` - 11 tests
-- `gestion_eventos/tests.py` - 16 tests
-- `liquidacion/tests.py` - 17 tests
-
-Cada archivo incluye:
-- Tests de modelos (creación, validaciones, métodos)
-- Tests de formularios (validación, campos)
-- Tests de vistas (autenticación, permisos, funcionalidad)
-- Tests de integración (flujos completos)
+### Errores pre-existentes (no bloquean)
+2 tests fallan con `NoReverseMatch: 'informados_por_medico_por_mes'`.
+La URL está referenciada en tests pero no registrada en `urls.py`.
+No bloquean el suite — son tests individuales que fallan, no el runner.
 
 ---
 
-## 🎯 Cobertura de Tests
+## 📁 Archivos de test por app
 
-Los tests cubren:
-- ✅ Creación y validación de modelos
-- ✅ Relaciones entre modelos (ForeignKey, ManyToMany)
-- ✅ Métodos personalizados y properties
-- ✅ Formularios de registro y creación
-- ✅ Autenticación y permisos
-- ✅ Vistas protegidas y públicas
-- ✅ Cálculos de negocio (regiones, totales)
-- ✅ Historial de cambios
-- ✅ Unicidad y constrains
+| App | Archivo(s) | Qué testea |
+|---|---|---|
+| `accounts` | `tests.py` | CustomUser, formularios, autenticación |
+| `control_guardias` | `tests.py` | Modelos, distribucion automática, vistas |
+| `control_stock` | `tests.py` | Stock, movimientos, alertas |
+| `consultorios` | `tests.py` | Turnos, conflictos, managers |
+| `preinformes` | `tests.py` | Modelos, estados, vistas de revisión |
+| `liquidacion` | `tests.py` | Modelos, cálculos, informes |
+| `protocolos` | `tests.py` | Smoke: modelos, URL resolve |
+| `dictado_informes` | `tests/test_utils.py` | Regex utils (REGEX_COMANDOS_VOZ etc.) |
+
+---
+
+## 🎯 Cobertura actual
+
+- ✅ Modelos: creación, validaciones, métodos, constraints de unicidad
+- ✅ Servicios: `control_guardias/services.py`, `control_stock/services.py`
+- ✅ Utils: `dictado_informes/utils.py` (regex precompiladas)
+- ✅ Autenticación y permisos por rol
+- ✅ URLs resuelven (smoke tests)
+- ⬜ `eges_import/services.py` — sin tests aún
+- ⬜ `preinformes/selectors.py` — sin tests aún
+- ⬜ `liquidacion/services.py` — sin tests aún
 
 ---
 

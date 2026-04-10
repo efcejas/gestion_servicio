@@ -1020,141 +1020,8 @@ def generar_pdf_liquidacion(request):
     Generar PDF de liquidación - v2.0
     Incluye: prácticas con montos, guardias pasivas, totales
     """
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    Story = []
-    styles = getSampleStyleSheet()
-
-    # Título y fecha
-    titulo = Paragraph("<b>Liquidación de Estudios por Médico - v2.0</b>", styles["Title"])
-    fecha_generacion = Paragraph(
-        f"<b>Fecha de generación:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-        styles["Normal"],
-    )
-    Story.append(titulo)
-    Story.append(fecha_generacion)
-    Story.append(Spacer(1, 10))
-
-    # Médicos
-    medicos = User.objects.filter(es_medico=True)
-    for medico in medicos:
-        # Encabezado del médico
-        encabezado_medico = Paragraph(
-            f"<b>Médico:</b> {medico.get_full_name()}", styles["Heading2"]
-        )
-        Story.append(encabezado_medico)
-        Story.append(Spacer(1, 5))
-
-        registros = RegistroEstudiosPorMedico.objects.filter(
-            medico=medico
-        ).prefetch_related("estudio").order_by("-fecha_registro")
-
-        # ===== PRÁCTICAS =====
-        if registros.exists():
-            data = [["Fecha", "Paciente", "Estudios", "Regiones", "OS", "Horario", "Monto"]]
-            total_regiones = 0
-            total_monto = 0
-
-            for registro in registros:
-                estudios_lista = registro.estudio.all()
-                estudios_texto = ", ".join(e.nombre for e in estudios_lista) if estudios_lista.exists() else "N/A"
-                regiones = registro.cantidad_regiones
-                total_regiones += regiones
-                total_monto += registro.monto_calculado
-
-                data.append([
-                    registro.fecha_del_informe.strftime('%d/%m/%Y') if registro.fecha_del_informe else "N/A",
-                    f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
-                    estudios_texto,
-                    str(regiones),
-                    registro.get_tipo_obra_social_display(),
-                    registro.get_horario_display(),
-                    f"${registro.monto_calculado:,.2f}"
-                ])
-
-            # Agregar total de prácticas
-            data.append(["", "", "TOTAL PRÁCTICAS", str(total_regiones), "", "", f"${total_monto:,.2f}"])
-
-            # Crear tabla
-            tabla = Table(data, colWidths=[60, 100, 120, 50, 60, 50, 70])
-            tabla.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#003366")),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('ALIGN', (3, 1), (3, -1), 'CENTER'),
-                ('ALIGN', (6, 1), (6, -1), 'RIGHT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 6),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#e0e0e0")),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ]))
-            Story.append(tabla)
-        else:
-            Story.append(Paragraph(
-                "<i>No hay prácticas registradas para este médico.</i>", styles["Normal"]))
-
-        Story.append(Spacer(1, 10))
-
-        # ===== GUARDIAS PASIVAS =====
-        guardias = GuardiaPasiva.objects.filter(medico=medico).order_by('-fecha_guardia')
-        if guardias.exists():
-            encabezado_guardias = Paragraph("<b>Guardias Pasivas</b>", styles["Heading3"])
-            Story.append(encabezado_guardias)
-            Story.append(Spacer(1, 3))
-
-            data_guardias = [["Fecha", "Tipo Guardia", "Monto", "Observaciones"]]
-            total_guardias = 0
-
-            for guardia in guardias:
-                total_guardias += guardia.monto
-                data_guardias.append([
-                    guardia.fecha_guardia.strftime('%d/%m/%Y'),
-                    guardia.get_tipo_guardia_display(),
-                    f"${guardia.monto:,.2f}",
-                    guardia.observaciones or ""
-                ])
-
-            data_guardias.append(["", "TOTAL GUARDIAS", f"${total_guardias:,.2f}", ""])
-
-            tabla_guardias = Table(data_guardias, colWidths=[70, 100, 80, 260])
-            tabla_guardias.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#70AD47")),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 6),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-                ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor("#E2EFDA")),
-                ('LEFTPADDING', (0, 0), (-1, -1), 3),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 3),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ]))
-            Story.append(tabla_guardias)
-            Story.append(Spacer(1, 10))
-
-            # Total General
-            if registros.exists():
-                total_general = total_monto + total_guardias
-                total_general_text = Paragraph(
-                    f"<b>TOTAL GENERAL (Prácticas + Guardias): ${total_general:,.2f}</b>",
-                    styles["Heading3"]
-                )
-                Story.append(total_general_text)
-
-        Story.append(Spacer(1, 15))
-
-    # Construir PDF
-    doc.build(Story)
-    buffer.seek(0)
+    from .services import generar_buffer_pdf_liquidacion
+    buffer = generar_buffer_pdf_liquidacion()
     return FileResponse(buffer, as_attachment=True, filename="Liquidacion_Medicos_v2.pdf")
 
 # [ANULADO - 16 de febrero 2026 y ELIMINADAS v3.0 - 17 feb 2026]
@@ -1171,185 +1038,31 @@ def generar_pdf_liquidacion(request):
 def exportar_excel_liquidacion(request):
     """
     Exportar liquidación completa a Excel - v3.1 UNIFICADA (Una sola solapa)
-    
+
     Incluye en una sola hoja:
     - Todas las prácticas (ECO + RAD + TOM + RES)
     - Guardias pasivas
     - Total general
     """
+    from .services import generar_buffer_excel_liquidacion
+
     medico_id = request.GET.get('medico')
     mes = request.GET.get('mes')
     año = request.GET.get('año')
 
-    # Filtrar TODAS las prácticas (sin excluir ningún tipo)
-    registros = RegistroEstudiosPorMedico.objects.prefetch_related(
-        Prefetch('estudio', queryset=Estudios.objects.all())
-    ).distinct()
-
-    if medico_id:
-        registros = registros.filter(medico_id=medico_id)
-    if mes and año:
-        registros = registros.filter(fecha_del_informe__year=int(año), fecha_del_informe__month=int(mes))
-
-    # Obtener guardias pasivas
-    guardias = GuardiaPasiva.objects.none()
-    if medico_id and mes and año:
-        guardias = GuardiaPasiva.objects.filter(
-            medico_id=medico_id,
-            fecha_guardia__year=int(año),
-            fecha_guardia__month=int(mes)
-        ).order_by('fecha_guardia')
-
-    # Obtener nombre del médico para el archivo
     medico = None
     if medico_id:
         medico = get_object_or_404(User, id=medico_id)
-        nombre_medico = f"{medico.first_name}_{medico.last_name}"
-    else:
-        nombre_medico = "todos_los_medicos"
 
-    # Crear libro de Excel
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Liquidación Completa"
+    buffer, nombre_medico = generar_buffer_excel_liquidacion(medico=medico, mes=mes, año=año)
 
-    # ======== SECCIÓN: PRÁCTICAS ========
-    # Encabezados prácticas
-    headers_practicas = [
-        "Fecha", "Paciente", "DNI", "Estudios", 
-        "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus"
-    ]
-    ws.append(headers_practicas)
-
-    # Estilo encabezados prácticas
-    for cell in ws[1]:
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.font = Font(bold=True, color="FFFFFF")
-        cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-
-    # Agregar registros de prácticas
-    total_regiones = 0
-    total_monto_practicas = 0
-    
-    for registro in registros.order_by('-fecha_del_informe'):
-        estudios_lista = registro.estudio.all()
-        estudios_nombres = ", ".join(e.nombre for e in estudios_lista) if estudios_lista.exists() else "N/A"
-        tipos_estudios = ", ".join(e.get_tipo_display() for e in estudios_lista) if estudios_lista.exists() else "N/A"
-        bonus_icon = "⚡ SÍ" if registro.paciente_internado else ""
-        
-        ws.append([
-            registro.fecha_del_informe.strftime("%d/%m/%Y"),
-            f"{registro.apellido_paciente.upper()} {registro.nombre_paciente.upper()}",
-            registro.dni_paciente,
-            estudios_nombres,
-            tipos_estudios,
-            registro.cantidad_regiones,
-            registro.get_tipo_obra_social_display(),
-            registro.get_horario_display(),
-            float(registro.monto_calculado),
-            bonus_icon
-        ])
-        
-        total_regiones += registro.cantidad_regiones
-        total_monto_practicas += registro.monto_calculado
-
-    # Fila de totales prácticas
-    ws.append([])
-    totales_practicas_row = ws.max_row + 1
-    ws.append(["", "", "", "", "SUBTOTAL PRÁCTICAS", total_regiones, "", "", float(total_monto_practicas), ""])
-    
-    for cell in ws[totales_practicas_row]:
-        cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    
-    ws.cell(row=totales_practicas_row, column=9).number_format = '$#,##0.00'
-
-    # ======== SECCIÓN: GUARDIAS ========
-    total_monto_guardias = 0
-    
-    if guardias.exists():
-        # Espaciado
-        ws.append([])
-        ws.append([])
-        
-        # Encabezados guardias
-        headers_guardias = ["Fecha", "Tipo de Guardia", "Monto", "Observaciones"]
-        header_row = ws.max_row + 1
-        ws.append(headers_guardias)
-        
-        # Estilo encabezados guardias
-        for col_num, cell in enumerate(ws[header_row], 1):
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
-        
-        # Agregar guardias
-        for guardia in guardias:
-            ws.append([
-                guardia.fecha_guardia.strftime("%d/%m/%Y"),
-                guardia.get_tipo_guardia_display(),
-                float(guardia.monto),
-                guardia.observaciones or ""
-            ])
-            total_monto_guardias += guardia.monto
-        
-        # Totales guardias
-        ws.append([])
-        totales_guardias_row = ws.max_row + 1
-        ws.append(["", "SUBTOTAL GUARDIAS", float(total_monto_guardias), ""])
-        
-        for cell in ws[totales_guardias_row]:
-            cell.font = Font(bold=True)
-            cell.fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-        
-        ws.cell(row=totales_guardias_row, column=3).number_format = '$#,##0.00'
-
-    # ======== TOTAL GENERAL ========
-    ws.append([])
-    ws.append([])
-    total_general_row = ws.max_row + 1
-    ws.append(["", "", "", "", "TOTAL GENERAL", "", "", "", float(total_monto_practicas + total_monto_guardias), ""])
-    
-    for cell in ws[total_general_row]:
-        cell.font = Font(bold=True, size=12)
-        cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
-    
-    ws.cell(row=total_general_row, column=9).number_format = '$#,##0.00'
-
-    # ======== FORMATO DE MONEDA EN TODAS LAS FILAS ========
-    # Columna 9 (Monto) en sección de prácticas
-    for row in range(2, totales_practicas_row):
-        ws.cell(row=row, column=9).number_format = '$#,##0.00'
-    
-    # Columna 3 (Monto) en sección de guardias si existen
-    if guardias.exists():
-        guardias_start = header_row + 1
-        guardias_end = totales_guardias_row - 1
-        for row in range(guardias_start, guardias_end + 1):
-            ws.cell(row=row, column=3).number_format = '$#,##0.00'
-
-    # ======== AJUSTE AUTOMÁTICO DE ANCHO DE COLUMNAS ========
-    for column_cells in ws.columns:
-        length = 0
-        column_letter = column_cells[0].column_letter
-        
-        for cell in column_cells:
-            try:
-                if cell.value:
-                    cell_length = len(str(cell.value))
-                    if cell_length > length:
-                        length = cell_length
-            except:
-                pass
-        
-        # Ajustar ancho con margen adicional
-        adjusted_width = (length + 3)
-        ws.column_dimensions[column_letter].width = adjusted_width
-
-    # Preparar respuesta HTTP
-    response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    response["Content-Disposition"] = f'attachment; filename="liquidacion_completa_{nombre_medico}_{mes}_{año}.xlsx"'
-    wb.save(response)
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = (
+        f'attachment; filename="liquidacion_completa_{nombre_medico}_{mes}_{año}.xlsx"'
+    )
+    response.write(buffer.read())
     return response
 
 # A continuación, se agrega el formulario para carga masiva de estudios
