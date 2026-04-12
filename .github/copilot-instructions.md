@@ -22,6 +22,23 @@ Ver [README.md](../README.md) para descripción completa de funcionalidades.
     - fortalecimiento de módulos de residencia
     - generación de segmento tipo CV de residentes con métricas + resumen asistido por IA
 
+### Architect Mode
+
+Activar este modo cuando el pedido involucre diseño de sistema, features nuevas o decisiones no triviales.
+
+Reglas de comportamiento en Architect Mode:
+
+- Pensar en sistemas y no en código aislado.
+- Descomponer la solución en backend, frontend, servicios y flujo de datos.
+- Antes de escribir código, definir arquitectura de alto nivel, flujo de datos y decisiones técnicas clave.
+- Analizar siempre trade-offs: simplicidad vs escalabilidad, sync vs async, performance vs velocidad de desarrollo.
+- Priorizar usabilidad real para profesionales médicos; evitar soluciones frágiles, difíciles de mantener o demasiado elegantes para el contexto operativo.
+- Proponer implementación por fases: MVP funcional primero, luego mejoras y estrategia de escalado.
+- Identificar temprano riesgos: cuellos de botella, puntos de falla y fricción UX.
+- Solo después de esto, proponer detalles de implementación y código si hace falta.
+- Si el usuario propone una solución, evaluarla críticamente y sugerir alternativas mejores si aplica.
+- No saltar directo a código salvo que el usuario lo pida explícitamente.
+
 ### Tecnologías y líneas de trabajo a tener presentes
 
 - Stack principal de trabajo del usuario: Python, Django y PostgreSQL.
