@@ -139,12 +139,12 @@ La documentación completa está organizada en:
 
 ### Documentos Importantes
 
-- **[Configuración de APIs de IA](docs/CONFIGURACION_APIS_IA.md)** - Setup OpenAI Whisper y GPT para dictado
-- [Sistema de Perfiles](docs/SISTEMA_PERFILES_README.md) - Gestión de usuarios y roles
-- [Sistema de Protocolos](docs/README_PROTOCOLOS.md) - Protocolos radiológicos
-- [Despliegue en Heroku](docs/README_colegiales_deploy.md) - Guía de deployment
+- **[Configuración de APIs de IA](docs/arquitectura/CONFIGURACION_APIS_IA.md)** - Setup OpenAI Whisper y GPT para dictado
+- [Sistema de Perfiles](docs/producto/SISTEMA_PERFILES_README.md) - Gestión de usuarios y roles
+- [Sistema de Protocolos](docs/producto/README_PROTOCOLOS.md) - Protocolos radiológicos
+- [Despliegue en Heroku](docs/operativa/README_colegiales_deploy.md) - Guía de deployment
 - [Seguridad](docs/SECURITY_IMPROVEMENTS.md) - Mejoras de seguridad
-- [Testing](docs/TESTS_README.md) - Suite de tests
+- [Testing](docs/operativa/TESTS_README.md) - Suite de tests
 
 ## 🧪 Testing
 
@@ -176,7 +176,7 @@ heroku logs --tail --app gestion-colegiales
 heroku run python manage.py migrate --app gestion-colegiales
 ```
 
-Ver guía completa en [docs/README_colegiales_deploy.md](docs/README_colegiales_deploy.md)
+Ver guía completa en [docs/operativa/README_colegiales_deploy.md](docs/operativa/README_colegiales_deploy.md)
 
 ## 🔐 Seguridad
 

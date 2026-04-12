@@ -86,7 +86,7 @@ python configurar_cloudinary_interactivo.py
    - Deploy a Heroku
    - Mejoras futuras
 
-3. **docs/SISTEMA_CLASES_RESIDENTES.md**
+3. **docs/producto/SISTEMA_CLASES_RESIDENTES.md**
    - Documentación técnica
    - Arquitectura del sistema
    - APIs

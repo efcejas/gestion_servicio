@@ -6,32 +6,41 @@
 
 ### Operación y despliegue
 
-- **[README_colegiales_deploy.md](README_colegiales_deploy.md)** - Guía principal de deploy en Heroku.
-- **[CHECKLIST_DEPLOY_HEROKU.md](CHECKLIST_DEPLOY_HEROKU.md)** - Checklist corto antes y después del deploy.
-- **[CONFIGURAR_SCHEDULER.md](CONFIGURAR_SCHEDULER.md)** - Configuración del scheduler local para pedidos.
-- **[HEROKU_CONFIG_VARS.md](HEROKU_CONFIG_VARS.md)** - Variables de entorno útiles para producción.
+- **[operativa/README.md](operativa/README.md)** - Índice de documentación operativa.
+- **[operativa/README_colegiales_deploy.md](operativa/README_colegiales_deploy.md)** - Guía principal de deploy en Heroku.
+- **[operativa/CHECKLIST_DEPLOY_HEROKU.md](operativa/CHECKLIST_DEPLOY_HEROKU.md)** - Checklist corto antes y después del deploy.
+- **[operativa/CONFIGURAR_SCHEDULER.md](operativa/CONFIGURAR_SCHEDULER.md)** - Configuración del scheduler local para pedidos.
+- **[operativa/HEROKU_CONFIG_VARS.md](operativa/HEROKU_CONFIG_VARS.md)** - Variables de entorno útiles para producción.
 
 ### Sistemas activos
 
-- **[README_PROTOCOLOS.md](README_PROTOCOLOS.md)** - Navegación del sistema de protocolos.
-- **[SISTEMA_PERFILES_README.md](SISTEMA_PERFILES_README.md)** - Roles, perfiles y flujo de usuario.
-- **[SISTEMA_RESIDENTES_README.md](SISTEMA_RESIDENTES_README.md)** - Módulo de residentes.
-- **[SISTEMA_CLASES_RESIDENTES.md](SISTEMA_CLASES_RESIDENTES.md)** - Sistema educativo de residentes.
-- **[SISTEMA_CONSULTORIOS.md](SISTEMA_CONSULTORIOS.md)** - Consultorios y equipamiento.
-- **[SISTEMA_LIQUIDACION_COLEGIALES_V2.md](SISTEMA_LIQUIDACION_COLEGIALES_V2.md)** - Referencia funcional de liquidación.
+- **[producto/README.md](producto/README.md)** - Índice de documentación funcional.
+- **[producto/README_PROTOCOLOS.md](producto/README_PROTOCOLOS.md)** - Navegación del sistema de protocolos.
+- **[producto/SISTEMA_PERFILES_README.md](producto/SISTEMA_PERFILES_README.md)** - Roles, perfiles y flujo de usuario.
+- **[producto/SISTEMA_RESIDENTES_README.md](producto/SISTEMA_RESIDENTES_README.md)** - Módulo de residentes.
+- **[producto/SISTEMA_CLASES_RESIDENTES.md](producto/SISTEMA_CLASES_RESIDENTES.md)** - Sistema educativo de residentes.
+- **[producto/SISTEMA_CONSULTORIOS.md](producto/SISTEMA_CONSULTORIOS.md)** - Consultorios y equipamiento.
+- **[producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md](producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md)** - Referencia funcional de liquidación.
 
 ### IA y dictado
 
-- **[CONFIGURACION_APIS_IA.md](CONFIGURACION_APIS_IA.md)** - Configuración de APIs para IA.
-- **[PLAN_ACCION_DICTADO_IA.md](PLAN_ACCION_DICTADO_IA.md)** - Documento vivo de roadmap y estado del sistema de dictado.
-- **[ARQUITECTURA_SISTEMA_DICTADO_IA.md](ARQUITECTURA_SISTEMA_DICTADO_IA.md)** - Arquitectura del sistema de dictado.
-- **[RELEVAMIENTO_SISTEMA_DICTADO_IA.md](RELEVAMIENTO_SISTEMA_DICTADO_IA.md)** - Relevamiento funcional/técnico actual.
+- **[arquitectura/README.md](arquitectura/README.md)** - Índice de documentación técnica.
+- **[arquitectura/CONFIGURACION_APIS_IA.md](arquitectura/CONFIGURACION_APIS_IA.md)** - Configuración de APIs para IA.
+- **[arquitectura/PLAN_ACCION_DICTADO_IA.md](arquitectura/PLAN_ACCION_DICTADO_IA.md)** - Documento vivo de roadmap y estado del sistema de dictado.
+- **[arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md](arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md)** - Arquitectura del sistema de dictado.
+- **[arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md](arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md)** - Relevamiento funcional/técnico actual.
 
 ### Calidad y seguridad
 
-- **[TESTS_README.md](TESTS_README.md)** - Ejecución y alcance de tests.
+- **[operativa/TESTS_README.md](operativa/TESTS_README.md)** - Ejecución y alcance de tests.
 - **[SECURITY_IMPROVEMENTS.md](SECURITY_IMPROVEMENTS.md)** - Resumen de mejoras de seguridad.
 - **[security/SECURITY_README.md](security/SECURITY_README.md)** - Índice detallado de documentos de seguridad.
+
+## Estructura activa
+
+- **[operativa/README.md](operativa/README.md)** - Deploy, scheduler, variables de entorno, testing y procedimientos.
+- **[producto/README.md](producto/README.md)** - Documentación funcional de módulos y flujos de negocio.
+- **[arquitectura/README.md](arquitectura/README.md)** - Roadmaps, relevamientos y documentos técnicos de diseño.
 
 ## Documentación histórica
 

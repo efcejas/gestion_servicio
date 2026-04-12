@@ -77,7 +77,7 @@ http://localhost:8000/admin/
 
 ## 📚 Documentación Completa
 
-Ver: `docs/SISTEMA_CONSULTORIOS.md`
+Ver: `docs/producto/SISTEMA_CONSULTORIOS.md`
 
 ---
 

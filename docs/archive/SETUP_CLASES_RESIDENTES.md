@@ -13,7 +13,7 @@
 - ✅ Sistema de permisos implementado
 - ✅ Forms con validación
 - ✅ Admin registrado (3 modelos)
-- ✅ Documentación completa (docs/SISTEMA_CLASES_RESIDENTES.md)
+- ✅ Documentación completa (docs/producto/SISTEMA_CLASES_RESIDENTES.md)
 
 ### PENDIENTE
 🔧 Configurar credenciales de Cloudinary
@@ -332,7 +332,7 @@ if all([CLOUDINARY_STORAGE['CLOUD_NAME'], ...]):
 Para consultas o problemas:
 1. Revisar este documento
 2. Verificar logs del servidor
-3. Consultar [docs/SISTEMA_CLASES_RESIDENTES.md](docs/SISTEMA_CLASES_RESIDENTES.md)
+3. Consultar [docs/producto/SISTEMA_CLASES_RESIDENTES.md](docs/producto/SISTEMA_CLASES_RESIDENTES.md)
 
 ---
 

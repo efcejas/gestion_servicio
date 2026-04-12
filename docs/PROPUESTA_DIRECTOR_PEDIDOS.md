@@ -209,7 +209,7 @@ Indicadores a monitorear:
 ### Documentación:
 - ✓ Código comentado y estructurado
 - ✓ Guía de deployment en `docs/DEPLOY_HEROKU_PEDIDOS.md`
-- ✓ Checklist de mantenimiento en `docs/CHECKLIST_DEPLOY_HEROKU.md`
+- ✓ Checklist de mantenimiento en `docs/operativa/CHECKLIST_DEPLOY_HEROKU.md`
 - ✓ Ejemplos de emails en `pedidos_estudios/EJEMPLOS_EMAILS.md`
 
 **Transferencia de conocimiento:** 2 horas para capacitar a otro desarrollador si fuera necesario.

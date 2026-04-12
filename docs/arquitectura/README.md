@@ -1,0 +1,10 @@
+# Documentacion de Arquitectura
+
+Documentos tecnicos, relevamientos y roadmap de evolucion del sistema.
+
+## Incluye
+
+- [CONFIGURACION_APIS_IA.md](CONFIGURACION_APIS_IA.md)
+- [PLAN_ACCION_DICTADO_IA.md](PLAN_ACCION_DICTADO_IA.md)
+- [ARQUITECTURA_SISTEMA_DICTADO_IA.md](ARQUITECTURA_SISTEMA_DICTADO_IA.md)
+- [RELEVAMIENTO_SISTEMA_DICTADO_IA.md](RELEVAMIENTO_SISTEMA_DICTADO_IA.md)

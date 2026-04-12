@@ -856,7 +856,7 @@ python manage.py test dictado_informes.tests.test_apis
 **Tests:** 14/14 OK ✅  
 **Mejora de performance:** 27.4% promedio, 51% mediana
 
-**Documentación completa:** [archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md](archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md)
+**Documentación completa:** [../archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md](../archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md)
 
 ### ✅ Tarea 3.1: Optimizar Queries del Admin (30 min) ✅ YA EXISTÍA
 
@@ -1802,8 +1802,8 @@ path('monitoring/', views.MonitoringDashboardView.as_view(), name='monitoring'),
 ### ✅ Tarea 5.1: Crear README Completo (1 hora)
 
 Ver archivos generados:
-- ✅ `RELEVAMIENTO_SISTEMA_DICTADO_IA.md`
-- ✅ `ARQUITECTURA_SISTEMA_DICTADO_IA.md`
+- ✅ `docs/arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md`
+- ✅ `docs/arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md`
 
 ### ✅ Tarea 5.2: Guía de Troubleshooting (1 hora)
 
@@ -2034,9 +2034,9 @@ Para problemas no resueltos:
 - [X] RELEVAMIENTO_DICTADO_IA.md completo
 - [X] ARQUITECTURA_DICTADO_IA.md detallado
 - [X] PLAN_ACCION_DICTADO_IA.md (este archivo)
-- [X] archive/dictado_ia/FASE_2_TESTS_COMPLETADA.md
-- [X] archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md
-- [X] archive/dictado_ia/FASE_4_MONITOREO_COMPLETADA.md
+- [X] ../archive/dictado_ia/FASE_2_TESTS_COMPLETADA.md
+- [X] ../archive/dictado_ia/FASE_3_OPTIMIZACIONES_COMPLETADA.md
+- [X] ../archive/dictado_ia/FASE_4_MONITOREO_COMPLETADA.md
 - [X] Comentarios actualizados en código
 
 **Resultado:** Documentación completa del sistema (~3,500 líneas de documentación)

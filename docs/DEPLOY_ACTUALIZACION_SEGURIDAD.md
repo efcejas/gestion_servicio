@@ -372,7 +372,7 @@ Estos se pueden configurar después del deploy exitoso ([ver MEJORAS_SEGURIDAD_I
 ## 📚 REFERENCIAS
 
 - [ACTUALIZACION_SEGURIDAD_COMPLETADA.md](../ACTUALIZACION_SEGURIDAD_COMPLETADA.md) - Detalles de CVEs corregidos
-- [CHECKLIST_DEPLOY_HEROKU.md](./CHECKLIST_DEPLOY_HEROKU.md) - Checklist general de deploy
+- [operativa/CHECKLIST_DEPLOY_HEROKU.md](operativa/CHECKLIST_DEPLOY_HEROKU.md) - Checklist general de deploy
 - [MEJORAS_SEGURIDAD_IMPLEMENTABLES.md](../MEJORAS_SEGURIDAD_IMPLEMENTABLES.md) - Próximas mejoras de seguridad
 
 ---
