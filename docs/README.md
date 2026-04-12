@@ -25,7 +25,6 @@
 - **[producto/SISTEMA_CLASES_RESIDENTES.md](producto/SISTEMA_CLASES_RESIDENTES.md)** - Sistema educativo de residentes.
 - **[producto/SISTEMA_CONSULTORIOS.md](producto/SISTEMA_CONSULTORIOS.md)** - Consultorios y equipamiento.
 - **[producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md](producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md)** - Referencia funcional de liquidación.
-- **[producto/PROPUESTA_DIRECTOR_PEDIDOS.md](producto/PROPUESTA_DIRECTOR_PEDIDOS.md)** - Contexto de producto del sistema de pedidos.
 - **[producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md](producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md)** - Resumen funcional/técnico del registro de estudios.
 - **[producto/NOTIFICACIONES_TOKEN_README.md](producto/NOTIFICACIONES_TOKEN_README.md)** - Acceso por token y notificaciones para médicos.
 - **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
@@ -34,7 +33,6 @@
 
 - **[arquitectura/README.md](arquitectura/README.md)** - Índice de documentación técnica.
 - **[arquitectura/CONFIGURACION_APIS_IA.md](arquitectura/CONFIGURACION_APIS_IA.md)** - Configuración de APIs para IA.
-- **[arquitectura/PLAN_ACCION_DICTADO_IA.md](arquitectura/PLAN_ACCION_DICTADO_IA.md)** - Documento vivo de roadmap y estado del sistema de dictado.
 - **[arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md](arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md)** - Arquitectura del sistema de dictado.
 - **[arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md](arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md)** - Relevamiento funcional/técnico actual.
 - **[arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md](arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md)** - Cambio técnico de normalización HTML en preinformes.
@@ -58,6 +56,8 @@
 
 - **[archive/](archive/)** - Archivo histórico general.
 - **[archive/dictado_ia/](archive/dictado_ia/)** - Fases cerradas del proyecto de dictado IA.
+- **[archive/dictado_ia/PLAN_ACCION_DICTADO_IA.md](archive/dictado_ia/PLAN_ACCION_DICTADO_IA.md)** - Plan de optimización ya ejecutado (histórico).
+- **[archive/producto/PROPUESTA_DIRECTOR_PEDIDOS.md](archive/producto/PROPUESTA_DIRECTOR_PEDIDOS.md)** - Propuesta funcional/económica de pedidos (histórico).
 
 Usar `archive/` para:
 - fases completadas

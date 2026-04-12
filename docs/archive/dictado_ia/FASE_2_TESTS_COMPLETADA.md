@@ -214,7 +214,7 @@ Cobertura Estimada: 75% del código crítico
 
 - [Documentación Django Testing](https://docs.djangoproject.com/en/stable/topics/testing/)
 - [Unittest Mock](https://docs.python.org/3/library/unittest.mock.html)
-- [../../arquitectura/PLAN_ACCION_DICTADO_IA.md](../../arquitectura/PLAN_ACCION_DICTADO_IA.md) - Plan completo de optimización
+- [PLAN_ACCION_DICTADO_IA.md](PLAN_ACCION_DICTADO_IA.md) - Plan completo de optimización
 
 ---
 

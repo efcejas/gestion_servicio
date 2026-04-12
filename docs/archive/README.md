@@ -15,7 +15,9 @@ Esta carpeta agrupa documentacion que ya no es la fuente principal de verdad, pe
 - [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md) - Templates legacy aun utiles como referencia.
 - [dictado_ia/FASE2_SISTEMA_CONVERSACIONAL_COMPLETO.md](dictado_ia/FASE2_SISTEMA_CONVERSACIONAL_COMPLETO.md) - Hito historico del flujo conversacional de dictado.
 - [dictado_ia/RELEVAMIENTO_UI_DICTADO.md](dictado_ia/RELEVAMIENTO_UI_DICTADO.md) - Auditoria historica de UX/UI del modulo de dictado.
+- [dictado_ia/PLAN_ACCION_DICTADO_IA.md](dictado_ia/PLAN_ACCION_DICTADO_IA.md) - Plan maestro ya ejecutado para optimizacion del dictado IA.
 - [producto/MVP_REVISION_EDITOR_UNICO.md](producto/MVP_REVISION_EDITOR_UNICO.md) - Definicion inicial del editor unico en revision staff.
+- [producto/PROPUESTA_DIRECTOR_PEDIDOS.md](producto/PROPUESTA_DIRECTOR_PEDIDOS.md) - Propuesta de negocio/producto del sistema de pedidos en su etapa inicial.
 
 ## Regla practica
 
