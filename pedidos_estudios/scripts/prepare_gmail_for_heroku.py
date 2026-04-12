@@ -16,6 +16,7 @@ def prepare_token_for_heroku():
     Lee token.json y lo prepara para usarse como variable de entorno en Heroku.
     """
     token_file = Path('token.json')
+    output_dir = Path('.local') / 'gmail'
     
     print("="*70)
     print("🔑 Preparación de Credenciales Gmail para Heroku")
@@ -70,8 +71,9 @@ def prepare_token_for_heroku():
         print("-"*70)
         print()
         
-        # Guardar en archivo temporal para copiar fácilmente
-        output_file = Path('token_for_heroku.txt')
+        # Guardar en carpeta local ignorada para no ensuciar la raíz del proyecto
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_file = output_dir / 'token_for_heroku.txt'
         with open(output_file, 'w') as f:
             f.write(token_json_compact)
         
@@ -90,8 +92,8 @@ def prepare_token_for_heroku():
         print("✅ ¡Listo! Ahora copia el valor y pégalo en Heroku Config Vars")
         print()
         print("⚠️  IMPORTANTE:")
-        print("   - NO subas token.json ni token_for_heroku.txt a Git")
-        print("   - Estos archivos ya están en .gitignore")
+        print("   - NO subas token.json ni los exports locales de Gmail a Git")
+        print("   - Estos archivos ya están cubiertos por .gitignore")
         print("   - El token se renovará automáticamente cuando expire")
         print()
         

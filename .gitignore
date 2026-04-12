@@ -26,6 +26,7 @@ media/
 
 # Claves y configuraciones sensibles
 .env
+.local/
 
 # Gmail API credentials
 credentials.json

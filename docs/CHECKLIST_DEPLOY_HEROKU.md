@@ -32,7 +32,7 @@ ls token.json
 # Ejecuta el script helper
 python pedidos_estudios/scripts/prepare_gmail_for_heroku.py
 
-# Esto generará token_for_heroku.txt con el valor para copiar
+# Esto generará .local/gmail/token_for_heroku.txt con el valor para copiar
 ```
 
 ### 4. Variables de Entorno en Heroku
@@ -46,7 +46,7 @@ DEBUG=False
 ALLOWED_HOSTS=<tu-app>.herokuapp.com
 
 # Gmail (CRÍTICO)
-GMAIL_TOKEN_JSON=<copia el contenido de token_for_heroku.txt>
+GMAIL_TOKEN_JSON=<copia el contenido de .local/gmail/token_for_heroku.txt>
 GMAIL_EMAIL=solicitudestudioscolegiales@gmail.com
 GMAIL_PEDIDOS_QUERY=is:unread
 
@@ -180,7 +180,7 @@ heroku logs --tail | grep "procesamiento"
 heroku config | grep GMAIL
 
 # Si falta, volver a paso 3 "Preparar Token para Heroku"
-heroku config:set GMAIL_TOKEN_JSON="<contenido de token_for_heroku.txt>"
+heroku config:set GMAIL_TOKEN_JSON="<contenido de .local/gmail/token_for_heroku.txt>"
 ```
 
 ### ❌ "No se pueden procesar emails"
