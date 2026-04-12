@@ -27,6 +27,8 @@
 - **[producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md](producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md)** - Referencia funcional de liquidación.
 - **[producto/PROPUESTA_DIRECTOR_PEDIDOS.md](producto/PROPUESTA_DIRECTOR_PEDIDOS.md)** - Contexto de producto del sistema de pedidos.
 - **[producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md](producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md)** - Resumen funcional/técnico del registro de estudios.
+- **[producto/NOTIFICACIONES_TOKEN_README.md](producto/NOTIFICACIONES_TOKEN_README.md)** - Acceso por token y notificaciones para médicos.
+- **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
 
 ### IA y dictado
 
@@ -38,6 +40,7 @@
 - **[arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md](arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md)** - Cambio técnico de normalización HTML en preinformes.
 - **[arquitectura/REFACTOR_REVISION_STAFF.md](arquitectura/REFACTOR_REVISION_STAFF.md)** - Refactor de la revisión de staff en preinformes.
 - **[arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md](arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md)** - Arquitectura de carga híbrida para clases de residentes.
+- **[arquitectura/SISTEMA_DISENO_DARK_MODE.md](arquitectura/SISTEMA_DISENO_DARK_MODE.md)** - Sistema visual unificado para dark mode en dictado IA.
 
 ### Calidad y seguridad
 
