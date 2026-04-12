@@ -10,9 +10,9 @@
 
 | Documento | Propósito | Cuándo Usar |
 |-----------|-----------|-------------|
-| [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md) | **Templates copiables** | ⭐ Cuando necesites agregar/modificar escenarios |
-| [MEJORAS_ELEGIR_PROTOCOLO_v3.md](MEJORAS_ELEGIR_PROTOCOLO_v3.md) | Documentación completa v3 | Entender arquitectura y cambios implementados |
-| [REPORTE_AUDITORIA_PROTOCOLOS.md](REPORTE_AUDITORIA_PROTOCOLOS.md) | Estado del sistema completo | Auditoría y diagnóstico de problemas |
+| [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md) | **Templates copiables** | ⭐ Cuando necesites agregar/modificar escenarios |
+| [archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md](archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md) | Documentación completa v3 | Entender arquitectura y cambios implementados |
+| [archive/REPORTE_AUDITORIA_PROTOCOLOS.md](archive/REPORTE_AUDITORIA_PROTOCOLOS.md) | Estado del sistema completo | Auditoría y diagnóstico de problemas |
 | Este archivo (README) | Índice de navegación | Punto de entrada a la documentación |
 
 ---
@@ -21,7 +21,7 @@
 
 ### 🆕 Quiero agregar un nuevo escenario clínico
 
-1. **Ir a**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+1. **Ir a**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
 2. **Sección**: "TEMPLATE: Agregar Nuevo Escenario"
 3. **Copiar**: Template base o ejemplo completo
 4. **Editar**: `protocolos/views.py` → lista `escenarios`
@@ -33,14 +33,14 @@
 
 ### ✏️ Quiero modificar una recomendación existente
 
-1. **Ir a**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+1. **Ir a**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
 2. **Sección**: "TEMPLATE: Modificar Solo Recomendación"
 3. **Buscar en**: `protocolos/views.py` → `'key': 'nombre-escenario'`
 4. **Reemplazar**: Solo bloque `'recommendation': {...}`
 
 ### 🎨 Quiero agregar un nuevo tag (ej: "Pediátrico")
 
-1. **Ir a**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+1. **Ir a**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
 2. **Sección**: "TEMPLATE: Agregar Nuevo Tag"
 3. **Editar**: 
    - `templates/protocolos/elegir_protocolo.html` (botón + JavaScript)
@@ -48,7 +48,7 @@
 
 ### 🔍 Quiero ver qué protocolos existen en la DB
 
-1. **Ir a**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+1. **Ir a**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
 2. **Sección**: "COMANDOS ÚTILES"
 3. **Copiar y ejecutar**:
    ```bash
@@ -62,20 +62,20 @@
 
 ### 🏗️ Quiero crear un protocolo nuevo en la DB
 
-1. **Ir a**: [REPORTE_AUDITORIA_PROTOCOLOS.md](REPORTE_AUDITORIA_PROTOCOLOS.md)
+1. **Ir a**: [archive/REPORTE_AUDITORIA_PROTOCOLOS.md](archive/REPORTE_AUDITORIA_PROTOCOLOS.md)
 2. **Sección**: "ANEXO: Comandos de Gestión Django"
 3. **Subsección**: "Crear nuevo protocolo"
 4. **Copiar template** y modificar valores
 
 ### 🐛 Tengo un problema / Error
 
-1. **Ir a**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+1. **Ir a**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
 2. **Sección**: "Solución Rápida de Problemas"
 3. **Buscar**: Síntoma (ej: "Botón gris", "Escenario no aparece")
 
 ### 📊 Quiero entender la arquitectura completa
 
-1. **Ir a**: [MEJORAS_ELEGIR_PROTOCOLO_v3.md](MEJORAS_ELEGIR_PROTOCOLO_v3.md)
+1. **Ir a**: [archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md](archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md)
 2. **Leer secciones**:
    - "Cambios Técnicos"
    - "Distribución de protocolos por nivel"
@@ -83,7 +83,7 @@
 
 ### 🔍 Quiero auditar el estado del sistema
 
-1. **Ir a**: [REPORTE_AUDITORIA_PROTOCOLOS.md](REPORTE_AUDITORIA_PROTOCOLOS.md)
+1. **Ir a**: [archive/REPORTE_AUDITORIA_PROTOCOLOS.md](archive/REPORTE_AUDITORIA_PROTOCOLOS.md)
 2. **Revisar**:
    - Resumen ejecutivo
    - Problemas detectados/corregidos
@@ -106,9 +106,9 @@
 
 | Archivo | Actualizar Cuando |
 |---------|-------------------|
-| `TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md` | Cambies estructura de escenarios o agregues nuevos templates |
-| `MEJORAS_ELEGIR_PROTOCOLO_v3.md` | Hagas cambios significativos en arquitectura |
-| `REPORTE_AUDITORIA_PROTOCOLOS.md` | Agregues/elimines protocolos o detectes problemas |
+| `archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md` | Cambies estructura de escenarios o agregues nuevos templates |
+| `archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md` | Hagas cambios significativos en arquitectura |
+| `archive/REPORTE_AUDITORIA_PROTOCOLOS.md` | Agregues/elimines protocolos o detectes problemas |
 | `README_PROTOCOLOS.md` (este archivo) | Cambies estructura de documentación |
 
 ---
@@ -234,9 +234,9 @@ python manage.py runserver
 
 ### Dónde Buscar Ayuda
 
-1. **Templates copiables**: [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
-2. **Troubleshooting extendido**: [MEJORAS_ELEGIR_PROTOCOLO_v3.md](MEJORAS_ELEGIR_PROTOCOLO_v3.md) → Sección "Troubleshooting"
-3. **Comandos Django**: [REPORTE_AUDITORIA_PROTOCOLOS.md](REPORTE_AUDITORIA_PROTOCOLOS.md) → ANEXO
+1. **Templates copiables**: [archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](archive/TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md)
+2. **Troubleshooting extendido**: [archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md](archive/MEJORAS_ELEGIR_PROTOCOLO_v3.md) → Sección "Troubleshooting"
+3. **Comandos Django**: [archive/REPORTE_AUDITORIA_PROTOCOLOS.md](archive/REPORTE_AUDITORIA_PROTOCOLOS.md) → ANEXO
 
 ---
 
