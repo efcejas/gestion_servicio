@@ -5,12 +5,16 @@ Esta carpeta agrupa documentacion que ya no es la fuente principal de verdad, pe
 ## Subgrupos
 
 - [dictado_ia/](dictado_ia/) - Fases cerradas y reportes historicos del proyecto de dictado IA.
+- [producto/](producto/) - MVPs, guias de prueba y decisiones funcionales ya cerradas.
+- [soporte_y_notas/](soporte_y_notas/) - Guiones, comparativas, notas y material auxiliar.
 
 ## Documentos historicos destacados
 
 - [MEJORAS_ELEGIR_PROTOCOLO_v3.md](MEJORAS_ELEGIR_PROTOCOLO_v3.md) - Arquitectura previa y troubleshooting extendido de protocolos.
 - [REPORTE_AUDITORIA_PROTOCOLOS.md](REPORTE_AUDITORIA_PROTOCOLOS.md) - Auditoria historica del sistema de protocolos.
 - [TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md](TEMPLATES_MANTENIMIENTO_PROTOCOLOS.md) - Templates legacy aun utiles como referencia.
+- [dictado_ia/FASE2_SISTEMA_CONVERSACIONAL_COMPLETO.md](dictado_ia/FASE2_SISTEMA_CONVERSACIONAL_COMPLETO.md) - Hito historico del flujo conversacional de dictado.
+- [producto/MVP_REVISION_EDITOR_UNICO.md](producto/MVP_REVISION_EDITOR_UNICO.md) - Definicion inicial del editor unico en revision staff.
 
 ## Regla practica
 
