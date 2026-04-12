@@ -69,12 +69,26 @@ class CustomUser(AbstractUser):
         help_text='Fecha en que se completó el perfil por primera vez'
     )
     
+    # Avatar de perfil
+    avatar = models.ImageField(
+        upload_to='avatars/',
+        blank=True,
+        null=True,
+        help_text='Foto de perfil del usuario'
+    )
+
     # Preferencias de usuario
     recibir_notificaciones = models.BooleanField(
         default=True,
         help_text='Recibir notificaciones por email'
     )
     
+    def get_avatar_url(self):
+        """Retorna la URL del avatar si existe, None si no."""
+        if self.avatar:
+            return self.avatar.url
+        return None
+
     def __str__(self):
         return f"{self.username} - {self.get_rol_display() if self.rol else 'Sin rol'}"
     

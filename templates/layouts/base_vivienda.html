@@ -56,9 +56,7 @@
                         <button type="button" id="vivienda-user-btn"
                                 class="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-xl p-2 hover:bg-white/30 focus:outline-none transition-all duration-300 shadow-md"
                                 data-dropdown-toggle="vivienda-user-dropdown">
-                            <div class="w-8 h-8 bg-white rounded-full flex items-center justify-center text-emerald-700 text-sm font-bold shadow">
-                                {{ user.get_full_name|first|upper }}
-                            </div>
+                            {% include 'components/user_avatar.html' with user_obj=user size="sm" %}
                             <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>

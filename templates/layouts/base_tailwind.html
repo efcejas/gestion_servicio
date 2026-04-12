@@ -67,9 +67,7 @@
                         <button type="button" id="user-menu-button" 
                                 class="flex items-center space-x-2 text-sm bg-white/20 backdrop-blur-sm rounded-xl p-3 hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 shadow-lg"
                                 data-dropdown-toggle="user-dropdown">
-                            <div class="w-9 h-9 bg-white rounded-full flex items-center justify-center text-medical-primary text-sm font-bold shadow-md">
-                                {{ user.get_full_name|first|upper }}
-                            </div>
+                            {% include 'components/user_avatar.html' with user_obj=user size="sm" %}
                             <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                             </svg>

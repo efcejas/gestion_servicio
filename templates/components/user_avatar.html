@@ -1,0 +1,49 @@
+{% comment %}
+USER AVATAR COMPONENT
+Renderiza el avatar de un usuario. Muestra la imagen subida si existe,
+o un círculo con las iniciales del usuario como fallback.
+
+Parámetros:
+  user_obj  (requerido) — el objeto usuario (CustomUser)
+  size      (opcional)  — variante de tamaño: "xs", "sm", "md", "lg", "xl"
+                          Por defecto: "md"
+
+Uso:
+  {% include 'components/user_avatar.html' with user_obj=request.user %}
+  {% include 'components/user_avatar.html' with user_obj=request.user size="lg" %}
+  {% include 'components/user_avatar.html' with user_obj=clase.autor size="sm" %}
+
+Tamaños:
+  xs  → 24px  (w-6 h-6)   texto xs   — para listas densas
+  sm  → 32px  (w-8 h-8)   texto xs   — para comentarios, chips
+  md  → 40px  (w-10 h-10) texto sm   — uso general (default)
+  lg  → 64px  (w-16 h-16) texto xl   — cabecera de perfil
+  xl  → 96px  (w-24 h-24) texto 2xl  — página de perfil principal
+{% endcomment %}
+
+{% with avatar_url=user_obj.get_avatar_url %}
+
+  {% if avatar_url %}
+    {# -- Avatar real -- #}
+    <img src="{{ avatar_url }}"
+         alt="Foto de perfil de {{ user_obj.get_full_name|default:user_obj.username }}"
+         class="rounded-full object-cover object-center flex-shrink-0 ring-2 ring-white shadow-sm
+                {% if size == 'xs' %}w-6 h-6
+                {% elif size == 'sm' %}w-8 h-8
+                {% elif size == 'lg' %}w-16 h-16
+                {% elif size == 'xl' %}w-24 h-24
+                {% else %}w-10 h-10{% endif %}">
+  {% else %}
+    {# -- Fallback con iniciales -- #}
+    <div class="rounded-full bg-medical-primary flex items-center justify-center text-white font-semibold flex-shrink-0 ring-2 ring-white shadow-sm
+                {% if size == 'xs' %}w-6 h-6 text-xs
+                {% elif size == 'sm' %}w-8 h-8 text-xs
+                {% elif size == 'lg' %}w-16 h-16 text-xl
+                {% elif size == 'xl' %}w-24 h-24 text-2xl
+                {% else %}w-10 h-10 text-sm{% endif %}"
+         aria-label="Foto de perfil de {{ user_obj.get_full_name|default:user_obj.username }}">
+      {{ user_obj.first_name|first|upper }}{{ user_obj.last_name|first|upper }}
+    </div>
+  {% endif %}
+
+{% endwith %}

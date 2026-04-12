@@ -135,10 +135,8 @@
                         <!-- Autor -->
                         <td class="px-4 py-4 max-w-xs">
                             <div class="flex items-center min-w-0">
-                                <div class="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-semibold mr-2">
-                                    {{ clase.autor.first_name.0 }}{{ clase.autor.last_name.0 }}
-                                </div>
-                                <span class="text-sm text-gray-700 truncate block">{{ clase.autor.get_full_name|truncatewords:2 }}</span>
+                                {% include 'components/user_avatar.html' with user_obj=clase.autor size="sm" %}
+                                <span class="text-sm text-gray-700 truncate block ml-2">{{ clase.autor.get_full_name|truncatewords:2 }}</span>
                             </div>
                         </td>
                         <!-- Stats -->

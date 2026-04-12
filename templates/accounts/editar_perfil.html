@@ -4,255 +4,108 @@
 {% block title %}Editar Perfil - Sistema de Gestión{% endblock %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-3xl mx-auto">
-        
-        <!-- Header -->
-        <div class="mb-6">
-            <h1 class="text-3xl font-bold text-gray-900 flex items-center">
-                <i class="fas fa-user-edit text-blue-600 mr-3"></i>
-                Editar Perfil
-            </h1>
-            <p class="mt-2 text-sm text-gray-600">
-                Actualiza tu información personal y preferencias
-            </p>
+
+<!-- Card principal -->
+<div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+
+    <!-- Card header estilo cover photo -->
+    <div class="relative">
+        <!-- Banner superior con degradado -->
+        <div class="theme-gradient-bg h-24 w-full">
+            <!-- texto titulo sobre el banner -->
+            <div class="h-full flex flex-col items-end justify-center px-6">
+                <h2 class="text-white text-2xl font-bold">Edita tu perfil</h2>
+                <span class="text-gray-300 text-sm mt-0.5">Personaliza tu información y preferencias</span>
+            </div>
         </div>
 
-        <!-- Card principal -->
-        <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            
-            <!-- Usuario info header -->
-            <div class="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-5 border-b border-gray-200">
-                <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                        {{ user.get_full_name|first|upper }}
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-semibold text-gray-900">{{ user.get_full_name }}</h2>
-                        <p class="text-sm text-gray-600">{{ user.email }}</p>
-                        {% if user.rol %}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-1">
-                            <i class="fas fa-user-tag mr-1"></i>
-                            {{ user.get_rol_display }}
-                        </span>
+        <!-- Zona blanca con avatar solapado -->
+        <div class="bg-white border-b border-gray-200 px-6 pb-4">
+            <div class="flex items-end justify-between">
+                <!-- Avatar solapado sobre el banner -->
+                <div class="flex items-end gap-4">
+                    <div class="relative -mt-10 flex-shrink-0">
+                        <div class="ring-4 ring-white rounded-full shadow-md">
+                            <label for="{{ form.avatar.id_for_label }}"
+                                   class="relative group cursor-pointer block"
+                                   title="Cambiar foto de perfil">
+                                {% include 'components/user_avatar.html' with user_obj=user size="xl" %}
+                                <div class="absolute inset-0 rounded-full bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                    <i class="fas fa-camera text-white text-base"></i>
+                                    <span class="text-white text-xs font-medium leading-tight mt-0.5">Cambiar</span>
+                                </div>
+                            </label>
+                        </div>
+                        {% if user.avatar %}
+                        <form method="post" action="{% url 'accounts:eliminar_avatar' %}" class="absolute bottom-2 right-2">
+                            {% csrf_token %}
+                            <button type="submit" title="Eliminar foto"
+                                    class="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md transition-colors"
+                                    onclick="return confirm('\u00bfEliminás la foto de perfil?')">
+                                <i class="fas fa-times text-xs"></i>
+                            </button>
+                        </form>
                         {% endif %}
+                    </div>{# /div.relative #}
+
+                    <!-- Nombre, badge y email -->
+                    <div class="pb-1">
+                        <h2 class="text-lg font-bold text-gray-900 leading-tight">{{ user.get_full_name }}</h2>
+                        <div class="flex items-center flex-wrap gap-2 mt-1">
+                            {% if user.rol %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 uppercase tracking-wide">
+                                {{ user.get_rol_display }}
+                            </span>
+                            {% endif %}
+                            {% if user.cargo %}
+                            <span class="text-xs text-gray-500 flex items-center gap-1">
+                                <i class="fas fa-briefcase text-gray-400"></i>{{ user.cargo }}
+                            </span>
+                            {% endif %}
+                            <span class="text-xs text-gray-400 flex items-center gap-1">
+                                <i class="fas fa-envelope text-gray-300"></i>{{ user.email }}
+                            </span>
+                        </div>
                     </div>
+                </div>
+
+                <!-- Botón cambiar foto (derecha) -->
+                <div class="pb-1 flex-shrink-0">
+                    <label for="{{ form.avatar.id_for_label }}"
+                           class="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer transition-colors shadow-sm">
+                        <i class="fas fa-camera text-gray-500"></i>
+                        Cambiar foto
+                    </label>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Formulario -->
-            <form method="post" class="p-6" novalidate>
-                {% csrf_token %}
-                
-                {% if form.non_field_errors %}
-                    {% include 'components/alert_message.html' with type='error' message=form.non_field_errors|join:", " %}
-                {% endif %}
+    <!-- Formulario -->
+    <form method="post" enctype="multipart/form-data" class="p-6" novalidate>
+        {% csrf_token %}
 
-                <!-- Información Personal -->
-                <div class="mb-8">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
-                        <i class="fas fa-id-card text-blue-600 mr-2"></i>
-                        Información Personal
-                    </h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Username -->
-                        <div>
-                            <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Nombre de usuario
-                            </label>
-                            {{ form.username }}
-                            {% if form.username.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.username.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
+        {% if form.non_field_errors %}
+        {% include 'components/alert_message.html' with type='error' message=form.non_field_errors|join:", " %}
+        {% endif %}
 
-                        <!-- Email -->
-                        <div>
-                            <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Email
-                            </label>
-                            {{ form.email }}
-                            {% if form.email.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.email.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
+        <!-- Información Personal -->
+        <div class="mb-8">
+            <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                <i class="fas fa-id-card text-blue-600 mr-2"></i>
+                Información Personal
+            </h3>
 
-                        <!-- Nombre -->
-                        <div>
-                            <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Nombre
-                            </label>
-                            {{ form.first_name }}
-                            {% if form.first_name.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.first_name.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Apellido -->
-                        <div>
-                            <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Apellido
-                            </label>
-                            {{ form.last_name }}
-                            {% if form.last_name.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.last_name.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Información Profesional -->
-                <div class="mb-8">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
-                        <i class="fas fa-user-md text-green-600 mr-2"></i>
-                        Información Profesional
-                    </h3>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Rol -->
-                        <div>
-                            <label for="{{ form.rol.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Rol
-                            </label>
-                            {{ form.rol }}
-                            {% if form.rol.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.rol.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Cargo -->
-                        <div>
-                            <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Cargo
-                            </label>
-                            {{ form.cargo }}
-                            {% if form.cargo.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.cargo.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Fecha ingreso residencia (solo para residentes) -->
-                        <div id="fecha-ingreso-container-edit">
-                            <label for="{{ form.fecha_ingreso_residencia.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Fecha de ingreso a residencia
-                            </label>
-                            {{ form.fecha_ingreso_residencia }}
-                            {% if form.fecha_ingreso_residencia.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.fecha_ingreso_residencia.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Año de residencia (solo para residentes) -->
-                        <div id="anio-residencia-container-edit">
-                            <label for="{{ form.anio_residencia.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                                Año de residencia
-                            </label>
-                            {{ form.anio_residencia }}
-                            <p class="mt-1 text-xs text-gray-500 flex items-start">
-                                <i class="fas fa-info-circle mr-1 mt-0.5"></i>
-                                <span>Se calcula automáticamente desde la fecha de ingreso</span>
-                            </p>
-                            {% if form.anio_residencia.errors %}
-                            <div class="mt-1 text-xs text-red-600">
-                                {% for error in form.anio_residencia.errors %}
-                                <p class="flex items-start">
-                                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                                </p>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Contacto -->
-                <div class="mb-8">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
-                        <i class="fas fa-phone text-purple-600 mr-2"></i>
-                        Contacto
-                    </h3>
-                    
-                    <div>
-                        <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
-                            Teléfono
-                        </label>
-                        {{ form.telefono }}
-                        {% if form.telefono.errors %}
-                        <div class="mt-1 text-xs text-red-600">
-                            {% for error in form.telefono.errors %}
-                            <p class="flex items-start">
-                                <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
-                            </p>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <!-- Preferencias -->
-                <div class="mb-8">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
-                        <i class="fas fa-cog text-indigo-600 mr-2"></i>
-                        Preferencias
-                    </h3>
-                    
-                    <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            {{ form.recibir_notificaciones }}
-                        </div>
-                        <div class="ml-3">
-                            <label for="{{ form.recibir_notificaciones.id_for_label }}" class="text-sm font-medium text-gray-700">
-                                {{ form.recibir_notificaciones.label }}
-                            </label>
-                            <p class="text-xs text-gray-500 mt-1">Recibirás actualizaciones importantes del sistema</p>
-                        </div>
-                    </div>
-                    {% if form.recibir_notificaciones.errors %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Username -->
+                <div>
+                    <label for="{{ form.username.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Nombre de usuario
+                    </label>
+                    {{ form.username }}
+                    {% if form.username.errors %}
                     <div class="mt-1 text-xs text-red-600">
-                        {% for error in form.recibir_notificaciones.errors %}
+                        {% for error in form.username.errors %}
                         <p class="flex items-start">
                             <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
                         </p>
@@ -261,28 +114,228 @@
                     {% endif %}
                 </div>
 
-                <!-- Botones -->
-                <div class="flex items-center justify-between pt-6 border-t border-gray-200">
-                    <a href="{% url 'home' %}" 
-                       class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                        <i class="fas fa-arrow-left"></i>
-                        Volver
-                    </a>
-                    <button type="submit" 
-                            class="inline-flex items-center gap-2 px-6 py-2.5 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm">
-                        <i class="fas fa-save"></i>
-                        Guardar Cambios
-                    </button>
+                <!-- Email -->
+                <div>
+                    <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email
+                    </label>
+                    {{ form.email }}
+                    {% if form.email.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.email.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
-            </form>
+
+                <!-- Nombre -->
+                <div>
+                    <label for="{{ form.first_name.id_for_label }}"
+                        class="block text-sm font-medium text-gray-700 mb-2">
+                        Nombre
+                    </label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.first_name.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Apellido -->
+                <div>
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Apellido
+                    </label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.last_name.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
-        <!-- Info cambio de contraseña -->
-        <div class="mt-6">
-            {% include 'components/alert_message.html' with type='info' message='<strong>¿Necesitas cambiar tu contraseña?</strong><br>Puedes hacerlo desde el menú de usuario en la esquina superior derecha.' %}
+        <!-- Información Profesional -->
+        <div class="mb-8">
+            <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                <i class="fas fa-user-md text-green-600 mr-2"></i>
+                Información Profesional
+            </h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Rol -->
+                <div>
+                    <label for="{{ form.rol.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Rol
+                    </label>
+                    {{ form.rol }}
+                    {% if form.rol.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.rol.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Cargo -->
+                <div>
+                    <label for="{{ form.cargo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        Cargo
+                    </label>
+                    {{ form.cargo }}
+                    {% if form.cargo.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.cargo.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Fecha ingreso residencia (solo para residentes) -->
+                <div id="fecha-ingreso-container-edit">
+                    <label for="{{ form.fecha_ingreso_residencia.id_for_label }}"
+                        class="block text-sm font-medium text-gray-700 mb-2">
+                        Fecha de ingreso a residencia
+                    </label>
+                    {{ form.fecha_ingreso_residencia }}
+                    {% if form.fecha_ingreso_residencia.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.fecha_ingreso_residencia.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Año de residencia (solo para residentes) -->
+                <div id="anio-residencia-container-edit">
+                    <label for="{{ form.anio_residencia.id_for_label }}"
+                        class="block text-sm font-medium text-gray-700 mb-2">
+                        Año de residencia
+                    </label>
+                    {{ form.anio_residencia }}
+                    <p class="mt-1 text-xs text-gray-500 flex items-start">
+                        <i class="fas fa-info-circle mr-1 mt-0.5"></i>
+                        <span>Se calcula automáticamente desde la fecha de ingreso</span>
+                    </p>
+                    {% if form.anio_residencia.errors %}
+                    <div class="mt-1 text-xs text-red-600">
+                        {% for error in form.anio_residencia.errors %}
+                        <p class="flex items-start">
+                            <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
-    </div>
+        <!-- Contacto -->
+        <div class="mb-8">
+            <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                <i class="fas fa-phone text-purple-600 mr-2"></i>
+                Contacto
+            </h3>
+
+            <div>
+                <label for="{{ form.telefono.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    Teléfono
+                </label>
+                {{ form.telefono }}
+                {% if form.telefono.errors %}
+                <div class="mt-1 text-xs text-red-600">
+                    {% for error in form.telefono.errors %}
+                    <p class="flex items-start">
+                        <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                    </p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Preferencias -->
+        <div class="mb-8">
+            <h3 class="text-base font-semibold text-gray-900 mb-4 pb-2 border-b border-gray-200 flex items-center">
+                <i class="fas fa-cog text-indigo-600 mr-2"></i>
+                Preferencias
+            </h3>
+
+            <div class="flex items-start">
+                <div class="flex items-center h-5">
+                    {{ form.recibir_notificaciones }}
+                </div>
+                <div class="ml-3">
+                    <label for="{{ form.recibir_notificaciones.id_for_label }}"
+                        class="text-sm font-medium text-gray-700">
+                        {{ form.recibir_notificaciones.label }}
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Recibirás actualizaciones importantes del sistema</p>
+                </div>
+            </div>
+            {% if form.recibir_notificaciones.errors %}
+            <div class="mt-1 text-xs text-red-600">
+                {% for error in form.recibir_notificaciones.errors %}
+                <p class="flex items-start">
+                    <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+                </p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {# Input de avatar oculto — el trigger es el avatar en la cabecera #}
+        <div class="hidden">{{ form.avatar }}</div>
+        {% if form.avatar.errors %}
+        <div class="mb-4 text-xs text-red-600">
+            {% for error in form.avatar.errors %}
+            <p class="flex items-start">
+                <i class="fas fa-exclamation-circle mr-1 mt-0.5"></i>{{ error }}
+            </p>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p id="avatar-filename" class="mb-4 text-xs text-green-600 hidden">
+            <i class="fas fa-check-circle mr-1"></i>
+            <span></span> — se guardará al hacer clic en Guardar Cambios.
+        </p>
+
+        <!-- Botones -->
+        <div class="flex items-center justify-between pt-6 border-t border-gray-200">
+            <a href="{% url 'home' %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </a>
+            <button type="submit"
+                class="inline-flex items-center gap-2 px-6 py-2.5 border border-transparent text-sm font-semibold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors shadow-sm">
+                <i class="fas fa-save"></i>
+                Guardar Cambios
+            </button>
+        </div>
+    </form>
 </div>
 {% endblock %}
 
@@ -323,6 +376,38 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkbox = document.querySelector('input[type="checkbox"]');
     if (checkbox) {
         checkbox.className = 'w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500 transition-colors cursor-pointer';
+    }
+
+    // Preview de avatar al seleccionar archivo
+    const avatarInput = document.getElementById('{{ form.avatar.id_for_label }}');
+    const avatarLabel = document.querySelector('label[for="{{ form.avatar.id_for_label }}"]');
+    const filenameEl  = document.getElementById('avatar-filename');
+
+    if (avatarInput && avatarLabel) {
+        avatarInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+
+            // Actualizar preview en cabecera
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const target = avatarLabel.querySelector('img, div[class*="rounded-full"]');
+                if (target) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = target.className;
+                    img.alt = 'Foto de perfil';
+                    target.replaceWith(img);
+                }
+            };
+            reader.readAsDataURL(file);
+
+            // Confirmación del nombre de archivo
+            if (filenameEl) {
+                filenameEl.querySelector('span').textContent = file.name;
+                filenameEl.classList.remove('hidden');
+            }
+        });
     }
 });
 </script>

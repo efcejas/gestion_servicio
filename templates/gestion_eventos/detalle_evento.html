@@ -136,9 +136,7 @@
                             <div class="group bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-all duration-200">
                                 <div class="flex items-start space-x-3">
                                     <div class="flex-shrink-0">
-                                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center shadow-md">
-                                            <span class="text-white font-bold text-sm">{{ nota.creado_por.get_full_name|first|upper }}</span>
-                                        </div>
+                                        {% include 'components/user_avatar.html' with user_obj=nota.creado_por size="md" %}
                                     </div>
                                     <div class="flex-1 min-w-0">
                                         <p class="text-gray-800 mb-2 leading-relaxed">{{ nota.comentario }}</p>

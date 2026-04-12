@@ -8,6 +8,7 @@ from .models import CustomUser
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.views.decorators.http import require_POST
 
 
 class UserRegisterView(SuccessMessageMixin, CreateView):
@@ -59,7 +60,7 @@ def editar_perfil(request):
     Permite modificar datos personales y preferencias.
     """
     if request.method == 'POST':
-        form = CustomUserChangeForm(request.POST, instance=request.user)
+        form = CustomUserChangeForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
             messages.success(
@@ -116,3 +117,13 @@ def username_recovery_done(request):
     return render(request, 'accounts/recuperar_usuario_done.html', {
         'hide_navbar': True,
     })
+
+
+@login_required
+@require_POST
+def eliminar_avatar(request):
+    """Elimina el avatar del usuario y borra el archivo del storage."""
+    if request.user.avatar:
+        request.user.avatar.delete(save=True)
+        messages.success(request, 'Foto de perfil eliminada correctamente.')
+    return redirect('accounts:editar_perfil')
