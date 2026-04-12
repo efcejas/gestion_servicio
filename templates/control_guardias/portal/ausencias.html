@@ -106,12 +106,14 @@
     </div>
     {% endif %}
 
+    {% if user.is_superuser %}
     <div class="mt-6">
         <a href="{% url 'control_guardias:index' %}"
            class="text-sm text-gray-400 hover:text-gray-600 transition-colors">
             ← Volver al inicio
         </a>
     </div>
+    {% endif %}
 
 </div>
 
