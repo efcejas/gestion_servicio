@@ -11,6 +11,8 @@
 - **[operativa/CHECKLIST_DEPLOY_HEROKU.md](operativa/CHECKLIST_DEPLOY_HEROKU.md)** - Checklist corto antes y después del deploy.
 - **[operativa/CONFIGURAR_SCHEDULER.md](operativa/CONFIGURAR_SCHEDULER.md)** - Configuración del scheduler local para pedidos.
 - **[operativa/HEROKU_CONFIG_VARS.md](operativa/HEROKU_CONFIG_VARS.md)** - Variables de entorno útiles para producción.
+- **[operativa/DEPLOY_HEROKU_PEDIDOS.md](operativa/DEPLOY_HEROKU_PEDIDOS.md)** - Deploy específico del sistema de pedidos.
+- **[operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md](operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md)** - Procedimiento de actualización de seguridad.
 
 ### Sistemas activos
 
@@ -21,6 +23,8 @@
 - **[producto/SISTEMA_CLASES_RESIDENTES.md](producto/SISTEMA_CLASES_RESIDENTES.md)** - Sistema educativo de residentes.
 - **[producto/SISTEMA_CONSULTORIOS.md](producto/SISTEMA_CONSULTORIOS.md)** - Consultorios y equipamiento.
 - **[producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md](producto/SISTEMA_LIQUIDACION_COLEGIALES_V2.md)** - Referencia funcional de liquidación.
+- **[producto/PROPUESTA_DIRECTOR_PEDIDOS.md](producto/PROPUESTA_DIRECTOR_PEDIDOS.md)** - Contexto de producto del sistema de pedidos.
+- **[producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md](producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md)** - Resumen funcional/técnico del registro de estudios.
 
 ### IA y dictado
 

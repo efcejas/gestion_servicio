@@ -208,7 +208,7 @@ Indicadores a monitorear:
 
 ### Documentación:
 - ✓ Código comentado y estructurado
-- ✓ Guía de deployment en `docs/DEPLOY_HEROKU_PEDIDOS.md`
+- ✓ Guía de deployment en `docs/operativa/DEPLOY_HEROKU_PEDIDOS.md`
 - ✓ Checklist de mantenimiento en `docs/operativa/CHECKLIST_DEPLOY_HEROKU.md`
 - ✓ Ejemplos de emails en `pedidos_estudios/EJEMPLOS_EMAILS.md`
 

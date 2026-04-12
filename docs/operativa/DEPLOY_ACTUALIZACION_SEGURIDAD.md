@@ -371,9 +371,9 @@ Estos se pueden configurar después del deploy exitoso ([ver MEJORAS_SEGURIDAD_I
 
 ## 📚 REFERENCIAS
 
-- [ACTUALIZACION_SEGURIDAD_COMPLETADA.md](../ACTUALIZACION_SEGURIDAD_COMPLETADA.md) - Detalles de CVEs corregidos
-- [operativa/CHECKLIST_DEPLOY_HEROKU.md](operativa/CHECKLIST_DEPLOY_HEROKU.md) - Checklist general de deploy
-- [MEJORAS_SEGURIDAD_IMPLEMENTABLES.md](../MEJORAS_SEGURIDAD_IMPLEMENTABLES.md) - Próximas mejoras de seguridad
+- [security/ACTUALIZACION_SEGURIDAD_COMPLETADA.md](../security/ACTUALIZACION_SEGURIDAD_COMPLETADA.md) - Detalles de CVEs corregidos
+- [CHECKLIST_DEPLOY_HEROKU.md](CHECKLIST_DEPLOY_HEROKU.md) - Checklist general de deploy
+- [security/MEJORAS_SEGURIDAD_IMPLEMENTABLES.md](../security/MEJORAS_SEGURIDAD_IMPLEMENTABLES.md) - Próximas mejoras de seguridad
 
 ---
 
