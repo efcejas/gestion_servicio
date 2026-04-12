@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     TipoEstudio, Region, PlantillaPreinforme, Preinforme, 
-    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme
+    RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
+    AdjuntoPreinforme
 )
 
 
@@ -164,3 +165,21 @@ class HistorialEstudiosAdmin(admin.ModelAdmin):
             historial.actualizar_estadisticas()
         self.message_user(request, f'Se actualizaron {queryset.count()} historiales.')
     actualizar_estadisticas.short_description = 'Actualizar estadísticas'
+
+
+@admin.register(AdjuntoPreinforme)
+class AdjuntoPreinformeAdmin(admin.ModelAdmin):
+    list_display = [
+        'preinforme',
+        'origen',
+        'subido_por',
+        'fecha_creacion',
+        'activo',
+    ]
+    list_filter = ['origen', 'activo', 'fecha_creacion']
+    search_fields = [
+        'preinforme__numero_estudio',
+        'preinforme__apellido_paciente',
+        'subido_por__username',
+    ]
+    readonly_fields = ['fecha_creacion']

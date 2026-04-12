@@ -203,6 +203,7 @@
             <div class="mt-2 p-4 bg-blue-50 rounded-md border border-blue-200">
                 <!-- Visualizador aislado con iframe para versión original -->
                 <iframe id="informe-original-viewer" 
+                    title="Vista de informe original"
                         style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
                         frameborder="0">
                 </iframe>
@@ -270,6 +271,7 @@
 
                         <!-- Vista limpia (iframe) -->
                         <iframe id="informe-final-viewer"
+                            title="Vista de informe final corregido"
                                 style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
                                 frameborder="0">
                         </iframe>
@@ -328,6 +330,7 @@
         <div class="mt-2 p-4 bg-gray-50 rounded-md">
             <!-- Visualizador aislado con iframe cuando no hay revisión -->
             <iframe id="informe-sin-revision-viewer" 
+                    title="Vista de preinforme sin revisión"
                     style="width: 100%; min-height: 400px; border: none; background: white; border-radius: 4px;"
                     frameborder="0">
             </iframe>
@@ -374,6 +377,46 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Evidencia Visual -->
+    <div class="bg-white shadow-md rounded-lg p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+            <i class="fas fa-images text-emerald-600 mr-2"></i>
+            Evidencia visual del caso
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+                <p class="text-sm font-medium text-gray-700 mb-2">Imágenes del preinformante</p>
+                {% if adjuntos_residente %}
+                <div class="grid grid-cols-2 gap-3">
+                    {% for adjunto in adjuntos_residente %}
+                    <a href="{{ adjunto.imagen.url }}" target="_blank" rel="noopener" class="block rounded-lg overflow-hidden border border-gray-200 hover:border-emerald-400 transition">
+                        <img src="{{ adjunto.imagen.url }}" alt="Adjunto residente" class="w-full h-32 object-cover" loading="lazy">
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 italic">No hay imágenes cargadas por el preinformante.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <p class="text-sm font-medium text-purple-700 mb-2">Imágenes de devolución del revisor</p>
+                {% if adjuntos_revisor %}
+                <div class="grid grid-cols-2 gap-3">
+                    {% for adjunto in adjuntos_revisor %}
+                    <a href="{{ adjunto.imagen.url }}" target="_blank" rel="noopener" class="block rounded-lg overflow-hidden border border-purple-200 hover:border-purple-400 transition">
+                        <img src="{{ adjunto.imagen.url }}" alt="Adjunto revisor" class="w-full h-32 object-cover" loading="lazy">
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 italic">Aún no hay imágenes de devolución del revisor.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <!-- ═══ ETIQUETAS CLÍNICAS (al pie, para no interrumpir comparativa) ═══ -->
     {% if preinforme.estado == 'finalizado' %}

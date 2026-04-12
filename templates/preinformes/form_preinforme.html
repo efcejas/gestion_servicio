@@ -20,7 +20,7 @@
         </div>
     </div>
 
-    <form method="post" class="space-y-6">
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
         <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
 
@@ -277,6 +277,86 @@
             </div>
         </div>
 
+        <!-- Evidencia Visual (debajo del editor) -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-50 to-teal-100 px-4 py-3 border-b border-emerald-200">
+                <h2 class="text-sm font-semibold text-emerald-900 flex items-center">
+                    <i class="fas fa-image text-emerald-600 mr-2"></i>
+                    Evidencia visual (opcional)
+                </h2>
+            </div>
+            <div class="p-4 space-y-4">
+                <p class="text-xs text-gray-600">
+                    Puedes subir hasta 3 imágenes (JPG/PNG/WEBP, máximo 5MB cada una) para que el revisor vea qué hallazgo estás reportando.
+                </p>
+                <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                    <i class="fas fa-shield-alt mr-1"></i>
+                    Evita incluir datos identificatorios del paciente en las capturas.
+                </p>
+
+                <div class="rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 p-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-emerald-900">Seleccionar imágenes</p>
+                            <p id="imagenes-residente-resumen" class="text-xs text-emerald-700 mt-1">Aún no seleccionaste archivos.</p>
+                        </div>
+                        <label for="id_imagenes_residente" class="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 cursor-pointer transition">
+                            <i class="fas fa-upload mr-2"></i>
+                            Elegir archivos
+                        </label>
+                    </div>
+
+                    <input type="file"
+                           id="id_imagenes_residente"
+                           name="imagenes_residente"
+                           accept="image/jpeg,image/png,image/webp"
+                           multiple
+                           class="sr-only" />
+
+                    <div id="preview-imagenes-residente" class="hidden mt-4">
+                        <p class="text-xs font-medium text-emerald-800 mb-2">Vista previa de carga</p>
+                        <div id="preview-imagenes-residente-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+                    </div>
+                </div>
+
+                {% if adjuntos_residente %}
+                <div>
+                    <p class="text-xs font-medium text-gray-700 mb-2">Imágenes ya cargadas</p>
+                    <p class="text-[11px] text-gray-500 mb-2">Marca "Eliminar" en las que quieras quitar y guarda el preinforme.</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {% for adjunto in adjuntos_residente %}
+                        <div class="rounded-lg overflow-hidden border border-gray-200 bg-white">
+                            <a href="{{ adjunto.imagen.url }}" target="_blank" rel="noopener" class="block hover:opacity-95 transition">
+                                <img src="{{ adjunto.imagen.url }}" alt="Adjunto residente" class="w-full h-28 object-cover" loading="lazy">
+                            </a>
+                            <label class="flex items-center gap-2 px-2 py-2 text-[11px] text-red-700 border-t border-gray-100 cursor-pointer">
+                                <input type="checkbox"
+                                       name="eliminar_adjuntos_residente"
+                                       value="{{ adjunto.id }}"
+                                       class="h-3.5 w-3.5 text-red-600 border-gray-300 rounded focus:ring-red-500">
+                                Eliminar
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if adjuntos_revisor %}
+                <div>
+                    <p class="text-xs font-medium text-purple-700 mb-2">Feedback visual del revisor</p>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {% for adjunto in adjuntos_revisor %}
+                        <a href="{{ adjunto.imagen.url }}" target="_blank" rel="noopener" class="block rounded-lg overflow-hidden border border-purple-200 hover:border-purple-400 transition">
+                            <img src="{{ adjunto.imagen.url }}" alt="Adjunto revisor" class="w-full h-28 object-cover" loading="lazy">
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
         <!-- Botones de acción -->
         <div class="bg-white rounded-2xl shadow-lg p-6">
             <div class="flex flex-col sm:flex-row gap-4 justify-end">
@@ -356,6 +436,107 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
     const regionSelect = document.getElementById('id_region');
     const plantillaSelect = document.getElementById('id_plantilla');
+    const inputImagenesResidente = document.getElementById('id_imagenes_residente');
+    const previewImagenesWrapper = document.getElementById('preview-imagenes-residente');
+    const previewImagenesGrid = document.getElementById('preview-imagenes-residente-grid');
+    const resumenImagenesResidente = document.getElementById('imagenes-residente-resumen');
+    const LIMITE_IMAGENES_RESIDENTE = 3;
+    let archivosSeleccionadosResidente = [];
+
+    if (inputImagenesResidente && previewImagenesWrapper && previewImagenesGrid && resumenImagenesResidente) {
+        function serializarArchivo(file) {
+            return `${file.name}-${file.size}-${file.lastModified}`;
+        }
+
+        function sincronizarInputConSeleccion() {
+            const dt = new DataTransfer();
+            archivosSeleccionadosResidente.forEach((file) => dt.items.add(file));
+            inputImagenesResidente.files = dt.files;
+        }
+
+        function renderPreviewSeleccion() {
+            previewImagenesGrid.innerHTML = '';
+
+            if (!archivosSeleccionadosResidente.length) {
+                previewImagenesWrapper.classList.add('hidden');
+                resumenImagenesResidente.textContent = 'Aún no seleccionaste archivos.';
+                return;
+            }
+
+            const cantidad = archivosSeleccionadosResidente.length;
+            const pesoTotalMb = (archivosSeleccionadosResidente.reduce((acc, file) => acc + file.size, 0) / (1024 * 1024)).toFixed(2);
+            resumenImagenesResidente.textContent = `${cantidad} archivo(s) seleccionado(s) · ${pesoTotalMb} MB en total`;
+            previewImagenesWrapper.classList.remove('hidden');
+
+            archivosSeleccionadosResidente.forEach((file, index) => {
+                const card = document.createElement('div');
+                card.className = 'relative rounded-lg border border-emerald-200 bg-white overflow-hidden';
+
+                const image = document.createElement('img');
+                image.className = 'w-full h-28 object-cover';
+                image.alt = file.name;
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'absolute top-1.5 right-1.5 flex items-center justify-center bg-red-600 text-white rounded-full w-7 h-7 text-base font-bold leading-none border border-white shadow hover:bg-red-700 transition';
+                removeButton.innerHTML = '&times;';
+                removeButton.title = 'Quitar imagen';
+                removeButton.addEventListener('click', () => {
+                    archivosSeleccionadosResidente.splice(index, 1);
+                    sincronizarInputConSeleccion();
+                    renderPreviewSeleccion();
+                });
+
+                const footer = document.createElement('div');
+                footer.className = 'px-2 py-1.5 text-[11px] text-gray-700 truncate';
+                footer.textContent = file.name;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    image.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+
+                card.appendChild(image);
+                card.appendChild(removeButton);
+                card.appendChild(footer);
+                previewImagenesGrid.appendChild(card);
+            });
+        }
+
+        inputImagenesResidente.addEventListener('click', function() {
+            // Permite volver a elegir el mismo archivo sin bloquear evento change
+            inputImagenesResidente.value = '';
+        });
+
+        inputImagenesResidente.addEventListener('change', function() {
+            const nuevosArchivos = Array.from(inputImagenesResidente.files || []);
+            if (!nuevosArchivos.length) {
+                return;
+            }
+
+            const existentes = new Set(archivosSeleccionadosResidente.map(serializarArchivo));
+
+            for (const file of nuevosArchivos) {
+                if (archivosSeleccionadosResidente.length >= LIMITE_IMAGENES_RESIDENTE) {
+                    break;
+                }
+
+                const hash = serializarArchivo(file);
+                if (!existentes.has(hash)) {
+                    archivosSeleccionadosResidente.push(file);
+                    existentes.add(hash);
+                }
+            }
+
+            if (archivosSeleccionadosResidente.length >= LIMITE_IMAGENES_RESIDENTE && nuevosArchivos.length > 0) {
+                resumenImagenesResidente.textContent = `Máximo ${LIMITE_IMAGENES_RESIDENTE} imágenes por carga. Quita una para agregar otra.`;
+            }
+
+            sincronizarInputConSeleccion();
+            renderPreviewSeleccion();
+        });
+    }
     
     // Manejo de asignación compartida vs revisor específico
     const asignacionCompartidaCheckbox = document.getElementById('id_asignacion_compartida');

@@ -2,8 +2,9 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
+from django.core.files.uploadedfile import SimpleUploadedFile
 
-from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios
+from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios, AdjuntoPreinforme
 
 User = get_user_model()
 
@@ -257,7 +258,7 @@ class NormalizeHTMLContentSoftTest(TestCase):
                       "NO debe convertir <br> a <p> cuando hay pocos <br>")
         
         # No debe crear párrafos adicionales
-        self.assertEqual(result.count('<p>'), 2, 
+        self.assertEqual(result.count('<p>'), 2,
                         "Debe mantener exactamente 2 <p> (no agregar más)")
     
     def test_caso2_convertir_pegado_sucio(self):
@@ -460,3 +461,158 @@ class NormalizeHTMLContentSoftTest(TestCase):
         self.assertLessEqual(result_soft.count('<p>'), 
                             html.count('<p>') + 2,  # tolerancia mínima
                             "Soft no debe crear muchos <p> adicionales")
+
+
+class AdjuntoPreinformeTest(TestCase):
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='residente_adjuntos',
+            email='residente_adjuntos@test.com',
+            password='testpass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.staff = User.objects.create_user(
+            username='staff_adjuntos',
+            email='staff_adjuntos@test.com',
+            password='testpass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo_estudio = TipoEstudio.objects.create(nombre='RM Cerebro')
+        self.region = Region.objects.create(nombre='Cráneo')
+
+    def _png_file(self, name='captura.png'):
+        # PNG mínimo de 1x1 pixel
+        return SimpleUploadedFile(
+            name,
+            b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82',
+            content_type='image/png',
+        )
+
+    def test_adjuntar_imagen_residente_al_crear_preinforme(self):
+        self.client.login(username='residente_adjuntos', password='testpass123')
+
+        response = self.client.post(
+            reverse('preinformes:crear_preinforme'),
+            {
+                'numero_estudio': '2026-9001',
+                'tipo_estudio': self.tipo_estudio.id,
+                'region': self.region.id,
+                'sistema_destino': 'eges',
+                'apellido_paciente': 'Paciente',
+                'nombre_paciente': 'Uno',
+                'informe_html': '<p>Hallazgo test</p>',
+                'imagenes_residente': self._png_file(),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        preinforme = Preinforme.objects.get(numero_estudio='2026-9001')
+        self.assertTrue(
+            AdjuntoPreinforme.objects.filter(
+                preinforme=preinforme,
+                origen='residente',
+                subido_por=self.residente,
+            ).exists()
+        )
+
+    def test_revisor_puede_adjuntar_feedback_visual(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-9002',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente='Dos',
+            informe_html='<p>Original</p>',
+        )
+        preinforme.enviar_a_revision()
+
+        self.client.login(username='staff_adjuntos', password='testpass123')
+        response = self.client.post(
+            reverse('preinformes:revisar_preinforme', kwargs={'pk': preinforme.pk}),
+            {
+                'informe_final_html': '<p>Informe corregido</p>',
+                'comentarios_generales': 'Buen trabajo.',
+                'imagenes_revisor': self._png_file('feedback.png'),
+                'guardar_y_continuar': '1',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            AdjuntoPreinforme.objects.filter(
+                preinforme=preinforme,
+                origen='revisor',
+                subido_por=self.staff,
+            ).exists()
+        )
+
+    def test_residente_no_puede_ver_preinforme_ajeno_con_adjuntos(self):
+        otro_residente = User.objects.create_user(
+            username='residente_otro',
+            email='residente_otro@test.com',
+            password='testpass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+
+        preinforme = Preinforme.objects.create(
+            residente=otro_residente,
+            numero_estudio='2026-9003',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente='Tres',
+            informe_html='<p>Texto</p>',
+        )
+
+        AdjuntoPreinforme.objects.create(
+            preinforme=preinforme,
+            imagen=self._png_file('ajeno.png'),
+            subido_por=otro_residente,
+            origen='residente',
+        )
+
+        self.client.login(username='residente_adjuntos', password='testpass123')
+        response = self.client.get(reverse('preinformes:ver_preinforme', kwargs={'pk': preinforme.pk}))
+        self.assertEqual(response.status_code, 404)
+
+    def test_residente_puede_eliminar_adjunto_propio_en_edicion(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-9004',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente='Cuatro',
+            informe_html='<p>Texto inicial</p>',
+        )
+        preinforme.enviar_a_revision()  # pendiente_revision sigue siendo editable por residente
+
+        adjunto = AdjuntoPreinforme.objects.create(
+            preinforme=preinforme,
+            imagen=self._png_file('borrar.png'),
+            subido_por=self.residente,
+            origen='residente',
+        )
+
+        self.client.login(username='residente_adjuntos', password='testpass123')
+        response = self.client.post(
+            reverse('preinformes:editar_preinforme', kwargs={'pk': preinforme.pk}),
+            {
+                'numero_estudio': preinforme.numero_estudio,
+                'tipo_estudio': self.tipo_estudio.id,
+                'region': self.region.id,
+                'sistema_destino': 'eges',
+                'apellido_paciente': preinforme.apellido_paciente,
+                'nombre_paciente': preinforme.nombre_paciente,
+                'informe_html': '<p>Texto actualizado</p>',
+                'eliminar_adjuntos_residente': str(adjunto.id),
+                'guardar_y_continuar': '1',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AdjuntoPreinforme.objects.filter(id=adjunto.id).exists())

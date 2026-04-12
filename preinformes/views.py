@@ -6,17 +6,20 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.core.paginator import Paginator
+from django.core.files.uploadedfile import UploadedFile
 from django.core.cache import cache
 from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 import json
 import logging
+import os
 
 from accounts.decorators import role_required
 from .models import (
     Preinforme, TipoEstudio, Region, PlantillaPreinforme, 
     RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
+    AdjuntoPreinforme,
     EncuestaResidente
 )
 from .forms import (
@@ -28,8 +31,93 @@ from .forms import (
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+MAX_ADJUNTOS_POR_ORIGEN = 3
+MAX_ADJUNTO_SIZE_MB = 5
+ALLOWED_ADJUNTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
 from .services import evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar
 from .selectors import get_asignados_de, get_pendientes_sin_revisor
+
+
+def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
+    """Valida y guarda adjuntos de imágenes para un preinforme."""
+    if not archivos:
+        return 0, None
+
+    existentes = AdjuntoPreinforme.objects.filter(
+        preinforme=preinforme,
+        origen=origen,
+        activo=True,
+    ).count()
+
+    if existentes + len(archivos) > MAX_ADJUNTOS_POR_ORIGEN:
+        disponibles = max(0, MAX_ADJUNTOS_POR_ORIGEN - existentes)
+        return 0, f'Solo puedes subir {MAX_ADJUNTOS_POR_ORIGEN} imágenes por rol. Te quedan {disponibles} disponibles.'
+
+    archivos_validos = []
+    for archivo in archivos:
+        if not isinstance(archivo, UploadedFile):
+            return 0, 'Archivo inválido recibido.'
+
+        extension = os.path.splitext(archivo.name)[1].lower()
+        if extension not in ALLOWED_ADJUNTO_EXTENSIONS:
+            return 0, 'Formato no permitido. Usa JPG, PNG o WEBP.'
+
+        if archivo.size > MAX_ADJUNTO_SIZE_MB * 1024 * 1024:
+            return 0, f'Cada imagen debe ser menor a {MAX_ADJUNTO_SIZE_MB} MB.'
+
+        archivos_validos.append(archivo)
+
+    creados = []
+    try:
+        with transaction.atomic():
+            for archivo in archivos_validos:
+                creado = AdjuntoPreinforme.objects.create(
+                    preinforme=preinforme,
+                    imagen=archivo,
+                    subido_por=subido_por,
+                    origen=origen,
+                    descripcion_corta='',
+                    activo=True,
+                )
+                creados.append(creado)
+    except Exception:
+        return 0, 'No se pudieron guardar las imágenes. Inténtalo nuevamente.'
+
+    return len(creados), None
+
+
+def _eliminar_adjuntos_residente(preinforme, adjunto_ids, usuario):
+    """Elimina adjuntos activos del residente para un preinforme editable."""
+    if not adjunto_ids:
+        return 0
+
+    ids_validos = []
+    for adjunto_id in adjunto_ids:
+        try:
+            ids_validos.append(int(adjunto_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not ids_validos:
+        return 0
+
+    adjuntos = AdjuntoPreinforme.objects.filter(
+        id__in=ids_validos,
+        preinforme=preinforme,
+        origen='residente',
+        subido_por=usuario,
+        activo=True,
+    )
+
+    eliminados = 0
+    for adjunto in adjuntos:
+        if adjunto.imagen:
+            adjunto.imagen.delete(save=False)
+        adjunto.delete()
+        eliminados += 1
+
+    return eliminados
 
 
 # === VISTAS PARA RESIDENTES ===
@@ -107,6 +195,18 @@ def crear_preinforme(request):
             preinforme = form.save(commit=False)
             preinforme.residente = request.user
             preinforme.save()
+
+            archivos = request.FILES.getlist('imagenes_residente')
+            cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
+                preinforme=preinforme,
+                archivos=archivos,
+                subido_por=request.user,
+                origen='residente',
+            )
+            if error_adjuntos:
+                messages.warning(request, f'Preinforme creado, pero hubo un problema al subir imágenes: {error_adjuntos}')
+            elif cantidad_adjuntos:
+                messages.success(request, f'Se adjuntaron {cantidad_adjuntos} imagen(es) al preinforme.')
             
             # Limpiar datos guardados en sesión
             if 'preinforme_form_data' in request.session:
@@ -159,6 +259,8 @@ def crear_preinforme(request):
     
     context = {
         'form': form,
+        'adjuntos_residente': [],
+        'adjuntos_revisor': [],
         'title': 'Nuevo Preinforme'
     }
     
@@ -185,6 +287,29 @@ def editar_preinforme(request, pk):
         form = PreinformeForm(request.POST, instance=preinforme, user=request.user)
         if form.is_valid():
             form.save()
+
+            ids_adjuntos_eliminar = request.POST.getlist('eliminar_adjuntos_residente')
+            eliminados = _eliminar_adjuntos_residente(
+                preinforme=preinforme,
+                adjunto_ids=ids_adjuntos_eliminar,
+                usuario=request.user,
+            )
+            if eliminados:
+                messages.success(request, f'Se eliminaron {eliminados} imagen(es) cargadas previamente.')
+
+            archivos = request.FILES.getlist('imagenes_residente')
+            cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
+                preinforme=preinforme,
+                archivos=archivos,
+                subido_por=request.user,
+                origen='residente',
+            )
+
+            if error_adjuntos:
+                messages.warning(request, f'Preinforme actualizado, pero hubo un problema al subir imágenes: {error_adjuntos}')
+            elif cantidad_adjuntos:
+                messages.success(request, f'Se adjuntaron {cantidad_adjuntos} imagen(es).')
+
             messages.success(request, 'Preinforme actualizado exitosamente.')
 
             if 'guardar_y_continuar' in request.POST:
@@ -208,6 +333,8 @@ def editar_preinforme(request, pk):
     context = {
         'form': form,
         'preinforme': preinforme,
+        'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
+        'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'title': 'Editar Preinforme'
     }
 
@@ -274,6 +401,8 @@ def ver_preinforme(request, pk):
     
     context = {
         'preinforme': preinforme,
+        'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
+        'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'title': f'Preinforme {preinforme.numero_estudio}'
     }
     
@@ -626,6 +755,18 @@ def revisar_preinforme(request, pk):
             revision = form.save(commit=False)
             # El informe final ya está en informe_final_html, no necesitamos generar nada
             revision.save()
+
+            archivos = request.FILES.getlist('imagenes_revisor')
+            cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
+                preinforme=preinforme,
+                archivos=archivos,
+                subido_por=request.user,
+                origen='revisor',
+            )
+            if error_adjuntos:
+                messages.warning(request, f'Revisión guardada, pero hubo un problema al subir imágenes: {error_adjuntos}')
+            elif cantidad_adjuntos:
+                messages.success(request, f'Se adjuntaron {cantidad_adjuntos} imagen(es) de feedback.')
             
             if 'guardar_y_continuar' in request.POST:
                 messages.success(request, 'Revisión guardada exitosamente.')
@@ -648,6 +789,8 @@ def revisar_preinforme(request, pk):
         'form': form,
         'preinforme': preinforme,
         'revision': revision,
+        'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
+        'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'title': f'Revisar Preinforme {preinforme.numero_estudio}'
     }
     

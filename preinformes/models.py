@@ -1,10 +1,11 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django_ckeditor_5.fields import CKEditor5Field
 import re
 import html
+import os
 
 User = get_user_model()
 
@@ -256,6 +257,12 @@ def strip_html_tags(text):
     if not text:
         return ''
     return re.sub(r'<[^>]+>', '', text).strip()
+
+
+def upload_adjunto_preinforme(instance, filename):
+    """Ruta de almacenamiento para adjuntos visuales del preinforme."""
+    extension = filename.split('.')[-1].lower() if '.' in filename else 'jpg'
+    return f'preinformes/adjuntos/{instance.preinforme_id}/{instance.origen}/{timezone.now().strftime("%Y%m%d_%H%M%S")}.{extension}'
 
 
 class EtiquetaPreinforme(models.Model):
@@ -718,6 +725,48 @@ class RevisionPreinforme(models.Model):
         self.crear_snapshot_residente()
         self.inicializar_informe_final(save=save)
         return self.informe_final_html
+
+
+class AdjuntoPreinforme(models.Model):
+    """Adjuntos visuales subidos por residente o revisor para docencia."""
+
+    ORIGEN_CHOICES = [
+        ('residente', 'Residente'),
+        ('revisor', 'Revisor'),
+    ]
+
+    preinforme = models.ForeignKey(
+        Preinforme,
+        on_delete=models.CASCADE,
+        related_name='adjuntos',
+    )
+    imagen = models.ImageField(
+        upload_to=upload_adjunto_preinforme,
+        validators=[FileExtensionValidator(allowed_extensions=['jpg', 'jpeg', 'png', 'webp'])],
+        verbose_name='Imagen',
+    )
+    subido_por = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='adjuntos_preinformes_subidos',
+    )
+    origen = models.CharField(max_length=20, choices=ORIGEN_CHOICES)
+    descripcion_corta = models.CharField(max_length=200, blank=True)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Adjunto de Preinforme'
+        verbose_name_plural = 'Adjuntos de Preinformes'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['preinforme', 'origen', '-fecha_creacion']),
+            models.Index(fields=['subido_por', '-fecha_creacion']),
+        ]
+
+    def __str__(self):
+        nombre_archivo = os.path.basename(self.imagen.name) if self.imagen else 'sin-archivo'
+        return f'Adjunto {self.preinforme.numero_estudio} - {self.origen} - {nombre_archivo}'
 
 
 class HistorialEstudios(models.Model):
