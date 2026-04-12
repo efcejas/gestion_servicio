@@ -10,6 +10,7 @@ Este sistema te permite **aprender y aplicar** prácticas de seguridad en tu pro
 SECURITY_README.md                      ← Estás aquí (inicio)
 ├── requirements-security.txt           ← Herramientas a instalar
 ├── audit_security.ps1                  ← Script de auditoría automatizada
+├── DASHBOARD_ADMIN_SEGURIDAD.md        ← Restricciones del dashboard administrativo
 ├── AUDITORIA_SEGURIDAD.md             ← Guía educativa completa
 ├── MEJORAS_SEGURIDAD_IMPLEMENTABLES.md ← Código listo para copiar
 └── SEGURIDAD_CHEATSHEET.md            ← Referencia rápida

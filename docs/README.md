@@ -13,6 +13,8 @@
 - **[operativa/HEROKU_CONFIG_VARS.md](operativa/HEROKU_CONFIG_VARS.md)** - Variables de entorno útiles para producción.
 - **[operativa/DEPLOY_HEROKU_PEDIDOS.md](operativa/DEPLOY_HEROKU_PEDIDOS.md)** - Deploy específico del sistema de pedidos.
 - **[operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md](operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md)** - Procedimiento de actualización de seguridad.
+- **[operativa/AUDITORIA_USO_LIQUIDACION.md](operativa/AUDITORIA_USO_LIQUIDACION.md)** - Checklist para validar uso real del módulo de liquidación.
+- **[operativa/COMANDO_IMPORTAR_ESTUDIOS.md](operativa/COMANDO_IMPORTAR_ESTUDIOS.md)** - Referencia del comando de importación de estudios desde EGES.
 
 ### Sistemas activos
 
@@ -33,12 +35,15 @@
 - **[arquitectura/PLAN_ACCION_DICTADO_IA.md](arquitectura/PLAN_ACCION_DICTADO_IA.md)** - Documento vivo de roadmap y estado del sistema de dictado.
 - **[arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md](arquitectura/ARQUITECTURA_SISTEMA_DICTADO_IA.md)** - Arquitectura del sistema de dictado.
 - **[arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md](arquitectura/RELEVAMIENTO_SISTEMA_DICTADO_IA.md)** - Relevamiento funcional/técnico actual.
+- **[arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md](arquitectura/CAMBIOS_NORMALIZE_SOFT_2026.md)** - Cambio técnico de normalización HTML en preinformes.
+- **[arquitectura/REFACTOR_REVISION_STAFF.md](arquitectura/REFACTOR_REVISION_STAFF.md)** - Refactor de la revisión de staff en preinformes.
+- **[arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md](arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md)** - Arquitectura de carga híbrida para clases de residentes.
 
 ### Calidad y seguridad
 
 - **[operativa/TESTS_README.md](operativa/TESTS_README.md)** - Ejecución y alcance de tests.
-- **[SECURITY_IMPROVEMENTS.md](SECURITY_IMPROVEMENTS.md)** - Resumen de mejoras de seguridad.
 - **[security/SECURITY_README.md](security/SECURITY_README.md)** - Índice detallado de documentos de seguridad.
+- **[security/DASHBOARD_ADMIN_SEGURIDAD.md](security/DASHBOARD_ADMIN_SEGURIDAD.md)** - Restricciones de acceso del dashboard administrativo.
 
 ## Estructura activa
 
