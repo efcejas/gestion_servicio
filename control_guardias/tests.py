@@ -462,6 +462,39 @@ class CalendarioViewTests(TestCase):
         response = self.client.get(reverse('control_guardias:calendario'))
         self.assertNotContains(response, '<select id="filtroResidente"')
 
+    def test_calendario_recibe_mes_anio_inicial_desde_query(self):
+        self.client.force_login(self.jefe)
+        response = self.client.get(reverse('control_guardias:calendario'), {'mes': '5', 'anio': '2026'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['calendario_initial_date'], '2026-05-01')
+
+    def test_calendario_query_invalida_no_define_fecha_inicial(self):
+        self.client.force_login(self.jefe)
+        response = self.client.get(reverse('control_guardias:calendario'), {'mes': '99', 'anio': 'abcd'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['calendario_initial_date'], '')
+
+    def test_calendario_con_return_to_valido_vuelve_al_borrador(self):
+        self.client.force_login(self.jefe)
+        return_to = reverse('control_guardias:distribucion_borrador', kwargs={'mes': 5, 'anio': 2026})
+        response = self.client.get(
+            reverse('control_guardias:calendario'),
+            {'mes': '5', 'anio': '2026', 'return_to': return_to},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['calendario_return_url'], return_to)
+        self.assertEqual(response.context['calendario_back_label'], 'Volver al borrador')
+
+    def test_calendario_con_return_to_invalido_usa_inicio(self):
+        self.client.force_login(self.jefe)
+        response = self.client.get(
+            reverse('control_guardias:calendario'),
+            {'return_to': 'https://evil.example/back'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['calendario_return_url'], reverse('control_guardias:index'))
+        self.assertEqual(response.context['calendario_back_label'], 'Ir al inicio')
+
     # ── API de eventos ───────────────────────────────────────────────────────
 
     def test_api_residente_solo_ve_sus_publicadas(self):
@@ -590,6 +623,27 @@ class DistribucionViewTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Generar distribución')
+
+    def test_publicar_borrador_redirige_a_calendario_del_mes_publicado(self):
+        self.client.login(username='jefe1', password='testpass123')
+
+        tipo = ConfiguracionTipoGuardia.objects.create(
+            nombre='Guardia redireccion',
+            hora_inicio=datetime.time(20, 0),
+            hora_fin=datetime.time(8, 0),
+            dias_semana='L,M,X,J,V',
+        )
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=tipo,
+            fecha=datetime.date(2026, 5, 10),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+
+        url = reverse('control_guardias:distribucion_publicar', kwargs={'mes': 5, 'anio': 2026})
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse('control_guardias:calendario') + '?mes=5&anio=2026')
 
 
 # ---------------------------------------------------------------------------
@@ -1057,6 +1111,40 @@ class AusenciasViewTest(TestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, 403)
 
+    def test_jefe_resuelve_ausencia_y_vuelve_con_foco(self):
+        from .services import reportar_ausencia
+
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        self.client.login(username='jefe1', password='testpass123')
+
+        url = reverse('control_guardias:ausencia_resolver', kwargs={'pk': ausencia.pk})
+        response = self.client.post(url, {
+            'return_to': reverse('control_guardias:ausencias'),
+            'focus': str(ausencia.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:ausencias')}?focus={ausencia.pk}",
+        )
+
+    def test_return_to_inseguro_en_resolver_ausencia_hace_fallback_local(self):
+        from .services import reportar_ausencia
+
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        self.client.login(username='jefe1', password='testpass123')
+
+        url = reverse('control_guardias:ausencia_resolver', kwargs={'pk': ausencia.pk})
+        response = self.client.post(url, {
+            'return_to': 'https://evil.example/steal',
+            'focus': str(ausencia.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:ausencias')}?focus={ausencia.pk}",
+        )
+
 
 class CambiosViewTest(TestCase):
     """Tests de permisos y acceso a las vistas de cambios."""
@@ -1079,13 +1167,134 @@ class CambiosViewTest(TestCase):
         self.client.login(username='res1', password='testpass123')
         url = reverse('control_guardias:solicitar_cambio', kwargs={'guardia_pk': self.g1.pk})
         response = self.client.post(url, {'guardia_receptor': self.g2.pk})
-        self.assertRedirects(response, reverse('control_guardias:cambios'))
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={self.g1.pk}",
+        )
         self.assertTrue(SolicitudCambioGuardia.objects.filter(
             solicitante=self.residente1, receptor=self.residente2).exists())
+
+    def test_residente_solicita_cambio_y_vuelve_a_mis_guardias_con_foco(self):
+        self.client.login(username='res1', password='testpass123')
+        url = reverse('control_guardias:solicitar_cambio', kwargs={'guardia_pk': self.g1.pk})
+        response = self.client.post(url, {
+            'guardia_receptor': self.g2.pk,
+            'return_to': reverse('control_guardias:mis_guardias'),
+            'focus': str(self.g1.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:mis_guardias')}?focus={self.g1.pk}",
+        )
+
+    def test_solicitar_cambio_con_return_to_inseguro_hace_fallback_cambios(self):
+        self.client.login(username='res1', password='testpass123')
+        url = reverse('control_guardias:solicitar_cambio', kwargs={'guardia_pk': self.g1.pk})
+        response = self.client.post(url, {
+            'guardia_receptor': self.g2.pk,
+            'return_to': 'https://evil.example/hijack',
+            'focus': str(self.g1.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={self.g1.pk}",
+        )
 
     def test_no_se_puede_solicitar_cambio_de_guardia_ajena(self):
         self.client.login(username='res1', password='testpass123')
         url = reverse('control_guardias:solicitar_cambio', kwargs={'guardia_pk': self.g2.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 404)
+
+    def test_jefe_revisa_cambio_y_vuelve_con_foco(self):
+        from .services import aceptar_cambio_receptor, solicitar_cambio
+
+        solicitud = solicitar_cambio(self.residente1, self.g1, self.g2)
+        aceptar_cambio_receptor(solicitud, self.residente2)
+
+        self.client.login(username='jefe1', password='testpass123')
+        url = reverse('control_guardias:cambio_revisar', kwargs={'pk': solicitud.pk})
+        response = self.client.post(url, {
+            'accion': 'rechazar',
+            'notas': 'No corresponde por cobertura',
+            'return_to': reverse('control_guardias:cambios'),
+            'focus': str(solicitud.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
+        )
+
+    def test_revisar_cambio_con_return_to_inseguro_hace_fallback_local(self):
+        from .services import aceptar_cambio_receptor, solicitar_cambio
+
+        solicitud = solicitar_cambio(self.residente1, self.g1, self.g2)
+        aceptar_cambio_receptor(solicitud, self.residente2)
+
+        self.client.login(username='jefe1', password='testpass123')
+        url = reverse('control_guardias:cambio_revisar', kwargs={'pk': solicitud.pk})
+        response = self.client.post(url, {
+            'accion': 'rechazar',
+            'notas': 'No corresponde por cobertura',
+            'return_to': 'https://evil.example/phishing',
+            'focus': str(solicitud.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
+        )
+
+    def test_receptor_responde_cambio_y_vuelve_con_foco(self):
+        from .services import solicitar_cambio
+
+        solicitud = solicitar_cambio(self.residente1, self.g1, self.g2)
+        self.client.login(username='res2', password='testpass123')
+        url = reverse('control_guardias:cambio_responder', kwargs={'pk': solicitud.pk})
+        response = self.client.post(url, {
+            'accion': 'aceptar',
+            'return_to': reverse('control_guardias:cambios'),
+            'focus': str(solicitud.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
+        )
+
+    def test_solicitante_cancela_cambio_y_vuelve_con_foco(self):
+        from .services import solicitar_cambio
+
+        solicitud = solicitar_cambio(self.residente1, self.g1, self.g2)
+        self.client.login(username='res1', password='testpass123')
+        url = reverse('control_guardias:cambio_cancelar', kwargs={'pk': solicitud.pk})
+        response = self.client.post(url, {
+            'return_to': reverse('control_guardias:cambios'),
+            'focus': str(solicitud.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
+        )
+
+    def test_responder_cambio_con_return_to_inseguro_hace_fallback_local(self):
+        from .services import solicitar_cambio
+
+        solicitud = solicitar_cambio(self.residente1, self.g1, self.g2)
+        self.client.login(username='res2', password='testpass123')
+        url = reverse('control_guardias:cambio_responder', kwargs={'pk': solicitud.pk})
+        response = self.client.post(url, {
+            'accion': 'aceptar',
+            'return_to': 'https://evil.example/redirect',
+            'focus': str(solicitud.pk),
+        })
+
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
+        )
 

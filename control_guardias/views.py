@@ -4,6 +4,7 @@ from django.db import models
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
@@ -65,6 +66,34 @@ class JefeInstructorMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         user = self.request.user
         return user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
+
+
+def _safe_return_url(request, fallback, focus=''):
+    return_to = (
+        request.POST.get('return_to')
+        or request.GET.get('return_to')
+        or ''
+    )
+
+    if return_to and url_has_allowed_host_and_scheme(
+        return_to,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        target = return_to
+    else:
+        target = fallback
+
+    focus_value = (
+        request.POST.get('focus')
+        or request.GET.get('focus')
+        or str(focus or '')
+    )
+    if not focus_value:
+        return target
+
+    separator = '&' if '?' in target else '?'
+    return f'{target}{separator}focus={focus_value}'
 
 
 class GuardiasIndexView(LoginRequiredMixin, TemplateView):
@@ -287,6 +316,30 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         )
         context['es_gestor'] = es_gestor
         context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.filter(activo=True)
+        # Retorno contextual: si se llega desde borrador, volver allí; en otro caso, ir al inicio.
+        return_to_q = self.request.GET.get('return_to', '')
+        if return_to_q and url_has_allowed_host_and_scheme(
+            return_to_q,
+            allowed_hosts={self.request.get_host()},
+            require_https=self.request.is_secure(),
+        ):
+            context['calendario_return_url'] = return_to_q
+            context['calendario_back_label'] = 'Volver al borrador'
+        else:
+            context['calendario_return_url'] = reverse('control_guardias:index')
+            context['calendario_back_label'] = 'Ir al inicio'
+        # Permite abrir el calendario directamente en un mes/año objetivo (ej. desde borrador)
+        context['calendario_initial_date'] = ''
+        mes_q = self.request.GET.get('mes')
+        anio_q = self.request.GET.get('anio')
+        if mes_q and anio_q:
+            try:
+                mes = int(mes_q)
+                anio = int(anio_q)
+                if 1 <= mes <= 12 and 2000 <= anio <= 2100:
+                    context['calendario_initial_date'] = f'{anio:04d}-{mes:02d}-01'
+            except (TypeError, ValueError):
+                pass
         # Feriados del rango visible (±6 meses) para colorear casilleros en el JS
         import json as _json
         from datetime import date as _date, timedelta as _td
@@ -618,7 +671,7 @@ class PublicarBorradorView(JefeInstructorMixin, TemplateView):
             messages.success(request, f"{count} guardia(s) publicada(s) correctamente.")
         else:
             messages.warning(request, "No había asignaciones en borrador para publicar.")
-        return redirect('control_guardias:calendario')
+        return redirect(f"{reverse('control_guardias:calendario')}?mes={mes}&anio={anio}")
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:distribucion_borrador',
@@ -747,18 +800,22 @@ class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
     def _get_ausencia(self, pk):
         return get_object_or_404(AusenciaResidente, pk=pk)
 
+    def _return_url(self, ausencia_pk=None):
+        fallback = reverse('control_guardias:ausencias')
+        return _safe_return_url(self.request, fallback, focus=ausencia_pk)
+
     def get(self, request, pk, *args, **kwargs):
         ausencia = self._get_ausencia(pk)
         if ausencia.estado == 'RESUELTA':
             messages.warning(request, 'Esta ausencia ya fue resuelta.')
-            return redirect('control_guardias:ausencias')
+            return redirect(self._return_url(ausencia.pk))
         return self.render_to_response(self._build_context(ausencia))
 
     def post(self, request, pk, *args, **kwargs):
         ausencia = self._get_ausencia(pk)
         if ausencia.estado == 'RESUELTA':
             messages.warning(request, 'Esta ausencia ya fue resuelta.')
-            return redirect('control_guardias:ausencias')
+            return redirect(self._return_url(ausencia.pk))
 
         # Leer reasignaciones del formulario: reemplazante_<guardia_pk>
         reasignaciones = {}
@@ -785,7 +842,7 @@ class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
             request,
             f'Ausencia de {ausencia.residente.get_full_name()} resuelta — {resumen}.'
         )
-        return redirect('control_guardias:ausencias')
+        return redirect(self._return_url(ausencia.pk))
 
     def _build_context(self, ausencia):
         guardias_data = []
@@ -798,7 +855,12 @@ class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
                 'candidatos': candidatos,   # lista de {'residente': obj, 'guardias_mes': int}
                 'sugerido': sugerido,
             })
-        return {'ausencia': ausencia, 'guardias_data': guardias_data}
+        return {
+            'ausencia': ausencia,
+            'guardias_data': guardias_data,
+            'return_to_url': self._return_url(),
+            'focus_id': ausencia.pk,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -864,11 +926,17 @@ class SolicitarCambioView(LoginRequiredMixin, TemplateView):
             estado='PUBLICADA',
         )
 
+    def _return_url(self, guardia_pk=None):
+        fallback = reverse('control_guardias:cambios')
+        return _safe_return_url(self.request, fallback, focus=guardia_pk)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         guardia = self._get_guardia(self.kwargs['guardia_pk'])
         context['guardia'] = guardia
         context['form'] = kwargs.get('form', SolicitudCambioGuardiaForm(solicitante=self.request.user))
+        context['return_to_url'] = self._return_url(guardia.pk)
+        context['focus_id'] = guardia.pk
         return context
 
     def post(self, request, guardia_pk, *args, **kwargs):
@@ -885,7 +953,7 @@ class SolicitarCambioView(LoginRequiredMixin, TemplateView):
                 guardia_receptor=form.cleaned_data['guardia_receptor'],
             )
             messages.success(request, "Solicitud de cambio enviada. El receptor fue notificado.")
-            return redirect('control_guardias:cambios')
+            return redirect(self._return_url(guardia_sol.pk))
         except CambioGuardiaError as e:
             messages.error(request, str(e))
             return self.render_to_response(self.get_context_data(form=form))
@@ -913,7 +981,13 @@ class ResponderCambioView(LoginRequiredMixin, TemplateView):
                 messages.error(request, "Acción no válida.")
         except CambioGuardiaError as e:
             messages.error(request, str(e))
-        return redirect('control_guardias:cambios')
+        return redirect(
+            _safe_return_url(
+                request,
+                reverse('control_guardias:cambios'),
+                focus=solicitud.pk,
+            )
+        )
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:cambios')
@@ -933,8 +1007,15 @@ class RevisarCambioView(JefeInstructorMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['solicitud'] = get_object_or_404(SolicitudCambioGuardia, pk=self.kwargs['pk'])
+        solicitud = get_object_or_404(SolicitudCambioGuardia, pk=self.kwargs['pk'])
+        context['solicitud'] = solicitud
         context['form'] = kwargs.get('form', NotasRechazoForm())
+        context['return_to_url'] = _safe_return_url(
+            self.request,
+            reverse('control_guardias:cambios'),
+            focus=solicitud.pk,
+        )
+        context['focus_id'] = solicitud.pk
         return context
 
     def post(self, request, pk, *args, **kwargs):
@@ -955,7 +1036,13 @@ class RevisarCambioView(JefeInstructorMixin, TemplateView):
                 messages.error(request, "Acción no válida.")
         except CambioGuardiaError as e:
             messages.error(request, str(e))
-        return redirect('control_guardias:cambios')
+        return redirect(
+            _safe_return_url(
+                request,
+                reverse('control_guardias:cambios'),
+                focus=solicitud.pk,
+            )
+        )
 
 
 class CancelarCambioView(LoginRequiredMixin, TemplateView):
@@ -970,7 +1057,13 @@ class CancelarCambioView(LoginRequiredMixin, TemplateView):
             messages.success(request, "Solicitud cancelada.")
         except CambioGuardiaError as e:
             messages.error(request, str(e))
-        return redirect('control_guardias:cambios')
+        return redirect(
+            _safe_return_url(
+                request,
+                reverse('control_guardias:cambios'),
+                focus=solicitud.pk,
+            )
+        )
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:cambios')

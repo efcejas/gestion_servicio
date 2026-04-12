@@ -136,4 +136,23 @@
     {% endif %}
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    if (!focus) {
+        return;
+    }
+    const card = document.getElementById(`solicitud-${focus}`);
+    if (!card) {
+        return;
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('ring-2', 'ring-indigo-300', 'ring-offset-2');
+    setTimeout(() => {
+        card.classList.remove('ring-2', 'ring-indigo-300', 'ring-offset-2');
+    }, 2200);
+});
+</script>
 {% endblock %}

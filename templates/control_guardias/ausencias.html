@@ -36,7 +36,7 @@
     {% if ausencias %}
     <div class="space-y-3">
         {% for ausencia in ausencias %}
-        <div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+        <div id="ausencia-{{ ausencia.pk }}" class="bg-gray-900 border border-gray-700 rounded-xl p-5">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="space-y-1">
                     {% if es_gestor %}
@@ -77,7 +77,7 @@
                     {% endif %}
                 </div>
                 {% if es_gestor and ausencia.estado == 'PENDIENTE' %}
-                <a href="{% url 'control_guardias:ausencia_resolver' ausencia.pk %}"
+                <a href="{% url 'control_guardias:ausencia_resolver' ausencia.pk %}?return_to={{ request.path|urlencode }}&focus={{ ausencia.pk }}"
                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-700 hover:bg-green-600 text-white text-xs font-medium rounded-lg transition-colors">
                     <i class="fas fa-people-arrows"></i>Gestionar reasignación
                 </a>
@@ -108,4 +108,23 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    if (!focus) {
+        return;
+    }
+    const card = document.getElementById(`ausencia-${focus}`);
+    if (!card) {
+        return;
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-900');
+    setTimeout(() => {
+        card.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-900');
+    }, 2200);
+});
+</script>
 {% endblock %}

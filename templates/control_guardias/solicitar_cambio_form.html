@@ -45,6 +45,8 @@
     <div class="bg-gray-900 border border-gray-700 rounded-xl p-6">
         <form method="post" novalidate>
             {% csrf_token %}
+            <input type="hidden" name="return_to" value="{{ return_to_url }}">
+            <input type="hidden" name="focus" value="{{ focus_id }}">
 
             <div class="space-y-5">
 
@@ -74,7 +76,7 @@
             </div>
 
             <div class="flex items-center justify-between mt-6">
-                <a href="{% url 'control_guardias:cambios' %}"
+                     <a href="{{ return_to_url }}"
                    class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Cancelar</a>
                 <button type="submit"
                         class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">

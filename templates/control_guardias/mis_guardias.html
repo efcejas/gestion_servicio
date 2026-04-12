@@ -45,7 +45,7 @@
         </div>
         <div class="divide-y divide-gray-700">
             {% for guardia in proximas_guardias %}
-            <div class="px-6 py-4 flex flex-wrap items-center gap-3 hover:bg-gray-750 transition-colors">
+            <div id="guardia-{{ guardia.pk }}" class="px-6 py-4 flex flex-wrap items-center gap-3 hover:bg-gray-750 transition-colors">
                 <div class="flex-1 min-w-0">
                     <p class="text-white font-medium">{{ guardia.fecha|date:"d/m/Y" }} &mdash; {{ guardia.fecha|date:"l" }}</p>
                     <p class="text-gray-400 text-sm">{{ guardia.tipo_guardia }} &bull; {{ guardia.get_franja_horaria_display }}</p>
@@ -56,7 +56,7 @@
                         <i class="fas fa-star"></i>Feriado
                     </span>
                     {% endif %}
-                    <a href="{% url 'control_guardias:solicitar_cambio' guardia.pk %}"
+                    <a href="{% url 'control_guardias:solicitar_cambio' guardia.pk %}?return_to={{ request.path|urlencode }}&focus={{ guardia.pk }}"
                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-medium rounded-lg transition-colors">
                         <i class="fas fa-exchange-alt"></i>Solicitar cambio
                     </a>
@@ -102,4 +102,23 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const params = new URLSearchParams(window.location.search);
+    const focus = params.get('focus');
+    if (!focus) {
+        return;
+    }
+    const card = document.getElementById(`guardia-${focus}`);
+    if (!card) {
+        return;
+    }
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-800');
+    setTimeout(() => {
+        card.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-800');
+    }, 2200);
+});
+</script>
 {% endblock %}

@@ -15,6 +15,7 @@
         <div class="flex flex-wrap items-center gap-2">
             {% if es_gestor and residentes %}
             <select id="filtroResidente"
+                  aria-label="Filtrar calendario por residente"
                     class="bg-gray-800 border border-gray-600 text-gray-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <option value="">Todos los residentes</option>
                 {% for r in residentes %}
@@ -22,9 +23,9 @@
                 {% endfor %}
             </select>
             {% endif %}
-            <a href="{% url 'control_guardias:index' %}"
+            <a href="{{ calendario_return_url }}"
                class="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:border-gray-400 transition-colors">
-                <i class="fas fa-arrow-left mr-2"></i>Volver
+              <i class="fas fa-arrow-left mr-2"></i>{{ calendario_back_label }}
             </a>
         </div>
     </div>
@@ -80,6 +81,7 @@
     <!-- Tooltip flotante de detalle -->
     <div id="guardiaTooltip"
          class="fixed z-50 hidden max-w-xs rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl text-sm text-gray-200"
+          aria-label="Detalle de guardia"
          role="tooltip">
         <p id="tooltipResidente" class="font-semibold text-white text-sm mb-0.5"></p>
         <p id="tooltipTipo" class="text-gray-400 text-xs mb-1"></p>
@@ -138,6 +140,7 @@
   const filtroEl     = document.getElementById('filtroResidente');
   const apiUrl       = "{% url 'control_guardias:guardias_api' %}";
   const FERIADOS     = new Set({{ feriados_json|safe }});
+  const INITIAL_DATE = "{{ calendario_initial_date|default:'' }}";
 
   let calendar = null;
 
@@ -242,6 +245,7 @@
 
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
+      initialDate: INITIAL_DATE || undefined,
       locale: 'es',
       allDaySlot: false,
       displayEventTime: false,

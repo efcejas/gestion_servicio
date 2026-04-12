@@ -11,7 +11,7 @@
             <h1 class="text-2xl font-bold text-gray-900">Solicitar cambio de guardia</h1>
             <p class="text-gray-500 mt-1 text-sm">Seleccioná la guardia del otro residente con quien querés intercambiar.</p>
         </div>
-        <a href="{% url 'control_guardias:mis_guardias' %}"
+        <a href="{{ return_to_url }}"
            class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
             <i class="fas fa-arrow-left mr-2"></i>Mis guardias
         </a>
@@ -50,6 +50,8 @@
     <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
         <form method="post" novalidate>
             {% csrf_token %}
+            <input type="hidden" name="return_to" value="{{ return_to_url }}">
+            <input type="hidden" name="focus" value="{{ focus_id }}">
 
             <div class="space-y-5">
 
@@ -79,7 +81,7 @@
             </div>
 
             <div class="flex items-center justify-between mt-6">
-                <a href="{% url 'control_guardias:cambios' %}"
+                     <a href="{{ return_to_url }}"
                    class="text-sm text-gray-500 hover:text-gray-700 transition-colors">Cancelar</a>
                 <button type="submit"
                         class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">

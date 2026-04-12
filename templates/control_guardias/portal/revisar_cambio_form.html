@@ -11,7 +11,7 @@
             <h1 class="text-2xl font-bold text-gray-900">Revisar cambio de guardia</h1>
             <p class="text-gray-500 mt-1 text-sm">Aprobá o rechazá el intercambio entre los dos residentes.</p>
         </div>
-        <a href="{% url 'control_guardias:cambios' %}"
+        <a href="{{ return_to_url }}"
            class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
             <i class="fas fa-arrow-left mr-2"></i>Cambios
         </a>
@@ -122,6 +122,8 @@
                 <div class="p-5">
                     <form method="post" novalidate>
                         {% csrf_token %}
+                        <input type="hidden" name="return_to" value="{{ return_to_url }}">
+                        <input type="hidden" name="focus" value="{{ focus_id }}">
                         <div class="mb-5">
                             <label class="block text-sm font-medium text-gray-700 mb-1.5">
                                 Notas / motivo <span class="text-gray-400 font-normal">(opcional)</span>
