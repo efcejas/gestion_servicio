@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "tailwind:dev": "npm --prefix theme/static_src run dev",
+    "tailwind:watch": "npm --prefix theme/static_src run tailwind-watch",
+    "tailwind:build": "npm --prefix theme/static_src run build-prod"
+  },
   "dependencies": {
     "@fullcalendar/core": "^6.1.19",
     "@fullcalendar/daygrid": "^6.1.19",

@@ -15,6 +15,7 @@
 - **[operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md](operativa/DEPLOY_ACTUALIZACION_SEGURIDAD.md)** - Procedimiento de actualización de seguridad.
 - **[operativa/AUDITORIA_USO_LIQUIDACION.md](operativa/AUDITORIA_USO_LIQUIDACION.md)** - Checklist para validar uso real del módulo de liquidación.
 - **[operativa/COMANDO_IMPORTAR_ESTUDIOS.md](operativa/COMANDO_IMPORTAR_ESTUDIOS.md)** - Referencia del comando de importación de estudios desde EGES.
+- **[operativa/FRONTEND_TAILWIND_WORKFLOW.md](operativa/FRONTEND_TAILWIND_WORKFLOW.md)** - Flujo operativo de Tailwind + IntelliSense en VS Code.
 
 ### Sistemas activos
 

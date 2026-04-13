@@ -24,6 +24,9 @@
     <!-- Select2 local -->
     <link href="{% static 'css/select2.min.css' %}" rel="stylesheet" />
 
+    <!-- CSS adicional de la página -->
+    {% block extra_css %}{% endblock %}
+
     <!-- jQuery local -->
     <script src="{% static 'js/jquery.min.js' %}"></script>
     <script src="{% static 'js/select2.min.js' %}"></script>

@@ -1,7 +1,4 @@
-﻿/* Tailwind CSS */
-@import url('https://cdn.tailwindcss.com');
-
-/* Variables CSS para colores médicos */
+﻿/* Variables CSS para colores médicos */
 :root {
     --medical-primary: #164569;
     --medical-secondary: #4b49c0;

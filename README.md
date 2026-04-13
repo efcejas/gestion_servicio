@@ -78,6 +78,9 @@ source gestion_env/bin/activate
 ```bash
 pip install -r requirements.txt
 npm install
+cd theme/static_src
+npm install
+cd ../..
 ```
 
 4. **Configurar variables de entorno**
@@ -106,7 +109,17 @@ python manage.py createsuperuser
 python manage.py runserver
 
 # Terminal 2 - Tailwind (watch mode)
-npm run dev
+npm run tailwind:dev
+```
+
+### Frontend (Tailwind) - comando rapido
+
+```bash
+# Compilar Tailwind en watch desde la raiz
+npm run tailwind:dev
+
+# Build minificado de Tailwind
+npm run tailwind:build
 ```
 
 ## 📁 Estructura del Proyecto
