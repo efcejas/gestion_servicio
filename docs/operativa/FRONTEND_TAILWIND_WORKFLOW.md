@@ -100,3 +100,28 @@ npm audit
 - Usar `tailwind-medical.css` solo para variables CSS y clases muy puntuales.
 - No agregar estilos nuevos en `static/styles/styles.css` (archivo legado).
 - Usar `extra_css` en templates solo para overrides puntuales de librerias de terceros.
+
+## Estandar de formularios (homogeneizacion)
+
+Aplicar este criterio en nuevos formularios o refactors de formularios existentes.
+
+1. Una sola decision por problema de UX.
+- Evitar duplicar campos que representan lo mismo (ej: `Certificado` + `Documentos adicionales`).
+- Preferir una unica seccion clara (`Documentos de respaldo`).
+
+2. Inputs de archivo con UI custom.
+- No depender del texto nativo del navegador (`No se eligió ningún archivo`).
+- Usar boton custom `Seleccionar archivo` + etiqueta con nombre de archivo + boton quitar.
+- Mantener compatibilidad de accesibilidad: `title` y `aria-label` en el input real.
+
+3. Carga multiple por filas.
+- Preferir `Agregar archivo` (una fila por documento) sobre multi-select nativo.
+- Definir maximo visible (en guardias: 5 archivos) y mostrar contador.
+
+4. Validaciones coherentes entre UI y backend.
+- Mostrar limites en UI (cantidad, tamaño, extensiones).
+- Revalidar siempre en backend con los mismos limites.
+
+5. Consistencia visual.
+- Mantener misma estructura y microcopy entre versiones portal y dark.
+- Reusar componentes/patrones cuando aparezcan en 2 o mas formularios.

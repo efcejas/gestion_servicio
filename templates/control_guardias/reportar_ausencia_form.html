@@ -24,7 +24,7 @@
     {% endif %}
 
     <div class="bg-gray-900 border border-gray-700 rounded-xl p-6">
-        <form method="post" novalidate>
+        <form method="post" enctype="multipart/form-data" novalidate>
             {% csrf_token %}
 
             <div class="space-y-5">
@@ -64,6 +64,26 @@
                     {% endif %}
                 </div>
 
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                        Documentos de respaldo <span class="text-gray-500 font-normal">(opcional)</span>
+                    </label>
+                    <div id="docs-adicionales-container" class="space-y-2">
+                    </div>
+                    <div class="mt-2 flex items-center gap-3">
+                        <button type="button"
+                                id="agregar-doc-adicional"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">
+                            <i class="fas fa-plus"></i>Agregar archivo
+                        </button>
+                        <span id="docs-adicionales-count" class="text-xs text-gray-500">0 de 5 archivos</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Hasta 5 archivos, máximo 10 MB por archivo.</p>
+                    {% if form.certificados_adicionales.errors %}
+                    <p class="text-red-400 text-xs mt-1">{{ form.certificados_adicionales.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
                 {% if form.non_field_errors %}
                 <div class="px-4 py-3 rounded-lg bg-red-900 border border-red-700 text-red-300 text-sm">
                     {{ form.non_field_errors.0 }}
@@ -84,4 +104,80 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const maxCampos = 5;
+    const container = document.getElementById('docs-adicionales-container');
+    const btnAgregar = document.getElementById('agregar-doc-adicional');
+    const count = document.getElementById('docs-adicionales-count');
+    if (!container || !btnAgregar || !count) {
+        return;
+    }
+
+    function actualizarContador() {
+        const total = container.querySelectorAll('input[name="certificados_adicionales"]').length;
+        count.textContent = total + ' de ' + maxCampos + ' archivos';
+        btnAgregar.disabled = total >= maxCampos;
+        btnAgregar.classList.toggle('opacity-50', total >= maxCampos);
+        btnAgregar.classList.toggle('cursor-not-allowed', total >= maxCampos);
+    }
+
+    function crearFila() {
+        const fila = document.createElement('div');
+        fila.className = 'flex items-center gap-2 p-2 border border-gray-700 rounded-md bg-gray-800';
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.name = 'certificados_adicionales';
+        input.accept = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.heic,.heif';
+        input.title = 'Seleccionar documento adicional';
+        input.setAttribute('aria-label', 'Seleccionar documento adicional');
+        input.className = 'hidden';
+
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.className = 'inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md border border-blue-800 text-blue-300 hover:bg-blue-900 transition-colors';
+        trigger.innerHTML = '<i class="fas fa-upload"></i>Seleccionar archivo';
+        trigger.addEventListener('click', function () {
+            input.click();
+        });
+
+        const nombre = document.createElement('span');
+        nombre.className = 'text-xs text-gray-400 flex-1 truncate';
+        nombre.textContent = 'Ningún archivo seleccionado';
+
+        input.addEventListener('change', function () {
+            nombre.textContent = input.files && input.files[0] ? input.files[0].name : 'Ningún archivo seleccionado';
+        });
+
+        const btnQuitar = document.createElement('button');
+        btnQuitar.type = 'button';
+        btnQuitar.className = 'inline-flex items-center justify-center px-2.5 py-2 text-xs font-medium rounded-md border border-red-800 text-red-300 hover:bg-red-900 transition-colors';
+        btnQuitar.innerHTML = '<i class="fas fa-trash"></i>';
+        btnQuitar.addEventListener('click', function () {
+            fila.remove();
+            actualizarContador();
+        });
+
+        fila.appendChild(input);
+        fila.appendChild(trigger);
+        fila.appendChild(nombre);
+        fila.appendChild(btnQuitar);
+        return fila;
+    }
+
+    btnAgregar.addEventListener('click', function () {
+        const total = container.querySelectorAll('input[name="certificados_adicionales"]').length;
+        if (total >= maxCampos) {
+            return;
+        }
+        container.appendChild(crearFila());
+        actualizarContador();
+    });
+
+    container.appendChild(crearFila());
+    actualizarContador();
+});
+</script>
 {% endblock %}

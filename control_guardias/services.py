@@ -10,7 +10,10 @@ import random
 from collections import defaultdict
 from datetime import date, timedelta
 
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db import transaction
+from django.urls import reverse
 
 from .models import AsignacionGuardia, ConfiguracionTipoGuardia, CuotaMensualGuardia, Feriado
 
@@ -327,11 +330,35 @@ def publicar_borrador(mes, anio):
     primer_dia = date(anio, mes, 1)
     ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
 
+    borradores = list(
+        AsignacionGuardia.objects.filter(
+            fecha__gte=primer_dia,
+            fecha__lte=ultimo_dia,
+            estado='BORRADOR',
+        ).select_related('residente')
+    )
     count = AsignacionGuardia.objects.filter(
         fecha__gte=primer_dia,
         fecha__lte=ultimo_dia,
         estado='BORRADOR',
     ).update(estado='PUBLICADA')
+
+    if count:
+        por_residente = defaultdict(list)
+        for guardia in borradores:
+            por_residente[guardia.residente].append(guardia.fecha)
+
+        for residente, fechas in por_residente.items():
+            fechas_ordenadas = sorted(set(fechas))
+            desde = fechas_ordenadas[0].strftime('%d/%m/%Y')
+            hasta = fechas_ordenadas[-1].strftime('%d/%m/%Y')
+            total = len(fechas)
+            crear_notificacion(
+                residente,
+                'PUBLICACION',
+                f"Se publicaron tus guardias de {_nombre_mes(mes)} {anio}. "
+                f"Total: {total}. Rango: {desde} a {hasta}.",
+            )
 
     return count
 
@@ -467,15 +494,58 @@ class CambioGuardiaError(Exception):
 
 
 def crear_notificacion(destinatario, tipo, mensaje, asignacion=None, solicitud=None):
-    """Crea una NotificacionGuardia para el destinatario."""
+    """Crea una NotificacionGuardia para el destinatario y envía email si aplica."""
     from .models import NotificacionGuardia
-    return NotificacionGuardia.objects.create(
+    notif = NotificacionGuardia.objects.create(
         destinatario=destinatario,
         tipo=tipo,
         mensaje=mensaje,
         asignacion=asignacion,
         solicitud_cambio=solicitud,
     )
+    _enviar_notificacion_email(destinatario, tipo, mensaje)
+    return notif
+
+
+def _enviar_notificacion_email(destinatario, tipo, mensaje):
+    """Envía correo para una notificación de guardia según preferencia del usuario."""
+    if not getattr(destinatario, 'is_active', False):
+        return
+    if not getattr(destinatario, 'recibir_notificaciones', True):
+        return
+    email = (getattr(destinatario, 'email', '') or '').strip()
+    if not email:
+        return
+
+    from .models import NotificacionGuardia
+
+    tipo_display = dict(NotificacionGuardia.TIPO_CHOICES).get(tipo, tipo)
+    subject = f"[Guardias] {tipo_display}"
+    nombre = destinatario.get_full_name() or destinatario.username
+    portal_url = _url_portal_guardias(destinatario)
+    body = (
+        f"Hola {nombre},\n\n"
+        f"{mensaje}\n\n"
+        f"Ingresá directo al sistema desde este enlace: {portal_url}\n\n"
+        "Este es un mensaje automático del sistema."
+    )
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[email],
+        fail_silently=True,
+    )
+
+
+def _url_portal_guardias(destinatario=None):
+    """Retorna URL absoluta de guardias para emails según rol del destinatario."""
+    base_url = getattr(settings, 'SITE_URL', '') or getattr(settings, 'BASE_URL', '') or 'http://localhost:8000'
+    if destinatario is not None and getattr(destinatario, 'rol', '') == 'medico_residente':
+        path = reverse('control_guardias:mis_guardias')
+    else:
+        path = reverse('control_guardias:index')
+    return f"{base_url.rstrip('/')}{path}"
 
 
 def _notificar_gestores(tipo, mensaje, solicitud=None):
@@ -494,14 +564,22 @@ def _notificar_gestores(tipo, mensaje, solicitud=None):
 # Ausencias
 # --------------------------------------------------------------------------
 
-def reportar_ausencia(residente, fecha_inicio, fecha_fin, motivo, descripcion=''):
+def reportar_ausencia(
+    residente,
+    fecha_inicio,
+    fecha_fin,
+    motivo,
+    descripcion='',
+    certificado=None,
+    certificados_adicionales=None,
+):
     """
     Registra una ausencia del residente y vincula las guardias PUBLICADAS afectadas.
 
     Retorna:
         AusenciaResidente creada
     """
-    from .models import AusenciaResidente
+    from .models import AusenciaDocumento, AusenciaResidente
 
     with transaction.atomic():
         ausencia = AusenciaResidente.objects.create(
@@ -510,7 +588,17 @@ def reportar_ausencia(residente, fecha_inicio, fecha_fin, motivo, descripcion=''
             fecha_fin=fecha_fin,
             motivo=motivo,
             descripcion=descripcion,
+            certificado=certificado,
         )
+
+        documentos = certificados_adicionales or []
+        if documentos:
+            for doc in documentos:
+                AusenciaDocumento.objects.create(
+                    ausencia=ausencia,
+                    archivo=doc,
+                    tipo_documento='CERTIFICADO',
+                )
 
         # Detectar y vincular guardias publicadas afectadas
         guardias_afectadas = AsignacionGuardia.objects.filter(

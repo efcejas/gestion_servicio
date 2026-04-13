@@ -1,11 +1,14 @@
 import datetime
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core import mail
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from .models import (
     AsignacionGuardia,
+    AusenciaDocumento,
     AusenciaResidente,
     ConfiguracionTipoGuardia,
     CuotaMensualGuardia,
@@ -604,6 +607,33 @@ class ServicioPublicarCancelarTest(TestCase):
             AsignacionGuardia.objects.filter(estado='BORRADOR', fecha__month=6).exists()
         )
 
+    def test_publicar_crea_notificacion_publicacion_para_residente(self):
+        publicar_borrador(5, 2026)
+        self.assertTrue(
+            NotificacionGuardia.objects.filter(
+                destinatario=self.residente,
+                tipo='PUBLICACION',
+            ).exists()
+        )
+
+    def test_publicar_envia_email_si_residente_tiene_mail(self):
+        self.residente.email = 'residente_pub@example.com'
+        self.residente.save(update_fields=['email'])
+
+        publicar_borrador(5, 2026)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('residente_pub@example.com', mail.outbox[0].to)
+
+    def test_publicar_email_incluye_link_directo_al_sistema(self):
+        self.residente.email = 'residente_pub@example.com'
+        self.residente.save(update_fields=['email'])
+
+        publicar_borrador(5, 2026)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/control_guardias/mis-guardias/', mail.outbox[0].body)
+
 
 class DistribucionViewTest(TestCase):
     """Tests de permisos y flujo básico de la vista de distribución."""
@@ -710,6 +740,82 @@ class ReportarAusenciaServiceTest(TestCase):
         self.assertTrue(
             NotificacionGuardia.objects.filter(destinatario=self.jefe).exists()
         )
+
+    def test_envia_email_a_gestor_si_tiene_mail(self):
+        self.jefe.email = 'jefe@example.com'
+        self.jefe.save(update_fields=['email'])
+
+        self.reportar_ausencia(
+            self.residente,
+            self.hoy,
+            self.hoy,
+            'ENFERMEDAD',
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('[Guardias]', mail.outbox[0].subject)
+        self.assertIn('jefe@example.com', mail.outbox[0].to)
+
+    def test_guarda_certificado_adjuntado(self):
+        archivo = SimpleUploadedFile(
+            'certificado.pdf',
+            b'%PDF-1.4 archivo de prueba',
+            content_type='application/pdf',
+        )
+        ausencia = self.reportar_ausencia(
+            self.residente,
+            self.hoy,
+            self.hoy,
+            'ENFERMEDAD',
+            certificado=archivo,
+        )
+
+        self.assertTrue(bool(ausencia.certificado))
+        self.assertIn('certificado.pdf', ausencia.certificado.name)
+
+    def test_guarda_documentos_adicionales(self):
+        doc1 = SimpleUploadedFile(
+            'extra1.pdf',
+            b'%PDF-1.4 documento 1',
+            content_type='application/pdf',
+        )
+        doc2 = SimpleUploadedFile(
+            'extra2.jpg',
+            b'\xff\xd8\xff imagen 2',
+            content_type='image/jpeg',
+        )
+
+        ausencia = self.reportar_ausencia(
+            self.residente,
+            self.hoy,
+            self.hoy,
+            'ENFERMEDAD',
+            certificados_adicionales=[doc1, doc2],
+        )
+
+        self.assertEqual(AusenciaDocumento.objects.filter(ausencia=ausencia).count(), 2)
+
+
+class AusenciaResidenteFormTest(TestCase):
+    def test_rechaza_mas_de_cinco_documentos_adicionales(self):
+        from .forms import AusenciaResidenteForm
+
+        residente = crear_residente('res_form_limite')
+        files = [
+            SimpleUploadedFile(f'extra{i}.pdf', b'%PDF-1.4 data', content_type='application/pdf')
+            for i in range(1, 7)
+        ]
+        data = {
+            'fecha_inicio': '2026-04-10',
+            'fecha_fin': '2026-04-11',
+            'motivo': 'ENFERMEDAD',
+            'descripcion': 'test',
+        }
+        form = AusenciaResidenteForm(data=data)
+        form.files.setlist('certificados_adicionales', files)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('certificados_adicionales', form.errors)
 
 
 class ResolverAusenciaServiceTest(TestCase):
@@ -914,6 +1020,15 @@ class SolicitarCambioServiceTest(TestCase):
             NotificacionGuardia.objects.filter(destinatario=self.residente2).exists()
         )
 
+    def test_envia_email_al_receptor_si_tiene_mail(self):
+        self.residente2.email = 'residente2@example.com'
+        self.residente2.save(update_fields=['email'])
+
+        self.solicitar_cambio(self.residente1, self.g1, self.g2)
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('residente2@example.com', mail.outbox[0].to)
+
     def test_error_si_guardia_no_es_del_solicitante(self):
         with self.assertRaises(self.CambioGuardiaError):
             self.solicitar_cambio(self.residente1, self.g2, self.g1)
@@ -1102,6 +1217,23 @@ class AusenciasViewTest(TestCase):
         })
         self.assertRedirects(response, reverse('control_guardias:ausencias'))
         self.assertTrue(AusenciaResidente.objects.filter(residente=self.residente).exists())
+
+    def test_residente_reporta_ausencia_via_post_con_documento(self):
+        self.client.login(username='residente1', password='testpass123')
+        doc = SimpleUploadedFile('doc1.pdf', b'%PDF-1.4 doc1', content_type='application/pdf')
+        response = self.client.post(
+            reverse('control_guardias:ausencia_reportar'),
+            {
+                'fecha_inicio': self.hoy.isoformat(),
+                'fecha_fin': self.hoy.isoformat(),
+                'motivo': 'OTRO',
+                'descripcion': 'con adjunto',
+                'certificados_adicionales': doc,
+            },
+        )
+        self.assertRedirects(response, reverse('control_guardias:ausencias'))
+        ausencia = AusenciaResidente.objects.filter(residente=self.residente).latest('reportada_en')
+        self.assertEqual(AusenciaDocumento.objects.filter(ausencia=ausencia).count(), 1)
 
     def test_residente_no_puede_resolver_ausencia(self):
         from .services import reportar_ausencia

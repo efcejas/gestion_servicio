@@ -729,7 +729,7 @@ class AusenciasView(LoginRequiredMixin, TemplateView):
             qs = (
                 AusenciaResidente.objects
                 .select_related('residente', 'resuelta_por')
-                .prefetch_related('guardias_afectadas')
+                .prefetch_related('guardias_afectadas', 'documentos')
                 .order_by('estado', '-reportada_en')
             )
         else:
@@ -737,7 +737,7 @@ class AusenciasView(LoginRequiredMixin, TemplateView):
                 AusenciaResidente.objects
                 .filter(residente=user)
                 .select_related('resuelta_por')
-                .prefetch_related('guardias_afectadas')
+                .prefetch_related('guardias_afectadas', 'documentos')
                 .order_by('-reportada_en')
             )
         context['ausencias'] = qs
@@ -762,7 +762,7 @@ class ReportarAusenciaView(LoginRequiredMixin, TemplateView):
         return context
 
     def post(self, request, *args, **kwargs):
-        form = AusenciaResidenteForm(request.POST)
+        form = AusenciaResidenteForm(request.POST, request.FILES)
         if not form.is_valid():
             return self.render_to_response(self.get_context_data(form=form))
         try:
@@ -772,6 +772,7 @@ class ReportarAusenciaView(LoginRequiredMixin, TemplateView):
                 fecha_fin=form.cleaned_data['fecha_fin'],
                 motivo=form.cleaned_data['motivo'],
                 descripcion=form.cleaned_data.get('descripcion', ''),
+                certificados_adicionales=form.cleaned_data.get('certificados_adicionales', []),
             )
             n = ausencia.guardias_afectadas.count()
             messages.success(

@@ -1,8 +1,17 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
+
+
+def upload_certificado_ausencia(instance, filename):
+    return f"control_guardias/ausencias/{instance.residente_id}/{filename}"
+
+
+def upload_documento_ausencia(instance, filename):
+    return f"control_guardias/ausencias/{instance.ausencia_id}/{filename}"
 
 
 class ConfiguracionTipoGuardia(models.Model):
@@ -181,6 +190,19 @@ class AusenciaResidente(models.Model):
     fecha_fin = models.DateField()
     motivo = models.CharField(max_length=20, choices=MOTIVO_CHOICES)
     descripcion = models.TextField(blank=True)
+    certificado = models.FileField(
+        upload_to=upload_certificado_ausencia,
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=[
+                    'jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'heic', 'heif'
+                ]
+            )
+        ],
+        help_text='Adjuntar certificado (imagen, PDF o documento).'
+    )
     guardias_afectadas = models.ManyToManyField(
         AsignacionGuardia,
         blank=True,
@@ -206,6 +228,55 @@ class AusenciaResidente(models.Model):
             f"{self.residente.get_full_name()} - "
             f"{self.get_motivo_display()} ({self.fecha_inicio} → {self.fecha_fin})"
         )
+
+    @property
+    def documentos_respaldo(self):
+        """Lista unificada de documentos (campo legado + adjuntos múltiples)."""
+        items = []
+        if self.certificado:
+            nombre = self.certificado.name.split('/')[-1]
+            items.append({'url': self.certificado.url, 'nombre': nombre})
+        for doc in self.documentos.all():
+            nombre = doc.archivo.name.split('/')[-1]
+            items.append({'url': doc.archivo.url, 'nombre': nombre})
+        return items
+
+
+class AusenciaDocumento(models.Model):
+    """Documentos adjuntos asociados a una ausencia (permite múltiples archivos)."""
+
+    TIPO_CHOICES = [
+        ('CERTIFICADO', 'Certificado'),
+        ('ESTUDIO', 'Estudio/Informe'),
+        ('NOTA', 'Nota administrativa'),
+        ('OTRO', 'Otro'),
+    ]
+
+    ausencia = models.ForeignKey(
+        AusenciaResidente,
+        on_delete=models.CASCADE,
+        related_name='documentos'
+    )
+    archivo = models.FileField(
+        upload_to=upload_documento_ausencia,
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'heic', 'heif']
+            )
+        ],
+        help_text='Documento respaldatorio adjunto a la ausencia.'
+    )
+    tipo_documento = models.CharField(max_length=20, choices=TIPO_CHOICES, default='CERTIFICADO')
+    observacion = models.CharField(max_length=200, blank=True)
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Documento de ausencia'
+        verbose_name_plural = 'Documentos de ausencias'
+        ordering = ['-fecha_subida']
+
+    def __str__(self):
+        return f"Documento {self.get_tipo_documento_display()} - Ausencia #{self.ausencia_id}"
 
 
 class SolicitudCambioGuardia(models.Model):

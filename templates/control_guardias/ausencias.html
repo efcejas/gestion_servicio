@@ -63,6 +63,19 @@
                     {% if ausencia.descripcion %}
                     <p class="text-gray-400 text-sm">{{ ausencia.descripcion }}</p>
                     {% endif %}
+                    {% if ausencia.documentos_respaldo %}
+                    <div class="mt-2 space-y-1">
+                        {% for documento in ausencia.documentos_respaldo %}
+                        <p class="text-sm">
+                            <a href="{{ documento.url }}" target="_blank" rel="noopener"
+                               class="inline-flex items-center gap-1.5 text-indigo-400 hover:text-indigo-300">
+                                <i class="fas fa-paperclip"></i>
+                                {{ documento.nombre }}
+                            </a>
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     {% with n=ausencia.guardias_afectadas.count %}
                     {% if n %}
                     <p class="text-xs text-gray-500 mt-1">

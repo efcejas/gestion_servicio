@@ -11,6 +11,11 @@ from .models import (
 
 INPUT_CLASS = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg'
 CHECKBOX_CLASS = 'w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded'
+EXTENSIONES_PERMITIDAS_CERT = {'jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'heic', 'heif'}
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
 
 
 class ConfiguracionTipoGuardiaForm(forms.ModelForm):
@@ -77,6 +82,18 @@ class FeriadoForm(forms.ModelForm):
 
 
 class AusenciaResidenteForm(forms.ModelForm):
+    certificados_adicionales = forms.Field(
+        required=False,
+        widget=MultipleFileInput(
+            attrs={
+                'class': 'w-full px-4 py-2.5 border border-gray-300 rounded-lg',
+                'multiple': True,
+                'accept': '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.heic,.heif',
+            }
+        ),
+        label='Documentos adicionales',
+    )
+
     class Meta:
         model = AusenciaResidente
         fields = ['fecha_inicio', 'fecha_fin', 'motivo', 'descripcion']
@@ -94,6 +111,26 @@ class AusenciaResidenteForm(forms.ModelForm):
         if inicio and fin and fin < inicio:
             raise forms.ValidationError('La fecha de fin no puede ser anterior a la fecha de inicio.')
         return cleaned_data
+
+    def clean_certificados_adicionales(self):
+        archivos = self.files.getlist('certificados_adicionales')
+        if not archivos:
+            return []
+        if len(archivos) > 5:
+            raise forms.ValidationError('Podés adjuntar hasta 5 documentos adicionales por ausencia.')
+
+        max_size = 10 * 1024 * 1024  # 10 MB por archivo
+        for archivo in archivos:
+            if archivo.size > max_size:
+                raise forms.ValidationError(
+                    f'El archivo {archivo.name} supera los 10 MB permitidos.'
+                )
+            extension = archivo.name.rsplit('.', 1)[-1].lower() if '.' in archivo.name else ''
+            if extension not in EXTENSIONES_PERMITIDAS_CERT:
+                raise forms.ValidationError(
+                    f'El archivo {archivo.name} tiene una extensión no permitida.'
+                )
+        return archivos
 
 
 class SolicitudCambioGuardiaForm(forms.ModelForm):
