@@ -15,6 +15,10 @@ module.exports = {
     
     // Python files que pueden tener clases CSS en strings
     '../../**/*.py',
+    '!../../gestion_env/**',
+    '!../../**/migrations/**',
+    '!../../node_modules/**',
+    '!../../staticfiles/**',
     
     // FLOWBITE: Incluir archivos de Flowbite para detectar clases
     './node_modules/flowbite/**/*.js',
