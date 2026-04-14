@@ -126,7 +126,7 @@
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold text-white"><i class="fas fa-clock text-blue-400 mr-2"></i>Próximas guardias</h2>
-            <a href="{% url 'control_guardias:mis_guardias' %}" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">Ver todas â†’</a>
+            <a href="{% url 'control_guardias:mis_guardias' %}" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">Ver todas &rarr;</a>
         </div>
         <div class="space-y-2">
             {% for guardia in proximas_guardias %}
@@ -264,7 +264,7 @@
     <div class="bg-gray-800 border border-gray-700 rounded-xl p-5">
         <div class="flex items-center justify-between mb-4">
             <h2 class="font-semibold text-white"><i class="fas fa-list-check text-blue-400 mr-2"></i>Próximas guardias publicadas</h2>
-            <a href="{% url 'control_guardias:calendario' %}" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">Ver calendario â†’</a>
+            <a href="{% url 'control_guardias:calendario' %}" class="text-sm text-blue-400 hover:text-blue-300 transition-colors">Ver calendario &rarr;</a>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm text-left">
