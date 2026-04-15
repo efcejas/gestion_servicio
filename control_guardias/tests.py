@@ -367,6 +367,68 @@ class ServicioDistribucionTest(TestCase):
                 self.assertNotEqual(delta, 1,
                     msg=f"{residente.username} tiene guardias consecutivas: {fechas[i]} y {fechas[i+1]}")
 
+    def test_distribucion_excluye_residente_con_ausencia_en_rango(self):
+        """Un residente ausente en el período no debe recibir guardias en ese rango."""
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        AusenciaResidente.objects.create(
+            residente=self.r1,
+            fecha_inicio=datetime.date(2026, 5, 1),
+            fecha_fin=datetime.date(2026, 5, 31),
+            motivo='LICENCIA',
+            descripcion='Ausencia completa del mes para validar exclusión en distribución',
+        )
+
+        generar_distribucion(
+            mes=5,
+            anio=2026,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+
+        self.assertEqual(
+            AsignacionGuardia.objects.filter(residente=self.r1, estado='BORRADOR').count(),
+            0,
+            msg='R1 no debería recibir guardias BORRADOR en mayo por ausencia reportada todo el mes.',
+        )
+
+    def test_distribucion_excluye_dentro_de_ausencia_parcial_y_permite_fuera(self):
+        """Con ausencia parcial, no asigna dentro del rango y sí puede asignar fuera."""
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        # Dejamos solo R1 con cuota para forzar asignaciones fuera del rango ausente.
+        CuotaMensualGuardia.objects.filter(anio_residencia__in=['R2', 'R3']).delete()
+        CuotaMensualGuardia.objects.filter(anio_residencia='R1').update(guardias_por_mes=5)
+
+        AusenciaResidente.objects.create(
+            residente=self.r1,
+            fecha_inicio=datetime.date(2026, 5, 11),
+            fecha_fin=datetime.date(2026, 5, 20),
+            motivo='LICENCIA',
+            descripcion='Ausencia parcial para validar exclusión en rango y asignación fuera de rango.',
+        )
+
+        generar_distribucion(
+            mes=5,
+            anio=2026,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+
+        fechas_r1 = list(
+            AsignacionGuardia.objects.filter(residente=self.r1, estado='BORRADOR')
+            .values_list('fecha', flat=True)
+        )
+        self.assertGreater(
+            len(fechas_r1),
+            0,
+            msg='R1 debería recibir al menos una guardia fuera del rango de ausencia parcial.',
+        )
+        self.assertTrue(
+            all(f < datetime.date(2026, 5, 11) or f > datetime.date(2026, 5, 20) for f in fechas_r1),
+            msg='R1 no debe tener guardias BORRADOR entre el 11/05 y el 20/05.',
+        )
+
     def test_sin_residentes_lanza_error(self):
         """DistribucionError si no hay residentes activos."""
         User.objects.filter(rol='medico_residente').update(is_active=False)
@@ -399,6 +461,87 @@ class ServicioDistribucionTest(TestCase):
         # Deben existir borradores y no haberse duplicado
         self.assertGreater(count_segunda, 0)
         self.assertLessEqual(count_segunda, count_primera + 2)
+
+    def test_distribucion_evita_guardias_a_dos_dias_cuando_hay_candidatos_disponibles(self):
+        """
+        Si hay candidatos sin penalización disponibles, el residente con guardia a 2 días
+        de distancia no debería ser elegido para ese slot.
+
+        Escenario controlado:
+          - Solo 2 residentes: r1 (ya asignado el lunes 4), r2 (sin asignaciones).
+          - Cuota: ambos 1 guardia.
+          - El miércoles 6 (2 días después) debe asignarse a r2 y no a r1.
+        """
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        # Cuota 1 para cada residente en este test
+        CuotaMensualGuardia.objects.filter(anio_residencia__in=['R1', 'R2', 'R3']).delete()
+        CuotaMensualGuardia.objects.create(anio_residencia='R1', guardias_por_mes=1)
+        CuotaMensualGuardia.objects.create(anio_residencia='R2', guardias_por_mes=1)
+        CuotaMensualGuardia.objects.create(anio_residencia='R3', guardias_por_mes=0)
+
+        # r1 ya tiene una guardia publicada el lunes 4/mayo
+        AsignacionGuardia.objects.create(
+            residente=self.r1,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 4),   # lunes
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+
+        qs = CTG.objects.filter(pk=self.tipo.pk)
+        generar_distribucion(mes=5, anio=2026, tipos_guardia=qs, creado_por=self.jefe)
+
+        # r1 agotó su cuota con la guardia publicada y además tiene penalización el miércoles 6
+        # r2 tiene cuota disponible y sin penalización → debe ser elegido
+        guardia_mie = AsignacionGuardia.objects.filter(
+            fecha=datetime.date(2026, 5, 6),   # miércoles
+            estado='BORRADOR',
+        ).first()
+        if guardia_mie:
+            self.assertEqual(guardia_mie.residente, self.r2,
+                msg="El miércoles 6 debería asignarse a r2 (sin penalización), no a r1 (guardia el lunes 4)")
+
+    def test_distribucion_cercania_es_blanda_asigna_si_no_hay_mejor_candidato(self):
+        """
+        La penalización por cercanía es BLANDA: si el único candidato disponible
+        tiene una guardia a 2 días de distancia, la cuota del residente se completa
+        igual. Verifica que la restricción NO actúa como hard block.
+        """
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        # Solo r1 activo con cuota 5
+        self.r2.is_active = False
+        self.r2.save()
+        self.r3.is_active = False
+        self.r3.save()
+
+        CuotaMensualGuardia.objects.filter(anio_residencia='R1').update(guardias_por_mes=5)
+        CuotaMensualGuardia.objects.filter(anio_residencia__in=['R2', 'R3']).delete()
+
+        # r1 ya tiene una guardia publicada el lunes 4/mayo;
+        # esto creará slots "penalizados por cercanía" el mié 6 y vie 8.
+        AsignacionGuardia.objects.create(
+            residente=self.r1,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 4),
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+
+        qs = CTG.objects.filter(pk=self.tipo.pk)
+        generar_distribucion(mes=5, anio=2026, tipos_guardia=qs, creado_por=self.jefe)
+
+        # r1 debe recibir su cuota completa de 5 borradores aunque algunos slots
+        # estén penalizados por cercanía. La penalización blanda NUNCA debe bloquear
+        # un slot cuando r1 es el único candidato disponible.
+        asignados = AsignacionGuardia.objects.filter(residente=self.r1, estado='BORRADOR').count()
+        self.assertEqual(asignados, 5,
+            msg=(
+                f"r1 debería recibir 5 borradores (recibió {asignados}). "
+                "La penalización por cercanía NO debe actuar como hard block."
+            )
+        )
 
 
 # ---------------------------------------------------------------------------

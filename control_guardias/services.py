@@ -15,7 +15,13 @@ from django.core.mail import send_mail
 from django.db import transaction
 from django.urls import reverse
 
-from .models import AsignacionGuardia, ConfiguracionTipoGuardia, CuotaMensualGuardia, Feriado
+from .models import (
+    AsignacionGuardia,
+    AusenciaResidente,
+    ConfiguracionTipoGuardia,
+    CuotaMensualGuardia,
+    Feriado,
+)
 
 # Mapeo de código de día a weekday() de Python (0=Lunes, 6=Domingo)
 DIA_SEMANA_MAP = {'L': 0, 'M': 1, 'X': 2, 'J': 3, 'V': 4, 'S': 5, 'D': 6}
@@ -203,6 +209,25 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         fechas_ocupadas[asig['residente_id']].add(asig['fecha'])
         anio_por_fecha[asig['fecha']].add(asig['residente__anio_residencia'])
 
+    # Pre-cargar fechas bloqueadas por ausencias reportadas dentro del período.
+    # Se trata como restricción dura: si un residente está ausente en una fecha,
+    # no puede ser candidato para ese slot.
+    fechas_ausentes = defaultdict(set)  # residente_pk -> set(fecha)
+    residentes_ids = [r.pk for r in residentes]
+    ausencias_periodo = AusenciaResidente.objects.filter(
+        residente_id__in=residentes_ids,
+        fecha_fin__gte=primer_dia,
+        fecha_inicio__lte=ultimo_dia,
+    ).values('residente_id', 'fecha_inicio', 'fecha_fin')
+
+    for ausencia in ausencias_periodo:
+        fecha_inicio = max(ausencia['fecha_inicio'], primer_dia)
+        fecha_fin = min(ausencia['fecha_fin'], ultimo_dia)
+        fecha_actual = fecha_inicio
+        while fecha_actual <= fecha_fin:
+            fechas_ausentes[ausencia['residente_id']].add(fecha_actual)
+            fecha_actual += timedelta(days=1)
+
     asignaciones_a_crear = []
     slots_sin_cubrir = []
     slots_fallback_anio = 0   # contador de slots cubiertos fuera de restricción de año
@@ -218,6 +243,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             and fecha not in fechas_ocupadas[r.pk]
             and dia_anterior not in fechas_ocupadas[r.pk]
             and dia_siguiente not in fechas_ocupadas[r.pk]
+            and fecha not in fechas_ausentes[r.pk]
         ]
 
         if not candidatos:
@@ -261,7 +287,11 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
                 feriados_historicos[r.pk],
             ))
         else:
-            candidatos.sort(key=lambda r: guardias_en_borrador[r.pk])
+            # Para días normales: primero menos guardias, luego penalización por cercanía de 2 días
+            candidatos.sort(key=lambda r: (
+                guardias_en_borrador[r.pk],
+                _score_cercania(r.pk, fecha, fechas_ocupadas),
+            ))
 
         # Tomar el grupo de empate y elegir al azar para evitar sesgo
         min_count = guardias_en_borrador[candidatos[0].pk]
@@ -445,6 +475,21 @@ def _es_consecutivo(fecha, ultima):
     if ultima is None:
         return False
     return abs((fecha - ultima).days) == 1
+
+
+def _score_cercania(residente_pk, fecha, fechas_ocupadas):
+    """
+    Penalización por proximidad: retorna 1 si el residente tiene otra guardia
+    a exactamente 2 días de distancia (ej. martes-jueves), 0 en caso contrario.
+
+    Usado como clave secundaria de ordenamiento en slots no feriado.
+    Es una restricción *blanda*: solo afecta el orden de prioridad,
+    nunca excluye al candidato del pool.
+    """
+    dos_antes = fecha - timedelta(days=2)
+    dos_despues = fecha + timedelta(days=2)
+    ocupadas = fechas_ocupadas[residente_pk]
+    return 1 if (dos_antes in ocupadas or dos_despues in ocupadas) else 0
 
 
 def _anio_puede_cubrir_slot(anio_residencia, weekday, es_feriado):
