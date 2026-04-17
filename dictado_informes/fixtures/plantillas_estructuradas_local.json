@@ -1,0 +1,212 @@
+[
+  {
+    "codigo": "ABDOMEN C/G",
+    "nombre": "RM de Abdomen con Gadolinio",
+    "titulo": "RM DE ABDOMEN CON GADOLINIO",
+    "seccion_tecnica": "Se realizó resonancia magnética de abdomen y pelvis, mediante secuencias que ponderan tiempos de relajación T1 y T2 en los diferentes planos. Se inyectó gadolinio endovenoso.",
+    "comentarios_base": [
+      "Fondos de saco pleurales libres.",
+      "El hígado y el bazo presentan morfología e intensidad de señal respetadas.",
+      "Vesícula biliar presente, de contenido homogéneo. No se observa dilatación de la vía biliar intra ni extra hepática.",
+      "Páncreas bien delimitado y sin lesión visible.",
+      "Glándulas suprarrenales de configuración habitual.",
+      "Ambos riñones de forma y tamaño normal, sin signos de hidronefrosis.",
+      "El retroperitoneo prevertebral se halla libre de adenomegalias.",
+      "No se constatan procesos expansivos ni líquido libre en cavidad al momento del examen."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "ANTEBRAZO",
+    "nombre": "RM de Antebrazo",
+    "titulo": "RM DE ANTEBRAZO [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el antebrazo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Estructuras óseas del radio y cúbito sin alteraciones.",
+      "Músculos del antebrazo de morfología y señal normales.",
+      "Tendones flexores y extensores conservados.",
+      "Nervios mediano, radial y cubital sin signos de compresión.",
+      "No se observa aumento del líquido articular.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "ATM",
+    "nombre": "RM de Articulación Temporomandibular",
+    "titulo": "RM DE ARTICULACIÓN TEMPOROMANDIBULAR [<DERECHA/IZQUIERDA>]",
+    "seccion_tecnica": "Se exploró la articulación temporomandibular [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Disco articular de morfología y señal normales.",
+      "En fase de apertura, correcta translación del cóndilo mandibular y recaptura del disco.",
+      "Músculos masticatorios sin alteraciones.",
+      "Articulación sin signos de inflamación.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "CADERA",
+    "nombre": "RM de Cadera",
+    "titulo": "RM DE CADERA [<DERECHA/IZQUIERDA>]",
+    "seccion_tecnica": "Se exploró la cadera [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Espacio articular coxo-femoral conservado.",
+      "Labrum sin alteraciones.",
+      "No se visualiza aumento del líquido articular.",
+      "No se observan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "CODO",
+    "nombre": "RM de Codo",
+    "titulo": "RM DE CODO [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el codo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Tendones epicondíleos y epitrocleares normales.",
+      "Resto de tendones y ligamentos de la articulación del codo sin alteraciones.",
+      "No se observa aumento del liquido articular.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "HOMBRO",
+    "nombre": "RM de Hombro",
+    "titulo": "RM DE HOMBRO [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el hombro [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "No se observan alteraciones en los tendones que conforman el manguito rotador ni en el tendón de la porción larga del bíceps.",
+      "Labrum de forma y señal normales.",
+      "No se visualiza aumento del liquido articular glenohumeral ni bursal.",
+      "Articulación acromioclavicular sin alteraciones."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "MANO",
+    "nombre": "RM de Mano",
+    "titulo": "RM DE MANO [<DERECHA/IZQUIERDA>]",
+    "seccion_tecnica": "Se exploró la mano [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Tendones flexores y extensores de grosor y señal conservados.",
+      "Ligamentos intercarpianos sin alteraciones.",
+      "Túnel carpiano de calibre normal.",
+      "Nervio mediano sin compresión.",
+      "Articulaciones metacarpofalángicas conservadas.",
+      "No se observa aumento del líquido articular."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "MUSLO",
+    "nombre": "RM de Muslo",
+    "titulo": "RM DE MUSLO [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el muslo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Músculos del muslo de morfología y señal normales.",
+      "Tendones y ligamentos sin alteraciones.",
+      "No se observan colecciones ni masas.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "MUÑECA",
+    "nombre": "RM de Muñeca",
+    "titulo": "RM DE MUÑECA [<DERECHA/IZQUIERDA>]",
+    "seccion_tecnica": "Se exploró la muñeca [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Fibrocartílago triangular íntegro.",
+      "Tendones flexores y extensores conservados.",
+      "Ligamentos escafo-lunares sin alteraciones.",
+      "Túnel carpiano de calibre normal.",
+      "Articulación radio-carpiana conservada.",
+      "No se observa aumento del líquido articular."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "PIE",
+    "nombre": "RM de Pie",
+    "titulo": "RM DE PIE [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el pie [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Estructuras óseas del pie sin alteraciones.",
+      "Articulaciones intertarsianas conservadas.",
+      "Tendones y ligamentos sin signos de lesión.",
+      "No se observa aumento del líquido articular.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "RODILLA",
+    "nombre": "RM de Rodilla",
+    "titulo": "RM DE RODILLA [<DERECHA/IZQUIERDA>]",
+    "seccion_tecnica": "Se exploró la rodilla [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Meniscos de altura y señal normales.",
+      "Ligamentos cruzados de trayecto y morfología conservados.",
+      "Resto de tendones y ligamentos de la rodilla sin alteraciones.",
+      "Rótula centrada, sin lesión visible.",
+      "No se observa aumento del líquido articular.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "TC_MSK",
+    "nombre": "TC de Musculoesquelético",
+    "titulo": "TC DE [<REGIÓN ANATÓMICA>]",
+    "seccion_tecnica": "Se realizó estudio tomográfico de la región solicitada con reconstrucciones multiplanares, sin contraste endovenoso.",
+    "comentarios_base": [
+      "Estructuras óseas de la región sin alteraciones.",
+      "Articulaciones conservadas.",
+      "Tejidos blandos sin signos de lesión.",
+      "No se observan colecciones ni masas.",
+      "No se visualizan lesiones evidentes."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "TOBILLO",
+    "nombre": "RM de Tobillo",
+    "titulo": "RM DE TOBILLO [<DERECHO/IZQUIERDO>]",
+    "seccion_tecnica": "Se exploró el tobillo [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.",
+    "comentarios_base": [
+      "Tendones retromaleolares internos, retromaleolares externos y tendones flexores del pie sin alteraciones.",
+      "No se observa aumento del líquido articular.",
+      "Fascia plantar  y tendón de Aquiles de espesor y señal normales.",
+      "No se visualizan lesiones óseas."
+    ],
+    "origen": "legacy",
+    "activa": true
+  },
+  {
+    "codigo": "TORAX S/G",
+    "nombre": "RM de Tórax sin Contraste",
+    "titulo": "RM DE TÓRAX SIN CONTRASTE",
+    "seccion_tecnica": "Se realizó resonancia magnética de tórax, mediante secuencias que ponderan tiempos de relajación T1 y T2 en los diferentes planos, sin administración de contraste endovenoso.",
+    "comentarios_base": [
+      "No se identifican procesos ocupantes ni áreas de consolidación parenquimatosa, dentro de las limitaciones del método.",
+      "Mediastino, hilios y axilas libres de imágenes adenomegálicas.",
+      "No se observa derrame pleural ni pericárdico."
+    ],
+    "origen": "legacy",
+    "activa": true
+  }
+]
