@@ -1,0 +1,133 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+{% load static %}
+
+{% block title %}Eliminar Plantilla Estructurada - Dictado{% endblock %}
+
+{% block content %}
+<div class="min-h-screen">
+    <!-- Header -->
+    <div class="flex items-center space-x-3 mb-6">
+        <div class="p-2 bg-red-900/50 rounded-lg">
+            <i class="fas fa-trash text-xl text-red-400"></i>
+        </div>
+        <div>
+            <h1 class="text-2xl font-bold text-white">Eliminar Plantilla Estructurada</h1>
+            <p class="text-sm text-gray-400">Desactivar plantilla del sistema</p>
+        </div>
+    </div>
+
+    <!-- Confirmación -->
+    <div class="bg-gray-800 border-l-4 border-red-500 rounded-lg p-8 max-w-2xl">
+        <!-- Icono grande -->
+        <div class="flex justify-center mb-6">
+            <div class="p-4 bg-red-900/30 border border-red-700 rounded-full">
+                <i class="fas fa-exclamation-triangle text-6xl text-red-400"></i>
+            </div>
+        </div>
+
+        <!-- Mensaje de confirmación -->
+        <div class="text-center mb-8">
+            <h2 class="text-2xl font-bold text-white mb-3">
+                ¿Desactivar esta plantilla?
+            </h2>
+            <p class="text-gray-300 mb-2">
+                Estás a punto de desactivar la plantilla:
+            </p>
+            <div class="bg-gray-900/50 border border-gray-700 rounded-lg p-4 my-4">
+                <p class="text-lg font-bold text-green-400">
+                    {{ object.codigo }} - {{ object.nombre }}
+                </p>
+                <p class="text-sm text-gray-400 mt-2">
+                    Origen: {{ object.get_origen_display }}
+                </p>
+            </div>
+        </div>
+
+        <!-- Información -->
+        <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+            <p class="text-blue-200 text-sm flex items-start">
+                <i class="fas fa-info-circle mr-2 mt-0.5 flex-shrink-0"></i>
+                <span>
+                    <strong>Nota:</strong> Esta acción <strong>no elimina los datos</strong>, solo desactiva la plantilla. 
+                    Ya no estará disponible en el selector de modo ESTRUCTURADO, pero puedes reactivarla desde el admin si es necesario.
+                </span>
+            </p>
+        </div>
+
+        <!-- Advertencia especial para plantillas legacy -->
+        {% if object.origen == 'legacy' %}
+        <div class="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+            <p class="text-yellow-200 text-sm flex items-start">
+                <i class="fas fa-exclamation-circle mr-2 mt-0.5 flex-shrink-0"></i>
+                <span>
+                    <strong>Plantilla Legacy:</strong> Esta plantilla fue migrada desde hardcode. 
+                    Solo desactívala si vas a crear una versión personalizada.
+                </span>
+            </p>
+        </div>
+        {% endif %}
+
+        <!-- Botones de acción -->
+        <div class="flex items-center gap-4 pt-6 border-t border-gray-700">
+            <form method="post" class="flex-1">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="w-full px-6 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center">
+                    <i class="fas fa-trash mr-2"></i>
+                    Sí, desactivar plantilla
+                </button>
+            </form>
+            <a href="{% url 'dictado_informes:plantilla_estructurada_list' %}" 
+               class="px-6 py-3 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-600 transition-colors flex items-center">
+                <i class="fas fa-ban mr-2"></i>
+                Cancelar
+            </a>
+        </div>
+    </div>
+
+    <!-- Detalles de la plantilla (lectura) -->
+    <div class="mt-8 bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 class="text-lg font-bold text-white mb-4">
+            <i class="fas fa-eye text-gray-400 mr-2"></i>
+            Vista Previa de la Plantilla
+        </h3>
+        
+        <div class="space-y-4">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 mb-1">Código:</p>
+                <p class="text-sm text-white font-mono bg-gray-900/50 p-2 rounded border border-gray-700">
+                    {{ object.codigo }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold text-gray-400 mb-1">Nombre:</p>
+                <p class="text-sm text-white">{{ object.nombre }}</p>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold text-gray-400 mb-1">Título:</p>
+                <p class="text-sm text-white font-mono bg-gray-900/50 p-2 rounded border border-gray-700">
+                    {{ object.titulo }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold text-gray-400 mb-1">Sección Técnica:</p>
+                <p class="text-sm text-gray-300 bg-gray-900/50 p-2 rounded border border-gray-700 whitespace-pre-wrap">
+                    {{ object.seccion_tecnica }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-xs font-semibold text-gray-400 mb-1">Comentarios Base ({{ object.comentarios_base|length }} líneas):</p>
+                <ul class="text-sm text-gray-300 bg-gray-900/50 p-2 rounded border border-gray-700 space-y-1">
+                    {% for comentario in object.comentarios_base %}
+                    <li class="list-disc list-inside">{{ comentario }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

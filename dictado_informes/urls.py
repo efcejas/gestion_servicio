@@ -24,6 +24,12 @@ urlpatterns = [
     path('plantillas/nueva/', views.PlantillaCreateView.as_view(), name='plantilla_create'),
     path('plantillas/<int:pk>/editar/', views.PlantillaUpdateView.as_view(), name='plantilla_update'),
     
+    # Plantillas Estructuradas (Guardrails de IA)
+    path('plantillas-estructuradas/', views.PlantillaEstructuradaListView.as_view(), name='plantilla_estructurada_list'),
+    path('plantillas-estructuradas/nueva/', views.PlantillaEstructuradaCreateView.as_view(), name='plantilla_estructurada_create'),
+    path('plantillas-estructuradas/<int:pk>/editar/', views.PlantillaEstructuradaUpdateView.as_view(), name='plantilla_estructurada_update'),
+    path('plantillas-estructuradas/<int:pk>/eliminar/', views.PlantillaEstructuradaDeleteView.as_view(), name='plantilla_estructurada_delete'),
+    
     # Diccionario Médico
     path('diccionario/', views.TerminoMedicoListView.as_view(), name='termino_list'),
     path('diccionario/nuevo/', views.TerminoMedicoCreateView.as_view(), name='termino_create'),

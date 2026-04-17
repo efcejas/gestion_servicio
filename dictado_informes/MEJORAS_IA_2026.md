@@ -318,6 +318,49 @@ print(ai_services.__file__)
 
 **Implementación**: Febrero 2026  
 **Sistema Base**: Sistema de Dictado Médico con IA  
+
+---
+
+## 🆕 Actualización Abril 2026 — Robustez Clínica + Simplificación UI
+
+### 1) Fidelidad semántica en COMENTARIO (modo estructurado)
+
+Se reforzó el prompt para priorizar:
+- fidelidad al dictado
+- no fragmentar una misma patología en frases telegráficas
+- agrupar localizaciones cuando son parte de un mismo hallazgo
+
+Además, se agregó postproceso de consolidación de hallazgos relacionados para evitar salidas tipo:
+"Lesión osteocondral..." + "Edema adyacente..." como líneas desconectadas.
+
+### 2) Aprendizaje con filtro anti-correcciones atípicas
+
+Se mantiene trazabilidad completa (todo se guarda en `CorreccionAprendizaje`), pero ahora:
+- solo se usa en prompts si la corrección es apta (`es_apta_para_prompt`)
+- para estilo completo se exige filtro extra (`es_apta_para_estilo`)
+
+Esto evita que una edición accidental/grosera contamine el comportamiento futuro.
+
+### 3) Estilo personal conectado en modo estructurado
+
+Se conectó la carga de ejemplos de estilo en `ai_services.py` para modo no FIEL.
+El sistema extrae un resumen corto del bloque COMENTARIO y lo usa como guía de forma/orden, sin habilitar invención de contenido.
+
+### 4) UI de Dictado Rápido descomprimida
+
+Cambios de UX aplicados en `dictado_rapido_whisper.html`:
+- eliminado flujo manual redundante de guardado de aprendizaje
+- eliminado atajo Ctrl+S legado
+- opciones secundarias movidas a "Opciones Avanzadas" colapsable
+- tips inferiores reducidos a una versión compacta
+
+### 5) Portapapeles y formato
+
+Se reforzó la copia para preservar mejor:
+- saltos de línea entre segmentos
+- compatibilidad de `text/plain` con CRLF en entornos Windows/legacy
+
+Resultado: menor riesgo de pegado en un único párrafo en sistemas externos.
 **Tecnologías**: Django + OpenAI Whisper + GPT-4o-mini/Groq
 
 ---

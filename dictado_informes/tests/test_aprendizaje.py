@@ -9,6 +9,7 @@ Cobertura esperada: ~75% del código de CorreccionAprendizaje
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from dictado_informes.models import CorreccionAprendizaje, TipoEstudio
 
 User = get_user_model()
@@ -218,6 +219,40 @@ class TestCorreccionAprendizaje(TestCase):
         
         # Debe tener 0 cambios detectados
         self.assertEqual(len(correccion.cambios_detectados), 0)
+
+    def test_correccion_grosera_queda_fuera_del_prompt(self):
+        """Una edición atípica se guarda, pero no debe usarse para aprendizaje automático."""
+        correccion = CorreccionAprendizaje.objects.create(
+            texto_original="Paciente con dolor de rodilla.",
+            texto_ia="COMENTARIO\nMeniscos normales.\nLigamentos conservados.\nCONCLUSIÓN\nEstudio normal.",
+            texto_final="asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf asdf",
+            usuario=self.user
+        )
+
+        self.assertFalse(CorreccionAprendizaje.es_apta_para_prompt(correccion))
+
+    def test_obtener_ejemplos_filtra_correccion_grosera(self):
+        """El selector de ejemplos debe ignorar correcciones atípicas y mantener las útiles."""
+        cache.clear()
+
+        CorreccionAprendizaje.objects.create(
+            texto_original="Rodilla con dolor",
+            texto_ia="COMENTARIO\nMeniscos normales.\nCONCLUSIÓN\nSin hallazgos.",
+            texto_final="texto random random random random random random random",
+            usuario=self.user
+        )
+
+        CorreccionAprendizaje.objects.create(
+            texto_original="rodilla con dolor",
+            texto_ia="Desgarro parcial del LCA.",
+            texto_final="Desgarro parcial del ligamento cruzado anterior.",
+            usuario=self.user
+        )
+
+        ejemplos = CorreccionAprendizaje.obtener_ejemplos_aprendizaje(usuario=self.user, limite=10)
+
+        self.assertIn('ligamento cruzado anterior', ejemplos.lower())
+        self.assertNotIn('random random', ejemplos.lower())
 
 
 class TestCorreccionAprendizajeAdmin(TestCase):

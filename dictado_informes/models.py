@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 import logging
 import re
+import difflib
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -27,6 +28,107 @@ class EstadoInforme(models.TextChoices):
     EN_REVISION = 'REV', 'En Revisión'
     FINALIZADO = 'FIN', 'Finalizado'
     FIRMADO = 'FIR', 'Firmado'
+
+
+class PlantillaEstructurada(models.Model):
+    """Plantillas estructuradas para modo ESTRUCTURADO con guardrails de IA.
+    
+    Define la estructura base (título, sección técnica, comentarios) que se usa
+    para mejorar el texto en modo ESTRUCTURADO. El sistema preserva líneas no 
+    mencionadas en el dictado original (guardrails).
+    
+    Campo 'codigo' vinculado a tipo de estudio (ej. RODILLA, CADERA, ABDOMEN C/G).
+    """
+    # Código único identificador (ej. RODILLA, CADERA, TORAX S/G, etc.)
+    codigo = models.CharField(
+        max_length=50,
+        unique=True,
+        db_index=True,
+        verbose_name="Código",
+        help_text="Identificador único: RODILLA, CADERA, ATM, TC_MSK, ABDOMEN C/G, TORAX S/G, etc."
+    )
+    
+    # Nombre descriptivo para UI (ej "RM de Rodilla")
+    nombre = models.CharField(
+        max_length=200,
+        verbose_name="Nombre",
+        help_text="Nombre descriptivo para mostrar en selectores (ej. 'RM de Rodilla')"
+    )
+    
+    # Titímulo base con placeholders tipo [<DERECHA/IZQUIERDA>]
+    titulo = models.CharField(
+        max_length=500,
+        verbose_name="Título",
+        help_text="Título de la plantilla con placeholders: 'RM DE RODILLA [<DERECHA/IZQUIERDA>]'"
+    )
+    
+    # Sección técnica descriptiva
+    seccion_tecnica = models.TextField(
+        verbose_name="Sección Técnica",
+        help_text="Descripción de la técnica utilizada en el estudio"
+    )
+    
+    # Comentarios base (anatomía normal) que se preservan en guardrails
+    # Lista JSON de strings, uno por línea
+    comentarios_base = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Comentarios Base",
+        help_text="Lista de líneas con anatomía normal que se preservan en modo ESTRUCTURADO"
+    )
+    
+    # Origen de la plantilla (legacy = migrada desde hardcode)
+    ORIGEN_CHOICES = [
+        ('legacy', 'Legado (migrado de hardcode)'),
+        ('user', 'Creada por usuario'),
+        ('system', 'Sistema'),
+    ]
+    origen = models.CharField(
+        max_length=20,
+        choices=ORIGEN_CHOICES,
+        default='legacy',
+        verbose_name="Origen",
+        help_text="Indica si fue migrada desde hardcode o creada por usuario"
+    )
+    
+    # Control de activación
+    activa = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Activa",
+        help_text="Solo se usan plantillas activas"
+    )
+    
+    # Auditoría
+    creada_por = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='plantillas_estructuradas_creadas',
+        verbose_name="Creada por"
+    )
+    fecha_creacion = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de Creación"
+    )
+    fecha_modificacion = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Última Modificación"
+    )
+    
+    class Meta:
+        verbose_name = "Plantilla Estructurada"
+        verbose_name_plural = "Plantillas Estructuradas"
+        ordering = ['codigo']
+        indexes = [
+            models.Index(fields=['codigo', 'activa']),
+            models.Index(fields=['origen']),
+        ]
+    
+    def __str__(self):
+        estado = "✅" if self.activa else "❌"
+        return f"{estado} {self.nombre} ({self.codigo})"
 
 
 class PlantillaInforme(models.Model):
@@ -863,6 +965,101 @@ class CorreccionAprendizaje(models.Model):
             from .ai_services import AIService
             AIService.invalidar_cache_usuario(self.usuario)
             logger.info(f"🗑️ Caché invalidado para usuario {self.usuario.id} tras nueva corrección")
+
+    @staticmethod
+    def _normalizar_para_control(texto):
+        """Normaliza texto para métricas de similitud en filtros de calidad."""
+        if not texto:
+            return ""
+        return re.sub(r'\s+', ' ', texto).strip().lower()
+
+    @classmethod
+    def es_apta_para_prompt(cls, correccion):
+        """
+        Determina si una corrección es confiable para aprendizaje automático.
+
+        Objetivo: evitar que una edición accidental/grosera contamine el prompt.
+        """
+        texto_ia = (correccion.texto_ia or '').strip()
+        texto_final = (correccion.texto_final or '').strip()
+        cambios = correccion.cambios_detectados or []
+
+        if not texto_ia or not texto_final or not cambios:
+            return False
+
+        # Evitar registros vacíos; permitir textos cortos para mantener compatibilidad del flujo.
+        if len(texto_ia) < 3 or len(texto_final) < 3:
+            return False
+
+        ratio_longitud = len(texto_final) / max(len(texto_ia), 1)
+        if ratio_longitud < 0.45 or ratio_longitud > 2.40:
+            return False
+
+        # Similitud global: si es demasiado baja suele indicar reescritura total/accidental.
+        ia_norm = cls._normalizar_para_control(texto_ia)
+        final_norm = cls._normalizar_para_control(texto_final)
+        similitud = difflib.SequenceMatcher(None, ia_norm, final_norm).ratio()
+        if similitud < 0.22:
+            return False
+
+        # Evitar textos repetitivos o basura (ej: "asdf asdf ...", "random random ...").
+        tokens_final = re.findall(r'[a-záéíóúñ]+', final_norm)
+        if len(tokens_final) >= 6:
+            frecuencias = {}
+            for t in tokens_final:
+                frecuencias[t] = frecuencias.get(t, 0) + 1
+
+            max_ratio = max(frecuencias.values()) / len(tokens_final)
+            ratio_unicos = len(frecuencias) / len(tokens_final)
+            if max_ratio > 0.45 or ratio_unicos < 0.35:
+                return False
+
+            terminos_medicos = {
+                'lesion', 'lesión', 'desgarro', 'edema', 'derrame', 'menisco', 'ligamento',
+                'rotula', 'rótula', 'condral', 'osteocondral', 'tendinopatia', 'tendinopatía',
+                'sinovitis', 'bursitis', 'fractura', 'cartilago', 'cartílago', 'hueso'
+            }
+            tiene_semantica_medica = any(t in terminos_medicos for t in frecuencias.keys())
+            if not tiene_semantica_medica and similitud < 0.55:
+                return False
+
+        # Detectar contenido sospechoso (ruido o pegado erróneo).
+        if re.search(r'(.)\1{6,}', texto_final):
+            return False
+
+        total = len(cambios)
+        criticos = 0
+        bajos = 0
+        for cambio in cambios:
+            score = cambio.get('score', 50)
+            categoria = cambio.get('categoria', 'otro')
+            tipo = cambio.get('tipo', '')
+
+            if score >= 70 or categoria in {'terminologia', 'clasificacion', 'estructural_critico'}:
+                criticos += 1
+
+            if score <= 30 and (categoria in {'otro', 'eliminacion'} or tipo in {'delete', 'eliminado'}):
+                bajos += 1
+
+        # Si hay muchísimos cambios de baja calidad y ninguno crítico, no usar para prompt.
+        if total >= 8 and criticos == 0 and (bajos / total) > 0.6:
+            return False
+
+        return True
+
+    @classmethod
+    def es_apta_para_estilo(cls, correccion):
+        """
+        Filtro adicional para ejemplos de estilo.
+        Requiere estructura mínima de informe para evitar aprender formatos pobres.
+        """
+        if not cls.es_apta_para_prompt(correccion):
+            return False
+
+        texto = (correccion.texto_final or '').upper()
+        tiene_estructura = 'COMENTARIO' in texto and 'CONCLUSI' in texto
+        tiene_longitud = len((correccion.texto_final or '').strip()) >= 80
+        return tiene_estructura and tiene_longitud
     
     @staticmethod
     def obtener_ejemplos_aprendizaje(usuario=None, limite=10):
@@ -891,7 +1088,7 @@ class CorreccionAprendizaje(models.Model):
             query = query.filter(usuario=usuario)
         
         # Traer más correcciones para poder filtrar las mejores
-        correcciones = query.only('cambios_detectados').order_by('-fecha_creacion')[:limite * 3]
+        correcciones = query.only('cambios_detectados', 'texto_ia', 'texto_final').order_by('-fecha_creacion')[:limite * 4]
         
         if not correcciones:
             return ""
@@ -900,7 +1097,12 @@ class CorreccionAprendizaje(models.Model):
         cambios_con_score = []
         reglas_conflicto = []  # ⭐ NUEVO: Separar reglas de conflicto
         
+        descartadas = 0
         for corr in correcciones:
+            if not CorreccionAprendizaje.es_apta_para_prompt(corr):
+                descartadas += 1
+                continue
+
             if corr.cambios_detectados:
                 for cambio in corr.cambios_detectados:
                     # Obtener score del análisis semántico (default 50 si no existe)
@@ -981,7 +1183,10 @@ class CorreccionAprendizaje(models.Model):
         # 🚀 GUARDAR EN CACHÉ (5 minutos)
         cache.set(cache_key, resultado, timeout=300)
         
-        logger.info(f"📚 Ejemplos priorizados: {len(lineas)} de {len(cambios_con_score)} cambios disponibles")
+        logger.info(
+            f"📚 Ejemplos priorizados: {len(lineas)} de {len(cambios_con_score)} cambios disponibles "
+            f"(descartadas por calidad: {descartadas})"
+        )
         
         return resultado
     
@@ -1011,15 +1216,21 @@ class CorreccionAprendizaje(models.Model):
             query = query.filter(usuario=usuario)
         
         # Traer los más recientes con texto completo
-        correcciones = query.only('texto_final').order_by('-fecha_creacion')[:limite]
+        correcciones = query.only('texto_final', 'texto_ia', 'cambios_detectados').order_by('-fecha_creacion')[:limite * 3]
         
         if not correcciones:
             return ""
         
         ejemplos = []
         for i, corr in enumerate(correcciones, 1):
+            if not CorreccionAprendizaje.es_apta_para_estilo(corr):
+                continue
+
             if corr.texto_final and len(corr.texto_final.strip()) > 50:  # Solo si es suficientemente largo
                 ejemplos.append(f"EJEMPLO {i}:\n{corr.texto_final.strip()}")
+
+            if len(ejemplos) >= limite:
+                break
         
         if not ejemplos:
             return ""

@@ -1,5 +1,47 @@
 from django.contrib import admin
-from .models import PlantillaInforme, Informe, AudioTranscripcion, TerminoMedico, CorreccionAprendizaje
+from django.utils.html import format_html, format_html_join
+from .models import PlantillaInforme, PlantillaEstructurada, Informe, AudioTranscripcion, TerminoMedico, CorreccionAprendizaje
+
+
+@admin.register(PlantillaEstructurada)
+class PlantillaEstructuradaAdmin(admin.ModelAdmin):
+    list_display = ['__str__', 'codigo', 'origen', 'activa', 'fecha_creacion']
+    list_filter = ['origen', 'activa', 'fecha_creacion']
+    search_fields = ['codigo', 'nombre', 'titulo']
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'origen', 'comentarios_base_preview']
+    
+    fieldsets = (
+        ('Identificación', {
+            'fields': ('codigo', 'nombre', 'activa')
+        }),
+        ('Contenido de Plantilla', {
+            'fields': ('titulo', 'seccion_tecnica', 'comentarios_base', 'comentarios_base_preview')
+        }),
+        ('Metadatos', {
+            'fields': ('origen', 'creada_por', 'fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Solo permite editar si es usuario (no legacy)"""
+        readonly = list(self.readonly_fields)
+        if obj and obj.origen == 'legacy':
+            # Plantillas legadas solo lectura para evitar sobrescribir defaults
+            readonly.extend(['codigo', 'titulo', 'seccion_tecnica', 'comentarios_base'])
+        return readonly
+
+    def comentarios_base_preview(self, obj):
+        """Muestra comentarios base como lista legible en admin."""
+        lineas = obj.comentarios_base or []
+        if not lineas:
+            return '-'
+
+        return format_html(
+            "<div style='white-space: normal; line-height: 1.5;'>{}</div>",
+            format_html_join('', "<div>• {}</div>", ((linea,) for linea in lineas))
+        )
+    comentarios_base_preview.short_description = "Vista previa (líneas)"
 
 
 @admin.register(PlantillaInforme)

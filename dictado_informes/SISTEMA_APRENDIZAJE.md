@@ -24,9 +24,12 @@ El sistema aprende automáticamente de tus correcciones manuales y las aplica en
 - Resultado: `"Gonartrosis tricompartimental grado III"`
 
 ### 4. Tu Edición Manual (Opcional)
-Si editas el texto mejorado y haces clic en **"Guardar Aprendizaje"**:
+Si editas el texto mejorado y copias el resultado, el sistema te pregunta si quieres guardar esa corrección para aprendizaje.
+
+Al confirmar:
 - Sistema detecta cambios con `difflib` (palabra por palabra)
 - Guarda en modelo `CorreccionAprendizaje`
+- Clasifica la corrección por calidad para decidir si entra al prompt automático
 - Ejemplo guardado:
   ```json
   {
@@ -37,12 +40,25 @@ Si editas el texto mejorado y haces clic en **"Guardar Aprendizaje"**:
   ```
 
 ### 5. Próxima Transcripción
-La IA **automáticamente** recibe estos ejemplos en su prompt:
+La IA **automáticamente** recibe en su prompt solo ejemplos aptos (no atípicos):
 ```
 APRENDE DE ESTAS CORRECCIONES ANTERIORES DEL USUARIO:
 ❌ tricompartimental → ✅ tricompartamental
 ❌ meniscos normales → ✅ meniscos de configuración habitual
 ```
+
+## 🛡️ Filtro de Seguridad del Aprendizaje
+
+Para evitar contaminación por ediciones accidentales o groseras, cada corrección se evalúa antes de usarse en prompts automáticos:
+
+- Se guarda todo en historial (trazabilidad completa)
+- Solo se usa en prompt si `es_apta_para_prompt(...)` devuelve True
+- Se descarta del prompt si detecta:
+   - divergencia excesiva texto_ia vs texto_final
+   - texto repetitivo/ruidoso (ej: "asdf asdf..." o "random random...")
+   - patrón de cambios de bajo valor clínico
+
+Además, para estilo completo (`es_apta_para_estilo(...)`) se exige estructura mínima (COMENTARIO + CONCLUSIÓN) para no aprender formato pobre.
 
 ## 🎯 Ventajas
 
@@ -59,12 +75,15 @@ Cuando tienes ejemplos de aprendizaje activos, verás:
 🧠 Aprendizaje Activo: 15 ejemplos activos mejorando tus transcripciones
 ```
 
+Nota: "activos" significa ejemplos aptos para prompt, no el total bruto guardado en historial.
+
 ## 🔧 Gestión en Admin Django
 
 ### Ver Correcciones
 1. Admin → **Correcciones de Aprendizaje**
 2. Filtra por usuario, fecha, tipo de estudio
 3. Ve las diferencias visuales (rojo/verde)
+4. Revisa textos atípicos: pueden estar guardados pero no entrar en aprendizaje automático
 
 ### Acciones Disponibles
 - **✅ Marcar como aplicada**: Marca correcciones ya usadas
@@ -78,9 +97,14 @@ Cuando tienes ejemplos de aprendizaje activos, verás:
 1. **Dicta**: "meniscos normales"
 2. **Resultado IA**: "Meniscos normales"
 3. **Editas**: "Meniscos de configuración habitual"
-4. **Guardas aprendizaje**: ✅ Corrección guardada! 3 cambios detectados
+4. **Copias y confirmas aprendizaje**: ✅ Corrección guardada
 5. **Dicta de nuevo**: "meniscos normales"
 6. **Resultado IA**: "Meniscos de configuración habitual" ← **Aplicó tu corrección!**
+
+### Test de descarte (anti-ruido):
+1. Crear una edición claramente inválida/ruidosa
+2. Verificar que se guarda en admin
+3. Confirmar que no aparece en ejemplos activos para prompt
 
 ### Verificación en Admin:
 1. Admin → Correcciones de Aprendizaje
@@ -91,9 +115,9 @@ Cuando tienes ejemplos de aprendizaje activos, verás:
 ## 📈 Límites y Configuración
 
 - **Ejemplos máximos por prompt**: 10 (configurable en `obtener_ejemplos_aprendizaje`)
-- **Ejemplos únicos mostrados**: 20 líneas máximo
-- **Ordenamiento**: Más recientes primero
-- **Scope**: Por usuario (personalizado)
+- **Filtro de calidad**: automático (`es_apta_para_prompt` y `es_apta_para_estilo`)
+- **Ordenamiento**: priorizado por score semántico
+- **Scope**: por usuario (personalizado)
 
 ## 🐛 Debug
 

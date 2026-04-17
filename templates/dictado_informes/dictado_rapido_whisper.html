@@ -4,6 +4,7 @@
 {% block title %}Dictado Rápido - Dictado de Informes - Dr. Cejas{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'django_ckeditor_5/dist/styles.css' %}">
 <style>
     @keyframes pulse-slow {
         0%, 100% {
@@ -69,7 +70,7 @@
                     <i id="iconGrabar" class="fas fa-microphone text-white text-5xl"></i>
                 </button>
                 <p id="estadoGrabacion" class="mt-4 text-gray-300 font-medium">
-                    Mantén presionado para grabar
+                    Presiona para iniciar grabación
                 </p>
                 <div id="tiempoGrabacion" class="hidden mt-2 text-3xl font-mono text-red-400 font-bold">
                     00:00
@@ -108,54 +109,65 @@
                         Tipo de Estudio
                     </label>
                     <select id="tipoPlantilla" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none">
-                        <option value="RODILLA">RM de Rodilla</option>
-                        <option value="HOMBRO">RM de Hombro</option>
-                        <option value="CODO">RM de Codo</option>
-                        <option value="TOBILLO">RM de Tobillo</option>
-                        <option value="MANO">RM de Mano</option>
-                        <option value="MUÑECA">RM de Muñeca</option>
-                        <option value="PIE">RM de Pie</option>
-                        <option value="CADERA">RM de Cadera</option>
-                        <option value="MUSLO">RM de Muslo</option>
-                        <option value="ATM">RM de Articulación Temporomandibular</option>
-                        <option value="ABDOMEN C/G">RM de abdomen con gadolinio</option>
-                        <option value="TC_MSK">TC Genérica MSK</option>
-                        <option value="ANTEBRAZO">RM de Antebrazo</option>
-                        <option value="TORAX_SG">RM de Tórax sin Contraste</option>
+                        {% for plantilla in plantillas_estructuradas %}
+                        <option value="{{ plantilla.codigo }}" {% if forloop.first %}selected{% endif %}>{{ plantilla.nombre }}</option>
+                        {% empty %}
+                        <option value="RODILLA">RM de Rodilla (por defecto - BD vacía)</option>
+                        {% endfor %}
                     </select>
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        <span id="plantillasCargadas">{{ plantillas_estructuradas|length }} plantillas disponibles desde BD</span>
+                    </p>
                 </div>
             </div>
 
-            <!-- Info Whisper -->
-            <div class="mt-4 bg-blue-900/30 border border-blue-700 rounded-lg p-3">
-                <p class="text-xs text-blue-200">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    <strong>Whisper</strong> es el sistema de transcripción médica más preciso. 
-                    Reconoce términos como "gonartrosis tricompartimental" correctamente.
-                </p>
+            <div class="mt-4">
+                <button id="btnOpcionesAvanzadas"
+                        class="w-full flex items-center justify-between bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-left hover:bg-gray-850 transition-colors"
+                        type="button"
+                        aria-expanded="false"
+                        aria-controls="panelOpcionesAvanzadas">
+                    <span class="text-xs font-bold text-gray-300">
+                        <i class="fas fa-sliders-h mr-2 text-cyan-400"></i>
+                        Opciones Avanzadas
+                    </span>
+                    <i id="iconOpcionesAvanzadas" class="fas fa-chevron-down text-gray-400 transition-transform"></i>
+                </button>
+
+                <div id="panelOpcionesAvanzadas" class="hidden mt-3 space-y-3">
+                    <!-- Info Whisper -->
+                    <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
+                        <p class="text-xs text-blue-200">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            <strong>Whisper</strong> es el sistema de transcripción médica más preciso.
+                            Reconoce términos como "gonartrosis tricompartimental" correctamente.
+                        </p>
+                    </div>
+
+                    <!-- Toggle Preview en Tiempo Real -->
+                    <div class="bg-cyan-900/30 border border-cyan-700 rounded-lg p-3">
+                        <label class="flex items-center justify-between cursor-pointer">
+                            <div>
+                                <p class="text-xs font-bold text-cyan-200">
+                                    <i class="fas fa-bolt mr-1"></i>
+                                    Preview en Tiempo Real
+                                </p>
+                                <p class="text-xs text-cyan-300 mt-1">Ver texto mientras hablas (experimental)</p>
+                            </div>
+                            <input type="checkbox" id="checkPreviewTiempoReal"
+                                   class="w-5 h-5 text-cyan-600 rounded focus:ring-cyan-500">
+                        </label>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Sistema de Aprendizaje Activo -->
             <div id="aprendizajeInfo" class="mt-4 bg-green-900/30 border border-green-700 rounded-lg p-3 hidden">
                 <p class="text-xs text-green-200">
                     <i class="fas fa-graduation-cap mr-1"></i>
                     <strong>🧠 Aprendizaje Activo:</strong> <span id="aprendizajeTexto">Cargando...</span>
                 </p>
-            </div>
-            
-            <!-- Toggle Preview en Tiempo Real -->
-            <div class="mt-4 bg-cyan-900/30 border border-cyan-700 rounded-lg p-3">
-                <label class="flex items-center justify-between cursor-pointer">
-                    <div>
-                        <p class="text-xs font-bold text-cyan-200">
-                            <i class="fas fa-bolt mr-1"></i>
-                            Preview en Tiempo Real
-                        </p>
-                        <p class="text-xs text-cyan-300 mt-1">Ver texto mientras hablas (experimental)</p>
-                    </div>
-                    <input type="checkbox" id="checkPreviewTiempoReal" checked
-                           class="w-5 h-5 text-cyan-600 rounded focus:ring-cyan-500">
-                </label>
             </div>
         </div>
 
@@ -199,9 +211,8 @@
                     <label class="text-sm font-semibold text-gray-300 mb-2 block">
                         ✨ Texto Mejorado por IA:
                     </label>
-                    <div id="textoMejorado" 
-                         contenteditable="true"
-                         class="min-h-32 bg-gray-900 border-2 border-green-600 rounded-lg p-4 text-green-200 text-sm whitespace-pre-wrap focus:outline-none focus:border-green-500"></div>
+                    <textarea id="textoMejorado"
+                              class="min-h-32 w-full bg-gray-900 border-2 border-green-600 rounded-lg p-4 text-green-200 text-sm"></textarea>
                     
                     <!-- Correcciones aplicadas -->
                     <div id="correcciones" class="hidden mt-3 bg-purple-900/30 border border-purple-600 rounded-lg p-3">
@@ -210,6 +221,13 @@
                             Correcciones aplicadas:
                         </p>
                         <ul id="listaCorrecciones" class="text-xs text-purple-200 space-y-1"></ul>
+                    </div>
+
+                    <div id="guardrailsResumen" class="hidden mt-3 bg-cyan-900/30 border border-cyan-600 rounded-lg p-3">
+                        <p class="text-xs font-bold text-cyan-200">
+                            <i class="fas fa-shield-alt mr-1"></i>
+                            <span id="guardrailsTexto"></span>
+                        </p>
                     </div>
                 </div>
 
@@ -224,29 +242,18 @@
 
                 <!-- CSRF token para AJAX -->
                 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                <div class="mt-4 grid grid-cols-2 gap-3">
+                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button id="btnCopiar" 
                             class="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg group">
                         <i class="fas fa-copy mr-2"></i>
-                        Copiar Texto <span class="ml-1 text-xs">✨ Guarda automáticamente</span>
+                        Copiar con Formato <span class="ml-1 text-xs">✨ Guarda automáticamente</span>
                         <span class="ml-2 text-xs opacity-70">Ctrl+Enter</span>
                     </button>
-                    <button id="btnGuardarAprendizaje" 
-                            class="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition-colors shadow-lg group opacity-60"
-                            title="Ya no es necesario - se guarda automáticamente al copiar">
-                        <i class="fas fa-brain mr-2"></i>
-                        Guardar Manual
-                        <span class="ml-2 text-xs opacity-70">Opcional</span>
+                    <button id="btnCopiarPlano"
+                            class="bg-teal-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-teal-700 transition-colors shadow-lg group">
+                        <i class="fas fa-file-alt mr-2"></i>
+                        Copiar Texto Plano
                     </button>
-                </div>
-
-                
-                <!-- Mensaje de aprendizaje guardado -->
-                <div id="mensajeAprendizaje" class="hidden mt-3 bg-green-900/30 border border-green-600 rounded-lg p-3">
-                    <p class="text-xs font-bold text-green-300">
-                        <i class="fas fa-check-circle mr-1"></i>
-                        <span id="textoMensajeAprendizaje"></span>
-                    </p>
                 </div>
             </div>
             
@@ -292,56 +299,19 @@
     <!-- Tips -->
     <div class="mt-6 bg-indigo-900/30 border border-indigo-700 rounded-xl p-4">
         <h3 class="text-sm font-bold text-indigo-200 mb-3">
-            💡 Cómo dictar para mejores resultados
+            💡 Guía rápida
         </h3>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs text-indigo-100 mb-4">
-            <div class="bg-indigo-800/40 rounded-lg p-3">
-                <p class="font-semibold mb-2 text-indigo-200">🎤 Grabar:</p>
-                <ul class="space-y-1 ml-2">
-                    <li>• Mantén presionado</li>
-                    <li>• O presiona <strong class="text-purple-300">Barra espaciadora</strong></li>
-                    <li>• Timer verde = suficiente</li>
-                </ul>
-            </div>
-            
-            <div class="bg-indigo-800/40 rounded-lg p-3">
-                <p class="font-semibold mb-2 text-indigo-200">⏸️ Puntuación Natural:</p>
-                <ul class="space-y-1 ml-2">
-                    <li>• <strong>Pausa corta</strong> = coma</li>
-                    <li>• <strong>Pausa larga</strong> = punto</li>
-                    <li>• NO digas "punto" ni "coma"</li>
-                </ul>
-            </div>
-            
-            <div class="bg-indigo-800/40 rounded-lg p-3">
-                <p class="font-semibold mb-2 text-indigo-200">⌨️ Atajos Rápidos:</p>
-                <ul class="space-y-1 ml-2">
-                    <li>• <strong class="text-green-300">Ctrl+Enter</strong> = Copiar</li>
-                    <li>• <strong class="text-purple-300">Ctrl+S</strong> = Guardar</li>
-                    <li>• <strong class="text-yellow-300">Espacio</strong> = Grabar</li>
-                </ul>
-            </div>
-            
-            <div class="bg-indigo-800/40 rounded-lg p-3">
-                <p class="font-semibold mb-2 text-indigo-200">↩️ Saltos Inteligentes:</p>
-                <ul class="space-y-1 ml-2">
-                    <li>• <strong>Automático</strong> entre conceptos</li>
-                    <li>• "Punto seguido" = misma línea</li>
-                    <li>• "Nueva línea" = salto extra</li>
-                </ul>
-            </div>
+
+        <div class="bg-indigo-800/40 rounded-lg p-3 text-xs text-indigo-100">
+            <ul class="space-y-1 ml-2">
+                <li>• <strong class="text-yellow-300">Espacio</strong> para grabar/detener</li>
+                <li>• <strong class="text-green-300">Ctrl+Enter</strong> para copiar con formato</li>
+                <li>• Pausa corta = coma, pausa larga = punto</li>
+                <li>• Evitar dictar "punto" y "coma" literal</li>
+            </ul>
         </div>
-        
-        <div class="bg-indigo-800/40 rounded-lg p-3">
-            <p class="text-xs text-indigo-200">
-                <strong>✅ Ejemplo:</strong> "Gonartrosis tricompartimental [pausa] Meniscos normales [pausa corta] sin lesiones"
-                <br>
-                <strong>📝 Resultado:</strong> <span class="text-green-300">Gonartrosis tricompartimental.</span><br><span class="text-green-300">Meniscos normales, sin lesiones.</span>
-            </p>
-        </div>
-        
-        <div class="mt-2 flex justify-end">
+
+        <div class="mt-3 flex justify-end">
             <a href="{% url 'dictado_informes:termino_list' %}" 
                class="text-sm text-purple-400 hover:text-purple-300 transition-colors">
                 <i class="fas fa-book-medical mr-1"></i>
@@ -352,72 +322,8 @@
 
 </div>
 
+<script src="{% static 'django_ckeditor_5/dist/bundle.js' %}"></script>
 <script>
-// ...existing code...
-
-// --- Aprendizaje automático al copiar texto ---
-document.addEventListener('DOMContentLoaded', function() {
-    const btnCopiar = document.getElementById('btnCopiar');
-    if (btnCopiar) {
-        btnCopiar.addEventListener('click', async function() {
-            // Obtener textos relevantes
-            const textoOriginal = document.getElementById('textoTranscrito')?.innerText || '';
-            const textoMejorado = document.getElementById('textoMejorado')?.innerText || '';
-            // El usuario puede editar el texto mejorado antes de copiar
-            const textoFinal = textoMejorado;
-
-            // Copiar al portapapeles
-            try {
-                await navigator.clipboard.writeText(textoFinal);
-            } catch (e) {
-                // fallback si clipboard falla
-                const temp = document.createElement('textarea');
-                temp.value = textoFinal;
-                document.body.appendChild(temp);
-                temp.select();
-                document.execCommand('copy');
-                document.body.removeChild(temp);
-            }
-
-            // Guardar aprendizaje automáticamente
-            try {
-                const response = await fetch('/dictado_informes/api/guardar-aprendizaje/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': (document.querySelector('[name=csrfmiddlewaretoken]')?.value || '')
-                    },
-                    body: JSON.stringify({
-                        texto_original: textoOriginal,
-                        texto_ia: textoMejorado,
-                        texto_final: textoFinal,
-                        tipo_estudio: ''
-                    })
-                });
-                const data = await response.json();
-                mostrarToast(data.success ? 'Aprendizaje guardado correctamente' : 'No se pudo guardar aprendizaje');
-            } catch (err) {
-                mostrarToast('Error al guardar aprendizaje');
-            }
-        });
-    }
-
-    // Función para mostrar notificación tipo toast
-    function mostrarToast(mensaje) {
-        const toast = document.getElementById('toast');
-        const toastTexto = document.getElementById('toastTexto');
-        if (toast && toastTexto) {
-            toastTexto.textContent = mensaje;
-            toast.classList.remove('hidden');
-            setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 2500);
-        } else {
-            alert(mensaje);
-        }
-    }
-});
-// --- Fin aprendizaje automático ---
 let mediaRecorder;
 let audioChunks = [];
 let tiempoInicio;
@@ -428,6 +334,204 @@ const btnGrabar = document.getElementById('btnGrabar');
 const iconGrabar = document.getElementById('iconGrabar');
 const estadoGrabacion = document.getElementById('estadoGrabacion');
 const tiempoGrabacion = document.getElementById('tiempoGrabacion');
+let grabandoActivo = false;
+let requiereConfirmacionIA = false;
+let motivoConfirmacionIA = '';
+let terminosSospechososIA = [];
+let editorTextoMejorado = null;
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function textoPlanoAHtml(texto) {
+    const limpio = (texto || '').trim();
+    if (!limpio) {
+        return '<p></p>';
+    }
+
+    const lineas = limpio.split('\n').map(l => l.trim()).filter(Boolean);
+    return lineas.map(l => `<p>${escapeHtml(l)}</p>`).join('');
+}
+
+function htmlATextoPlano(html) {
+    const div = document.createElement('div');
+    div.innerHTML = html || '';
+
+    // Preservar separadores de bloque para que al pegar no colapse en un solo párrafo.
+    div.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+
+    const selectoresBloque = 'p,div,li,tr,h1,h2,h3,h4,h5,h6,blockquote';
+    div.querySelectorAll(selectoresBloque).forEach(el => {
+        if (!el.textContent?.endsWith('\n')) {
+            el.appendChild(document.createTextNode('\n'));
+        }
+    });
+
+    return (div.textContent || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\r/g, '')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+function esTituloSegmento(linea) {
+    const valor = (linea || '').trim().replace(/:+$/, '').trim();
+    if (!valor || valor.length > 60) {
+        return false;
+    }
+
+    // Encabezado típico en informes: mayúsculas, espacios y signos simples.
+    if (!/^[A-ZÁÉÍÓÚÜÑ0-9\s()\-\/.,]+$/.test(valor)) {
+        return false;
+    }
+
+    // Debe contener letras y evitar frases largas en minúsculas.
+    return /[A-ZÁÉÍÓÚÜÑ]/.test(valor);
+}
+
+function normalizarEspaciadoSegmentosTexto(texto) {
+    const lineas = (texto || '').replace(/\r\n/g, '\n').split('\n');
+    const salida = [];
+
+    lineas.forEach((lineaOriginal) => {
+        const linea = lineaOriginal.replace(/[ \t]+$/g, '');
+        const esTitulo = esTituloSegmento(linea);
+
+        if (esTitulo && salida.length > 0 && salida[salida.length - 1].trim() !== '') {
+            salida.push('');
+        }
+
+        salida.push(linea);
+    });
+
+    return salida
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+function normalizarEspaciadoSegmentosHtml(html) {
+    const contenedor = document.createElement('div');
+    contenedor.innerHTML = html || '';
+
+    const bloques = Array.from(contenedor.querySelectorAll('p,div,li,h1,h2,h3,h4,h5,h6,blockquote'));
+    bloques.forEach((el) => {
+        const texto = (el.textContent || '').trim();
+        if (!esTituloSegmento(texto)) {
+            return;
+        }
+
+        const prev = el.previousElementSibling;
+        if (prev && (prev.textContent || '').trim() !== '') {
+            const separador = document.createElement('p');
+            separador.innerHTML = '&nbsp;';
+            el.parentNode.insertBefore(separador, el);
+        }
+    });
+
+    return contenedor.innerHTML;
+}
+
+function setTextoMejoradoContenido(contenido) {
+    const raw = contenido || '';
+    const pareceHtml = /<\/?[a-z][\s\S]*>/i.test(raw);
+    const html = pareceHtml ? raw : textoPlanoAHtml(raw);
+
+    if (editorTextoMejorado) {
+        editorTextoMejorado.setData(html);
+    } else {
+        const textarea = document.getElementById('textoMejorado');
+        if (textarea) {
+            textarea.value = htmlATextoPlano(html);
+        }
+    }
+}
+
+function getTextoMejoradoHtml() {
+    if (editorTextoMejorado) {
+        return editorTextoMejorado.getData() || '';
+    }
+    const textarea = document.getElementById('textoMejorado');
+    return textoPlanoAHtml(textarea ? textarea.value : '');
+}
+
+function getTextoMejoradoTextoPlano() {
+    return htmlATextoPlano(getTextoMejoradoHtml());
+}
+
+async function copiarAlPortapapeles(html, textoPlano, modo = 'rich') {
+    const textoPlanoCompat = (textoPlano || '').replace(/\r?\n/g, '\r\n');
+
+    if (modo === 'plain') {
+        await navigator.clipboard.writeText(textoPlanoCompat);
+        return;
+    }
+
+    if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([textoPlanoCompat], { type: 'text/plain' }),
+        });
+        try {
+            await navigator.clipboard.write([item]);
+            return;
+        } catch (error) {
+            console.warn('⚠️ Clipboard API rich falló, intentando fallback legacy:', error);
+        }
+    }
+
+    const copioConFallback = copiarConExecCommand(html, textoPlanoCompat);
+    if (copioConFallback) {
+        return;
+    }
+
+    await navigator.clipboard.writeText(textoPlanoCompat);
+}
+
+function copiarConExecCommand(html, textoPlano) {
+    let exito = false;
+
+    const listener = (e) => {
+        try {
+            e.preventDefault();
+            e.clipboardData.setData('text/html', html);
+            e.clipboardData.setData('text/plain', textoPlano);
+            exito = true;
+        } catch (error) {
+            exito = false;
+        }
+    };
+
+    document.addEventListener('copy', listener);
+    try {
+        document.execCommand('copy');
+    } finally {
+        document.removeEventListener('copy', listener);
+    }
+
+    return exito;
+}
+
+async function inicializarEditorTextoMejorado() {
+    const el = document.getElementById('textoMejorado');
+    if (!el || !window.ClassicEditor) {
+        return;
+    }
+
+    try {
+        editorTextoMejorado = await window.ClassicEditor.create(el, {
+            toolbar: ['undo', 'redo', '|', 'bold', 'italic', 'underline', '|', 'bulletedList', 'numberedList', '|', 'paragraph'],
+            licenseKey: 'GPL',
+            language: 'es',
+        });
+    } catch (error) {
+        console.error('❌ No se pudo inicializar CKEditor en dictado rápido:', error);
+    }
+}
 
 // 🚀 WEB SPEECH API para preview en tiempo real
 let recognition = null;
@@ -489,6 +593,30 @@ cargarInfoAprendizaje();
 document.addEventListener('DOMContentLoaded', () => {
     const modoRadios = document.querySelectorAll('input[name="modoIA"]');
     const selectorPlantilla = document.getElementById('selectorPlantilla');
+    const btnOpcionesAvanzadas = document.getElementById('btnOpcionesAvanzadas');
+    const panelOpcionesAvanzadas = document.getElementById('panelOpcionesAvanzadas');
+    const iconOpcionesAvanzadas = document.getElementById('iconOpcionesAvanzadas');
+
+    inicializarEditorTextoMejorado();
+
+    const actualizarPanelAvanzado = (abierto) => {
+        if (!panelOpcionesAvanzadas || !btnOpcionesAvanzadas || !iconOpcionesAvanzadas) {
+            return;
+        }
+        panelOpcionesAvanzadas.classList.toggle('hidden', !abierto);
+        iconOpcionesAvanzadas.classList.toggle('rotate-180', abierto);
+        btnOpcionesAvanzadas.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+    };
+
+    const panelAvanzadoGuardado = localStorage.getItem('dictadoOpcionesAvanzadasAbierto') === 'true';
+    actualizarPanelAvanzado(panelAvanzadoGuardado);
+
+    btnOpcionesAvanzadas?.addEventListener('click', () => {
+        const estaOculto = panelOpcionesAvanzadas.classList.contains('hidden');
+        const abrir = estaOculto;
+        actualizarPanelAvanzado(abrir);
+        localStorage.setItem('dictadoOpcionesAvanzadasAbierto', abrir ? 'true' : 'false');
+    });
     
     modoRadios.forEach(radio => {
         radio.addEventListener('change', () => {
@@ -521,18 +649,17 @@ async function cargarInfoAprendizaje() {
     }
 }
 
-// Evento mousedown/touchstart - Iniciar grabación
-btnGrabar.addEventListener('mousedown', iniciarGrabacion);
-btnGrabar.addEventListener('touchstart', iniciarGrabacion);
-
-// Evento mouseup/touchend - Detener grabación
-btnGrabar.addEventListener('mouseup', detenerGrabacion);
-btnGrabar.addEventListener('touchend', detenerGrabacion);
-btnGrabar.addEventListener('mouseleave', detenerGrabacion); // Si sale del botón
-
-async function iniciarGrabacion(e) {
+// Grabación por toggle (iniciar/detener)
+btnGrabar.addEventListener('click', (e) => {
     e.preventDefault();
-    
+    if (grabandoActivo) {
+        detenerGrabacion();
+    } else {
+        iniciarGrabacion();
+    }
+});
+
+async function iniciarGrabacion() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
@@ -605,11 +732,12 @@ async function iniciarGrabacion(e) {
         // Optimizado: 500ms reduce overhead sin perder calidad
         mediaRecorder.start(500); // Genera chunks cada 500ms
         tiempoInicio = Date.now();
+        grabandoActivo = true;
         
         // UI grabando
         btnGrabar.classList.add('scale-125', 'animate-pulse');
         iconGrabar.className = 'fas fa-stop text-white text-5xl';
-        estadoGrabacion.textContent = '🔴 Grabando... Mantén presionado mínimo 0.5 seg';
+        estadoGrabacion.textContent = '🔴 Grabando... Presiona nuevamente para detener';
         estadoGrabacion.classList.remove('text-gray-300', 'text-green-400');
         estadoGrabacion.classList.add('text-red-400', 'font-bold');
         tiempoGrabacion.classList.remove('hidden');
@@ -628,7 +756,7 @@ async function iniciarGrabacion(e) {
             if (milisegundos >= DURACION_MINIMA_MS) {
                 tiempoGrabacion.classList.remove('text-red-400');
                 tiempoGrabacion.classList.add('text-green-400');
-                estadoGrabacion.textContent = '✅ Listo! Suelta para enviar';
+                estadoGrabacion.textContent = '✅ Grabando correctamente. Presiona para detener';
             }
         }, 100);
         
@@ -640,6 +768,7 @@ async function iniciarGrabacion(e) {
 
 function detenerGrabacion() {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
+        grabandoActivo = false;
         const duracion = Date.now() - tiempoInicio;
         
         // 🚀 Detener preview en tiempo real
@@ -679,7 +808,7 @@ function detenerGrabacion() {
         // Validar duración mínima
         if (duracion < DURACION_MINIMA_MS) {
             console.warn(`⚠️ Grabación muy corta: ${duracion}ms (mínimo: ${DURACION_MINIMA_MS}ms)`);
-            estadoGrabacion.textContent = `⚠️ Muy corto (${Math.round(duracion)}ms). Mantén presionado mínimo 0.5 segundos`;
+            estadoGrabacion.textContent = `⚠️ Muy corto (${Math.round(duracion)}ms). Intenta dictar un poco más`;
             estadoGrabacion.classList.remove('text-red-400', 'font-bold');
             estadoGrabacion.classList.add('text-yellow-400');
             tiempoGrabacion.classList.add('hidden');
@@ -698,7 +827,6 @@ function detenerGrabacion() {
         estadoGrabacion.classList.remove('text-red-400', 'font-bold', 'text-yellow-400');
         estadoGrabacion.classList.add('text-gray-300');
         tiempoGrabacion.classList.add('hidden');
-        estadoGrabacion.textContent = 'Procesando...';
         estadoGrabacion.classList.remove('text-red-400', 'font-bold');
         tiempoGrabacion.classList.add('hidden');
     }
@@ -800,7 +928,7 @@ async function procesarAudio() {
             procesandoDiv.classList.add('hidden');
             document.getElementById('contenedorResultado').classList.remove('hidden');
             document.getElementById('textoTranscrito').textContent = textoTranscrito;
-            document.getElementById('textoMejorado').textContent = '⏳ Mejorando con IA...';
+            setTextoMejoradoContenido('⏳ Mejorando con IA...');
             estadoGrabacion.textContent = '🤖 Mejorando texto con IA...';
             estadoGrabacion.classList.remove('text-red-400');
             estadoGrabacion.classList.add('text-blue-400');
@@ -834,11 +962,26 @@ async function procesarAudio() {
             if (!dataMejora.success) {
                 throw new Error(dataMejora.error || 'Error en mejora IA');
             }
+
+            requiereConfirmacionIA = !!dataMejora.requiere_confirmacion;
+            motivoConfirmacionIA = dataMejora.motivo_confianza || '';
+            terminosSospechososIA = dataMejora.terminos_sospechosos || [];
+
+            // Mostrar resumen de guardrails si aplica
+            const guardrails = dataMejora.guardrails_aplicados || [];
+            const guardrailsResumen = document.getElementById('guardrailsResumen');
+            const guardrailsTexto = document.getElementById('guardrailsTexto');
+            if (guardrails.length > 0 && guardrailsResumen && guardrailsTexto) {
+                guardrailsTexto.textContent = `Guardrails: se restauraron ${guardrails.length} líneas de plantilla no mencionadas.`;
+                guardrailsResumen.classList.remove('hidden');
+            } else if (guardrailsResumen) {
+                guardrailsResumen.classList.add('hidden');
+            }
             
-            document.getElementById('textoMejorado').textContent = dataMejora.texto_mejorado;
+            setTextoMejoradoContenido(dataMejora.texto_mejorado);
             
             // Guardar texto IA para aprendizaje
-            textoIAGlobal = dataMejora.texto_mejorado;
+            textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(dataMejora.texto_mejorado));
             
             // Mostrar correcciones si hay
             if (dataMejora.correcciones_aplicadas && dataMejora.correcciones_aplicadas.length > 0) {
@@ -859,12 +1002,14 @@ async function procesarAudio() {
             
             // COPIADO AUTOMÁTICO si está activado
             if (copiadoAutomaticoActivo) {
-                await navigator.clipboard.writeText(dataMejora.texto_mejorado);
+                const html = limpiarCorchetesHtml(getTextoMejoradoHtml());
+                const textoPlano = limpiarCorchetesTexto(getTextoMejoradoTextoPlano());
+                await copiarAlPortapapeles(html, textoPlano);
                 mostrarToast('✅ Texto copiado automáticamente', 'success');
             }
             
             // GUARDAR EN HISTORIAL
-            guardarEnHistorial(textoOriginalGlobal, dataMejora.texto_mejorado);
+            guardarEnHistorial(textoOriginalGlobal, getTextoMejoradoTextoPlano());
             
         } catch (error) {
             console.error('🚨 Error procesando audio:', error);
@@ -872,7 +1017,7 @@ async function procesarAudio() {
             // Manejar errores específicos de audio
             let mensajeError = error.message;
             if (mensajeError.includes('audio_too_short')) {
-                mensajeError = '⚠️ Audio demasiado corto. Mantén presionado el botón por más tiempo (mínimo 0.5 segundos)';
+                mensajeError = '⚠️ Audio demasiado corto. Inicia nuevamente y dicta por más tiempo';
             } else if (mensajeError.includes('Audio file is too short')) {
                 mensajeError = '⚠️ Grabación muy corta. Intenta hablar más tiempo';
             } else if (mensajeError.includes('insufficient_quota')) {
@@ -898,50 +1043,12 @@ async function procesarAudio() {
     };
 }
 
-// Copiar texto y guardar aprendizaje automáticamente
-document.getElementById('btnCopiar').addEventListener('click', async () => {
-    let texto = document.getElementById('textoMejorado').textContent;
-    
-    // Limpiar corchetes [<contenido>] del texto para copiado limpio
-    texto = limpiarCorchetes(texto);
-    
-    try {
-        await navigator.clipboard.writeText(texto);
-        const btn = document.getElementById('btnCopiar');
-        const textoOriginal = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Copiado!';
-        btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-        btn.classList.add('bg-green-500');
-        
-        // 🎯 Guardar aprendizaje automáticamente al copiar
-        guardarAprendizajeAutomatico();
-        
-        setTimeout(() => {
-            btn.innerHTML = textoOriginal;
-            btn.classList.add('bg-green-600', 'hover:bg-green-700');
-            btn.classList.remove('bg-green-500');
-        }, 2000);
-    } catch (error) {
-        alert('❌ Error al copiar');
-    }
-});
+function limpiarCorchetesTexto(texto) {
+    return (texto || '').replace(/\[<([^>]*)>\]/g, '$1').trim();
+}
 
-// Función para limpiar corchetes del texto (ahora solo limpia [<LADO>] del título)
-function limpiarCorchetes(texto) {
-    console.log('🧹 Texto original:', texto);
-    
-    let textoLimpio = texto;
-    
-    // Solo limpiar los corchetes del título [<LADO>]
-    textoLimpio = textoLimpio.replace(/\[<([^>]*)>\]/g, '$1');
-    
-    // Limpiar espacios múltiples y líneas vacías
-    textoLimpio = textoLimpio.replace(/\s+/g, ' ');
-    textoLimpio = textoLimpio.replace(/\n\s*\n\s*\n/g, '\n\n');
-    
-    console.log('✨ Texto limpio final:', textoLimpio);
-    
-    return textoLimpio.trim();
+function limpiarCorchetesHtml(html) {
+    return (html || '').replace(/\[<([^>]*)>\]/g, '$1');
 }
 
 // Variables globales para guardar aprendizaje
@@ -950,7 +1057,7 @@ let textoIAGlobal = '';
 
 // 🎯 Función para guardar aprendizaje automáticamente
 async function guardarAprendizajeAutomatico() {
-    const textoFinal = document.getElementById('textoMejorado').textContent;
+    const textoFinal = getTextoMejoradoTextoPlano();
     
     // Solo guardar si hay texto válido (mínimo 20 caracteres)
     if (!textoFinal || textoFinal.trim().length < 20) {
@@ -988,73 +1095,6 @@ async function guardarAprendizajeAutomatico() {
         // No mostrar error al usuario para no interrumpir el flujo
     }
 }
-
-// Guardar aprendizaje (botón manual - ahora opcional)
-document.getElementById('btnGuardarAprendizaje').addEventListener('click', async () => {
-    const textoFinal = document.getElementById('textoMejorado').textContent;
-    
-    // Verificar si el usuario hizo cambios
-    if (textoIAGlobal.trim() === textoFinal.trim()) {
-        alert('ℹ️ No detecté cambios en el texto. Edita el texto antes de guardar el aprendizaje.');
-        return;
-    }
-    
-    const btn = document.getElementById('btnGuardarAprendizaje');
-    const textoOriginal = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Guardando...';
-    
-    try {
-        const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
-        
-        const response = await fetch('{% url "dictado_informes:guardar_aprendizaje" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({
-                texto_original: textoOriginalGlobal,
-                texto_ia: textoIAGlobal,
-                texto_final: textoFinal,
-                tipo_estudio: modoIA === 'FIEL' ? 'OTR' : ''
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success && data.guardado) {
-            // Mostrar mensaje de éxito
-            document.getElementById('textoMensajeAprendizaje').textContent = data.message;
-            document.getElementById('mensajeAprendizaje').classList.remove('hidden');
-            
-            btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Guardado!';
-            btn.classList.remove('bg-purple-600', 'hover:bg-purple-700');
-            btn.classList.add('bg-green-600');
-            
-            // Recargar contador de aprendizaje
-            cargarInfoAprendizaje();
-            
-            setTimeout(() => {
-                document.getElementById('mensajeAprendizaje').classList.add('hidden');
-                btn.innerHTML = textoOriginal;
-                btn.classList.add('bg-purple-600', 'hover:bg-purple-700');
-                btn.classList.remove('bg-green-600');
-                btn.disabled = false;
-            }, 5000);
-        } else {
-            btn.innerHTML = textoOriginal;
-            btn.disabled = false;
-            alert(data.message || 'No hay cambios para guardar');
-        }
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('❌ Error al guardar aprendizaje');
-        btn.innerHTML = textoOriginal;
-        btn.disabled = false;
-    }
-});
 
 // ========================================
 // MEJORAS DE UX
@@ -1104,12 +1144,32 @@ if (copiadoGuardado === 'true') {
 }
 
 // Función de copiado mejorada
-async function copiarTexto() {
-    const texto = document.getElementById('textoMejorado').textContent;
+async function copiarTexto(modoCopia = 'rich') {
+    const textoBase = limpiarCorchetesTexto(getTextoMejoradoTextoPlano());
+    const texto = normalizarEspaciadoSegmentosTexto(textoBase);
+    const htmlBase = limpiarCorchetesHtml(getTextoMejoradoHtml());
+    const html = normalizarEspaciadoSegmentosHtml(htmlBase);
+
+    if (requiereConfirmacionIA) {
+        const sufijoTerminos = terminosSospechososIA.length > 0
+            ? `\n\nTérminos sospechosos: ${terminosSospechososIA.join(', ')}`
+            : '';
+        const confirmar = confirm(
+            `⚠️ La IA marcó esta salida como de baja confianza.\n\nMotivo: ${motivoConfirmacionIA || 'Divergencia elevada'}${sufijoTerminos}\n\n¿Confirmas que este texto es correcto antes de copiar?`
+        );
+        if (!confirmar) {
+            mostrarToast('Revisa el texto antes de copiar', 'info');
+            return;
+        }
+    }
     
     try {
-        await navigator.clipboard.writeText(texto);
-        mostrarToast('✅ Texto copiado al portapapeles', 'success');
+        await copiarAlPortapapeles(html, texto, modoCopia);
+        if (modoCopia === 'plain') {
+            mostrarToast('✅ Texto plano copiado al portapapeles', 'success');
+        } else {
+            mostrarToast('✅ Texto con formato copiado al portapapeles', 'success');
+        }
         
         // Feedback visual en el botón
         const btn = document.getElementById('btnCopiar');
@@ -1118,17 +1178,26 @@ async function copiarTexto() {
         setTimeout(() => {
             btn.innerHTML = textoOriginal;
         }, 2000);
+
+        // Aprendizaje opt-in: preguntar solo si hubo cambios respecto al texto IA
+        const textoFinal = getTextoMejoradoTextoPlano();
+        const huboCambios = (textoIAGlobal || '').trim() !== (textoFinal || '').trim();
+        if (huboCambios) {
+            const confirmarAprendizaje = confirm('¿Querés guardar esta corrección para aprendizaje?');
+            if (confirmarAprendizaje) {
+                await guardarAprendizajeAutomatico();
+                mostrarToast('✅ Copiado y aprendizaje guardado', 'success');
+            }
+        }
     } catch (error) {
         mostrarToast('❌ Error al copiar', 'error');
     }
 }
 
-document.getElementById('btnCopiar')?.addEventListener('click', copiarTexto);
+document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
+document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
 
 // 3. ATAJOS DE TECLADO
-// Variable para trackear si estamos grabando con espacio
-let grabandoConEspacio = false;
-
 document.addEventListener('keydown', (e) => {
     // Ctrl+Enter = Copiar
     if (e.ctrlKey && e.key === 'Enter') {
@@ -1139,16 +1208,7 @@ document.addEventListener('keydown', (e) => {
         }
     }
     
-    // Ctrl+S = Guardar aprendizaje
-    if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        const contenedor = document.getElementById('contenedorResultado');
-        if (!contenedor.classList.contains('hidden')) {
-            document.getElementById('btnGuardarAprendizaje').click();
-        }
-    }
-    
-    // Barra espaciadora = Grabar (mantener presionado)
+    // Barra espaciadora = toggle iniciar/detener
     if (e.code === 'Space' && !e.repeat) {
         const elementoActivo = document.activeElement;
         // Solo si NO está en un input/textarea/contenteditable
@@ -1157,36 +1217,15 @@ document.addEventListener('keydown', (e) => {
             !elementoActivo.isContentEditable) {
             e.preventDefault();
             e.stopPropagation();
-            grabandoConEspacio = true;
-            btnGrabar.dispatchEvent(new MouseEvent('mousedown'));
+            if (grabandoActivo) {
+                detenerGrabacion();
+            } else {
+                iniciarGrabacion();
+            }
             return false;
         }
     }
 });
-
-// Soltar barra espaciadora = Detener grabación
-document.addEventListener('keyup', (e) => {
-    if (e.code === 'Space' && grabandoConEspacio) {
-        const elementoActivo = document.activeElement;
-        if (elementoActivo.tagName !== 'INPUT' && 
-            elementoActivo.tagName !== 'TEXTAREA' && 
-            !elementoActivo.isContentEditable) {
-            e.preventDefault();
-            e.stopPropagation();
-            grabandoConEspacio = false;
-            btnGrabar.dispatchEvent(new MouseEvent('mouseup'));
-            return false;
-        }
-    }
-});
-
-// Prevenir scroll cuando se presiona espacio (adicional)
-window.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' && grabandoConEspacio) {
-        e.preventDefault();
-        return false;
-    }
-}, { passive: false });
 
 // 4. HISTORIAL DE DICTADOS (LocalStorage)
 const HISTORIAL_MAX = 5;
@@ -1200,7 +1239,7 @@ function guardarEnHistorial(textoOriginal, textoMejorado) {
         mejorado: textoMejorado,
         preview: textoMejorado.substring(0, 50) + '...'
     });
-    
+
     // Limitar a últimos 5
     historial = historial.slice(0, HISTORIAL_MAX);
     
@@ -1279,7 +1318,7 @@ function recuperarDictado(index) {
         document.getElementById('contenedorResultado').classList.remove('hidden');
         
         document.getElementById('textoTranscrito').textContent = dictado.original || dictado.mejorado;
-        document.getElementById('textoMejorado').textContent = dictado.mejorado;
+        setTextoMejoradoContenido(dictado.mejorado);
         
         textoOriginalGlobal = dictado.original || dictado.mejorado;
         textoIAGlobal = dictado.mejorado;

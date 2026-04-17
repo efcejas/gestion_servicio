@@ -12,9 +12,10 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 from .models import (
     Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
-    EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado
+    EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
+    PlantillaEstructurada
 )
-from .forms import TerminoMedicoForm
+from .forms import TerminoMedicoForm, PlantillaEstructuradaForm
 from .ai_services import ai_service
 import json
 import base64
@@ -75,6 +76,14 @@ class DashboardDictadoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateV
 class DictadoRapidoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView):
     """Vista simplificada para dictado rápido sin guardar - solo dictar, mejorar y copiar"""
     template_name = 'dictado_informes/dictado_rapido_whisper.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pasar plantillas estructuradas para selector dinámico
+        context['plantillas_estructuradas'] = PlantillaEstructurada.objects.filter(
+            activa=True
+        ).values('codigo', 'nombre').order_by('codigo')
+        return context
 
 
 class InformeListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
@@ -239,6 +248,95 @@ class PlantillaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView
     def form_valid(self, form):
         messages.success(self.request, "✅ Plantilla actualizada exitosamente")
         return super().form_valid(form)
+
+
+# ========================================================================
+# VISTAS CRUD PARA PLANTILLAS ESTRUCTURADAS (Guardrails de IA)
+# ========================================================================
+
+class PlantillaEstructuradaListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+    """Lista de plantillas estructuradas para guardrails"""
+    model = PlantillaEstructurada
+    template_name = 'dictado_informes/plantilla_estructurada_list.html'
+    context_object_name = 'plantillas'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related('creada_por').order_by('codigo')
+        
+        activa = self.request.GET.get('activa')
+        if activa == 'true':
+            queryset = queryset.filter(activa=True)
+        elif activa == 'false':
+            queryset = queryset.filter(activa=False)
+        
+        origen = self.request.GET.get('origen')
+        if origen:
+            queryset = queryset.filter(origen=origen)
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ORIGEN_CHOICES'] = PlantillaEstructurada.ORIGEN_CHOICES
+        context['origen_seleccionado'] = self.request.GET.get('origen', '')
+        return context
+
+
+class PlantillaEstructuradaCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+    """Crear una nueva plantilla estructurada"""
+    model = PlantillaEstructurada
+    form_class = PlantillaEstructuradaForm
+    template_name = 'dictado_informes/plantilla_estructurada_form.html'
+    success_url = reverse_lazy('dictado_informes:plantilla_estructurada_list')
+    
+    def form_valid(self, form):
+        form.instance.creada_por = self.request.user
+        form.instance.origen = 'user'
+        messages.success(self.request, f"✅ Plantilla '{form.instance.nombre}' creada exitosamente")
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['es_nueva'] = True
+        context['titulo'] = 'Crear Nueva Plantilla Estructurada'
+        return context
+
+
+class PlantillaEstructuradaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+    """Editar una plantilla estructurada existente"""
+    model = PlantillaEstructurada
+    form_class = PlantillaEstructuradaForm
+    template_name = 'dictado_informes/plantilla_estructurada_form.html'
+    success_url = reverse_lazy('dictado_informes:plantilla_estructurada_list')
+    
+    def form_valid(self, form):
+        messages.success(self.request, f"✅ Plantilla '{form.instance.nombre}' actualizada exitosamente")
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['es_nueva'] = False
+        context['titulo'] = f'Editar Plantilla: {self.object.nombre}'
+        # Si es legacy, mostrar advertencia
+        if self.object.origen == 'legacy':
+            context['advertencia_legacy'] = 'Esta plantilla fue migrada desde hardcode. Los cambios afectarán el comportamiento de IA.'
+        return context
+
+
+class PlantillaEstructuradaDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+    """Eliminar una plantilla estructurada (soft delete)"""
+    model = PlantillaEstructurada
+    template_name = 'dictado_informes/plantilla_estructurada_confirm_delete.html'
+    success_url = reverse_lazy('dictado_informes:plantilla_estructurada_list')
+    
+    def delete(self, request, *args, **kwargs):
+        plantilla = self.get_object()
+        # Soft delete - solo desactivar
+        plantilla.activa = False
+        plantilla.save()
+        messages.success(request, f"🗑️ Plantilla '{plantilla.nombre}' desactivada exitosamente")
+        return redirect(self.success_url)
 
 
 # Vista AJAX para obtener plantilla por ID
@@ -519,7 +617,13 @@ def mejorar_texto_ia(request):
             'confianza': result.get('confianza', 0.0),
             'sugerencias': result.get('sugerencias', []),
             'correcciones_aplicadas': correcciones,  # Enviar correcciones al frontend
-            'modo': result.get('modo', modo)  # Retornar modo usado por la IA
+            'modo': result.get('modo', modo),  # Retornar modo usado por la IA
+            'score_confianza': result.get('score_confianza', 1.0),
+            'requiere_confirmacion': result.get('requiere_confirmacion', False),
+            'motivo_confianza': result.get('motivo_confianza', ''),
+            'guardrails_aplicados': result.get('guardrails_aplicados', []),
+            'posible_invencion': result.get('posible_invencion', False),
+            'terminos_sospechosos': result.get('terminos_sospechosos', [])
         })
     
     except json.JSONDecodeError as e:
@@ -682,16 +786,30 @@ def guardar_correccion_aprendizaje(request):
             usuario=request.user,
             tipo_estudio=tipo_estudio if tipo_estudio in dict(TipoEstudio.choices) else ''
         )
+
+        apta_para_prompt = CorreccionAprendizaje.es_apta_para_prompt(correccion)
+        estado_aprendizaje = "apta" if apta_para_prompt else "descartada_para_prompt"
         
         logger.info(f"✅ Corrección de aprendizaje guardada ID={correccion.id} por {request.user}")
         logger.info(f"   Cambios detectados: {len(correccion.cambios_detectados)}")
+        logger.info(f"   Estado aprendizaje automático: {estado_aprendizaje}")
+
+        if apta_para_prompt:
+            mensaje = f"✅ Corrección guardada! {len(correccion.cambios_detectados)} cambios detectados"
+        else:
+            mensaje = (
+                "✅ Corrección guardada en historial, pero no se usará automáticamente "
+                "porque parece una edición atípica."
+            )
         
         return JsonResponse({
             'success': True,
-            'message': f'✅ Corrección guardada! {len(correccion.cambios_detectados)} cambios detectados',
+            'message': mensaje,
             'guardado': True,
             'id': correccion.id,
-            'cambios': correccion.cambios_detectados
+            'cambios': correccion.cambios_detectados,
+            'apta_para_prompt': apta_para_prompt,
+            'estado_aprendizaje': estado_aprendizaje,
         })
         
     except Exception as e:
