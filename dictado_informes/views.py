@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.urls import reverse_lazy
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Avg
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
@@ -84,6 +84,80 @@ class DictadoRapidoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView
             activa=True
         ).values('codigo', 'nombre').order_by('codigo')
         return context
+
+
+class DemoPresentacionIAView(TemplateView):
+    """Pantalla de demo para charla clinica (sin logica de negocio)."""
+    template_name = 'dictado_informes/demo_presentacion_ia.html'
+
+
+def demo_segmentos_reales_api(request):
+    """Métricas agregadas para incrustar segmentos reales en la demo de presentación."""
+    data = {
+        'dictado': {
+            'informes_total': 0,
+            'informes_finalizados': 0,
+            'correcciones_aprendizaje': 0,
+            'tiempo_promedio_segundos': 0,
+        },
+        'preinformes': {
+            'total': 0,
+            'pendiente_revision': 0,
+            'finalizado': 0,
+            'revisiones': 0,
+        },
+        'docencia': {
+            'clases_activas': 0,
+            'conversaciones_bot': 0,
+            'mensajes_bot': 0,
+        }
+    }
+
+    # Segmento real de Dictado IA
+    data['dictado']['informes_total'] = Informe.objects.count()
+    data['dictado']['informes_finalizados'] = Informe.objects.filter(
+        estado=EstadoInforme.FINALIZADO
+    ).count()
+    data['dictado']['correcciones_aprendizaje'] = CorreccionAprendizaje.objects.count()
+
+    promedio_ms = MetricaDictado.objects.filter(
+        tiempo_total_ms__isnull=False
+    ).aggregate(promedio=Avg('tiempo_total_ms'))['promedio']
+    if promedio_ms:
+        data['dictado']['tiempo_promedio_segundos'] = round(float(promedio_ms) / 1000, 1)
+
+    # Segmento real de Preinformes (residencia)
+    try:
+        from preinformes.models import Preinforme, RevisionPreinforme
+
+        data['preinformes']['total'] = Preinforme.objects.count()
+        data['preinformes']['pendiente_revision'] = Preinforme.objects.filter(
+            estado='pendiente_revision'
+        ).count()
+        data['preinformes']['finalizado'] = Preinforme.objects.filter(
+            estado='finalizado'
+        ).count()
+        data['preinformes']['revisiones'] = RevisionPreinforme.objects.count()
+    except Exception as exc:
+        logger.warning("No se pudieron cargar métricas de preinformes para demo: %s", exc)
+
+    # Segmento real de Docencia
+    try:
+        from clases_residentes.models import ClaseResidente, ConversacionBot, MensajeBot
+
+        data['docencia']['clases_activas'] = ClaseResidente.objects.filter(activa=True).count()
+        data['docencia']['conversaciones_bot'] = ConversacionBot.objects.count()
+        data['docencia']['mensajes_bot'] = MensajeBot.objects.count()
+    except Exception as exc:
+        logger.warning("No se pudieron cargar métricas de docencia para demo: %s", exc)
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'actualizado': timezone.now().strftime('%d/%m/%Y %H:%M'),
+            'data': data,
+        }
+    )
 
 
 class InformeListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
