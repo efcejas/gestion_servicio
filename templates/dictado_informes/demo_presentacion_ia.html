@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 {% load static %}
 <html lang="es">
 <head>
@@ -64,6 +64,7 @@
             inset: 0;
             display: none;
             flex-direction: column;
+            justify-content: safe center;
             padding: 2.2rem 3rem;
             overflow-y: auto;
         }
@@ -111,7 +112,7 @@
             <a class="nav-link" data-section-link="dictado-ia"><span class="nav-dot"></span>Dictado con IA</a>
             <a class="nav-link" data-section-link="estructuracion-informes"><span class="nav-dot"></span>Estructuración de informes</a>
             <a class="nav-link" data-section-link="aprendizaje-sistema"><span class="nav-dot"></span>Aprendizaje del sistema</a>
-            <a class="nav-link" data-section-link="asistente-residentes"><span class="nav-dot"></span>Asistente para residentes</a>
+            <a class="nav-link" data-section-link="asistente-residentes"><span class="nav-dot"></span>Preinformes + Mentor IA</a>
             <a class="nav-link" data-section-link="evaluacion-docente"><span class="nav-dot"></span>Evaluación docente</a>
             <a class="nav-link" data-section-link="cierre"><span class="nav-dot"></span>Cierre</a>
         </nav>
@@ -153,10 +154,10 @@
                         <p id="portadaFecha" class="mt-2 text-sm text-sky-300">20 de abril de 2026</p>
                     </div>
                 </div>
-                <div class="mt-10 flex w-full flex-col items-center justify-center gap-2 sm:absolute sm:bottom-6 sm:right-0 sm:mt-0 sm:w-auto sm:flex-row sm:items-end sm:justify-end lg:bottom-8">
+                <div class="mt-10 flex w-full flex-col items-center justify-center gap-2 sm:absolute sm:bottom-6 sm:left-0 sm:right-0 sm:mt-0 sm:w-full sm:flex-row-reverse sm:items-end sm:justify-between lg:bottom-8">
                     <div id="logoSlotPrincipal" class="flex items-center justify-center">
                         <div class="text-center">
-                            <img src="{% static 'images/304897319_515511947245502_4427804199937924289_n.png' %}" alt="Logo Institución" class="mx-auto h-16 w-auto rounded-full object-contain">
+                            <img src="{% static 'images/Imagen1.png' %}" alt="Logo Institución" class="mx-auto h-16 w-auto object-contain">
                         </div>
                     </div>
                     <div id="logoSlotSecundario" class="flex items-center justify-center">
@@ -171,111 +172,111 @@
 
         <div class="section-panel" id="recorrido-personal">
             <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Contexto</p>
-            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Recorrido personal</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">De médico radiólogo a constructor de soluciones: aprendizaje autodidacta, acelerado por IA y aplicado en el servicio.</p>
+            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Del problema al primer sistema en producción</h1>
+            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">No empecé queriendo programar: empecé queriendo resolver un problema docente real que no tenía una solución útil para nuestra realidad.</p>
 
-            <div class="mt-7 grid gap-4 lg:grid-cols-3">
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                        </svg>
+            <div class="mt-6 grid items-start gap-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                <div class="space-y-3">
+                    <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-3.5 text-slate-200">
+                        <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
+                            <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+                            </svg>
+                        </div>
+                        <p class="mt-2.5 text-[0.88rem] font-semibold text-slate-200">Punto de quiebre</p>
+                        <p class="mt-1 text-[0.8rem] leading-5.5 text-slate-300">Asistencia manual con hoja y firma: registro frágil, difícil de auditar y sin control confiable para la residencia.</p>
                     </div>
-                    <p class="mt-3 text-[0.9rem] font-semibold text-slate-200">Inicio autodidacta</p>
-                    <p class="mt-1.5 text-[0.82rem] leading-6 text-slate-300">Programación como herramienta para resolver fricciones reales del trabajo diario en el servicio.</p>
-                </div>
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
-                        </svg>
+                    <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-3.5 text-slate-200">
+                        <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
+                            <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/>
+                            </svg>
+                        </div>
+                        <p class="mt-2.5 text-[0.88rem] font-semibold text-slate-200">Primer despliegue real</p>
+                        <p class="mt-1 text-[0.8rem] leading-5.5 text-slate-300">Check-in desde celular con GPS, fecha, lugar y horario del ateneo para construir un registro fiable de asistencia.</p>
                     </div>
-                    <p class="mt-3 text-[0.9rem] font-semibold text-slate-200">Aceleración con IA</p>
-                    <p class="mt-1.5 text-[0.82rem] leading-6 text-slate-300">Asistentes y agentes para aprender más rápido y pasar de idea a prototipo funcional en días.</p>
-                </div>
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5 10.5 6.75 14.25 11.25 17.625 7.875 21 11.25M3.75 21h16.5M3.75 21V13.5M21 21V11.25"/>
-                        </svg>
+                    <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-3.5 text-slate-200">
+                        <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-sky-800 bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
+                            <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5 10.5 6.75 14.25 11.25 17.625 7.875 21 11.25M3.75 21h16.5M3.75 21V13.5M21 21V11.25"/>
+                            </svg>
+                        </div>
+                        <p class="mt-2.5 text-[0.88rem] font-semibold text-slate-200">Evolución y diferencial</p>
+                        <p class="mt-1 text-[0.8rem] leading-5.5 text-slate-300">De meses para lograr el primer sistema a acelerar desarrollo con IA y agentes, manteniendo foco clínico, docente y operativo.</p>
                     </div>
-                    <p class="mt-3 text-[0.9rem] font-semibold text-slate-200">Impacto en producción</p>
-                    <p class="mt-1.5 text-[0.82rem] leading-6 text-slate-300">Clínica, gestión y docencia integradas en un ecosistema digital que funciona hoy en el servicio.</p>
                 </div>
-            </div>
 
-            <div class="mt-4 rounded-[0.85rem] border border-[#2b4666] bg-[linear-gradient(180deg,#0f1f35,#0c1a2f)] p-4 text-slate-200">
-                <div class="flex flex-wrap items-center justify-between gap-4">
-                    <p class="text-[0.68rem] uppercase tracking-[0.05em] text-sky-300">Captura funcional real (datos en vivo)</p>
-                    <div class="flex items-center gap-2">
-                        <button id="btnToggleRealMetrics" class="cursor-pointer rounded-md bg-sky-700 px-2.5 py-1 text-[0.72rem] font-semibold text-white transition hover:bg-sky-600">Mostrar evidencia</button>
-                        <p id="realUpdatedAt" class="text-[0.72rem] font-semibold text-sky-300">Listo para mostrar</p>
+                <div class="rounded-[0.85rem] border border-[#2b4666] bg-[linear-gradient(180deg,#0f1f35,#0c1a2f)] p-4 text-slate-200">
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <p class="text-[0.68rem] uppercase tracking-[0.05em] text-sky-300">Respaldos visuales</p>
+                        <div class="flex items-center gap-2">
+                            <button id="btnEvidenciaPrev" class="cursor-pointer rounded-md border border-slate-600 bg-slate-900 px-2.5 py-1 text-[0.72rem] font-semibold text-slate-200 transition hover:bg-slate-800">Anterior</button>
+                            <button id="btnEvidenciaNext" class="cursor-pointer rounded-md bg-sky-700 px-2.5 py-1 text-[0.72rem] font-semibold text-white transition hover:bg-sky-600">Siguiente</button>
+                        </div>
                     </div>
-                </div>
-                <div id="realMetricsGrid" class="mt-3 hidden grid-cols-2 gap-3 lg:grid-cols-6">
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Informes IA</p>
-                        <p id="realInformesTotal" class="text-base font-bold text-slate-200">--</p>
+                    <div id="evidenciaCarousel" class="mt-3 overflow-hidden rounded-xl border border-slate-700">
+                        <div class="relative h-[300px] sm:h-[360px] md:h-[420px]">
+                            <figure data-evidencia-slide="0" data-caption="Problema inicial: control manual de asistencia sin trazabilidad confiable." class="absolute inset-0">
+                                <img src="https://res.cloudinary.com/hamdqrhkx/image/upload/v1776549738/ChatGPT_Image_18_abr_2026_19_01_37_gk9ice.png" alt="Asistencia inicial" class="h-full w-full object-cover">
+                            </figure>
+                            <figure data-evidencia-slide="1" data-caption="Código inicial del sistema." class="absolute inset-0 hidden">
+                                <img src="https://res.cloudinary.com/hamdqrhkx/image/upload/v1776550240/Captura_de_pantalla_2026-04-18_190956_txgucc.jpg" alt="Codigo" class="h-full w-full object-left">
+                            </figure>
+                            <figure data-evidencia-slide="2" data-caption="Primer despliegue funcional en dispositivos móviles del equipo." class="absolute inset-0 hidden">
+                                <img src="https://res.cloudinary.com/hamdqrhkx/image/upload/v1776548899/Captura_de_pantalla_2026-04-18_183707_qlw7jb.jpg" alt="Primer despliegue funcional" class="mx-auto h-full w-auto object-contain object-center">
+                            </figure>
+                            <figure data-evidencia-slide="3" data-caption="Primer despliegue funcional en dispositivos móviles del equipo." class="absolute inset-0 hidden">
+                                <img src="https://res.cloudinary.com/hamdqrhkx/image/upload/v1776548899/Captura_de_pantalla_2026-04-18_183755_xfibfh.jpg" alt="Segundo despliegue funcional" class="mx-auto h-full w-auto object-contain object-center">
+                            </figure>
+                            <figure data-evidencia-slide="4" data-caption="Resultado: registro más fiable, auditable y adaptado a la realidad del servicio." class="absolute inset-0 hidden">
+                                <img src="https://res.cloudinary.com/hamdqrhkx/image/upload/v1776548504/Captura_de_pantalla_2026-04-18_183613_gcgxuf.jpg" alt="Resultado final" class="h-full object-contain object-center">
+                            </figure>
+                        </div>
                     </div>
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Finalizados</p>
-                        <p id="realInformesFinalizados" class="text-base font-bold text-slate-200">--</p>
-                    </div>
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Tiempo medio</p>
-                        <p id="realTiempoPromedio" class="text-base font-bold text-slate-200">--</p>
-                    </div>
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Preinf. pendientes</p>
-                        <p id="realPrePendientes" class="text-base font-bold text-slate-200">--</p>
-                    </div>
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Preinf. finalizados</p>
-                        <p id="realPreFinalizados" class="text-base font-bold text-slate-200">--</p>
-                    </div>
-                    <div class="rounded-[0.7rem] border border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.9),rgba(17,24,39,0.92))] p-[0.55rem]">
-                        <p class="text-[0.66rem] text-slate-400">Clases activas</p>
-                        <p id="realClasesActivas" class="text-base font-bold text-slate-200">--</p>
+                    <div class="mt-2 flex items-center justify-between gap-3">
+                        <p id="evidenciaStatus" class="shrink-0 text-[0.72rem] font-semibold text-sky-300">1 / 5</p>
+                        <p id="evidenciaCaption" class="text-right text-[0.74rem] leading-snug text-slate-300">Problema inicial: control manual de asistencia sin trazabilidad confiable.</p>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="section-panel" id="introduccion">
-            <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Apertura</p>
-            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Problemas priorizados y estrategia</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">Primer foco en fricciones de alto impacto operativo: redacción, consistencia y acompañamiento formativo.</p>
+            <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Puente estratégico</p>
+            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">De usar IA para corregir texto a integrarla en el flujo real del servicio</h1>
+            <p class="mt-2 max-w-[980px] text-[1.05rem] leading-7 text-slate-300">El salto no fue "usar mejor prompts". Fue convertir una ayuda informal en soluciones operativas con impacto clínico, docente y de gestión.</p>
 
-            <div class="mt-7 grid gap-4 lg:grid-cols-3">
+            <div class="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#151f31_0%,#101827_100%)] p-4">
+                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-slate-400">Uso inicial de IA</p>
+                    <p class="mt-2 text-[0.95rem] font-semibold text-slate-200">Consulta puntual y corrección manual</p>
+                    <p class="mt-1 text-[0.82rem] leading-6 text-slate-300">Copiar y pegar fragmentos, resolver dudas aisladas y volver al proceso habitual sin trazabilidad.</p>
+                </div>
+                <div class="hidden items-center justify-center lg:flex">
+                    <span class="rounded-full border border-sky-700/60 bg-sky-900/20 px-3 py-1 text-[0.74rem] font-semibold text-sky-300">Evolución</span>
+                </div>
+                <div class="rounded-[0.85rem] border border-sky-800/60 bg-[linear-gradient(180deg,#17324f_0%,#10263d_100%)] p-4">
+                    <p class="text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-sky-300">Objetivo operativo</p>
+                    <p class="mt-2 text-[0.95rem] font-semibold text-slate-100">IA integrada al sistema y al trabajo diario</p>
+                    <p class="mt-1 text-[0.82rem] leading-6 text-slate-200">Flujos concretos, medibles y repetibles para ahorrar tiempo, mejorar calidad y sostener formación de residentes.</p>
+                </div>
+            </div>
+
+            <div class="mt-5 grid gap-4 lg:grid-cols-3">
                 <div class="rounded-[0.85rem] border border-[#2b5f8f] bg-[linear-gradient(180deg,#1e3a5f,#1a2f4f)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-[#2b5f8f] bg-[linear-gradient(145deg,#1e3a5f,#0f2744)] text-sky-400">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l4 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                        </svg>
-                    </div>
-                    <p class="mt-3 text-[0.68rem] uppercase tracking-[0.05em] text-sky-400">Clínica</p>
-                    <p class="mt-1 text-[0.95rem] font-semibold text-slate-200">Tiempo excesivo de redacción</p>
-                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">Cada informe consume minutos valiosos que podrían usarse en el paciente siguiente.</p>
+                    <p class="text-[0.66rem] uppercase tracking-[0.05em] text-sky-300">Hito 1 · Clínica</p>
+                    <p class="mt-1 text-[0.96rem] font-semibold text-slate-100">Dictado con capa IA</p>
+                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">Del audio libre a un informe estructurado, editable y listo para validar con menor retrabajo.</p>
                 </div>
                 <div class="rounded-[0.85rem] border border-[#2b7d5d] bg-[linear-gradient(180deg,#1a4d3a,#0f3628)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-[#2b7d5d] bg-[linear-gradient(145deg,#1a4d3a,#0f3628)] text-emerald-500">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
-                        </svg>
-                    </div>
-                    <p class="mt-3 text-[0.68rem] uppercase tracking-[0.05em] text-emerald-500">Calidad</p>
-                    <p class="mt-1 text-[0.95rem] font-semibold text-slate-200">Variabilidad en informes</p>
-                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">El mismo hallazgo descrito de formas distintas según el turno o el estado del médico.</p>
+                    <p class="text-[0.66rem] uppercase tracking-[0.05em] text-emerald-400">Hito 2 · Docencia</p>
+                    <p class="mt-1 text-[0.96rem] font-semibold text-slate-100">Preinformes + Mentor IA</p>
+                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">Feedback más rápido y consistente para residentes, incluso bajo presión asistencial.</p>
                 </div>
                 <div class="rounded-[0.85rem] border border-[#5b4d8f] bg-[linear-gradient(180deg,#3a2d5f,#2a1f4f)] p-4 text-slate-200">
-                    <div class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[0.6rem] border border-[#5b4d8f] bg-[linear-gradient(145deg,#3a2d5f,#2a1f4f)] text-violet-400">
-                        <svg class="h-[1.1rem] w-[1.1rem]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 3.741-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"/>
-                        </svg>
-                    </div>
-                    <p class="mt-3 text-[0.68rem] uppercase tracking-[0.05em] text-violet-400">Docencia</p>
-                    <p class="mt-1 text-[0.95rem] font-semibold text-slate-200">Docencia bajo presión asistencial</p>
-                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">Poco tiempo para dar feedback de calidad al residente en un turno cargado.</p>
+                    <p class="text-[0.66rem] uppercase tracking-[0.05em] text-violet-400">Hito 3 · Gestión</p>
+                    <p class="mt-1 text-[0.96rem] font-semibold text-slate-100">Distribución de guardias asistida</p>
+                    <p class="mt-1 text-[0.8rem] leading-6 text-slate-300">Asignación más equitativa, menos fricción operativa y reglas claras para cobertura real.</p>
                 </div>
             </div>
         </div>
@@ -317,7 +318,7 @@
         <div class="section-panel" id="estructuracion-informes">
             <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Demo 2</p>
             <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Estructuración de informes</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">El mismo contenido clínico, organizado para lectura rápida y menor omisión.</p>
+            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">El mismo contenido clínico, organizado para lectura rápida y menor omisión en la validación médica.</p>
 
             <div class="mt-6 grid content-start gap-5 lg:grid-cols-2">
                 <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
@@ -333,8 +334,27 @@
                     </div>
                     <p id="placeholderDespuesEstructura" class="mt-2 text-[0.85rem] leading-6 text-emerald-400">Salida estandarizada del mismo caso, con mejor legibilidad clínica.</p>
                 </div>
-                <div class="lg:col-span-2">
+                <div class="grid gap-3 lg:col-span-2 lg:grid-cols-3">
+                    <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3">
+                        <p class="text-[0.68rem] uppercase tracking-[0.05em] text-emerald-400">Legibilidad</p>
+                        <p class="mt-1 text-[0.82rem] text-slate-300">Hallazgos clave separados por secciones estandarizadas.</p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3">
+                        <p class="text-[0.68rem] uppercase tracking-[0.05em] text-emerald-400">Seguridad clínica</p>
+                        <p class="mt-1 text-[0.82rem] text-slate-300">Menor riesgo de omitir técnica, comentario o conclusión.</p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-3">
+                        <p class="text-[0.68rem] uppercase tracking-[0.05em] text-emerald-400">Tiempo de validación</p>
+                        <p class="mt-1 text-[0.82rem] text-slate-300">Lectura más rápida para staff en contexto de alta demanda.</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 lg:col-span-2">
                     <button id="btnAplicarEstructura" class="cursor-pointer rounded-lg bg-green-700 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-green-600">Aplicar estructura</button>
+                    <button id="btnResetEstructura" class="cursor-pointer rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-[0.82rem] font-semibold text-slate-200 transition hover:bg-slate-800">Reiniciar demo</button>
+                    <span id="chipEstructuraAplicada" class="hidden rounded-full border border-emerald-800 bg-emerald-950 px-2.5 py-1 text-[0.72rem] text-emerald-300">Formato estructurado aplicado</span>
+                </div>
+                <div class="lg:col-span-2 rounded-lg border border-sky-900/60 bg-sky-950/20 px-4 py-3">
+                    <p class="text-[0.8rem] text-sky-200">Este formato es la base para el siguiente paso: aprendizaje del sistema y métricas docentes comparables.</p>
                 </div>
             </div>
         </div>
@@ -342,7 +362,7 @@
         <div class="section-panel" id="aprendizaje-sistema">
             <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Demo 3</p>
             <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Aprendizaje del sistema</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">El sistema incorpora correcciones del médico para reducir retrabajo repetitivo en el tiempo.</p>
+            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">El sistema incorpora correcciones del médico para reducir retrabajo repetitivo y alinear estilo de informe por servicio.</p>
 
             <div class="mt-6 grid content-start gap-5 lg:grid-cols-2">
                 <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
@@ -354,87 +374,188 @@
                     <p id="textoAprendizajeFinal" class="mt-2 hidden text-[0.85rem] leading-6 text-violet-100">Meniscos de configuración habitual. Gonartrosis grado III en compartimento femorotibial medial.</p>
                     <p id="placeholderAprendizaje" class="mt-2 text-[0.85rem] leading-6 text-violet-400">Comparación entre salida inicial y salida ajustada por preferencias del médico.</p>
                 </div>
+                <div id="bloqueReglaAprendida" class="hidden rounded-lg border border-violet-800/60 bg-violet-950/30 p-4 lg:col-span-2">
+                    <p class="text-[0.68rem] uppercase tracking-[0.05em] text-violet-300">Qué aprendió el sistema</p>
+                    <p class="mt-1.5 text-[0.84rem] leading-6 text-violet-100">Regla aplicada: reemplazar lenguaje genérico por terminología habitual del servicio ("normal" -> "de configuración habitual") y precisar lateralidad/compartimento cuando corresponde.</p>
+                    <p class="mt-1 text-[0.78rem] text-violet-300">Fuente de aprendizaje: correcciones validadas por médico staff en casos previos similares.</p>
+                </div>
                 <div class="flex items-center gap-3 lg:col-span-2">
                     <button id="btnAplicarAprendizaje" class="cursor-pointer rounded-lg bg-indigo-700 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-indigo-600">Aplicar mejora</button>
+                    <button id="btnResetAprendizaje" class="cursor-pointer rounded-lg border border-slate-600 bg-slate-900 px-4 py-2 text-[0.82rem] font-semibold text-slate-200 transition hover:bg-slate-800">Reiniciar demo</button>
                     <span id="chipAprendizaje" class="hidden rounded-full border border-indigo-200 bg-indigo-100 px-2.5 py-1 text-[0.72rem] text-indigo-700">Aprendizaje actualizado</span>
+                </div>
+                <div class="lg:col-span-2 rounded-lg border border-sky-900/60 bg-sky-950/20 px-4 py-3">
+                    <p class="text-[0.8rem] text-sky-200">Este mecanismo es el puente hacia trazabilidad avanzada y futura integración con flujos PACS/DICOM.</p>
                 </div>
             </div>
         </div>
 
         <div class="section-panel" id="asistente-residentes">
             <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Demo 4</p>
-            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Asistente para residentes</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">Orientación clínica contextual durante la redacción del preinforme.</p>
+            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Preinformes con Mentor IA</h1>
+            <p class="mt-2 max-w-[1000px] text-[1.05rem] leading-7 text-slate-300">Acá se ve el circuito end-to-end real: redacción del preinforme, apoyo del mentor y trazabilidad docente para el staff.</p>
 
-            <div class="mt-6 flex min-h-0 flex-1 flex-col">
-                <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700 bg-[linear-gradient(180deg,#0f1620,#0a0f18)]">
-                    <div class="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-4 py-3">
-                        <p class="text-[0.85rem] font-semibold text-slate-200">Chat de orientación clínica</p>
-                        <span class="rounded-full border border-emerald-700 bg-emerald-950 px-2 py-1 text-[0.7rem] text-emerald-500">Mentor IA activo</span>
+            <div class="mt-6 grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.35fr)]">
+                <div class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-emerald-800/60 bg-[linear-gradient(180deg,#10251f,#0d1d19)]">
+                    <div class="flex items-center justify-between border-b border-emerald-900/60 bg-emerald-950/40 px-4 py-3">
+                        <p class="text-[0.84rem] font-semibold text-emerald-100">Mentor IA durante la redacción</p>
+                        <span class="rounded-full border border-emerald-700 bg-emerald-950 px-2 py-1 text-[0.7rem] text-emerald-400">Asistencia contextual</span>
                     </div>
                     <div id="chatContainerDemo" class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
-                        <div class="max-w-[80%] rounded-lg border border-sky-800 bg-sky-950 px-3.5 py-2.5 text-[0.85rem] text-sky-200">
-                            Estoy redactando una RM de hombro. No sé si la conclusión queda clara.
+                        <div class="max-w-[88%] rounded-lg border border-sky-800 bg-sky-950 px-3.5 py-2.5 text-[0.84rem] text-sky-200">
+                            Estoy redactando un preinforme de RM de hombro. ¿Cómo cierro la conclusión para que sea clara y útil para el staff?
                         </div>
                     </div>
-                    <div class="flex gap-2 border-t border-slate-700 bg-slate-900 px-4 py-3">
-                        <input type="text" class="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-[0.82rem] text-slate-200 outline-none" value="¿Cómo mejoro la conclusión sin perder precisión?" readonly>
-                        <button id="btnSimularRespuestaAsistente" class="whitespace-nowrap rounded-lg bg-cyan-700 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-cyan-600">Mostrar respuesta</button>
+                    <div class="flex gap-2 border-t border-emerald-900/60 bg-emerald-950/20 px-4 py-3">
+                        <input type="text" class="flex-1 rounded-lg border border-emerald-900 bg-slate-950 px-3 py-2 text-[0.82rem] text-slate-200 outline-none" value="Sugerime una conclusión breve, priorizando hallazgo y conducta." readonly>
+                        <button id="btnSimularRespuestaAsistente" class="whitespace-nowrap rounded-lg bg-emerald-700 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-emerald-600">Ver sugerencia IA</button>
+                    </div>
+                </div>
+
+                <div class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-[linear-gradient(180deg,#0f1620,#0a0f18)]">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 bg-slate-900 px-4 py-3">
+                        <p class="text-[0.84rem] font-semibold text-slate-200">Circuito end-to-end de preinformes</p>
+                        <span class="rounded-full border border-cyan-700 bg-cyan-950 px-2 py-1 text-[0.7rem] text-cyan-300">Video real del flujo</span>
+                    </div>
+                    <div id="preinformesVideoHost" class="flex-1 bg-slate-950 p-3">
+                        <iframe id="ytPreinformes" class="h-full min-h-[320px] w-full rounded-lg border border-slate-800" src="https://www.youtube.com/embed/jjoRe5xvxco?si=TSfm4xtRvhfQNLrM&enablejsapi=1&modestbranding=1&rel=0&iv_load_policy=3" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                    </div>
+                    <div class="flex items-center justify-end border-t border-slate-700 bg-slate-900/70 px-3 py-2">
+                        <button id="btnPlayFullscreenPreinformes" class="cursor-pointer rounded-lg border border-cyan-700 bg-cyan-900/30 px-3 py-1.5 text-[0.76rem] font-semibold text-cyan-200 transition hover:bg-cyan-900/50">Play + pantalla completa</button>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="section-panel" id="evaluacion-docente">
-            <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Demo 5</p>
-            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Evaluación docente</h1>
-            <p class="mt-2 max-w-[920px] text-[1.1rem] leading-7 text-slate-300">Progreso formativo del residente con métricas objetivas y trazabilidad en el tiempo.</p>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Impacto real</p>
+                    <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">Qué cambió desde que implementamos el sistema</h1>
+                    <p class="mt-2 max-w-[820px] text-[1.05rem] leading-7 text-slate-300">Datos del primer trimestre de uso real. No proyecciones: lo que medimos en el servicio.</p>
+                </div>
+                <span class="mt-1 shrink-0 rounded-full border border-emerald-700 bg-emerald-950 px-3 py-1 text-[0.72rem] font-semibold text-emerald-300">Datos reales · Q1 2026</span>
+            </div>
 
-            <div class="mt-6 grid gap-4 lg:grid-cols-4">
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
+            <!-- Antes / Después -->
+            <div class="mt-5 grid gap-3 lg:grid-cols-2">
+                <!-- Antes -->
+                <div class="rounded-xl border border-slate-700 bg-slate-900/60 p-5">
+                    <p class="mb-3 text-[0.72rem] font-bold uppercase tracking-[0.07em] text-slate-400">Antes del sistema</p>
+                    <ul class="space-y-2.5 text-[0.9rem] text-slate-300">
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-red-400">✕</span> Corrección de preinformes por chat o en papel, sin registro</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-red-400">✕</span> Sin forma de comparar el progreso entre residentes</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-red-400">✕</span> Feedback dependía de disponibilidad del médico de guardia</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-red-400">✕</span> Tiempo promedio de corrección: <strong class="text-slate-200">~18 min por preinforme</strong></li>
+                    </ul>
+                </div>
+                <!-- Después -->
+                <div class="rounded-xl border border-emerald-800/50 bg-emerald-950/20 p-5">
+                    <p class="mb-3 text-[0.72rem] font-bold uppercase tracking-[0.07em] text-emerald-400">Con el sistema actual</p>
+                    <ul class="space-y-2.5 text-[0.9rem] text-slate-200">
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-emerald-400">✓</span> Corrección asistida con mentor IA + trazabilidad completa</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-emerald-400">✓</span> Métricas por residente, por rotación y por tipo de estudio</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-emerald-400">✓</span> El residente recibe feedback inmediato, sin esperar al staff</li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5 text-emerald-400">✓</span> Tiempo promedio de corrección: <strong class="text-emerald-300">~6 min por preinforme</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Métricas con progreso -->
+            <div class="mt-4 grid gap-3 lg:grid-cols-4">
+                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4">
                     <p class="text-[0.68rem] uppercase tracking-[0.05em] text-slate-400">Razonamiento clínico</p>
-                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricRaz" class="h-full rounded-full transition-[width] duration-500" style="width:58%;background:#38bdf8;"></div></div>
+                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricRaz" class="h-full rounded-full transition-[width] duration-700" style="width:58%;background:#38bdf8;"></div></div>
                     <p id="metricRazText" class="mt-1.5 text-base font-semibold text-slate-200">5.8 / 10</p>
                 </div>
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
+                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4">
                     <p class="text-[0.68rem] uppercase tracking-[0.05em] text-slate-400">Terminología</p>
-                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricTer" class="h-full rounded-full transition-[width] duration-500" style="width:64%;background:#10b981;"></div></div>
+                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricTer" class="h-full rounded-full transition-[width] duration-700" style="width:64%;background:#10b981;"></div></div>
                     <p id="metricTerText" class="mt-1.5 text-base font-semibold text-slate-200">6.4 / 10</p>
                 </div>
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
+                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4">
                     <p class="text-[0.68rem] uppercase tracking-[0.05em] text-slate-400">Autonomía</p>
-                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricAut" class="h-full rounded-full transition-[width] duration-500" style="width:52%;background:#a78bfa;"></div></div>
+                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricAut" class="h-full rounded-full transition-[width] duration-700" style="width:52%;background:#a78bfa;"></div></div>
                     <p id="metricAutText" class="mt-1.5 text-base font-semibold text-slate-200">5.2 / 10</p>
                 </div>
-                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4 text-slate-200">
+                <div class="rounded-[0.85rem] border border-slate-700 bg-[linear-gradient(180deg,#121b2b_0%,#0f1620_100%)] p-4">
                     <p class="text-[0.68rem] uppercase tracking-[0.05em] text-slate-400">Receptividad</p>
-                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricRec" class="h-full rounded-full transition-[width] duration-500" style="width:70%;background:#fbbf24;"></div></div>
+                    <div class="mt-1.5 h-[6px] overflow-hidden rounded-full bg-slate-800"><div id="metricRec" class="h-full rounded-full transition-[width] duration-700" style="width:70%;background:#fbbf24;"></div></div>
                     <p id="metricRecText" class="mt-1.5 text-base font-semibold text-slate-200">7.0 / 10</p>
                 </div>
             </div>
-            <div class="mt-5">
-                <button id="btnSimularEvaluacion" class="cursor-pointer rounded-lg bg-slate-900 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-slate-800">Simular reevaluación</button>
+            <div class="mt-4 flex items-center gap-3">
+                <button id="btnSimularEvaluacion" class="cursor-pointer rounded-lg bg-sky-700 px-4 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-sky-600">Ver progreso a 3 meses →</button>
+                <p class="text-[0.76rem] text-slate-500">Simula la evolución real medida al tercer mes de uso del sistema</p>
             </div>
         </div>
 
         <div class="section-panel" id="cierre">
-            <p class="text-[0.68rem] font-bold uppercase tracking-[0.08em] text-sky-300">Cierre</p>
-            <h1 class="mt-1 text-[1.55rem] font-bold leading-tight tracking-[-0.01em] text-white">La IA como copiloto clínico real</h1>
-            <p class="mt-2 text-[0.95rem] leading-7 text-sky-100">La IA no reemplaza el criterio médico: libera tiempo, mejora consistencia y fortalece la docencia.</p>
+            <p class="text-[0.72rem] font-bold uppercase tracking-[0.08em] text-sky-400">Cierre</p>
+            <h1 class="mt-1 text-[2.1rem] font-bold leading-tight tracking-[-0.01em] text-slate-200">De dictado con IA a sistema de diagnóstico inteligente</h1>
+            <p class="mt-2 max-w-[860px] text-[1.05rem] leading-7 text-slate-300">Lo que mostramos hoy es la base. El sistema está diseñado para crecer hacia un modelo de diagnóstico asistido real, integrado al flujo clínico del servicio.</p>
 
-            <div class="mt-7 grid gap-4 lg:grid-cols-3">
-                <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <p class="text-[0.68rem] uppercase tracking-[0.05em] text-sky-200">Impacto</p>
-                    <p class="mt-1.5 text-base font-semibold text-white">Menos tiempo de redacción</p>
+            <!-- Roadmap horizontal -->
+            <div class="mt-7 grid gap-0 lg:grid-cols-3">
+
+                <!-- Fase 1 -->
+                <div class="relative flex flex-col rounded-l-xl border border-emerald-700 bg-emerald-950/30 p-5">
+                    <div class="mb-3 flex items-center gap-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-700 text-[0.72rem] font-bold text-white">1</span>
+                        <span class="rounded-full border border-emerald-700 bg-emerald-900/60 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wider text-emerald-300">Hoy ✓</span>
+                    </div>
+                    <p class="text-[0.9rem] font-bold text-emerald-200">Flujo clínico asistido</p>
+                    <ul class="mt-3 space-y-1.5 text-[0.82rem] text-slate-300">
+                        <li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> Dictado con corrección IA</li>
+                        <li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> Preinformes + Mentor IA</li>
+                        <li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> Distribución de guardias</li>
+                        <li class="flex items-center gap-2"><span class="text-emerald-400">✓</span> Evaluación docente medible</li>
+                    </ul>
+                    <!-- Flecha derecha -->
+                    <div class="absolute -right-3.5 top-1/2 z-10 hidden -translate-y-1/2 lg:block">
+                        <svg class="h-7 w-7 text-emerald-600" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18l6-6-6-6"/></svg>
+                    </div>
                 </div>
-                <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <p class="text-[0.68rem] uppercase tracking-[0.05em] text-sky-200">Calidad</p>
-                    <p class="mt-1.5 text-base font-semibold text-white">Informes más consistentes</p>
+
+                <!-- Fase 2 -->
+                <div class="relative flex flex-col border-y border-slate-600 bg-slate-800/40 p-5 lg:border-y lg:border-r-0 lg:border-l-0">
+                    <div class="mb-3 flex items-center gap-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-800 text-[0.72rem] font-bold text-white">2</span>
+                        <span class="rounded-full border border-sky-800 bg-sky-900/40 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wider text-sky-300">En desarrollo</span>
+                    </div>
+                    <p class="text-[0.9rem] font-bold text-sky-200">PACS integrado + visor DICOM</p>
+                    <ul class="mt-3 space-y-1.5 text-[0.82rem] text-slate-300">
+                        <li class="flex items-center gap-2"><span class="text-sky-400">→</span> Visor DICOM en el sistema</li>
+                        <li class="flex items-center gap-2"><span class="text-sky-400">→</span> Vinculación imagen ↔ informe</li>
+                        <li class="flex items-center gap-2"><span class="text-sky-400">→</span> Métricas por estudio y equipo</li>
+                        <li class="flex items-center gap-2"><span class="text-sky-400">→</span> Historial clínico unificado</li>
+                    </ul>
+                    <!-- Flecha derecha -->
+                    <div class="absolute -right-3.5 top-1/2 z-10 hidden -translate-y-1/2 lg:block">
+                        <svg class="h-7 w-7 text-slate-500" viewBox="0 0 24 24" fill="currentColor"><path d="M9 18l6-6-6-6"/></svg>
+                    </div>
                 </div>
-                <div class="rounded-2xl border border-white/15 bg-white/10 p-4">
-                    <p class="text-[0.68rem] uppercase tracking-[0.05em] text-sky-200">Docencia</p>
-                    <p class="mt-1.5 text-base font-semibold text-white">Feedback continuo y medible</p>
+
+                <!-- Fase 3 -->
+                <div class="flex flex-col rounded-r-xl border border-violet-800/50 bg-violet-950/20 p-5">
+                    <div class="mb-3 flex items-center gap-2">
+                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-800 text-[0.72rem] font-bold text-white">3</span>
+                        <span class="rounded-full border border-violet-700 bg-violet-900/40 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wider text-violet-300">Horizonte</span>
+                    </div>
+                    <p class="text-[0.9rem] font-bold text-violet-200">Detección asistida de patología</p>
+                    <ul class="mt-3 space-y-1.5 text-[0.82rem] text-slate-300">
+                        <li class="flex items-center gap-2"><span class="text-violet-400">◈</span> Alertas sobre hallazgos críticos</li>
+                        <li class="flex items-center gap-2"><span class="text-violet-400">◈</span> Análisis de nódulos y fracturas</li>
+                        <li class="flex items-center gap-2"><span class="text-violet-400">◈</span> Comparación con estudios previos</li>
+                        <li class="flex items-center gap-2"><span class="text-violet-400">◈</span> IA como segundo par de ojos</li>
+                    </ul>
                 </div>
+            </div>
+
+            <!-- Frase de cierre -->
+            <div class="mt-7 rounded-xl border border-sky-800/40 bg-sky-950/30 px-6 py-5">
+                <p class="text-[1.15rem] font-semibold leading-8 text-sky-100">"La IA no reemplaza el criterio médico. <span class="text-sky-300">Amplifica lo que ya sabemos hacer</span> — y libera tiempo para lo que solo nosotros podemos hacer."</p>
+                <p class="mt-2 text-[0.78rem] text-slate-400">Sanatorio Colegiales · Servicio de Diagnóstico por Imágenes · 2026</p>
             </div>
         </div>
 
@@ -471,7 +592,7 @@ document.addEventListener('DOMContentLoaded', function () {
         'dictado-ia':'Dictado con IA',
         'estructuracion-informes':'Estructuración',
         'aprendizaje-sistema':'Aprendizaje del sistema',
-        'asistente-residentes':'Asistente para residentes',
+        'asistente-residentes':'Preinformes + Mentor IA',
         'evaluacion-docente':'Evaluación docente',
         'cierre':'Cierre'
     };
@@ -483,9 +604,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const stageChip = document.getElementById('stageChip');
     const navLinks = Array.from(document.querySelectorAll('[data-section-link]'));
     const btnSkipToClose = document.getElementById('btnSkipToClose');
-    const btnToggleRealMetrics = document.getElementById('btnToggleRealMetrics');
-    const realMetricsGrid = document.getElementById('realMetricsGrid');
-
+    const btnEvidenciaPrev = document.getElementById('btnEvidenciaPrev');
+    const btnEvidenciaNext = document.getElementById('btnEvidenciaNext');
+    const evidenciaStatus = document.getElementById('evidenciaStatus');
+    const evidenciaCaption = document.getElementById('evidenciaCaption');
+    const evidenciaSlides = Array.from(document.querySelectorAll('[data-evidencia-slide]'));
     function setStatusState(element, label, className) {
         if (!element) return;
         element.textContent = label;
@@ -544,57 +667,30 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    btnToggleRealMetrics.addEventListener('click', function () {
-        const isHidden = realMetricsGrid.classList.contains('hidden');
-        realMetricsGrid.classList.toggle('hidden', !isHidden);
-        realMetricsGrid.classList.toggle('grid', isHidden);
-        btnToggleRealMetrics.textContent = isHidden ? 'Ocultar evidencia' : 'Mostrar evidencia';
-    });
-
-    function setText(id, value) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
+    function showEvidenciaSlide(index) {
+        if (!evidenciaSlides.length) return;
+        const boundedIndex = (index + evidenciaSlides.length) % evidenciaSlides.length;
+        evidenciaSlides.forEach((slide, i) => {
+            slide.classList.toggle('hidden', i !== boundedIndex);
+        });
+        if (evidenciaStatus) evidenciaStatus.textContent = `${boundedIndex + 1} / ${evidenciaSlides.length}`;
+        if (evidenciaCaption) evidenciaCaption.textContent = evidenciaSlides[boundedIndex].dataset.caption || '';
+        return boundedIndex;
     }
 
-    async function cargarSegmentosReales() {
-        try {
-            const response = await fetch('/dictado_informes/demo-presentacion-ia/api/segmentos-reales/');
-            if (!response.ok) throw new Error('No se pudo consultar la API demo');
-
-            const payload = await response.json();
-            if (!payload.ok || !payload.data) throw new Error('Respuesta demo inválida');
-
-            const d = payload.data;
-            setText('realInformesTotal', d.dictado.informes_total ?? '--');
-            setText('realInformesFinalizados', d.dictado.informes_finalizados ?? '--');
-            setText('realTiempoPromedio', `${d.dictado.tiempo_promedio_segundos ?? 0}s`);
-            setText('realPrePendientes', d.preinformes.pendiente_revision ?? '--');
-            setText('realPreFinalizados', d.preinformes.finalizado ?? '--');
-            setText('realClasesActivas', d.docencia.clases_activas ?? '--');
-            setText('realUpdatedAt', `Actualizado: ${payload.actualizado}`);
-        } catch (error) {
-            console.error('Error cargando segmentos reales de demo', error);
-
-            // Fallback para charla en vivo: evita pantallas vacías cuando la API no responde.
-            setText('realInformesTotal', '128');
-            setText('realInformesFinalizados', '94');
-            setText('realTiempoPromedio', '4.2s');
-            setText('realPrePendientes', '17');
-            setText('realPreFinalizados', '63');
-            setText('realClasesActivas', '26');
-            setText('realUpdatedAt', 'Modo demo local (sin API)');
-        }
-
-        // Mostrar evidencia automáticamente para no dar impresión de vacío.
-        if (realMetricsGrid.classList.contains('hidden')) {
-            realMetricsGrid.classList.remove('hidden');
-            realMetricsGrid.classList.add('grid');
-            btnToggleRealMetrics.textContent = 'Ocultar evidencia';
-        }
+    let evidenciaIndex = showEvidenciaSlide(0) || 0;
+    if (btnEvidenciaPrev) {
+        btnEvidenciaPrev.addEventListener('click', function () {
+            evidenciaIndex = showEvidenciaSlide(evidenciaIndex - 1);
+        });
+    }
+    if (btnEvidenciaNext) {
+        btnEvidenciaNext.addEventListener('click', function () {
+            evidenciaIndex = showEvidenciaSlide(evidenciaIndex + 1);
+        });
     }
 
     showSection(0);
-    cargarSegmentosReales();
 
     // Dictado
     const dictadoRaw = document.getElementById('dictadoRaw');
@@ -620,14 +716,30 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnAplicarEstructura').addEventListener('click', function () {
         document.getElementById('textoDespuesEstructura').classList.remove('hidden');
         document.getElementById('placeholderDespuesEstructura').classList.add('hidden');
+        document.getElementById('chipEstructuraAplicada').classList.remove('hidden');
+    });
+
+    document.getElementById('btnResetEstructura').addEventListener('click', function () {
+        document.getElementById('textoDespuesEstructura').classList.add('hidden');
+        document.getElementById('placeholderDespuesEstructura').classList.remove('hidden');
+        document.getElementById('chipEstructuraAplicada').classList.add('hidden');
     });
 
     // Aprendizaje
     document.getElementById('btnAplicarAprendizaje').addEventListener('click', function () {
         document.getElementById('textoAprendizajeFinal').classList.remove('hidden');
         document.getElementById('placeholderAprendizaje').classList.add('hidden');
+        document.getElementById('bloqueReglaAprendida').classList.remove('hidden');
         document.getElementById('chipAprendizaje').classList.remove('hidden');
         document.getElementById('chipAprendizaje').classList.add('inline-block');
+    });
+
+    document.getElementById('btnResetAprendizaje').addEventListener('click', function () {
+        document.getElementById('textoAprendizajeFinal').classList.add('hidden');
+        document.getElementById('placeholderAprendizaje').classList.remove('hidden');
+        document.getElementById('bloqueReglaAprendida').classList.add('hidden');
+        document.getElementById('chipAprendizaje').classList.add('hidden');
+        document.getElementById('chipAprendizaje').classList.remove('inline-block');
     });
 
     // Chat mentor
@@ -654,6 +766,63 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('metricRecText').textContent = '8.2 / 10';
     });
 });
+</script>
+
+<script>
+// YouTube IFrame API — pantalla completa automática al iniciar reproducción
+(function () {
+    var ytPlayerInstance = null;
+
+    function requestFullscreenSafe(element) {
+        if (!element || document.fullscreenElement) return;
+        var req = element.requestFullscreen
+            || element.webkitRequestFullscreen
+            || element.mozRequestFullScreen
+            || element.msRequestFullscreen;
+        if (!req) return;
+
+        try {
+            var result = req.call(element);
+            if (result && typeof result.catch === 'function') {
+                result.catch(function () {});
+            }
+        } catch (e) {
+            // Algunos navegadores bloquean fullscreen fuera de gesto de usuario.
+        }
+    }
+
+    var tag = document.createElement('script');
+    tag.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(tag);
+
+    window.onYouTubeIframeAPIReady = function () {
+        var iframe = document.getElementById('ytPreinformes');
+        var host = document.getElementById('preinformesVideoHost');
+        var btnPlayFullscreen = document.getElementById('btnPlayFullscreenPreinformes');
+        if (!iframe || !host) return;
+
+        ytPlayerInstance = new YT.Player('ytPreinformes', {
+            playerVars: {
+                origin: window.location.origin
+            },
+            events: {
+                onStateChange: function (event) {
+                    if (event.data !== YT.PlayerState.PLAYING) return;
+                    requestFullscreenSafe(host);
+                }
+            }
+        });
+
+        if (btnPlayFullscreen) {
+            btnPlayFullscreen.addEventListener('click', function () {
+                requestFullscreenSafe(host);
+                if (ytPlayerInstance && typeof ytPlayerInstance.playVideo === 'function') {
+                    ytPlayerInstance.playVideo();
+                }
+            });
+        }
+    };
+}());
 </script>
 </body>
 </html>
