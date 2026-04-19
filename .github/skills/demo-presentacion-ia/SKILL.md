@@ -16,20 +16,22 @@ Cuando se trabaje en `templates/dictado_informes/demo_presentacion_ia.html`:
 **URL**: `/dictado_informes/demo-presentacion-ia/`
 **Stack**: Tailwind CSS via CDN (solo este template) · Alpine.js · Vanilla JS · YouTube IFrame API
 
-Presentación interactiva de 9 secciones navegables por sidebar lateral y teclado (← →).
+Presentación interactiva de 11 secciones navegables por sidebar lateral y teclado (← →).
 
-### Secciones actuales (18/04/2026)
-| id | Nombre | Estado |
-|----|--------|--------|
-| portada | Título general | ✅ |
-| contexto-clinico | Problema + motivación | ✅ |
-| dictado-rapido | Demo dictado IA | ✅ |
-| estructuracion-informes | Antes/Después estructurado | ✅ |
-| aprendizaje-sistema | Adaptación al estilo del servicio | ✅ |
-| asistente-residentes | Video YouTube + IFrame API | ✅ |
-| evaluacion-docente | Métricas Antes/Después Q1 2026 | ✅ |
-| carrusel-evidencia | Galería de evidencia clínica | ✅ |
-| cierre | Roadmap 3 fases + frase de impacto | ✅ |
+### Secciones actuales (19/04/2026)
+| # | id | Nombre | Stage chip |
+|---|-----|--------|------------|
+| 1 | `portada` | Título + logos institucional y profesional | Inicio |
+| 2 | `recorrido-personal` | Del problema al primer sistema en producción | Contexto |
+| 3 | `introduccion` | Problemas clave | Problema |
+| 4 | `dictado-ia` | Hito 1 · Dictado con IA + video YouTube | Demo |
+| 5 | `estructuracion-informes` | Capa 2 · Estructuración de informes | Demo |
+| 6 | `aprendizaje-sistema` | Capa 3 · Aprendizaje del sistema | Demo |
+| 7 | `asistente-residentes` | Hito 2 · Preinformes + Mentor IA + video YouTube | Docencia |
+| 8 | `evaluacion-docente` | Evaluación docente · métricas Q1 2026 | Impacto |
+| 9 | `guardias-asistidas` | Hito 3 · Guardias (demo en vivo) | Gestión |
+| 10 | `cierre` | Roadmap 3 fases + frase de impacto | Visión |
+| 11 | `agradecimiento` | Muchas gracias + tres logos | Final |
 
 ---
 
@@ -140,6 +142,8 @@ function requestFullscreenSafe(element) {
 | `postMessage origin mismatch` en consola | Iframe enviaba mensajes a `youtube.com` pero origen era `localhost` | Agregar `playerVars: { origin: window.location.origin }` |
 | Fullscreen bloqueado automáticamente | Browser bloquea fullscreen desde eventos de iframes cross-origin | Botón fallback en contexto de la página principal |
 | Scroll inaccesible en sección larga | `justify-content: center` clipea contenido que desborda | Cambiar a `justify-content: safe center` |
+| `btnSkipToClose` saltaba a `agradecimiento` (último slide) | Usaba `sectionIds.length - 1` → cambia si se agregan slides después de `cierre` | Usar `sectionIds.indexOf('cierre')` — robusto frente a reordenamientos |
+| Fullscreen area negra en video dictado | Host sin `flex-1`, iframe sin `h-full` | Host como `flex-1`, iframe con `h-full min-h-[320px]` |
 
 ---
 

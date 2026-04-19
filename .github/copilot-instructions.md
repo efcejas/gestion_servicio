@@ -58,7 +58,7 @@ Reglas de comportamiento en Architect Mode:
 ```bash
 # Desarrollo
 python manage.py runserver
-npm run dev                              # Tailwind watch
+npm run tailwind:watch                   # Tailwind watch
 
 # Tests
 python manage.py test <app>             # ej: python manage.py test control_guardias
@@ -91,6 +91,9 @@ preinformes/        Pre-informes de residentes + sistema mentor
 protocolos/         Catálogo de protocolos radiológicos
 clases_residentes/  Sistema educativo para residentes
 control_guardias/   Gestión de guardias — ver .github/instructions/control_guardias.instructions.md
+control_stock/      Control de stock con escáner + IA
+gestion_eventos/    Gestión de eventos institucionales
+ahorro_vivienda/    Tracker personal de ahorro primera vivienda
 equipos/            Inventario y mantenimiento
 gestion_estudios/   Catálogo de estudios disponibles
 eges_import/        Importación desde sistema EGES externo
@@ -100,7 +103,7 @@ eges_import/        Importación desde sistema EGES externo
 
 ## Patrón de capas (Services / Selectors / Exceptions)
 
-Las apps críticas separan lógica de negocio de views.py. Ver [`/memories/repo/arquitectura_capas.md`] para estado completo.
+Las apps críticas separan lógica de negocio de views.py. Apps con capas activas (10/04/2026): `control_guardias`, `control_stock`, `eges_import`, `preinformes`, `liquidacion`. Ver [`/memories/repo/arquitectura_capas.md`] para estado completo.
 
 | Capa | Regla clave |
 |------|-------------|
