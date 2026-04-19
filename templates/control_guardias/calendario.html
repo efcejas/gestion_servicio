@@ -95,10 +95,26 @@
 {% block extra_css %}
 <style>
   /* FullCalendar dark-mode overrides */
+  #calendar .fc {
+    --fc-page-text-color: rgb(229 231 235);
+    --fc-neutral-text-color: rgb(209 213 219);
+  }
   #calendar .fc-theme-standard .fc-scrollgrid { border-color: rgb(55 65 81); }
-  #calendar .fc .fc-daygrid-day-number { color: rgb(209 213 219); text-decoration: none; }
-  #calendar .fc .fc-col-header-cell-cushion { color: rgb(156 163 175); text-decoration: none; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  #calendar .fc .fc-daygrid-day-number { color: rgb(209 213 219) !important; text-decoration: none; }
+  #calendar .fc .fc-col-header-cell-cushion { color: rgb(156 163 175) !important; text-decoration: none; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
+  #calendar .fc a.fc-daygrid-day-number:link,
+  #calendar .fc a.fc-daygrid-day-number:visited { color: rgb(209 213 219) !important; }
+  #calendar .fc a.fc-col-header-cell-cushion:link,
+  #calendar .fc a.fc-col-header-cell-cushion:visited { color: rgb(156 163 175) !important; }
   #calendar .fc .fc-toolbar-title { color: rgb(243 244 246); font-size: 1.1rem; font-weight: 600; }
+  /* Fallback: algunos builds de FullCalendar no incluyen wrapper .fc */
+  #calendar .fc-daygrid-day-number,
+  #calendar a.fc-daygrid-day-number:link,
+  #calendar a.fc-daygrid-day-number:visited { color: rgb(209 213 219) !important; }
+  #calendar .fc-col-header-cell-cushion,
+  #calendar a.fc-col-header-cell-cushion:link,
+  #calendar a.fc-col-header-cell-cushion:visited { color: rgb(156 163 175) !important; }
+  #calendar .fc-toolbar-title { color: rgb(243 244 246) !important; }
   #calendar .fc .fc-button { background-color: rgb(31 41 55); color: rgb(209 213 219); border-color: rgb(55 65 81); font-size: .8rem; padding: .3rem .75rem; }
   #calendar .fc .fc-button:hover { background-color: rgb(55 65 81); }
   #calendar .fc .fc-button-primary:not(:disabled).fc-button-active,
