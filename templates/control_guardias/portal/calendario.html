@@ -23,6 +23,14 @@
                 {% endfor %}
             </select>
             {% endif %}
+            {% if user.is_superuser %}
+            <a id="btnVolverPresentacionGuardias"
+               href="{% url 'dictado_informes:demo_presentacion_ia' %}?section={{ request.GET.presentation_section|default:'guardias-asistidas' }}"
+               target="presentacion_ia"
+               class="inline-flex items-center px-4 py-2 text-sm text-cyan-700 hover:text-cyan-900 border border-cyan-300 rounded-lg hover:border-cyan-500 bg-cyan-50 transition-colors shadow-sm">
+              <i class="fas fa-display mr-2"></i>Volver a presentación
+            </a>
+            {% endif %}
             <a href="{{ calendario_return_url }}"
                class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
               <i class="fas fa-arrow-left mr-2"></i>{{ calendario_back_label }}
@@ -273,6 +281,28 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     initCalendar('');
+
+    const btnVolver = document.getElementById('btnVolverPresentacionGuardias');
+    if (btnVolver) {
+      btnVolver.addEventListener('click', function (e) {
+        if (window.opener && !window.opener.closed) {
+          e.preventDefault();
+          try {
+            window.opener.postMessage(
+              { type: 'presentacion-go-section', section: '{{ request.GET.presentation_section|default:"guardias-asistidas"|escapejs }}' },
+              window.location.origin
+            );
+          } catch (err) {}
+          try {
+            window.opener.focus();
+            window.close();
+          } catch (err) {
+            window.open(btnVolver.href, btnVolver.target || '_blank');
+          }
+        }
+      });
+    }
+
     if (filtroEl) {
       filtroEl.addEventListener('change', function () {
         hideTooltip();

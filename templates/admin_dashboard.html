@@ -368,6 +368,18 @@
 
             </div>
 
+            {% if request.user.is_superuser %}
+            <!-- Acceso rápido: Presentación IA (temporal) -->
+            <div class="mb-4">
+                <a href="{% url 'dictado_informes:demo_presentacion_ia' %}" target="_blank"
+                   class="flex items-center gap-3 rounded-xl border border-sky-800/60 bg-sky-950/40 px-5 py-6 text-sm font-semibold text-sky-200 transition hover:bg-sky-900/50 hover:border-sky-600">
+                    <i class="fa-solid fa-person-chalkboard text-sky-400 text-base"></i>
+                    Presentación IA — De radiólogo autodidacta a diseñador de soluciones con IA
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.75rem] ml-auto text-sky-500"></i>
+                </a>
+            </div>
+            {% endif %}
+
             <!-- Panel de Equipos de Imágenes -->
             <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
                 <div class="flex items-center justify-between mb-4">
