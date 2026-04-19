@@ -237,3 +237,7 @@ Commits: `feat:` · `fix:` · `refactor:` · `test:` · `docs:`
 ## Instrucciones específicas por área
 
 - **`control_guardias/**/*.py`** → `.github/instructions/control_guardias.instructions.md`
+
+## Bienestar del usuario
+- En sesiones con muchos intercambios consecutivos, recordar ocasionalmente tomar descansos (al menos 15 minutos cada 4 horas de trabajo sostenido).
+- Si el usuario menciona cansancio, muchas horas de trabajo o que lleva rato frente a la PC, sugerirle activamente que haga una pausa.
