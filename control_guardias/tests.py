@@ -608,6 +608,11 @@ class CalendarioViewTests(TestCase):
         response = self.client.get(reverse('control_guardias:calendario'))
         self.assertNotContains(response, '<select id="filtroResidente"')
 
+    def test_residente_ve_toggle_para_guardias_del_servicio(self):
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('control_guardias:calendario'))
+        self.assertContains(response, 'Mostrar guardias del servicio')
+
     def test_calendario_recibe_mes_anio_inicial_desde_query(self):
         self.client.force_login(self.jefe)
         response = self.client.get(reverse('control_guardias:calendario'), {'mes': '5', 'anio': '2026'})
@@ -697,6 +702,55 @@ class CalendarioViewTests(TestCase):
         # Publicada → color de paleta según pk del residente
         color_esperado = _RESIDENTE_PALETTE[self.residente.pk % len(_RESIDENTE_PALETTE)]
         self.assertEqual(por_id[str(self.guardia_pub.pk)]['backgroundColor'], color_esperado)
+
+    def test_api_residente_puede_ver_todas_las_publicadas_si_lo_pide(self):
+        otro_residente = crear_residente('otro_cal', 'R3')
+        guardia_otro = AsignacionGuardia.objects.create(
+            residente=otro_residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 6),
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('control_guardias:guardias_api'), {'ver_todas': '1'})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        ids = [ev['id'] for ev in data]
+        self.assertIn(str(self.guardia_pub.pk), ids)
+        self.assertIn(str(guardia_otro.pk), ids)
+        evento_otro = next(ev for ev in data if ev['id'] == str(guardia_otro.pk))
+        self.assertFalse(evento_otro['extendedProps']['es_mia'])
+
+    def test_api_marca_guardia_con_cambio_pendiente(self):
+        otro_residente = crear_residente('otro_pend', 'R3')
+        guardia_otro = AsignacionGuardia.objects.create(
+            residente=otro_residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 8),
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+        SolicitudCambioGuardia.objects.create(
+            solicitante=self.residente,
+            receptor=otro_residente,
+            guardia_solicitante=self.guardia_pub,
+            guardia_receptor=guardia_otro,
+            estado='PENDIENTE_JEFE',
+        )
+
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('control_guardias:guardias_api'), {'ver_todas': '1'})
+        self.assertEqual(response.status_code, 200)
+        data = {ev['id']: ev for ev in response.json()}
+
+        self.assertTrue(data[str(self.guardia_pub.pk)]['extendedProps']['cambio_pendiente'])
+        self.assertEqual(
+            data[str(self.guardia_pub.pk)]['extendedProps']['cambio_pendiente_label'],
+            'Cambio pendiente de aprobación',
+        )
+        self.assertEqual(data[str(self.guardia_pub.pk)]['backgroundColor'], '#f59e0b')
 
     def test_api_requiere_autenticacion(self):
         """API redirige si no autenticado."""
@@ -1462,6 +1516,15 @@ class CambiosViewTest(TestCase):
             response,
             f"{reverse('control_guardias:mis_guardias')}?focus={self.g1.pk}",
         )
+
+    def test_solicitar_cambio_desde_calendario_precarga_guardia_objetivo(self):
+        self.client.login(username='res1', password='testpass123')
+        url = reverse('control_guardias:solicitar_cambio', kwargs={'guardia_pk': self.g1.pk})
+        response = self.client.get(url, {'target_guardia': str(self.g2.pk)})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['guardia_objetivo'], self.g2)
+        self.assertContains(response, self.g2.residente.get_full_name())
 
     def test_solicitar_cambio_con_return_to_inseguro_hace_fallback_cambios(self):
         self.client.login(username='res1', password='testpass123')

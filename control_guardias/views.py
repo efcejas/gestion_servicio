@@ -224,6 +224,47 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
     login_url = 'login'
 
     _COLOR_BORRADOR = '#6b7280'        # gris (borradores no publicados)
+    _COLOR_PENDIENTE_CAMBIO = '#f59e0b'  # ámbar
+
+    def _build_pendencias_por_guardia(self, user, guardia_ids):
+        if not guardia_ids:
+            return {}
+
+        solicitudes = (
+            SolicitudCambioGuardia.objects
+            .filter(
+                estado__in=['PENDIENTE_RECEPTOR', 'PENDIENTE_JEFE']
+            )
+            .filter(
+                models.Q(guardia_solicitante_id__in=guardia_ids)
+                | models.Q(guardia_receptor_id__in=guardia_ids)
+            )
+            .select_related('solicitante', 'receptor')
+            .order_by('-fecha_solicitud')
+        )
+
+        pendencias = {}
+        for solicitud in solicitudes:
+            guardias_relacionadas = [solicitud.guardia_solicitante_id, solicitud.guardia_receptor_id]
+            for guardia_id in guardias_relacionadas:
+                if guardia_id not in guardia_ids or guardia_id in pendencias:
+                    continue
+
+                if solicitud.estado == 'PENDIENTE_RECEPTOR':
+                    if solicitud.receptor_id == user.pk:
+                        label = 'Pendiente de tu respuesta'
+                    else:
+                        label = 'Cambio pendiente de respuesta'
+                else:
+                    label = 'Cambio pendiente de aprobación'
+
+                pendencias[guardia_id] = {
+                    'estado': solicitud.estado,
+                    'label': label,
+                    'solicitud_id': solicitud.pk,
+                }
+
+        return pendencias
 
     def get(self, request, *args, **kwargs):
         user = request.user
@@ -231,6 +272,7 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
             user.rol in ['jefe_residentes', 'instructor_residentes']
             or user.is_superuser
         )
+        ver_todas = request.GET.get('ver_todas') == '1'
 
         start_param = request.GET.get('start', '')
         end_param = request.GET.get('end', '')
@@ -245,11 +287,9 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
             if residente_id:
                 qs = qs.filter(residente_id=residente_id)
         else:
-            qs = (
-                AsignacionGuardia.objects
-                .filter(residente=user, estado='PUBLICADA')
-                .select_related('residente', 'tipo_guardia')
-            )
+            qs = AsignacionGuardia.objects.filter(estado='PUBLICADA').select_related('residente', 'tipo_guardia')
+            if not ver_todas:
+                qs = qs.filter(residente=user)
 
         if start_param and end_param:
             try:
@@ -259,11 +299,20 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
             except (ValueError, IndexError):
                 pass
 
+        qs = list(qs)
+        pendencias_por_guardia = self._build_pendencias_por_guardia(
+            request.user,
+            {asignacion.pk for asignacion in qs},
+        )
+
         eventos = []
         for asignacion in qs:
             nombre = asignacion.residente.get_full_name()
+            pendiente = pendencias_por_guardia.get(asignacion.pk)
             if asignacion.estado == 'BORRADOR':
                 color = self._COLOR_BORRADOR
+            elif pendiente:
+                color = self._COLOR_PENDIENTE_CAMBIO
             else:
                 color = _RESIDENTE_PALETTE[asignacion.residente_id % len(_RESIDENTE_PALETTE)]
 
@@ -276,12 +325,18 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
                 'borderColor': color,
                 'textColor': '#fff',
                 'extendedProps': {
+                    'guardia_id': asignacion.pk,
+                    'residente_id': asignacion.residente_id,
                     'residente': nombre,
                     'tipo_guardia': asignacion.tipo_guardia.nombre,
                     'hora_inicio': asignacion.tipo_guardia.hora_inicio.strftime('%H:%M'),
                     'hora_fin': asignacion.tipo_guardia.hora_fin.strftime('%H:%M'),
                     'es_feriado': asignacion.es_feriado,
                     'estado': asignacion.estado,
+                    'es_mia': asignacion.residente_id == user.pk,
+                    'cambio_pendiente': bool(pendiente),
+                    'cambio_pendiente_estado': pendiente['estado'] if pendiente else '',
+                    'cambio_pendiente_label': pendiente['label'] if pendiente else '',
                 }
             })
 
@@ -363,6 +418,16 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
             ]
         else:
             context['mi_color'] = _RESIDENTE_PALETTE[user.pk % len(_RESIDENTE_PALETTE)]
+            context['mis_guardias_para_cambio'] = (
+                AsignacionGuardia.objects
+                .filter(
+                    residente=user,
+                    estado='PUBLICADA',
+                    fecha__gte=timezone.now().date(),
+                )
+                .select_related('tipo_guardia')
+                .order_by('fecha', 'tipo_guardia__nombre')
+            )
         return context
 
 
@@ -931,18 +996,46 @@ class SolicitarCambioView(LoginRequiredMixin, TemplateView):
         fallback = reverse('control_guardias:cambios')
         return _safe_return_url(self.request, fallback, focus=guardia_pk)
 
+    def _get_target_guardia_id(self):
+        raw = self.request.GET.get('target_guardia', '').strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    def _build_form(self, data=None):
+        initial = {}
+        target_guardia_id = self._get_target_guardia_id()
+        if data is None and target_guardia_id:
+            initial['guardia_receptor'] = target_guardia_id
+        return SolicitudCambioGuardiaForm(
+            data,
+            solicitante=self.request.user,
+            initial=initial,
+        )
+
+    def _get_guardia_objetivo(self, form):
+        target_guardia_id = self._get_target_guardia_id()
+        if not target_guardia_id:
+            return None
+        return form.fields['guardia_receptor'].queryset.filter(pk=target_guardia_id).first()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         guardia = self._get_guardia(self.kwargs['guardia_pk'])
+        form = kwargs.get('form', self._build_form())
         context['guardia'] = guardia
-        context['form'] = kwargs.get('form', SolicitudCambioGuardiaForm(solicitante=self.request.user))
+        context['form'] = form
+        context['guardia_objetivo'] = self._get_guardia_objetivo(form)
         context['return_to_url'] = self._return_url(guardia.pk)
         context['focus_id'] = guardia.pk
         return context
 
     def post(self, request, guardia_pk, *args, **kwargs):
         guardia_sol = self._get_guardia(guardia_pk)
-        form = SolicitudCambioGuardiaForm(request.POST, solicitante=request.user)
+        form = self._build_form(request.POST)
         if not form.is_valid():
             return self.render_to_response(
                 self.get_context_data(form=form)

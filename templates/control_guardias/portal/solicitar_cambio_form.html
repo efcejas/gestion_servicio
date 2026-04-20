@@ -37,6 +37,26 @@
         </div>
     </div>
 
+    {% if guardia_objetivo %}
+    <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-4 mb-5">
+        <p class="text-xs font-medium text-indigo-500 uppercase tracking-wider mb-2">Guardia seleccionada desde calendario</p>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
+                <i class="fas fa-user-group text-indigo-600"></i>
+            </div>
+            <div>
+                <p class="font-semibold text-gray-900">{{ guardia_objetivo.residente.get_full_name }}</p>
+                <p class="text-gray-600 text-sm">
+                    {{ guardia_objetivo.fecha|date:"d/m/Y" }}
+                    — {{ guardia_objetivo.tipo_guardia.nombre }}
+                    — {{ guardia_objetivo.tipo_guardia.hora_inicio|time:"H:i" }} a {{ guardia_objetivo.tipo_guardia.hora_fin|time:"H:i" }}
+                </p>
+            </div>
+        </div>
+        <p class="mt-2 text-xs text-indigo-700">La guardia del otro residente ya quedó preseleccionada. Si necesitás, podés cambiarla manualmente en el selector.</p>
+    </div>
+    {% endif %}
+
     {% if messages %}
         {% for message in messages %}
         <div class="mb-4 px-4 py-3 rounded-lg text-sm border
