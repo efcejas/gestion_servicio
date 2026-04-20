@@ -54,6 +54,24 @@ SITE_URL = config('SITE_URL', default='http://localhost:8000')
 # Score mínimo de confianza para aceptar un email como pedido válido (0-100)
 PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 
+CORREO_RESUMEN_CONFIG = {
+    'ENABLED': config('CORREO_RESUMEN_ENABLED', default=False, cast=bool),
+    'PROVIDER': config('CORREO_RESUMEN_PROVIDER', default='imap'),
+    'IMAP_HOST': config('CORREO_RESUMEN_IMAP_HOST', default=''),
+    'IMAP_PORT': config('CORREO_RESUMEN_IMAP_PORT', default=993, cast=int),
+    'IMAP_USERNAME': config('CORREO_RESUMEN_IMAP_USERNAME', default=''),
+    'IMAP_PASSWORD': config('CORREO_RESUMEN_IMAP_PASSWORD', default=''),
+    'IMAP_FOLDER': config('CORREO_RESUMEN_IMAP_FOLDER', default='INBOX'),
+    'SEARCH_CRITERIA': config('CORREO_RESUMEN_SEARCH_CRITERIA', default='UNSEEN'),
+    'MAX_EMAILS_PER_RUN': config('CORREO_RESUMEN_MAX_EMAILS_PER_RUN', default=20, cast=int),
+    'ENABLE_AI_SUMMARY': config('CORREO_RESUMEN_ENABLE_AI_SUMMARY', default=False, cast=bool),
+    'PRIORITY_SENDERS': config('CORREO_RESUMEN_PRIORITY_SENDERS', default='calidad@sanatoriocolegiales.com.ar,auditoria@sanatoriocolegiales.com.ar,soporte@sanatoriocolegiales.com.ar'),
+    'URGENT_KEYWORDS': config('CORREO_RESUMEN_URGENT_KEYWORDS', default='urgente,importante,auditoria,guardia,falla,reclamo'),
+    'ACTION_KEYWORDS': config('CORREO_RESUMEN_ACTION_KEYWORDS', default='responder,confirmar,coordinar,pendiente,resolver'),
+    'GMAIL_QUERY': config('CORREO_RESUMEN_GMAIL_QUERY', default='category:primary newer_than:3d'),
+    'GMAIL_ACCOUNT': config('CORREO_RESUMEN_GMAIL_ACCOUNT', default=''),
+}
+
 
 # Application definition
 
@@ -88,6 +106,7 @@ INSTALLED_APPS = [
     'pedidos_estudios.apps.PedidosEstudiosConfig',  # Sistema de pedidos por email
     'ahorro_vivienda.apps.AhorroViviendaConfig',  # Tracker ahorro primera vivienda
     'control_stock.apps.ControlStockConfig',  # Control de stock con escáner + IA
+    'correo_resumen.apps.CorreoResumenConfig',
     
     # Tailwind CSS
     'tailwind',

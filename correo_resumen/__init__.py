@@ -1,0 +1,1 @@
+"""App de resumen de correos para el dashboard administrativo."""

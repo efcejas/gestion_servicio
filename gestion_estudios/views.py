@@ -251,6 +251,20 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 'equipos_recientes': [],
             })
 
+        try:
+            context.update(self.get_correos_context())
+        except Exception as e:
+            print(f"❌ Error en correos resumidos: {e}")
+            context.update({
+                'correo_resumen_habilitado': False,
+                'correos_urgentes': [],
+                'correos_importantes_no_leidos': [],
+                'correo_resumen_del_dia': [],
+                'correo_importantes_hoy_count': 0,
+                'correo_urgentes_count': 0,
+                'correo_ultima_sync': None,
+            })
+
         return context
 
     # ------------------------ EVENTOS ------------------------
@@ -506,6 +520,14 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             'equipos_por_area': list(equipos_por_area),
             'equipos_recientes': equipos_recientes,
         }
+
+    def get_correos_context(self):
+        from django.conf import settings
+        from correo_resumen.selectors import get_dashboard_context
+
+        context = get_dashboard_context()
+        context['correo_resumen_habilitado'] = settings.CORREO_RESUMEN_CONFIG.get('ENABLED', False)
+        return context
 
 @superuser_required
 def eventos_modal(request):
