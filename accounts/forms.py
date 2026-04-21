@@ -88,6 +88,10 @@ class CompletarPerfilForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['rol'].required = True
+        self.fields['rol'].choices = [
+            choice for choice in self.fields['rol'].choices
+            if choice[0] != 'piloto_dictado'
+        ]
         # Fecha de ingreso solo obligatoria para residentes
         self.fields['fecha_ingreso_residencia'].required = False
     

@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from .models import CustomUser
-from .forms import CustomUserCreationForm
+from .forms import CustomUserCreationForm, CompletarPerfilForm
 
 User = get_user_model()
 
@@ -91,6 +91,15 @@ class CustomUserCreationFormTest(TestCase):
         }
         form = CustomUserCreationForm(data=form_data)
         self.assertFalse(form.is_valid())
+
+
+class CompletarPerfilFormTest(TestCase):
+    def test_no_muestra_rol_piloto_dictado_en_autoregistro(self):
+        form = CompletarPerfilForm()
+
+        valores = [choice[0] for choice in form.fields['rol'].choices]
+
+        self.assertNotIn('piloto_dictado', valores)
 
 
 class UserRegisterViewTest(TestCase):
