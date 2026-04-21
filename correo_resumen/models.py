@@ -106,3 +106,73 @@ class CorreoResumen(models.Model):
     @property
     def remitente_visible(self):
         return self.remitente_nombre or self.remitente or 'Sin remitente'
+
+
+class CorreoHilo(models.Model):
+    """
+    Agrupa CorreoResumen en hilos (conversaciones).
+    Se genera automáticamente al sincronizar basado en asunto normalizado + ventana temporal.
+    """
+    PRIORIDADES = [
+        ('URGENTE', 'Urgente'),
+        ('ALTA', 'Alta'),
+        ('NORMAL', 'Normal'),
+        ('BAJA', 'Baja'),
+    ]
+
+    ESTADOS_ATENCION = [
+        ('pendiente', 'Pendiente'),
+        ('en_curso', 'En curso'),
+        ('resuelto', 'Resuelto'),
+    ]
+
+    cuenta = models.CharField(max_length=255, default='inbox-principal')
+    asunto_normalizado = models.CharField(max_length=500, db_index=True)
+    participantes = models.JSONField(default=dict, blank=True)  # {"carolina": "carolina@...", ...}
+    correos = models.ManyToManyField(CorreoResumen, related_name='hilo')
+    
+    fecha_primer_email = models.DateTimeField()
+    fecha_ultimo_email = models.DateTimeField()
+    
+    resumen_hilo = models.TextField(blank=True)
+    prioridad_hilo = models.CharField(max_length=10, choices=PRIORIDADES, default='NORMAL')
+    estado_hilo = models.CharField(
+        max_length=20,
+        choices=ESTADOS_ATENCION,
+        default='pendiente'
+    )
+    requiere_respuesta = models.BooleanField(default=False)
+    fecha_compromiso = models.DateTimeField(null=True, blank=True)
+    fecha_seguimiento = models.DateTimeField(null=True, blank=True)
+    
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha_ultimo_email', '-prioridad_hilo']
+        verbose_name = 'Hilo de correo'
+        verbose_name_plural = 'Hilos de correo'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cuenta', 'asunto_normalizado'],
+                name='correo_hilo_unique_cuenta_asunto',
+            )
+        ]
+        indexes = [
+            models.Index(fields=['cuenta', 'asunto_normalizado']),
+            models.Index(fields=['estado_hilo', '-fecha_ultimo_email']),
+            models.Index(fields=['requiere_respuesta', 'estado_hilo']),
+            models.Index(fields=['fecha_compromiso', 'estado_hilo']),
+            models.Index(fields=['fecha_seguimiento', 'estado_hilo']),
+        ]
+
+    def __str__(self):
+        return f'{self.asunto_normalizado[:60]} ({self.correos.count()} correos)'
+
+    @property
+    def cantidad_correos(self):
+        return self.correos.count()
+
+    @property
+    def participantes_lista(self):
+        return list(self.participantes.keys()) if self.participantes else []

@@ -34,7 +34,9 @@ from .views import (
     send_test_email, 
     AdminDashboardView, 
     eventos_modal, 
-    cambiar_estado_evento
+    cambiar_estado_evento,
+    correo_hilo_cambiar_estado,
+    correo_hilo_detalle,
 )
 
 urlpatterns = [
@@ -85,6 +87,8 @@ urlpatterns = [
     # URL para el modal de eventos del dashboard
     path('dashboard/eventos/modal/', eventos_modal, name='eventos_modal'),
     path('dashboard/eventos/<int:evento_id>/cambiar-estado/', cambiar_estado_evento, name='cambiar_estado_evento'),
+    path('dashboard/correos/hilo/<int:hilo_id>/estado/', correo_hilo_cambiar_estado, name='correo_hilo_cambiar_estado'),
+    path('dashboard/correos/hilo/<int:hilo_id>/', correo_hilo_detalle, name='correo_hilo_detalle'),
 ]
 
 # Servir archivos subidos por usuarios (MEDIA) en desarrollo

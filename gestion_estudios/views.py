@@ -16,8 +16,9 @@ from django.core.mail import send_mail
 from functools import wraps
 from django.db.models import Count, Max
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse
 from django.views.generic import TemplateView
 
 from control_guardias.models import AsignacionGuardia
@@ -25,6 +26,7 @@ from gestion_eventos.models import EventoServicio
 from liquidacion.models import RegistroEstudiosPorMedico
 from agenda.models import AgendaItem, NotaPersonal
 from equipos.models import EquipoImagen
+from correo_resumen.models import CorreoHilo
 
 
 def superuser_required(view_func):
@@ -525,9 +527,19 @@ class AdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
         from django.conf import settings
         from correo_resumen.selectors import get_dashboard_context
 
-        context = get_dashboard_context()
+        hilo_filtro = self.request.GET.get('hilo_filtro', 'todos')
+        context = get_dashboard_context(hilo_filtro=hilo_filtro)
         context['correo_resumen_habilitado'] = settings.CORREO_RESUMEN_CONFIG.get('ENABLED', False)
         return context
+
+
+def _resolver_return_to(return_to):
+    if return_to and return_to.startswith('/'):
+        return return_to
+    if return_to:
+        return reverse(return_to)
+    return reverse('admin_dashboard')
+
 
 @superuser_required
 def eventos_modal(request):
@@ -600,3 +612,66 @@ def cambiar_estado_evento(request, evento_id):
             return JsonResponse({'success': False, 'error': str(e)})
     
     return JsonResponse({'success': False, 'error': 'Método no permitido'})
+
+
+@superuser_required
+def correo_hilo_cambiar_estado(request, hilo_id):
+    """Actualiza estado o seguimiento operativo de un hilo."""
+    if request.method != 'POST':
+        return redirect('admin_dashboard')
+
+    hilo = get_object_or_404(CorreoHilo, id=hilo_id)
+    from correo_resumen.services import actualizar_estado_hilo, actualizar_seguimiento_hilo
+
+    return_to = request.POST.get('return_to') or request.GET.get('return_to') or 'admin_dashboard'
+
+    try:
+        if request.POST.get('accion') == 'seguimiento':
+            fecha_raw = request.POST.get('fecha_seguimiento', '').strip()
+            fecha_seguimiento = None
+            if fecha_raw:
+                fecha_seguimiento = datetime.fromisoformat(fecha_raw)
+                if timezone.is_naive(fecha_seguimiento):
+                    fecha_seguimiento = timezone.make_aware(fecha_seguimiento, timezone.get_current_timezone())
+
+            resultado = actualizar_seguimiento_hilo(hilo, fecha_seguimiento)
+            if resultado['fecha_seguimiento']:
+                mensaje = f"Seguimiento programado para {timezone.localtime(resultado['fecha_seguimiento']).strftime('%d/%m %H:%M')}."
+                if resultado['estado_reabierto']:
+                    mensaje += ' El hilo volvió a pendiente.'
+                messages.success(request, mensaje)
+            else:
+                messages.success(request, 'Seguimiento eliminado.')
+        else:
+            nuevo_estado = request.POST.get('estado_hilo', '').strip()
+            resultado = actualizar_estado_hilo(hilo, nuevo_estado)
+            messages.success(
+                request,
+                f"Hilo actualizado a {hilo.get_estado_hilo_display().lower()} ({resultado['correos_actualizados']} correo(s)).",
+            )
+    except ValueError as exc:
+        messages.error(request, str(exc))
+
+    return redirect(_resolver_return_to(return_to))
+
+
+@superuser_required
+def correo_hilo_detalle(request, hilo_id):
+    """Detalle de un hilo de correos para revisión rápida en dashboard admin."""
+    hilo = get_object_or_404(
+        CorreoHilo.objects.prefetch_related('correos').all(),
+        id=hilo_id,
+    )
+    return_to = request.GET.get('return_to') or 'admin_dashboard'
+
+    correos = hilo.correos.all().order_by('-fecha_email')
+
+    context = {
+        'hide_navbar': True,
+        'hilo': hilo,
+        'correos': correos,
+        'return_to': return_to,
+        'return_to_url': _resolver_return_to(return_to),
+        'estados_hilo': CorreoHilo.ESTADOS_ATENCION,
+    }
+    return render(request, 'dashboard/correo_hilo_detalle.html', context)

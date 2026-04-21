@@ -37,6 +37,335 @@
                 {% endif %}
             </div>
 
+            {% if messages %}
+            <div class="space-y-2 mb-4">
+                {% for message in messages %}
+                <div class="rounded-lg border px-3 py-2 text-sm {% if message.tags == 'success' %}border-emerald-800 bg-emerald-950/40 text-emerald-200{% elif message.tags == 'error' %}border-red-800 bg-red-950/40 text-red-200{% else %}border-gray-700 bg-gray-800 text-gray-200{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="bg-gray-800 border border-gray-700 rounded-xl mb-4 overflow-hidden">
+                <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-700">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-envelope-open-text text-cyan-400"></i>
+                        <span class="font-semibold text-white text-sm">Resumen de correos</span>
+                    </div>
+                    <div class="text-[0.65rem] text-gray-500">
+                        {% if correo_ultima_sync and correo_ultima_sync.finalizado_en %}
+                            Actualizado {{ correo_ultima_sync.finalizado_en|timesince }} atrás
+                        {% elif correo_resumen_habilitado %}
+                            Sin sincronización registrada
+                        {% else %}
+                            Módulo no configurado
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="p-4 grid grid-cols-1 xl:grid-cols-12 gap-4">
+                    <div class="xl:col-span-7 space-y-4">
+                        {% if correo_hilos_todos_count %}
+                        <div class="rounded-xl border border-orange-700 bg-orange-950/30 shadow-sm shadow-orange-950/20 p-4">
+                            <div class="flex flex-col gap-3 mb-3">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-comments text-orange-200"></i>
+                                    <p class="text-xs font-semibold uppercase tracking-wider text-orange-200">Atención Hoy <span class="ml-2 inline-block px-2 py-0.5 bg-orange-700/50 text-orange-300 rounded text-[0.65rem]">{{ correo_hilos_atencion_hoy_count }}</span></p>
+                                </div>
+                                <div class="flex flex-wrap gap-2">
+                                    <a href="?hilo_filtro=todos" class="inline-flex items-center px-2.5 py-1 rounded-full border text-[0.68rem] transition-colors {% if correo_hilos_filtro_actual == 'todos' %}border-orange-500 bg-orange-900/60 text-orange-100{% else %}border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800{% endif %}">
+                                        Todos <span class="ml-2 text-orange-200/80">{{ correo_hilos_todos_count }}</span>
+                                    </a>
+                                    <a href="?hilo_filtro=pendiente" class="inline-flex items-center px-2.5 py-1 rounded-full border text-[0.68rem] transition-colors {% if correo_hilos_filtro_actual == 'pendiente' %}border-amber-500 bg-amber-900/60 text-amber-100{% else %}border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800{% endif %}">
+                                        Pendientes <span class="ml-2 text-amber-200/80">{{ correo_hilos_pendiente_count }}</span>
+                                    </a>
+                                    <a href="?hilo_filtro=en_curso" class="inline-flex items-center px-2.5 py-1 rounded-full border text-[0.68rem] transition-colors {% if correo_hilos_filtro_actual == 'en_curso' %}border-blue-500 bg-blue-900/60 text-blue-100{% else %}border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800{% endif %}">
+                                        En curso <span class="ml-2 text-blue-200/80">{{ correo_hilos_en_curso_count }}</span>
+                                    </a>
+                                    <a href="?hilo_filtro=urgentes" class="inline-flex items-center px-2.5 py-1 rounded-full border text-[0.68rem] transition-colors {% if correo_hilos_filtro_actual == 'urgentes' %}border-red-500 bg-red-900/60 text-red-100{% else %}border-gray-700 bg-gray-900/60 text-gray-300 hover:bg-gray-800{% endif %}">
+                                        Urgentes <span class="ml-2 text-red-200/80">{{ correo_hilos_urgentes_count }}</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="space-y-2">
+                                {% for hilo in correos_atencion_hoy_por_hilo %}
+                                <div class="rounded-lg bg-gray-950/70 border border-orange-800/40 p-3">
+                                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                        <a href="/dashboard/correos/hilo/{{ hilo.id }}/?return_to={{ request.get_full_path|urlencode }}" class="min-w-0 flex-1 hover:opacity-95 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 rounded-md">
+                                            <div class="flex flex-wrap items-center gap-2 mb-1">
+                                                <p class="text-xs font-semibold text-white truncate">{{ hilo.resumen_hilo|default:hilo.asunto_normalizado }}</p>
+                                                <span class="inline-block px-2 py-0.5 bg-cyan-700/40 text-cyan-200 text-[0.65rem] rounded whitespace-nowrap">{{ hilo.cantidad_correos }} correo{{ hilo.cantidad_correos|pluralize }}</span>
+                                                {% if hilo.requiere_respuesta %}
+                                                <span class="inline-block px-2 py-0.5 bg-red-700/40 text-red-300 text-[0.65rem] rounded whitespace-nowrap">Respuesta</span>
+                                                {% endif %}
+                                                {% if hilo.fecha_seguimiento %}
+                                                <span class="inline-block px-2 py-0.5 bg-fuchsia-700/30 text-fuchsia-200 text-[0.65rem] rounded whitespace-nowrap">Seguimiento {{ hilo.fecha_seguimiento|date:"d/m H:i" }}</span>
+                                                {% endif %}
+                                                {% if hilo.fecha_compromiso %}
+                                                <span class="inline-block px-2 py-0.5 bg-yellow-700/40 text-yellow-200 text-[0.65rem] rounded whitespace-nowrap">{{ hilo.fecha_compromiso|date:"d/m H:i" }}</span>
+                                                {% endif %}
+                                                <span class="inline-block px-2 py-0.5 text-[0.65rem] rounded whitespace-nowrap {% if hilo.estado_hilo == 'pendiente' %}bg-amber-900/40 text-amber-200{% elif hilo.estado_hilo == 'en_curso' %}bg-blue-900/40 text-blue-200{% else %}bg-emerald-900/40 text-emerald-200{% endif %}">{{ hilo.get_estado_hilo_display }}</span>
+                                            </div>
+                                            <div class="flex items-center justify-between gap-3">
+                                                <p class="text-[0.7rem] text-orange-100 truncate">
+                                                    {% for participante in hilo.participantes_lista|slice:":3" %}
+                                                        {{ participante }}{% if not forloop.last %} · {% endif %}
+                                                    {% empty %}
+                                                        Sin participantes identificados
+                                                    {% endfor %}
+                                                </p>
+                                                <span class="text-[0.65rem] text-gray-400 whitespace-nowrap">{{ hilo.fecha_ultimo_email|date:"d/m H:i" }}</span>
+                                            </div>
+                                        </a>
+                                        <div class="flex items-center gap-2 lg:pl-3 lg:border-l lg:border-gray-800">
+                                            <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="estado_hilo" value="en_curso">
+                                                <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-blue-800 bg-blue-950/40 text-[0.7rem] text-blue-200 hover:bg-blue-900/50 transition-colors">
+                                                    En curso
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="estado_hilo" value="resuelto">
+                                                <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                <button type="submit" class="inline-flex items-center px-2.5 py-1.5 rounded-lg border border-emerald-800 bg-emerald-950/40 text-[0.7rem] text-emerald-200 hover:bg-emerald-900/50 transition-colors">
+                                                    Resuelto
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% empty %}
+                                <div class="rounded-lg border border-dashed border-orange-800/60 bg-gray-950/40 px-3 py-4 text-sm text-orange-100">
+                                    No hay hilos para este filtro en la bandeja operativa.
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% elif correos_atencion_hoy %}
+                        <div class="rounded-xl border border-orange-700 bg-orange-950/30 shadow-sm shadow-orange-950/20 p-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-clock text-orange-200"></i>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-orange-200">Atención Hoy <span class="ml-2 inline-block px-2 py-0.5 bg-orange-700/50 text-orange-300 rounded text-[0.65rem]">{{ correo_atencion_hoy_count }}</span></p>
+                            </div>
+                            <div class="space-y-2">
+                                {% for correo in correos_atencion_hoy %}
+                                <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-950/70 border border-orange-800/40 hover:border-orange-700/60 transition-colors">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
+                                            {% if correo.requiere_respuesta %}
+                                            <span class="inline-block px-2 py-0.5 bg-red-700/40 text-red-300 text-[0.65rem] rounded whitespace-nowrap">Respuesta</span>
+                                            {% endif %}
+                                            {% if correo.fecha_compromiso %}
+                                            <span class="inline-block px-2 py-0.5 bg-yellow-700/40 text-yellow-200 text-[0.65rem] rounded whitespace-nowrap">{{ correo.fecha_compromiso|date:"d/m H:i" }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="text-[0.7rem] text-orange-100 truncate">{{ correo.remitente_visible }}</p>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="rounded-xl border border-cyan-700 bg-cyan-950/30 shadow-sm shadow-cyan-950/20 p-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <i class="fas fa-list-check text-cyan-200"></i>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-cyan-200">Resumen ejecutivo del día</p>
+                            </div>
+                            {% if correo_resumen_del_dia %}
+                                <div class="space-y-2">
+                                    {% for bullet in correo_resumen_del_dia %}
+                                    <div class="flex items-start gap-2 text-sm text-gray-100">
+                                        <span class="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-300"></span>
+                                        <span>{{ bullet }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            {% elif correo_resumen_habilitado %}
+                                <p class="text-sm text-gray-200">Todavía no hay correos priorizados para resumir.</p>
+                            {% else %}
+                                <p class="text-sm text-gray-200">Configurá la cuenta institucional para empezar a ver el resumen automático.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="xl:col-span-5">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-1 gap-3">
+                            <div class="rounded-xl border border-fuchsia-700 bg-fuchsia-950/25 shadow-sm shadow-fuchsia-950/20 p-3 sm:col-span-3 xl:col-span-1">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div>
+                                        <p class="text-[0.7rem] font-semibold uppercase tracking-wider text-fuchsia-200">Agenda de seguimiento</p>
+                                        <p class="text-[0.65rem] text-fuchsia-100/70 mt-1">Recordatorios operativos por hilo</p>
+                                    </div>
+                                    <span class="text-base font-bold text-fuchsia-200">{{ correo_hilos_seguimiento_vencidos_count|add:correo_hilos_seguimiento_proximos_count }}</span>
+                                </div>
+
+                                <div class="space-y-3">
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-[0.68rem] font-semibold uppercase tracking-wider text-red-200">Vencidos</p>
+                                            <span class="text-[0.7rem] text-red-200">{{ correo_hilos_seguimiento_vencidos_count }}</span>
+                                        </div>
+                                        <div class="space-y-2">
+                                            {% for hilo in correo_hilos_seguimiento_vencidos %}
+                                            <div class="rounded-lg border border-red-800/60 bg-gray-950/70 p-2.5">
+                                                <a href="/dashboard/correos/hilo/{{ hilo.id }}/?return_to={{ request.get_full_path|urlencode }}" class="block min-w-0 hover:opacity-90 transition-opacity">
+                                                    <p class="text-xs font-semibold text-white truncate">{{ hilo.resumen_hilo|default:hilo.asunto_normalizado }}</p>
+                                                    <div class="flex items-center justify-between gap-2 mt-1">
+                                                        <p class="text-[0.65rem] text-red-100">{{ hilo.fecha_seguimiento|date:"d/m H:i" }}</p>
+                                                        <span class="text-[0.65rem] text-gray-400">{{ hilo.get_estado_hilo_display }}</span>
+                                                    </div>
+                                                </a>
+                                                <div class="flex items-center gap-2 mt-2">
+                                                    <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="estado_hilo" value="en_curso">
+                                                        <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                        <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-blue-800 bg-blue-950/40 text-[0.65rem] text-blue-200 hover:bg-blue-900/50 transition-colors">En curso</button>
+                                                    </form>
+                                                    <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="estado_hilo" value="resuelto">
+                                                        <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                        <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-emerald-800 bg-emerald-950/40 text-[0.65rem] text-emerald-200 hover:bg-emerald-900/50 transition-colors">Resuelto</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                            {% empty %}
+                                            <div class="rounded-lg border border-dashed border-fuchsia-800/50 bg-gray-950/40 px-3 py-3 text-xs text-gray-300">
+                                                No hay seguimientos vencidos.
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <div class="flex items-center justify-between mb-2">
+                                            <p class="text-[0.68rem] font-semibold uppercase tracking-wider text-fuchsia-200">Próximos</p>
+                                            <span class="text-[0.7rem] text-fuchsia-200">{{ correo_hilos_seguimiento_proximos_count }}</span>
+                                        </div>
+                                        <div class="space-y-2">
+                                            {% for hilo in correo_hilos_seguimiento_proximos %}
+                                            <div class="rounded-lg border border-fuchsia-800/50 bg-gray-950/70 p-2.5">
+                                                <a href="/dashboard/correos/hilo/{{ hilo.id }}/?return_to={{ request.get_full_path|urlencode }}" class="block min-w-0 hover:opacity-90 transition-opacity">
+                                                    <p class="text-xs font-semibold text-white truncate">{{ hilo.resumen_hilo|default:hilo.asunto_normalizado }}</p>
+                                                    <div class="flex items-center justify-between gap-2 mt-1">
+                                                        <p class="text-[0.65rem] text-fuchsia-100">{{ hilo.fecha_seguimiento|date:"d/m H:i" }}</p>
+                                                        <span class="text-[0.65rem] text-gray-400">{{ hilo.get_estado_hilo_display }}</span>
+                                                    </div>
+                                                </a>
+                                                <div class="flex items-center gap-2 mt-2">
+                                                    <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="estado_hilo" value="en_curso">
+                                                        <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                        <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-blue-800 bg-blue-950/40 text-[0.65rem] text-blue-200 hover:bg-blue-900/50 transition-colors">En curso</button>
+                                                    </form>
+                                                    <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="inline">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="estado_hilo" value="resuelto">
+                                                        <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                                                        <button type="submit" class="inline-flex items-center px-2 py-1 rounded-lg border border-emerald-800 bg-emerald-950/40 text-[0.65rem] text-emerald-200 hover:bg-emerald-900/50 transition-colors">Resuelto</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                            {% empty %}
+                                            <div class="rounded-lg border border-dashed border-fuchsia-800/50 bg-gray-950/40 px-3 py-3 text-xs text-gray-300">
+                                                No hay seguimientos próximos.
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-xl border border-red-700 bg-red-950/40 shadow-sm shadow-red-950/30 p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-[0.7rem] font-semibold uppercase tracking-wider text-red-200">Urgentes</p>
+                                    <span class="text-base font-bold text-red-300">{{ correo_urgentes_count|default:0 }}</span>
+                                </div>
+                                {% if correos_urgentes %}
+                                    <div class="space-y-2">
+                                        {% for correo in correos_urgentes %}
+                                        <div class="rounded-lg border border-red-800/60 bg-gray-950/70 p-2.5">
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="min-w-0">
+                                                    <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
+                                                    <p class="text-[0.65rem] text-red-100 mt-1 truncate">{{ correo.remitente_visible }}</p>
+                                                </div>
+                                                <span class="text-[0.65rem] text-gray-400 whitespace-nowrap">{{ correo.fecha_email|date:"H:i" }}</span>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-xs text-gray-300">No hay correos urgentes detectados.</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="rounded-xl border border-amber-700 bg-amber-950/35 shadow-sm shadow-amber-950/20 p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-[0.7rem] font-semibold uppercase tracking-wider text-amber-200">Importantes no leídos</p>
+                                    <span class="text-base font-bold text-amber-300">{{ correo_importantes_hoy_count|default:0 }}</span>
+                                </div>
+                                {% if correos_importantes_no_leidos %}
+                                    <div class="space-y-2">
+                                        {% for correo in correos_importantes_no_leidos %}
+                                        <div class="rounded-lg border border-amber-800/60 bg-gray-950/70 p-2.5">
+                                            <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
+                                            <p class="text-[0.65rem] text-amber-50 mt-1 truncate">{{ correo.remitente_visible }}</p>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-xs text-gray-300">No hay correos importantes pendientes.</p>
+                                {% endif %}
+                            </div>
+
+                            <div class="rounded-xl border border-gray-700 bg-gray-900/40 p-3">
+                                <p class="text-[0.7rem] font-semibold uppercase tracking-wider text-gray-400 mb-3">Estado del módulo</p>
+                                {% if correo_resumen_habilitado %}
+                                    <div class="inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/30 px-3 py-1 text-xs text-emerald-300">
+                                        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
+                                        Activo
+                                    </div>
+                                {% else %}
+                                    <div class="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800 px-3 py-1 text-xs text-gray-300">
+                                        <span class="h-2 w-2 rounded-full bg-gray-500"></span>
+                                        Pendiente de configuración
+                                    </div>
+                                {% endif %}
+
+                                {% if correo_ultima_sync %}
+                                <div class="mt-3 space-y-1.5 text-xs">
+                                    <div class="flex items-center justify-between gap-3">
+                                        <span class="text-gray-500">Último estado</span>
+                                        <span class="text-white">{{ correo_ultima_sync.get_estado_display }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <span class="text-gray-500">Correos leídos</span>
+                                        <span class="text-white">{{ correo_ultima_sync.correos_leidos }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-3">
+                                        <span class="text-gray-500">Nuevos priorizados</span>
+                                        <span class="text-white">{{ correo_ultima_sync.correos_nuevos }}</span>
+                                    </div>
+                                    {% if correo_ultima_sync.mensaje %}
+                                    <p class="text-[0.7rem] text-gray-400 pt-2 border-t border-gray-700">{{ correo_ultima_sync.mensaje }}</p>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Grid: Agenda y Notas -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
 
@@ -282,171 +611,13 @@
 
             </div>
 
-            <div class="bg-gray-800 border border-gray-700 rounded-xl mb-6 overflow-hidden">
-                <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-700">
-                    <div class="flex items-center gap-2">
-                        <i class="fas fa-envelope-open-text text-cyan-400"></i>
-                        <span class="font-semibold text-white text-sm">Resumen de correos</span>
-                    </div>
-                    <div class="text-[0.65rem] text-gray-500">
-                        {% if correo_ultima_sync and correo_ultima_sync.finalizado_en %}
-                            Actualizado {{ correo_ultima_sync.finalizado_en|timesince }} atrás
-                        {% elif correo_resumen_habilitado %}
-                            Sin sincronización registrada
-                        {% else %}
-                            Módulo no configurado
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="lg:col-span-3">
-                        {% if correos_atencion_hoy %}
-                        <div class="rounded-xl border border-orange-700 bg-orange-950/30 shadow-sm shadow-orange-950/20 p-4 mb-4">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i class="fas fa-clock text-orange-200"></i>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-orange-200">Atención Hoy <span class="ml-2 inline-block px-2 py-0.5 bg-orange-700/50 text-orange-300 rounded text-[0.65rem]">{{ correo_atencion_hoy_count }}</span></p>
-                            </div>
-                            <div class="space-y-2">
-                                {% for correo in correos_atencion_hoy %}
-                                <div class="flex items-center justify-between gap-3 p-3 rounded-lg bg-gray-950/70 border border-orange-800/40 hover:border-orange-700/60 transition-colors">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center gap-2 mb-1">
-                                            <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
-                                            {% if correo.requiere_respuesta %}
-                                            <span class="inline-block px-2 py-0.5 bg-red-700/40 text-red-300 text-[0.65rem] rounded whitespace-nowrap">Respuesta</span>
-                                            {% endif %}
-                                            {% if correo.fecha_compromiso %}
-                                            <span class="inline-block px-2 py-0.5 bg-yellow-700/40 text-yellow-200 text-[0.65rem] rounded whitespace-nowrap">{{ correo.fecha_compromiso|date:"d/m H:i" }}</span>
-                                            {% endif %}
-                                        </div>
-                                        <p class="text-[0.7rem] text-orange-100 truncate">{{ correo.remitente_visible }}</p>
-                                    </div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="lg:col-span-2 space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div class="rounded-xl border border-red-700 bg-red-950/40 shadow-sm shadow-red-950/30 p-4">
-                                <div class="flex items-center justify-between mb-3">
-                                    <p class="text-xs font-semibold uppercase tracking-wider text-red-200">Urgentes</p>
-                                    <span class="text-lg font-bold text-red-300">{{ correo_urgentes_count|default:0 }}</span>
-                                </div>
-                                {% if correos_urgentes %}
-                                    <div class="space-y-3">
-                                        {% for correo in correos_urgentes %}
-                                        <div class="rounded-lg border border-red-800/60 bg-gray-950/70 p-3">
-                                            <div class="flex items-start justify-between gap-3">
-                                                <div class="min-w-0">
-                                                    <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
-                                                    <p class="text-[0.7rem] text-red-100 mt-1 truncate">{{ correo.remitente_visible }}</p>
-                                                </div>
-                                                <span class="text-[0.65rem] text-gray-400 whitespace-nowrap">{{ correo.fecha_email|date:"H:i" }}</span>
-                                            </div>
-                                            {% if correo.resumen_ejecutivo %}
-                                            <p class="text-[0.7rem] text-gray-200 mt-2 line-clamp-2">{{ correo.resumen_ejecutivo }}</p>
-                                            {% endif %}
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="text-xs text-gray-300">No hay correos urgentes detectados.</p>
-                                {% endif %}
-                            </div>
-
-                            <div class="rounded-xl border border-amber-700 bg-amber-950/35 shadow-sm shadow-amber-950/20 p-4">
-                                <div class="flex items-center justify-between mb-3">
-                                    <p class="text-xs font-semibold uppercase tracking-wider text-amber-200">Importantes no leídos</p>
-                                    <span class="text-lg font-bold text-amber-300">{{ correo_importantes_hoy_count|default:0 }}</span>
-                                </div>
-                                {% if correos_importantes_no_leidos %}
-                                    <div class="space-y-3">
-                                        {% for correo in correos_importantes_no_leidos %}
-                                        <div class="rounded-lg border border-amber-800/60 bg-gray-950/70 p-3">
-                                            <p class="text-xs font-semibold text-white truncate">{{ correo.asunto }}</p>
-                                            <p class="text-[0.7rem] text-amber-50 mt-1 truncate">{{ correo.remitente_visible }}</p>
-                                            <p class="text-[0.65rem] text-gray-200 mt-2 line-clamp-2">{{ correo.snippet }}</p>
-                                        </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="text-xs text-gray-300">No hay correos importantes pendientes.</p>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="rounded-xl border border-cyan-700 bg-cyan-950/30 shadow-sm shadow-cyan-950/20 p-4">
-                            <div class="flex items-center gap-2 mb-3">
-                                <i class="fas fa-list-check text-cyan-200"></i>
-                                <p class="text-xs font-semibold uppercase tracking-wider text-cyan-200">Resumen ejecutivo del día</p>
-                            </div>
-                            {% if correo_resumen_del_dia %}
-                                <div class="space-y-2">
-                                    {% for bullet in correo_resumen_del_dia %}
-                                    <div class="flex items-start gap-2 text-sm text-gray-100">
-                                        <span class="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-300"></span>
-                                        <span>{{ bullet }}</span>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            {% elif correo_resumen_habilitado %}
-                                <p class="text-sm text-gray-200">Todavía no hay correos priorizados para resumir.</p>
-                            {% else %}
-                                <p class="text-sm text-gray-200">Configurá la cuenta institucional para empezar a ver el resumen automático.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="rounded-xl border border-gray-700 bg-gray-900/40 p-4">
-                            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Estado del módulo</p>
-                            {% if correo_resumen_habilitado %}
-                                <div class="inline-flex items-center gap-2 rounded-full border border-emerald-800/60 bg-emerald-950/30 px-3 py-1 text-xs text-emerald-300">
-                                    <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                    Activo
-                                </div>
-                            {% else %}
-                                <div class="inline-flex items-center gap-2 rounded-full border border-gray-700 bg-gray-800 px-3 py-1 text-xs text-gray-300">
-                                    <span class="h-2 w-2 rounded-full bg-gray-500"></span>
-                                    Pendiente de configuración
-                                </div>
-                            {% endif %}
-
-                            {% if correo_ultima_sync %}
-                            <div class="mt-4 space-y-2 text-xs">
-                                <div class="flex items-center justify-between gap-3">
-                                    <span class="text-gray-500">Último estado</span>
-                                    <span class="text-white">{{ correo_ultima_sync.get_estado_display }}</span>
-                                </div>
-                                <div class="flex items-center justify-between gap-3">
-                                    <span class="text-gray-500">Correos leídos</span>
-                                    <span class="text-white">{{ correo_ultima_sync.correos_leidos }}</span>
-                                </div>
-                                <div class="flex items-center justify-between gap-3">
-                                    <span class="text-gray-500">Nuevos priorizados</span>
-                                    <span class="text-white">{{ correo_ultima_sync.correos_nuevos }}</span>
-                                </div>
-                                {% if correo_ultima_sync.mensaje %}
-                                <p class="text-[0.7rem] text-gray-400 pt-2 border-t border-gray-700">{{ correo_ultima_sync.mensaje }}</p>
-                                {% endif %}
-                            </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Stats cards -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
 
                 {% if SANATORIO_MODULOS.eventos %}
                 <!-- Card: Eventos del Servicio -->
                 <a href="{% url 'gestion_eventos:lista_eventos' %}"
-                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-gray-500 transition-colors group overflow-hidden block">
+                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-gray-500 transition-colors group overflow-hidden block">
                     <i class="fas fa-triangle-exclamation absolute -right-3 -bottom-3 text-7xl
                         {% if cantidad_eventos_abiertos > 0 %}text-red-500/10
                         {% elif cantidad_eventos_en_revision > 0 %}text-yellow-500/10
@@ -454,7 +625,7 @@
                         group-hover:scale-110 transition-transform origin-bottom-right"></i>
                     <div class="relative">
                         <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Eventos del Servicio</p>
-                        <div class="text-4xl font-bold
+                        <div class="text-3xl font-bold
                             {% if cantidad_eventos_abiertos > 0 %}text-red-400
                             {% elif cantidad_eventos_en_revision > 0 %}text-yellow-400
                             {% else %}text-green-400{% endif %}">
@@ -479,13 +650,13 @@
 
                 <!-- Card: Preinformes Pendientes -->
                 <a href="{% url 'preinformes:lista_revision' %}"
-                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 hover:border-gray-500 transition-colors group overflow-hidden block">
+                   class="relative bg-gray-800 border border-gray-700 rounded-xl p-4 hover:border-gray-500 transition-colors group overflow-hidden block">
                     <i class="fas fa-file-medical absolute -right-3 -bottom-3 text-7xl
                         {% if preinformes_pendientes_count > 0 %}text-pink-500/10{% else %}text-gray-600/20{% endif %}
                         group-hover:scale-110 transition-transform origin-bottom-right"></i>
                     <div class="relative">
                         <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-3">Preinformes Pendientes</p>
-                        <div class="text-4xl font-bold {% if preinformes_pendientes_count > 0 %}text-pink-400{% else %}text-green-400{% endif %}">
+                        <div class="text-3xl font-bold {% if preinformes_pendientes_count > 0 %}text-pink-400{% else %}text-green-400{% endif %}">
                             {{ preinformes_pendientes_count|default:0 }}
                         </div>
                         <p class="text-xs text-gray-500 mt-1">
@@ -501,7 +672,7 @@
                 </a>
 
                 <!-- Card: Médico de Guardia -->
-                <div class="relative bg-gray-800 border border-gray-700 rounded-xl p-5 overflow-hidden">
+                <div class="relative bg-gray-800 border border-gray-700 rounded-xl p-4 overflow-hidden">
                     <i class="fas fa-user-doctor absolute -right-3 -bottom-3 text-7xl
                         {% if 'Sin cubrir' in nombre_medico_guardia %}text-red-500/10{% else %}text-green-500/10{% endif %}"></i>
                     <div class="relative">

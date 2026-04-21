@@ -1,0 +1,136 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+
+{% block title %}Detalle de Hilo de Correo{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 space-y-4">
+    {% if messages %}
+        <div class="space-y-2">
+            {% for message in messages %}
+            <div class="rounded-lg border px-3 py-2 text-sm {% if message.tags == 'success' %}border-emerald-800 bg-emerald-950/40 text-emerald-200{% elif message.tags == 'error' %}border-red-800 bg-red-950/40 text-red-200{% else %}border-gray-700 bg-gray-800 text-gray-200{% endif %}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="flex items-center justify-between gap-3">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-cyan-300">Correo Resumen</p>
+            <h1 class="text-xl font-bold text-white">Detalle del Hilo</h1>
+            <p class="text-sm text-gray-300 mt-1">{{ hilo.asunto_normalizado }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 justify-end">
+            <span class="inline-flex items-center px-3 py-1 rounded-full border text-xs {% if hilo.estado_hilo == 'pendiente' %}border-amber-700 bg-amber-950/40 text-amber-200{% elif hilo.estado_hilo == 'en_curso' %}border-blue-700 bg-blue-950/40 text-blue-200{% else %}border-emerald-700 bg-emerald-950/40 text-emerald-200{% endif %}">
+                Estado: {{ hilo.get_estado_hilo_display }}
+            </span>
+            <a href="{{ return_to_url }}" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-600 bg-gray-800 text-sm text-gray-200 hover:bg-gray-700">
+                <i class="fas fa-arrow-left mr-2"></i> Volver al dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-700 bg-gray-800 p-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-gray-300">Manejo del hilo</p>
+                <p class="text-sm text-gray-400 mt-1">Actualiza el estado operativo para sacarlo de pendientes o dejarlo en seguimiento.</p>
+            </div>
+        </div>
+        <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="flex flex-wrap gap-2">
+            {% csrf_token %}
+            <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+            <button type="submit" name="estado_hilo" value="pendiente" class="inline-flex items-center px-3 py-2 rounded-lg border text-sm transition-colors {% if hilo.estado_hilo == 'pendiente' %}border-amber-700 bg-amber-900/40 text-amber-200{% else %}border-gray-600 bg-gray-900 text-gray-200 hover:bg-gray-700{% endif %}">
+                Pendiente
+            </button>
+            <button type="submit" name="estado_hilo" value="en_curso" class="inline-flex items-center px-3 py-2 rounded-lg border text-sm transition-colors {% if hilo.estado_hilo == 'en_curso' %}border-blue-700 bg-blue-900/40 text-blue-200{% else %}border-gray-600 bg-gray-900 text-gray-200 hover:bg-gray-700{% endif %}">
+                En curso
+            </button>
+            <button type="submit" name="estado_hilo" value="resuelto" class="inline-flex items-center px-3 py-2 rounded-lg border text-sm transition-colors {% if hilo.estado_hilo == 'resuelto' %}border-emerald-700 bg-emerald-900/40 text-emerald-200{% else %}border-gray-600 bg-gray-900 text-gray-200 hover:bg-gray-700{% endif %}">
+                Marcar resuelto
+            </button>
+        </form>
+    </div>
+
+    <div class="rounded-xl border border-fuchsia-800/70 bg-fuchsia-950/20 p-4">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-fuchsia-200">Seguimiento</p>
+                <p class="text-sm text-gray-300 mt-1">Usá este recordatorio para que el hilo reaparezca como agenda operativa aunque no tenga vencimiento original.</p>
+            </div>
+            <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="flex flex-col sm:flex-row gap-2 sm:items-end">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="seguimiento">
+                <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+                <div>
+                    <label for="fecha_seguimiento" class="block text-[0.7rem] uppercase tracking-wider text-fuchsia-200 mb-1">Próximo seguimiento</label>
+                    <input id="fecha_seguimiento" name="fecha_seguimiento" type="datetime-local" value="{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:'Y-m-d\\TH:i' }}{% endif %}" class="rounded-lg border border-fuchsia-800 bg-gray-900 text-sm text-white px-3 py-2">
+                </div>
+                <button type="submit" class="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-fuchsia-700 bg-fuchsia-950/40 text-sm text-fuchsia-100 hover:bg-fuchsia-900/40 transition-colors">
+                    Guardar seguimiento
+                </button>
+            </form>
+        </div>
+        {% if hilo.fecha_seguimiento %}
+        <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="mt-3">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="seguimiento">
+            <input type="hidden" name="fecha_seguimiento" value="">
+            <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+            <button type="submit" class="inline-flex items-center px-3 py-2 rounded-lg border border-gray-600 bg-gray-900 text-sm text-gray-200 hover:bg-gray-700 transition-colors">
+                Limpiar seguimiento
+            </button>
+        </form>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-3">
+        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Correos</p>
+            <p class="text-lg font-semibold text-white">{{ hilo.cantidad_correos }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Prioridad</p>
+            <p class="text-lg font-semibold text-white">{{ hilo.prioridad_hilo }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Requiere respuesta</p>
+            <p class="text-lg font-semibold text-white">{% if hilo.requiere_respuesta %}Sí{% else %}No{% endif %}</p>
+        </div>
+        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Seguimiento</p>
+            <p class="text-lg font-semibold text-white">{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:"d/m H:i" }}{% else %}-{% endif %}</p>
+        </div>
+        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Último correo</p>
+            <p class="text-lg font-semibold text-white">{{ hilo.fecha_ultimo_email|date:"d/m H:i" }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-gray-700 bg-gray-800 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-300 mb-3">Conversación</p>
+        {% if correos %}
+            <div class="space-y-3">
+                {% for correo in correos %}
+                <article class="rounded-lg border border-gray-700 bg-gray-900 p-3">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-white truncate">{{ correo.asunto }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ correo.remitente_visible }}</p>
+                        </div>
+                        <p class="text-[0.7rem] text-gray-400 whitespace-nowrap">{{ correo.fecha_email|date:"d/m H:i" }}</p>
+                    </div>
+                    {% if correo.resumen_ejecutivo %}
+                    <p class="text-sm text-gray-200 mt-2">{{ correo.resumen_ejecutivo }}</p>
+                    {% elif correo.snippet %}
+                    <p class="text-sm text-gray-300 mt-2">{{ correo.snippet }}</p>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-sm text-gray-300">No hay correos asociados a este hilo.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

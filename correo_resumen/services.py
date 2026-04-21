@@ -1,6 +1,7 @@
 import email
 import imaplib
 import re
+import unicodedata
 from email.header import decode_header, make_header
 from email.utils import parsedate_to_datetime, parseaddr
 
@@ -10,7 +11,7 @@ from django.utils import timezone
 from dictado_informes.ai_services import AIService
 
 from .exceptions import ConfiguracionCorreoError, ConexionCorreoError, ResumenIAError
-from .models import CorreoResumen, CorreoSincronizacion
+from .models import CorreoResumen, CorreoSincronizacion, CorreoHilo
 
 
 KEYWORD_CATEGORIAS = {
@@ -28,6 +29,180 @@ def _split_csv(raw_value):
 
 def get_correo_resumen_config():
     return getattr(settings, 'CORREO_RESUMEN_CONFIG', {})
+
+
+def _normalizar_asunto(asunto):
+    """
+    Normaliza asunto de email para agrupación en hilos.
+    "RE: Recorrida de Calidad" → "recorrida de calidad"
+    "FW: Auditoría - seguimiento" → "auditoria seguimiento"
+    """
+    if not asunto:
+        return ''
+    
+    # Remover prefijos comunes
+    asunto = re.sub(r'^(re:|fwd:|fw:|re\[|fwd\[)', '', asunto, flags=re.IGNORECASE).strip()
+    
+    # Convertir a minúscula
+    asunto = asunto.lower()
+    
+    # Remover tildes/acentos
+    asunto = ''.join(
+        c for c in unicodedata.normalize('NFD', asunto)
+        if unicodedata.category(c) != 'Mn'
+    )
+    
+    # Remover caracteres especiales pero mantener espacios
+    asunto = re.sub(r'[^a-z0-9\s-]', '', asunto)
+    
+    # Remover espacios múltiples y espacios al inicio/final
+    asunto = ' '.join(asunto.split())
+    
+    return asunto[:200]  # Limitar longitud
+
+
+def _agrupar_correos_en_hilos(config):
+    """
+    Agrupa CorreoResumen en CorreoHilo basado en asunto normalizado.
+    Ventana temporal: 3 días (configurable).
+    
+    Lógica:
+    1. Para cada CorreoResumen sin hilo asignado
+    2. Normalizar asunto
+    3. Buscar CorreoHilo existente con mismo asunto
+    4. Si existe Y último email < 3 días: agregar a hilo
+    5. Si no: crear hilo nuevo
+    6. Actualizar CorreoHilo con stats agregadas
+    """
+    ventana_dias = int(config.get('THREAD_WINDOW_DAYS', 3))
+    cuenta = config.get('IMAP_USERNAME', 'inbox-principal')
+    
+    correos_sin_hilo = CorreoResumen.objects.filter(hilo__isnull=True).order_by('fecha_email')
+    
+    for correo in correos_sin_hilo:
+        asunto_norm = _normalizar_asunto(correo.asunto)
+        if not asunto_norm:
+            continue
+        
+        # Buscar hilo existente dentro de ventana temporal
+        fecha_limite = correo.fecha_email - timezone.timedelta(days=ventana_dias)
+        
+        hilo = CorreoHilo.objects.filter(
+            cuenta=cuenta,
+            asunto_normalizado=asunto_norm,
+            fecha_ultimo_email__gte=fecha_limite
+        ).first()
+        
+        if not hilo:
+            # Crear hilo nuevo
+            hilo = CorreoHilo.objects.create(
+                cuenta=cuenta,
+                asunto_normalizado=asunto_norm,
+                fecha_primer_email=correo.fecha_email,
+                fecha_ultimo_email=correo.fecha_email,
+                requiere_respuesta=correo.requiere_respuesta,
+                prioridad_hilo=correo.prioridad_sugerida,
+                estado_hilo=correo.estado_atencion,
+                fecha_compromiso=correo.fecha_compromiso,
+            )
+        
+        # Agregar correo al hilo
+        hilo.correos.add(correo)
+        
+        # Actualizar participantes
+        if correo.remitente and correo.remitente not in hilo.participantes:
+            hilo.participantes[correo.remitente] = correo.remitente_nombre or correo.remitente
+        
+        # Actualizar stats del hilo
+        correos_hilo = hilo.correos.all()
+        hilo.fecha_ultimo_email = correos_hilo.latest('fecha_email').fecha_email
+        hilo.fecha_primer_email = correos_hilo.earliest('fecha_email').fecha_email
+        hilo.requiere_respuesta = correos_hilo.filter(requiere_respuesta=True).exists()
+        hilo.prioridad_hilo = max(
+            correos_hilo.values_list('prioridad_sugerida', flat=True),
+            key=lambda p: {'URGENTE': 3, 'ALTA': 2, 'NORMAL': 1, 'BAJA': 0}.get(p, 0)
+        ) if correos_hilo.exists() else 'NORMAL'
+        hilo.fecha_compromiso = correos_hilo.filter(
+            fecha_compromiso__isnull=False
+        ).earliest('fecha_compromiso').fecha_compromiso if correos_hilo.filter(fecha_compromiso__isnull=False).exists() else None
+        hilo.resumen_hilo = _generar_resumen_hilo(hilo)
+        hilo.save()
+
+
+def _generar_resumen_hilo(hilo):
+    """
+    Genera un resumen breve de la conversación del hilo.
+    Ej: "3 correos: Auditoría sobre recorrida de calidad - requiere respuesta antes del viernes"
+    """
+    correos = hilo.correos.all().order_by('fecha_email')
+    cantidad = correos.count()
+    
+    # Primer correo (tema)
+    primer_correo = correos.first()
+    tema = primer_correo.asunto[:50] if primer_correo else hilo.asunto_normalizado[:50]
+    
+    # Estado de la conversación
+    partes = [f'{cantidad} correo{"s" if cantidad != 1 else ""}']
+    if hilo.requiere_respuesta:
+        partes.append('requiere respuesta')
+    if hilo.fecha_seguimiento:
+        dias_seguimiento = (hilo.fecha_seguimiento.date() - timezone.now().date()).days
+        if dias_seguimiento < 0:
+            partes.append('seguimiento vencido')
+        elif dias_seguimiento == 0:
+            partes.append('seguimiento hoy')
+        elif dias_seguimiento == 1:
+            partes.append('seguimiento mañana')
+    if hilo.fecha_compromiso:
+        dias_hasta = (hilo.fecha_compromiso.date() - timezone.now().date()).days
+        if dias_hasta == 0:
+            partes.append('vence hoy')
+        elif dias_hasta == 1:
+            partes.append('vence mañana')
+        elif dias_hasta < 7:
+            partes.append(f'vence en {dias_hasta} días')
+
+    resumen = f"{tema}. {', '.join(partes)}."
+    return resumen[:280]
+
+
+def actualizar_estado_hilo(hilo, nuevo_estado):
+    """Actualiza el estado operativo del hilo y de sus correos asociados."""
+    estados_validos = {opcion[0] for opcion in CorreoHilo.ESTADOS_ATENCION}
+    if nuevo_estado not in estados_validos:
+        raise ValueError('Estado de hilo no válido')
+
+    hilo.estado_hilo = nuevo_estado
+    hilo.save(update_fields=['estado_hilo', 'actualizado_en'])
+
+    hilo.correos.update(estado_atencion=nuevo_estado)
+
+    return {
+        'exito': True,
+        'estado_hilo': hilo.estado_hilo,
+        'correos_actualizados': hilo.correos.count(),
+    }
+
+
+def actualizar_seguimiento_hilo(hilo, fecha_seguimiento):
+    """Programa o limpia una fecha de seguimiento operativa para un hilo."""
+    estado_reabierto = False
+
+    hilo.fecha_seguimiento = fecha_seguimiento
+
+    if fecha_seguimiento and hilo.estado_hilo == 'resuelto':
+        hilo.estado_hilo = 'pendiente'
+        hilo.correos.update(estado_atencion='pendiente')
+        estado_reabierto = True
+
+    hilo.resumen_hilo = _generar_resumen_hilo(hilo)
+    hilo.save(update_fields=['fecha_seguimiento', 'estado_hilo', 'resumen_hilo', 'actualizado_en'])
+
+    return {
+        'exito': True,
+        'fecha_seguimiento': hilo.fecha_seguimiento,
+        'estado_reabierto': estado_reabierto,
+    }
 
 
 def _decode_header_value(value):
@@ -446,6 +621,13 @@ def sincronizar_correos_resumen(max_emails=None):
         sync.mensaje = f'{nuevos} correo(s) nuevos priorizados'
         sync.finalizado_en = timezone.now()
         sync.save(update_fields=['correos_leidos', 'correos_nuevos', 'mensaje', 'finalizado_en'])
+        
+        # Agrupar correos en hilos (después de guardar todo)
+        try:
+            _agrupar_correos_en_hilos(config)
+        except Exception as e:
+            print(f"⚠️ Advertencia en agrupación de hilos: {e}")
+        
         return {'exito': True, 'mensaje': sync.mensaje, 'nuevos': nuevos}
     except CorreoResumenError as exc:
         sync.estado = 'ERROR'
