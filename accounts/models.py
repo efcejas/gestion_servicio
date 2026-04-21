@@ -16,6 +16,7 @@ class CustomUser(AbstractUser):
         ('jefe_residentes', 'Jefe de Residentes'),
         ('instructor_residentes', 'Instructor de Residentes'),
         ('jefe_servicio', 'Jefe de Servicio'),
+        ('piloto_dictado', 'Piloto Dictado IA'),
         ('cardiologo', 'Cardiólogo'),  # NUEVO - Liquidación v2.0
         ('tecnico', 'Técnico Radiólogo'),
         ('administrativo', 'Administrativo'),
@@ -145,5 +146,9 @@ class CustomUser(AbstractUser):
     def es_residente(self):
         """Verifica si el usuario es residente."""
         return self.rol == 'medico_residente'
+
+    def puede_acceder_dictado_ia(self):
+        """Permite acceso al piloto de dictado y a superusuarios."""
+        return self.is_superuser or self.rol == 'piloto_dictado'
 
 

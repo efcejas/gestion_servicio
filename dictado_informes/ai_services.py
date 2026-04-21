@@ -71,7 +71,7 @@ class AIService:
         if not self.enabled:
             logger.warning("⚠️ Ninguna API de IA configurada. Servicios deshabilitados.")
     
-    def _get_plantilla_estructurada(self, tipo_plantilla):
+    def _get_plantilla_estructurada(self, tipo_plantilla, usuario=None):
         """
         Obtiene plantilla estructurada desde BD con fallback a hardcode.
         
@@ -85,10 +85,8 @@ class AIService:
         
         try:
             # Intentar leer desde BD (prioridad 1)
-            plantilla_obj = PlantillaEstructurada.objects.get(
-                codigo=tipo_plantilla,
-                activa=True
-            )
+            queryset = PlantillaEstructurada.visibles_para_usuario(usuario, solo_activas=True)
+            plantilla_obj = queryset.get(codigo=tipo_plantilla)
             logger.info(f"📋 Plantilla '{tipo_plantilla}' cargada desde BD (origen: {plantilla_obj.origen})")
             return {
                 'titulo': plantilla_obj.titulo,
@@ -631,7 +629,7 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                 logger.info(f"📋 Generando plantilla tipo: {tipo_plantilla}")
                 
                 # 🔄 LEER PLANTILLA DESDE BD (con fallback a hardcode)
-                plantilla_actual = self._get_plantilla_estructurada(tipo_plantilla)
+                plantilla_actual = self._get_plantilla_estructurada(tipo_plantilla, usuario=usuario)
                 comentarios_str = '\n'.join(plantilla_actual['comentarios'])
                 
                 # 🚀 PROMPT OPTIMIZADO: 50% más corto usando formato compacto

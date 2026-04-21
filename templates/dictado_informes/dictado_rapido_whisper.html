@@ -109,15 +109,33 @@
                         Tipo de Estudio
                     </label>
                     <select id="tipoPlantilla" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none">
-                        {% for plantilla in plantillas_estructuradas %}
-                        <option value="{{ plantilla.codigo }}" {% if forloop.first %}selected{% endif %}>{{ plantilla.nombre }}</option>
-                        {% empty %}
+                        {% if plantillas_estructuradas %}
+                            {% if plantillas_propias %}
+                            <optgroup label="Mis plantillas">
+                                {% for plantilla in plantillas_propias %}
+                                <option value="{{ plantilla.codigo }}" {% if plantilla.codigo == plantillas_default_codigo %}selected{% endif %}>
+                                    {{ plantilla.nombre }} {% if plantilla.compartida %}[Compartida]{% else %}[Privada]{% endif %}
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+
+                            {% if plantillas_biblioteca %}
+                            <optgroup label="Biblioteca compartida">
+                                {% for plantilla in plantillas_biblioteca %}
+                                <option value="{{ plantilla.codigo }}" {% if plantilla.codigo == plantillas_default_codigo %}selected{% endif %}>
+                                    {{ plantilla.nombre }} [Compartida por {% if plantilla.creada_por__username %}{{ plantilla.creada_por__username }}{% else %}sistema{% endif %}]
+                                </option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endif %}
+                        {% else %}
                         <option value="RODILLA">RM de Rodilla (por defecto - BD vacía)</option>
-                        {% endfor %}
+                        {% endif %}
                     </select>
                     <p class="text-xs text-gray-500 mt-1">
                         <i class="fas fa-info-circle mr-1"></i>
-                        <span id="plantillasCargadas">{{ plantillas_estructuradas|length }} plantillas disponibles desde BD</span>
+                        <span id="plantillasCargadas">{{ plantillas_total_visibles }} plantillas visibles ({{ plantillas_propias|length }} propias + {{ plantillas_biblioteca|length }} compartidas)</span>
                     </p>
                 </div>
             </div>

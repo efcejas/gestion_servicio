@@ -20,7 +20,7 @@ class PlantillaEstructuradaForm(forms.ModelForm):
     
     class Meta:
         model = PlantillaEstructurada
-        fields = ['codigo', 'nombre', 'titulo', 'seccion_tecnica', 'comentarios_base_texto', 'activa']
+        fields = ['codigo', 'nombre', 'titulo', 'seccion_tecnica', 'comentarios_base_texto', 'activa', 'compartida']
         widgets = {
             'codigo': forms.TextInput(attrs={
                 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-700 text-white',
@@ -42,6 +42,9 @@ class PlantillaEstructuradaForm(forms.ModelForm):
             }),
             'activa': forms.CheckboxInput(attrs={
                 'class': 'rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'
+            }),
+            'compartida': forms.CheckboxInput(attrs={
+                'class': 'rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'
             })
         }
         labels = {
@@ -49,10 +52,15 @@ class PlantillaEstructuradaForm(forms.ModelForm):
             'nombre': 'Nombre Descriptivo',
             'titulo': 'Título de la Plantilla',
             'seccion_tecnica': 'Sección Técnica',
-            'activa': 'Activa'
+            'activa': 'Activa',
+            'compartida': '¿Compartir esta plantilla con otros usuarios de Dictado IA?'
+        }
+        help_texts = {
+            'compartida': 'Si la compartes, otros usuarios del módulo podrán usarla en Dictado Rápido. Si no, quedará solo para vos y para superusuarios.'
         }
     
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         # Si es edición, cargar comentarios_base del JSON a textarea
         if self.instance.pk:
@@ -64,6 +72,9 @@ class PlantillaEstructuradaForm(forms.ModelForm):
         else:
             # En creación, permitir editar código
             self.fields['codigo'].widget.attrs['readonly'] = False
+
+        if user and getattr(user, 'rol', None) == 'piloto_dictado' and not self.instance.pk:
+            self.fields['compartida'].initial = False
     
     def clean_codigo(self):
         """Validar que el código sea único (excepto para la instancia actual)"""

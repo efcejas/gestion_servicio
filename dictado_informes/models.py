@@ -98,6 +98,13 @@ class PlantillaEstructurada(models.Model):
         verbose_name="Activa",
         help_text="Solo se usan plantillas activas"
     )
+
+    compartida = models.BooleanField(
+        default=True,
+        db_index=True,
+        verbose_name="Compartida",
+        help_text="Si está activa y compartida, queda disponible para otros usuarios de Dictado IA"
+    )
     
     # Auditoría
     creada_por = models.ForeignKey(
@@ -129,6 +136,26 @@ class PlantillaEstructurada(models.Model):
     def __str__(self):
         estado = "✅" if self.activa else "❌"
         return f"{estado} {self.nombre} ({self.codigo})"
+
+    @classmethod
+    def visibles_para_usuario(cls, usuario, solo_activas=False):
+        queryset = cls.objects.all()
+
+        if solo_activas:
+            queryset = queryset.filter(activa=True)
+
+        if not usuario or not getattr(usuario, 'is_authenticated', False):
+            return queryset.filter(compartida=True)
+
+        if usuario.is_superuser:
+            return queryset
+
+        return queryset.filter(models.Q(compartida=True) | models.Q(creada_por=usuario))
+
+    def puede_ser_editada_por(self, usuario):
+        if not usuario or not getattr(usuario, 'is_authenticated', False):
+            return False
+        return usuario.is_superuser or self.creada_por_id == usuario.id
 
 
 class PlantillaInforme(models.Model):

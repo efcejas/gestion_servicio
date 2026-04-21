@@ -25,6 +25,14 @@ import time  # 🚀 FASE 4: Para medir tiempos
 logger = logging.getLogger(__name__)
 
 
+def user_can_access_dictado_module(user):
+    return user.is_authenticated and getattr(user, 'puede_acceder_dictado_ia', lambda: False)()
+
+
+def get_plantillas_estructuradas_visibles(user, solo_activas=False):
+    return PlantillaEstructurada.visibles_para_usuario(user, solo_activas=solo_activas)
+
+
 class SuperuserRequiredMixin(UserPassesTestMixin):
     """Mixin para restringir acceso solo a superusuarios"""
     def test_func(self):
@@ -32,6 +40,17 @@ class SuperuserRequiredMixin(UserPassesTestMixin):
     
     def handle_no_permission(self):
         messages.warning(self.request, "⚠️ No tienes permiso para acceder a esta sección.")
+        return redirect('home')
+
+
+class DictadoModuleAccessMixin(UserPassesTestMixin):
+    """Acceso restringido al piloto de dictado y superusuarios."""
+
+    def test_func(self):
+        return user_can_access_dictado_module(self.request.user)
+
+    def handle_no_permission(self):
+        messages.warning(self.request, "⚠️ No tienes permiso para acceder a Dictado IA.")
         return redirect('home')
 
 
@@ -73,16 +92,43 @@ class DashboardDictadoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateV
         return context
 
 
-class DictadoRapidoView(LoginRequiredMixin, SuperuserRequiredMixin, TemplateView):
+class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateView):
     """Vista simplificada para dictado rápido sin guardar - solo dictar, mejorar y copiar"""
     template_name = 'dictado_informes/dictado_rapido_whisper.html'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Pasar plantillas estructuradas para selector dinámico
-        context['plantillas_estructuradas'] = PlantillaEstructurada.objects.filter(
-            activa=True
-        ).values('codigo', 'nombre').order_by('codigo')
+        plantillas_visibles = list(get_plantillas_estructuradas_visibles(
+            self.request.user,
+            solo_activas=True,
+        ).values(
+            'codigo',
+            'nombre',
+            'creada_por_id',
+            'creada_por__username',
+            'compartida',
+        ).order_by('codigo'))
+
+        plantillas_propias = [
+            p for p in plantillas_visibles
+            if p['creada_por_id'] == self.request.user.id
+        ]
+        plantillas_biblioteca = [
+            p for p in plantillas_visibles
+            if p['creada_por_id'] != self.request.user.id
+        ]
+
+        default_codigo = None
+        if plantillas_propias:
+            default_codigo = plantillas_propias[0]['codigo']
+        elif plantillas_biblioteca:
+            default_codigo = plantillas_biblioteca[0]['codigo']
+
+        context['plantillas_estructuradas'] = plantillas_visibles
+        context['plantillas_propias'] = plantillas_propias
+        context['plantillas_biblioteca'] = plantillas_biblioteca
+        context['plantillas_default_codigo'] = default_codigo
+        context['plantillas_total_visibles'] = len(plantillas_visibles)
         return context
 
 
@@ -328,7 +374,7 @@ class PlantillaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView
 # VISTAS CRUD PARA PLANTILLAS ESTRUCTURADAS (Guardrails de IA)
 # ========================================================================
 
-class PlantillaEstructuradaListView(LoginRequiredMixin, SuperuserRequiredMixin, ListView):
+class PlantillaEstructuradaListView(LoginRequiredMixin, DictadoModuleAccessMixin, ListView):
     """Lista de plantillas estructuradas para guardrails"""
     model = PlantillaEstructurada
     template_name = 'dictado_informes/plantilla_estructurada_list.html'
@@ -336,7 +382,13 @@ class PlantillaEstructuradaListView(LoginRequiredMixin, SuperuserRequiredMixin, 
     paginate_by = 20
     
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('creada_por').order_by('codigo')
+        queryset = get_plantillas_estructuradas_visibles(self.request.user).select_related('creada_por').order_by('codigo')
+
+        scope = self.request.GET.get('scope')
+        if scope == 'mias':
+            queryset = queryset.filter(creada_por=self.request.user)
+        elif scope == 'biblioteca':
+            queryset = queryset.filter(compartida=True).exclude(creada_por=self.request.user)
         
         activa = self.request.GET.get('activa')
         if activa == 'true':
@@ -347,6 +399,12 @@ class PlantillaEstructuradaListView(LoginRequiredMixin, SuperuserRequiredMixin, 
         origen = self.request.GET.get('origen')
         if origen:
             queryset = queryset.filter(origen=origen)
+
+        compartida = self.request.GET.get('compartida')
+        if compartida == 'true':
+            queryset = queryset.filter(compartida=True)
+        elif compartida == 'false':
+            queryset = queryset.filter(compartida=False)
         
         return queryset
     
@@ -354,10 +412,12 @@ class PlantillaEstructuradaListView(LoginRequiredMixin, SuperuserRequiredMixin, 
         context = super().get_context_data(**kwargs)
         context['ORIGEN_CHOICES'] = PlantillaEstructurada.ORIGEN_CHOICES
         context['origen_seleccionado'] = self.request.GET.get('origen', '')
+        context['compartida_seleccionada'] = self.request.GET.get('compartida', '')
+        context['scope_seleccionado'] = self.request.GET.get('scope', '')
         return context
 
 
-class PlantillaEstructuradaCreateView(LoginRequiredMixin, SuperuserRequiredMixin, CreateView):
+class PlantillaEstructuradaCreateView(LoginRequiredMixin, DictadoModuleAccessMixin, CreateView):
     """Crear una nueva plantilla estructurada"""
     model = PlantillaEstructurada
     form_class = PlantillaEstructuradaForm
@@ -367,8 +427,14 @@ class PlantillaEstructuradaCreateView(LoginRequiredMixin, SuperuserRequiredMixin
     def form_valid(self, form):
         form.instance.creada_por = self.request.user
         form.instance.origen = 'user'
-        messages.success(self.request, f"✅ Plantilla '{form.instance.nombre}' creada exitosamente")
+        estado_comparticion = 'compartida' if form.instance.compartida else 'privada'
+        messages.success(self.request, f"✅ Plantilla '{form.instance.nombre}' creada exitosamente como {estado_comparticion}")
         return super().form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -377,7 +443,7 @@ class PlantillaEstructuradaCreateView(LoginRequiredMixin, SuperuserRequiredMixin
         return context
 
 
-class PlantillaEstructuradaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin, UpdateView):
+class PlantillaEstructuradaUpdateView(LoginRequiredMixin, DictadoModuleAccessMixin, UpdateView):
     """Editar una plantilla estructurada existente"""
     model = PlantillaEstructurada
     form_class = PlantillaEstructuradaForm
@@ -387,6 +453,16 @@ class PlantillaEstructuradaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin
     def form_valid(self, form):
         messages.success(self.request, f"✅ Plantilla '{form.instance.nombre}' actualizada exitosamente")
         return super().form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PlantillaEstructurada.objects.all()
+        return PlantillaEstructurada.objects.filter(creada_por=self.request.user)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -398,7 +474,7 @@ class PlantillaEstructuradaUpdateView(LoginRequiredMixin, SuperuserRequiredMixin
         return context
 
 
-class PlantillaEstructuradaDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, DeleteView):
+class PlantillaEstructuradaDeleteView(LoginRequiredMixin, DictadoModuleAccessMixin, DeleteView):
     """Eliminar una plantilla estructurada (soft delete)"""
     model = PlantillaEstructurada
     template_name = 'dictado_informes/plantilla_estructurada_confirm_delete.html'
@@ -411,6 +487,11 @@ class PlantillaEstructuradaDeleteView(LoginRequiredMixin, SuperuserRequiredMixin
         plantilla.save()
         messages.success(request, f"🗑️ Plantilla '{plantilla.nombre}' desactivada exitosamente")
         return redirect(self.success_url)
+
+    def get_queryset(self):
+        if self.request.user.is_superuser:
+            return PlantillaEstructurada.objects.all()
+        return PlantillaEstructurada.objects.filter(creada_por=self.request.user)
 
 
 # Vista AJAX para obtener plantilla por ID
@@ -464,7 +545,7 @@ def transcribir_audio_whisper(request):
     
     Seguridad: CSRF protegido, requiere autenticación y superuser
     """
-    if not request.user.is_superuser:
+    if not user_can_access_dictado_module(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     # 📊 FASE 4: Iniciar medición de tiempo
@@ -593,7 +674,7 @@ def mejorar_texto_ia(request):
     Soporta modo plantilla para respetar estructuras predefinidas
     🚀 FASE 4: Registra métricas de performance
     """
-    if not request.user.is_superuser:
+    if not user_can_access_dictado_module(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     # 📊 FASE 4: Iniciar medición de tiempo
@@ -831,7 +912,7 @@ def guardar_correccion_aprendizaje(request):
     Guarda una corrección manual del usuario para entrenar la IA.
     Se llama cuando el usuario edita el texto mejorado y lo guarda.
     """
-    if not request.user.is_superuser:
+    if not user_can_access_dictado_module(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     try:

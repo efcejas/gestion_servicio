@@ -124,6 +124,8 @@ class HomeView(LoginRequiredMixin, TemplateView):
         """Redirigir superusuarios al dashboard de admin"""
         if request.user.is_authenticated and request.user.is_superuser:
             return redirect('admin_dashboard')
+        if request.user.is_authenticated and getattr(request.user, 'rol', None) == 'piloto_dictado':
+            return redirect('dictado_informes:dictado_rapido')
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):

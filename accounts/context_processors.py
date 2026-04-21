@@ -114,6 +114,19 @@ def navbar_links(request):
         return item('Pedidos de Estudios', 'fa-clipboard-list',
                     'pedidos_estudios:dashboard', active_ns='pedidos_estudios')
 
+    def i_dictado_rapido():
+        return item('Dictado Rápido', 'fa-microphone-lines',
+                    'dictado_informes:dictado_rapido', active_url_names=['dictado_rapido'])
+
+    def i_plantillas_estructuradas():
+        return item('Plantillas Estructuradas', 'fa-layer-group',
+                    'dictado_informes:plantilla_estructurada_list', active_url_names=['plantilla_estructurada'])
+
+    def i_demo_dictado_ia():
+        return item('Demo IA Colegiales', 'fa-person-chalkboard',
+                    'dictado_informes:demo_presentacion_ia',
+                    active_url_names=['demo_presentacion_ia'])
+
     groups = []
 
     # ── SUPERUSUARIO ──────────────────────────────────────────────────────────
@@ -133,9 +146,11 @@ def navbar_links(request):
                 item('CADI 2026', 'fa-chart-bar',
                      'preinformes:resultados_encuesta',
                      active_url_names=['resultados_encuesta']),
-                 item('Demo IA Colegiales', 'fa-person-chalkboard',
-                     'dictado_informes:demo_presentacion_ia',
-                     active_url_names=['demo_presentacion_ia']),
+            ),
+            group('Dictado IA', 'fa-wave-square',
+                i_dictado_rapido(),
+                i_plantillas_estructuradas(),
+                i_demo_dictado_ia(),
             ),
             group('Guardias', 'fa-shield-alt',
                 item('Portal de Guardias', 'fa-calendar-alt',
@@ -255,6 +270,15 @@ def navbar_links(request):
                 item('Panel Docente', 'fa-chart-line',
                      'preinformes:panel_docencia',
                      active_url_names=['panel_docencia']) if es_docencia else None,
+            ),
+        ] if g]
+
+    # ── PILOTO DICTADO IA ───────────────────────────────────────────────────
+    elif user.rol == 'piloto_dictado':
+        groups = [g for g in [
+            group('Dictado IA', 'fa-wave-square',
+                i_dictado_rapido(),
+                i_plantillas_estructuradas(),
             ),
         ] if g]
 

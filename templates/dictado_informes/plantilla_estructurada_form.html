@@ -74,18 +74,28 @@
                                 <i class="fas fa-microscope text-cyan-400 mr-1"></i>
                             {% elif field.name == 'activa' %}
                                 <i class="fas fa-toggle-on text-green-400 mr-1"></i>
+                            {% elif field.name == 'compartida' %}
+                                <i class="fas fa-share-nodes text-cyan-400 mr-1"></i>
                             {% endif %}
                             {{ field.label }}
                         </label>
                         
-                        {% if field.name == 'activa' %}
+                        {% if field.name == 'activa' or field.name == 'compartida' %}
                             <div class="flex items-center">
                                 {{ field }}
                                 <span class="ml-3 text-sm text-gray-400">
-                                    {% if field.value %}
-                                        Plantilla activa (disponible para dictados)
+                                    {% if field.name == 'activa' %}
+                                        {% if field.value %}
+                                            Plantilla activa (disponible para dictados)
+                                        {% else %}
+                                            Plantilla inactiva (no disponible)
+                                        {% endif %}
                                     {% else %}
-                                        Plantilla inactiva (no disponible)
+                                        {% if field.value %}
+                                            Quedará disponible para otros usuarios del módulo
+                                        {% else %}
+                                            Quedará solo para vos y para superusuarios
+                                        {% endif %}
                                     {% endif %}
                                 </span>
                             </div>
@@ -147,7 +157,7 @@
             </h3>
             <p class="text-blue-200 text-sm">
                 Define la estructura base para informes en modo IA ESTRUCTURADO. Incluye:
-                <ul class="list-disc list-inside mt-2 space-y-1">
+                <ul class="text-blue-100 list-disc list-inside mt-2 space-y-1">
                     <li><strong>Título:</strong> Nombre del estudio (ej. RM DE RODILLA)</li>
                     <li><strong>Sección Técnica:</strong> Descripción de la técnica utilizada</li>
                     <li><strong>Comentarios Base:</strong> Líneas de anatomía normal que se preservan</li>
@@ -162,7 +172,7 @@
             </h3>
             <p class="text-purple-200 text-sm">
                 Los guardrails preservan las líneas de anatomía normal que <strong>no fueron mencionadas</strong> en el dictado.
-                <ul class="list-disc list-inside mt-2 space-y-1">
+                <ul class="text-purple-100 list-disc list-inside mt-2 space-y-1">
                     <li>Si dicta "desgarro menisco" → IA reemplaza solo esa línea</li>
                     <li>Líneas no mencionadas → se restauran automáticamente</li>
                     <li>Resultado = estructura coherente + hallazgos dictados</li>

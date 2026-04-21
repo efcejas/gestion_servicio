@@ -32,6 +32,38 @@
         </div>
 
         <ul class="space-y-1 font-medium">
+            {% if user.rol == 'piloto_dictado' %}
+            <li class="pt-1 mt-1">
+                <p class="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Dictado de Informes</p>
+            </li>
+            <li>
+                <a href="{% url 'dictado_informes:dictado_rapido' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-indigo-900 group {% if request.resolver_match.url_name == 'dictado_rapido' %}bg-indigo-900{% endif %}">
+                    <svg class="w-5 h-5 {% if request.resolver_match.url_name == 'dictado_rapido' %}text-yellow-400{% else %}text-gray-400{% endif %} group-hover:text-yellow-300 transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap">Dictado Rápido</span>
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'dictado_informes:plantilla_estructurada_list' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name and 'plantilla_estructurada' in request.resolver_match.url_name %}bg-gray-700{% endif %}">
+                    <svg class="w-5 h-5 {% if request.resolver_match.url_name and 'plantilla_estructurada' in request.resolver_match.url_name %}text-cyan-400{% else %}text-gray-400{% endif %} group-hover:text-cyan-300 transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 3a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V4a1 1 0 00-1-1H4zM12 3a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V4a1 1 0 00-1-1h-4zM4 11a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1H4zM12 11a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1h-4z"/>
+                    </svg>
+                    <span class="flex-1 ms-3 whitespace-nowrap">Plantillas Estructuradas</span>
+                </a>
+            </li>
+            <li class="pt-3 mt-1 border-t border-gray-700">
+                <form method="post" action="{% url 'logout' %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="flex items-center w-full p-2 text-white rounded-lg transition-colors hover:bg-red-900 group">
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-red-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        <span class="ms-3 group-hover:text-red-400 transition-colors">Cerrar Sesión</span>
+                    </button>
+                </form>
+            </li>
+            {% else %}
 
             {# ══════════════════════════════════ #}
             {# SECCIÓN: PRINCIPAL                 #}
@@ -69,6 +101,15 @@
                         <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
                     </svg>
                     <span class="ms-2 text-sm text-gray-300 group-hover:text-white transition-colors">Dictado Rápido</span>
+                </a>
+            </li>
+            <!-- Plantillas Estructuradas -->
+            <li>
+                <a href="{% url 'dictado_informes:plantilla_estructurada_list' %}" class="flex items-center p-2 ml-3 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.url_name and 'plantilla_estructurada' in request.resolver_match.url_name %}bg-gray-700{% endif %}">
+                    <svg class="w-4 h-4 mr-2 {% if request.resolver_match.url_name and 'plantilla_estructurada' in request.resolver_match.url_name %}text-cyan-400{% else %}text-gray-500{% endif %} group-hover:text-cyan-400 transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 3a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V4a1 1 0 00-1-1H4zM12 3a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V4a1 1 0 00-1-1h-4zM4 11a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1H4zM12 11a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1v-4a1 1 0 00-1-1h-4z"/>
+                    </svg>
+                    <span class="ms-2 text-sm text-gray-300 group-hover:text-white transition-colors">Plantillas Estructuradas</span>
                 </a>
             </li>
             <!-- Diccionario Médico -->
@@ -321,6 +362,7 @@
                 </form>
             </li>
 
+            {% endif %}
         </ul>
     </div>
 </aside>
