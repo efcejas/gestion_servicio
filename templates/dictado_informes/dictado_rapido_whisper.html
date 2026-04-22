@@ -108,31 +108,167 @@
                         <i class="fas fa-file-medical text-green-400 mr-1"></i>
                         Tipo de Estudio
                     </label>
-                    <select id="tipoPlantilla" class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none">
-                        {% if plantillas_estructuradas %}
-                            {% if plantillas_propias %}
-                            <optgroup label="Mis plantillas">
-                                {% for plantilla in plantillas_propias %}
-                                <option value="{{ plantilla.codigo }}" {% if plantilla.codigo == plantillas_default_codigo %}selected{% endif %}>
-                                    {{ plantilla.nombre }} {% if plantilla.compartida %}[Compartida]{% else %}[Privada]{% endif %}
-                                </option>
-                                {% endfor %}
-                            </optgroup>
-                            {% endif %}
 
-                            {% if plantillas_biblioteca %}
-                            <optgroup label="Biblioteca compartida">
-                                {% for plantilla in plantillas_biblioteca %}
-                                <option value="{{ plantilla.codigo }}" {% if plantilla.codigo == plantillas_default_codigo %}selected{% endif %}>
-                                    {{ plantilla.nombre }} [Compartida por {% if plantilla.creada_por__username %}{{ plantilla.creada_por__username }}{% else %}sistema{% endif %}]
-                                </option>
-                                {% endfor %}
-                            </optgroup>
-                            {% endif %}
-                        {% else %}
-                        <option value="RODILLA">RM de Rodilla (por defecto - BD vacía)</option>
+                    {% if plantillas_estructuradas %}
+
+                    <!-- Tabs filtro: Todas / Las mías -->
+                    <div class="flex text-xs border border-gray-700 rounded-lg overflow-hidden mb-2">
+                        <button type="button" id="tabTodasPlantillas"
+                                onclick="filtrarPlantillas('todas')"
+                                class="flex-1 px-3 py-1.5 bg-purple-900/40 text-purple-300 font-semibold transition-colors">
+                            <i class="fas fa-layer-group mr-1"></i>
+                            Todas
+                            <span class="ml-1 opacity-70">({{ plantillas_total_visibles }})</span>
+                        </button>
+                        <button type="button" id="tabMiasPlantillas"
+                                onclick="filtrarPlantillas('mias')"
+                                class="flex-1 px-3 py-1.5 text-gray-400 hover:text-gray-200 transition-colors border-l border-gray-700">
+                            <i class="fas fa-user mr-1"></i>
+                            Las mías
+                            <span class="ml-1 opacity-70">({{ plantillas_propias|length }})</span>
+                        </button>
+                    </div>
+
+                    <!-- Buscador -->
+                    <div class="relative mb-1.5">
+                        <i class="fas fa-search absolute top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none" style="left:14px;"></i>
+                        <input type="text" id="buscadorPlantillas"
+                               placeholder="Buscar plantilla..."
+                               oninput="filtrarPlantillas()"
+                               class="w-full bg-gray-900 border border-gray-700 rounded-lg text-white text-xs focus:border-purple-500 focus:outline-none"
+                               style="padding: 8px 32px 8px 38px;">
+                        <button type="button" id="btnLimpiarBusqueda"
+                                onclick="document.getElementById('buscadorPlantillas').value=''; filtrarPlantillas();"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs hidden">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <!-- Select nativo con optgroups -->
+                    <select id="tipoPlantilla"
+                            class="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:border-purple-500 focus:outline-none">
+                        {% if plantillas_propias %}
+                        <optgroup label="— Mis plantillas —" id="optgroup-mias">
+                            {% for p in plantillas_propias %}
+                            <option value="{{ p.codigo }}"
+                                    data-grupo="mias"
+                                    data-nombre="{{ p.nombre|lower }}"
+                                    {% if p.codigo == plantillas_default_codigo %}selected{% endif %}>
+                                {{ p.nombre }}{% if not p.compartida %} [Privada]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endif %}
+                        {% if plantillas_biblioteca %}
+                        <optgroup label="— Biblioteca compartida —" id="optgroup-biblioteca">
+                            {% for p in plantillas_biblioteca %}
+                            <option value="{{ p.codigo }}"
+                                    data-grupo="biblioteca"
+                                    data-nombre="{{ p.nombre|lower }}"
+                                    {% if p.codigo == plantillas_default_codigo %}selected{% endif %}>
+                                {{ p.nombre }} [{{ p.creada_por__username|default:"sistema" }}]
+                            </option>
+                            {% endfor %}
+                        </optgroup>
                         {% endif %}
                     </select>
+
+                    <!-- Empty state "Las mías" sin plantillas -->
+                    <div id="emptyMias" class="hidden mt-2 px-3 py-4 bg-gray-900/60 rounded-lg text-center space-y-1">
+                        <i class="fas fa-folder-open text-gray-600 text-lg"></i>
+                        <p class="text-xs text-gray-400">Todavía no tenés plantillas propias.</p>
+                        <a href="{% url 'dictado_informes:plantilla_estructurada_create' %}"
+                           class="text-xs text-purple-400 hover:text-purple-300 underline underline-offset-2">
+                            Crear mi primera plantilla
+                        </a>
+                    </div>
+
+                    <!-- Empty state búsqueda sin resultados -->
+                    <div id="emptySinResultados" class="hidden mt-2 px-3 py-3 text-center text-xs text-gray-500">
+                        <i class="fas fa-search mr-1"></i> Sin resultados
+                    </div>
+
+                    <script>
+                    (function() {
+                        let filtroActivo = 'todas';
+
+                        window.filtrarPlantillas = function(nuevoFiltro) {
+                            if (nuevoFiltro) filtroActivo = nuevoFiltro;
+
+                            const busqueda = (document.getElementById('buscadorPlantillas').value || '').toLowerCase().trim();
+                            const select = document.getElementById('tipoPlantilla');
+                            const options = select.querySelectorAll('option');
+                            const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+
+                            // Mostrar/ocultar botón limpiar
+                            btnLimpiar.classList.toggle('hidden', !busqueda);
+
+                            // Actualizar tabs
+                            document.getElementById('tabTodasPlantillas').className =
+                                'flex-1 px-3 py-1.5 transition-colors ' +
+                                (filtroActivo === 'todas'
+                                    ? 'bg-purple-900/40 text-purple-300 font-semibold'
+                                    : 'text-gray-400 hover:text-gray-200');
+                            document.getElementById('tabMiasPlantillas').className =
+                                'flex-1 px-3 py-1.5 transition-colors border-l border-gray-700 ' +
+                                (filtroActivo === 'mias'
+                                    ? 'bg-purple-900/40 text-purple-300 font-semibold'
+                                    : 'text-gray-400 hover:text-gray-200');
+
+                            let visibles = 0;
+                            let primerVisible = null;
+
+                            options.forEach(function(opt) {
+                                const grupo = opt.dataset.grupo;
+                                const nombre = opt.dataset.nombre || '';
+                                const pasaFiltro = filtroActivo === 'todas' || grupo === filtroActivo;
+                                const pasaBusqueda = !busqueda || nombre.includes(busqueda);
+                                const mostrar = pasaFiltro && pasaBusqueda;
+
+                                // Los <option> no se pueden ocultar con display:none en todos los browsers,
+                                // así que los removemos/reinsertamos dinámicamente via disabled + style
+                                if (mostrar) {
+                                    opt.disabled = false;
+                                    opt.style.display = '';
+                                    visibles++;
+                                    if (!primerVisible) primerVisible = opt;
+                                } else {
+                                    opt.disabled = true;
+                                    opt.style.display = 'none';
+                                }
+                            });
+
+                            // Si la opción seleccionada quedó oculta, mover al primer visible
+                            const seleccionada = select.options[select.selectedIndex];
+                            if (seleccionada && seleccionada.disabled && primerVisible) {
+                                select.value = primerVisible.value;
+                                document.getElementById('tipoPlantilla') && (document.getElementById('tipoPlantilla').dispatchEvent(new Event('change')));
+                            }
+
+                            // Empty states
+                            const tienePropias = {{ plantillas_propias|length }} > 0;
+                            document.getElementById('emptyMias').classList.toggle(
+                                'hidden', !(filtroActivo === 'mias' && !tienePropias)
+                            );
+                            document.getElementById('emptySinResultados').classList.toggle(
+                                'hidden', !(visibles === 0 && (tienePropias || filtroActivo === 'todas'))
+                            );
+                            select.classList.toggle('hidden', visibles === 0);
+                        };
+
+                        // Init al cargar
+                        document.addEventListener('DOMContentLoaded', function() {
+                            filtrarPlantillas('todas');
+                        });
+                    })();
+                    </script>
+
+                    {% else %}
+                    <div class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-500 text-sm">
+                        Sin plantillas cargadas
+                    </div>
+                    {% endif %}
+
                     <p class="text-xs text-gray-500 mt-1">
                         <i class="fas fa-info-circle mr-1"></i>
                         <span id="plantillasCargadas">{{ plantillas_total_visibles }} plantillas visibles ({{ plantillas_propias|length }} propias + {{ plantillas_biblioteca|length }} compartidas)</span>
