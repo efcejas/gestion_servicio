@@ -45,6 +45,7 @@ from .services import (
     DistribucionError,
     aceptar_cambio_receptor,
     aprobar_cambio,
+    cancelar_ausencia,
     cancelar_borrador,
     cancelar_cambio,
     generar_distribucion,
@@ -1140,7 +1141,7 @@ class RevisarCambioView(JefeInstructorMixin, TemplateView):
 
 
 class CancelarCambioView(LoginRequiredMixin, TemplateView):
-    """POST: solicitante cancela su propia solicitud (solo PENDIENTE_RECEPTOR)."""
+    """POST: solicitante cancela su propia solicitud (PENDIENTE_RECEPTOR o PENDIENTE_JEFE)."""
     template_name = None
     login_url = 'login'
 
@@ -1161,3 +1162,28 @@ class CancelarCambioView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:cambios')
+
+
+class CancelarAusenciaView(LoginRequiredMixin, TemplateView):
+    """POST: residente cancela su propia ausencia (solo PENDIENTE)."""
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        ausencia = get_object_or_404(AusenciaResidente, pk=pk)
+        try:
+            cancelar_ausencia(ausencia, request.user)
+            messages.success(request, "Ausencia cancelada.")
+        except DistribucionError as e:
+            messages.error(request, str(e))
+        return redirect(
+            _safe_return_url(
+                request,
+                reverse('control_guardias:ausencias'),
+                focus=ausencia.pk,
+            )
+        )
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:ausencias')
+

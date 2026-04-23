@@ -1366,12 +1366,28 @@ class CancelarCambioTest(TestCase):
         with self.assertRaises(self.CambioGuardiaError):
             self.cancelar(solicitud, self.residente2)
 
-    def test_no_cancelar_si_pendiente_jefe(self):
+    def test_solicitante_puede_cancelar_pendiente_jefe(self):
+        """Solicitante puede cancelar incluso cuando está en PENDIENTE_JEFE."""
         from .services import aceptar_cambio_receptor
         solicitud = self.solicitar(self.residente1, self.g1, self.g2)
         aceptar_cambio_receptor(solicitud, self.residente2)
+        # Ahora está en PENDIENTE_JEFE
+        self.assertEqual(solicitud.estado, 'PENDIENTE_JEFE')
+        # El solicitante aún puede cancelar
+        self.cancelar(solicitud, self.residente1)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'CANCELADA')
+
+    def test_no_cancelar_si_aprobada_o_rechazada(self):
+        """No se puede cancelar si ya fue aprobada o rechazada."""
+        from .services import aceptar_cambio_receptor, rechazar_cambio_jefe
+        
+        # Test con aprobada
+        solicitud1 = self.solicitar(self.residente1, self.g1, self.g2)
+        aceptar_cambio_receptor(solicitud1, self.residente2)
+        aprobar_cambio(solicitud1, self.jefe)  # Simula aprobación
         with self.assertRaises(self.CambioGuardiaError):
-            self.cancelar(solicitud, self.residente1)
+            self.cancelar(solicitud1, self.residente1)
 
 
 class AusenciasViewTest(TestCase):
@@ -1473,6 +1489,57 @@ class AusenciasViewTest(TestCase):
             response,
             f"{reverse('control_guardias:ausencias')}?focus={ausencia.pk}",
         )
+
+    def test_residente_puede_cancelar_ausencia_pendiente(self):
+        from .services import reportar_ausencia, cancelar_ausencia
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        self.assertEqual(ausencia.estado, 'PENDIENTE')
+        
+        cancelar_ausencia(ausencia, self.residente)
+        ausencia.refresh_from_db()
+        
+        self.assertEqual(ausencia.estado, 'RESUELTA')
+        self.assertEqual(ausencia.resuelta_por, self.residente)
+
+    def test_otro_residente_no_puede_cancelar_ausencia_ajena(self):
+        from .services import reportar_ausencia, cancelar_ausencia
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        
+        with self.assertRaises(DistribucionError) as cm:
+            cancelar_ausencia(ausencia, self.otro_residente)
+        
+        self.assertIn("Solo el residente", str(cm.exception))
+
+    def test_no_cancelar_ausencia_resuelta(self):
+        from .services import reportar_ausencia, cancelar_ausencia
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        ausencia.estado = 'RESUELTA'
+        ausencia.resuelta_por = self.jefe
+        ausencia.save()
+        
+        with self.assertRaises(DistribucionError) as cm:
+            cancelar_ausencia(ausencia, self.residente)
+        
+        self.assertIn("a\u00fan no fue resuelta", str(cm.exception))
+
+    def test_residente_cancela_ausencia_via_post(self):
+        from .services import reportar_ausencia
+        ausencia = reportar_ausencia(self.residente, self.hoy, self.hoy, 'PERSONAL')
+        
+        self.client.login(username='residente1', password='testpass123')
+        url = reverse('control_guardias:ausencia_cancelar', kwargs={'pk': ausencia.pk})
+        response = self.client.post(url, {
+            'return_to': reverse('control_guardias:ausencias'),
+            'focus': str(ausencia.pk),
+        })
+        
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:ausencias')}?focus={ausencia.pk}",
+        )
+        
+        ausencia.refresh_from_db()
+        self.assertEqual(ausencia.estado, 'RESUELTA')
 
 
 class CambiosViewTest(TestCase):

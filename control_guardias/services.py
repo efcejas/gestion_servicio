@@ -964,11 +964,11 @@ def rechazar_cambio_jefe(solicitud, jefe, notas=''):
 
 
 def cancelar_cambio(solicitud, solicitante):
-    """Solicitante cancela su propia solicitud (solo si está PENDIENTE_RECEPTOR)."""
+    """Solicitante cancela su propia solicitud (si está PENDIENTE_RECEPTOR o PENDIENTE_JEFE)."""
     if solicitud.solicitante != solicitante:
         raise CambioGuardiaError("Solo el solicitante puede cancelar la solicitud.")
-    if solicitud.estado != 'PENDIENTE_RECEPTOR':
-        raise CambioGuardiaError("Solo se puede cancelar si todavía no fue respondida por el receptor.")
+    if solicitud.estado not in ('PENDIENTE_RECEPTOR', 'PENDIENTE_JEFE'):
+        raise CambioGuardiaError("Solo se puede cancelar si aún no fue aprobada por los jefes.")
 
     solicitud.estado = 'CANCELADA'
     solicitud.save(update_fields=['estado'])
@@ -980,3 +980,17 @@ def cancelar_cambio(solicitud, solicitante):
         f"del {solicitud.guardia_solicitante.fecha.strftime('%d/%m/%Y')}.",
         solicitud=solicitud,
     )
+
+def cancelar_ausencia(ausencia, residente):
+    """Residente cancela su propia ausencia reportada (si aún está PENDIENTE)."""
+    if ausencia.residente != residente:
+        raise DistribucionError("Solo el residente puede cancelar su ausencia.")
+    if ausencia.estado != 'PENDIENTE':
+        raise DistribucionError("Solo se puede cancelar una ausencia si aún no fue resuelta.")
+
+    ausencia.estado = 'RESUELTA'
+    ausencia.resuelta_por = residente  # El residente mismo la cancela
+    ausencia.save(update_fields=['estado', 'resuelta_por'])
+
+    # Desvincula las guardias afectadas (se mantienen asignadas al residente)
+    ausencia.guardias_afectadas.clear()

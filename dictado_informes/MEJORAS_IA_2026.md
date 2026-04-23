@@ -258,6 +258,14 @@ print(ejemplos)
 ### Mediano Plazo (1-2 meses)
 - [ ] Fine-tuning de modelo con correcciones priorizadas
 - [ ] A/B testing: optimización de tiempos de caché
+- [ ] Cerebro complementario de estilo/contexto (reglas explicables por usuario)
+
+### Línea Futura (producto)
+- Diseñar una capa de "perfil editorial" por usuario que aprenda:
+    - preferencias de fraseo (cómo quiere expresar hallazgos)
+    - ubicación habitual de conceptos por bloque del informe
+    - patrones recurrentes de edición tras la mejora IA
+- Implementar con guardrails clínicos estrictos y trazabilidad completa de cada sugerencia aplicada.
 - [ ] Exportación periódica de datos para ML
 
 ### Largo Plazo (3-6 meses)

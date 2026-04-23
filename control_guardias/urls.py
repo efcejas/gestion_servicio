@@ -4,6 +4,7 @@ from .views import (
     AusenciasView,
     BorradorView,
     CalendarioView,
+    CancelarAusenciaView,
     CancelarBorradorView,
     CancelarCambioView,
     CambiosGuardiaView,
@@ -62,6 +63,7 @@ urlpatterns = [
     path('ausencias/', AusenciasView.as_view(), name='ausencias'),
     path('ausencias/reportar/', ReportarAusenciaView.as_view(), name='ausencia_reportar'),
     path('ausencias/<int:pk>/resolver/', ResolverAusenciaView.as_view(), name='ausencia_resolver'),
+    path('ausencias/<int:pk>/cancelar/', CancelarAusenciaView.as_view(), name='ausencia_cancelar'),
 
     # -- Cambios de guardia (Fase 5) --
     path('cambios/', CambiosGuardiaView.as_view(), name='cambios'),

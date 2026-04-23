@@ -78,7 +78,17 @@ Variables: solicitud, gestor (bool)
                         </button>
                     </div>
                 </form>
-                {% elif solicitud.estado == 'PENDIENTE_RECEPTOR' and solicitud.solicitante == request.user %}
+                {% elif solicitud.solicitante == request.user and solicitud.estado == 'PENDIENTE_RECEPTOR' %}
+                <form method="post" action="{% url 'control_guardias:cambio_cancelar' solicitud.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="return_to" value="{{ request.path }}">
+                    <input type="hidden" name="focus" value="{{ solicitud.pk }}">
+                    <button type="submit"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-medium rounded-lg transition-colors">
+                        <i class="fas fa-ban"></i>Cancelar
+                    </button>
+                </form>
+                {% elif solicitud.solicitante == request.user and solicitud.estado == 'PENDIENTE_JEFE' %}
                 <form method="post" action="{% url 'control_guardias:cambio_cancelar' solicitud.pk %}">
                     {% csrf_token %}
                     <input type="hidden" name="return_to" value="{{ request.path }}">

@@ -147,3 +147,58 @@ Si la IA no aplica tus correcciones:
 - [ ] Ranking de correcciones por votos de utilidad
 - [ ] Sugerencias proactivas basadas en patrones
 - [ ] Exportación automática para entrenamiento periódico
+
+## 🧠 Futuro: Cerebro Complementario de Estilo y Contexto
+
+Sí, se entiende perfecto, y no es "mucho". Es una evolución natural del aprendizaje actual.
+
+Objetivo: agregar una capa que no solo aprenda reemplazos puntuales (token a token), sino también
+decisiones editoriales de estilo y estructura del usuario.
+
+### Qué debería aprender esa capa
+
+- Preferencias de redacción: p.ej. "de configuración habitual" vs "normales"
+- Preferencias de ubicación: mover frases de COMENTARIO a CONCLUSIÓN (o al revés)
+- Patrones de audio frecuentes: cómo suele dictar, abreviaturas personales, muletillas
+- Nivel de concisión: estilo breve vs estilo más descriptivo
+
+### MVP recomendado (incremental y seguro)
+
+1. Capturar eventos de edición estructurados por bloque:
+   - bloque_origen (COMENTARIO/CONCLUSION/TECNICA)
+   - bloque_destino
+   - tipo_operacion (insertar, reemplazar, mover)
+2. Calcular features simples del estilo:
+   - longitud promedio de frases
+   - frecuencia de términos de cierre ("sin signos de...")
+   - uso de clasificaciones (Romanos, escalas)
+3. Generar perfil de estilo por usuario (JSON versionado) con explicabilidad:
+   - "observaciones" legibles para el médico
+   - "reglas activas" con score de confianza
+4. Aplicar reglas solo si superan umbral de confianza y pasan guardrails clínicos.
+
+### Ejemplos de salida esperada (explicables)
+
+- "Detecté que preferís ubicar hallazgos leves en COMENTARIO y reservar CONCLUSIÓN para síntesis." 
+- "En tus últimos 40 informes, reemplazaste 32 veces 'normales' por 'de configuración habitual'." 
+- "Sugerencia aplicada con confianza alta (0.86): ajustar frase final al estilo habitual."
+
+### Guardrails obligatorios
+
+- Nunca inventar hallazgos ni modificar lateralidad/gradación clínica sin evidencia explícita
+- Bloquear aprendizaje de sesiones atípicas (fatiga, texto ruidoso, ediciones masivas)
+- Mantener trazabilidad completa: qué regla actuó, cuándo y con qué confianza
+- Permitir "desactivar regla" por usuario desde UI
+
+### Fases sugeridas
+
+- Fase 1 (MVP): perfil de estilo + sugerencias explicables (sin aplicar automáticamente)
+- Fase 2: auto-aplicación solo en reglas de forma (no semántica clínica) con fallback
+- Fase 3: ranking adaptativo por contexto (tipo de estudio, región anatómica, guardia vs ambulatorio)
+
+### Métricas de éxito
+
+- Reducción de edición manual post-IA (% de caracteres modificados)
+- Aumento de aceptación de sugerencias (%)
+- Tiempo total desde dictado a informe final
+- Tasa de "undo" de sugerencias (para detectar sobreajuste)

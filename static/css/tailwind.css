@@ -2865,10 +2865,6 @@ input:checked + .toggle-bg {
   top: 100%;
 }
 
-.left-3\.5 {
-  left: 0.875rem;
-}
-
 .z-0 {
   z-index: 0;
 }
@@ -96546,14 +96542,6 @@ input:checked + .toggle-bg {
 
 .pt-6 {
   padding-top: 1.5rem;
-}
-
-.pl-9 {
-  padding-left: 2.25rem;
-}
-
-.pr-8 {
-  padding-right: 2rem;
 }
 
 .text-left {
