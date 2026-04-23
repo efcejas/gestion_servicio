@@ -171,15 +171,32 @@
 
             <div class="flex items-center justify-between border-t border-gray-100 px-6 py-4">
               <button id="cancelarModalCambioCalendario" type="button" class="text-sm text-gray-500 hover:text-gray-700">
-                Cancelar
+                Cerrar
               </button>
               {% if mis_guardias_para_cambio %}
-              <button id="continuarSolicitudCambioCalendario"
-                  type="button"
-                  class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-                  disabled>
-                <i class="fas fa-arrow-right"></i>Ir al formulario
-              </button>
+              <div id="botonesModalCambio">
+                <button id="continuarSolicitudCambioCalendario"
+                    type="button"
+                    class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                    disabled>
+                  <i class="fas fa-arrow-right"></i>Ir al formulario
+                </button>
+
+                <!-- Formulario oculto para cancelar solicitud -->
+                <form id="formCancelarSolicitudCalendario" method="POST" style="display:none;">
+                  {% csrf_token %}
+                  <input type="hidden" id="cancelarSolicitudReturnTo" name="return_to" value="">
+                  <input type="hidden" id="cancelarSolicitudFocus" name="focus" value="">
+                </form>
+
+                <!-- Botón cancelar solicitud (visible cuando pendiente) -->
+                <button id="cancelarSolicitudModalCambio"
+                    type="button"
+                    class="hidden inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                    onclick="if (confirm('¿Cancelar la solicitud de cambio pendiente?')) document.getElementById('formCancelarSolicitudCalendario').submit(); return false;">
+                  <i class="fas fa-trash-alt"></i>Cancelar solicitud
+                </button>
+              </div>
               {% endif %}
             </div>
           </div>
@@ -246,6 +263,10 @@
   const alertaCambioPendienteEl = document.getElementById('alertaCambioPendienteCalendario');
   const textoCambioPendienteEl = document.getElementById('textoCambioPendienteCalendario');
   const bloqueSeleccionMiGuardiaEl = document.getElementById('bloqueSeleccionMiGuardiaCambio');
+  const cancelarSolicitudCambioEl = document.getElementById('cancelarSolicitudModalCambio');
+  const formCancelarSolicitudEl = document.getElementById('formCancelarSolicitudCalendario');
+  const cancelarSolicitudReturnToEl = document.getElementById('cancelarSolicitudReturnTo');
+  const cancelarSolicitudFocusEl = document.getElementById('cancelarSolicitudFocus');
   const apiUrl      = "{% url 'control_guardias:guardias_api' %}";
   const solicitarCambioBaseUrl = "{% url 'control_guardias:solicitar_cambio' guardia_pk=999999 %}";
   const FERIADOS    = new Set({{ feriados_json|safe }});
@@ -316,6 +337,18 @@
       continuarCambioEl.disabled = true;
       continuarCambioEl.classList.remove('hidden');
     }
+    if (cancelarSolicitudCambioEl) {
+      cancelarSolicitudCambioEl.classList.add('hidden');
+    }
+    if (formCancelarSolicitudEl) {
+      formCancelarSolicitudEl.removeAttribute('action');
+    }
+    if (cancelarSolicitudReturnToEl) {
+      cancelarSolicitudReturnToEl.value = '';
+    }
+    if (cancelarSolicitudFocusEl) {
+      cancelarSolicitudFocusEl.value = '';
+    }
   }
 
   function openCambioModal(event) {
@@ -331,6 +364,7 @@
       horaFin: ex.hora_fin || '',
       cambioPendiente,
       cambioPendienteLabel: ex.cambio_pendiente_label || 'Cambio pendiente',
+      cambio_pendiente_solicitud_id: ex.cambio_pendiente_solicitud_id || '',
     };
 
     const fechaTexto = guardiaObjetivoCambio.fecha
@@ -356,6 +390,25 @@
     if (continuarCambioEl) {
       continuarCambioEl.disabled = true;
       continuarCambioEl.classList.toggle('hidden', cambioPendiente);
+    }
+
+    const solicitudIdPendiente = guardiaObjetivoCambio.cambio_pendiente_solicitud_id;
+    const puedeCancelarPendiente = cambioPendiente && Boolean(solicitudIdPendiente);
+    if (cancelarSolicitudCambioEl) {
+      cancelarSolicitudCambioEl.classList.toggle('hidden', !puedeCancelarPendiente);
+    }
+    if (formCancelarSolicitudEl) {
+      if (puedeCancelarPendiente) {
+        formCancelarSolicitudEl.action = "{% url 'control_guardias:cambio_cancelar' pk=999999 %}".replace('999999', String(solicitudIdPendiente));
+      } else {
+        formCancelarSolicitudEl.removeAttribute('action');
+      }
+    }
+    if (cancelarSolicitudReturnToEl) {
+      cancelarSolicitudReturnToEl.value = `${window.location.pathname}${window.location.search}`;
+    }
+    if (cancelarSolicitudFocusEl) {
+      cancelarSolicitudFocusEl.value = String(event.id || '');
     }
 
     modalCambioEl.classList.remove('hidden');

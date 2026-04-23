@@ -338,6 +338,7 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
                     'cambio_pendiente': bool(pendiente),
                     'cambio_pendiente_estado': pendiente['estado'] if pendiente else '',
                     'cambio_pendiente_label': pendiente['label'] if pendiente else '',
+                    'cambio_pendiente_solicitud_id': pendiente['solicitud_id'] if pendiente else '',
                 }
             })
 
