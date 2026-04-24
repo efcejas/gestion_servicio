@@ -620,7 +620,11 @@ class FeriadoCreateView(JefeInstructorMixin, CreateView):
             ],
             'feriados': Feriado.objects.order_by('fecha'),
             'feriado_form': kwargs.get('feriado_form', FeriadoForm()),
-                    'rotaciones_activas': RotacionExterna.objects.filter(activo=True).select_related('residente').order_by('fecha_inicio'),
+            'rotaciones_activas': (
+                RotacionExterna.objects.filter(activo=True)
+                .select_related('residente')
+                .order_by('fecha_inicio')
+            ),
         }
 
 
@@ -1291,9 +1295,11 @@ class EliminarGuardiaExcepcionView(JefeInstructorMixin, TemplateView):
                 messages.success(request, 'Guardia eliminada sin carry-over.')
         except (DistribucionError, CambioGuardiaError) as e:
             messages.error(request, str(e))
-        return _safe_return_url(
-            request,
-            reverse('control_guardias:calendario'),
+        return redirect(
+            _safe_return_url(
+                request,
+                reverse('control_guardias:calendario'),
+            )
         )
 
     def get(self, request, *args, **kwargs):

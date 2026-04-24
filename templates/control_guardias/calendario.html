@@ -149,6 +149,10 @@
   #calendar .fc .fc-list-event:hover td { background: rgb(31 41 55); }
   #calendar .fc .fc-list-event td { border-color: rgb(55 65 81); color: rgb(229 231 235); }
   #calendar .fc .fc-list-event-title a { color: rgb(229 231 235); text-decoration: none; }
+  #calendar .fc .fc-daygrid-day-events { overflow: hidden; }
+  #calendar .fc .fc-daygrid-event-harness { max-width: 100%; }
+  #calendar .guardia-fc-chip { max-width: 100%; overflow: hidden; }
+  #calendar .guardia-fc-chip .guardia-fc-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 {% endblock %}
 
@@ -174,8 +178,6 @@
     const ev = info.event;
     const ex = ev.extendedProps || {};
     const rect = info.el.getBoundingClientRect();
-    const scrollY = window.scrollY || 0;
-    const scrollX = window.scrollX || 0;
 
     document.getElementById('tooltipResidente').textContent = ex.residente || ev.title;
     document.getElementById('tooltipTipo').textContent = ex.tipo_guardia || '';
@@ -198,13 +200,15 @@
     tooltip.classList.remove('hidden');
     const tw = tooltip.offsetWidth;
     const th = tooltip.offsetHeight;
-    let top  = rect.top + scrollY - th - 10;
-    let left = rect.left + scrollX;
+    let top  = rect.top - th - 10;
+    let left = rect.left;
 
-    if (top < scrollY + 8) top = rect.bottom + scrollY + 8;
-    const maxLeft = scrollX + window.innerWidth - tw - 8;
+    if (top < 8) top = rect.bottom + 8;
+    const maxTop = window.innerHeight - th - 8;
+    if (top > maxTop) top = maxTop;
+    const maxLeft = window.innerWidth - tw - 8;
     if (left > maxLeft) left = maxLeft;
-    if (left < scrollX + 8) left = scrollX + 8;
+    if (left < 8) left = 8;
 
     tooltip.style.top  = top + 'px';
     tooltip.style.left = left + 'px';
@@ -239,9 +243,8 @@
     dot.style.backgroundColor = bgColor;
 
     const label = document.createElement('span');
-    label.className = 'truncate text-[10px] font-medium text-gray-100 leading-tight';
+    label.className = 'guardia-fc-chip-label truncate text-[10px] font-medium text-gray-100 leading-tight';
     label.textContent = labelText;
-    if (abrev.length > 18) label.title = nombre;
 
     wrap.appendChild(dot);
     wrap.appendChild(label);

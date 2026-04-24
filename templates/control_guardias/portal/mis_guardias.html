@@ -62,7 +62,7 @@
                     {% endif %}
                     <a href="{% url 'control_guardias:solicitar_slot_vacante' guardia.pk %}?return_to={{ request.path|urlencode }}&focus={{ guardia.pk }}"
                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-medium rounded-lg transition-colors">
-                        <i class="fas fa-right-left"></i>Mover a slot vacio
+                        <i class="fas fa-right-left"></i>Mover a slot vacío
                     </a>
                     <a href="{% url 'control_guardias:solicitar_cambio' guardia.pk %}?return_to={{ request.path|urlencode }}&focus={{ guardia.pk }}"
                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors">

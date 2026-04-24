@@ -1,12 +1,12 @@
 {% extends 'layouts/base_tailwind.html' %}
 
-{% block title %}Nueva Penalizacion de Cuota{% endblock %}
+{% block title %}Nueva Penalización de Cuota{% endblock %}
 
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Nueva penalizacion manual</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Nueva penalización manual</h1>
             <p class="text-gray-500 mt-1">Suma guardias adicionales a la cuota mensual del residente.</p>
         </div>
         <a href="{% url 'control_guardias:configuracion' %}?tab=cuotas"
@@ -42,7 +42,7 @@
                     {% endif %}
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Anio</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Año</label>
                     {{ form.anio }}
                     {% if form.anio.errors %}
                     <p class="text-red-600 text-xs mt-1">{{ form.anio.errors|join:', ' }}</p>
@@ -72,7 +72,7 @@
                 </a>
                 <button type="submit"
                         class="inline-flex items-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors">
-                    <i class="fas fa-check mr-2"></i>Guardar penalizacion
+                    <i class="fas fa-check mr-2"></i>Guardar penalización
                 </button>
             </div>
         </form>

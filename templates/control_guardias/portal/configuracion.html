@@ -189,68 +189,6 @@
 
     <!-- Panel: Feriados -->
     <div id="panel-feriados" class="hidden" role="tabpanel">
-            <!-- Panel: Rotaciones Externas -->
-            <div id="panel-rotaciones" class="hidden" role="tabpanel">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-lg font-semibold text-gray-900">Rotaciones externas activas</h2>
-                        <p class="text-gray-500 text-sm mt-1">Residentes en rotación reciben preferencia de jueves en la distribución automática.</p>
-                    </div>
-                    <a href="{% url 'control_guardias:rotacion_crear' %}"
-                       class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
-                        <i class="fas fa-plus mr-2"></i>Nueva rotación
-                    </a>
-                </div>
-                {% if rotaciones_activas %}
-                <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
-                    <table class="w-full text-sm text-left text-gray-700">
-                        <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
-                            <tr>
-                                <th class="px-6 py-3">Residente</th>
-                                <th class="px-6 py-3">Desde</th>
-                                <th class="px-6 py-3">Hasta</th>
-                                <th class="px-6 py-3">Descripción</th>
-                                <th class="px-6 py-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 bg-white">
-                            {% for rot in rotaciones_activas %}
-                            <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="px-6 py-4 font-medium text-gray-900">{{ rot.residente.get_full_name }}</td>
-                                <td class="px-6 py-4">{{ rot.fecha_inicio|date:"d/m/Y" }}</td>
-                                <td class="px-6 py-4">{{ rot.fecha_fin|date:"d/m/Y" }}</td>
-                                <td class="px-6 py-4 text-gray-500">{{ rot.descripcion|default:"—" }}</td>
-                                <td class="px-6 py-4 text-right">
-                                    <a href="{% url 'control_guardias:rotacion_eliminar' rot.pk %}"
-                                       class="text-red-400 hover:text-red-600 transition-colors" title="Eliminar">
-                                        <i class="fas fa-trash"></i>
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% else %}
-                <div class="text-center py-12 bg-white rounded-lg border border-gray-200 shadow-sm">
-                    <i class="fas fa-person-walking-luggage text-4xl text-gray-300 mb-3"></i>
-                    <p class="text-gray-500">No hay rotaciones externas activas.</p>
-                    <a href="{% url 'control_guardias:rotacion_crear' %}"
-                       class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
-                        <i class="fas fa-plus mr-2"></i>Registrar rotación
-                    </a>
-                </div>
-                {% endif %}
-                <div class="mt-4 text-right">
-                    <a href="{% url 'control_guardias:rotaciones_lista' %}"
-                       class="text-sm text-blue-600 hover:text-blue-800 transition-colors">
-                        Ver historial completo <i class="fas fa-arrow-right ml-1"></i>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Panel: Feriados -->
-            <div id="panel-feriados" class="hidden" role="tabpanel">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             <!-- Formulario de nuevo feriado -->
@@ -324,6 +262,66 @@
                 </div>
                 {% endif %}
             </div>
+        </div>
+    </div>
+
+    <!-- Panel: Rotaciones Externas -->
+    <div id="panel-rotaciones" class="hidden" role="tabpanel">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Rotaciones externas activas</h2>
+                <p class="text-gray-500 text-sm mt-1">Residentes en rotación reciben preferencia de jueves en la distribución automática.</p>
+            </div>
+            <a href="{% url 'control_guardias:rotacion_crear' %}"
+               class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                <i class="fas fa-plus mr-2"></i>Nueva rotación
+            </a>
+        </div>
+        {% if rotaciones_activas %}
+        <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <table class="w-full text-sm text-left text-gray-700">
+                <thead class="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-6 py-3">Residente</th>
+                        <th class="px-6 py-3">Desde</th>
+                        <th class="px-6 py-3">Hasta</th>
+                        <th class="px-6 py-3">Descripción</th>
+                        <th class="px-6 py-3 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for rot in rotaciones_activas %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 font-medium text-gray-900">{{ rot.residente.get_full_name }}</td>
+                        <td class="px-6 py-4">{{ rot.fecha_inicio|date:"d/m/Y" }}</td>
+                        <td class="px-6 py-4">{{ rot.fecha_fin|date:"d/m/Y" }}</td>
+                        <td class="px-6 py-4 text-gray-500">{{ rot.descripcion|default:"—" }}</td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="{% url 'control_guardias:rotacion_eliminar' rot.pk %}"
+                               class="text-red-400 hover:text-red-600 transition-colors" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-12 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <i class="fas fa-person-walking-luggage text-4xl text-gray-300 mb-3"></i>
+            <p class="text-gray-500">No hay rotaciones externas activas.</p>
+            <a href="{% url 'control_guardias:rotacion_crear' %}"
+               class="mt-4 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg">
+                <i class="fas fa-plus mr-2"></i>Registrar rotación
+            </a>
+        </div>
+        {% endif %}
+        <div class="mt-4 text-right">
+            <a href="{% url 'control_guardias:rotaciones_lista' %}"
+               class="text-sm text-blue-600 hover:text-blue-800 transition-colors">
+                Ver historial completo <i class="fas fa-arrow-right ml-1"></i>
+            </a>
         </div>
     </div>
 

@@ -1804,6 +1804,64 @@ class EliminarGuardiaExcepcionServiceTest(TestCase):
         self.assertLessEqual(guardias_res, 3)
 
 
+class EliminarGuardiaExcepcionViewTest(TestCase):
+    """Tests de la vista para eliminar guardias por excepción."""
+
+    def setUp(self):
+        self.jefe = crear_jefe('jefe_exc_view')
+        self.residente = crear_residente('res_exc_view', 'R2')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        self.client.login(username='jefe_exc_view', password='testpass123')
+
+    def _crear_guardia_publicada(self, fecha):
+        return AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=fecha,
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+
+    def test_post_redirige_y_crea_carryover_por_defecto(self):
+        guardia = self._crear_guardia_publicada(datetime.date(2026, 5, 10))
+        url = reverse('control_guardias:guardia_eliminar_excepcion', kwargs={'guardia_pk': guardia.pk})
+
+        response = self.client.post(url, {'return_to': reverse('control_guardias:calendario')})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            AjusteCuotaGuardia.objects.filter(
+                residente=self.residente,
+                tipo='CARRYOVER',
+                mes=6,
+                anio=2026,
+            ).exists()
+        )
+
+    def test_post_sin_traslado_no_crea_carryover(self):
+        guardia = self._crear_guardia_publicada(datetime.date(2026, 5, 18))
+        url = reverse('control_guardias:guardia_eliminar_excepcion', kwargs={'guardia_pk': guardia.pk})
+
+        response = self.client.post(
+            url,
+            {
+                'trasladar_cuota': 'false',
+                'motivo': 'Cobertura externa',
+                'return_to': reverse('control_guardias:calendario'),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            AjusteCuotaGuardia.objects.filter(
+                residente=self.residente,
+                tipo='CARRYOVER',
+                mes=6,
+                anio=2026,
+            ).exists()
+        )
+
+
 # ---------------------------------------------------------------------------
 # Fase 6: SolicitudSlotVacante — aprobar, rechazar, cancelar
 # ---------------------------------------------------------------------------
