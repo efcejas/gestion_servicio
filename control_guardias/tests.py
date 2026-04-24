@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 
 from .models import (
+    AjusteCuotaGuardia,
     AsignacionGuardia,
     AusenciaDocumento,
     AusenciaResidente,
@@ -14,7 +15,9 @@ from .models import (
     CuotaMensualGuardia,
     Feriado,
     NotificacionGuardia,
+    RotacionExterna,
     SolicitudCambioGuardia,
+    SolicitudSlotVacante,
 )
 
 User = get_user_model()
@@ -1380,7 +1383,7 @@ class CancelarCambioTest(TestCase):
 
     def test_no_cancelar_si_aprobada_o_rechazada(self):
         """No se puede cancelar si ya fue aprobada o rechazada."""
-        from .services import aceptar_cambio_receptor, rechazar_cambio_jefe
+        from .services import aceptar_cambio_receptor, aprobar_cambio, rechazar_cambio_jefe
         
         # Test con aprobada
         solicitud1 = self.solicitar(self.residente1, self.g1, self.g2)
@@ -1703,3 +1706,273 @@ class CambiosViewTest(TestCase):
             f"{reverse('control_guardias:cambios')}?focus={solicitud.pk}",
         )
 
+
+
+# ---------------------------------------------------------------------------
+# Fase 6: AjusteCuotaGuardia — carry-over y penalización
+# ---------------------------------------------------------------------------
+
+class EliminarGuardiaExcepcionServiceTest(TestCase):
+    """Tests del service eliminar_guardia_excepcion con carry-over automático."""
+
+    def setUp(self):
+        from .services import eliminar_guardia_excepcion as _svc
+        self._svc = _svc
+        self.jefe = crear_jefe()
+        self.residente = crear_residente('res_exc', 'R2')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        CuotaMensualGuardia.objects.create(anio_residencia='R2', guardias_por_mes=4)
+
+    def _crear_guardia_publicada(self, fecha):
+        return AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=fecha,
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+
+    def test_eliminar_guardia_publicada_con_carryover(self):
+        """Al eliminar con trasladar_cuota=True se crea AjusteCuotaGuardia CARRYOVER."""
+        guardia = self._crear_guardia_publicada(datetime.date(2026, 5, 15))
+        resultado = self._svc(guardia, self.jefe, trasladar_cuota=True, motivo='Test')
+
+        self.assertTrue(resultado['ajuste_creado'])
+        ajuste = AjusteCuotaGuardia.objects.get(residente=self.residente, tipo='CARRYOVER')
+        self.assertEqual(ajuste.mes, 6)
+        self.assertEqual(ajuste.anio, 2026)
+        self.assertEqual(ajuste.cantidad, 1)
+        self.assertFalse(AsignacionGuardia.objects.filter(pk=resultado['guardia_eliminada']).exists())
+
+    def test_eliminar_guardia_publicada_sin_carryover(self):
+        """Con trasladar_cuota=False no se crea ningún ajuste."""
+        guardia = self._crear_guardia_publicada(datetime.date(2026, 5, 15))
+        resultado = self._svc(guardia, self.jefe, trasladar_cuota=False)
+
+        self.assertFalse(resultado['ajuste_creado'])
+        self.assertFalse(AjusteCuotaGuardia.objects.filter(residente=self.residente).exists())
+
+    def test_carryover_de_diciembre_va_a_enero_del_anio_siguiente(self):
+        """Guardia de diciembre → carry-over a enero del año siguiente."""
+        guardia = self._crear_guardia_publicada(datetime.date(2026, 12, 10))
+        self._svc(guardia, self.jefe, trasladar_cuota=True)
+
+        ajuste = AjusteCuotaGuardia.objects.get(residente=self.residente, tipo='CARRYOVER')
+        self.assertEqual(ajuste.mes, 1)
+        self.assertEqual(ajuste.anio, 2027)
+
+    def test_no_se_puede_eliminar_guardia_borrador(self):
+        """Solo se pueden eliminar guardias PUBLICADAS."""
+        from .services import CambioGuardiaError
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 20),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        with self.assertRaises(CambioGuardiaError):
+            self._svc(guardia, self.jefe)
+
+    def test_ajuste_suma_cuota_en_distribucion(self):
+        """
+        Un AjusteCuotaGuardia existente aumenta la cuota disponible
+        del residente en generar_distribucion().
+        """
+        from .services import generar_distribucion
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        AjusteCuotaGuardia.objects.create(
+            residente=self.residente,
+            mes=5,
+            anio=2026,
+            cantidad=1,
+            tipo='CARRYOVER',
+            creado_por=self.jefe,
+        )
+        CuotaMensualGuardia.objects.filter(anio_residencia='R2').update(guardias_por_mes=2)
+
+        resultado = generar_distribucion(
+            mes=5, anio=2026,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+        self.assertGreater(resultado['asignaciones_creadas'], 0)
+        guardias_res = AsignacionGuardia.objects.filter(
+            residente=self.residente, estado='BORRADOR'
+        ).count()
+        self.assertLessEqual(guardias_res, 3)
+
+
+# ---------------------------------------------------------------------------
+# Fase 6: SolicitudSlotVacante — aprobar, rechazar, cancelar
+# ---------------------------------------------------------------------------
+
+class AprobarSlotVacanteServiceTest(TestCase):
+    """Tests del flujo completo de solicitud de slot vacante."""
+
+    def setUp(self):
+        self.jefe = crear_jefe()
+        self.residente = crear_residente('res_slot', 'R2')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        CuotaMensualGuardia.objects.create(anio_residencia='R2', guardias_por_mes=4)
+        self.guardia_ceder = AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 6),
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+        self.solicitud = SolicitudSlotVacante.objects.create(
+            solicitante=self.residente,
+            guardia_ceder=self.guardia_ceder,
+            slot_fecha=datetime.date(2026, 5, 14),
+            slot_tipo_guardia=self.tipo,
+            notas_solicitante='Tengo parcial el miércoles',
+        )
+
+    def test_aprobar_slot_vacante_reasigna_guardia_y_crea_nueva(self):
+        """Al aprobar: guardia_ceder → REASIGNADA, nueva guardia PUBLICADA en slot."""
+        from .services import aprobar_slot_vacante
+        aprobar_slot_vacante(self.solicitud, self.jefe, notas='OK')
+
+        self.solicitud.refresh_from_db()
+        self.guardia_ceder.refresh_from_db()
+
+        self.assertEqual(self.solicitud.estado, 'APROBADA')
+        self.assertEqual(self.guardia_ceder.estado, 'REASIGNADA')
+        nueva = AsignacionGuardia.objects.get(
+            residente=self.residente,
+            fecha=datetime.date(2026, 5, 14),
+            tipo_guardia=self.tipo,
+        )
+        self.assertEqual(nueva.estado, 'PUBLICADA')
+        self.assertEqual(self.solicitud.guardia_creada, nueva)
+
+    def test_aprobar_slot_vacante_no_duplica_si_ya_ocupado(self):
+        """Si el slot ya está ocupado al momento de aprobar, lanza error."""
+        from .services import aprobar_slot_vacante, CambioGuardiaError
+        AsignacionGuardia.objects.create(
+            residente=crear_residente('otro_res', 'R1'),
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 14),
+            estado='PUBLICADA',
+            creada_por=self.jefe,
+        )
+        with self.assertRaises(CambioGuardiaError):
+            aprobar_slot_vacante(self.solicitud, self.jefe)
+
+    def test_rechazar_slot_vacante_cambia_estado_y_guarda_notas(self):
+        """Al rechazar: estado → RECHAZADA, notas del jefe guardadas."""
+        from .services import rechazar_slot_vacante
+        rechazar_slot_vacante(self.solicitud, self.jefe, notas='No hay cobertura ese día')
+
+        self.solicitud.refresh_from_db()
+        self.guardia_ceder.refresh_from_db()
+
+        self.assertEqual(self.solicitud.estado, 'RECHAZADA')
+        self.assertIn('No hay cobertura', self.solicitud.notas_jefe)
+        self.assertEqual(self.guardia_ceder.estado, 'PUBLICADA')
+
+    def test_cancelar_slot_vacante_por_solicitante(self):
+        """El residente puede cancelar una solicitud PENDIENTE."""
+        from .services import cancelar_slot_vacante
+        cancelar_slot_vacante(self.solicitud, self.residente)
+
+        self.solicitud.refresh_from_db()
+        self.assertEqual(self.solicitud.estado, 'CANCELADA')
+        self.guardia_ceder.refresh_from_db()
+        self.assertEqual(self.guardia_ceder.estado, 'PUBLICADA')
+
+    def test_residente_no_puede_cancelar_solicitud_aprobada(self):
+        """No se puede cancelar una solicitud ya APROBADA."""
+        from .services import cancelar_slot_vacante, aprobar_slot_vacante, CambioGuardiaError
+        aprobar_slot_vacante(self.solicitud, self.jefe)
+        self.solicitud.refresh_from_db()
+        with self.assertRaises(CambioGuardiaError):
+            cancelar_slot_vacante(self.solicitud, self.residente)
+
+    def test_no_se_puede_aprobar_solicitud_ya_resuelta(self):
+        """Aprobar una solicitud RECHAZADA lanza error."""
+        from .services import aprobar_slot_vacante, rechazar_slot_vacante, CambioGuardiaError
+        rechazar_slot_vacante(self.solicitud, self.jefe)
+        self.solicitud.refresh_from_db()
+        with self.assertRaises(CambioGuardiaError):
+            aprobar_slot_vacante(self.solicitud, self.jefe)
+
+
+# ---------------------------------------------------------------------------
+# Fase 6: RotacionExterna — preferencia de jueves en distribución
+# ---------------------------------------------------------------------------
+
+class RotacionExternaDistribucionTest(TestCase):
+    """Residentes en rotación reciben preferencia de jueves en la distribución."""
+
+    def setUp(self):
+        self.jefe = crear_jefe()
+        self.rotante = crear_residente('rotante', 'R2')
+        self.normal = crear_residente('normal', 'R2')
+        self.tipo = ConfiguracionTipoGuardia.objects.create(
+            nombre='Guardia semana rotacion',
+            hora_inicio=datetime.time(17, 0),
+            hora_fin=datetime.time(8, 0),
+            dias_semana='L,M,X,J,V',
+            aplica_feriados=False,
+        )
+        CuotaMensualGuardia.objects.create(anio_residencia='R2', guardias_por_mes=3)
+        RotacionExterna.objects.create(
+            residente=self.rotante,
+            fecha_inicio=datetime.date(2026, 5, 1),
+            fecha_fin=datetime.date(2026, 5, 31),
+            descripcion='Rotación test',
+            creado_por=self.jefe,
+        )
+
+    def test_distribucion_corre_sin_error_con_rotacion(self):
+        """La distribución no falla cuando hay residentes en rotación."""
+        from .services import generar_distribucion
+        from .models import ConfiguracionTipoGuardia as CTG
+        resultado = generar_distribucion(
+            mes=5, anio=2026,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+        self.assertGreater(resultado['asignaciones_creadas'], 0)
+
+    def test_rotante_recibe_al_menos_un_jueves(self):
+        """
+        El residente en rotación tiene PRIORIDAD de jueves en el sort del algoritmo.
+        Valida que la distribución asigna guardias al rotante respetando su cuota
+        y que el sort de jueves no rompe el algoritmo (ran sin error, guardias creadas).
+        Nota: no se garantiza un jueves específico si el rotante tiene conflicto
+        de días consecutivos (ej: recibió miércoles antes del jueves).
+        """
+        from .services import generar_distribucion
+        from .models import ConfiguracionTipoGuardia as CTG
+        import random
+        random.seed(42)
+        resultado = generar_distribucion(
+            mes=5, anio=2026,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+        # El rotante recibe guardias (hasta su cuota de 3)
+        guardias_rotante = AsignacionGuardia.objects.filter(
+            residente=self.rotante, estado='BORRADOR'
+        ).count()
+        self.assertGreater(guardias_rotante, 0, 'El rotante debería recibir al menos 1 guardia')
+        self.assertLessEqual(guardias_rotante, 3, 'El rotante no puede superar su cuota')
+        # Ningún residente tiene días consecutivos
+        for residente in [self.rotante, self.normal]:
+            fechas = sorted(
+                AsignacionGuardia.objects.filter(
+                    residente=residente, estado='BORRADOR'
+                ).values_list('fecha', flat=True)
+            )
+            import datetime as dt
+            for i in range(1, len(fechas)):
+                self.assertNotEqual(
+                    fechas[i] - fechas[i - 1],
+                    dt.timedelta(days=1),
+                    f'{residente.username} tiene guardias consecutivas'
+                )

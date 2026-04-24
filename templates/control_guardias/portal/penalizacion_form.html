@@ -1,0 +1,81 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Nueva Penalizacion de Cuota{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Nueva penalizacion manual</h1>
+            <p class="text-gray-500 mt-1">Suma guardias adicionales a la cuota mensual del residente.</p>
+        </div>
+        <a href="{% url 'control_guardias:configuracion' %}?tab=cuotas"
+           class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left mr-2"></i>Volver
+        </a>
+    </div>
+
+    <div class="max-w-2xl bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <form method="post" class="space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3 text-sm">
+                {{ form.non_field_errors|join:', ' }}
+            </div>
+            {% endif %}
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Residente</label>
+                {{ form.residente }}
+                {% if form.residente.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.residente.errors|join:', ' }}</p>
+                {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                    {{ form.mes }}
+                    {% if form.mes.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.mes.errors|join:', ' }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Anio</label>
+                    {{ form.anio }}
+                    {% if form.anio.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.anio.errors|join:', ' }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Guardias adicionales</label>
+                    {{ form.cantidad }}
+                    {% if form.cantidad.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.cantidad.errors|join:', ' }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Motivo</label>
+                {{ form.motivo }}
+                {% if form.motivo.errors %}
+                <p class="text-red-600 text-xs mt-1">{{ form.motivo.errors|join:', ' }}</p>
+                {% endif %}
+            </div>
+
+            <div class="pt-2 flex items-center justify-end gap-2">
+                <a href="{% url 'control_guardias:configuracion' %}?tab=cuotas"
+                   class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors">
+                    <i class="fas fa-check mr-2"></i>Guardar penalizacion
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

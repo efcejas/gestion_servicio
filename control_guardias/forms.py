@@ -2,11 +2,14 @@ from django import forms
 
 from .models import (
     AsignacionGuardia,
+        AjusteCuotaGuardia,
     AusenciaResidente,
     ConfiguracionTipoGuardia,
     CuotaMensualGuardia,
     Feriado,
+    RotacionExterna,
     SolicitudCambioGuardia,
+    SolicitudSlotVacante,
 )
 
 INPUT_CLASS = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg'
@@ -69,6 +72,47 @@ class CuotaMensualGuardiaForm(forms.ModelForm):
                 attrs={'class': INPUT_CLASS, 'min': 0, 'max': 100, 'step': '0.01'}
             ),
         }
+
+
+class AjustePenalizacionForm(forms.ModelForm):
+    class Meta:
+        model = AjusteCuotaGuardia
+        fields = ['residente', 'mes', 'anio', 'cantidad', 'motivo']
+        widgets = {
+            'residente': forms.Select(attrs={'class': INPUT_CLASS}),
+            'mes': forms.NumberInput(attrs={'class': INPUT_CLASS, 'min': 1, 'max': 12}),
+            'anio': forms.NumberInput(attrs={'class': INPUT_CLASS, 'min': 2025, 'max': 2099}),
+            'cantidad': forms.NumberInput(attrs={'class': INPUT_CLASS, 'min': 1}),
+            'motivo': forms.Textarea(attrs={'class': INPUT_CLASS, 'rows': 3, 'placeholder': 'Motivo de la penalizacion'}),
+        }
+        labels = {
+            'cantidad': 'Guardias adicionales',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        self.fields['residente'].queryset = User.objects.filter(
+            rol='medico_residente',
+            perfil_completo=True,
+            is_active=True,
+        ).order_by('last_name', 'first_name')
+
+        import datetime
+        hoy = datetime.date.today()
+        if not self.initial.get('mes'):
+            self.initial['mes'] = hoy.month
+        if not self.initial.get('anio'):
+            self.initial['anio'] = hoy.year
+        if not self.initial.get('cantidad'):
+            self.initial['cantidad'] = 1
+
+    def clean_cantidad(self):
+        cantidad = self.cleaned_data.get('cantidad')
+        if cantidad is None or cantidad < 1:
+            raise forms.ValidationError('La penalizacion debe ser al menos 1 guardia adicional.')
+        return cantidad
 
 
 class FeriadoForm(forms.ModelForm):
@@ -225,3 +269,46 @@ class GenerarDistribucionForm(forms.Form):
         hoy = datetime.date.today()
         self.fields['mes'].initial = hoy.month
         self.fields['anio'].initial = hoy.year
+
+
+class RotacionExternaForm(forms.ModelForm):
+    class Meta:
+        model = RotacionExterna
+        fields = ['residente', 'fecha_inicio', 'fecha_fin', 'descripcion', 'activo']
+        widgets = {
+            'residente': forms.Select(attrs={'class': INPUT_CLASS}),
+            'fecha_inicio': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+            'fecha_fin': forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+            'descripcion': forms.TextInput(attrs={'class': INPUT_CLASS, 'placeholder': 'Ej: Rotación Clínica Médica HIBA'}),
+            'activo': forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        residentes_qs = User.objects.filter(
+            rol__in=['medico_residente', 'jefe_residentes', 'instructor_residentes']
+        ).order_by('last_name', 'first_name')
+        self.fields['residente'].queryset = residentes_qs
+
+    def clean(self):
+        cleaned = super().clean()
+        inicio = cleaned.get('fecha_inicio')
+        fin = cleaned.get('fecha_fin')
+        if inicio and fin and fin < inicio:
+            raise forms.ValidationError('La fecha de fin no puede ser anterior a la de inicio.')
+        return cleaned
+
+
+class SolicitudSlotVacanteForm(forms.ModelForm):
+    class Meta:
+        model = SolicitudSlotVacante
+        fields = ['notas_solicitante']
+        widgets = {
+            'notas_solicitante': forms.Textarea(attrs={
+                'class': INPUT_CLASS,
+                'rows': 3,
+                'placeholder': 'Motivo del pedido (opcional)...',
+            }),
+        }

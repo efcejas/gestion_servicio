@@ -16,11 +16,14 @@ from django.db import transaction
 from django.urls import reverse
 
 from .models import (
+    AjusteCuotaGuardia,
     AsignacionGuardia,
     AusenciaResidente,
     ConfiguracionTipoGuardia,
     CuotaMensualGuardia,
     Feriado,
+    RotacionExterna,
+    SolicitudSlotVacante,
 )
 
 # Mapeo de código de día a weekday() de Python (0=Lunes, 6=Domingo)
@@ -117,6 +120,20 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         r.pk: cuotas.get(r.anio_residencia, 0)
         for r in residentes
     }
+
+    # Aplicar ajustes de cuota del mes (CARRYOVER y PENALIZACION)
+    ajustes = AjusteCuotaGuardia.objects.filter(mes=mes, anio=anio).select_related('residente')
+    ajustes_por_residente = defaultdict(int)
+    for ajuste in ajustes:
+        ajustes_por_residente[ajuste.residente_id] += ajuste.cantidad
+    for r in residentes:
+        extra = ajustes_por_residente.get(r.pk, 0)
+        if extra:
+            cuota_disponible[r.pk] += extra
+            tipo_ajuste = 'Traslado' if extra > 0 else 'ajuste'
+            advertencias.append(
+                f"{r.get_full_name()}: cuota aumentada +{extra} por {tipo_ajuste} ({_nombre_mes(mes)} {anio})."
+            )
 
     # ------------------------------------------------------------------
     # 3. Feriados del período
@@ -228,6 +245,15 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             fechas_ausentes[ausencia['residente_id']].add(fecha_actual)
             fecha_actual += timedelta(days=1)
 
+    # Residentes en rotación externa activa durante el período (preferencia jueves)
+    residentes_en_rotacion = set(
+        RotacionExterna.objects.filter(
+            activo=True,
+            fecha_inicio__lte=ultimo_dia,
+            fecha_fin__gte=primer_dia,
+        ).values_list('residente_id', flat=True)
+    )
+
     asignaciones_a_crear = []
     slots_sin_cubrir = []
     slots_fallback_anio = 0   # contador de slots cubiertos fuera de restricción de año
@@ -285,6 +311,14 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             candidatos.sort(key=lambda r: (
                 guardias_en_borrador[r.pk],
                 feriados_historicos[r.pk],
+            ))
+        elif weekday == 3 and residentes_en_rotacion:
+            # Jueves con rotantes: dar prioridad a residentes en rotación externa
+            # (tienen disponibilidad reducida entre semana, el jueves les conviene más)
+            candidatos.sort(key=lambda r: (
+                0 if r.pk in residentes_en_rotacion else 1,
+                guardias_en_borrador[r.pk],
+                _score_cercania(r.pk, fecha, fechas_ocupadas),
             ))
         else:
             # Para días normales: primero menos guardias, luego penalización por cercanía de 2 días
@@ -994,3 +1028,199 @@ def cancelar_ausencia(ausencia, residente):
 
     # Desvincula las guardias afectadas (se mantienen asignadas al residente)
     ausencia.guardias_afectadas.clear()
+
+
+# ==========================================================================
+# Nuevos servicios: carry-over, slot vacante
+# ==========================================================================
+
+def eliminar_guardia_excepcion(guardia, jefe, trasladar_cuota=True, motivo=''):
+    """
+    Elimina una guardia PUBLICADA por excepción (decisión del jefe).
+
+    Si trasladar_cuota=True (default), crea automáticamente un AjusteCuotaGuardia
+    tipo CARRYOVER para el mes siguiente, compensando al residente por la guardia
+    eliminada sin posibilidad de cambio.
+
+    Retorna:
+        dict con claves 'guardia_eliminada' (pk) y 'ajuste_creado' (AjusteCuotaGuardia|None)
+
+    Lanza:
+        CambioGuardiaError si la guardia no está en estado PUBLICADA.
+    """
+    if guardia.estado != 'PUBLICADA':
+        raise CambioGuardiaError(
+            f"Solo se pueden eliminar por excepción guardias PUBLICADAS. "
+            f"Esta guardia está en estado: {guardia.get_estado_display()}."
+        )
+
+    residente = guardia.residente
+    fecha_guardia = guardia.fecha
+
+    # Calcular mes siguiente para el carry-over
+    if fecha_guardia.month == 12:
+        mes_carryover = 1
+        anio_carryover = fecha_guardia.year + 1
+    else:
+        mes_carryover = fecha_guardia.month + 1
+        anio_carryover = fecha_guardia.year
+
+    guardia_pk = guardia.pk
+
+    with transaction.atomic():
+        guardia.delete()
+
+        ajuste = None
+        if trasladar_cuota:
+            motivo_ajuste = (
+                motivo or
+                f"Guardia del {fecha_guardia.strftime('%d/%m/%Y')} eliminada por excepción "
+                f"por {jefe.get_full_name()}."
+            )
+            ajuste = AjusteCuotaGuardia.objects.create(
+                residente=residente,
+                mes=mes_carryover,
+                anio=anio_carryover,
+                cantidad=1,
+                tipo='CARRYOVER',
+                motivo=motivo_ajuste,
+                creado_por=jefe,
+            )
+
+        crear_notificacion(
+            residente,
+            'GUARDIA_REASIGNADA',
+            f"Tu guardia del {fecha_guardia.strftime('%d/%m/%Y')} fue eliminada por el jefe."
+            + (f" Se acreditó una guardia extra para {_nombre_mes(mes_carryover)} {anio_carryover}." if ajuste else ''),
+        )
+
+    return {'guardia_eliminada': guardia_pk, 'ajuste_creado': ajuste}
+
+
+def aprobar_slot_vacante(solicitud, jefe, notas=''):
+    """
+    Jefe aprueba una SolicitudSlotVacante.
+
+    Efectos:
+      - guardia_ceder → estado REASIGNADA
+      - Nueva AsignacionGuardia PUBLICADA para el mismo residente en slot_fecha/slot_tipo
+      - solicitud → APROBADA, guardia_creada asignada
+
+    La cuota queda neutra (cede una, toma una).
+
+    Lanza:
+        CambioGuardiaError si el estado no es PENDIENTE o el slot ya fue ocupado.
+    """
+    from django.utils import timezone as tz
+
+    if solicitud.estado != 'PENDIENTE':
+        raise CambioGuardiaError(
+            f"Solo se puede aprobar una solicitud PENDIENTE. Estado actual: {solicitud.get_estado_display()}."
+        )
+
+    # Verificar que el slot destino sigue vacante
+    slot_ocupado = AsignacionGuardia.objects.filter(
+        fecha=solicitud.slot_fecha,
+        tipo_guardia=solicitud.slot_tipo_guardia,
+        estado__in=['PUBLICADA', 'BORRADOR'],
+    ).exists()
+    if slot_ocupado:
+        raise CambioGuardiaError(
+            f"El slot del {solicitud.slot_fecha.strftime('%d/%m/%Y')} "
+            f"({solicitud.slot_tipo_guardia.nombre}) ya no está disponible."
+        )
+
+    with transaction.atomic():
+        # Marcar guardia original como reasignada
+        guardia_cedida = solicitud.guardia_ceder
+        guardia_cedida.estado = 'REASIGNADA'
+        guardia_cedida.notas = (
+            f"Movida al {solicitud.slot_fecha.strftime('%d/%m/%Y')} "
+            f"por solicitud de slot vacante aprobada por {jefe.get_full_name()}."
+        )
+        guardia_cedida.save(update_fields=['estado', 'notas', 'fecha_actualizacion'])
+
+        # Crear nueva guardia en el slot destino
+        nueva_guardia = AsignacionGuardia.objects.create(
+            residente=solicitud.solicitante,
+            tipo_guardia=solicitud.slot_tipo_guardia,
+            fecha=solicitud.slot_fecha,
+            estado='PUBLICADA',
+            creada_por=jefe,
+            notas=(
+                f"Creada por aprobación de solicitud de slot vacante "
+                f"(reemplaza guardia del {guardia_cedida.fecha.strftime('%d/%m/%Y')})."
+            ),
+        )
+
+        # Actualizar solicitud
+        solicitud.estado = 'APROBADA'
+        solicitud.revisado_por = jefe
+        solicitud.notas_jefe = notas
+        solicitud.guardia_creada = nueva_guardia
+        solicitud.fecha_resolucion = tz.now()
+        solicitud.save(update_fields=[
+            'estado', 'revisado_por', 'notas_jefe', 'guardia_creada', 'fecha_resolucion'
+        ])
+
+    crear_notificacion(
+        solicitud.solicitante,
+        'CAMBIO_APROBADO',
+        f"Tu solicitud de slot vacante fue aprobada. "
+        f"Tu guardia del {guardia_cedida.fecha.strftime('%d/%m/%Y')} fue movida al "
+        f"{solicitud.slot_fecha.strftime('%d/%m/%Y')} ({solicitud.slot_tipo_guardia.nombre}).",
+    )
+
+    return solicitud
+
+
+def rechazar_slot_vacante(solicitud, jefe, notas=''):
+    """
+    Jefe rechaza una SolicitudSlotVacante.
+
+    Lanza:
+        CambioGuardiaError si el estado no es PENDIENTE.
+    """
+    from django.utils import timezone as tz
+
+    if solicitud.estado != 'PENDIENTE':
+        raise CambioGuardiaError(
+            f"Solo se puede rechazar una solicitud PENDIENTE. Estado actual: {solicitud.get_estado_display()}."
+        )
+
+    solicitud.estado = 'RECHAZADA'
+    solicitud.revisado_por = jefe
+    solicitud.notas_jefe = notas
+    solicitud.fecha_resolucion = tz.now()
+    solicitud.save(update_fields=['estado', 'revisado_por', 'notas_jefe', 'fecha_resolucion'])
+
+    crear_notificacion(
+        solicitud.solicitante,
+        'CAMBIO_RECHAZADO',
+        f"Tu solicitud de slot vacante del "
+        f"{solicitud.guardia_ceder.fecha.strftime('%d/%m/%Y')} → "
+        f"{solicitud.slot_fecha.strftime('%d/%m/%Y')} fue rechazada."
+        + (f" Motivo: {notas}" if notas else ''),
+    )
+
+    return solicitud
+
+
+def cancelar_slot_vacante(solicitud, solicitante):
+    """
+    Residente cancela su propia solicitud de slot vacante (si está PENDIENTE).
+
+    Lanza:
+        CambioGuardiaError si el solicitante no es el dueño o el estado no permite cancelar.
+    """
+    if solicitud.solicitante != solicitante:
+        raise CambioGuardiaError("Solo el solicitante puede cancelar esta solicitud.")
+    if solicitud.estado != 'PENDIENTE':
+        raise CambioGuardiaError(
+            f"Solo se puede cancelar una solicitud PENDIENTE. Estado actual: {solicitud.get_estado_display()}."
+        )
+
+    solicitud.estado = 'CANCELADA'
+    solicitud.save(update_fields=['estado'])
+
+    return solicitud

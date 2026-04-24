@@ -1,0 +1,97 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Nueva Rotación Externa{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl px-4 sm:px-6 lg:px-8 py-4 mx-auto">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Nueva Rotación Externa</h1>
+        <a href="{% url 'control_guardias:rotaciones_lista' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-500 mb-6">
+            Los residentes con rotación activa durante el mes a distribuir reciben preferencia de jueves
+            en el algoritmo automático de guardias.
+        </p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <div class="space-y-5">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Residente</label>
+                    {{ form.residente }}
+                    {% if form.residente.errors %}
+                    <p class="text-red-600 text-xs mt-1">{{ form.residente.errors.0 }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de inicio</label>
+                        {{ form.fecha_inicio }}
+                        {% if form.fecha_inicio.errors %}
+                        <p class="text-red-600 text-xs mt-1">{{ form.fecha_inicio.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de fin</label>
+                        {{ form.fecha_fin }}
+                        {% if form.fecha_fin.errors %}
+                        <p class="text-red-600 text-xs mt-1">{{ form.fecha_fin.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Descripción <span class="text-gray-400 font-normal">(opcional)</span>
+                    </label>
+                    {{ form.descripcion }}
+                </div>
+
+                <div class="flex items-center gap-3">
+                    {{ form.activo }}
+                    <label class="text-sm text-gray-700">Rotación activa (aplica en distribución)</label>
+                </div>
+
+                {% if form.non_field_errors %}
+                <div class="px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+                    {% for error in form.non_field_errors %}
+                    <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <div class="flex justify-end gap-3 pt-2">
+                    <a href="{% url 'control_guardias:rotaciones_lista' %}"
+                       class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors">
+                        Cancelar
+                    </a>
+                    <button type="submit"
+                            class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                        Guardar rotación
+                    </button>
+                </div>
+
+            </div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

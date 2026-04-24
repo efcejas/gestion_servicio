@@ -8,6 +8,9 @@ from .models import (
     Feriado,
     NotificacionGuardia,
     SolicitudCambioGuardia,
+    AjusteCuotaGuardia,
+    RotacionExterna,
+    SolicitudSlotVacante,
 )
 
 
@@ -81,3 +84,40 @@ class NotificacionGuardiaAdmin(admin.ModelAdmin):
     def get_destinatario(self, obj):
         return obj.destinatario.get_full_name()
     get_destinatario.short_description = 'Destinatario'
+
+
+@admin.register(AjusteCuotaGuardia)
+class AjusteCuotaGuardiaAdmin(admin.ModelAdmin):
+    list_display = ('get_residente', 'tipo', 'mes', 'anio', 'cantidad', 'creado_en')
+    list_filter = ('tipo', 'anio', 'mes')
+    search_fields = ('residente__first_name', 'residente__last_name')
+    raw_id_fields = ('residente', 'creado_por', 'guardia_origen')
+
+    def get_residente(self, obj):
+        return obj.residente.get_full_name()
+    get_residente.short_description = 'Residente'
+
+
+@admin.register(RotacionExterna)
+class RotacionExternaAdmin(admin.ModelAdmin):
+    list_display = ('get_residente', 'fecha_inicio', 'fecha_fin', 'descripcion', 'activo')
+    list_filter = ('activo',)
+    search_fields = ('residente__first_name', 'residente__last_name', 'descripcion')
+    raw_id_fields = ('residente', 'creado_por')
+    date_hierarchy = 'fecha_inicio'
+
+    def get_residente(self, obj):
+        return obj.residente.get_full_name()
+    get_residente.short_description = 'Residente'
+
+
+@admin.register(SolicitudSlotVacante)
+class SolicitudSlotVacanteAdmin(admin.ModelAdmin):
+    list_display = ('get_solicitante', 'slot_fecha', 'estado', 'fecha_solicitud')
+    list_filter = ('estado',)
+    search_fields = ('solicitante__first_name', 'solicitante__last_name')
+    raw_id_fields = ('solicitante', 'guardia_ceder', 'revisado_por', 'guardia_creada')
+
+    def get_solicitante(self, obj):
+        return obj.solicitante.get_full_name()
+    get_solicitante.short_description = 'Solicitante'

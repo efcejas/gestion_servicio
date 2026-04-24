@@ -1,0 +1,100 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Solicitudes de Slot Vacante{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
+
+    <!-- Encabezado -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Solicitudes de Slot Vacante</h1>
+            <p class="text-gray-500 mt-0.5 text-sm">
+                Residentes que quieren mover su guardia a un slot libre del mismo mes.
+            </p>
+        </div>
+        <a href="{% url 'control_guardias:cambios' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if solicitudes %}
+    <div class="space-y-4">
+        {% for sol in solicitudes %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+
+                <!-- Info principal -->
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="font-semibold text-gray-900">{{ sol.solicitante.get_full_name }}</span>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Pendiente
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-600 space-y-1">
+                        <p>
+                            <span class="font-medium">Cede:</span>
+                            {{ sol.guardia_ceder.fecha|date:"d/m/Y" }}
+                            ({{ sol.guardia_ceder.tipo_guardia.nombre }})
+                        </p>
+                        <p>
+                            <span class="font-medium">Solicita slot:</span>
+                            {{ sol.slot_fecha|date:"d/m/Y" }}
+                            ({{ sol.slot_tipo_guardia.nombre }})
+                        </p>
+                        {% if sol.notas_solicitante %}
+                        <p class="text-gray-500 italic">"{{ sol.notas_solicitante }}"</p>
+                        {% endif %}
+                        <p class="text-xs text-gray-400">
+                            Solicitado el {{ sol.fecha_solicitud|date:"d/m/Y \a \l\a\s H:i" }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Formulario de revisión -->
+                <div class="shrink-0 w-full sm:w-72">
+                    <form method="post" action="{% url 'control_guardias:slot_vacante_revisar' sol.pk %}">
+                        {% csrf_token %}
+                        <textarea name="notas_jefe" rows="2"
+                                  placeholder="Notas (opcional)..."
+                                  class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        <div class="flex gap-2">
+                            <button type="submit" name="accion" value="aprobar"
+                                    class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors">
+                                <i class="fas fa-check mr-1"></i>Aprobar
+                            </button>
+                            <button type="submit" name="accion" value="rechazar"
+                                    class="flex-1 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-medium rounded-lg transition-colors"
+                                    onclick="return confirm('¿Rechazar esta solicitud?')">
+                                <i class="fas fa-times mr-1"></i>Rechazar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 text-gray-400">
+        <i class="fas fa-check-circle text-4xl mb-3 text-green-300"></i>
+        <p class="text-sm">No hay solicitudes pendientes.</p>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

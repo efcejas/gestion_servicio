@@ -1,0 +1,103 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Solicitar Slot Vacante{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl px-4 sm:px-6 lg:px-8 py-4 mx-auto">
+
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Mover mi guardia</h1>
+        <a href="{% url 'control_guardias:mis_guardias' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
+            <i class="fas fa-arrow-left"></i>Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="mb-4 px-4 py-3 rounded-lg text-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Card: guardia que se cede -->
+    <div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-5">
+        <p class="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-1">Guardia que cedés</p>
+        <p class="text-gray-900 font-medium">
+            {{ guardia.fecha|date:"l d \d\e F \d\e Y" }}
+        </p>
+        <p class="text-sm text-gray-600">{{ guardia.tipo_guardia.nombre }}</p>
+    </div>
+
+    {% if slots_disponibles %}
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+        <p class="text-sm text-gray-600 mb-5">
+            Elegí el día al que querés mover tu guardia. El jefe lo validará antes de hacerse efectivo.
+        </p>
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="slot_tipo_guardia" value="{{ tipo_guardia.pk }}">
+
+            <!-- Grilla de días disponibles -->
+            <div class="mb-5">
+                <p class="text-sm font-medium text-gray-700 mb-3">Slot destino</p>
+                <div class="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {% for dia in slots_disponibles %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="slot_fecha" value="{{ dia|date:'Y-m-d' }}" class="sr-only peer" required>
+                        <div class="text-center px-2 py-2.5 rounded-lg border border-gray-200 text-sm
+                                    peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600
+                                    hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                            <div class="font-semibold">{{ dia|date:"d" }}</div>
+                            <div class="text-xs opacity-75">{{ dia|date:"D"|truncatechars:3 }}</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Notas -->
+            <div class="mb-5">
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Motivo <span class="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                {{ form.notas_solicitante }}
+            </div>
+
+            <!-- Aviso -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-700 mb-5">
+                <i class="fas fa-info-circle mr-1"></i>
+                La operación es cuota-neutral: cedés el día {{ guardia.fecha|date:"d/m" }} y tomás el slot nuevo.
+                La cuota mensual no cambia.
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <a href="{% url 'control_guardias:mis_guardias' %}"
+                   class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                    Enviar solicitud
+                </button>
+            </div>
+        </form>
+    </div>
+    {% else %}
+    <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500">
+        <i class="fas fa-calendar-times text-3xl mb-3 text-gray-300"></i>
+        <p class="text-sm">No hay slots vacíos disponibles para este tipo de guardia en este mes.</p>
+        <a href="{% url 'control_guardias:mis_guardias' %}"
+           class="mt-4 inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
+            <i class="fas fa-arrow-left"></i>Volver a mis guardias
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

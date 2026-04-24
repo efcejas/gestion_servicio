@@ -7,10 +7,13 @@ from .views import (
     CancelarAusenciaView,
     CancelarBorradorView,
     CancelarCambioView,
+    CancelarSlotVacanteView,
     CambiosGuardiaView,
     ConfiguracionView,
     CuotaMensualFormView,
+        PenalizacionCuotaCreateView,
     DistribucionView,
+    EliminarGuardiaExcepcionView,
     FeriadoCreateView,
     FeriadoDeleteView,
     GuardiasApiView,
@@ -22,7 +25,13 @@ from .views import (
     ResolverAusenciaView,
     ResponderCambioView,
     RevisarCambioView,
+    RevisarSlotVacanteView,
+    RotacionExternaCreateView,
+    RotacionExternaDeleteView,
+    RotacionExternaListView,
     SolicitarCambioView,
+    SolicitarSlotVacanteView,
+    SolicitudesSlotVacanteView,
     TipoGuardiaCreateView,
     TipoGuardiaDeleteView,
     TipoGuardiaUpdateView,
@@ -48,6 +57,7 @@ urlpatterns = [
 
     # Cuotas mensuales
     path('configuracion/cuotas/<str:anio>/editar/', CuotaMensualFormView.as_view(), name='cuota_editar'),
+    path('configuracion/penalizaciones/nueva/', PenalizacionCuotaCreateView.as_view(), name='penalizacion_crear'),
 
     # Feriados
     path('configuracion/feriados/nuevo/', FeriadoCreateView.as_view(), name='feriado_crear'),
@@ -71,5 +81,19 @@ urlpatterns = [
     path('cambios/<int:pk>/responder/', ResponderCambioView.as_view(), name='cambio_responder'),
     path('cambios/<int:pk>/revisar/', RevisarCambioView.as_view(), name='cambio_revisar'),
     path('cambios/<int:pk>/cancelar/', CancelarCambioView.as_view(), name='cambio_cancelar'),
+
+    # -- Rotaciones externas (jefe) --
+    path('configuracion/rotaciones/', RotacionExternaListView.as_view(), name='rotaciones_lista'),
+    path('configuracion/rotaciones/nueva/', RotacionExternaCreateView.as_view(), name='rotacion_crear'),
+    path('configuracion/rotaciones/<int:pk>/eliminar/', RotacionExternaDeleteView.as_view(), name='rotacion_eliminar'),
+
+    # -- Eliminar guardia por excepción (jefe, con carry-over automático) --
+    path('guardias/<int:guardia_pk>/eliminar-excepcion/', EliminarGuardiaExcepcionView.as_view(), name='guardia_eliminar_excepcion'),
+
+    # -- Slot vacante (residente → jefe) --
+    path('slot-vacante/solicitudes/', SolicitudesSlotVacanteView.as_view(), name='solicitudes_slot_vacante'),
+    path('slot-vacante/<int:pk>/revisar/', RevisarSlotVacanteView.as_view(), name='slot_vacante_revisar'),
+    path('guardias/<int:guardia_pk>/solicitar-slot-vacante/', SolicitarSlotVacanteView.as_view(), name='solicitar_slot_vacante'),
+    path('slot-vacante/<int:pk>/cancelar/', CancelarSlotVacanteView.as_view(), name='slot_vacante_cancelar'),
 ]
 

@@ -22,6 +22,10 @@
                 <option value="{{ r.pk }}">{{ r.get_full_name }}</option>
                 {% endfor %}
             </select>
+            <a href="{% url 'control_guardias:solicitudes_slot_vacante' %}"
+               class="inline-flex items-center px-4 py-2 text-sm text-amber-700 hover:text-amber-900 border border-amber-300 rounded-lg hover:border-amber-500 bg-amber-50 transition-colors shadow-sm">
+              <i class="fas fa-inbox mr-2"></i>Slots vacantes pendientes
+            </a>
             {% endif %}
             {% if not es_gestor %}
             <button id="toggleVerTodasGuardias"
@@ -60,6 +64,10 @@
                 {% endfor %}
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-500 rounded-full font-medium">
                     <span class="w-2 h-2 rounded-full bg-gray-400 shrink-0"></span>Borrador
+                </span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium bg-red-50 text-red-700 border border-red-200">
+                  <span class="w-2 h-2 rounded-full shrink-0 bg-red-500"></span>
+                  Click en PUBLICADA para eliminar por excepcion
                 </span>
             {% else %}
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-medium"
@@ -204,6 +212,14 @@
       </div>
       {% endif %}
 
+      {% if es_gestor %}
+      <form id="formEliminarExcepcionCalendario" method="POST" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="trasladar_cuota" value="true">
+        <input type="hidden" name="return_to" id="eliminarExcepcionReturnTo" value="">
+      </form>
+      {% endif %}
+
 </div>
 {% endblock %}
 
@@ -269,9 +285,12 @@
   const cancelarSolicitudFocusEl = document.getElementById('cancelarSolicitudFocus');
   const apiUrl      = "{% url 'control_guardias:guardias_api' %}";
   const solicitarCambioBaseUrl = "{% url 'control_guardias:solicitar_cambio' guardia_pk=999999 %}";
+  const eliminarExcepcionBaseUrl = "{% url 'control_guardias:guardia_eliminar_excepcion' guardia_pk=999999 %}";
   const FERIADOS    = new Set({{ feriados_json|safe }});
   const INITIAL_DATE = "{{ calendario_initial_date|default:'' }}";
   const ES_GESTOR = {{ es_gestor|yesno:'true,false' }};
+  const formEliminarExcepcionEl = document.getElementById('formEliminarExcepcionCalendario');
+  const eliminarExcepcionReturnToEl = document.getElementById('eliminarExcepcionReturnTo');
 
   const currentUrl = new URL(window.location.href);
   let mostrandoTodas = !ES_GESTOR && currentUrl.searchParams.get('ver_todas') === '1';
@@ -290,6 +309,18 @@
     targetUrl.searchParams.set('return_to', `${returnTo.pathname}${returnTo.search}`);
     targetUrl.searchParams.set('focus', String(miGuardiaId));
     return `${targetUrl.pathname}${targetUrl.search}`;
+  }
+
+  function submitEliminarExcepcion(guardiaId) {
+    if (!formEliminarExcepcionEl || !guardiaId) return;
+    if (!window.confirm('Se eliminara esta guardia PUBLICADA y se creara carry-over automatico al mes siguiente. Desea continuar?')) {
+      return;
+    }
+    formEliminarExcepcionEl.action = eliminarExcepcionBaseUrl.replace('999999', String(guardiaId));
+    if (eliminarExcepcionReturnToEl) {
+      eliminarExcepcionReturnToEl.value = `${window.location.pathname}${window.location.search}`;
+    }
+    formEliminarExcepcionEl.submit();
   }
 
   function syncToggleUrl() {
@@ -553,8 +584,17 @@
       eventMouseEnter: showTooltip,
       eventMouseLeave: hideTooltip,
       eventClick: (info) => {
-        if (ES_GESTOR) return;
         const ex = info.event.extendedProps || {};
+
+        if (ES_GESTOR) {
+          if (ex.estado === 'PUBLICADA') {
+            info.jsEvent.preventDefault();
+            hideTooltip();
+            submitEliminarExcepcion(info.event.id);
+          }
+          return;
+        }
+
         if (!mostrandoTodas || ex.es_mia || ex.estado !== 'PUBLICADA') {
           return;
         }

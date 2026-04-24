@@ -385,3 +385,164 @@ class NotificacionGuardia(models.Model):
     def __str__(self):
         estado = '✓' if self.leida else '●'
         return f"[{estado}] {self.destinatario.get_full_name()} - {self.get_tipo_display()}"
+
+
+class AjusteCuotaGuardia(models.Model):
+    """
+    Ajuste a la cuota mensual de guardias de un residente.
+    CARRYOVER: guardia eliminada por excepción trasladada al mes siguiente.
+    PENALIZACION: guardia extra asignada como penalización.
+    El algoritmo de distribución suma estos ajustes a la cuota base.
+    """
+    TIPO_CHOICES = [
+        ('CARRYOVER', 'Traslado del mes anterior'),
+        ('PENALIZACION', 'Guardia extra por penalización'),
+    ]
+
+    residente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='ajustes_cuota_guardias'
+    )
+    mes = models.PositiveSmallIntegerField(help_text='Mes al que aplica el ajuste (1-12).')
+    anio = models.PositiveIntegerField(help_text='Año al que aplica el ajuste.')
+    cantidad = models.PositiveSmallIntegerField(
+        default=1,
+        help_text='Guardias adicionales que se suman a la cuota base del residente para ese mes.'
+    )
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    motivo = models.TextField(blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='ajustes_cuota_creados'
+    )
+    guardia_origen = models.ForeignKey(
+        AsignacionGuardia,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='ajuste_cuota_generado',
+        help_text='Guardia que originó este ajuste (trazabilidad).'
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Ajuste de cuota de guardia'
+        verbose_name_plural = 'Ajustes de cuota de guardias'
+        ordering = ['-creado_en']
+
+    def __str__(self):
+        return (
+            f"{self.get_tipo_display()} — {self.residente.get_full_name()} "
+            f"+{self.cantidad} guardia(s) ({self.mes:02d}/{self.anio})"
+        )
+
+
+class RotacionExterna(models.Model):
+    """
+    Período de rotación externa de un residente (carga manual del jefe).
+    Residentes activos en rotación reciben preferencia de jueves en el
+    algoritmo de distribución, ya que tienen disponibilidad reducida entre semana.
+    """
+    residente = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='rotaciones_externas'
+    )
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    descripcion = models.CharField(
+        max_length=200,
+        blank=True,
+        help_text='Ej: Rotación Clínica Médica HIBA'
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text='Desmarcar para ignorar esta rotación sin eliminarla del historial.'
+    )
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='rotaciones_creadas'
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Rotación externa'
+        verbose_name_plural = 'Rotaciones externas'
+        ordering = ['-fecha_inicio']
+
+    def __str__(self):
+        return (
+            f"{self.residente.get_full_name()} — "
+            f"{self.fecha_inicio.strftime('%d/%m/%Y')} al {self.fecha_fin.strftime('%d/%m/%Y')}"
+        )
+
+
+class SolicitudSlotVacante(models.Model):
+    """
+    Solicitud de un residente para mover su guardia a un slot vacío del mismo mes.
+    No requiere contraparte (≠ cambio bilateral). La cuota queda neutra:
+    el residente cede la guardia del día X y toma el slot libre del día Y.
+    Al aprobarse: guardia_ceder → REASIGNADA + nueva AsignacionGuardia PUBLICADA.
+    """
+    ESTADO_CHOICES = [
+        ('PENDIENTE', 'Pendiente de validación'),
+        ('APROBADA', 'Aprobada'),
+        ('RECHAZADA', 'Rechazada'),
+        ('CANCELADA', 'Cancelada por el solicitante'),
+    ]
+
+    solicitante = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_slot_vacante'
+    )
+    guardia_ceder = models.ForeignKey(
+        AsignacionGuardia,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_slot_vacante_origen',
+        help_text='Guardia que el residente cede (día X).'
+    )
+    slot_fecha = models.DateField(help_text='Fecha del slot vacante destino (día Y).')
+    slot_tipo_guardia = models.ForeignKey(
+        ConfiguracionTipoGuardia,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_slot_vacante',
+        help_text='Tipo del slot vacante destino.'
+    )
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE')
+    notas_solicitante = models.TextField(blank=True)
+    notas_jefe = models.TextField(blank=True)
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='slots_vacantes_revisados'
+    )
+    guardia_creada = models.ForeignKey(
+        AsignacionGuardia,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='solicitud_slot_vacante_origen',
+        help_text='AsignacionGuardia creada al aprobar (trazabilidad).'
+    )
+    fecha_solicitud = models.DateTimeField(auto_now_add=True)
+    fecha_resolucion = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Solicitud de slot vacante'
+        verbose_name_plural = 'Solicitudes de slot vacante'
+        ordering = ['-fecha_solicitud']
+
+    def __str__(self):
+        return (
+            f"Slot vacante: {self.solicitante.get_full_name()} "
+            f"[{self.guardia_ceder.fecha.strftime('%d/%m/%Y')} → {self.slot_fecha.strftime('%d/%m/%Y')}] "
+            f"({self.get_estado_display()})"
+        )

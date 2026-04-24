@@ -11,20 +11,26 @@ from django.views.generic import CreateView, DeleteView, ListView, TemplateView,
 from .forms import (
     ConfiguracionTipoGuardiaForm,
     CuotaMensualGuardiaForm,
+        AjustePenalizacionForm,
     FeriadoForm,
     GenerarDistribucionForm,
     AusenciaResidenteForm,
+    RotacionExternaForm,
     SolicitudCambioGuardiaForm,
+    SolicitudSlotVacanteForm,
     NotasRechazoForm,
 )
 from .models import (
     AsignacionGuardia,
+    AjusteCuotaGuardia,
     AusenciaResidente,
     ConfiguracionTipoGuardia,
     CuotaMensualGuardia,
     Feriado,
     NotificacionGuardia,
+    RotacionExterna,
     SolicitudCambioGuardia,
+    SolicitudSlotVacante,
 )
 # Paleta de colores por residente (estable: residente.pk % len(_RESIDENTE_PALETTE))
 _RESIDENTE_PALETTE = [
@@ -45,14 +51,18 @@ from .services import (
     DistribucionError,
     aceptar_cambio_receptor,
     aprobar_cambio,
+    aprobar_slot_vacante,
     cancelar_ausencia,
     cancelar_borrador,
     cancelar_cambio,
+    cancelar_slot_vacante,
+    eliminar_guardia_excepcion,
     generar_distribucion,
     obtener_metricas_mes,
     publicar_borrador,
     rechazar_cambio_jefe,
     rechazar_cambio_receptor,
+    rechazar_slot_vacante,
     reportar_ausencia,
     resolver_ausencia,
     solicitar_cambio,
@@ -448,7 +458,6 @@ class ConfiguracionView(JefeInstructorMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['tipos_guardia'] = ConfiguracionTipoGuardia.objects.select_related('creado_por')
-        # Pasar todas las filas R1-R4 siempre, con cuota o sin ella
         cuotas_map = {c.anio_residencia: c for c in CuotaMensualGuardia.objects.all()}
         context['cuotas_filas'] = [
             {'anio': anio, 'cuota': cuotas_map.get(anio)}
@@ -456,6 +465,11 @@ class ConfiguracionView(JefeInstructorMixin, TemplateView):
         ]
         context['feriados'] = Feriado.objects.order_by('fecha')
         context['feriado_form'] = FeriadoForm()
+        context['rotaciones_activas'] = (
+            RotacionExterna.objects.filter(activo=True)
+            .select_related('residente')
+            .order_by('fecha_inicio')
+        )
         return context
 
 
@@ -559,6 +573,22 @@ class CuotaMensualFormView(JefeInstructorMixin, TemplateView):
         return self.render_to_response(self.get_context_data(form=form))
 
 
+class PenalizacionCuotaCreateView(JefeInstructorMixin, CreateView):
+    """Registrar penalización manual que agrega guardias a la cuota mensual del residente."""
+    model = AjusteCuotaGuardia
+    form_class = AjustePenalizacionForm
+    template_name = 'control_guardias/portal/penalizacion_form.html'
+
+    def form_valid(self, form):
+        form.instance.tipo = 'PENALIZACION'
+        form.instance.creado_por = self.request.user
+        messages.success(self.request, 'Penalización registrada correctamente.')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('control_guardias:configuracion') + '?tab=cuotas'
+
+
 class FeriadoCreateView(JefeInstructorMixin, CreateView):
     model = Feriado
     form_class = FeriadoForm
@@ -590,6 +620,7 @@ class FeriadoCreateView(JefeInstructorMixin, CreateView):
             ],
             'feriados': Feriado.objects.order_by('fecha'),
             'feriado_form': kwargs.get('feriado_form', FeriadoForm()),
+                    'rotaciones_activas': RotacionExterna.objects.filter(activo=True).select_related('residente').order_by('fecha_inicio'),
         }
 
 
@@ -1187,4 +1218,227 @@ class CancelarAusenciaView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:ausencias')
+
+
+# ─────────────────────────────────────────────────────────────────
+# Rotaciones externas (jefe) — CRUD simple
+# ─────────────────────────────────────────────────────────────────
+
+class RotacionExternaListView(JefeInstructorMixin, ListView):
+    """Jefe: lista todas las rotaciones externas registradas."""
+    model = RotacionExterna
+    template_name = 'control_guardias/portal/rotaciones_externas.html'
+    context_object_name = 'rotaciones'
+    login_url = 'login'
+
+    def get_queryset(self):
+        return RotacionExterna.objects.select_related('residente', 'creado_por').order_by('-fecha_inicio')
+
+
+class RotacionExternaCreateView(JefeInstructorMixin, CreateView):
+    """Jefe: registra una nueva rotación externa."""
+    model = RotacionExterna
+    form_class = RotacionExternaForm
+    template_name = 'control_guardias/portal/rotacion_externa_form.html'
+    login_url = 'login'
+
+    def form_valid(self, form):
+        form.instance.creado_por = self.request.user
+        messages.success(self.request, 'Rotación registrada correctamente.')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('control_guardias:rotaciones_lista')
+
+
+class RotacionExternaDeleteView(JefeInstructorMixin, DeleteView):
+    """Jefe: elimina una rotación externa."""
+    model = RotacionExterna
+    template_name = 'control_guardias/portal/rotacion_externa_confirmar_eliminar.html'
+    login_url = 'login'
+    success_url = reverse_lazy('control_guardias:rotaciones_lista')
+
+    def form_valid(self, form):
+        messages.success(self.request, 'Rotación eliminada.')
+        return super().form_valid(form)
+
+
+# ─────────────────────────────────────────────────────────────────
+# Eliminar guardia por excepción (jefe) — carry-over automático
+# ─────────────────────────────────────────────────────────────────
+
+class EliminarGuardiaExcepcionView(JefeInstructorMixin, TemplateView):
+    """
+    POST: jefe elimina una guardia PUBLICADA por excepción.
+    Si trasladar_cuota=True (default), crea carry-over al mes siguiente.
+    """
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, guardia_pk, *args, **kwargs):
+        guardia = get_object_or_404(AsignacionGuardia, pk=guardia_pk)
+        trasladar = request.POST.get('trasladar_cuota', 'true').lower() != 'false'
+        motivo = request.POST.get('motivo', '').strip()
+        try:
+            resultado = eliminar_guardia_excepcion(guardia, request.user, trasladar_cuota=trasladar, motivo=motivo)
+            if resultado.get('ajuste_creado'):
+                messages.success(
+                    request,
+                    f"Guardia eliminada. Se creó carry-over para "
+                    f"{guardia.residente.get_full_name()} en el mes siguiente."
+                )
+            else:
+                messages.success(request, 'Guardia eliminada sin carry-over.')
+        except (DistribucionError, CambioGuardiaError) as e:
+            messages.error(request, str(e))
+        return _safe_return_url(
+            request,
+            reverse('control_guardias:calendario'),
+        )
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:calendario')
+
+
+# ─────────────────────────────────────────────────────────────────
+# Solicitudes de slot vacante (residente → jefe)
+# ─────────────────────────────────────────────────────────────────
+
+class SolicitarSlotVacanteView(LoginRequiredMixin, TemplateView):
+    """
+    Residente solicita mover su guardia a un slot vacío.
+    GET: muestra modal con formulario.
+    POST: crea la SolicitudSlotVacante.
+    """
+    template_name = 'control_guardias/portal/solicitar_slot_vacante.html'
+    login_url = 'login'
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        guardia = get_object_or_404(AsignacionGuardia, pk=self.kwargs['guardia_pk'])
+        if guardia.residente_id != self.request.user.id or guardia.estado != 'PUBLICADA':
+            from django.http import Http404
+            raise Http404('Guardia no disponible para solicitud de slot vacante.')
+        ctx['guardia'] = guardia
+        ctx['form'] = SolicitudSlotVacanteForm()
+        # Slots vacíos: mismos tipos de guardia, mismo mes/año, sin asignación existente
+        import calendar
+        fecha = guardia.fecha
+        ultimo_dia = calendar.monthrange(fecha.year, fecha.month)[1]
+        from datetime import date
+        inicio_mes = date(fecha.year, fecha.month, 1)
+        fin_mes = date(fecha.year, fecha.month, ultimo_dia)
+        guardias_ocupadas = AsignacionGuardia.objects.filter(
+            fecha__range=(inicio_mes, fin_mes),
+            tipo_guardia=guardia.tipo_guardia,
+            estado__in=['BORRADOR', 'PUBLICADA'],
+        ).values_list('fecha', flat=True)
+        from django.contrib.auth import get_user_model
+        dias_libres = [
+            date(fecha.year, fecha.month, d)
+            for d in range(1, ultimo_dia + 1)
+            if date(fecha.year, fecha.month, d) not in guardias_ocupadas
+            and date(fecha.year, fecha.month, d) != fecha
+        ]
+        ctx['slots_disponibles'] = dias_libres
+        ctx['tipo_guardia'] = guardia.tipo_guardia
+        return ctx
+
+    def post(self, request, guardia_pk, *args, **kwargs):
+        guardia = get_object_or_404(AsignacionGuardia, pk=guardia_pk)
+        if guardia.residente_id != request.user.id or guardia.estado != 'PUBLICADA':
+            messages.error(request, 'Solo podés solicitar slot vacante sobre una guardia propia en estado PUBLICADA.')
+            return redirect(reverse('control_guardias:mis_guardias'))
+        form = SolicitudSlotVacanteForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Formulario inválido.')
+            return redirect(reverse('control_guardias:solicitar_slot_vacante', kwargs={'guardia_pk': guardia_pk}))
+
+        slot_fecha_str = request.POST.get('slot_fecha')
+        tipo_id = request.POST.get('slot_tipo_guardia')
+        if not slot_fecha_str or not tipo_id:
+            messages.error(request, 'Debés seleccionar un slot destino.')
+            return redirect(reverse('control_guardias:solicitar_slot_vacante', kwargs={'guardia_pk': guardia_pk}))
+
+        from datetime import date as date_cls
+        try:
+            slot_fecha = date_cls.fromisoformat(slot_fecha_str)
+        except ValueError:
+            messages.error(request, 'Fecha de slot inválida.')
+            return redirect(reverse('control_guardias:solicitar_slot_vacante', kwargs={'guardia_pk': guardia_pk}))
+
+        tipo = get_object_or_404(ConfiguracionTipoGuardia, pk=tipo_id)
+        SolicitudSlotVacante.objects.create(
+            solicitante=request.user,
+            guardia_ceder=guardia,
+            slot_fecha=slot_fecha,
+            slot_tipo_guardia=tipo,
+            notas_solicitante=form.cleaned_data.get('notas_solicitante', ''),
+        )
+        messages.success(request, 'Solicitud enviada. El jefe la revisará a la brevedad.')
+        return redirect(_safe_return_url(request, reverse('control_guardias:mis_guardias')))
+
+
+class CancelarSlotVacanteView(LoginRequiredMixin, TemplateView):
+    """POST: residente cancela su propia solicitud de slot vacante (solo PENDIENTE)."""
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        solicitud = get_object_or_404(SolicitudSlotVacante, pk=pk, solicitante=request.user)
+        try:
+            cancelar_slot_vacante(solicitud, request.user)
+            messages.success(request, 'Solicitud cancelada.')
+        except (DistribucionError, CambioGuardiaError) as e:
+            messages.error(request, str(e))
+        return redirect(_safe_return_url(request, reverse('control_guardias:mis_guardias')))
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:mis_guardias')
+
+
+class SolicitudesSlotVacanteView(JefeInstructorMixin, ListView):
+    """Jefe: lista solicitudes de slot vacante pendientes."""
+    model = SolicitudSlotVacante
+    template_name = 'control_guardias/portal/solicitudes_slot_vacante.html'
+    context_object_name = 'solicitudes'
+    login_url = 'login'
+
+    def get_queryset(self):
+        return SolicitudSlotVacante.objects.filter(
+            estado='PENDIENTE'
+        ).select_related(
+            'solicitante', 'guardia_ceder', 'guardia_ceder__tipo_guardia', 'slot_tipo_guardia'
+        ).order_by('fecha_solicitud')
+
+
+class RevisarSlotVacanteView(JefeInstructorMixin, TemplateView):
+    """
+    Jefe: aprueba o rechaza una SolicitudSlotVacante.
+    POST con accion=aprobar|rechazar.
+    """
+    template_name = None
+    login_url = 'login'
+
+    def post(self, request, pk, *args, **kwargs):
+        solicitud = get_object_or_404(SolicitudSlotVacante, pk=pk)
+        accion = request.POST.get('accion')
+        notas = request.POST.get('notas_jefe', '').strip()
+        try:
+            if accion == 'aprobar':
+                aprobar_slot_vacante(solicitud, request.user, notas=notas)
+                messages.success(request, 'Solicitud aprobada. Guardia reasignada correctamente.')
+            elif accion == 'rechazar':
+                rechazar_slot_vacante(solicitud, request.user, notas=notas)
+                messages.warning(request, 'Solicitud rechazada.')
+            else:
+                messages.error(request, 'Acción inválida.')
+        except (DistribucionError, CambioGuardiaError) as e:
+            messages.error(request, str(e))
+        return redirect(
+            _safe_return_url(request, reverse('control_guardias:solicitudes_slot_vacante'))
+        )
+
+    def get(self, request, *args, **kwargs):
+        return redirect('control_guardias:solicitudes_slot_vacante')
 
