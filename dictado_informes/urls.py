@@ -8,9 +8,9 @@ urlpatterns = [
     # Dashboard
     path('', views.DashboardDictadoView.as_view(), name='dashboard'),
 
-    # Demo de presentacion clinica
-    path('demo-presentacion-ia/', views.DemoPresentacionIAView.as_view(), name='demo_presentacion_ia'),
-    path('demo-presentacion-ia/api/segmentos-reales/', views.demo_segmentos_reales_api, name='demo_segmentos_reales_api'),
+    # Demo de presentacion clinica — SILENCIADA (reactivar descomentando)
+    # path('demo-presentacion-ia/', views.DemoPresentacionIAView.as_view(), name='demo_presentacion_ia'),
+    # path('demo-presentacion-ia/api/segmentos-reales/', views.demo_segmentos_reales_api, name='demo_segmentos_reales_api'),
     
     # Dictado Rápido (nueva funcionalidad simplificada)
     path('dictado-rapido/', views.DictadoRapidoView.as_view(), name='dictado_rapido'),

@@ -122,10 +122,10 @@ def navbar_links(request):
         return item('Plantillas Estructuradas', 'fa-layer-group',
                     'dictado_informes:plantilla_estructurada_list', active_url_names=['plantilla_estructurada'])
 
-    def i_demo_dictado_ia():
-        return item('Demo IA Colegiales', 'fa-person-chalkboard',
-                    'dictado_informes:demo_presentacion_ia',
-                    active_url_names=['demo_presentacion_ia'])
+    # def i_demo_dictado_ia():  # SILENCIADA — reactivar descomentando
+    #     return item('Demo IA Colegiales', 'fa-person-chalkboard',
+    #                 'dictado_informes:demo_presentacion_ia',
+    #                 active_url_names=['demo_presentacion_ia'])
 
     groups = []
 
@@ -150,7 +150,7 @@ def navbar_links(request):
             group('Dictado IA', 'fa-wave-square',
                 i_dictado_rapido(),
                 i_plantillas_estructuradas(),
-                i_demo_dictado_ia(),
+                # i_demo_dictado_ia(),  # SILENCIADA
             ),
             group('Guardias', 'fa-shield-alt',
                 item('Portal de Guardias', 'fa-calendar-alt',

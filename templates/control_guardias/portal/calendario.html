@@ -35,14 +35,15 @@
               <i class="fas fa-users mr-2"></i>Mostrar guardias del servicio
             </button>
             {% endif %}
-            {% if user.is_superuser %}
-            <a id="btnVolverPresentacionGuardias"
-               href="{% url 'dictado_informes:demo_presentacion_ia' %}?section={{ request.GET.presentation_section|default:'guardias-asistidas' }}"
-               target="presentacion_ia"
-               class="inline-flex items-center px-4 py-2 text-sm text-cyan-700 hover:text-cyan-900 border border-cyan-300 rounded-lg hover:border-cyan-500 bg-cyan-50 transition-colors shadow-sm">
-              <i class="fas fa-display mr-2"></i>Volver a presentación
-            </a>
-            {% endif %}
+            {# SILENCIADO — reactivar descomentando #}
+            {# {% if user.is_superuser %} #}
+            {# <a id="btnVolverPresentacionGuardias" #}
+            {#    href="{% url 'dictado_informes:demo_presentacion_ia' %}?section={{ request.GET.presentation_section|default:'guardias-asistidas' }}" #}
+            {#    target="presentacion_ia" #}
+            {#    class="inline-flex items-center px-4 py-2 text-sm text-cyan-700 hover:text-cyan-900 border border-cyan-300 rounded-lg hover:border-cyan-500 bg-cyan-50 transition-colors shadow-sm"> #}
+            {#   <i class="fas fa-display mr-2"></i>Volver a presentación #}
+            {# </a> #}
+            {# {% endif %} #}
             <a href="{{ calendario_return_url }}"
                class="inline-flex items-center px-4 py-2 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:border-gray-400 bg-white transition-colors shadow-sm">
               <i class="fas fa-arrow-left mr-2"></i>{{ calendario_back_label }}
