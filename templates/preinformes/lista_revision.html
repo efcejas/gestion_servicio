@@ -8,7 +8,8 @@
     <!-- Header Card con Gradiente -->
     <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg mb-6 overflow-hidden">
         <div class="px-8 py-6">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
                 <div class="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
                     <i class="fas fa-clipboard-check text-2xl text-white"></i>
                 </div>
@@ -16,6 +17,14 @@
                     <h1 class="text-3xl font-bold text-white">Lista de Preinformes para Revisar</h1>
                     <p class="text-orange-100 mt-1">Preinformes pendientes de revisión por staff</p>
                 </div>
+                </div>
+                {% if user.rol == 'medico_staff' or user.rol == 'jefe_servicio' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <a href="{% url 'preinformes:dashboard_staff' %}" 
+                   class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors text-sm font-medium border border-white/30">
+                    <i class="fas fa-chart-bar"></i>
+                    <span class="hidden sm:inline">Ver Dashboard</span>
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>

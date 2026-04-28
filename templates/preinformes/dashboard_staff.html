@@ -7,8 +7,17 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
     <!-- Header -->
     <div class="mb-6 bg-gradient-to-r from-purple-600 to-purple-800 rounded-lg shadow-lg p-8 text-white">
-        <h1 class="text-3xl font-bold">Panel de control de preinformes</h1>
-        <p class="mt-2 text-purple-100">Revisión y corrección de preinformes de residentes</p>
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold">Panel de control de preinformes</h1>
+                <p class="mt-2 text-purple-100">Revisión y corrección de preinformes de residentes</p>
+            </div>
+            <a href="{% url 'preinformes:lista_revision' %}" 
+               class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors text-sm font-medium border border-white/30">
+                <i class="fas fa-clipboard-check"></i>
+                <span class="hidden sm:inline">Lista de revisión</span>
+            </a>
+        </div>
     </div>
 
     <!-- Estadísticas rápidas  -->

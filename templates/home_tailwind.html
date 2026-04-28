@@ -75,7 +75,7 @@
         <!-- ========== CARDS SEGÚN EL ROL DEL USUARIO ========== -->
         
         <!-- RESIDENTES (médico_residente, jefe_residentes, instructor_residentes) -->
-        {% if user.es_medico or user.is_superuser %}
+        {% if user.es_medico and user.rol != 'medico_staff' and user.rol != 'jefe_servicio' or user.is_superuser %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <!-- Clases -->
