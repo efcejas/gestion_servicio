@@ -1,5 +1,24 @@
 # Sistema de Preinformes - Correcciones de Formato para Word/EGES
 
+## Pendiente Abierto (27/04/2026)
+
+### Autoguardado en edicion/revision
+- Estado actual: pendiente de resolucion definitiva.
+- Sintoma reportado en entorno real: al escribir no cambia el indicador a "Editando..." y no se observa guardado automatico tras el intervalo.
+- Alcance: edicion de preinforme por residente y pantalla de revision por staff (integracion con CKEditor5 de django_ckeditor_5).
+
+### Contexto de intento previo
+- Se ajustaron endpoints y condiciones de estados editables.
+- Se reforzo el binding del editor para tomar la instancia desde el registry del widget.
+- Persisten reportes de no activacion del estado visual de autoguardado en algunos escenarios.
+
+### Plan de reanudacion sugerido
+1. Verificar en navegador (Network + Console) que haya evento de cambio del editor y POST al endpoint de autosave.
+2. Confirmar en runtime que la instancia activa corresponda al campo correcto (`id_informe_html` / `id_informe_final_html`).
+3. Agregar trazas temporales de diagnostico en frontend (sin dejar logs permanentes en produccion).
+4. Cubrir con test E2E de frontend (Playwright) para validar transiciones del indicador: `Listo -> Editando -> Guardando -> Guardado`.
+5. Luego remover trazas temporales y documentar fix final.
+
 ## 🎯 Objetivo
 Garantizar que el formato de los preinformes se preserve correctamente al copiar a Word/EGES, con:
 - Título alineado a la izquierda (no centrado)
