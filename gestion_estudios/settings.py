@@ -543,8 +543,8 @@ SECURE_REFERRER_POLICY = 'same-origin'
 
 # Cookies HTTPOnly (prevenir acceso desde JavaScript - Anti-XSS)
 # Tiempo de inactividad antes de cerrar sesión automáticamente (segundos)
-# Valor por defecto: 30 minutos. Ajustar con SESSION_INACTIVITY_TIMEOUT en .env
-SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=30 * 60))
+# Valor por defecto: 5 horas. Ajustar con SESSION_INACTIVITY_TIMEOUT en .env
+SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=5 * 60 * 60))
 
 SESSION_COOKIE_HTTPONLY = True
 
