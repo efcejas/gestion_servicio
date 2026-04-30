@@ -61,6 +61,20 @@
   </div>
   {% endif %}
 
+  {% if proyeccion_negativa %}
+  <div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-5 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+        <i class="fas fa-arrow-trend-down text-amber-600 text-xl"></i>
+      </div>
+      <div>
+        <p class="text-amber-800 font-bold">Capital en descenso</p>
+        <p class="text-amber-700 text-sm">El promedio mensual de los últimos períodos es negativo. Estás descapitalizando.</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- KPIs -->
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-6">
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 relative">

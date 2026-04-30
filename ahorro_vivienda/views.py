@@ -173,6 +173,7 @@ def dashboard(request):
         'chart_desglose_datasets': json.dumps(chart_desglose_datasets),
         'variaciones': variaciones,
         'var_prom_mensual': var_prom_mensual,
+        'proyeccion_negativa': var_prom_mensual is not None and var_prom_mensual < 0,
     })
 
 
@@ -261,6 +262,8 @@ def nuevo_snapshot(request):
                 for deleted in formset.deleted_objects:
                     deleted.delete()
                 snapshot.recalcular_total()
+                if snapshot.total_usd_calculado == 0:
+                    messages.warning(request, 'Total calculado: USD 0. Verificá que las cotizaciones estén cargadas para los ítems en ARS o EUR.')
                 messages.success(request, f'Snapshot del {snapshot.fecha.strftime("%d/%m/%Y")} guardado. Total: USD {snapshot.total_usd_calculado:,.2f}')
                 return redirect('ahorro_vivienda:detalle_snapshot', pk=snapshot.pk)
             else:
@@ -331,6 +334,8 @@ def editar_snapshot(request, pk):
             for deleted in formset.deleted_objects:
                 deleted.delete()
             snapshot.recalcular_total()
+            if snapshot.total_usd_calculado == 0:
+                messages.warning(request, 'Total calculado: USD 0. Verificá que las cotizaciones estén cargadas para los ítems en ARS o EUR.')
             messages.success(request, f'Snapshot del {snapshot.fecha.strftime("%d/%m/%Y")} actualizado. Total: USD {snapshot.total_usd_calculado:,.2f}')
             return redirect('ahorro_vivienda:detalle_snapshot', pk=snapshot.pk)
     else:

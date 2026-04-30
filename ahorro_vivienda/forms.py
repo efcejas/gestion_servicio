@@ -123,6 +123,17 @@ class CapitalItemForm(forms.ModelForm):
             'orden': forms.HiddenInput(),
         }
 
+    def clean(self):
+        cleaned_data = super().clean()
+        monto = cleaned_data.get('monto_original')
+        if monto is not None and monto <= 0:
+            self.add_error('monto_original', 'El monto debe ser mayor a 0.')
+        cotiz_tipo = cleaned_data.get('cotizacion_tipo')
+        cotiz_manual = cleaned_data.get('cotizacion_manual')
+        if cotiz_tipo == 'manual' and (cotiz_manual is None or cotiz_manual <= 0):
+            self.add_error('cotizacion_manual', 'Debés ingresar la cotización manual.')
+        return cleaned_data
+
 
 CapitalItemFormSet = inlineformset_factory(
     Snapshot,
