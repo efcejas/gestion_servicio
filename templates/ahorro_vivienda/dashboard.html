@@ -118,6 +118,9 @@
       {% if proyeccion_meses is not None %}
         <p class="text-3xl font-bold text-gray-900">~{{ proyeccion_meses }} <span class="text-xl font-semibold text-gray-500">meses</span></p>
         {% if proyeccion_fecha %}<p class="text-xs text-gray-400 mt-2"><i class="fas fa-calendar-check mr-1"></i>{{ proyeccion_fecha|date:"M Y" }}</p>{% endif %}
+      {% elif proyeccion_imposible %}
+        <p class="text-xl font-semibold text-amber-500 mt-1">Tendencia negativa</p>
+        <p class="text-xs text-gray-400 mt-1">El capital promedio está bajando</p>
       {% else %}
         <p class="text-xl font-semibold text-gray-400 mt-1">Sin datos</p>
         <p class="text-xs text-gray-400 mt-1">Necesitás 2+ snapshots</p>

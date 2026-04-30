@@ -75,6 +75,7 @@ def dashboard(request):
     # Proyección lineal: "en cuántos meses llegamos"
     proyeccion_meses = None
     proyeccion_fecha = None
+    proyeccion_imposible = False  # tiene datos pero tendencia negativa
     if config and len(snapshots) >= 2:
         # Variación promedio mensual en USD
         variaciones = []
@@ -91,6 +92,8 @@ def dashboard(request):
                 proyeccion_meses = round(float(falta_usd) / var_prom)
                 if proyeccion_meses >= 0:
                     proyeccion_fecha = date.today() + timedelta(days=proyeccion_meses * 30)
+            elif var_prom <= 0:
+                proyeccion_imposible = True
 
     # Datos para Chart.js evolución
     chart_labels = [s.fecha.strftime('%b %Y') for s in snapshots]
@@ -174,6 +177,7 @@ def dashboard(request):
         'variaciones': variaciones,
         'var_prom_mensual': var_prom_mensual,
         'proyeccion_negativa': var_prom_mensual is not None and var_prom_mensual < 0,
+        'proyeccion_imposible': proyeccion_imposible,
     })
 
 
