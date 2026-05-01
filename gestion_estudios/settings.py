@@ -323,6 +323,10 @@ CKEDITOR_5_CONFIGS = {
                     'styles': True
                 }
             ]
+        },
+        # Evita warning 'widget-toolbar-no-items' del plugin ImageToolbar incluido en el bundle
+        'image': {
+            'toolbar': ['imageTextAlternative']
         }
     }
 }

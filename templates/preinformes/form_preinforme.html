@@ -251,12 +251,10 @@
                         <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
                         Contenido del Preinforme
                     </h2>
-                    {% if preinforme.pk and preinforme.estado == 'borrador' %}
-                    <div id="autosave-indicator" class="text-sm text-gray-500 flex items-center">
+                    <div id="autosave-indicator" class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 transition-colors duration-200">
                         <i class="fas fa-circle text-gray-400 mr-1" id="autosave-icon"></i>
                         <span id="autosave-status">Listo</span>
                     </div>
-                    {% endif %}
                 </div>
             </div>
             <div class="p-6">
@@ -625,6 +623,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarPlantillas() {
+        if (!plantillaSelect) {
+            return Promise.resolve();
+        }
+
         const tipoEstudioId = tipoEstudioSelect.value;
         const regionId = regionSelect.value;
         const sistemaDestino = document.getElementById('id_sistema_destino')?.value || 'eges';
@@ -828,9 +830,9 @@ document.addEventListener('DOMContentLoaded', function() {
         cargarPlantillas();
     }
     
-    tipoEstudioSelect.addEventListener('change', confirmarYCargarPlantillas);
-    regionSelect.addEventListener('change', confirmarYCargarPlantillas);
-    plantillaSelect.addEventListener('change', aplicarPlantilla);
+    tipoEstudioSelect?.addEventListener('change', confirmarYCargarPlantillas);
+    regionSelect?.addEventListener('change', confirmarYCargarPlantillas);
+    plantillaSelect?.addEventListener('change', aplicarPlantilla);
     
     // Listener para sistema_destino: recargar plantillas cuando cambia
     const sistemaDestinoField = document.getElementById('id_sistema_destino');
@@ -839,13 +841,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Inicializar estado del selector de plantillas
-    if (!tipoEstudioSelect.value || !regionSelect.value) {
+    if (plantillaSelect && (!tipoEstudioSelect?.value || !regionSelect?.value)) {
         plantillaSelect.disabled = true;
         plantillaSelect.innerHTML = '<option value="">Primero selecciona tipo y región</option>';
     }
 
     // Cargar plantillas al inicio si hay valores seleccionados
-    if (tipoEstudioSelect.value && regionSelect.value) {
+    if (plantillaSelect && tipoEstudioSelect?.value && regionSelect?.value) {
         cargarPlantillas();
     }
     
@@ -853,7 +855,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const urlParams = new URLSearchParams(window.location.search);
     const plantillaIdParam = urlParams.get('plantilla_id');
     
-    if (plantillaIdParam) {
+    if (plantillaIdParam && plantillaSelect) {
         console.log('🔄 Detectada plantilla recién creada:', plantillaIdParam);
         
         // Esperar a que las plantillas se carguen y luego seleccionar
@@ -883,222 +885,251 @@ document.addEventListener('DOMContentLoaded', function() {
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // === SISTEMA DE AUTOGUARDADO ===
-    {% if preinforme.pk and preinforme.estado == 'borrador' %}
-    
-    const AUTOSAVE_INTERVAL = 30000; // 30 segundos
-    const preinformeId = {{ preinforme.pk }};
-    let autosaveTimer = null;
-    let lastSaveData = {};
-    let isSaving = false;
-    let isEditing = false;
-    let editorReady = false;
+    // === SISTEMA DE AUTOGUARDADO (localStorage + servidor) ===
+    (function() {
+        const PREINFORME_PK = {{ preinforme.pk|default:'null' }};
+        const PREINFORME_ESTADO = '{{ preinforme.estado|default:"" }}';
+        const LOCAL_KEY = 'preinforme_draft_' + (PREINFORME_PK || 'nuevo');
+        const AUTOSAVE_DELAY = 2000;   // 2 s tras dejar de escribir
+        const SERVER_INTERVAL = 30000; // 30 s guardado servidor
+        const SERVER_STATES = ['borrador', 'pendiente_revision'];
 
-    // Elementos del indicador
-    const autosaveIndicator = document.getElementById('autosave-indicator');
-    const autosaveStatus = document.getElementById('autosave-status');
-    const autosaveIcon = document.getElementById('autosave-icon');
+        let isDirty = false;
+        let isSubmitting = false;
+        let debounceTimer = null;
+        let serverTimer = null;
+        let editorReady = false;
 
-    if (!autosaveIndicator || !autosaveStatus || !autosaveIcon) {
-        console.error('❌ Elementos del indicador de autoguardado no encontrados');
-    } else {
-        console.log('✅ Elementos del indicador encontrados');
-    }
+        const autosaveIndicator = document.getElementById('autosave-indicator');
+        const autosaveStatus = document.getElementById('autosave-status');
+        const autosaveIcon   = document.getElementById('autosave-icon');
 
-    function updateAutosaveIndicator(status, message) {
-        if (!autosaveStatus || !autosaveIcon) {
-            console.warn('⚠️ No se pueden actualizar indicadores');
-            return;
-        }
-        
-        console.log(`🔄 Actualizando indicador: ${status} - ${message}`);
-        autosaveStatus.textContent = message;
-        
-        // Remover todas las clases de icono
-        autosaveIcon.className = '';
-        
-        switch(status) {
-            case 'editing':
-                autosaveIcon.className = 'fas fa-pen mr-1 text-amber-500';
-                break;
-            case 'saving':
-                autosaveIcon.className = 'fas fa-spinner fa-spin mr-1 text-blue-500';
-                break;
-            case 'saved':
-                autosaveIcon.className = 'fas fa-check-circle mr-1 text-green-500';
-                break;
-            case 'error':
-                autosaveIcon.className = 'fas fa-exclamation-circle mr-1 text-red-500';
-                break;
-            default:
-                autosaveIcon.className = 'fas fa-circle mr-1 text-gray-400';
-        }
-    }
-
-    function getCurrentContent() {
-        const editor = window.ckeditorInstance;
-        let content = '';
-        
-        if (editor && typeof editor.getData === 'function') {
-            content = editor.getData() || '';
-        } else {
-            const textarea = document.getElementById('id_informe_html');
-            content = textarea ? textarea.value : '';
-        }
-        
-        return { informe_html: content };
-    }
-
-    function hasContentChanged() {
-        const current = getCurrentContent();
-        const changed = JSON.stringify(current) !== JSON.stringify(lastSaveData);
-        if (changed) {
-            console.log('📝 Contenido ha cambiado');
-        }
-        return changed;
-    }
-
-    function performAutosave() {
-        if (isSaving) {
-            console.log('⏳ Ya hay un guardado en proceso');
-            return;
-        }
-        
-        if (!hasContentChanged()) {
-            console.log('✓ Sin cambios para guardar');
-            return;
-        }
-
-        const currentContent = getCurrentContent();
-        isSaving = true;
-        updateAutosaveIndicator('saving', 'Guardando...');
-
-        // Preparar datos para envío
-        const formData = new FormData();
-        formData.append('informe_html', currentContent.informe_html);
-
-        // Agregar CSRF token
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        formData.append('csrfmiddlewaretoken', csrfToken);
-
-        console.log('💾 Iniciando guardado automático...');
-
-        fetch(`{% url 'preinformes:autosave_preinforme' pk=0 %}`.replace('0', preinformeId), {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                lastSaveData = currentContent;
-                isEditing = false;
-                updateAutosaveIndicator('saved', `Guardado ${data.timestamp}`);
-                console.log('✅ Guardado exitoso');
-                
-                // Volver a estado normal después de 3 segundos
-                setTimeout(() => {
-                    if (autosaveStatus.textContent.includes('Guardado')) {
-                        updateAutosaveIndicator('ready', 'Listo');
-                    }
-                }, 3000);
-            } else {
-                throw new Error(data.message || 'Error al guardar');
+        function setIndicator(status, msg) {
+            if (!autosaveStatus) return;
+            autosaveStatus.textContent = msg;
+            const iconMap = {
+                editing: 'fas fa-pen mr-1 text-amber-500',
+                saving:  'fas fa-spinner fa-spin mr-1 text-blue-500',
+                saved:   'fas fa-check-circle mr-1 text-green-500',
+                local:   'fas fa-hdd mr-1 text-blue-400',
+                error:   'fas fa-exclamation-circle mr-1 text-red-500',
+                ready:   'fas fa-circle mr-1 text-gray-400',
+            };
+            if (autosaveIcon) autosaveIcon.className = iconMap[status] || iconMap.ready;
+            const pillMap = {
+                editing: 'border-amber-200 bg-amber-50 text-amber-700',
+                saving: 'border-blue-200 bg-blue-50 text-blue-700',
+                saved: 'border-green-200 bg-green-50 text-green-700',
+                local: 'border-sky-200 bg-sky-50 text-sky-700',
+                error: 'border-red-200 bg-red-50 text-red-700',
+                ready: 'border-gray-200 bg-gray-50 text-gray-600',
+            };
+            if (autosaveIndicator) {
+                autosaveIndicator.className = 'inline-flex items-center rounded-full border px-3 py-1 text-sm transition-colors duration-200 ' + (pillMap[status] || pillMap.ready);
+                autosaveIndicator.dataset.state = status;
             }
-        })
-        .catch(error => {
-            console.error('❌ Error en autoguardado:', error);
-            isEditing = false;
-            updateAutosaveIndicator('error', 'Error al guardar');
-            
-            // Volver a estado normal después de 5 segundos
-            setTimeout(() => {
-                updateAutosaveIndicator('ready', 'Listo');
-            }, 5000);
-        })
-        .finally(() => {
-            isSaving = false;
-        });
-    }
-
-    function scheduleAutosave() {
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(() => {
-            performAutosave();
-            scheduleAutosave(); // Reprogramar para el siguiente ciclo
-        }, AUTOSAVE_INTERVAL);
-    }
-    
-    function onContentChange() {
-        // Marcar como editando inmediatamente
-        if (!isEditing) {
-            isEditing = true;
-            updateAutosaveIndicator('editing', 'Editando...');
         }
-        // Reprogramar autoguardado
-        scheduleAutosave();
-    }
 
-    // Detectar cambios en los editores
-    function setupChangeDetection() {
-        const maxAttempts = 10;
-        let attempts = 0;
-        
-        function trySetup() {
-            attempts++;
-            const editor = window.ckeditorInstance;
-            
-            if (editor && editor.model && editor.model.document) {
-                editor.model.document.on('change:data', () => {
-                    console.log('📝 Cambio detectado en editor');
-                    onContentChange();
-                });
-                editorReady = true;
-                console.log('✅ Detección de cambios configurada en CKEditor5');
-                
-                // Guardar estado inicial
-                lastSaveData = getCurrentContent();
-                updateAutosaveIndicator('ready', 'Listo');
-                
-                return true;
+        // --- localStorage helpers ---
+        function getEditorContent() {
+            const ck = window.ckeditorInstance;
+            if (ck && typeof ck.getData === 'function') return ck.getData() || '';
+            const ta = document.getElementById('id_informe_html');
+            return ta ? ta.value : '';
+        }
+
+        function saveDraftLocal() {
+            try {
+                localStorage.setItem(LOCAL_KEY, getEditorContent());
+            } catch(e) { /* cuota llena, ignorar */ }
+        }
+
+        function clearDraftLocal() {
+            try { localStorage.removeItem(LOCAL_KEY); } catch(e) {}
+        }
+
+        function getDraftLocal() {
+            try { return localStorage.getItem(LOCAL_KEY); } catch(e) { return null; }
+        }
+
+        // --- Restaurar borrador local al cargar ---
+        function maybeRestoreDraft() {
+            const draft = getDraftLocal();
+            if (!draft || draft.trim() === '') return;
+
+            // Si hay plantilla_id en la URL, no restaurar silenciosamente
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('plantilla_id')) {
+                clearDraftLocal();
+                return;
             }
-            
-            if (attempts < maxAttempts) {
-                console.log(`⏳ Intento ${attempts}/${maxAttempts} de conectar con editor...`);
-                setTimeout(trySetup, 500);
-                return false;
+
+            // Sólo restaurar si el editor está vacío
+            const current = getEditorContent();
+            if (current && current.trim() !== '') return;
+
+            function doRestore() {
+                const ck = window.ckeditorInstance;
+                if (ck && typeof ck.setData === 'function') {
+                    ck.setData(draft);
+                } else {
+                    const ta = document.getElementById('id_informe_html');
+                    if (ta) ta.value = draft;
+                }
+                setIndicator('local', 'Borrador local restaurado');
+                setTimeout(() => setIndicator('ready', 'Listo'), 3000);
+            }
+
+            if (editorReady) {
+                doRestore();
             } else {
-                console.warn('⚠️ No se pudo conectar con CKEditor después de ' + maxAttempts + ' intentos');
-                
-                // Fallback: usar textarea
+                // Esperar a que el editor esté listo
+                const wait = setInterval(() => {
+                    if (editorReady) { clearInterval(wait); doRestore(); }
+                }, 200);
+            }
+        }
+
+        // --- Guardado en servidor ---
+        function saveToServer() {
+            if (!PREINFORME_PK) return;
+            if (!SERVER_STATES.includes(PREINFORME_ESTADO)) return;
+            if (isSubmitting) return;
+
+            const content = getEditorContent();
+            if (!content || content.trim() === '') return;
+
+            setIndicator('saving', 'Guardando...');
+
+            const formData = new FormData();
+            formData.append('informe_html', content);
+            const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+            if (csrf) formData.append('csrfmiddlewaretoken', csrf.value);
+
+            fetch(`{% url 'preinformes:autosave_preinforme' pk=0 %}`.replace('/0/', '/' + PREINFORME_PK + '/'), {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    clearDraftLocal();
+                    isDirty = false;
+                    setIndicator('saved', 'Guardado ' + (data.timestamp || ''));
+                    setTimeout(() => setIndicator('ready', 'Listo'), 3000);
+                } else {
+                    throw new Error(data.error || 'error');
+                }
+            })
+            .catch(() => {
+                setIndicator('error', 'Error al guardar');
+                setTimeout(() => setIndicator('ready', 'Listo'), 4000);
+            });
+        }
+
+        // --- Al cambiar contenido ---
+        function onContentChange() {
+            isDirty = true;
+            saveDraftLocal();
+            setIndicator('editing', 'Editando...');
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                if (isDirty && !isSubmitting) saveToServer();
+            }, AUTOSAVE_DELAY);
+        }
+
+        // --- Ciclo periódico servidor (respaldo) ---
+        function startServerCycle() {
+            if (!PREINFORME_PK) return;
+            serverTimer = setInterval(() => {
+                if (isDirty && !isSubmitting) saveToServer();
+            }, SERVER_INTERVAL);
+        }
+
+        // --- Conectar con CKEditor ---
+        function connectEditor() {
+            // Intentar primero con el global (poblado por initializeEditorIfNeeded)
+            let ck = window.ckeditorInstance;
+
+            // Fallback: buscar directamente en el DOM (igual que initializeEditorIfNeeded)
+            if (!ck) {
                 const textarea = document.getElementById('id_informe_html');
                 if (textarea) {
-                    textarea.addEventListener('input', () => {
-                        console.log('📝 Cambio detectado en textarea (fallback)');
-                        onContentChange();
-                    });
-                    console.log('✅ Detección configurada en textarea (fallback)');
+                    const ckContainer = textarea.nextElementSibling;
+                    if (ckContainer && ckContainer.classList.contains('ck-editor')) {
+                        const ckContent = ckContainer.querySelector('.ck-content');
+                        if (ckContent && ckContent.ckeditorInstance) {
+                            ck = ckContent.ckeditorInstance;
+                            window.ckeditorInstance = ck; // sincronizar el global
+                        }
+                    }
                 }
-                
-                lastSaveData = getCurrentContent();
-                updateAutosaveIndicator('ready', 'Listo');
+            }
+
+            if (ck && ck.model && ck.model.document) {
+                ck.model.document.on('change:data', onContentChange);
+                editorReady = true;
+                setIndicator('ready', 'Listo');
+                maybeRestoreDraft();
                 return true;
             }
+            return false;
         }
-        
-        trySetup();
-    }
 
-    // Inicializar autoguardado después de que el DOM esté listo
-    console.log('🚀 Iniciando sistema de autoguardado...');
-    setupChangeDetection();
-    scheduleAutosave();
+        function tryConnectEditor(attempts) {
+            if (connectEditor()) return;
+            if (attempts > 0) {
+                setTimeout(() => tryConnectEditor(attempts - 1), 400);
+            } else {
+                // Fallback: textarea
+                const ta = document.getElementById('id_informe_html');
+                if (ta) ta.addEventListener('input', onContentChange);
+                editorReady = true;
+                setIndicator('ready', 'Listo');
+                maybeRestoreDraft();
+            }
+        }
 
-    // Limpiar timer al salir
-    window.addEventListener('beforeunload', () => {
-        clearTimeout(autosaveTimer);
-    });
+        // --- beforeunload ---
+        window.addEventListener('beforeunload', function(e) {
+            if (!isDirty || isSubmitting) return;
+            saveDraftLocal(); // garantizar local
 
-    {% endif %}
+            // sendBeacon al servidor si existe el objeto
+            if (PREINFORME_PK && SERVER_STATES.includes(PREINFORME_ESTADO)) {
+                const content = getEditorContent();
+                const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+                if (content && csrf) {
+                    const fd = new FormData();
+                    fd.append('informe_html', content);
+                    fd.append('csrfmiddlewaretoken', csrf.value);
+                    navigator.sendBeacon(
+                        `{% url 'preinformes:autosave_preinforme' pk=0 %}`.replace('/0/', '/' + PREINFORME_PK + '/'),
+                        fd
+                    );
+                }
+            }
+
+            e.preventDefault();
+            e.returnValue = '';
+        });
+
+        // --- Limpiar al enviar el formulario ---
+        const form = document.querySelector('form');
+        if (form) {
+            form.addEventListener('submit', function() {
+                isSubmitting = true;
+                clearTimeout(debounceTimer);
+                clearInterval(serverTimer);
+                clearDraftLocal();
+            });
+        }
+
+        // --- Arrancar ---
+        tryConnectEditor(15);
+        startServerCycle();
+    })();
+
     
     // Botón de Nueva Plantilla - redirigir a página dedicada con contexto
     const btnAbrir = document.getElementById('btnNuevaPlantilla');

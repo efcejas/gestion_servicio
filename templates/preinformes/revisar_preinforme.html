@@ -158,7 +158,7 @@
                             </h2>
                             <p class="text-sm text-gray-600 mt-1">El informe del residente está cargado. Realice las modificaciones necesarias.</p>
                         </div>
-                        <div id="autosave-indicator" class="text-sm text-gray-500 flex items-center">
+                        <div id="autosave-indicator" class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 transition-colors duration-200">
                             <i class="fas fa-circle text-gray-400 mr-1" id="autosave-icon"></i>
                             <span id="autosave-status">Listo</span>
                         </div>
@@ -338,84 +338,165 @@
 </div>
 
 <script>
-// === SISTEMA DE AUTOGUARDADO ===
-const AUTOSAVE_INTERVAL = 30000; // 30 segundos
-let autosaveTimer = null;
-let editorInstance = null;
+// === SISTEMA DE AUTOGUARDADO REVISOR (localStorage + servidor) ===
+(function() {
+    const PREINFORME_PK = {{ preinforme.pk }};
+    const LOCAL_KEY = 'revision_draft_' + PREINFORME_PK;
+    const AUTOSAVE_DELAY  = 2000;   // 2 s tras dejar de escribir
+    const SERVER_INTERVAL = 30000;  // 30 s ciclo servidor
 
-const autosaveIndicator = document.getElementById('autosave-indicator');
-const autosaveStatus = document.getElementById('autosave-status');
-const autosaveIcon = document.getElementById('autosave-icon');
+    let isDirty = false;
+    let isSubmitting = false;
+    let debounceTimer = null;
+    let serverTimer = null;
+    let editorInstance = null;
 
-function updateAutosaveIndicator(status, message) {
-    if (!autosaveStatus || !autosaveIcon) return;
-    
-    autosaveStatus.textContent = message;
-    autosaveIcon.className = 'fas fa-circle mr-1';
-    
-    switch(status) {
-        case 'saving':
-            autosaveIcon.className = 'fas fa-spinner fa-spin mr-1';
-            autosaveIcon.style.color = '#3B82F6'; // blue
-            break;
-        case 'success':
-            autosaveIcon.style.color = '#10B981'; // green
-            break;
-        case 'error':
-            autosaveIcon.style.color = '#EF4444'; // red
-            break;
-        default:
-            autosaveIcon.style.color = '#6B7280'; // gray
-    }
-}
+    const autosaveIndicator = document.getElementById('autosave-indicator');
+    const autosaveStatus = document.getElementById('autosave-status');
+    const autosaveIcon   = document.getElementById('autosave-icon');
 
-function performAutosave() {
-    if (!editorInstance) return;
-    
-    const preinformeId = {{ preinforme.pk }};
-    const informeHtml = editorInstance.getData();
-    
-    if (!informeHtml || informeHtml.trim() === '') return;
-    
-    updateAutosaveIndicator('saving', 'Guardando...');
-    
-    fetch(`/preinformes/autosave-revision/${preinformeId}/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-        },
-        body: JSON.stringify({
-            informe_final_html: informeHtml
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            updateAutosaveIndicator('success', 'Guardado');
-            setTimeout(() => {
-                updateAutosaveIndicator('ready', 'Listo');
-            }, 2000);
-        } else {
-            throw new Error(data.error || 'Error desconocido');
+    function setIndicator(status, msg) {
+        if (!autosaveStatus) return;
+        autosaveStatus.textContent = msg;
+        const iconMap = {
+            editing: 'fas fa-pen mr-1 text-amber-500',
+            saving:  'fas fa-spinner fa-spin mr-1 text-blue-500',
+            saved:   'fas fa-check-circle mr-1 text-green-500',
+            local:   'fas fa-hdd mr-1 text-blue-400',
+            error:   'fas fa-exclamation-circle mr-1 text-red-500',
+            ready:   'fas fa-circle mr-1 text-gray-400',
+        };
+        if (autosaveIcon) autosaveIcon.className = iconMap[status] || iconMap.ready;
+        const pillMap = {
+            editing: 'border-amber-200 bg-amber-50 text-amber-700',
+            saving:  'border-blue-200 bg-blue-50 text-blue-700',
+            saved:   'border-green-200 bg-green-50 text-green-700',
+            local:   'border-sky-200 bg-sky-50 text-sky-700',
+            error:   'border-red-200 bg-red-50 text-red-700',
+            ready:   'border-gray-200 bg-gray-50 text-gray-600',
+        };
+        if (autosaveIndicator) {
+            autosaveIndicator.className = 'inline-flex items-center rounded-full border px-3 py-1 text-sm transition-colors duration-200 ' + (pillMap[status] || pillMap.ready);
         }
-    })
-    .catch(error => {
-        console.error('Error en autoguardado:', error);
-        updateAutosaveIndicator('error', 'Error al guardar');
-        setTimeout(() => {
-            updateAutosaveIndicator('ready', 'Listo');
-        }, 3000);
+    }
+
+    // --- localStorage helpers ---
+    function getEditorContent() {
+        if (editorInstance) return editorInstance.getData() || '';
+        const el = document.querySelector('[name="informe_final_html"]');
+        return el ? el.value : '';
+    }
+
+    function saveDraftLocal() {
+        try { localStorage.setItem(LOCAL_KEY, getEditorContent()); } catch(e) {}
+    }
+
+    function clearDraftLocal() {
+        try { localStorage.removeItem(LOCAL_KEY); } catch(e) {}
+    }
+
+    function getDraftLocal() {
+        try { return localStorage.getItem(LOCAL_KEY); } catch(e) { return null; }
+    }
+
+    // --- Restaurar borrador local ---
+    function maybeRestoreDraft() {
+        const draft = getDraftLocal();
+        if (!draft || draft.trim() === '') return;
+        const current = getEditorContent();
+        if (current && current.trim() !== '') return;
+        if (editorInstance && typeof editorInstance.setData === 'function') {
+            editorInstance.setData(draft);
+        } else {
+            const el = document.querySelector('[name="informe_final_html"]');
+            if (el) el.value = draft;
+        }
+        setIndicator('local', 'Borrador local restaurado');
+        setTimeout(() => setIndicator('ready', 'Listo'), 3000);
+    }
+
+    // --- Guardado en servidor ---
+    function saveToServer() {
+        if (isSubmitting) return;
+        const content = getEditorContent();
+        if (!content || content.trim() === '') return;
+
+        setIndicator('saving', 'Guardando...');
+
+        fetch(`/preinformes/revision/${PREINFORME_PK}/autosave/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ informe_final_html: content })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                clearDraftLocal();
+                isDirty = false;
+                setIndicator('saved', 'Guardado ' + (data.timestamp || ''));
+                setTimeout(() => setIndicator('ready', 'Listo'), 3000);
+            } else {
+                throw new Error(data.error || 'error');
+            }
+        })
+        .catch(() => {
+            setIndicator('error', 'Error al guardar');
+            setTimeout(() => setIndicator('ready', 'Listo'), 4000);
+        });
+    }
+
+    // --- Al cambiar contenido ---
+    function onContentChange() {
+        isDirty = true;
+        saveDraftLocal();
+        setIndicator('editing', 'Editando...');
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            if (isDirty && !isSubmitting) saveToServer();
+        }, AUTOSAVE_DELAY);
+    }
+
+    // --- Ciclo periódico servidor (respaldo) ---
+    function startServerCycle() {
+        serverTimer = setInterval(() => {
+            if (isDirty && !isSubmitting) saveToServer();
+        }, SERVER_INTERVAL);
+    }
+
+    // --- beforeunload ---
+    window.addEventListener('beforeunload', function(e) {
+        if (!isDirty || isSubmitting) return;
+        saveDraftLocal();
+        // sendBeacon (JSON)
+        const content = getEditorContent();
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (content && csrf) {
+            const blob = new Blob(
+                [JSON.stringify({ informe_final_html: content, csrfmiddlewaretoken: csrf.value })],
+                { type: 'application/json' }
+            );
+            navigator.sendBeacon(`/preinformes/revision/${PREINFORME_PK}/autosave/`, blob);
+        }
+        e.preventDefault();
+        e.returnValue = '';
     });
-}
 
-function startAutosave() {
-    if (autosaveTimer) clearInterval(autosaveTimer);
-    autosaveTimer = setInterval(performAutosave, AUTOSAVE_INTERVAL);
-}
+    // --- Limpiar al enviar ---
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function() {
+            isSubmitting = true;
+            clearTimeout(debounceTimer);
+            clearInterval(serverTimer);
+            clearDraftLocal();
+        });
+    }
 
-// Inicializar autoguardado cuando CKEditor esté listo
-document.addEventListener('DOMContentLoaded', function() {
+    // --- Inicialización con DOMContentLoaded ---
+    document.addEventListener('DOMContentLoaded', function() {
     const editorElement = document.querySelector('[name="informe_final_html"]');
     const editorLoading = document.getElementById('editor-loading');
     const editorContainer = document.getElementById('editor-container');
@@ -516,53 +597,52 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    if (editorElement) {
-        // Intentar primero con el evento nativo de CKEditor si está disponible
-        const initEditor = () => {
-            if (editorElement.ckeditorInstance) {
-                editorInstance = editorElement.ckeditorInstance;
-                
-                // Ocultar spinner y mostrar editor con transición suave
-                if (editorLoading) {
-                    editorLoading.style.display = 'none';
+    function connectEditor() {
+        // django-ckeditor-5 pone la instancia en .ck-content, NO en el textarea
+        let ck = null;
+        if (editorElement) {
+            const ckContainer = editorElement.nextElementSibling;
+            if (ckContainer && ckContainer.classList.contains('ck-editor')) {
+                const ckContent = ckContainer.querySelector('.ck-content');
+                if (ckContent && ckContent.ckeditorInstance) {
+                    ck = ckContent.ckeditorInstance;
                 }
-                if (editorContainer) {
-                    editorContainer.style.opacity = '1';
-                }
-                
-                startAutosave();
-                console.log('✅ CKEditor cargado y listo');
-                return true;
             }
-            return false;
-        };
-        
-        // Intentar detectar el evento de carga del widget Django CKEditor5
-        editorElement.addEventListener('ckeditor5:ready', function() {
-            console.log('📝 CKEditor evento nativo detectado');
-            initEditor();
-        });
-        
-        // Fallback: polling más rápido (100ms en lugar de 500ms)
-        const checkEditor = setInterval(() => {
-            if (initEditor()) {
-                clearInterval(checkEditor);
-            }
-        }, 100);
-        
-        // Timeout de seguridad: si después de 8 segundos no se carga, mostrar de todos modos
-        setTimeout(() => {
-            if (editorLoading && editorLoading.style.display !== 'none') {
-                console.warn('⚠️ CKEditor tardó demasiado, mostrando de todos modos');
-                editorLoading.style.display = 'none';
-                if (editorContainer) {
-                    editorContainer.style.opacity = '1';
-                }
-                clearInterval(checkEditor);
-            }
-        }, 8000);
+        }
+        // Fallback: global (si algún otro script lo popula)
+        if (!ck) ck = window.ckeditorInstance || null;
+
+        if (ck && ck.model && ck.model.document) {
+            editorInstance = ck;
+            if (editorLoading) editorLoading.style.display = 'none';
+            if (editorContainer) editorContainer.style.opacity = '1';
+            editorInstance.model.document.on('change:data', onContentChange);
+            maybeRestoreDraft();
+            startServerCycle();
+            setIndicator('ready', 'Listo');
+            return true;
+        }
+        return false;
     }
-});
+
+    function tryConnectEditor(attempts) {
+        if (connectEditor()) return;
+        if (attempts > 0) {
+            setTimeout(() => tryConnectEditor(attempts - 1), 400);
+        } else {
+            // Fallback: textarea directo
+            if (editorElement) editorElement.addEventListener('input', onContentChange);
+            if (editorLoading) editorLoading.style.display = 'none';
+            if (editorContainer) editorContainer.style.opacity = '1';
+            maybeRestoreDraft();
+            startServerCycle();
+            setIndicator('ready', 'Listo');
+        }
+    }
+
+    tryConnectEditor(20); // 20 × 400ms = 8 s máximo, sin warning artificial
+}); // DOMContentLoaded
+})(); // IIFE autosave
 
 /**
  * Copia el informe final con formato HTML

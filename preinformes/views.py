@@ -831,7 +831,7 @@ def autosave_revision(request, pk):
         return JsonResponse({
             'success': True,
             'message': 'Guardado automático exitoso',
-            'timestamp': revision.fecha_modificacion.isoformat()
+            'timestamp': timezone.localtime(revision.fecha_modificacion).strftime('%H:%M'),
         })
         
     except Exception as e:
@@ -1089,7 +1089,7 @@ def autosave_preinforme(request, pk):
             Preinforme, 
             pk=pk, 
             residente=request.user,
-            estado='borrador'
+            estado__in=['borrador', 'pendiente_revision']
         )
         
         # Renovar marca de edición
@@ -1103,15 +1103,15 @@ def autosave_preinforme(request, pk):
             preinforme.informe_html = informe_html
             preinforme.save(update_fields=['informe_html'])
             return JsonResponse({
-                'success': True, 
+                'success': True,
                 'message': 'Preinforme guardado automáticamente',
-                'timestamp': preinforme.fecha_modificacion.strftime('%H:%M:%S')
+                'timestamp': timezone.localtime(preinforme.fecha_modificacion).strftime('%H:%M'),
             })
         else:
             return JsonResponse({
-                'success': True, 
+                'success': True,
                 'message': 'Sin cambios para guardar',
-                'timestamp': preinforme.fecha_modificacion.strftime('%H:%M:%S')
+                'timestamp': timezone.localtime(preinforme.fecha_modificacion).strftime('%H:%M'),
             })
             
     except Preinforme.DoesNotExist:
