@@ -176,3 +176,17 @@ class CorreoHilo(models.Model):
     @property
     def participantes_lista(self):
         return list(self.participantes.keys()) if self.participantes else []
+
+    @property
+    def es_urgente(self):
+        return self.prioridad_hilo == 'URGENTE'
+
+    @property
+    def compromiso_vencido(self):
+        from django.utils import timezone
+        return bool(self.fecha_compromiso and self.fecha_compromiso < timezone.now())
+
+    @property
+    def seguimiento_vencido(self):
+        from django.utils import timezone
+        return bool(self.fecha_seguimiento and self.fecha_seguimiento < timezone.now())

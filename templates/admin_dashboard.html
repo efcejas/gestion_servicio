@@ -96,14 +96,25 @@
                                             <div class="flex flex-wrap items-center gap-2 mb-1">
                                                 <p class="text-xs font-semibold text-white truncate">{{ hilo.resumen_hilo|default:hilo.asunto_normalizado }}</p>
                                                 <span class="inline-block px-2 py-0.5 bg-cyan-700/40 text-cyan-200 text-[0.65rem] rounded whitespace-nowrap">{{ hilo.cantidad_correos }} correo{{ hilo.cantidad_correos|pluralize }}</span>
+                                                {% if hilo.es_urgente %}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-700/60 border border-red-600/50 text-red-100 text-[0.65rem] rounded font-semibold whitespace-nowrap"><i class="fas fa-bolt"></i> URGENTE</span>
+                                                {% endif %}
                                                 {% if hilo.requiere_respuesta %}
                                                 <span class="inline-block px-2 py-0.5 bg-red-700/40 text-red-300 text-[0.65rem] rounded whitespace-nowrap">Respuesta</span>
                                                 {% endif %}
                                                 {% if hilo.fecha_seguimiento %}
+                                                {% if hilo.seguimiento_vencido %}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-red-950/60 border border-red-700/60 text-red-200 text-[0.65rem] rounded whitespace-nowrap"><i class="fas fa-clock"></i> Seg. vencido {{ hilo.fecha_seguimiento|date:"d/m H:i" }}</span>
+                                                {% else %}
                                                 <span class="inline-block px-2 py-0.5 bg-fuchsia-700/30 text-fuchsia-200 text-[0.65rem] rounded whitespace-nowrap">Seguimiento {{ hilo.fecha_seguimiento|date:"d/m H:i" }}</span>
                                                 {% endif %}
+                                                {% endif %}
                                                 {% if hilo.fecha_compromiso %}
+                                                {% if hilo.compromiso_vencido %}
+                                                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-950/60 border border-orange-600/60 text-orange-200 text-[0.65rem] rounded font-semibold whitespace-nowrap"><i class="fas fa-exclamation-triangle"></i> Comp. vencido {{ hilo.fecha_compromiso|date:"d/m H:i" }}</span>
+                                                {% else %}
                                                 <span class="inline-block px-2 py-0.5 bg-yellow-700/40 text-yellow-200 text-[0.65rem] rounded whitespace-nowrap">{{ hilo.fecha_compromiso|date:"d/m H:i" }}</span>
+                                                {% endif %}
                                                 {% endif %}
                                                 <span class="inline-block px-2 py-0.5 text-[0.65rem] rounded whitespace-nowrap {% if hilo.estado_hilo == 'pendiente' %}bg-amber-900/40 text-amber-200{% elif hilo.estado_hilo == 'en_curso' %}bg-blue-900/40 text-blue-200{% else %}bg-emerald-900/40 text-emerald-200{% endif %}">{{ hilo.get_estado_hilo_display }}</span>
                                             </div>

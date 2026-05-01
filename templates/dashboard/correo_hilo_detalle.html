@@ -21,6 +21,15 @@
             <p class="text-sm text-gray-300 mt-1">{{ hilo.asunto_normalizado }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-2 justify-end">
+            {% if hilo.es_urgente %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-red-600/60 bg-red-900/40 text-xs text-red-100 font-semibold"><i class="fas fa-bolt"></i> URGENTE</span>
+            {% endif %}
+            {% if hilo.compromiso_vencido %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-orange-600/60 bg-orange-950/40 text-xs text-orange-200 font-semibold"><i class="fas fa-exclamation-triangle"></i> Compromiso vencido</span>
+            {% endif %}
+            {% if hilo.seguimiento_vencido %}
+            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-red-700/60 bg-red-950/40 text-xs text-red-200"><i class="fas fa-clock"></i> Seguimiento vencido</span>
+            {% endif %}
             <span class="inline-flex items-center px-3 py-1 rounded-full border text-xs {% if hilo.estado_hilo == 'pendiente' %}border-amber-700 bg-amber-950/40 text-amber-200{% elif hilo.estado_hilo == 'en_curso' %}border-blue-700 bg-blue-950/40 text-blue-200{% else %}border-emerald-700 bg-emerald-950/40 text-emerald-200{% endif %}">
                 Estado: {{ hilo.get_estado_hilo_display }}
             </span>
@@ -58,17 +67,27 @@
                 <p class="text-xs font-semibold uppercase tracking-wider text-fuchsia-200">Seguimiento</p>
                 <p class="text-sm text-gray-300 mt-1">Usá este recordatorio para que el hilo reaparezca como agenda operativa aunque no tenga vencimiento original.</p>
             </div>
-            <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="flex flex-col sm:flex-row gap-2 sm:items-end">
+            <form method="post" action="{% url 'correo_hilo_cambiar_estado' hilo.id %}" class="flex flex-col gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="accion" value="seguimiento">
                 <input type="hidden" name="return_to" value="{{ request.get_full_path }}">
-                <div>
-                    <label for="fecha_seguimiento" class="block text-[0.7rem] uppercase tracking-wider text-fuchsia-200 mb-1">Próximo seguimiento</label>
-                    <input id="fecha_seguimiento" name="fecha_seguimiento" type="datetime-local" value="{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:'Y-m-d\\TH:i' }}{% endif %}" class="rounded-lg border border-fuchsia-800 bg-gray-900 text-sm text-white px-3 py-2">
+                {# Presets rápidos #}
+                <div class="flex flex-wrap gap-2">
+                    <span class="text-[0.7rem] uppercase tracking-wider text-fuchsia-300 self-center mr-1">Acceso rápido:</span>
+                    <button type="button" onclick="setFollowUp('today-18')" class="px-2 py-1 rounded border border-fuchsia-800/60 bg-fuchsia-950/30 text-xs text-fuchsia-200 hover:bg-fuchsia-900/50 transition-colors">Hoy 18:00</button>
+                    <button type="button" onclick="setFollowUp('tomorrow-8')" class="px-2 py-1 rounded border border-fuchsia-800/60 bg-fuchsia-950/30 text-xs text-fuchsia-200 hover:bg-fuchsia-900/50 transition-colors">Mañana 08:00</button>
+                    <button type="button" onclick="setFollowUp('48h')" class="px-2 py-1 rounded border border-fuchsia-800/60 bg-fuchsia-950/30 text-xs text-fuchsia-200 hover:bg-fuchsia-900/50 transition-colors">+48 h</button>
+                    <button type="button" onclick="setFollowUp('next-monday')" class="px-2 py-1 rounded border border-fuchsia-800/60 bg-fuchsia-950/30 text-xs text-fuchsia-200 hover:bg-fuchsia-900/50 transition-colors">Próx. lunes 08:00</button>
                 </div>
-                <button type="submit" class="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-fuchsia-700 bg-fuchsia-950/40 text-sm text-fuchsia-100 hover:bg-fuchsia-900/40 transition-colors">
-                    Guardar seguimiento
-                </button>
+                <div class="flex flex-col sm:flex-row gap-2 sm:items-end">
+                    <div>
+                        <label for="fecha_seguimiento" class="block text-[0.7rem] uppercase tracking-wider text-fuchsia-200 mb-1">Próximo seguimiento</label>
+                        <input id="fecha_seguimiento" name="fecha_seguimiento" type="datetime-local" value="{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:'Y-m-d\\TH:i' }}{% endif %}" class="rounded-lg border border-fuchsia-800 bg-gray-900 text-sm text-white px-3 py-2">
+                    </div>
+                    <button type="submit" class="inline-flex items-center justify-center px-3 py-2 rounded-lg border border-fuchsia-700 bg-fuchsia-950/40 text-sm text-fuchsia-100 hover:bg-fuchsia-900/40 transition-colors">
+                        Guardar seguimiento
+                    </button>
+                </div>
             </form>
         </div>
         {% if hilo.fecha_seguimiento %}
@@ -97,9 +116,9 @@
             <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Requiere respuesta</p>
             <p class="text-lg font-semibold text-white">{% if hilo.requiere_respuesta %}Sí{% else %}No{% endif %}</p>
         </div>
-        <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
-            <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Seguimiento</p>
-            <p class="text-lg font-semibold text-white">{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:"d/m H:i" }}{% else %}-{% endif %}</p>
+        <div class="rounded-xl border {% if hilo.seguimiento_vencido %}border-red-700/60 bg-red-950/20{% else %}border-gray-700 bg-gray-800{% endif %} p-3">
+            <p class="text-[0.7rem] uppercase tracking-wider {% if hilo.seguimiento_vencido %}text-red-300{% else %}text-gray-400{% endif %}">Seguimiento{% if hilo.seguimiento_vencido %} ⚠{% endif %}</p>
+            <p class="text-lg font-semibold {% if hilo.seguimiento_vencido %}text-red-200{% else %}text-white{% endif %}">{% if hilo.fecha_seguimiento %}{{ hilo.fecha_seguimiento|date:"d/m H:i" }}{% else %}-{% endif %}</p>
         </div>
         <div class="rounded-xl border border-gray-700 bg-gray-800 p-3">
             <p class="text-[0.7rem] uppercase tracking-wider text-gray-400">Último correo</p>
@@ -133,4 +152,40 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function setFollowUp(preset) {
+    const input = document.getElementById('fecha_seguimiento');
+    const now = new Date();
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+    function fmt(d) {
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    let target = new Date(now);
+
+    if (preset === 'today-18') {
+        target.setHours(18, 0, 0, 0);
+        // Si ya pasaron las 18:00 de hoy, usar mañana 18:00
+        if (target <= now) target.setDate(target.getDate() + 1);
+    } else if (preset === 'tomorrow-8') {
+        target.setDate(target.getDate() + 1);
+        target.setHours(8, 0, 0, 0);
+    } else if (preset === '48h') {
+        target.setTime(now.getTime() + 48 * 60 * 60 * 1000);
+        target.setMinutes(0, 0, 0);
+    } else if (preset === 'next-monday') {
+        const day = target.getDay(); // 0=dom, 1=lun … 6=sáb
+        const daysUntilMonday = day === 0 ? 1 : (8 - day);
+        target.setDate(target.getDate() + daysUntilMonday);
+        target.setHours(8, 0, 0, 0);
+    }
+
+    input.value = fmt(target);
+    input.focus();
+}
+</script>
 {% endblock %}
