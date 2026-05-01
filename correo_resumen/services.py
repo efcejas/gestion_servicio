@@ -126,6 +126,22 @@ def _agrupar_correos_en_hilos(config):
             fecha_compromiso__isnull=False
         ).earliest('fecha_compromiso').fecha_compromiso if correos_hilo.filter(fecha_compromiso__isnull=False).exists() else None
         hilo.resumen_hilo = _generar_resumen_hilo(hilo)
+
+        # Si el hilo ya tenía resumen IA pero recibió correos nuevos, marcarlo para regenerar
+        if hilo.resumen_ia_generado:
+            hilo.resumen_ia_generado = False
+
+        # Intentar enriquecer con IA si está habilitado
+        config = get_correo_resumen_config()
+        if config.get('ENABLE_AI_SUMMARY') and not hilo.resumen_ia_generado:
+            try:
+                resumen_ia = _generar_resumen_hilo_ia(hilo)
+                if resumen_ia:
+                    hilo.resumen_hilo = resumen_ia
+                    hilo.resumen_ia_generado = True
+            except ResumenIAError:
+                pass  # fallback: queda el resumen local
+
         hilo.save()
 
 
@@ -459,6 +475,64 @@ def _generar_resumen_ia(payload, clasificacion):
         if not isinstance(acciones, list):
             acciones = []
         return resumen or _generar_resumen_local(payload, clasificacion)[0], acciones[:2]
+    except Exception as exc:
+        raise ResumenIAError(str(exc)) from exc
+
+
+def _generar_resumen_hilo_ia(hilo):
+    """
+    Genera el resumen de un hilo usando IA (OpenRouter via AIService).
+    Toma los snippets/resúmenes de los últimos correos del hilo y produce
+    un texto accionable de una línea que se guarda en hilo.resumen_hilo.
+
+    Retorna el texto generado o None si falla (el llamador decide qué hacer).
+    """
+    import json
+
+    config = get_correo_resumen_config()
+    if not config.get('ENABLE_AI_SUMMARY'):
+        return None
+
+    ai_service = AIService()
+    if not ai_service.llm_enabled:
+        return None
+
+    correos = hilo.correos.order_by('-fecha_email')[:5]
+    if not correos.exists():
+        return None
+
+    bloques = []
+    for c in correos:
+        texto = c.resumen_ejecutivo or c.snippet or ''
+        if texto:
+            bloques.append(f'- [{c.fecha_email.strftime("%d/%m")}] {c.remitente_visible}: {texto[:200]}')
+
+    if not bloques:
+        return None
+
+    contexto_correos = '\n'.join(bloques)
+
+    prompt = (
+        'Sos un asistente ejecutivo para un jefe de servicio médico de diagnóstico por imágenes. '
+        'Te doy el hilo de una conversación de correo institucional. '
+        'Escribí UNA sola frase clara y accionable que resuma el estado actual del hilo y lo que requiere atención. '
+        'Máximo 200 caracteres. Sin comillas ni prefijos. Solo el texto.\n\n'
+        f'Asunto del hilo: {hilo.asunto_normalizado}\n'
+        f'Correos recientes:\n{contexto_correos}'
+    )
+
+    try:
+        response = ai_service.llm_client.chat.completions.create(
+            model=ai_service.llm_model,
+            messages=[
+                {'role': 'system', 'content': 'Respondé solo con el texto del resumen, sin explicaciones ni formato adicional.'},
+                {'role': 'user', 'content': prompt},
+            ],
+            temperature=0.2,
+            max_tokens=80,
+        )
+        resumen = response.choices[0].message.content.strip().strip('"').strip("'")
+        return resumen[:280] if resumen else None
     except Exception as exc:
         raise ResumenIAError(str(exc)) from exc
 

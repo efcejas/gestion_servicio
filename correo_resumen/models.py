@@ -144,6 +144,7 @@ class CorreoHilo(models.Model):
     requiere_respuesta = models.BooleanField(default=False)
     fecha_compromiso = models.DateTimeField(null=True, blank=True)
     fecha_seguimiento = models.DateTimeField(null=True, blank=True)
+    resumen_ia_generado = models.BooleanField(default=False)
     
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
