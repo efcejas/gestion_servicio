@@ -20,7 +20,7 @@ class PlantillaEstructuradaForm(forms.ModelForm):
     
     class Meta:
         model = PlantillaEstructurada
-        fields = ['codigo', 'nombre', 'titulo', 'seccion_tecnica', 'comentarios_base_texto', 'activa', 'compartida']
+        fields = ['codigo', 'nombre', 'titulo', 'seccion_tecnica', 'comentarios_base_texto', 'guia_estilo', 'activa', 'compartida']
         widgets = {
             'codigo': forms.TextInput(attrs={
                 'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-700 text-white',
@@ -40,6 +40,11 @@ class PlantillaEstructuradaForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': 'Se exploró la rodilla [<lado>] con secuencias que ponderan tiempos de relajación T1, T2 y STIR en los diferentes planos.'
             }),
+            'guia_estilo': forms.Textarea(attrs={
+                'class': 'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-700 text-white',
+                'rows': 5,
+                'placeholder': 'Ej: Para meniscos usar "de configuración habitual" en normalidad. En desgarros indicar grado Stoller y cuerno comprometido. Mantener conclusión breve en una línea.'
+            }),
             'activa': forms.CheckboxInput(attrs={
                 'class': 'rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500'
             }),
@@ -52,10 +57,15 @@ class PlantillaEstructuradaForm(forms.ModelForm):
             'nombre': 'Nombre Descriptivo',
             'titulo': 'Título de la Plantilla',
             'seccion_tecnica': 'Sección Técnica',
+            'guia_estilo': 'Guía de Estilo para IA',
             'activa': 'Activa',
             'compartida': '¿Compartir esta plantilla con otros usuarios de Dictado IA?'
         }
         help_texts = {
+            'guia_estilo': (
+                'Instrucciones de redacción para esta plantilla. '
+                'La IA las toma con prioridad en modo ESTRUCTURADO.'
+            ),
             'compartida': 'Si la compartes, otros usuarios del módulo podrán usarla en Dictado Rápido. Si no, quedará solo para vos y para superusuarios.'
         }
     
