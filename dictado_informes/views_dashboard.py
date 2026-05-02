@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Avg, Max, Min, Count, Q
 from datetime import timedelta
-from .models import MetricaDictado, TipoEstudio
+from .models import MetricaDictado, TipoEstudio, FeedbackCalidadDictado, PlantillaEstructurada
 import logging
 import json
 
@@ -41,6 +41,92 @@ def dashboard_metricas(request):
     
     # Obtener estadísticas del periodo
     stats = MetricaDictado.obtener_estadisticas_periodo(fecha_desde, fecha_hasta)
+
+    # Calidad de salida (feedback explícito del usuario)
+    feedback_qs = FeedbackCalidadDictado.objects.filter(
+        fecha__gte=fecha_desde,
+        fecha__lte=fecha_hasta,
+    )
+    feedback_resumen = feedback_qs.aggregate(
+        total_feedback=Count('id'),
+        correctos=Count('id', filter=Q(estado_feedback=FeedbackCalidadDictado.EstadoFeedback.CORRECTO)),
+        requirieron_correccion=Count(
+            'id',
+            filter=Q(estado_feedback=FeedbackCalidadDictado.EstadoFeedback.REQUIRIO_CORRECCION)
+        ),
+        porcentaje_edicion_promedio=Avg('porcentaje_edicion'),
+    )
+    total_feedback = feedback_resumen.get('total_feedback') or 0
+    correctos = feedback_resumen.get('correctos') or 0
+    feedback_resumen['tasa_correcto_primer_intento'] = (
+        round((correctos / total_feedback) * 100, 2) if total_feedback > 0 else 0.0
+    )
+
+    plantillas_con_mas_correccion = list(
+        feedback_qs.filter(tipo_plantilla__gt='')
+        .values('tipo_plantilla')
+        .annotate(
+            total=Count('id'),
+            correcciones=Count(
+                'id',
+                filter=Q(estado_feedback=FeedbackCalidadDictado.EstadoFeedback.REQUIRIO_CORRECCION)
+            ),
+            porcentaje_edicion_promedio=Avg('porcentaje_edicion'),
+        )
+        .order_by('-correcciones', '-total')[:10]
+    )
+
+    # Recomendaciones automáticas por plantilla (alerta temprana de calidad)
+    UMBRAL_ALERTA_CORRECCION = 40.0
+    UMBRAL_ALERTA_EDICION = 25.0
+    recomendaciones_plantilla = []
+
+    for fila in plantillas_con_mas_correccion:
+        total = fila.get('total') or 0
+        correcciones = fila.get('correcciones') or 0
+        tasa_correccion = round((correcciones / total) * 100, 2) if total > 0 else 0.0
+        porcentaje_edicion = round(float(fila.get('porcentaje_edicion_promedio') or 0.0), 2)
+
+        fila['tasa_correccion'] = tasa_correccion
+        fila['nivel_alerta'] = (
+            'alta'
+            if (tasa_correccion >= 60 or porcentaje_edicion >= 35)
+            else 'media'
+            if (tasa_correccion >= UMBRAL_ALERTA_CORRECCION or porcentaje_edicion >= UMBRAL_ALERTA_EDICION)
+            else 'baja'
+        )
+
+        if fila['nivel_alerta'] == 'alta':
+            accion = (
+                'Revisar guia_estilo en admin y agregar reglas explícitas por estructura '
+                '(qué reemplazar, qué conservar y términos preferidos).'
+            )
+        elif fila['nivel_alerta'] == 'media':
+            accion = (
+                'Ajustar guía de estilo con 2-3 ejemplos de redacción para hallazgos frecuentes '
+                'y validarlos con casos reales.'
+            )
+        else:
+            accion = 'Plantilla estable. Mantener y monitorear.'
+
+        fila['accion_sugerida'] = accion
+
+        if fila['nivel_alerta'] in ('alta', 'media'):
+            codigo = fila.get('tipo_plantilla', '')
+            plantilla_obj = PlantillaEstructurada.objects.filter(codigo=codigo).values('pk').first()
+            recomendaciones_plantilla.append({
+                'tipo_plantilla': codigo,
+                'tasa_correccion': tasa_correccion,
+                'porcentaje_edicion_promedio': porcentaje_edicion,
+                'nivel_alerta': fila['nivel_alerta'],
+                'accion_sugerida': accion,
+                'pk': plantilla_obj['pk'] if plantilla_obj else None,
+            })
+
+    recomendaciones_plantilla = sorted(
+        recomendaciones_plantilla,
+        key=lambda r: (r['nivel_alerta'] != 'alta', -r['tasa_correccion'], -r['porcentaje_edicion_promedio'])
+    )[:5]
     
     # Obtener top usuarios
     top_usuarios = MetricaDictado.obtener_top_usuarios(fecha_desde, fecha_hasta, limite=10)
@@ -125,6 +211,11 @@ def dashboard_metricas(request):
     
     contexto = {
         'stats': stats,
+        'feedback_resumen': feedback_resumen,
+        'plantillas_con_mas_correccion': plantillas_con_mas_correccion,
+        'recomendaciones_plantilla': recomendaciones_plantilla,
+        'umbral_alerta_correccion': UMBRAL_ALERTA_CORRECCION,
+        'umbral_alerta_edicion': UMBRAL_ALERTA_EDICION,
         'top_usuarios': top_usuarios,
         'anomalias': anomalias,
         'rangos_tiempo': rangos_tiempo,

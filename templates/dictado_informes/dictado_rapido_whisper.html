@@ -409,6 +409,22 @@
                         Copiar Texto Plano
                     </button>
                 </div>
+
+                <div id="panelFeedbackCalidad" class="hidden mt-4 bg-gray-900/70 border border-gray-700 rounded-lg p-3">
+                    <p class="text-xs font-bold text-gray-300 mb-2">
+                        <i class="fas fa-clipboard-check mr-1 text-cyan-400"></i>
+                        Feedback rápido de calidad
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button id="btnFeedbackCorrecto" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors">
+                            ✓ Correcto al primer intento
+                        </button>
+                        <button id="btnFeedbackCorreccion" class="bg-amber-700 hover:bg-amber-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors">
+                            ✎ Requirió corrección
+                        </button>
+                    </div>
+                    <p id="feedbackCalidadEstado" class="hidden mt-2 text-xs text-cyan-300"></p>
+                </div>
             </div>
             
             <!-- Toast de notificaciones -->
@@ -493,6 +509,7 @@ let requiereConfirmacionIA = false;
 let motivoConfirmacionIA = '';
 let terminosSospechososIA = [];
 let editorTextoMejorado = null;
+let feedbackCalidadEnviado = false;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -1164,6 +1181,16 @@ async function procesarAudio() {
             
             // GUARDAR EN HISTORIAL
             guardarEnHistorial(textoOriginalGlobal, getTextoMejoradoTextoPlano());
+
+            // Habilitar feedback de calidad para esta salida
+            feedbackCalidadEnviado = false;
+            const panelFeedbackCalidad = document.getElementById('panelFeedbackCalidad');
+            const feedbackCalidadEstado = document.getElementById('feedbackCalidadEstado');
+            if (panelFeedbackCalidad) panelFeedbackCalidad.classList.remove('hidden');
+            if (feedbackCalidadEstado) {
+                feedbackCalidadEstado.classList.add('hidden');
+                feedbackCalidadEstado.textContent = '';
+            }
             
         } catch (error) {
             console.error('🚨 Error procesando audio:', error);
@@ -1208,6 +1235,51 @@ function limpiarCorchetesHtml(html) {
 // Variables globales para guardar aprendizaje
 let textoOriginalGlobal = '';
 let textoIAGlobal = '';
+
+async function registrarFeedbackCalidad(estadoFeedback) {
+    if (feedbackCalidadEnviado) {
+        mostrarToast('Feedback ya registrado para este dictado', 'info');
+        return;
+    }
+
+    const textoFinal = getTextoMejoradoTextoPlano();
+    const modoIA = document.querySelector('input[name="modoIA"]:checked')?.value || 'FIEL';
+    const tipoPlantilla = document.getElementById('tipoPlantilla')?.value || '';
+
+    try {
+        const response = await fetch('{% url "dictado_informes:feedback_calidad" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                estado_feedback: estadoFeedback,
+                texto_ia: textoIAGlobal,
+                texto_final: textoFinal,
+                modo_dictado: modoIA,
+                tipo_estudio: '',
+                tipo_plantilla: modoIA === 'ESTRUCTURADO' ? tipoPlantilla : ''
+            })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'No se pudo registrar feedback');
+        }
+
+        feedbackCalidadEnviado = true;
+        const feedbackCalidadEstado = document.getElementById('feedbackCalidadEstado');
+        if (feedbackCalidadEstado) {
+            feedbackCalidadEstado.textContent = `Guardado. Edición estimada: ${data.porcentaje_edicion}% (${data.caracteres_editados} caracteres).`;
+            feedbackCalidadEstado.classList.remove('hidden');
+        }
+        mostrarToast('✅ Feedback de calidad guardado', 'success');
+    } catch (error) {
+        console.error('Error registrando feedback de calidad:', error);
+        mostrarToast('❌ No se pudo guardar feedback', 'error');
+    }
+}
 
 // 🎯 Función para guardar aprendizaje automáticamente
 async function guardarAprendizajeAutomatico() {
@@ -1350,6 +1422,8 @@ async function copiarTexto(modoCopia = 'rich') {
 
 document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
 document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
+document.getElementById('btnFeedbackCorrecto')?.addEventListener('click', () => registrarFeedbackCalidad('correcto'));
+document.getElementById('btnFeedbackCorreccion')?.addEventListener('click', () => registrarFeedbackCalidad('correccion'));
 
 // 3. ATAJOS DE TECLADO
 document.addEventListener('keydown', (e) => {

@@ -13,7 +13,7 @@ from django.core.files.base import ContentFile
 from .models import (
     Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
-    PlantillaEstructurada
+    PlantillaEstructurada, FeedbackCalidadDictado
 )
 from .forms import TerminoMedicoForm, PlantillaEstructuradaForm
 from .ai_services import ai_service
@@ -21,6 +21,7 @@ import json
 import base64
 import logging
 import time  # 🚀 FASE 4: Para medir tiempos
+import difflib
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,34 @@ def user_can_access_dictado_module(user):
 
 def get_plantillas_estructuradas_visibles(user, solo_activas=False):
     return PlantillaEstructurada.visibles_para_usuario(user, solo_activas=solo_activas)
+
+
+def _calcular_metricas_edicion(texto_ia, texto_final):
+    """Calcula edición manual aproximada con ratio de similitud de caracteres."""
+    texto_ia = (texto_ia or '').strip()
+    texto_final = (texto_final or '').strip()
+
+    if not texto_ia and not texto_final:
+        return {
+            'longitud_texto_ia': 0,
+            'longitud_texto_final': 0,
+            'caracteres_editados': 0,
+            'porcentaje_edicion': 0.0,
+            'tuvo_edicion': False,
+        }
+
+    ratio = difflib.SequenceMatcher(None, texto_ia, texto_final).ratio()
+    base = max(len(texto_ia), len(texto_final), 1)
+    caracteres_editados = max(0, int(round((1.0 - ratio) * base)))
+    porcentaje_edicion = round((caracteres_editados / base) * 100, 2)
+
+    return {
+        'longitud_texto_ia': len(texto_ia),
+        'longitud_texto_final': len(texto_final),
+        'caracteres_editados': caracteres_editados,
+        'porcentaje_edicion': porcentaje_edicion,
+        'tuvo_edicion': caracteres_editados > 0,
+    }
 
 
 class SuperuserRequiredMixin(UserPassesTestMixin):
@@ -973,6 +1002,57 @@ def guardar_correccion_aprendizaje(request):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@require_POST
+def registrar_feedback_calidad(request):
+    """Registra feedback binario de calidad y magnitud de edición manual."""
+    if not user_can_access_dictado_module(request.user):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        estado_feedback = data.get('estado_feedback', '').strip()
+        texto_ia = data.get('texto_ia', '')
+        texto_final = data.get('texto_final', '')
+        modo_dictado = data.get('modo_dictado', FeedbackCalidadDictado.ModoDictado.FIEL)
+        tipo_estudio = data.get('tipo_estudio', '')
+        tipo_plantilla = data.get('tipo_plantilla', '')
+
+        estados_validos = {e[0] for e in FeedbackCalidadDictado.EstadoFeedback.choices}
+        if estado_feedback not in estados_validos:
+            return JsonResponse({'error': 'estado_feedback inválido'}, status=400)
+
+        modos_validos = {m[0] for m in FeedbackCalidadDictado.ModoDictado.choices}
+        if modo_dictado not in modos_validos:
+            modo_dictado = FeedbackCalidadDictado.ModoDictado.FIEL
+
+        if tipo_estudio not in dict(TipoEstudio.choices):
+            tipo_estudio = ''
+
+        metricas = _calcular_metricas_edicion(texto_ia, texto_final)
+
+        feedback = FeedbackCalidadDictado.objects.create(
+            usuario=request.user,
+            estado_feedback=estado_feedback,
+            modo_dictado=modo_dictado,
+            tipo_estudio=tipo_estudio,
+            tipo_plantilla=(tipo_plantilla or '')[:50],
+            **metricas,
+        )
+
+        return JsonResponse({
+            'success': True,
+            'id': feedback.id,
+            'porcentaje_edicion': feedback.porcentaje_edicion,
+            'caracteres_editados': feedback.caracteres_editados,
+            'tuvo_edicion': feedback.tuvo_edicion,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Datos inválidos en la solicitud'}, status=400)
+    except Exception as e:
+        logger.exception(f"Error registrando feedback de calidad: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @require_http_methods(["GET"])

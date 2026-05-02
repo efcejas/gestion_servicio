@@ -34,9 +34,9 @@ class AIService:
         if openai_key:
             self.llm_client = OpenAI(api_key=openai_key)
             self.llm_enabled = True
-            self.llm_model = 'gpt-4o-mini'
+            self.llm_model = 'gpt-4.1-mini'
             self.llm_provider = 'openai'
-            logger.info("✅ OpenAI GPT-4o-mini configurado para mejora de texto (PRIORITARIO)")
+            logger.info("✅ OpenAI GPT-4.1-mini configurado para mejora de texto (PRIORITARIO)")
             
             # Groq como fallback gratuito si OpenAI falla
             if groq_key:
@@ -91,7 +91,8 @@ class AIService:
             return {
                 'titulo': plantilla_obj.titulo,
                 'seccion_tecnica': plantilla_obj.seccion_tecnica,
-                'comentarios': plantilla_obj.comentarios_base or []
+                'comentarios': plantilla_obj.comentarios_base or [],
+                'guia_estilo': plantilla_obj.guia_estilo or '',
             }
         except PlantillaEstructurada.DoesNotExist:
             logger.warning(f"⚠️ Plantilla '{tipo_plantilla}' no encontrada en BD, usando hardcode")
@@ -262,8 +263,11 @@ class AIService:
                 ]
             }
         }
-        
-        return plantillas.get(tipo_plantilla, plantillas['RODILLA'])
+
+        plantilla = plantillas.get(tipo_plantilla, plantillas['RODILLA'])
+        # Asegurar que el fallback hardcode siempre tiene guia_estilo
+        plantilla.setdefault('guia_estilo', '')
+        return plantilla
     
     def get_api_info(self):
         """Retorna información sobre el proveedor de IA y límites"""
@@ -630,81 +634,74 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                 
                 # 🔄 LEER PLANTILLA DESDE BD (con fallback a hardcode)
                 plantilla_actual = self._get_plantilla_estructurada(tipo_plantilla, usuario=usuario)
-                comentarios_str = '\n'.join(plantilla_actual['comentarios'])
-                
-                # 🚀 PROMPT OPTIMIZADO: 50% más corto usando formato compacto
-                prompt = f"""Radiólogo experto: Genera informe de {tipo_nombre} según dictado.
+                guia_estilo = plantilla_actual.get('guia_estilo', '')
+                guia_estilo_bloque = f"""
+🖊️ GUÍA DE ESTILO DEL RADIÓLOGO (PRIORIDAD MÁXIMA):
+{guia_estilo}
 
-📝 DICTADO:
+""" if guia_estilo.strip() else ''
+
+                # Numerar las líneas de la plantilla para razonamiento semántico explícito
+                comentarios_numerados = '\n'.join(
+                    f"[{i+1}] {linea}"
+                    for i, linea in enumerate(plantilla_actual['comentarios'])
+                )
+
+                # 🧠 PROMPT CON RAZONAMIENTO SEMÁNTICO DE LÍNEAS
+                prompt = f"""Sos un radiólogo experto generando un informe de {tipo_nombre}.
+{guia_estilo_bloque}
+━━━ DICTADO DEL MÉDICO ━━━
 {texto_original}
 
-📋 ESTRUCTURA:
+━━━ PLANTILLA BASE (líneas numeradas) ━━━
+Cada línea describe una estructura anatómica específica. Leelas con atención.
+{comentarios_numerados}
+
+━━━ INSTRUCCIÓN DE RAZONAMIENTO (ejecutá en orden) ━━━
+
+PASO 1 — ANÁLISIS SEMÁNTICO:
+Para cada estructura o hallazgo mencionado en el dictado, identificá cuál línea numerada de la plantilla corresponde.
+Ejemplo: si el dictado dice "condromalacia rotuliana", la línea [N] que habla de "Rótula..." es la afectada.
+Si el dictado menciona "bursas distendidas" y hay una línea que incluye "bursal" o "líquido articular glenohumeral ni bursal", esa línea es la afectada.
+
+PASO 2 — DECISIÓN POR LÍNEA:
+Para CADA línea numerada, tomá UNA de estas decisiones:
+  • CONSERVAR → la estructura no fue mencionada en el dictado → copiar la línea exactamente igual
+  • REEMPLAZAR → el dictado menciona un hallazgo patológico de esa estructura → escribir el hallazgo en terminología médica precisa
+    • AGREGAR → el dictado menciona algo que no tiene línea propia en la plantilla → crear una línea nueva y ubicarla en posición anatómica coherente
+
+PASO 2.1 — REGLA DE UBICACIÓN PARA LÍNEAS NUEVAS (AGREGAR):
+Si el hallazgo nuevo no existe en la plantilla base, ubicarlo así:
+    1) Junto a la línea anatómicamente más cercana (misma región/sistema)
+    2) Si afecta una estructura relacionada con una línea existente, colocarlo inmediatamente después de esa línea
+    3) Si no hay ancla clara, insertarlo antes de las líneas de cierre global (por ejemplo "No se visualizan lesiones óseas" o "No se observa aumento del líquido articular")
+    4) Evitar agrupar todos los hallazgos nuevos al final del COMENTARIO
+
+PASO 3 — REGLAS DE ORO:
+  ✅ Nunca eliminar una línea sin reemplazarla o justificarlo
+  ✅ Si una línea habla de dos estructuras (ej: "bursas y tendón") y solo una fue mencionada, reescribir la línea dejando normal la no mencionada
+  ✅ Si aparece una estructura patológica nueva no contemplada en plantilla, crear su línea e insertarla cerca de su estructura relacionada
+  ✅ Si dicta "el resto normal" → conservar todas las líneas no modificadas
+  ✅ Lenguaje coloquial del dictado → terminología radiológica precisa en el informe
+  ✅ NO inventar hallazgos no dictados
+  ✅ Si hay contradicción (patología + "sin alteraciones" de la misma estructura) → eliminar la parte normal
+
+━━━ FORMATO DE SALIDA ━━━
+Generá el informe final con esta estructura exacta (títulos en MAYÚSCULAS, sin asteriscos ni markdown):
+
 {plantilla_actual['titulo']}
 
 INFORMACIÓN CLÍNICA
-[Síntomas/antecedentes del dictado]
+[Síntomas o antecedentes del dictado]
 
 TÉCNICA
 {plantilla_actual['seccion_tecnica']}
 
 COMENTARIO
-[Hallazgos - 1 línea por estructura]
+[Una línea por estructura. Cada oración termina con punto y salto de línea. NO todo en un párrafo.]
 
 CONCLUSIÓN
-[Resumen diagnóstico]
-
-🎯 REGLAS CRÍTICAS DE FORMATO:
-▶ CADA hallazgo debe estar en su PROPIA LÍNEA
-▶ Termina cada oración con punto y NUEVA LÍNEA
-▶ NO escribas todo en un solo párrafo
-▶ Si un mismo hallazgo afecta múltiples espacios/regiones, escribir UNA sola línea agrupando localizaciones con comas y "y"
-▶ Ejemplo CORRECTO:
-  Hallazgo 1.
-  Hallazgo 2.
-  Hallazgo 3.
-▶ Ejemplo INCORRECTO:
-  Hallazgo 1. Hallazgo 2. Hallazgo 3.
-
-🎯 REGLAS:
-1. FORMATO: Títulos en MAYÚSCULAS sin asteriscos. Una línea por hallazgo SIN viñetas (-) ni bullets.
-1.1 FIDELIDAD AL DICTADO: Mantener la idea clínica original y su relación causal/anatómica. No reformular en frases telegráficas.
-1.2 NO FRAGMENTAR: Si el dictado expresa una misma patología con complemento (ej. "lesión ... con edema adyacente"), mantenerlo en UNA sola línea.
-
-2. COMENTARIO - LÓGICA DE REEMPLAZO:
-   ⚠️ CRÍTICO: SOLO reemplaza las líneas de estructuras que DICTÓ el usuario.
-   ✅ CONSERVA todas las líneas normales de estructuras NO mencionadas.
-   
-   Base normal: {comentarios_str}
-   
-   EJEMPLO DE LÓGICA:
-   Si dicta: "desgarro menisco interno, quiste de Baker"
-   
-   CORRECTO ✅:
-   Desgarro del menisco interno.
-   Menisco externo de configuración normal.
-   Ligamentos cruzados de trayecto y morfología conservados. ← CONSERVÓ (no mencionado)
-   Resto de tendones y ligamentos sin alteraciones. ← CONSERVÓ (no mencionado)
-   Rótula centrada, sin lesión visible. ← CONSERVÓ (no mencionado)
-   Quiste de Baker de [tamaño].
-   No se observa aumento del líquido articular. ← CONSERVÓ (no mencionado)
-   No se visualizan lesiones óseas. ← CONSERVÓ (no mencionado)
-   
-   INCORRECTO ❌:
-   Desgarro del menisco interno.
-   Menisco externo normal.
-   Quiste de Baker.
-   ← ELIMINÓ ligamentos, tendones, rótula (MAL!)
-   
-3. Si dice "el resto normal" / "el resto sin alteraciones":
-   → Mantén TODAS las líneas normales de la plantilla para estructuras no mencionadas
-   → Al final agrega: "Resto de estructuras sin particularidades."
-   
-4. Si dicta "desgarro LCA" → elimina "ligamentos conservados", coloca en posición anatómica correspondiente
-4. Si dicta "desgarro LCA" → elimina "ligamentos conservados", coloca en posición anatómica correspondiente
-5. Lenguaje coloquial → terminología médica precisa
-6. NO inventes hallazgos no dictados
-7. Elimina contradicciones (ej: patología + "sin alteraciones" de misma estructura)
-8. ⚠️ NO ELIMINES líneas normales de estructuras no mencionadas
+[Texto corrido narrativo, 2-4 líneas. Sin viñetas. Sin "se observa / se evidencia". Jerarquizar: hallazgo principal → asociados → secundarios.]
 
 💡 EJEMPLO COMPLETO:
 Dictado: "rodilla derecha, trauma, desgarro LCA, derrame articular"
@@ -769,74 +766,8 @@ PRINCIPIOS FUNDAMENTALES:
 
 6. CASOS ESPECIALES:
    • Estudio NORMAL → "Estudio dentro de los parámetros normales."
-   • Estudio con hallazgo único → ser igualmente conciso y directo
-   • Múltiples hallazgos → jerarquizar y agrupar lógicamente
-
-EJEMPLOS DE CONCLUSIONES CORRECTAS:
-
-Ejemplo 1 (lesión meniscal + edema):
-"Meniscopatía determinada por desgarro horizontal que compromete el cuerpo y cuerno posterior del menisco interno, con edema óseo de aspecto contusivo en el cóndilo femoral medial asociado. Derrame articular leve."
-
-Ejemplo 2 (manguito rotador):
-"Tendinopatía del supraespinoso y tenosinovitis del tendón de la porción larga del bíceps, con edema óseo en la articulación acromioclavicular."
-
-Ejemplo 3 (gonartrosis):
-"Gonartrosis tricompartimental con condromalacia rotuliana grado III-IV. Meniscopatía degenerativa con desgarro complejo del menisco interno y extrusión meniscal asociada."
-
-Ejemplo 4 (normal):
-"Estudio dentro de los parámetros normales."
-
-EJEMPLOS DE CONCLUSIONES INCORRECTAS:
-
-❌ "Se observa desgarro del menisco interno. También se visualiza derrame articular."
-   (Problema: verbos innecesarios, estructura fragmentada)
-
-❌ "- Desgarro meniscal
-    - Derrame articular  
-    - Edema óseo"
-   (Problema: formato de lista, no es prosa narrativa)
-
-❌ "Meniscos normales. Ligamentos normales. Derrame articular presente."
-   (Problema: menciona estructuras normales innecesariamente)
-
-❌ "Hallazgos compatibles con cambios degenerativos inespecíficos."
-   (Problema: lenguaje vago, poco profesional)
-
-INSTRUCCIÓN FINAL:
-Genera una conclusión que sea un párrafo narrativo profesional, jerarquizado, usando terminología radiológica precisa, sin verbos de observación innecesarios, que sintetice los hallazgos patológicos principales del COMENTARIO en 2-4 líneas máximo.
-
-Ejemplo de estudio normal:
-COMENTARIO
-Meniscos de altura y señal normales.
-Ligamentos cruzados de trayecto y morfología conservados.
-[...todas las líneas normales...]
-
-CONCLUSIÓN
-Estudio dentro de los parámetros normales.
-
-�🚫 PROHIBIDO:
-- Usar asteriscos (**) en títulos
-- Usar viñetas (-) o bullets (•) en COMENTARIO
-- Markdown de cualquier tipo
-- Escribir todo el COMENTARIO en un solo párrafo
-- ELIMINAR líneas normales de la plantilla que no fueron mencionadas
-
-✅ FORMATO CORRECTO: Texto plano profesional
-✅ CRÍTICO: CADA hallazgo en su propia línea con SALTO DE LÍNEA después
-✅ NO escribir todo junto: Cada oración termina con punto y NUEVA LÍNEA
-✅ CONSERVAR líneas normales de estructuras no dictadas
-
-9. CONCLUSIÓN (RADIÓLOGO PROFESIONAL):
-   • Texto corrido, narrativo (NO ítems ni viñetas en la conclusión)
-   • Redacción directa: "Desgarro del LCA" (NO "se observa desgarro")
-   • Jerarquía: patología principal → asociados → secundarios → cierre
-   • Terminología estándar (gonartrosis, meniscopatía, tendinopatía, etc.)
-   • 2-4 líneas máximo, sin repetir frases literales del comentario
-   • NO describir estructuras normales, NO agregar sugerencias clínicas
-   • Si todo normal → "Estudio dentro de los parámetros normales."
-
-10. Estudio comparativo → Primera línea COMENTARIO: "Comparativo con [fecha]"
-11. Frases "el resto normal" → usa líneas normales plantilla (no la frase literal)"""
+   • Estudio comparativo → primera línea del COMENTARIO: "Comparativo con [fecha]"
+   • "El resto normal" en el dictado → conservar todas las líneas no modificadas"""
                 
                 # 🧠 AGREGAR EJEMPLOS DE APRENDIZAJE al prompt
                 if ejemplos_aprendizaje:

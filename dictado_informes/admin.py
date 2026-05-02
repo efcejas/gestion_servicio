@@ -1,6 +1,15 @@
 from django.contrib import admin
 from django.utils.html import format_html, format_html_join
-from .models import PlantillaInforme, PlantillaEstructurada, Informe, AudioTranscripcion, TerminoMedico, CorreccionAprendizaje
+from django.utils.safestring import mark_safe
+from .models import (
+    PlantillaInforme,
+    PlantillaEstructurada,
+    Informe,
+    AudioTranscripcion,
+    TerminoMedico,
+    CorreccionAprendizaje,
+    FeedbackCalidadDictado,
+)
 
 
 @admin.register(PlantillaEstructurada)
@@ -17,6 +26,14 @@ class PlantillaEstructuradaAdmin(admin.ModelAdmin):
         ('Contenido de Plantilla', {
             'fields': ('titulo', 'seccion_tecnica', 'comentarios_base', 'comentarios_base_preview')
         }),
+        ('Guía de Estilo para IA', {
+            'fields': ('guia_estilo',),
+            'description': (
+                'Instrucciones en lenguaje natural que la IA recibe al generar informes con esta plantilla. '
+                'Ejemplo: "Para meniscos usar \'de configuración habitual\'. '
+                'En desgarros indicar siempre grado Stoller y cuerno afectado."'
+            ),
+        }),
         ('Metadatos', {
             'fields': ('origen', 'creada_por', 'fecha_creacion', 'fecha_modificacion'),
             'classes': ('collapse',)
@@ -27,7 +44,7 @@ class PlantillaEstructuradaAdmin(admin.ModelAdmin):
         """Solo permite editar si es usuario (no legacy)"""
         readonly = list(self.readonly_fields)
         if obj and obj.origen == 'legacy':
-            # Plantillas legadas solo lectura para evitar sobrescribir defaults
+            # Plantillas legadas: estructura de solo lectura, pero guia_estilo siempre editable
             readonly.extend(['codigo', 'titulo', 'seccion_tecnica', 'comentarios_base'])
         return readonly
 
@@ -251,7 +268,7 @@ class CorreccionAprendizajeAdmin(admin.ModelAdmin):
         """Preview del texto final"""
         return obj.texto_final[:200] + '...' if len(obj.texto_final) > 200 else obj.texto_final
     texto_final_preview.short_description = "Texto Final (usuario)"
-    
+
     def diferencias_visuales(self, obj):
         """Muestra las diferencias de forma visual"""
         if not obj.cambios_detectados:
@@ -336,3 +353,15 @@ class CorreccionAprendizajeAdmin(admin.ModelAdmin):
         else:
             self.message_user(request, "No hay ejemplos de aprendizaje disponibles todavía.", level='warning')
     ver_ejemplos_aprendizaje.short_description = "👁️ Ver ejemplos usados en prompt IA"
+
+
+@admin.register(FeedbackCalidadDictado)
+class FeedbackCalidadDictadoAdmin(admin.ModelAdmin):
+    list_display = [
+        'fecha', 'usuario', 'estado_feedback', 'modo_dictado',
+        'tipo_estudio', 'tipo_plantilla', 'porcentaje_edicion', 'tuvo_edicion'
+    ]
+    list_filter = ['estado_feedback', 'modo_dictado', 'tipo_estudio', 'fecha']
+    search_fields = ['usuario__username', 'tipo_plantilla']
+    readonly_fields = ['fecha']
+    date_hierarchy = 'fecha'

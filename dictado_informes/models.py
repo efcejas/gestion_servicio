@@ -77,6 +77,19 @@ class PlantillaEstructurada(models.Model):
         help_text="Lista de líneas con anatomía normal que se preservan en modo ESTRUCTURADO"
     )
     
+    # Guía de estilo personal: instrucciones en lenguaje natural para la IA
+    # Ejemplo: "Para meniscos usar 'de configuración habitual'. Indicar grado Stoller en desgarros."
+    guia_estilo = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Guía de Estilo",
+        help_text=(
+            "Instrucciones en lenguaje natural que la IA recibe para esta plantilla. "
+            "Ejemplo: 'Para meniscos usar \"de configuración habitual\" (no \"normales\"). "
+            "En desgarros indicar siempre grado Stoller y cuerno afectado.'"
+        )
+    )
+
     # Origen de la plantilla (legacy = migrada desde hardcode)
     ORIGEN_CHOICES = [
         ('legacy', 'Legado (migrado de hardcode)'),
@@ -1268,6 +1281,69 @@ class CorreccionAprendizaje(models.Model):
         cache.set(cache_key, resultado, timeout=600)
         
         return resultado
+
+
+class FeedbackCalidadDictado(models.Model):
+    """Feedback clínico post-generación para medir calidad real de salida."""
+
+    class EstadoFeedback(models.TextChoices):
+        CORRECTO = 'correcto', 'Correcto al primer intento'
+        REQUIRIO_CORRECCION = 'correccion', 'Requirió corrección manual'
+
+    class ModoDictado(models.TextChoices):
+        FIEL = 'FIEL', 'Fiel al Dictado'
+        ESTRUCTURADO = 'ESTRUCTURADO', 'Plantilla Estructurada'
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='feedbacks_calidad_dictado',
+        verbose_name="Usuario"
+    )
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name="Fecha")
+
+    estado_feedback = models.CharField(
+        max_length=20,
+        choices=EstadoFeedback.choices,
+        verbose_name="Resultado reportado"
+    )
+    modo_dictado = models.CharField(
+        max_length=20,
+        choices=ModoDictado.choices,
+        default=ModoDictado.FIEL,
+        verbose_name="Modo de dictado"
+    )
+    tipo_estudio = models.CharField(
+        max_length=3,
+        choices=TipoEstudio.choices,
+        blank=True,
+        verbose_name="Tipo de Estudio"
+    )
+    tipo_plantilla = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Código de Plantilla"
+    )
+
+    longitud_texto_ia = models.IntegerField(default=0, verbose_name="Longitud texto IA")
+    longitud_texto_final = models.IntegerField(default=0, verbose_name="Longitud texto final")
+    caracteres_editados = models.IntegerField(default=0, verbose_name="Caracteres editados")
+    porcentaje_edicion = models.FloatField(default=0.0, verbose_name="Porcentaje de edición")
+    tuvo_edicion = models.BooleanField(default=False, verbose_name="¿Hubo edición manual?")
+
+    class Meta:
+        verbose_name = "Feedback de Calidad de Dictado"
+        verbose_name_plural = "Feedbacks de Calidad de Dictado"
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['-fecha']),
+            models.Index(fields=['usuario', '-fecha']),
+            models.Index(fields=['estado_feedback', '-fecha']),
+            models.Index(fields=['tipo_plantilla', '-fecha']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_estado_feedback_display()} - {self.usuario} - {self.fecha:%d/%m %H:%M}"
 
 # ========================================
 # 🚀 FASE 4: SISTEMA DE MONITOREO

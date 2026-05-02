@@ -101,6 +101,100 @@
     </div>
 </div>
 
+<!-- Calidad de salida (feedback clínico) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
+        <p class="text-gray-400 text-sm font-semibold">Feedbacks</p>
+        <p class="text-3xl font-bold text-white mt-1">{{ feedback_resumen.total_feedback|default:0 }}</p>
+    </div>
+    <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
+        <p class="text-gray-400 text-sm font-semibold">Correcto Primer Intento</p>
+        <p class="text-3xl font-bold text-emerald-300 mt-1">{{ feedback_resumen.tasa_correcto_primer_intento|floatformat:1 }}%</p>
+    </div>
+    <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
+        <p class="text-gray-400 text-sm font-semibold">Requirieron Corrección</p>
+        <p class="text-3xl font-bold text-amber-300 mt-1">{{ feedback_resumen.requirieron_correccion|default:0 }}</p>
+    </div>
+    <div class="bg-gray-800 border-2 border-gray-700 rounded-lg p-4">
+        <p class="text-gray-400 text-sm font-semibold">Edición Promedio</p>
+        <p class="text-3xl font-bold text-cyan-300 mt-1">{{ feedback_resumen.porcentaje_edicion_promedio|default:0|floatformat:1 }}%</p>
+    </div>
+</div>
+
+<div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+    <h3 class="text-lg font-bold text-white mb-3 flex items-center">
+        <i class="fas fa-notes-medical text-amber-400 mr-2"></i>
+        Plantillas con Más Correcciones Manuales
+    </h3>
+    <div class="overflow-x-auto">
+        <table class="w-full table-fixed divide-y divide-gray-700">
+            <thead class="bg-gray-700">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase">Plantilla</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">Feedbacks</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">Con Corrección</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">Tasa Corrección</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase">Edición Prom.</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-700">
+                {% for fila in plantillas_con_mas_correccion %}
+                <tr class="hover:bg-gray-700">
+                    <td class="px-4 py-3 text-sm text-white">{{ fila.tipo_plantilla }}</td>
+                    <td class="px-4 py-3 text-sm text-right text-gray-300">{{ fila.total }}</td>
+                    <td class="px-4 py-3 text-sm text-right text-amber-300">{{ fila.correcciones }}</td>
+                    <td class="px-4 py-3 text-sm text-right {% if fila.nivel_alerta == 'alta' %}text-red-300{% elif fila.nivel_alerta == 'media' %}text-amber-300{% else %}text-emerald-300{% endif %}">{{ fila.tasa_correccion|floatformat:1 }}%</td>
+                    <td class="px-4 py-3 text-sm text-right text-cyan-300">{{ fila.porcentaje_edicion_promedio|default:0|floatformat:1 }}%</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="px-4 py-6 text-center text-gray-400">
+                        Aún no hay feedback suficiente para ranking de plantillas.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+    <h3 class="text-lg font-bold text-white mb-2 flex items-center">
+        <i class="fas fa-lightbulb text-cyan-400 mr-2"></i>
+        Recomendaciones Automáticas de Optimización
+    </h3>
+    <p class="text-xs text-gray-400 mb-3">
+        Se muestran plantillas con tasa de corrección >= {{ umbral_alerta_correccion }}% o edición promedio >= {{ umbral_alerta_edicion }}%.
+    </p>
+
+    <div class="space-y-3">
+        {% for reco in recomendaciones_plantilla %}
+        <div class="rounded-lg border px-3 py-3 {% if reco.nivel_alerta == 'alta' %}border-red-700 bg-red-900/20{% else %}border-amber-700 bg-amber-900/20{% endif %}">
+            <div class="flex items-center justify-between gap-3 mb-1">
+                <p class="text-sm font-semibold text-white">{{ reco.tipo_plantilla }}</p>
+                <span class="text-xs px-2 py-0.5 rounded {% if reco.nivel_alerta == 'alta' %}bg-red-800 text-red-200{% else %}bg-amber-800 text-amber-200{% endif %}">
+                    {{ reco.nivel_alerta|upper }}
+                </span>
+            </div>
+            <p class="text-xs text-gray-300 mb-1">
+                Tasa corrección: <strong>{{ reco.tasa_correccion|floatformat:1 }}%</strong> | Edición prom.: <strong>{{ reco.porcentaje_edicion_promedio|floatformat:1 }}%</strong>
+            </p>
+            <p class="text-xs text-cyan-200 mb-2">{{ reco.accion_sugerida }}</p>
+            {% if reco.pk %}
+            <a href="{% url 'dictado_informes:plantilla_estructurada_update' reco.pk %}#guia_estilo"
+               class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-200 transition-colors">
+                <i class="fas fa-edit text-cyan-400"></i> Editar guía de estilo
+            </a>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="rounded-lg border border-emerald-700 bg-emerald-900/20 px-3 py-3 text-sm text-emerald-200">
+            No hay plantillas en zona de alerta. El sistema está estable en este periodo.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
 <!-- Gráficos -->
 {% if stats.por_tipo_estudio or stats.por_modo %}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
