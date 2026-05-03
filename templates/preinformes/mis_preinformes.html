@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
+    {% include 'components/breadcrumb.html' with section_label="Preinformes" section_url="preinformes:dashboard_residente" current_label="Mis Preinformes" %}
     <!-- Header Card con Gradiente -->
     <div class="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg mb-6 overflow-hidden">
         <div class="px-8 py-6">
@@ -116,69 +117,22 @@
     <!-- Lista de preinformes -->
     <div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
         {% if page_obj.object_list %}
-            <div class="overflow-x-auto">
-                <table class="w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Estudio
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Paciente
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Tipo / Región
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Estado
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Fecha
-                            </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Acciones
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        {% for preinforme in page_obj.object_list %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900">
-                                    {{ preinforme.numero_estudio }}
-                                </div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">
-                                    {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
-                                </div>
+            <div class="p-4 sm:p-5 space-y-4 sm:space-y-3">
+                {% for preinforme in page_obj.object_list %}
+                <article class="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <div class="p-4 sm:p-4">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Estudio</p>
+                                <h3 class="text-base font-semibold text-gray-900">{{ preinforme.numero_estudio }}</h3>
+                                <p class="text-sm text-gray-700 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
                                 {% if preinforme.edad_paciente or preinforme.sexo_paciente %}
-                                <div class="text-sm text-gray-500">
+                                <p class="text-xs text-gray-500 mt-0.5">
                                     {% if preinforme.edad_paciente %}{{ preinforme.edad_paciente }} años{% endif %}{% if preinforme.edad_paciente and preinforme.sexo_paciente %} - {% endif %}{% if preinforme.sexo_paciente %}{{ preinforme.get_sexo_paciente_display }}{% endif %}
-                                </div>
+                                </p>
                                 {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</div>
-                                <div class="text-sm text-gray-500">{{ preinforme.region.nombre }}</div>
-                                {% if preinforme.etiquetas.exists %}
-                                    <div class="flex flex-wrap gap-1 mt-1">
-                                        {% for etiqueta in preinforme.etiquetas.all|slice:":3" %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
-                                                  style="background-color: {{ etiqueta.color }};">
-                                                <i class="fas fa-tag mr-1" style="font-size: 0.6rem;"></i>
-                                                {{ etiqueta.nombre }}
-                                            </span>
-                                        {% endfor %}
-                                        {% if preinforme.etiquetas.count > 3 %}
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-300 text-gray-700">
-                                                +{{ preinforme.etiquetas.count|add:"-3" }}
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            </div>
+                            <div>
                                 <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
                                     {% if preinforme.estado == 'borrador' %}bg-gradient-to-r from-gray-400 to-gray-500 text-white
                                     {% elif preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
@@ -188,38 +142,66 @@
                                     <i class="fas fa-circle text-xs mr-1"></i>
                                     {{ preinforme.get_estado_display }}
                                 </span>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{ preinforme.fecha_creacion|date:"d/m/Y H:i" }}
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div class="flex space-x-2">
-                                    <a href="{% url 'preinformes:ver_preinforme' preinforme.pk %}"
-                                       class="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm">
-                                        <i class="fas fa-eye mr-1"></i>Ver
-                                    </a>
-                                    
-                                    {% if preinforme.estado == 'borrador' or preinforme.estado == 'pendiente_revision' %}
-                                        <a href="{% url 'preinformes:editar_preinforme' preinforme.pk %}"
-                                           class="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm">
-                                            <i class="fas fa-edit mr-1"></i>Editar
-                                        </a>
-                                    {% endif %}
-                                    
-                                    {% if preinforme.estado == 'finalizado' and preinforme.revision %}
-                                        <button onclick="copiarInformeFinal({{ preinforme.pk }})"
-                                                class="inline-flex items-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm"
-                                                title="{% if preinforme.sistema_destino == 'netterm' %}Copiar para NetTerm{% elif preinforme.sistema_destino == 'eges' %}Copiar para EGES{% else %}Copiar informe{% endif %}">
-                                            <i class="fas fa-copy mr-1"></i>
-                                            {% if preinforme.sistema_destino == 'netterm' %}NetTerm{% elif preinforme.sistema_destino == 'eges' %}EGES{% else %}Copiar{% endif %}
-                                        </button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 sm:mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2 text-sm">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo</p>
+                                <p class="text-gray-900">{{ preinforme.tipo_estudio.nombre }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Región</p>
+                                <p class="text-gray-900">{{ preinforme.region.nombre }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</p>
+                                <p class="text-gray-700">{{ preinforme.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                            </div>
+                        </div>
+
+                        {% if preinforme.etiquetas.exists %}
+                        <div class="mt-3 sm:mt-2 flex flex-wrap gap-1.5">
+                            {% for etiqueta in preinforme.etiquetas.all|slice:":3" %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                                      style="background-color: {{ etiqueta.color }};">
+                                    <i class="fas fa-tag mr-1" style="font-size: 0.6rem;"></i>
+                                    {{ etiqueta.nombre }}
+                                </span>
+                            {% endfor %}
+                            {% if preinforme.etiquetas.count > 3 %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-300 text-gray-700">
+                                    +{{ preinforme.etiquetas.count|add:"-3" }}
+                                </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <div class="mt-4 sm:mt-3 flex flex-wrap gap-2">
+                            <a href="{% url 'preinformes:ver_preinforme' preinforme.pk %}"
+                               class="inline-flex items-center px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                <i class="fas fa-eye mr-1"></i>Ver
+                            </a>
+
+                            {% if preinforme.estado == 'borrador' or preinforme.estado == 'pendiente_revision' %}
+                                <a href="{% url 'preinformes:editar_preinforme' preinforme.pk %}"
+                                   class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                    <i class="fas fa-edit mr-1"></i>Editar
+                                </a>
+                            {% endif %}
+
+                            {% if preinforme.estado == 'finalizado' and preinforme.revision %}
+                                <button onclick="copiarInformeFinal({{ preinforme.pk }})"
+                                        class="inline-flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm text-sm"
+                                        title="{% if preinforme.sistema_destino == 'netterm' %}Copiar para NetTerm{% elif preinforme.sistema_destino == 'eges' %}Copiar para EGES{% else %}Copiar informe{% endif %}">
+                                    <i class="fas fa-copy mr-1"></i>
+                                    {% if preinforme.sistema_destino == 'netterm' %}NetTerm{% elif preinforme.sistema_destino == 'eges' %}EGES{% else %}Copiar{% endif %}
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
             </div>
 
             <!-- Paginación -->
@@ -424,4 +406,5 @@ function mostrarNotificacion(mensaje, tipo) {
     }, 3000);
 }
 </script>
+
 {% endblock %}

@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-0">
+    {% include 'components/breadcrumb.html' with section_label="Preinformes" section_url="preinformes:dashboard_residente" current_label="Banco de Informes" %}
 
     <!-- Header -->
     <div class="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-2xl shadow-lg overflow-hidden mb-4">
@@ -87,47 +88,19 @@
             </p>
         </div>
 
-        <div class="overflow-x-auto">
-            <table class="w-full divide-y divide-gray-200">
-                <thead class="bg-gradient-to-r from-teal-50 to-cyan-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">N° Estudio</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Paciente</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Tipo / Región</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Residente</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Fecha</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Sistema</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for preinforme in page_obj %}
-                    <tr class="hover:bg-teal-50/40 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="text-sm font-medium text-gray-900">{{ preinforme.numero_estudio }}</span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</div>
+        <div class="p-4 sm:p-5 space-y-4 sm:space-y-3">
+            {% for preinforme in page_obj %}
+            <article class="rounded-xl border border-teal-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <div class="p-4 sm:p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="text-base font-semibold text-gray-900">{{ preinforme.numero_estudio }}</p>
+                            <p class="text-sm font-medium text-gray-900 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
                             {% if preinforme.dni_paciente %}
-                            <div class="text-xs text-gray-400">DNI {{ preinforme.dni_paciente }}</div>
+                            <p class="text-xs text-gray-400">DNI {{ preinforme.dni_paciente }}</p>
                             {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</div>
-                            <div class="text-xs text-gray-500">{{ preinforme.region.nombre }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 bg-teal-100 rounded-full flex items-center justify-center shrink-0">
-                                    <i class="fas fa-user-graduate text-teal-600 text-xs"></i>
-                                </div>
-                                <span class="text-sm text-gray-700">{{ preinforme.residente.get_full_name }}</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {{ preinforme.fecha_finalizacion|date:"d/m/Y" }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
+                        </div>
+                        <div>
                             {% if preinforme.sistema_destino == 'netterm' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
                                 <i class="fas fa-terminal mr-1"></i>NetTerm
@@ -137,17 +110,34 @@
                                 <i class="fas fa-database mr-1"></i>EGES
                             </span>
                             {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <a href="{% url 'preinformes:ver_banco_preinforme' preinforme.pk %}"
-                               class="inline-flex items-center px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
-                                <i class="fas fa-eye mr-1.5"></i>Ver y Copiar
-                            </a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 sm:mt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-2 text-sm">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo / Región</p>
+                            <p class="text-gray-900">{{ preinforme.tipo_estudio.nombre }}</p>
+                            <p class="text-xs text-gray-500">{{ preinforme.region.nombre }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Residente</p>
+                            <p class="text-gray-900">{{ preinforme.residente.get_full_name }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha</p>
+                            <p class="text-gray-700">{{ preinforme.fecha_finalizacion|date:"d/m/Y" }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 sm:mt-3">
+                        <a href="{% url 'preinformes:ver_banco_preinforme' preinforme.pk %}"
+                           class="inline-flex items-center px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+                            <i class="fas fa-eye mr-1.5"></i>Ver y Copiar
+                        </a>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
         </div>
 
         <!-- Paginación -->
@@ -196,3 +186,4 @@
 
 </div>
 {% endblock %}
+

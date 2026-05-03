@@ -1,0 +1,33 @@
+{% load i18n %}
+<nav aria-label="breadcrumb" class="flex items-center flex-wrap gap-1 text-sm text-gray-500 mb-3 px-0.5">
+
+  {# Home siempre presente #}
+  <a href="{% url 'home' %}" class="inline-flex items-center gap-1 hover:text-teal-600 transition-colors font-medium">
+    <i class="fas fa-house text-xs"></i>
+    <span>Inicio</span>
+  </a>
+
+  {% if section_label %}
+    <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
+    {% if section_url %}
+      <a href="{% url section_url %}" class="inline-flex items-center gap-1 hover:text-teal-600 transition-colors">
+        {% if section_icon %}<i class="fas {{ section_icon }} text-xs"></i>{% endif %}
+        <span>{{ section_label }}</span>
+      </a>
+    {% else %}
+      <span class="inline-flex items-center gap-1">
+        {% if section_icon %}<i class="fas {{ section_icon }} text-xs text-gray-400"></i>{% endif %}
+        {{ section_label }}
+      </span>
+    {% endif %}
+  {% endif %}
+
+  {% if current_label %}
+    <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
+    <span class="inline-flex items-center gap-1 text-gray-700 font-semibold">
+      {% if current_icon %}<i class="fas {{ current_icon }} text-xs text-gray-500"></i>{% endif %}
+      {{ current_label }}
+    </span>
+  {% endif %}
+
+</nav>

@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="max-w-6xl mx-auto px-4">
+    {% include 'components/breadcrumb.html' with section_label="Preinformes" section_url="preinformes:dashboard_residente" current_label=title %}
     <!-- Header Card -->
     <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-lg mb-6 overflow-hidden">
         <div class="px-8 py-6">

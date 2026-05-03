@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0">
+    {% include 'components/breadcrumb.html' with section_label="Revisión" section_url="preinformes:dashboard_staff" current_label="Lista de revisión" %}
     <!-- Header Card con Gradiente -->
     <div class="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl shadow-lg mb-6 overflow-hidden">
         <div class="px-8 py-6">
@@ -120,167 +121,121 @@
 
 <div class="w-full bg-white rounded-2xl shadow-lg overflow-hidden">
     {% if page_obj.object_list %}
-        <div class="overflow-x-auto">
-            <table class="w-full divide-y divide-gray-200">
-                <thead class="bg-gradient-to-r from-orange-50 to-red-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Estudio
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Paciente
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Residente
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Tipo / Región
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Revisor
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Estado
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Fecha Envío
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-orange-700 uppercase tracking-wider">
-                            Acciones
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                    {% for preinforme in page_obj.object_list %}
-                    <tr class="hover:bg-orange-50 transition-colors">
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm font-medium text-gray-900">
-                                {{ preinforme.numero_estudio }}
-                            </div>
-                            {% if preinforme.asignacion_compartida %}
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                                <i class="fas fa-users mr-1"></i>
-                                Compartido
-                            </span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-700">
-                                {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
-                            </div>
-                            {% if preinforme.edad_paciente or preinforme.sexo_paciente %}
-                            <div class="text-sm text-gray-500">
-                                {% if preinforme.edad_paciente %}{{ preinforme.edad_paciente }} años{% endif %}{% if preinforme.edad_paciente and preinforme.sexo_paciente %} - {% endif %}{% if preinforme.sexo_paciente %}{{ preinforme.get_sexo_paciente_display }}{% endif %}
-                            </div>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                {{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}
-                            </div>
-                            <div class="text-sm text-gray-500">
-                                {{ preinforme.residente.username }}
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">{{ preinforme.tipo_estudio.nombre }}</div>
-                            <div class="text-sm text-gray-500">{{ preinforme.region.nombre }}</div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            {% if preinforme.revisor %}
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                                        <i class="fas fa-user-md text-indigo-600 text-xs"></i>
-                                    </div>
-                                    <div class="ml-2">
-                                        <div class="text-sm font-medium text-gray-900">{{ preinforme.revisor.get_full_name }}</div>
-                                    </div>
-                                </div>
-                            {% else %}
-                                <span class="text-sm text-gray-400 italic">
-                                    <i class="fas fa-user-slash"></i> Sin asignar
+        <div class="p-4 sm:p-5 space-y-4 sm:space-y-3">
+            {% for preinforme in page_obj.object_list %}
+            <article class="rounded-xl border border-orange-100 bg-white shadow-sm hover:shadow-md transition-shadow">
+            <div class="p-4 sm:p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <p class="text-base font-semibold text-gray-900">{{ preinforme.numero_estudio }}</p>
+                                {% if preinforme.asignacion_compartida %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                                    <i class="fas fa-users mr-1"></i>Compartido
                                 </span>
-                            {% endif %}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
-                                {% if preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
-                                {% elif preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white
-                                {% elif preinforme.estado == 'finalizado' %}bg-gradient-to-r from-green-500 to-emerald-600 text-white
-                                {% endif %}">
-                                <i class="fas fa-circle text-xs mr-1.5"></i>
-                                {{ preinforme.get_estado_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {{ preinforme.fecha_envio_revision|date:"d/m/Y H:i" }}
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div class="flex flex-col space-y-1">
-                                {% if preinforme.estado == 'finalizado' %}
-                                    <!-- Preinforme finalizado: solo lectura -->
-                                    {% if preinforme.revision %}
-                                    <a href="{% url 'preinformes:comparacion_revision' preinforme.pk %}"
-                                       class="inline-flex items-center justify-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                        <i class="fas fa-columns mr-1"></i>
-                                        Ver comparación
-                                    </a>
-                                    {% endif %}
-                                {% else %}
-                                    <!-- Si es compartido y está disponible para tomar -->
-                                    {% if preinforme.asignacion_compartida and not preinforme.revisor %}
-                                        <form method="post" action="{% url 'preinformes:tomar_estudio' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
-                                            {% csrf_token %}
-                                            <button type="submit" 
-                                                    class="w-full inline-flex items-center justify-center px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm font-semibold">
-                                                <i class="fas fa-hand-point-right mr-1"></i>
-                                                Tomar este estudio
-                                            </button>
-                                        </form>
-                                    {% else %}
-                                        <!-- Botón revisar normal -->
-                                        <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
-                                           class="inline-flex items-center justify-center px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors shadow-sm">
-                                            <i class="fas fa-{% if preinforme.estado == 'pendiente_revision' %}clipboard-check{% else %}arrow-right{% endif %} mr-1"></i>
-                                            {% if preinforme.estado == 'pendiente_revision' %}
-                                                Revisar
-                                            {% else %}
-                                                Continuar
-                                            {% endif %}
-                                        </a>
-                                        
-                                        <!-- Botón asignar/desasignar (solo si NO es compartido) -->
-                                        {% if not preinforme.asignacion_compartida %}
-                                            {% if not preinforme.revisor %}
-                                                <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="action" value="asignarme">
-                                                    <button type="submit" 
-                                                            class="w-full inline-flex items-center justify-center px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                                        <i class="fas fa-hand-pointer mr-1"></i>
-                                                        Asignarme
-                                                    </button>
-                                                </form>
-                                            {% elif preinforme.revisor == user %}
-                                                <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="action" value="desasignar">
-                                                    <button type="submit" 
-                                                            class="w-full inline-flex items-center justify-center px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors shadow-sm text-xs">
-                                                        <i class="fas fa-times mr-1"></i>
-                                                        Desasignar
-                                                    </button>
-                                                </form>
-                                            {% endif %}
-                                        {% endif %}
-                                    {% endif %}
                                 {% endif %}
                             </div>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            <p class="text-sm text-gray-700 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                            {% if preinforme.edad_paciente or preinforme.sexo_paciente %}
+                            <p class="text-xs text-gray-500 mt-0.5">
+                                {% if preinforme.edad_paciente %}{{ preinforme.edad_paciente }} años{% endif %}{% if preinforme.edad_paciente and preinforme.sexo_paciente %} - {% endif %}{% if preinforme.sexo_paciente %}{{ preinforme.get_sexo_paciente_display }}{% endif %}
+                            </p>
+                            {% endif %}
+                        </div>
+                        <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
+                            {% if preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
+                            {% elif preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white
+                            {% elif preinforme.estado == 'finalizado' %}bg-gradient-to-r from-green-500 to-emerald-600 text-white
+                            {% endif %}">
+                            <i class="fas fa-circle text-xs mr-1.5"></i>
+                            {{ preinforme.get_estado_display }}
+                        </span>
+                    </div>
+
+                    <div class="mt-3 sm:mt-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-2 text-sm">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Residente</p>
+                            <p class="text-gray-900">{{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}</p>
+                            <p class="text-xs text-gray-500">{{ preinforme.residente.username }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo / Región</p>
+                            <p class="text-gray-900">{{ preinforme.tipo_estudio.nombre }}</p>
+                            <p class="text-xs text-gray-500">{{ preinforme.region.nombre }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Revisor</p>
+                            {% if preinforme.revisor %}
+                                <p class="text-gray-900">{{ preinforme.revisor.get_full_name }}</p>
+                            {% else %}
+                                <p class="text-gray-500 italic">Sin asignar</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha envío</p>
+                            <p class="text-gray-700">{{ preinforme.fecha_envio_revision|date:"d/m/Y H:i" }}</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 sm:mt-3 flex flex-wrap gap-2">
+                        {% if preinforme.estado == 'finalizado' %}
+                            {% if preinforme.revision %}
+                            <a href="{% url 'preinformes:comparacion_revision' preinforme.pk %}"
+                               class="inline-flex items-center justify-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                <i class="fas fa-columns mr-1"></i>
+                                Ver comparación
+                            </a>
+                            {% endif %}
+                        {% else %}
+                            {% if preinforme.asignacion_compartida and not preinforme.revisor %}
+                                <form method="post" action="{% url 'preinformes:tomar_estudio' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center justify-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm text-sm font-semibold">
+                                        <i class="fas fa-hand-point-right mr-1"></i>
+                                        Tomar este estudio
+                                    </button>
+                                </form>
+                            {% else %}
+                                <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
+                                   class="inline-flex items-center justify-center px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                    <i class="fas fa-{% if preinforme.estado == 'pendiente_revision' %}clipboard-check{% else %}arrow-right{% endif %} mr-1"></i>
+                                    {% if preinforme.estado == 'pendiente_revision' %}
+                                        Revisar
+                                    {% else %}
+                                        Continuar
+                                    {% endif %}
+                                </a>
+
+                                {% if not preinforme.asignacion_compartida %}
+                                    {% if not preinforme.revisor %}
+                                        <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="asignarme">
+                                            <button type="submit"
+                                                    class="inline-flex items-center justify-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                                <i class="fas fa-hand-pointer mr-1"></i>
+                                                Asignarme
+                                            </button>
+                                        </form>
+                                    {% elif preinforme.revisor == user %}
+                                        <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="desasignar">
+                                            <button type="submit"
+                                                    class="inline-flex items-center justify-center px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-lg transition-colors shadow-sm text-sm">
+                                                <i class="fas fa-times mr-1"></i>
+                                                Desasignar
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
         </div>
 
         <!-- Paginación -->
