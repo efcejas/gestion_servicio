@@ -1,6 +1,13 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Preinforme, PlantillaPreinforme, RevisionPreinforme, TipoEstudio, Region
+from .models import (
+    Preinforme,
+    PlantillaPreinforme,
+    RevisionPreinforme,
+    TipoEstudio,
+    Region,
+    prepare_editor_html_content,
+)
 
 User = get_user_model()
 
@@ -175,6 +182,10 @@ class PreinformeForm(forms.ModelForm):
         
         return cleaned_data
 
+    def clean_informe_html(self):
+        contenido = self.cleaned_data.get('informe_html', '')
+        return prepare_editor_html_content(contenido)
+
 
 class FiltroPreinformesForm(forms.Form):
     """Formulario para filtrar preinformes"""
@@ -276,6 +287,10 @@ class RevisionPreinformeForm(forms.ModelForm):
             elif hasattr(self.instance, 'preinforme'):
                 self.fields['informe_final_html'].initial = self.instance.generar_informe_original_residente()
 
+    def clean_informe_final_html(self):
+        contenido = self.cleaned_data.get('informe_final_html', '')
+        return prepare_editor_html_content(contenido)
+
 
 class PlantillaPreinformeForm(forms.ModelForm):
     """Formulario para crear/editar plantillas"""
@@ -308,6 +323,10 @@ class PlantillaPreinformeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['tipo_estudio'].queryset = TipoEstudio.objects.filter(activo=True)
         self.fields['region'].queryset = Region.objects.filter(activo=True)
+
+    def clean_contenido(self):
+        contenido = self.cleaned_data.get('contenido', '')
+        return prepare_editor_html_content(contenido)
 
 
 class NuevaPlantillaResidenteForm(forms.ModelForm):
@@ -356,3 +375,7 @@ class NuevaPlantillaResidenteForm(forms.ModelForm):
             )
         
         return cleaned_data
+
+    def clean_contenido(self):
+        contenido = self.cleaned_data.get('contenido', '')
+        return prepare_editor_html_content(contenido)

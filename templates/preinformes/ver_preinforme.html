@@ -290,7 +290,7 @@
                         </div>
 
                         <!-- Leyenda diff (oculta por defecto) -->
-                        <div id="diff-leyenda" class="hidden mt-3 flex items-center gap-4 text-xs text-gray-500 border-t border-gray-100 pt-2">
+                        <div id="diff-leyenda" class="hidden mt-3 items-center gap-4 text-xs text-gray-500 border-t border-gray-100 pt-2">
                             <span class="flex items-center gap-1">
                                 <span style="background:#d1fae5;border-radius:3px;padding:1px 6px;color:#065f46;font-weight:600;">Texto agregado</span>
                             </span>
@@ -490,6 +490,7 @@
     </div>
 </div>
 
+<script src="{% static 'js/preinformes_copy.js' %}"></script>
 <script>
 // =====================================================================
 // DIFF: comparación visual word-level entre versión original y final
@@ -648,12 +649,14 @@ function toggleDiffMode() {
         iframe.style.display   = 'none';
         divDiff.style.display  = 'block';
         leyenda.classList.remove('hidden');
+        leyenda.classList.add('flex');
         btn.innerHTML = '<i class="fas fa-eye mr-1.5"></i>Ver versión final';
         btn.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-green-50 text-green-700 border-green-200 hover:bg-green-100';
     } else {
         iframe.style.display   = 'block';
         divDiff.style.display  = 'none';
         leyenda.classList.add('hidden');
+        leyenda.classList.remove('flex');
         btn.innerHTML = '<i class="fas fa-code-branch mr-1.5"></i>Ver cambios';
         btn.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100';
     }
@@ -664,103 +667,10 @@ function toggleDiffMode() {
  * Copia el informe final con formato HTML enriquecido usando AJAX
  */
 function copiarInformeFinal(preinformeId) {
-    fetch(`/preinformes/copiar-informe/${preinformeId}/`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.informe_html) {
-                const sistemaDestino = data.sistema_destino || 'eges';
-                
-                // Para NetTerm: copiar solo texto plano con saltos de línea preservados
-                if (sistemaDestino === 'netterm') {
-                    copiarTextoPlano(data.informe_texto);
-                } else {
-                    // Para EGES: copiar HTML tal cual está guardado (solo sin backgrounds)
-                    const htmlContent = data.informe_html;
-                    const plainText = data.informe_texto || data.informe_final;
-                    
-                    // Intentar copiar con ClipboardItem (múltiples MIME types)
-                    if (navigator.clipboard && window.ClipboardItem) {
-                        try {
-                            const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-                            const textBlob = new Blob([plainText], { type: 'text/plain' });
-                            const clipboardItem = new ClipboardItem({
-                                'text/html': htmlBlob,
-                                'text/plain': textBlob
-                            });
-                            
-                            navigator.clipboard.write([clipboardItem])
-                                .then(() => mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success'))
-                                .catch(err => {
-                                    console.error('Error con ClipboardItem:', err);
-                                    copiarConFallbackHTML(htmlContent, plainText);
-                                });
-                        } catch (err) {
-                            console.error('Error creando ClipboardItem:', err);
-                            copiarConFallbackHTML(htmlContent, plainText);
-                        }
-                    } else {
-                        copiarConFallbackHTML(htmlContent, plainText);
-                    }
-                }
-            } else {
-                alert('No se pudo obtener el informe');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error al obtener el informe');
-        });
-}
-
-function copiarConFallbackHTML(htmlContent, plainText) {
-    const tempDiv = document.createElement('div');
-    tempDiv.contentEditable = 'true';
-    tempDiv.style.position = 'fixed';
-    tempDiv.style.left = '-9999px';
-    // Reset explícito de estilos para evitar herencia
-    tempDiv.style.fontWeight = 'normal';
-    tempDiv.style.fontStyle = 'normal';
-    tempDiv.style.textDecoration = 'none';
-    tempDiv.innerHTML = htmlContent;
-    document.body.appendChild(tempDiv);
-    
-    try {
-        const range = document.createRange();
-        range.selectNodeContents(tempDiv);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        if (document.execCommand('copy')) {
-            mostrarNotificacion('¡Informe copiado con formato!', 'success');
-        } else {
-            throw new Error('execCommand falló');
-        }
-    } catch (err) {
-        console.error('Error con fallback HTML:', err);
-        copiarTextoPlano(plainText);
-    } finally {
-        document.body.removeChild(tempDiv);
-        window.getSelection().removeAllRanges();
-    }
-}
-
-function copiarTextoPlano(texto) {
-    const textarea = document.createElement('textarea');
-    textarea.value = texto;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    
-    try {
-        document.execCommand('copy');
-        mostrarNotificacion('¡Informe copiado en texto plano para NetTerm!', 'success');
-    } catch (err) {
-        alert('Error al copiar al portapapeles');
-    } finally {
-        document.body.removeChild(textarea);
-    }
+    window.PreinformesCopy.copyFinalReport({
+        preinformeId: preinformeId,
+        notify: mostrarNotificacion,
+    });
 }
 
 function mostrarNotificacion(mensaje, tipo) {

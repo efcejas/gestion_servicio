@@ -6,6 +6,7 @@ from django_ckeditor_5.fields import CKEditor5Field
 import re
 import html
 import os
+from bs4 import BeautifulSoup
 
 User = get_user_model()
 
@@ -61,6 +62,27 @@ def sanitize_center_alignment(html_content):
                           r'class="\1\2"', html_content, flags=re.IGNORECASE)
     
     return html_content
+
+
+def strip_background_styles(html_content):
+    """Elimina backgrounds inline heredados de pegados externos sin tocar el resto del formato."""
+    if not html_content:
+        return html_content
+
+    soup = BeautifulSoup(html_content, 'html.parser')
+    for tag in soup.find_all(True):
+        if not tag.has_attr('style'):
+            continue
+
+        style_parts = [s.strip() for s in tag['style'].split(';') if s.strip()]
+        cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
+
+        if cleaned_parts:
+            tag['style'] = '; '.join(cleaned_parts)
+        else:
+            del tag['style']
+
+    return str(soup)
 
 
 def normalize_html_content(content):
@@ -250,6 +272,13 @@ def normalize_html_content_soft(content: str, br_threshold: int = 3) -> str:
     )
     
     return cleaned.strip()
+
+
+def prepare_editor_html_content(content: str) -> str:
+    """Limpia y normaliza HTML para usarlo como formato canónico del editor."""
+    content = sanitize_center_alignment(content or '')
+    content = strip_background_styles(content)
+    return normalize_html_content_soft(content)
 
 
 def strip_html_tags(text):

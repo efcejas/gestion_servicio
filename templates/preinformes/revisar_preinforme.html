@@ -337,6 +337,7 @@
 
 </div>
 
+<script src="{% static 'js/preinformes_copy.js' %}"></script>
 <script>
 // === SISTEMA DE AUTOGUARDADO REVISOR (localStorage + servidor) ===
 (function() {
@@ -650,147 +651,14 @@
  */
 
 const SISTEMA_DESTINO = '{{ preinforme.sistema_destino }}';
+const PREINFORME_ID = {{ preinforme.pk }};
 
 function copiarInformeFinal() {
-    // Obtener el contenido HTML del editor CKEditor
-    const editorElement = document.querySelector('[name="informe_final_html"]');
-    if (!editorElement) {
-        mostrarNotificacion('No se encontró el editor', 'error');
-        return;
-    }
-    
-    // Obtener el contenido del editor
-    let htmlContent = '';
-    if (editorElement.ckeditorInstance) {
-        // Si es CKEditor5, usar getData()
-        htmlContent = editorElement.ckeditorInstance.getData();
-    } else {
-        // Fallback: leer directamente del textarea
-        htmlContent = editorElement.value;
-    }
-    
-    if (!htmlContent || htmlContent.trim() === '') {
-        mostrarNotificacion('El informe está vacío', 'error');
-        return;
-    }
-    
-    // Para NetTerm: convertir HTML a texto plano preservando saltos de línea
-    if (SISTEMA_DESTINO === 'netterm') {
-        // Convertir HTML a texto preservando estructura
-        let textoPlano = htmlContent;
-        // Reemplazar </p> con salto de línea
-        textoPlano = textoPlano.replace(/<\/p>/gi, '\n');
-        // Reemplazar <br> con salto de línea
-        textoPlano = textoPlano.replace(/<br\s*\/?>/gi, '\n');
-        // Reemplazar </div> con salto de línea
-        textoPlano = textoPlano.replace(/<\/div>/gi, '\n');
-        // Reemplazar </h1-6> con salto de línea
-        textoPlano = textoPlano.replace(/<\/h[1-6]>/gi, '\n');
-        // Reemplazar </li> con salto de línea
-        textoPlano = textoPlano.replace(/<\/li>/gi, '\n');
-        
-        // Eliminar todas las etiquetas HTML
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = textoPlano;
-        textoPlano = tempDiv.textContent || tempDiv.innerText || '';
-        
-        // Limpiar exceso de saltos de línea (máximo 2 consecutivos)
-        while (textoPlano.includes('\n\n\n')) {
-            textoPlano = textoPlano.replace(/\n\n\n/g, '\n\n');
-        }
-        
-        textoPlano = textoPlano.trim();
-        copiarTextoPlano(textoPlano);
-    } else {
-        // Para EGES: copiar HTML tal cual está guardado (sin wrapper que sobrescriba estilos)
-        
-        // Generar versión texto plano como fallback
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = htmlContent;
-        const plainText = tempDiv.textContent || tempDiv.innerText || '';
-        
-        // Intentar copiar con ClipboardItem API (navegadores modernos)
-        if (navigator.clipboard && window.ClipboardItem) {
-            try {
-                const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-                const textBlob = new Blob([plainText], { type: 'text/plain' });
-                
-                const clipboardItem = new ClipboardItem({
-                    'text/html': htmlBlob,
-                    'text/plain': textBlob
-                });
-                
-                navigator.clipboard.write([clipboardItem])
-                    .then(() => {
-                        mostrarNotificacion('¡Informe copiado con formato para EGES!', 'success');
-                    })
-                    .catch(err => {
-                        console.error('Error con ClipboardItem:', err);
-                        copiarConFallback(htmlContent, plainText);
-                    });
-            } catch (err) {
-                console.error('Error creando ClipboardItem:', err);
-                copiarConFallback(htmlContent, plainText);
-            }
-        } else {
-            copiarConFallback(htmlContent, plainText);
-        }
-    }
-}
-
-/**
- * Método fallback usando execCommand
- */
-function copiarConFallback(htmlContent, plainText) {
-    const tempDiv = document.createElement('div');
-    tempDiv.contentEditable = 'true';
-    tempDiv.style.position = 'fixed';
-    tempDiv.style.left = '-9999px';
-    tempDiv.innerHTML = htmlContent;
-    document.body.appendChild(tempDiv);
-    
-    try {
-        const range = document.createRange();
-        range.selectNodeContents(tempDiv);
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-        
-        const success = document.execCommand('copy');
-        
-        if (success) {
-            mostrarNotificacion('¡Informe copiado con formato!', 'success');
-        } else {
-            throw new Error('execCommand falló');
-        }
-    } catch (err) {
-        console.error('Error con fallback HTML:', err);
-        copiarTextoPlano(plainText);
-    } finally {
-        document.body.removeChild(tempDiv);
-        window.getSelection().removeAllRanges();
-    }
-}
-
-/**
- * Último recurso: copiar solo texto plano
- */
-function copiarTextoPlano(texto) {
-    const textarea = document.createElement('textarea');
-    textarea.value = texto;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    
-    try {
-        document.execCommand('copy');
-        mostrarNotificacion('¡Informe copiado en texto plano para NetTerm!', 'success');
-    } catch (err) {
-        mostrarNotificacion('Error al copiar', 'error');
-    } finally {
-        document.body.removeChild(textarea);
-    }
+    window.PreinformesCopy.copyFinalReport({
+        preinformeId: PREINFORME_ID,
+        defaultSistemaDestino: SISTEMA_DESTINO,
+        notify: mostrarNotificacion,
+    });
 }
 
 /**

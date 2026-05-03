@@ -616,3 +616,305 @@ class AdjuntoPreinformeTest(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AdjuntoPreinforme.objects.filter(id=adjunto.id).exists())
+
+
+# ---------------------------------------------------------------------------
+# Smoke tests: autosave residente + revisor, copiar_informe_final, cargar_plantillas
+# ---------------------------------------------------------------------------
+
+class AutosaveRevisionSmokeTest(TestCase):
+    """Tests del endpoint autosave_revision (POST /preinformes/revision/<pk>/autosave/)."""
+
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='res_autosave',
+            email='res_autosave@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.revisor = User.objects.create_user(
+            username='rev_autosave',
+            email='rev_autosave@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo_estudio = TipoEstudio.objects.create(nombre='TC Abdomen')
+        self.region = Region.objects.create(nombre='Abdomen')
+
+        self.preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-AS001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Prueba',
+            nombre_paciente='Autosave',
+            informe_html='<p>Contenido inicial</p>',
+        )
+        self.preinforme.iniciar_revision(self.revisor)
+        # Crear el objeto RevisionPreinforme que crearía la vista revisar_preinforme
+        from .models import RevisionPreinforme
+        self.revision = RevisionPreinforme.objects.create(
+            preinforme=self.preinforme,
+            revisor=self.revisor,
+            informe_final_html='<p>Inicial del revisor</p>',
+        )
+
+    def _url(self):
+        return reverse('preinformes:autosave_revision', kwargs={'pk': self.preinforme.pk})
+
+    def test_autosave_revision_sin_login_devuelve_302(self):
+        """Sin autenticación debe redirigir al login."""
+        import json
+        response = self.client.post(
+            self._url(),
+            data=json.dumps({'informe_final_html': '<p>X</p>'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_autosave_revision_revisor_correcto_ok(self):
+        """Revisor asignado puede guardar: devuelve JSON success=True."""
+        import json
+        self.client.login(username='rev_autosave', password='pass123')
+        payload = '<p>Contenido guardado por autosave</p>'
+        response = self.client.post(
+            self._url(),
+            data=json.dumps({'informe_final_html': payload}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('timestamp', data)
+
+        # Verificar que se persistió en BD
+        from .models import RevisionPreinforme
+        revision = RevisionPreinforme.objects.get(preinforme=self.preinforme)
+        self.assertEqual(revision.informe_final_html, payload)
+
+    def test_autosave_revision_contenido_vacio_devuelve_400(self):
+        """Contenido vacío debe devolver HTTP 400."""
+        import json
+        self.client.login(username='rev_autosave', password='pass123')
+        response = self.client.post(
+            self._url(),
+            data=json.dumps({'informe_final_html': ''}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json().get('success'))
+
+    def test_autosave_revision_revisor_incorrecto_devuelve_404(self):
+        """Un revisor distinto al asignado debe recibir 404."""
+        import json
+        otro_staff = User.objects.create_user(
+            username='otro_staff',
+            email='otro@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.client.login(username='otro_staff', password='pass123')
+        response = self.client.post(
+            self._url(),
+            data=json.dumps({'informe_final_html': '<p>Intento</p>'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class CopiarInformeFinalSmokeTest(TestCase):
+    """Tests del endpoint copiar_informe_final (GET /preinformes/copiar-informe/<pk>/)."""
+
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='res_copiar',
+            email='res_copiar@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.revisor = User.objects.create_user(
+            username='rev_copiar',
+            email='rev_copiar@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.otro_residente = User.objects.create_user(
+            username='res_copiar_otro',
+            email='res_copiar_otro@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.tipo_estudio = TipoEstudio.objects.create(nombre='RM Rodilla')
+        self.region = Region.objects.create(nombre='Rodilla')
+
+    def _crear_preinforme(self, sistema='eges'):
+        return Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-CP001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Copiar',
+            nombre_paciente='Test',
+            informe_html='<p>Hallazgos de prueba.</p>',
+            sistema_destino=sistema,
+        )
+
+    def _url(self, pk):
+        return reverse('preinformes:copiar_informe_final', kwargs={'pk': pk})
+
+    def test_copiar_sin_login_redirige(self):
+        p = self._crear_preinforme()
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 302)
+
+    def test_copiar_propio_residente_devuelve_json(self):
+        """El propio residente puede copiar su informe."""
+        p = self._crear_preinforme()
+        self.client.login(username='res_copiar', password='pass123')
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('informe_html', data)
+        self.assertIn('informe_texto', data)
+        self.assertIn('sistema_destino', data)
+        self.assertEqual(data['sistema_destino'], 'eges')
+
+    def test_copiar_revisor_asignado_devuelve_json(self):
+        """El revisor asignado puede copiar."""
+        p = self._crear_preinforme()
+        p.iniciar_revision(self.revisor)
+        self.client.login(username='rev_copiar', password='pass123')
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('informe_html', response.json())
+
+    def test_copiar_residente_ajeno_no_finalizado_devuelve_403(self):
+        """Un residente distinto no puede copiar un informe no finalizado."""
+        p = self._crear_preinforme()
+        self.client.login(username='res_copiar_otro', password='pass123')
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 403)
+
+    def test_copiar_informe_finalizado_cualquier_residente_ok(self):
+        """Cualquier residente puede copiar un informe ya finalizado (banco de informes)."""
+        p = self._crear_preinforme()
+        p.iniciar_revision(self.revisor)
+        p.finalizar_revision()
+        self.client.login(username='res_copiar_otro', password='pass123')
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_copiar_sistema_netterm_devuelve_texto_sin_acentos(self):
+        """Sistema NetTerm: informe_texto no debe contener vocales con tilde."""
+        p = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-CP002',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Acción',
+            nombre_paciente='Revisión',
+            informe_html='<p>Conclusión: hallazgos normales. Corazón sin alteraciones.</p>',
+            sistema_destino='netterm',
+        )
+        self.client.login(username='res_copiar', password='pass123')
+        response = self.client.get(self._url(p.pk))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['sistema_destino'], 'netterm')
+        # El texto plano para NetTerm no debe tener acentos
+        texto = data['informe_texto']
+        for acento in ['á', 'é', 'í', 'ó', 'ú', 'Á', 'É', 'Í', 'Ó', 'Ú']:
+            self.assertNotIn(acento, texto, f"NetTerm texto no debe contener '{acento}'")
+
+
+class CargarPlantillasSmokeTest(TestCase):
+    """Tests del endpoint cargar_plantillas (GET /preinformes/cargar-plantillas/)."""
+
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='res_plantilla',
+            email='res_plantilla@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.staff = User.objects.create_user(
+            username='staff_plantilla',
+            email='staff_plantilla@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo = TipoEstudio.objects.create(nombre='RX Columna')
+        self.region = Region.objects.create(nombre='Columna')
+
+        self.plantilla_publica = PlantillaPreinforme.objects.create(
+            nombre='Columna Normal',
+            tipo_estudio=self.tipo,
+            region=self.region,
+            contenido='<p>TÉCNICA: columna lumbar.</p>',
+            creada_por=self.staff,
+            estado='publica',
+            sistema_destino='eges',
+        )
+        self.plantilla_borrador = PlantillaPreinforme.objects.create(
+            nombre='Borrador privado',
+            tipo_estudio=self.tipo,
+            region=self.region,
+            contenido='<p>Borrador</p>',
+            creada_por=self.staff,
+            estado='borrador',
+            sistema_destino='eges',
+        )
+
+    def _url(self):
+        return reverse('preinformes:cargar_plantillas')
+
+    def test_cargar_sin_login_redirige(self):
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 302)
+
+    def test_cargar_plantillas_publicas_devuelve_lista(self):
+        """Residente ve plantillas públicas."""
+        self.client.login(username='res_plantilla', password='pass123')
+        response = self.client.get(self._url(), {'tipo_estudio_id': self.tipo.id})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        nombres = [p['nombre'] for p in data['plantillas']]
+        self.assertIn('Columna Normal', nombres)
+        # Borrador de otro usuario NO debe aparecer para el residente
+        self.assertNotIn('Borrador privado', nombres)
+
+    def test_cargar_plantillas_borrador_visible_para_su_creador(self):
+        """El creador de un borrador lo ve en su lista."""
+        self.client.login(username='staff_plantilla', password='pass123')
+        response = self.client.get(self._url(), {'tipo_estudio_id': self.tipo.id})
+        self.assertEqual(response.status_code, 200)
+        nombres = [p['nombre'] for p in response.json()['plantillas']]
+        self.assertIn('Borrador privado', nombres)
+
+    def test_cargar_plantillas_contenido_normalizado(self):
+        """El contenido devuelto no debe tener fondos de color ni estilos sucios."""
+        from preinformes.models import PlantillaPreinforme
+        # Plantilla con fondo rojo (background-color sucio)
+        p = PlantillaPreinforme.objects.create(
+            nombre='Con fondo',
+            tipo_estudio=self.tipo,
+            region=self.region,
+            contenido='<p style="background-color: red;">Texto</p>',
+            creada_por=self.staff,
+            estado='publica',
+            sistema_destino='eges',
+        )
+        self.client.login(username='res_plantilla', password='pass123')
+        response = self.client.get(self._url(), {'tipo_estudio_id': self.tipo.id})
+        datos = response.json()['plantillas']
+        plantilla_con_fondo = next((x for x in datos if x['nombre'] == 'Con fondo'), None)
+        self.assertIsNotNone(plantilla_con_fondo)
+        self.assertNotIn('background-color', plantilla_con_fondo['contenido'])

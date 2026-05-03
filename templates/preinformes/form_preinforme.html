@@ -93,7 +93,7 @@
                                 <!-- En creación: campo normal -->
                                 <div class="relative flex-1">
                                     <!-- Spinner de carga solo sobre el select -->
-                                    <div id="plantillaLoadingSpinner" class="hidden absolute inset-0 bg-white bg-opacity-90 flex items-center justify-center rounded-md z-10 pointer-events-none">
+                                    <div id="plantillaLoadingSpinner" class="hidden absolute inset-0 bg-white bg-opacity-90 items-center justify-center rounded-md z-10 pointer-events-none">
                                         <div class="flex items-center gap-2 text-teal-600">
                                             <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -647,6 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const spinner = document.getElementById('plantillaLoadingSpinner');
         if (spinner) {
             spinner.classList.remove('hidden');
+            spinner.classList.add('flex');
         }
 
         return fetch(`{% url 'preinformes:cargar_plantillas' %}?tipo_estudio_id=${tipoEstudioId}&region_id=${regionId}&sistema_destino=${sistemaDestino}`)
@@ -684,6 +685,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Ocultar spinner
                 if (spinner) {
                     spinner.classList.add('hidden');
+                    spinner.classList.remove('flex');
                 }
                 
                 return data;
@@ -694,6 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Ocultar spinner
                 if (spinner) {
                     spinner.classList.add('hidden');
+                    spinner.classList.remove('flex');
                 }
                 
                 throw error;
@@ -717,6 +720,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const spinner = document.getElementById('plantillaLoadingSpinner');
         if (spinner) {
             spinner.classList.remove('hidden');
+            spinner.classList.add('flex');
         }
         
         // Actualizar el campo hidden plantilla_utilizada
@@ -765,6 +769,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Ocultar spinner
                             if (spinner) {
                                 spinner.classList.add('hidden');
+                                spinner.classList.remove('flex');
                             }
                         }, 200);
                         
@@ -773,6 +778,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         // Ocultar spinner en caso de error
                         if (spinner) {
                             spinner.classList.add('hidden');
+                            spinner.classList.remove('flex');
                         }
                     }
                 }, 1500); // Tiempo generoso para inicialización
@@ -783,6 +789,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Ocultar spinner en caso de error
                 if (spinner) {
                     spinner.classList.add('hidden');
+                    spinner.classList.remove('flex');
                 }
             });
     }
@@ -1034,7 +1041,16 @@ document.addEventListener('DOMContentLoaded', function() {
             setIndicator('editing', 'Editando...');
             clearTimeout(debounceTimer);
             debounceTimer = setTimeout(() => {
-                if (isDirty && !isSubmitting) saveToServer();
+                if (!isDirty || isSubmitting) return;
+
+                if (!PREINFORME_PK || !SERVER_STATES.includes(PREINFORME_ESTADO)) {
+                    isDirty = false;
+                    setIndicator('local', 'Borrador local guardado');
+                    setTimeout(() => setIndicator('ready', 'Listo'), 3000);
+                    return;
+                }
+
+                saveToServer();
             }, AUTOSAVE_DELAY);
         }
 

@@ -14,13 +14,17 @@ from django.views.decorators.http import require_http_methods
 import json
 import logging
 import os
+import re
+import html
+import unicodedata
 
 from accounts.decorators import role_required
 from .models import (
     Preinforme, TipoEstudio, Region, PlantillaPreinforme, 
     RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
     AdjuntoPreinforme,
-    EncuestaResidente
+    EncuestaResidente,
+    prepare_editor_html_content,
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
@@ -85,6 +89,90 @@ def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
         return 0, 'No se pudieron guardar las imágenes. Inténtalo nuevamente.'
 
     return len(creados), None
+
+
+def _normalizar_html_editor(content):
+    """Aplica una normalización HTML suave para usar una base consistente en editor/exportación."""
+    return prepare_editor_html_content(content)
+
+
+def _html_a_texto_plano_exportacion(html_content, ascii_only=False):
+    """Convierte HTML a texto plano preservando saltos de línea clínicamente útiles."""
+    from django.utils.html import strip_tags
+
+    texto_con_saltos = html_content or ''
+    texto_con_saltos = texto_con_saltos.replace('</p>', '\n').replace('</P>', '\n')
+    texto_con_saltos = re.sub(r'<br\s*/?>', '\n', texto_con_saltos, flags=re.IGNORECASE)
+    texto_con_saltos = texto_con_saltos.replace('</div>', '\n').replace('</DIV>', '\n')
+    texto_con_saltos = re.sub(r'</h[1-6]>', '\n', texto_con_saltos, flags=re.IGNORECASE)
+    texto_con_saltos = texto_con_saltos.replace('</li>', '\n').replace('</LI>', '\n')
+
+    informe_texto = strip_tags(texto_con_saltos)
+    informe_texto = html.unescape(informe_texto)
+
+    if ascii_only:
+        informe_texto = unicodedata.normalize('NFKD', informe_texto).encode('ascii', 'ignore').decode('ascii')
+
+    while '\n\n\n' in informe_texto:
+        informe_texto = informe_texto.replace('\n\n\n', '\n\n')
+
+    return informe_texto.strip()
+
+
+def _construir_payload_exportacion(html_content, sistema_destino):
+    """Construye la representación final para copiar según sistema destino."""
+    from bs4 import BeautifulSoup
+
+    html_normalizado = _normalizar_html_editor(html_content)
+
+    if sistema_destino == 'netterm':
+        informe_texto = _html_a_texto_plano_exportacion(html_normalizado, ascii_only=True)
+        return {
+            'informe_html': html_normalizado,
+            'informe_texto': informe_texto,
+            'informe_final': informe_texto,
+            'sistema_destino': sistema_destino,
+        }
+
+    soup = BeautifulSoup(html_normalizado, 'html.parser')
+
+    for span in soup.find_all('span'):
+        if not span.has_attr('style'):
+            continue
+
+        style = span['style']
+        style_parts = [s.strip() for s in style.split(';') if s.strip()]
+        color_value = None
+        for part in style_parts:
+            if part.lower().startswith('color:'):
+                color_value = part.split(':', 1)[1].strip()
+                break
+
+        if color_value:
+            font_tag = soup.new_tag('font', color=color_value)
+            for child in list(span.contents):
+                font_tag.append(child.extract())
+            span.replace_with(font_tag)
+
+    for tag in soup.find_all(True):
+        if tag.has_attr('style'):
+            style = tag['style']
+            style_parts = [s.strip() for s in style.split(';') if s.strip()]
+            cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
+            if cleaned_parts:
+                tag['style'] = '; '.join(cleaned_parts)
+            else:
+                del tag['style']
+
+    informe_html = str(soup)
+    informe_texto = _html_a_texto_plano_exportacion(informe_html, ascii_only=False)
+
+    return {
+        'informe_html': informe_html,
+        'informe_texto': informe_texto,
+        'informe_final': informe_texto,
+        'sistema_destino': sistema_destino,
+    }
 
 
 def _eliminar_adjuntos_residente(preinforme, adjunto_ids, usuario):
@@ -803,6 +891,7 @@ def revisar_preinforme(request, pk):
 @require_http_methods(["POST"])
 def autosave_revision(request, pk):
     """Guarda automáticamente el informe_final_html sin recargar la página"""
+    from django.http import Http404
     try:
         # pk es el ID del preinforme, no de la revisión
         preinforme = get_object_or_404(
@@ -833,7 +922,9 @@ def autosave_revision(request, pk):
             'message': 'Guardado automático exitoso',
             'timestamp': timezone.localtime(revision.fecha_modificacion).strftime('%H:%M'),
         })
-        
+
+    except Http404:
+        raise
     except Exception as e:
         return JsonResponse({
             'success': False,
@@ -879,7 +970,7 @@ def cargar_plantillas(request):
         {
             'id': p.id, 
             'nombre': p.nombre,
-            'contenido': p.contenido,
+            'contenido': _normalizar_html_editor(p.contenido),
             'es_propia': p.creada_por == request.user if request.user.is_authenticated else False,
             'estado': p.estado,
             'sistema_destino': p.get_sistema_destino_display()
@@ -901,7 +992,7 @@ def plantilla_json(request, pk):
             return JsonResponse({'error': 'No tienes permiso para acceder a esta plantilla'}, status=403)
         
         data = {
-            'contenido': plantilla.contenido or '',
+            'contenido': _normalizar_html_editor(plantilla.contenido),
             'nombre': plantilla.nombre
         }
         
@@ -1001,42 +1092,7 @@ def crear_plantilla_residente(request):
             plantilla.creada_por = request.user
             plantilla.activa = True
             plantilla.estado = 'publica' if compartir else 'borrador'
-            
-            # Convertir saltos de línea a HTML si es necesario
-            if plantilla.contenido:
-                if not ('<p>' in plantilla.contenido or '<br>' in plantilla.contenido):
-                    lines = plantilla.contenido.split('\n')
-                    html_lines = []
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            html_lines.append(f'<p>{line}</p>')
-                    plantilla.contenido = ''.join(html_lines)
-            
-            # === LIMPIEZA DE HTML ANTES DE GUARDAR ===
-            if plantilla.contenido:
-                from preinformes.models import sanitize_center_alignment, normalize_html_content_soft
-                from bs4 import BeautifulSoup
-                
-                # 1. Eliminar alineación centrada
-                plantilla.contenido = sanitize_center_alignment(plantilla.contenido)
-                
-                # 2. Eliminar backgrounds (para evitar resaltados verdes/amarillos de Word)
-                soup = BeautifulSoup(plantilla.contenido, 'html.parser')
-                for tag in soup.find_all(True):
-                    if tag.has_attr('style'):
-                        style_parts = [s.strip() for s in tag['style'].split(';') if s.strip()]
-                        cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
-                        
-                        if cleaned_parts:
-                            tag['style'] = '; '.join(cleaned_parts)
-                        else:
-                            del tag['style']
-                
-                plantilla.contenido = str(soup)
-                
-                # 3. Normalizar HTML de forma RESPETUOSA (preserva estructura original)
-                plantilla.contenido = normalize_html_content_soft(plantilla.contenido)
+            plantilla.contenido = prepare_editor_html_content(plantilla.contenido)
             
             try:
                 plantilla.save()
@@ -1151,9 +1207,6 @@ def generar_informe_final(request, pk):
 @login_required
 def copiar_informe_final(request, pk):
     """Copiar informe final al portapapeles"""
-    import re
-    from bs4 import BeautifulSoup
-    
     preinforme = get_object_or_404(Preinforme, pk=pk)
     
     # Verificar permisos
@@ -1173,85 +1226,9 @@ def copiar_informe_final(request, pk):
     else:
         # Si no hay revisión, usar el preinforme original con método unificado
         informe_html_original = preinforme.get_informe_html_or_legacy()
-    
-    # Limpiar HTML solo de backgrounds (resaltado verde) - mantener todo lo demás fiel al guardado
-    soup = BeautifulSoup(informe_html_original, 'html.parser')
-    
-    # Convertir <span style="color:..."> a <font color="..."> para compatibilidad con Word/EGES
-    for span in soup.find_all('span'):
-        if span.has_attr('style'):
-            style = span['style']
-            style_parts = [s.strip() for s in style.split(';') if s.strip()]
-            
-            color_value = None
-            for part in style_parts:
-                part_lower = part.lower()
-                if part_lower.startswith('color:'):
-                    color_value = part.split(':', 1)[1].strip()
-                    break
-            
-            # Si tiene color, convertir a <font>
-            if color_value:
-                font_tag = soup.new_tag('font', color=color_value)
-                font_tag.string = span.get_text()
-                span.replace_with(font_tag)
-    
-    # Limpiar backgrounds de todos los tags
-    for tag in soup.find_all(True):
-        if tag.has_attr('style'):
-            style = tag['style']
-            style_parts = [s.strip() for s in style.split(';') if s.strip()]
-            cleaned_parts = [p for p in style_parts if not p.lower().startswith('background')]
-            
-            if cleaned_parts:
-                tag['style'] = '; '.join(cleaned_parts)
-            else:
-                del tag['style']
-    
-    informe_html = str(soup)
-    
-    # Convertir HTML a texto plano preservando saltos de línea
-    from django.utils.html import strip_tags
-    
-    # Primero reemplazar etiquetas HTML con saltos de línea antes de eliminarlas
-    texto_con_saltos = informe_html_original
-    
-    # Los </p> generan un salto simple (no doble para evitar mucho espacio)
-    texto_con_saltos = texto_con_saltos.replace('</p>', '\n').replace('</P>', '\n')
-    
-    # Los <br> generan un salto simple
-    texto_con_saltos = re.sub(r'<br\s*/?>', '\n', texto_con_saltos, flags=re.IGNORECASE)
-    
-    # Los </div> y otros bloques generan un salto
-    texto_con_saltos = texto_con_saltos.replace('</div>', '\n').replace('</DIV>', '\n')
-    
-    # Los encabezados generan un salto simple
-    texto_con_saltos = re.sub(r'</h[1-6]>', '\n', texto_con_saltos, flags=re.IGNORECASE)
-    
-    # Lista items generan salto
-    texto_con_saltos = texto_con_saltos.replace('</li>', '\n').replace('</LI>', '\n')
-    
-    # Ahora eliminar todas las etiquetas HTML restantes
-    informe_texto = strip_tags(texto_con_saltos)
-    
-    # Convertir entidades HTML (&nbsp;, &amp;, etc.) a texto real
-    import html
-    informe_texto = html.unescape(informe_texto)
-    
-    # Limpiar exceso de saltos (máximo 1 línea vacía entre párrafos)
-    while '\n\n\n' in informe_texto:
-        informe_texto = informe_texto.replace('\n\n\n', '\n\n')
-    
-    # Limpiar espacios y tabs al final
-    informe_texto = informe_texto.strip()
-    
-    return JsonResponse({
-        'informe_html': informe_html,
-        'informe_texto': informe_texto,
-        'sistema_destino': preinforme.sistema_destino,
-        # Mantener compatibilidad con código antiguo
-        'informe_final': informe_texto
-    })
+
+    payload = _construir_payload_exportacion(informe_html_original, preinforme.sistema_destino)
+    return JsonResponse(payload)
 
 
 # === VISTAS DE ESTADÍSTICAS ===
