@@ -679,7 +679,8 @@ Si el hallazgo nuevo no existe en la plantilla base, ubicarlo así:
 
 PASO 3 — REGLAS DE ORO:
   ✅ Nunca eliminar una línea sin reemplazarla o justificarlo
-  ✅ Si una línea habla de dos estructuras (ej: "bursas y tendón") y solo una fue mencionada, reescribir la línea dejando normal la no mencionada
+  ✅ Si una línea habla de dos estructuras (ej: "bursas y tendón") y solo una fue mencionada, reescribir la línea dejando normal la no menciona
+  ✅ Si una línea de la plantilla niega varios hallazgos en conjunto (ej: "No se identifican X ni Y") y el dictado confirma UNO de ellos, reescribir la línea conservando solo la negación del hallazgo NO confirmado. Si el dictado confirma TODOS los hallazgos negados en esa línea, eliminarla por completo y reemplazarla por el hallazgo positivo. Ej: dictado dice 'imagen nodular' → plantilla dice 'No se identifican nódulos ni áreas de consolidación' → reescribir como 'No se identifican áreas de consolidación parenquimatosa.'
   ✅ Si aparece una estructura patológica nueva no contemplada en plantilla, crear su línea e insertarla cerca de su estructura relacionada
   ✅ Si dicta "el resto normal" → conservar todas las líneas no modificadas
   ✅ Lenguaje coloquial del dictado → terminología radiológica precisa en el informe
