@@ -446,37 +446,56 @@ def reportar_ausencia(request, pk):
         es_rango = bool(fecha_fin and fecha_fin != fecha_inicio)
 
         if es_rango:
-            # ── Modo rango: generar una ausencia por cada ocurrencia del día ──
-            fechas = _fechas_del_bloque_en_rango(bloque.dia_semana, fecha_inicio, fecha_fin)
+            # ── Modo rango: generar ausencias para TODOS los bloques del profesional ──
+            # Identificar el profesional (interno o externo)
+            from django.db.models import Q
+            prof_interno = bloque.profesional_interno
+            prof_externo = bloque.profesional_externo
+
+            if prof_interno:
+                bloques_afectados = BloqueHorario.objects.filter(
+                    Q(profesional_interno=prof_interno),
+                    estado=EstadoBloque.ACTIVO,
+                ).select_related('consultorio')
+            elif prof_externo:
+                bloques_afectados = BloqueHorario.objects.filter(
+                    Q(profesional_externo=prof_externo),
+                    estado=EstadoBloque.ACTIVO,
+                ).select_related('consultorio')
+            else:
+                bloques_afectados = BloqueHorario.objects.filter(pk=bloque.pk)
+
             creadas = 0
             omitidas = 0
-            for fecha in fechas:
-                if AusenciaCobertura.objects.filter(bloque=bloque, fecha_ausencia=fecha).exists():
-                    omitidas += 1
-                    continue
-                nueva = AusenciaCobertura(
-                    bloque=bloque,
-                    fecha_ausencia=fecha,
-                    fecha_fin_ausencia=fecha_fin,
-                    profesional_ausente_interno=bloque.profesional_interno,
-                    profesional_ausente_externo=bloque.profesional_externo,
-                    motivo=motivo,
-                    detalle_motivo=detalle_motivo,
-                    estado=EstadoAusenciaCobertura.REPORTADA,
-                    reportado_por=request.user,
-                )
-                nueva.save()
-                # Proponer cobertura para el primero disponible
-                if bloque.permite_cobertura_residente:
-                    try:
-                        res = sugerir_cobertura(bloque, fecha)
-                        if res['candidatos']:
-                            nueva.residente_sugerido = res['candidatos'][0]['usuario']
-                            nueva.estado = EstadoAusenciaCobertura.PROPUESTA
-                            nueva.save(update_fields=['residente_sugerido', 'estado', 'fecha_modificacion'])
-                    except (SinResidentesDisponiblesError, BloqueNoCubreError):
-                        pass
-                creadas += 1
+            for b in bloques_afectados:
+                fechas = _fechas_del_bloque_en_rango(b.dia_semana, fecha_inicio, fecha_fin)
+                for fecha in fechas:
+                    if AusenciaCobertura.objects.filter(bloque=b, fecha_ausencia=fecha).exists():
+                        omitidas += 1
+                        continue
+                    nueva = AusenciaCobertura(
+                        bloque=b,
+                        fecha_ausencia=fecha,
+                        fecha_fin_ausencia=fecha_fin,
+                        profesional_ausente_interno=b.profesional_interno,
+                        profesional_ausente_externo=b.profesional_externo,
+                        motivo=motivo,
+                        detalle_motivo=detalle_motivo,
+                        estado=EstadoAusenciaCobertura.REPORTADA,
+                        reportado_por=request.user,
+                    )
+                    nueva.save()
+                    # Proponer cobertura para el primero disponible
+                    if b.permite_cobertura_residente:
+                        try:
+                            res = sugerir_cobertura(b, fecha)
+                            if res['candidatos']:
+                                nueva.residente_sugerido = res['candidatos'][0]['usuario']
+                                nueva.estado = EstadoAusenciaCobertura.PROPUESTA
+                                nueva.save(update_fields=['residente_sugerido', 'estado', 'fecha_modificacion'])
+                        except (SinResidentesDisponiblesError, BloqueNoCubreError):
+                            pass
+                    creadas += 1
 
             partes = [f'{creadas} ausencia{"s" if creadas != 1 else ""} registrada{"s" if creadas != 1 else ""}']
             if omitidas:
