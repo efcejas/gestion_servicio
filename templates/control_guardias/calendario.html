@@ -7,7 +7,7 @@
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4">
 
     <!-- Encabezado -->
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-5" id="printHideControls">
         <div>
             <h1 class="text-2xl font-bold text-white">Calendario de Guardias</h1>
             <p class="text-gray-400 mt-0.5 text-sm">Vista mensual de las guardias asignadas</p>
@@ -32,6 +32,11 @@
             {#   <i class="fas fa-display mr-2"></i>Volver a presentación #}
             {# </a> #}
             {# {% endif %} #}
+            <button id="btnDescargarPdf"
+                    type="button"
+                    class="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:border-gray-400 transition-colors">
+              <i class="fas fa-file-pdf mr-2"></i>Descargar PDF
+            </button>
             <a href="{{ calendario_return_url }}"
                class="inline-flex items-center px-4 py-2 text-sm text-gray-300 hover:text-white border border-gray-600 rounded-lg hover:border-gray-400 transition-colors">
               <i class="fas fa-arrow-left mr-2"></i>{{ calendario_back_label }}
@@ -154,10 +159,61 @@
   #calendar .fc .fc-daygrid-event-harness { max-width: 100%; }
   #calendar .guardia-fc-chip { max-width: 100%; overflow: hidden; }
   #calendar .guardia-fc-chip .guardia-fc-chip-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Impresión ─────────────────────────────────────────────────────── */
+  @media print {
+    @page { size: landscape; margin: 1cm; }
+
+    /* Ocultar chrome de la app */
+    #logo-sidebar,
+    button[data-drawer-toggle],
+    .sm\:ml-64 > .p-4 > [class*="breadcrumb"],
+    [id^="printHide"] { display: none !important; }
+
+    /* Eliminar margen del sidebar */
+    .sm\:ml-64 { margin-left: 0 !important; }
+    .p-4, .md\:p-6 { padding: 0 !important; }
+
+    /* Ocultar controles de la vista */
+    #printHideControls,
+    #filtroResidente,
+    #guardiaTooltip,
+    #calendarLoading { display: none !important; }
+
+    /* Forzar fondo blanco y texto oscuro para impresión */
+    body, html { background: white !important; color: black !important; }
+    .bg-gray-900, [class*="bg-gray-"] { background: white !important; }
+    .text-white, .text-gray-200, .text-gray-300, .text-gray-400 { color: #111 !important; }
+    .border-gray-700, .border-gray-600 { border-color: #ccc !important; }
+
+    /* Colores del calendario */
+    #calendar .fc { --fc-page-text-color: #111 !important; --fc-neutral-text-color: #333 !important; }
+    #calendar .fc-theme-standard .fc-scrollgrid { border-color: #ccc !important; }
+    #calendar .fc .fc-daygrid-day-number { color: #111 !important; }
+    #calendar .fc .fc-col-header-cell-cushion { color: #444 !important; }
+    #calendar .fc .fc-toolbar-title { color: #111 !important; }
+    #calendar .fc .fc-button { display: none !important; }
+    #calendar .fc .fc-toolbar-chunk:first-child .fc-button,
+    #calendar .fc .fc-toolbar-chunk:last-child .fc-button { display: none !important; }
+    #calendar .fc .fc-toolbar { justify-content: center !important; margin-bottom: .5cm; }
+    #calendar .fc .fc-daygrid-day.fc-day-today { background: #eff6ff !important; }
+    #calendar .fc .fc-daygrid-day.fc-day-feriado { background: #fffbeb !important; }
+    #calendar .fc .fc-scrollgrid-section > td { border-color: #ccc !important; }
+    #calendar .fc .fc-daygrid-day { border-color: #ccc !important; }
+    #calendar .fc .fc-daygrid-day-frame { min-height: 60px !important; }
+
+    /* Chips de guardias — mantener colores pero sobre fondo blanco */
+    #calendar .guardia-fc-chip { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+    /* Leyenda de colores — forzar que se imprima */
+    .flex.flex-wrap.items-center.gap-3.mb-4 span { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
 </style>
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
 <script src="{% static 'js/index.global.min.js' %}"></script>
 <script>
 (function () {
@@ -246,6 +302,7 @@
     const label = document.createElement('span');
     label.className = 'guardia-fc-chip-label truncate text-[10px] font-medium text-gray-100 leading-tight';
     label.textContent = labelText;
+    label.dataset.fullname = abrev;  // nombre completo para el PDF
 
     wrap.appendChild(dot);
     wrap.appendChild(label);
@@ -358,6 +415,102 @@
     document.addEventListener('scroll', hideTooltip, true);
   });
 
+}());
+</script>
+
+<!-- Generación de PDF del calendario -->
+<script>
+(function () {
+  'use strict';
+
+  const btn = document.getElementById('btnDescargarPdf');
+  if (!btn) return;
+
+  btn.addEventListener('click', async function () {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF || !window.html2canvas) {
+      alert('Las librerías de PDF aún se están cargando. Intentá de nuevo en unos segundos.');
+      return;
+    }
+
+    // Feedback visual
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generando…';
+
+    try {
+      const calEl = document.getElementById('calendar');
+
+      // Expandir nombres completos en los chips antes de capturar
+      const chips = calEl.querySelectorAll('.guardia-fc-chip-label');
+      const chipState = Array.from(chips).map((el) => ({
+        el,
+        text: el.textContent,
+        overflow: el.style.overflow,
+        whiteSpace: el.style.whiteSpace,
+        textOverflow: el.style.textOverflow,
+        maxWidth: el.style.maxWidth,
+      }));
+      chipState.forEach(({ el }) => {
+        el.textContent = el.dataset.fullname || el.textContent;
+        el.style.overflow = 'visible';
+        el.style.whiteSpace = 'normal';
+        el.style.textOverflow = 'clip';
+        el.style.maxWidth = 'none';
+      });
+
+      // Expandir el contenedor del chip también
+      const wraps = calEl.querySelectorAll('.guardia-fc-chip');
+      const wrapState = Array.from(wraps).map((el) => ({ el, overflow: el.style.overflow }));
+      wrapState.forEach(({ el }) => { el.style.overflow = 'visible'; });
+
+      // Capturar el calendario con fondo blanco para PDF legible
+      const canvas = await html2canvas(calEl, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        // Ignorar elementos que no deben aparecer (tooltip, spinner)
+        ignoreElements: (el) =>
+          el.id === 'guardiaTooltip' || el.id === 'calendarLoading',
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const ratio = canvas.height / canvas.width;
+      const imgH = pageW * ratio;
+      const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
+
+      pdf.addImage(imgData, 'PNG', 0, yOffset, pageW, Math.min(imgH, pageH));
+
+      // Nombre del archivo basado en el mes visible en el título del calendario
+      const titleEl = document.querySelector('.fc-toolbar-title');
+      const titulo = titleEl ? titleEl.textContent.trim().toLowerCase().replace(/\s+/g, '-') : 'guardias';
+      pdf.save(`calendario-guardias-${titulo}.pdf`);
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      alert('No se pudo generar el PDF. Por favor intentá de nuevo.');
+    } finally {
+      // Restaurar estado original de los chips
+      if (typeof chipState !== 'undefined') {
+        chipState.forEach(({ el, text, overflow, whiteSpace, textOverflow, maxWidth }) => {
+          el.textContent = text;
+          el.style.overflow = overflow;
+          el.style.whiteSpace = whiteSpace;
+          el.style.textOverflow = textOverflow;
+          el.style.maxWidth = maxWidth;
+        });
+      }
+      if (typeof wrapState !== 'undefined') {
+        wrapState.forEach(({ el, overflow }) => { el.style.overflow = overflow; });
+      }
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+    }
+  });
 }());
 </script>
 {% endblock %}
