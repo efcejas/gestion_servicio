@@ -918,8 +918,9 @@
       const wrapState = Array.from(wraps).map((el) => ({ el, overflow: el.style.overflow }));
       wrapState.forEach(({ el }) => { el.style.overflow = 'visible'; });
 
+      const SCALE = 3;
       const canvas = await html2canvas(calEl, {
-        scale: 2,
+        scale: SCALE,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
@@ -928,15 +929,17 @@
       });
 
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const ratio = canvas.height / canvas.width;
-      const imgH = pageW * ratio;
-      const yOffset = imgH < pageH ? (pageH - imgH) / 2 : 0;
-
-      pdf.addImage(imgData, 'PNG', 0, yOffset, pageW, Math.min(imgH, pageH));
+      // Crear página del PDF con las dimensiones exactas del canvas capturado
+      const mmPerPx = 25.4 / (96 * SCALE);
+      const pageW = canvas.width  * mmPerPx;
+      const pageH = canvas.height * mmPerPx;
+      const pdf = new jsPDF({
+        orientation: pageW > pageH ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: [pageW, pageH],
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH);
 
       const titleEl = document.querySelector('.fc-toolbar-title');
       const titulo = titleEl ? titleEl.textContent.trim().toLowerCase().replace(/\s+/g, '-') : 'guardias';
