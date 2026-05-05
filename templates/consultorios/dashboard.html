@@ -110,6 +110,56 @@
         </section>
     </div>
 
+    {# ── Tarjetas operativas EGES (solo para admin / jefe) ── #}
+    {% with rol=request.user.rol %}
+    {% if request.user.is_superuser or rol == 'administrativo' or rol == 'jefe_servicio' %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <a href="{% url 'consultorios:bandeja_eges' %}"
+           class="block bg-white border border-cyan-100 rounded-xl p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <div class="p-3 bg-cyan-100 rounded-lg text-cyan-600">
+                        <i class="fa-solid fa-list-check text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-900">Bandeja EGES</p>
+                        <p class="text-sm text-gray-500 mt-0.5">Tareas pendientes de ejecución en EGES.</p>
+                    </div>
+                </div>
+                {% if tareas_eges_pendientes %}
+                <span class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-cyan-500 rounded-full">
+                    {{ tareas_eges_pendientes }}
+                </span>
+                {% else %}
+                <span class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-green-600 bg-green-100 rounded-full">
+                    <i class="fa-solid fa-check text-xs"></i>
+                </span>
+                {% endif %}
+            </div>
+        </a>
+        <a href="{% url 'consultorios:solicitudes_extra_lista' %}"
+           class="block bg-white border border-violet-100 rounded-xl p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <div class="p-3 bg-violet-100 rounded-lg text-violet-600">
+                        <i class="fa-solid fa-calendar-plus text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-gray-900">Agendas extra</p>
+                        <p class="text-sm text-gray-500 mt-0.5">Solicitudes de apertura fuera de horario habitual.</p>
+                    </div>
+                </div>
+                {% if solicitudes_extra_pendientes %}
+                <span class="flex-shrink-0 inline-flex items-center justify-center w-8 h-8 text-sm font-bold text-white bg-violet-500 rounded-full">
+                    {{ solicitudes_extra_pendientes }}
+                </span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    {% endif %}
+    {% endwith %}
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <a href="{% url 'consultorios:grilla_semanal' %}"
            class="block bg-white border border-gray-100 rounded-xl p-5 hover:shadow-md transition-shadow">
@@ -147,6 +197,22 @@
                 </div>
             </div>
         </a>
+        {% with rol=request.user.rol %}
+        {% if request.user.is_superuser or rol == 'jefe_servicio' %}
+        <a href="{% url 'consultorios:agendas_descubiertas' %}"
+           class="block bg-white border border-rose-100 rounded-xl p-5 hover:shadow-md transition-shadow">
+            <div class="flex items-start gap-3">
+                <div class="p-3 bg-rose-100 rounded-lg text-rose-600">
+                    <i class="fa-solid fa-calendar-xmark text-lg"></i>
+                </div>
+                <div>
+                    <p class="font-semibold text-gray-900">Agendas descubiertas</p>
+                    <p class="text-sm text-gray-500 mt-0.5">Bloques sin cobertura en las próximas semanas.</p>
+                </div>
+            </div>
+        </a>
+        {% endif %}
+        {% endwith %}
     </div>
 </div>
 {% endblock %}

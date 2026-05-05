@@ -1,0 +1,167 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Solicitudes de Agenda Extra{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-violet-600 to-violet-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold"><i class="fa-solid fa-calendar-plus mr-2"></i>Solicitudes de Agenda Extra</h1>
+        <p class="mt-1 text-violet-200">
+          {% if total_pendientes %}
+            {{ total_pendientes }} pendiente{{ total_pendientes|pluralize }} de aprobación
+          {% else %}
+            Sin solicitudes pendientes
+          {% endif %}
+        </p>
+      </div>
+      <a href="{% url 'consultorios:solicitud_extra_nueva' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-white text-violet-700 font-semibold rounded-lg shadow hover:bg-violet-50 transition text-sm">
+        <i class="fa-solid fa-plus"></i> Nueva solicitud
+      </a>
+    </div>
+  </div>
+
+  {% if not solicitudes %}
+    <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-12 text-center">
+      <i class="fa-solid fa-calendar-xmark text-5xl text-gray-300 mb-4"></i>
+      <p class="text-gray-500">No hay solicitudes registradas.</p>
+      <a href="{% url 'consultorios:solicitud_extra_nueva' %}"
+         class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-medium transition">
+        <i class="fa-solid fa-plus"></i> Crear primera solicitud
+      </a>
+    </div>
+  {% else %}
+    <div class="space-y-3">
+      {% for sol in solicitudes %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+          <div class="flex items-start justify-between gap-4">
+
+            <!-- Estado badge -->
+            <div class="flex-shrink-0 mt-1">
+              {% if sol.estado == 'PENDIENTE' %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-600">
+                  <i class="fa-solid fa-hourglass-half text-lg"></i>
+                </span>
+              {% elif sol.estado == 'APROBADA' %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 text-green-600">
+                  <i class="fa-solid fa-circle-check text-lg"></i>
+                </span>
+              {% else %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-500">
+                  <i class="fa-solid fa-circle-xmark text-lg"></i>
+                </span>
+              {% endif %}
+            </div>
+
+            <!-- Detalle -->
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="font-semibold text-gray-800">{{ sol.consultorio.nombre }}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full
+                  {% if sol.estado == 'PENDIENTE' %}bg-amber-100 text-amber-700
+                  {% elif sol.estado == 'APROBADA' %}bg-green-100 text-green-700
+                  {% else %}bg-red-100 text-red-600{% endif %}">
+                  {{ sol.get_estado_display }}
+                </span>
+                <span class="text-xs text-gray-400">{{ sol.get_tipo_actividad_display }}</span>
+              </div>
+
+              <p class="text-sm text-gray-600">
+                <i class="fa-solid fa-calendar-day mr-1 text-gray-400"></i>
+                <strong>{{ sol.fecha_solicitada|date:"d/m/Y" }}</strong>
+                — {{ sol.hora_inicio|time:"H:i" }} a {{ sol.hora_fin|time:"H:i" }}
+              </p>
+
+              {% if sol.profesional_interno or sol.profesional_externo %}
+                <p class="text-sm text-gray-600 mt-0.5">
+                  <i class="fa-solid fa-user-doctor mr-1 text-gray-400"></i>
+                  {{ sol.nombre_profesional }}
+                </p>
+              {% endif %}
+
+              <p class="text-xs text-gray-400 mt-1 italic">{{ sol.motivo|truncatechars:120 }}</p>
+
+              <p class="text-xs text-gray-400 mt-1">
+                Solicitado por {{ sol.solicitante.get_full_name|default:sol.solicitante.username }}
+                — {{ sol.fecha_creacion|date:"d/m/Y H:i" }}
+              </p>
+
+              {% if sol.observaciones_resolucion %}
+                <p class="text-xs text-red-400 mt-1 italic">
+                  Motivo de rechazo: {{ sol.observaciones_resolucion }}
+                </p>
+              {% endif %}
+
+              {% if sol.tarea_eges %}
+                <p class="text-xs text-cyan-600 mt-1">
+                  <i class="fa-solid fa-link mr-1"></i>Tarea EGES generada
+                  — {{ sol.tarea_eges.get_estado_display }}
+                </p>
+              {% endif %}
+            </div>
+
+            <!-- Acciones para jefe -->
+            {% if es_jefe and sol.estado == 'PENDIENTE' %}
+              <div class="flex-shrink-0 flex flex-col gap-2">
+                <form method="post" action="{% url 'consultorios:solicitud_extra_resolver' sol.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="accion" value="aprobar">
+                  <button type="submit"
+                          class="w-full inline-flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition">
+                    <i class="fa-solid fa-check"></i> Aprobar
+                  </button>
+                </form>
+                <button type="button"
+                        onclick="abrirModalRechazo({{ sol.pk }})"
+                        class="w-full inline-flex items-center gap-1.5 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded-lg transition">
+                  <i class="fa-solid fa-xmark"></i> Rechazar
+                </button>
+              </div>
+            {% endif %}
+
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Modal de rechazo -->
+<div id="modalRechazo" class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+    <div class="p-6">
+      <h2 class="text-lg font-bold text-gray-800 mb-1">Rechazar solicitud</h2>
+      <p class="text-sm text-gray-500 mb-4">Podés indicar el motivo para que el solicitante lo vea.</p>
+      <form id="formRechazo" method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="rechazar">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Motivo del rechazo <span class="text-gray-400">(opcional)</span></label>
+          <textarea name="observaciones_resolucion" rows="3"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                    placeholder="Ej: No hay consultorio disponible ese día..."></textarea>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" onclick="cerrarModalRechazo()"
+                  class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:text-gray-800">Cancelar</button>
+          <button type="submit"
+                  class="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">Confirmar rechazo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function abrirModalRechazo(pk) {
+    document.getElementById('formRechazo').action = `/consultorios/solicitudes-extra/${pk}/resolver/`;
+    document.getElementById('modalRechazo').classList.remove('hidden');
+  }
+  function cerrarModalRechazo() {
+    document.getElementById('modalRechazo').classList.add('hidden');
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}{{ titulo }}{% endblock %}
+
+{% block modulo_content %}
+<div class="max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-violet-600 to-violet-800 rounded-xl shadow-lg p-6 text-white">
+    <h1 class="text-2xl font-bold"><i class="fa-solid fa-calendar-plus mr-2"></i>{{ titulo }}</h1>
+    <p class="mt-1 text-violet-200 text-sm">Completá los datos de la agenda extra que necesitás abrir.</p>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+    <div class="lg:col-span-2">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Errores generales -->
+        {% if form.non_field_errors %}
+          <div class="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-600 text-sm">
+            {{ form.non_field_errors|join:", " }}
+          </div>
+        {% endif %}
+
+        <!-- Consultorio y fecha -->
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6 mb-6">
+          <h2 class="text-base font-semibold text-gray-700 mb-4">
+            <i class="fa-solid fa-door-open mr-2 text-violet-500"></i>Consultorio y fecha
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="sm:col-span-2">
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.consultorio.label }}</label>
+              {{ form.consultorio }}
+              {% if form.consultorio.errors %}<p class="text-red-500 text-xs mt-1">{{ form.consultorio.errors|join:", " }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_solicitada.label }}</label>
+              {{ form.fecha_solicitada }}
+              {% if form.fecha_solicitada.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_solicitada.errors|join:", " }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.tipo_actividad.label }}</label>
+              {{ form.tipo_actividad }}
+              {% if form.tipo_actividad.errors %}<p class="text-red-500 text-xs mt-1">{{ form.tipo_actividad.errors|join:", " }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.hora_inicio.label }}</label>
+              {{ form.hora_inicio }}
+              {% if form.hora_inicio.errors %}<p class="text-red-500 text-xs mt-1">{{ form.hora_inicio.errors|join:", " }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.hora_fin.label }}</label>
+              {{ form.hora_fin }}
+              {% if form.hora_fin.errors %}<p class="text-red-500 text-xs mt-1">{{ form.hora_fin.errors|join:", " }}</p>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Profesional -->
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6 mb-6">
+          <h2 class="text-base font-semibold text-gray-700 mb-1">
+            <i class="fa-solid fa-user-doctor mr-2 text-violet-500"></i>Profesional
+          </h2>
+          <p class="text-xs text-gray-400 mb-4">Indicá el profesional que va a trabajar ese día. Solo uno: interno O externo.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.profesional_interno.label }}</label>
+              {{ form.profesional_interno }}
+              {% if form.profesional_interno.errors %}<p class="text-red-500 text-xs mt-1">{{ form.profesional_interno.errors|join:", " }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.profesional_externo.label }}</label>
+              {{ form.profesional_externo }}
+              {% if form.profesional_externo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.profesional_externo.errors|join:", " }}</p>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Motivo -->
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6 mb-6">
+          <h2 class="text-base font-semibold text-gray-700 mb-4">
+            <i class="fa-solid fa-comment-medical mr-2 text-violet-500"></i>Motivo
+          </h2>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.motivo.label }}</label>
+          {{ form.motivo }}
+          {% if form.motivo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.motivo.errors|join:", " }}</p>{% endif %}
+        </div>
+
+        <!-- Acciones -->
+        <div class="flex items-center justify-between">
+          <a href="{% url 'consultorios:solicitudes_extra_lista' %}"
+             class="inline-flex items-center gap-2 px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm">
+            <i class="fa-solid fa-arrow-left"></i> Cancelar
+          </a>
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-6 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg shadow transition">
+            <i class="fa-solid fa-paper-plane"></i> {{ boton_accion }}
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-100 rounded-xl shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-violet-500"></i>
+          <h3 class="text-sm font-semibold text-gray-800">Ayuda rápida</h3>
+        </div>
+        <div class="p-5 space-y-3 text-sm text-gray-600">
+          <p><span class="font-semibold text-gray-700">Profesional:</span> elegir solo uno (interno o externo).</p>
+          <p><span class="font-semibold text-gray-700">Horario:</span> la hora de fin debe ser posterior a la de inicio.</p>
+          <p><span class="font-semibold text-gray-700">Motivo:</span> describir la necesidad operativa (demanda, reemplazo, contingencia).</p>
+        </div>
+      </div>
+
+      <div class="bg-violet-50 border border-violet-200 rounded-xl p-5 text-sm text-violet-800">
+        <div class="flex gap-2 items-start">
+          <i class="fa-solid fa-lightbulb text-violet-500 mt-0.5 shrink-0"></i>
+          <p>Las solicitudes aprobadas generan automáticamente una tarea pendiente para ejecución en EGES.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

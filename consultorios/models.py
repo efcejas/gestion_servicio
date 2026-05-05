@@ -748,3 +748,352 @@ class AusenciaCobertura(models.Model):
         if self.profesional_ausente_externo:
             return self.profesional_ausente_externo.nombre_completo()
         return 'Sin profesional'
+
+
+# ---------------------------------------------------------------------------
+# Módulo operativo EGES
+# ---------------------------------------------------------------------------
+
+class AccionEGES(models.TextChoices):
+    """Acción que debe realizar la administrativa en EGES."""
+    HABILITAR = 'HABILITAR', 'Habilitar agenda'
+    DESHABILITAR = 'DESHABILITAR', 'Deshabilitar agenda'
+    REASIGNAR = 'REASIGNAR', 'Reasignar agenda a otro profesional'
+
+
+class OrigenTareaEGES(models.TextChoices):
+    """Evento del sistema que generó la tarea."""
+    BLOQUE_NUEVO = 'BLOQUE_NUEVO', 'Bloque nuevo creado'
+    BLOQUE_DESACTIVADO = 'BLOQUE_DESAC', 'Bloque desactivado/pausado'
+    BLOQUE_MODIFICADO = 'BLOQUE_MOD', 'Bloque modificado (horario/profesional)'
+    AUSENCIA_SIN_COBERTURA = 'AUSENCIA_SC', 'Ausencia sin cobertura'
+    AUSENCIA_CON_COBERTURA = 'AUSENCIA_CC', 'Ausencia con cobertura (reasignación)'
+    COBERTURA_CANCELADA = 'COB_CANCEL', 'Cobertura cancelada'
+    SOLICITUD_EXTRA = 'SOLIC_EXTRA', 'Solicitud de agenda extra aprobada'
+    MANUAL = 'MANUAL', 'Creada manualmente'
+
+
+class EstadoTareaEGES(models.TextChoices):
+    PENDIENTE = 'PENDIENTE', 'Pendiente'
+    EJECUTADO = 'EJECUTADO', 'Ejecutado en EGES'
+
+
+class TareaAgendaEGES(models.Model):
+    """
+    Tarea concreta para la administrativa: qué debe hacer en EGES
+    como consecuencia de un evento en este sistema.
+
+    Ciclo de vida: PENDIENTE → EJECUTADO
+    """
+
+    accion = models.CharField(
+        max_length=20,
+        choices=AccionEGES.choices,
+        help_text='Acción a realizar en EGES'
+    )
+
+    origen = models.CharField(
+        max_length=20,
+        choices=OrigenTareaEGES.choices,
+        default=OrigenTareaEGES.MANUAL,
+        help_text='Evento que originó esta tarea'
+    )
+
+    consultorio = models.ForeignKey(
+        Consultorio,
+        on_delete=models.CASCADE,
+        related_name='tareas_eges',
+        help_text='Consultorio afectado'
+    )
+
+    # Profesional al que refiere la tarea (puede ser interno o externo)
+    profesional_interno = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='tareas_eges',
+        blank=True,
+        null=True,
+    )
+
+    profesional_externo = models.ForeignKey(
+        ProfesionalExterno,
+        on_delete=models.SET_NULL,
+        related_name='tareas_eges',
+        blank=True,
+        null=True,
+    )
+
+    # Fecha/horario afectados
+    fecha_afectada = models.DateField(
+        blank=True,
+        null=True,
+        help_text='Fecha puntual afectada (ausencias, eventos únicos)'
+    )
+
+    fecha_desde = models.DateField(
+        blank=True,
+        null=True,
+        help_text='Inicio del rango afectado (vacaciones, cambios de bloque)'
+    )
+
+    fecha_hasta = models.DateField(
+        blank=True,
+        null=True,
+        help_text='Fin del rango afectado'
+    )
+
+    hora_inicio = models.TimeField(
+        blank=True,
+        null=True,
+        help_text='Franja horaria de inicio'
+    )
+
+    hora_fin = models.TimeField(
+        blank=True,
+        null=True,
+        help_text='Franja horaria de fin'
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=EstadoTareaEGES.choices,
+        default=EstadoTareaEGES.PENDIENTE,
+    )
+
+    notas = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Información adicional para la administrativa'
+    )
+
+    # Trazabilidad
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='tareas_eges_creadas',
+        blank=True,
+        null=True,
+    )
+
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    ejecutado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='tareas_eges_ejecutadas',
+        blank=True,
+        null=True,
+        help_text='Administrativa que marcó la tarea como ejecutada'
+    )
+
+    fecha_ejecucion = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text='Momento en que se marcó como ejecutado en EGES'
+    )
+
+    notas_ejecucion = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Notas de la administrativa al ejecutar (ej: número de agenda creada)'
+    )
+
+    class Meta:
+        verbose_name = 'Tarea EGES'
+        verbose_name_plural = 'Tareas EGES'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['estado', 'fecha_creacion']),
+            models.Index(fields=['consultorio', 'estado']),
+        ]
+
+    def __str__(self):
+        profesional = self.nombre_profesional()
+        fecha = self.fecha_afectada or self.fecha_desde or '—'
+        return f"[{self.get_estado_display()}] {self.get_accion_display()} — {profesional} — {self.consultorio.nombre} ({fecha})"
+
+    def nombre_profesional(self):
+        if self.profesional_interno:
+            return self.profesional_interno.get_full_name() or self.profesional_interno.username
+        if self.profesional_externo:
+            return self.profesional_externo.nombre_completo()
+        return 'Sin especificar'
+
+    def marcar_ejecutada(self, usuario, notas=''):
+        """Marca la tarea como ejecutada en EGES."""
+        self.estado = EstadoTareaEGES.EJECUTADO
+        self.ejecutado_por = usuario
+        self.fecha_ejecucion = timezone.now()
+        self.notas_ejecucion = notas
+        self.save(update_fields=['estado', 'ejecutado_por', 'fecha_ejecucion', 'notas_ejecucion'])
+
+
+class EstadoSolicitudExtra(models.TextChoices):
+    PENDIENTE = 'PENDIENTE', 'Pendiente de aprobación'
+    APROBADA = 'APROBADA', 'Aprobada'
+    RECHAZADA = 'RECHAZADA', 'Rechazada'
+
+
+class SolicitudAgendaExtra(models.Model):
+    """
+    Pedido de apertura de agenda fuera del horario habitual de un bloque.
+    Ejemplo: un residente que quiere trabajar un sábado.
+
+    Flujo:
+      Residente/jefe_residentes crea solicitud (PENDIENTE)
+        → jefe_servicio aprueba o rechaza
+          → Si APROBADA: se genera automáticamente una TareaAgendaEGES (HABILITAR)
+          → Si RECHAZADA: cierra sin más acción
+    """
+
+    solicitante = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_agenda_extra',
+        help_text='Usuario que realiza la solicitud'
+    )
+
+    consultorio = models.ForeignKey(
+        Consultorio,
+        on_delete=models.CASCADE,
+        related_name='solicitudes_agenda_extra',
+    )
+
+    # Profesional que va a trabajar ese día extra
+    profesional_interno = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='solicitudes_extra_como_profesional',
+        blank=True,
+        null=True,
+    )
+
+    profesional_externo = models.ForeignKey(
+        ProfesionalExterno,
+        on_delete=models.SET_NULL,
+        related_name='solicitudes_extra_como_profesional',
+        blank=True,
+        null=True,
+    )
+
+    fecha_solicitada = models.DateField(
+        help_text='Fecha en que se solicita la agenda extra'
+    )
+
+    hora_inicio = models.TimeField(
+        help_text='Franja horaria de inicio'
+    )
+
+    hora_fin = models.TimeField(
+        help_text='Franja horaria de fin'
+    )
+
+    tipo_actividad = models.CharField(
+        max_length=20,
+        choices=TipoActividad.choices,
+        default=TipoActividad.ECO_GENERAL,
+    )
+
+    motivo = models.TextField(
+        help_text='Motivo de la solicitud de agenda extra'
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=EstadoSolicitudExtra.choices,
+        default=EstadoSolicitudExtra.PENDIENTE,
+    )
+
+    # Resolución
+    resuelto_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='solicitudes_extra_resueltas',
+        blank=True,
+        null=True,
+        help_text='Jefe que aprobó o rechazó la solicitud'
+    )
+
+    fecha_resolucion = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    observaciones_resolucion = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Motivo de rechazo u observaciones del jefe'
+    )
+
+    # Tarea EGES generada al aprobar (trazabilidad)
+    tarea_eges = models.OneToOneField(
+        TareaAgendaEGES,
+        on_delete=models.SET_NULL,
+        related_name='solicitud_origen',
+        blank=True,
+        null=True,
+        help_text='Tarea EGES generada automáticamente al aprobar'
+    )
+
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Solicitud de Agenda Extra'
+        verbose_name_plural = 'Solicitudes de Agenda Extra'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['estado', 'fecha_solicitada']),
+        ]
+
+    def __str__(self):
+        profesional = self.nombre_profesional()
+        return f"[{self.get_estado_display()}] {profesional} — {self.consultorio.nombre} {self.fecha_solicitada} {self.hora_inicio}-{self.hora_fin}"
+
+    def clean(self):
+        if self.hora_inicio and self.hora_fin and self.hora_inicio >= self.hora_fin:
+            raise ValidationError('La hora de inicio debe ser anterior a la hora de fin.')
+        if self.profesional_interno and self.profesional_externo:
+            raise ValidationError('Especificar un profesional: interno O externo, no ambos.')
+
+    def nombre_profesional(self):
+        if self.profesional_interno:
+            return self.profesional_interno.get_full_name() or self.profesional_interno.username
+        if self.profesional_externo:
+            return self.profesional_externo.nombre_completo()
+        return 'Sin especificar'
+
+    def aprobar(self, jefe):
+        """Aprueba la solicitud y genera la TareaAgendaEGES correspondiente."""
+        if self.estado != EstadoSolicitudExtra.PENDIENTE:
+            raise ValidationError('Solo se pueden aprobar solicitudes en estado PENDIENTE.')
+
+        tarea = TareaAgendaEGES.objects.create(
+            accion=AccionEGES.HABILITAR,
+            origen=OrigenTareaEGES.SOLICITUD_EXTRA,
+            consultorio=self.consultorio,
+            profesional_interno=self.profesional_interno,
+            profesional_externo=self.profesional_externo,
+            fecha_afectada=self.fecha_solicitada,
+            hora_inicio=self.hora_inicio,
+            hora_fin=self.hora_fin,
+            notas=f'Agenda extra aprobada. Motivo: {self.motivo}',
+            creado_por=jefe,
+        )
+
+        self.estado = EstadoSolicitudExtra.APROBADA
+        self.resuelto_por = jefe
+        self.fecha_resolucion = timezone.now()
+        self.tarea_eges = tarea
+        self.save(update_fields=['estado', 'resuelto_por', 'fecha_resolucion', 'tarea_eges'])
+
+    def rechazar(self, jefe, observaciones=''):
+        """Rechaza la solicitud."""
+        if self.estado != EstadoSolicitudExtra.PENDIENTE:
+            raise ValidationError('Solo se pueden rechazar solicitudes en estado PENDIENTE.')
+
+        self.estado = EstadoSolicitudExtra.RECHAZADA
+        self.resuelto_por = jefe
+        self.fecha_resolucion = timezone.now()
+        self.observaciones_resolucion = observaciones
+        self.save(update_fields=['estado', 'resuelto_por', 'fecha_resolucion', 'observaciones_resolucion'])

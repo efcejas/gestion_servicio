@@ -6,11 +6,15 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from .models import (
+    AccionEGES,
     AsignacionEquipoConsultorio,
     AusenciaCobertura,
     BloqueHorario,
     Consultorio,
+    EstadoTareaEGES,
     ProfesionalExterno,
+    SolicitudAgendaExtra,
+    TareaAgendaEGES,
 )
 
 
@@ -390,3 +394,147 @@ class AusenciaCoberturaAdmin(admin.ModelAdmin):
         return obj.nombre_profesional_ausente()
 
     profesional_ausente_display.short_description = 'Ausente'
+
+
+@admin.register(TareaAgendaEGES)
+class TareaAgendaEGESAdmin(admin.ModelAdmin):
+    """Administración de tareas EGES para administrativas."""
+
+    list_display = [
+        'accion_display',
+        'consultorio',
+        'profesional_display',
+        'fecha_afectada',
+        'origen',
+        'estado_display',
+        'creado_por',
+        'fecha_creacion',
+    ]
+    list_filter = ['estado', 'accion', 'origen', 'consultorio', 'fecha_creacion']
+    search_fields = [
+        'consultorio__nombre',
+        'profesional_interno__first_name',
+        'profesional_interno__last_name',
+        'profesional_externo__nombre',
+        'profesional_externo__apellido',
+        'notas',
+    ]
+    readonly_fields = ['fecha_creacion', 'fecha_ejecucion', 'ejecutado_por']
+
+    fieldsets = (
+        ('Tarea', {
+            'fields': ('accion', 'origen', 'consultorio', 'notas')
+        }),
+        ('Profesional', {
+            'fields': ('profesional_interno', 'profesional_externo')
+        }),
+        ('Fecha/Horario', {
+            'fields': ('fecha_afectada', 'fecha_desde', 'fecha_hasta', 'hora_inicio', 'hora_fin')
+        }),
+        ('Estado', {
+            'fields': ('estado',)
+        }),
+        ('Ejecución', {
+            'fields': ('ejecutado_por', 'fecha_ejecucion', 'notas_ejecucion'),
+            'classes': ('collapse',),
+        }),
+        ('Auditoría', {
+            'fields': ('creado_por', 'fecha_creacion'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def accion_display(self, obj):
+        colores = {
+            AccionEGES.HABILITAR: 'green',
+            AccionEGES.DESHABILITAR: 'red',
+            AccionEGES.REASIGNAR: 'orange',
+        }
+        color = colores.get(obj.accion, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.get_accion_display(),
+        )
+
+    accion_display.short_description = 'Acción'
+    accion_display.admin_order_field = 'accion'
+
+    def profesional_display(self, obj):
+        return obj.nombre_profesional()
+
+    profesional_display.short_description = 'Profesional'
+
+    def estado_display(self, obj):
+        colores = {
+            EstadoTareaEGES.PENDIENTE: 'orange',
+            EstadoTareaEGES.EJECUTADO: 'green',
+        }
+        color = colores.get(obj.estado, 'gray')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.get_estado_display(),
+        )
+
+    estado_display.short_description = 'Estado'
+    estado_display.admin_order_field = 'estado'
+
+
+@admin.register(SolicitudAgendaExtra)
+class SolicitudAgendaExtraAdmin(admin.ModelAdmin):
+    """Administración de solicitudes de agenda extra."""
+
+    list_display = [
+        'fecha_solicitada',
+        'consultorio',
+        'profesional_display',
+        'horario_display',
+        'tipo_actividad',
+        'estado',
+        'solicitante',
+        'resuelto_por',
+    ]
+    list_filter = ['estado', 'tipo_actividad', 'consultorio', 'fecha_solicitada']
+    search_fields = [
+        'consultorio__nombre',
+        'profesional_interno__first_name',
+        'profesional_interno__last_name',
+        'profesional_externo__nombre',
+        'profesional_externo__apellido',
+        'motivo',
+    ]
+    readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'fecha_resolucion', 'resuelto_por', 'tarea_eges']
+
+    fieldsets = (
+        ('Solicitud', {
+            'fields': ('solicitante', 'consultorio', 'fecha_solicitada', 'hora_inicio', 'hora_fin', 'tipo_actividad', 'motivo')
+        }),
+        ('Profesional', {
+            'fields': ('profesional_interno', 'profesional_externo')
+        }),
+        ('Resolución', {
+            'fields': ('estado', 'resuelto_por', 'fecha_resolucion', 'observaciones_resolucion', 'tarea_eges'),
+            'classes': ('collapse',),
+        }),
+        ('Metadatos', {
+            'fields': ('fecha_creacion', 'fecha_modificacion'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def profesional_display(self, obj):
+        return obj.nombre_profesional()
+
+    profesional_display.short_description = 'Profesional'
+
+    def horario_display(self, obj):
+        if not obj.hora_inicio or not obj.hora_fin:
+            return '-'
+        return format_html(
+            '<strong>{}</strong> - <strong>{}</strong>',
+            obj.hora_inicio.strftime('%H:%M'),
+            obj.hora_fin.strftime('%H:%M'),
+        )
+
+    horario_display.short_description = 'Horario'

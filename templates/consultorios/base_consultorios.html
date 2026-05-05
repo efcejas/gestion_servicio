@@ -13,7 +13,20 @@
       <p class="text-sm font-semibold text-gray-700">Gestion de consultorios</p>
     </div>
     <div class="px-2">
-      <div class="flex items-center gap-1 h-10 overflow-x-auto scrollbar-hide">
+      <div class="relative">
+        <button id="consultorios-subnav-left"
+                type="button"
+                class="subnav-scroll-btn left-0 hidden"
+                aria-label="Desplazar navegación a la izquierda">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        <div id="consultorios-subnav-edge-left" class="subnav-edge left-0 hidden" aria-hidden="true"></div>
+        <div id="consultorios-subnav-edge-right" class="subnav-edge right-0 hidden" aria-hidden="true"></div>
+
+        <div id="consultorios-subnav-scroll" class="flex items-center gap-1 h-10 overflow-x-auto scrollbar-hide scroll-smooth px-8">
 
       {# Resumen #}
       <a href="{% url 'consultorios:dashboard' %}"
@@ -33,11 +46,10 @@
         Grilla semanal
       </a>
 
-      {# Divisor #}
-      <span class="mx-1 h-5 w-px bg-gray-200 shrink-0"></span>
-
-      {# Ausencias — visible para todos los roles que pueden gestionar #}
+      {# Divisor + Ausencias + Gestión — visible para roles con gestión de bloques #}
       {% if puede_gestionar_bloques %}
+        <span class="mx-1 h-5 w-px bg-gray-200 shrink-0"></span>
+
         <a href="{% url 'consultorios:ausencias_pendientes' %}"
            class="subnav-link {% if request.resolver_match.url_name == 'ausencias_pendientes' %}active{% endif %}">
           <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -55,10 +67,7 @@
            class="subnav-link {% if request.resolver_match.url_name == 'ausencias_historial' %}active{% endif %}">
           Historial
         </a>
-      {% endif %}
 
-      {# Divisor #}
-      {% if puede_gestionar_bloques %}
         <span class="mx-1 h-4 w-px bg-gray-200 shrink-0"></span>
 
         {# Gestión — solo roles administrativos/jefe #}
@@ -78,6 +87,18 @@
           Profesionales
         </a>
 
+        {% with rol=request.user.rol %}
+        {% if request.user.is_superuser or rol == 'jefe_servicio' %}
+        <a href="{% url 'consultorios:agendas_descubiertas' %}"
+           class="subnav-link {% if request.resolver_match.url_name == 'agendas_descubiertas' %}active{% endif %}">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Descubiertas
+        </a>
+        {% endif %}
+        {% endwith %}
+
         <a href="{% url 'consultorios:bloque_crear' %}"
            class="subnav-link {% if request.resolver_match.url_name == 'bloque_crear' or request.resolver_match.url_name == 'bloque_editar' %}active{% endif %}">
           <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -87,6 +108,55 @@
         </a>
       {% endif %}
 
+      {# EGES — visible para administrativo y jefe_servicio #}
+      {% with rol=request.user.rol %}
+      {% if request.user.is_superuser or rol == 'administrativo' or rol == 'jefe_servicio' %}
+        <span class="mx-1 h-4 w-px bg-gray-200 shrink-0"></span>
+
+        <a href="{% url 'consultorios:bandeja_eges' %}"
+           class="subnav-link {% if request.resolver_match.url_name == 'bandeja_eges' %}active{% endif %}">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+          </svg>
+          Bandeja EGES
+          {% if tareas_eges_pendientes %}
+            <span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-cyan-500 rounded-full">
+              {{ tareas_eges_pendientes }}
+            </span>
+          {% endif %}
+        </a>
+
+        <a href="{% url 'consultorios:historial_eges' %}"
+           class="subnav-link {% if request.resolver_match.url_name == 'historial_eges' %}active{% endif %}">
+          Historial EGES
+        </a>
+
+        <a href="{% url 'consultorios:solicitudes_extra_lista' %}"
+           class="subnav-link {% if 'solicitud' in request.resolver_match.url_name %}active{% endif %}">
+          <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Agendas extra
+          {% if solicitudes_extra_pendientes %}
+            <span class="ml-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-violet-500 rounded-full">
+              {{ solicitudes_extra_pendientes }}
+            </span>
+          {% endif %}
+        </a>
+      {% endif %}
+      {% endwith %}
+
+        </div>
+
+        <button id="consultorios-subnav-right"
+                type="button"
+                class="subnav-scroll-btn right-0 hidden"
+                aria-label="Desplazar navegación a la derecha">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 </section>
@@ -119,8 +189,168 @@
     border-bottom-color: #2563eb;
     font-weight: 600;
   }
+  .subnav-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.75rem;
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #e5e7eb;
+    color: #4b5563;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    z-index: 10;
+    transition: all 0.15s ease;
+  }
+  .subnav-scroll-btn:hover {
+    background: #ffffff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+  }
+  .subnav-scroll-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .subnav-edge {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2.25rem;
+    pointer-events: none;
+    z-index: 8;
+  }
+  .subnav-edge.left-0 {
+    background: linear-gradient(to right, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+  }
+  .subnav-edge.right-0 {
+    background: linear-gradient(to left, rgba(255, 255, 255, 1), rgba(255, 255, 255, 0));
+  }
+  .consultorios-form-control[type="date"],
+  .consultorios-form-control[type="time"] {
+    color-scheme: light;
+  }
+  select.consultorios-form-control {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 0.95rem;
+    padding-right: 2.15rem;
+  }
+  select.consultorios-form-control::-ms-expand {
+    display: none;
+  }
+  input.consultorios-form-control[type="time"] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.65rem center;
+    background-size: 1rem;
+    padding-right: 2.15rem;
+  }
+  .consultorios-form-control[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.85;
+    cursor: pointer;
+  }
+  input.consultorios-form-control[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 0.02;
+    cursor: pointer;
+  }
+  @media (max-width: 640px) {
+    .subnav-edge {
+      width: 1.5rem;
+    }
+  }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
+
+<script>
+  (function () {
+    const scroller = document.getElementById('consultorios-subnav-scroll');
+    const leftBtn = document.getElementById('consultorios-subnav-left');
+    const rightBtn = document.getElementById('consultorios-subnav-right');
+    const leftEdge = document.getElementById('consultorios-subnav-edge-left');
+    const rightEdge = document.getElementById('consultorios-subnav-edge-right');
+
+    if (!scroller || !leftBtn || !rightBtn) {
+      return;
+    }
+
+    const step = 260;
+
+    function ensureActiveLinkVisible() {
+      const activeLink = scroller.querySelector('.subnav-link.active');
+      if (!activeLink) {
+        return;
+      }
+
+      const scrollerRect = scroller.getBoundingClientRect();
+      const linkRect = activeLink.getBoundingClientRect();
+      const edgePadding = 42;
+
+      const isOutLeft = linkRect.left < (scrollerRect.left + edgePadding);
+      const isOutRight = linkRect.right > (scrollerRect.right - edgePadding);
+
+      if (isOutLeft || isOutRight) {
+        const targetLeft = activeLink.offsetLeft - (scroller.clientWidth / 2) + (activeLink.clientWidth / 2);
+        scroller.scrollTo({ left: Math.max(0, targetLeft), behavior: 'auto' });
+      }
+    }
+
+    function updateScrollButtons() {
+      const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+      const hasOverflow = maxScroll > 2;
+
+      leftBtn.classList.toggle('hidden', !hasOverflow);
+      rightBtn.classList.toggle('hidden', !hasOverflow);
+
+      if (!hasOverflow) {
+        leftBtn.disabled = true;
+        rightBtn.disabled = true;
+        if (leftEdge) leftEdge.classList.add('hidden');
+        if (rightEdge) rightEdge.classList.add('hidden');
+        return;
+      }
+
+      const atLeft = scroller.scrollLeft <= 1;
+      const atRight = scroller.scrollLeft >= (maxScroll - 1);
+
+      leftBtn.disabled = atLeft;
+      rightBtn.disabled = atRight;
+
+      if (leftEdge) leftEdge.classList.toggle('hidden', atLeft);
+      if (rightEdge) rightEdge.classList.toggle('hidden', atRight);
+    }
+
+    leftBtn.addEventListener('click', function () {
+      scroller.scrollBy({ left: -step, behavior: 'smooth' });
+    });
+
+    rightBtn.addEventListener('click', function () {
+      scroller.scrollBy({ left: step, behavior: 'smooth' });
+    });
+
+    scroller.addEventListener('wheel', function (event) {
+      if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+        scroller.scrollLeft += event.deltaY;
+        event.preventDefault();
+      }
+    }, { passive: false });
+
+    scroller.addEventListener('scroll', updateScrollButtons);
+    window.addEventListener('resize', updateScrollButtons);
+
+    requestAnimationFrame(function () {
+      ensureActiveLinkVisible();
+      updateScrollButtons();
+    });
+  })();
+</script>
 
 {% endblock %}

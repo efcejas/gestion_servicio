@@ -6,7 +6,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from .models import BloqueHorario, MotivoAusencia, Consultorio, ProfesionalExterno
+from .models import BloqueHorario, MotivoAusencia, Consultorio, ProfesionalExterno, SolicitudAgendaExtra, TipoActividad
 from .utils import ConflictDetector
 
 User = get_user_model()
@@ -46,12 +46,20 @@ class BloqueHorarioForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        base_class = 'w-full rounded border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
+        base_class = (
+            'consultorios-form-control w-full rounded border border-gray-300 '
+            'bg-white text-gray-900 px-3 py-2 focus:border-blue-500 '
+            'focus:outline-none focus:ring-1 focus:ring-blue-500'
+        )
         for field_name, field in self.fields.items():
             if isinstance(field.widget, forms.CheckboxInput):
                 field.widget.attrs.setdefault('class', 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500')
             else:
                 field.widget.attrs.setdefault('class', base_class)
+                if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                    style = field.widget.attrs.get('style', '')
+                    if 'color-scheme' not in style:
+                        field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
 
         self.fields['profesional_interno'].queryset = User.objects.filter(
             is_active=True,
@@ -100,7 +108,7 @@ class AusenciaCoberturaForm(forms.Form):
     """
 
     _input_class = (
-        'w-full rounded border border-gray-300 px-3 py-2 '
+        'consultorios-form-control w-full rounded border border-gray-300 bg-white text-gray-900 px-3 py-2 '
         'focus:border-orange-500 focus:outline-none focus:ring-1 focus:ring-orange-500'
     )
 
@@ -132,6 +140,10 @@ class AusenciaCoberturaForm(forms.Form):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.setdefault('class', self._input_class)
+            if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                style = field.widget.attrs.get('style', '')
+                if 'color-scheme' not in style:
+                    field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
 
     def clean(self):
         cleaned_data = super().clean()
@@ -147,7 +159,7 @@ class AusenciaCoberturaForm(forms.Form):
 # ---------------------------------------------------------------------------
 
 _FIELD_CLASS = (
-    'w-full rounded border border-gray-300 px-3 py-2 text-sm '
+    'consultorios-form-control w-full rounded border border-gray-300 bg-white text-gray-900 px-3 py-2 text-sm '
     'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500'
 )
 _CHECKBOX_CLASS = 'h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'
@@ -170,6 +182,14 @@ class ConsultorioForm(forms.ModelForm):
                 field.widget.attrs.setdefault('class', _CHECKBOX_CLASS)
             else:
                 field.widget.attrs.setdefault('class', _FIELD_CLASS)
+                if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                    style = field.widget.attrs.get('style', '')
+                    if 'color-scheme' not in style:
+                        field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
+                if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                    style = field.widget.attrs.get('style', '')
+                    if 'color-scheme' not in style:
+                        field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
 
 
 class ProfesionalExternoForm(forms.ModelForm):
@@ -192,3 +212,60 @@ class ProfesionalExternoForm(forms.ModelForm):
                 field.widget.attrs.setdefault('class', _CHECKBOX_CLASS)
             else:
                 field.widget.attrs.setdefault('class', _FIELD_CLASS)
+                if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                    style = field.widget.attrs.get('style', '')
+                    if 'color-scheme' not in style:
+                        field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
+
+
+class SolicitudAgendaExtraForm(forms.ModelForm):
+    """Formulario para solicitar una agenda extra fuera del horario habitual."""
+
+    class Meta:
+        model = SolicitudAgendaExtra
+        fields = [
+            'consultorio',
+            'profesional_interno',
+            'profesional_externo',
+            'fecha_solicitada',
+            'hora_inicio',
+            'hora_fin',
+            'tipo_actividad',
+            'motivo',
+        ]
+        widgets = {
+            'fecha_solicitada': forms.DateInput(attrs={'type': 'date'}),
+            'hora_inicio': forms.TimeInput(attrs={'type': 'time'}),
+            'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
+            'motivo': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
+        self.fields['consultorio'].queryset = Consultorio.objects.activos()
+        self.fields['profesional_externo'].queryset = ProfesionalExterno.objects.activos()
+        self.fields['profesional_externo'].required = False
+        self.fields['profesional_interno'].required = False
+
+        for name, field in self.fields.items():
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs.setdefault('class', _CHECKBOX_CLASS)
+            else:
+                field.widget.attrs.setdefault('class', _FIELD_CLASS)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        interno = cleaned_data.get('profesional_interno')
+        externo = cleaned_data.get('profesional_externo')
+
+        if interno and externo:
+            raise ValidationError('Especificar un profesional: interno O externo, no ambos.')
+
+        hora_inicio = cleaned_data.get('hora_inicio')
+        hora_fin = cleaned_data.get('hora_fin')
+        if hora_inicio and hora_fin and hora_inicio >= hora_fin:
+            raise ValidationError({'hora_fin': 'La hora de fin debe ser posterior a la hora de inicio.'})
+
+        return cleaned_data

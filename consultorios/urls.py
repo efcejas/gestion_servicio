@@ -41,4 +41,17 @@ urlpatterns = [
     path('profesionales/', views.profesionales_lista, name='profesionales_lista'),
     path('profesionales/nuevo/', views.ProfesionalExternoCreateView.as_view(), name='profesional_nuevo'),
     path('profesionales/<int:pk>/editar/', views.ProfesionalExternoUpdateView.as_view(), name='profesional_editar'),
+
+    # Bandeja EGES (administrativas)
+    path('eges/bandeja/', views.bandeja_eges, name='bandeja_eges'),
+    path('eges/<int:pk>/ejecutada/', views.marcar_tarea_ejecutada, name='tarea_eges_ejecutada'),
+    path('eges/historial/', views.historial_eges, name='historial_eges'),
+
+    # Solicitudes de agenda extra
+    path('solicitudes-extra/', views.solicitudes_extra_lista, name='solicitudes_extra_lista'),
+    path('solicitudes-extra/nueva/', views.solicitud_extra_nueva, name='solicitud_extra_nueva'),
+    path('solicitudes-extra/<int:pk>/resolver/', views.resolver_solicitud_extra, name='solicitud_extra_resolver'),
+
+    # Agendas descubiertas
+    path('agendas-descubiertas/', views.agendas_descubiertas, name='agendas_descubiertas'),
 ]

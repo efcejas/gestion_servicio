@@ -1,0 +1,84 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Historial EGES{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-gray-600 to-gray-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Historial EGES</h1>
+        <p class="mt-1 text-gray-300">{{ total }} tarea{{ total|pluralize }} ejecutada{{ total|pluralize }}</p>
+      </div>
+      <a href="{% url 'consultorios:bandeja_eges' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition">
+        <i class="fa-solid fa-list-check"></i> Ir a bandeja
+      </a>
+    </div>
+  </div>
+
+  {% if not tareas %}
+    <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-12 text-center">
+      <i class="fa-solid fa-inbox text-5xl text-gray-300 mb-4"></i>
+      <p class="text-lg text-gray-500">Sin tareas ejecutadas aún.</p>
+    </div>
+  {% else %}
+    <div class="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Acción</th>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Consultorio</th>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Profesional</th>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Fecha</th>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Ejecutado por</th>
+            <th class="text-left px-4 py-3 text-gray-600 font-medium">Notas</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for tarea in tareas %}
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-3">
+                {% if tarea.accion == 'HABILITAR' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                    <i class="fa-solid fa-circle-plus"></i> {{ tarea.get_accion_display }}
+                  </span>
+                {% elif tarea.accion == 'DESHABILITAR' %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                    <i class="fa-solid fa-circle-xmark"></i> {{ tarea.get_accion_display }}
+                  </span>
+                {% else %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
+                    <i class="fa-solid fa-arrows-rotate"></i> {{ tarea.get_accion_display }}
+                  </span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-gray-800 font-medium">{{ tarea.consultorio.nombre }}</td>
+              <td class="px-4 py-3 text-gray-600">{{ tarea.nombre_profesional }}</td>
+              <td class="px-4 py-3 text-gray-500">
+                {% if tarea.fecha_afectada %}
+                  {{ tarea.fecha_afectada|date:"d/m/Y" }}
+                {% elif tarea.fecha_desde %}
+                  {{ tarea.fecha_desde|date:"d/m/Y" }} → {{ tarea.fecha_hasta|date:"d/m/Y"|default:"—" }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-gray-500">
+                {% if tarea.ejecutado_por %}
+                  {{ tarea.ejecutado_por.get_full_name|default:tarea.ejecutado_por.username }}<br>
+                  <span class="text-xs text-gray-400">{{ tarea.fecha_ejecucion|date:"d/m/Y H:i" }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">
+                {{ tarea.notas_ejecucion|default:"—" }}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Bandeja EGES{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-cyan-600 to-cyan-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold"><i class="fa-solid fa-list-check mr-2"></i>Bandeja EGES</h1>
+        <p class="mt-1 text-cyan-100">
+          {% if total_pendientes %}
+            {{ total_pendientes }} tarea{{ total_pendientes|pluralize }} pendiente{{ total_pendientes|pluralize }} de ejecución
+          {% else %}
+            Sin tareas pendientes — todo al día
+          {% endif %}
+        </p>
+      </div>
+      <div class="text-right">
+        <a href="{% url 'consultorios:historial_eges' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition">
+          <i class="fa-solid fa-clock-rotate-left"></i> Ver historial
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% if not tareas %}
+    <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-12 text-center">
+      <i class="fa-solid fa-circle-check text-5xl text-green-400 mb-4"></i>
+      <p class="text-xl font-semibold text-gray-700">Sin tareas pendientes</p>
+      <p class="text-gray-400 mt-1">Todas las agendas están actualizadas en EGES.</p>
+    </div>
+  {% else %}
+    <div class="space-y-3">
+      {% for tarea in tareas %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+          <div class="flex items-start justify-between gap-4">
+
+            <!-- Ícono de acción -->
+            <div class="flex-shrink-0 mt-1">
+              {% if tarea.accion == 'HABILITAR' %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-green-100 text-green-600">
+                  <i class="fa-solid fa-circle-plus text-lg"></i>
+                </span>
+              {% elif tarea.accion == 'DESHABILITAR' %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600">
+                  <i class="fa-solid fa-circle-xmark text-lg"></i>
+                </span>
+              {% else %}
+                <span class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-100 text-orange-600">
+                  <i class="fa-solid fa-arrows-rotate text-lg"></i>
+                </span>
+              {% endif %}
+            </div>
+
+            <!-- Detalle -->
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span class="font-semibold text-gray-800">{{ tarea.get_accion_display }}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{{ tarea.get_origen_display }}</span>
+              </div>
+
+              <p class="text-gray-700 text-sm">
+                <i class="fa-solid fa-door-open mr-1 text-gray-400"></i>
+                <strong>{{ tarea.consultorio.nombre }}</strong>
+                {% if tarea.hora_inicio and tarea.hora_fin %}
+                  — {{ tarea.hora_inicio|time:"H:i" }} a {{ tarea.hora_fin|time:"H:i" }}
+                {% endif %}
+              </p>
+
+              {% if tarea.profesional_interno or tarea.profesional_externo %}
+                <p class="text-gray-600 text-sm mt-0.5">
+                  <i class="fa-solid fa-user-doctor mr-1 text-gray-400"></i>
+                  {{ tarea.nombre_profesional }}
+                </p>
+              {% endif %}
+
+              {% if tarea.fecha_afectada %}
+                <p class="text-gray-500 text-sm mt-0.5">
+                  <i class="fa-solid fa-calendar-day mr-1 text-gray-400"></i>
+                  Fecha: <strong>{{ tarea.fecha_afectada|date:"d/m/Y" }}</strong>
+                </p>
+              {% elif tarea.fecha_desde %}
+                <p class="text-gray-500 text-sm mt-0.5">
+                  <i class="fa-solid fa-calendar-range mr-1 text-gray-400"></i>
+                  Del {{ tarea.fecha_desde|date:"d/m/Y" }} al {{ tarea.fecha_hasta|date:"d/m/Y"|default:"—" }}
+                </p>
+              {% endif %}
+
+              {% if tarea.notas %}
+                <p class="text-gray-400 text-xs mt-1 italic">{{ tarea.notas }}</p>
+              {% endif %}
+
+              <p class="text-gray-400 text-xs mt-1">
+                Generada {{ tarea.fecha_creacion|date:"d/m/Y H:i" }}
+                {% if tarea.creado_por %} por {{ tarea.creado_por.get_full_name|default:tarea.creado_por.username }}{% endif %}
+              </p>
+            </div>
+
+            <!-- Botón ejecutar -->
+            <div class="flex-shrink-0">
+              <button type="button"
+                      onclick="abrirModalEjecucion({{ tarea.pk }}, '{{ tarea.get_accion_display|escapejs }}')"
+                      class="inline-flex items-center gap-2 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition">
+                <i class="fa-solid fa-check"></i> Marcar ejecutado
+              </button>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Modal confirmación de ejecución -->
+<div id="modalEjecucion"
+     class="fixed inset-0 z-50 hidden bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+    <div class="p-6">
+      <h2 class="text-lg font-bold text-gray-800 mb-1">Confirmar ejecución en EGES</h2>
+      <p class="text-sm text-gray-500 mb-4">Acción: <strong id="modalAccionLabel"></strong></p>
+
+      <form id="formEjecucion" method="post" action="">
+        {% csrf_token %}
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Notas de ejecución <span class="text-gray-400 font-normal">(opcional — ej: N° de agenda creada)</span>
+          </label>
+          <textarea name="notas_ejecucion" rows="3"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    placeholder="Ej: Agenda #1234 habilitada para Dr. García..."></textarea>
+        </div>
+        <div class="flex gap-3 justify-end">
+          <button type="button" onclick="cerrarModalEjecucion()"
+                  class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg">
+            Cancelar
+          </button>
+          <button type="submit"
+                  class="px-4 py-2 text-sm bg-cyan-600 hover:bg-cyan-700 text-white font-medium rounded-lg">
+            Confirmar ejecución
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  function abrirModalEjecucion(pk, accion) {
+    document.getElementById('modalAccionLabel').textContent = accion;
+    document.getElementById('formEjecucion').action = `/consultorios/eges/${pk}/ejecutada/`;
+    document.getElementById('modalEjecucion').classList.remove('hidden');
+  }
+  function cerrarModalEjecucion() {
+    document.getElementById('modalEjecucion').classList.add('hidden');
+  }
+</script>
+{% endblock %}

@@ -127,6 +127,10 @@ def navbar_links(request):
     #                 'dictado_informes:demo_presentacion_ia',
     #                 active_url_names=['demo_presentacion_ia'])
 
+    def i_consultorios():
+        return item('Consultorios', 'fa-door-open',
+                    'consultorios:dashboard', active_ns='consultorios')
+
     groups = []
 
     # ── SUPERUSUARIO ──────────────────────────────────────────────────────────
@@ -158,6 +162,7 @@ def navbar_links(request):
             ),
             group('Gestión', 'fa-cogs',
                 i_pedidos(),
+                i_consultorios(),
             ),
         ] if g]
 
@@ -230,6 +235,7 @@ def navbar_links(request):
             ),
             group('Gestión', 'fa-cogs',
                 i_pedidos(),
+                i_consultorios(),
             ),
         ] if g]
 
@@ -271,6 +277,9 @@ def navbar_links(request):
                      'preinformes:panel_docencia',
                      active_url_names=['panel_docencia']) if es_docencia else None,
             ),
+            group('Gestión', 'fa-cogs',
+                i_consultorios(),
+            ),
         ] if g]
 
     # ── PILOTO DICTADO IA ───────────────────────────────────────────────────
@@ -291,3 +300,39 @@ def navbar_links(request):
         ] if g]
 
     return {'nav_groups': groups}
+
+
+def consultorios_badges(request):
+    """
+    Inyecta en todos los templates el contador de tareas EGES pendientes
+    y solicitudes de agenda extra pendientes de aprobación.
+    Solo activo si el usuario está autenticado y tiene rol relevante.
+    """
+    if not request.user.is_authenticated:
+        return {}
+
+    user = request.user
+    rol = getattr(user, 'rol', None)
+
+    tareas_eges_pendientes = 0
+    solicitudes_extra_pendientes = 0
+
+    try:
+        if user.is_superuser or rol in ('administrativo', 'jefe_servicio'):
+            from consultorios.models import TareaAgendaEGES, EstadoTareaEGES, SolicitudAgendaExtra, EstadoSolicitudExtra
+            tareas_eges_pendientes = TareaAgendaEGES.objects.filter(
+                estado=EstadoTareaEGES.PENDIENTE
+            ).count()
+
+        if user.is_superuser or rol == 'jefe_servicio':
+            from consultorios.models import SolicitudAgendaExtra, EstadoSolicitudExtra
+            solicitudes_extra_pendientes = SolicitudAgendaExtra.objects.filter(
+                estado=EstadoSolicitudExtra.PENDIENTE
+            ).count()
+    except Exception:
+        pass
+
+    return {
+        'tareas_eges_pendientes': tareas_eges_pendientes,
+        'solicitudes_extra_pendientes': solicitudes_extra_pendientes,
+    }

@@ -15,13 +15,20 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth import get_user_model
 
 from .models import (
-    Consultorio,
-    BloqueHorario,
-    ProfesionalExterno,
-    DiaSemana,
-    EstadoBloque,
+    AccionEGES,
     AusenciaCobertura,
+    BloqueHorario,
+    Consultorio,
+    DiaSemana,
     EstadoAusenciaCobertura,
+    EstadoBloque,
+    EstadoSolicitudExtra,
+    EstadoTareaEGES,
+    OrigenTareaEGES,
+    ProfesionalExterno,
+    SolicitudAgendaExtra,
+    TareaAgendaEGES,
+    TipoActividad,
 )
 from .utils import ConflictDetector
 from .forms import BloqueHorarioForm, AusenciaCoberturaForm, ConsultorioForm, ProfesionalExternoForm
@@ -700,4 +707,252 @@ class ProfesionalExternoUpdateView(GestionBloquesMixin, UpdateView):
         ctx['titulo'] = f'Editar — {self.object.nombre_completo()}'
         ctx['boton_accion'] = 'Guardar cambios'
         return ctx
+
+
+# ---------------------------------------------------------------------------
+# Bandeja EGES (administrativas)
+# ---------------------------------------------------------------------------
+
+def _es_administrativo(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return getattr(user, 'rol', None) in {'administrativo', 'jefe_servicio'}
+
+
+def _es_jefe_servicio(user):
+    if not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    return getattr(user, 'rol', None) == 'jefe_servicio'
+
+
+@login_required
+def bandeja_eges(request):
+    """
+    Bandeja de TareaAgendaEGES pendientes para la administrativa.
+    Muestra las tareas PENDIENTE ordenadas por fecha de creación.
+    """
+    if not _es_administrativo(request.user):
+        raise PermissionDenied
+
+    tareas = (
+        TareaAgendaEGES.objects
+        .filter(estado=EstadoTareaEGES.PENDIENTE)
+        .select_related('consultorio', 'profesional_interno', 'profesional_externo', 'creado_por')
+        .order_by('fecha_creacion')
+    )
+
+    return render(request, 'consultorios/bandeja_eges.html', {
+        'tareas': tareas,
+        'total_pendientes': tareas.count(),
+    })
+
+
+@require_POST
+@login_required
+def marcar_tarea_ejecutada(request, pk):
+    """
+    POST: Marca una TareaAgendaEGES como EJECUTADO.
+    Captura notas opcionales de la administrativa.
+    """
+    if not _es_administrativo(request.user):
+        raise PermissionDenied
+
+    tarea = get_object_or_404(TareaAgendaEGES, pk=pk)
+
+    if tarea.estado != EstadoTareaEGES.PENDIENTE:
+        messages.warning(request, 'Esta tarea ya fue ejecutada anteriormente.')
+        return redirect('consultorios:bandeja_eges')
+
+    notas = request.POST.get('notas_ejecucion', '').strip()
+    tarea.marcar_ejecutada(usuario=request.user, notas=notas)
+
+    messages.success(
+        request,
+        f'Tarea marcada como ejecutada en EGES: {tarea.get_accion_display()} — {tarea.consultorio.nombre}.'
+    )
+    return redirect('consultorios:bandeja_eges')
+
+
+@login_required
+def historial_eges(request):
+    """Historial de tareas EGES ejecutadas, visible para administrativos y jefatura."""
+    if not _es_administrativo(request.user):
+        raise PermissionDenied
+
+    tareas = (
+        TareaAgendaEGES.objects
+        .filter(estado=EstadoTareaEGES.EJECUTADO)
+        .select_related('consultorio', 'profesional_interno', 'profesional_externo', 'ejecutado_por')
+        .order_by('-fecha_ejecucion')
+    )
+
+    return render(request, 'consultorios/historial_eges.html', {
+        'tareas': tareas,
+        'total': tareas.count(),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Solicitudes de agenda extra (jefe_servicio aprueba/rechaza)
+# ---------------------------------------------------------------------------
+
+@login_required
+def solicitudes_extra_lista(request):
+    """
+    Lista de solicitudes de agenda extra.
+    - Jefe de servicio: ve todas.
+    - Otros roles: ve solo las propias.
+    """
+    es_jefe = _es_jefe_servicio(request.user)
+
+    if es_jefe:
+        solicitudes = SolicitudAgendaExtra.objects.select_related(
+            'consultorio', 'profesional_interno', 'profesional_externo',
+            'solicitante', 'resuelto_por', 'tarea_eges',
+        ).order_by('-fecha_creacion')
+    else:
+        solicitudes = SolicitudAgendaExtra.objects.filter(
+            solicitante=request.user
+        ).select_related(
+            'consultorio', 'profesional_interno', 'profesional_externo', 'tarea_eges',
+        ).order_by('-fecha_creacion')
+
+    pendientes = solicitudes.filter(estado=EstadoSolicitudExtra.PENDIENTE)
+
+    return render(request, 'consultorios/solicitudes_extra_lista.html', {
+        'solicitudes': solicitudes,
+        'pendientes': pendientes,
+        'total_pendientes': pendientes.count(),
+        'es_jefe': es_jefe,
+    })
+
+
+@login_required
+def solicitud_extra_nueva(request):
+    """Formulario para crear una nueva solicitud de agenda extra."""
+    from .forms import SolicitudAgendaExtraForm
+
+    form = SolicitudAgendaExtraForm(request.POST or None, user=request.user)
+
+    if request.method == 'POST' and form.is_valid():
+        solicitud = form.save(commit=False)
+        solicitud.solicitante = request.user
+        solicitud.save()
+        messages.success(
+            request,
+            f'Solicitud registrada para el {solicitud.fecha_solicitada}. '
+            'El jefe de servicio recibirá la notificación.'
+        )
+        return redirect('consultorios:solicitudes_extra_lista')
+
+    return render(request, 'consultorios/solicitud_extra_form.html', {
+        'form': form,
+        'titulo': 'Nueva solicitud de agenda extra',
+        'boton_accion': 'Enviar solicitud',
+    })
+
+
+@require_POST
+@login_required
+def resolver_solicitud_extra(request, pk):
+    """
+    POST: Jefe aprueba o rechaza una SolicitudAgendaExtra.
+    action = 'aprobar' | 'rechazar'
+    """
+    if not _es_jefe_servicio(request.user):
+        raise PermissionDenied
+
+    solicitud = get_object_or_404(SolicitudAgendaExtra, pk=pk)
+    accion = request.POST.get('accion', '')
+    observaciones = request.POST.get('observaciones_resolucion', '').strip()
+
+    if accion == 'aprobar':
+        try:
+            solicitud.aprobar(jefe=request.user)
+            messages.success(
+                request,
+                f'Solicitud aprobada. Se generó una tarea EGES para habilitar la agenda del {solicitud.fecha_solicitada}.'
+            )
+        except Exception as exc:
+            messages.error(request, f'No se pudo aprobar: {exc}')
+
+    elif accion == 'rechazar':
+        try:
+            solicitud.rechazar(jefe=request.user, observaciones=observaciones)
+            messages.info(request, 'Solicitud rechazada.')
+        except Exception as exc:
+            messages.error(request, f'No se pudo rechazar: {exc}')
+
+    else:
+        messages.error(request, 'Acción no reconocida.')
+
+    return redirect('consultorios:solicitudes_extra_lista')
+
+
+# ---------------------------------------------------------------------------
+# Agendas descubiertas (jefe de servicio)
+# ---------------------------------------------------------------------------
+
+@login_required
+def agendas_descubiertas(request):
+    """
+    Vista para el jefe: bloques con ausencias sin cobertura confirmada
+    en las próximas N semanas.
+    """
+    from datetime import timedelta
+
+    user = request.user
+    if not (user.is_superuser or getattr(user, 'rol', None) == 'jefe_servicio'):
+        messages.error(request, 'No tienes permisos para ver agendas descubiertas.')
+        return redirect('consultorios:dashboard')
+
+    semanas = int(request.GET.get('semanas', 4))
+    semanas = max(1, min(semanas, 12))
+
+    hoy = timezone.now().date()
+    hasta = hoy + timedelta(weeks=semanas)
+
+    ausencias = (
+        AusenciaCobertura.objects
+        .filter(
+            estado__in=[
+                EstadoAusenciaCobertura.REPORTADA,
+                EstadoAusenciaCobertura.PROPUESTA,
+            ],
+            fecha_ausencia__gte=hoy,
+            fecha_ausencia__lte=hasta,
+        )
+        .select_related(
+            'bloque__consultorio',
+            'bloque__profesional_interno',
+            'bloque__profesional_externo',
+            'profesional_ausente_interno',
+            'profesional_ausente_externo',
+            'residente_sugerido',
+        )
+        .order_by('fecha_ausencia', 'bloque__consultorio__nombre')
+    )
+
+    from collections import defaultdict
+    por_semana = defaultdict(list)
+    for a in ausencias:
+        lunes = a.fecha_ausencia - timedelta(days=a.fecha_ausencia.weekday())
+        por_semana[lunes].append(a)
+
+    semanas_lista = [
+        {'lunes': lunes, 'ausencias': items}
+        for lunes, items in sorted(por_semana.items())
+    ]
+
+    return render(request, 'consultorios/agendas_descubiertas.html', {
+        'semanas_lista': semanas_lista,
+        'total': len(ausencias),
+        'semanas': semanas,
+        'hasta': hasta,
+        'opciones_semanas': [2, 4, 6, 8, 12],
+    })
 
