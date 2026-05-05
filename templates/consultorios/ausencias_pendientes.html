@@ -1,0 +1,94 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Ausencias Pendientes{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-amber-600 to-amber-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">⚠️ Ausencias Pendientes</h1>
+        <p class="mt-1 text-amber-100">
+          {% if total %}{{ total }} ausencia{{ total|pluralize }} sin cobertura confirmada{% else %}Sin ausencias pendientes{% endif %}
+        </p>
+      </div>
+      <a href="{% url 'consultorios:ausencias_historial' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+        <i class="fas fa-history"></i> Historial
+      </a>
+    </div>
+  </div>
+
+  {% if ausencias %}
+    <div class="space-y-3">
+      {% for aus in ausencias %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-4 px-5 py-4">
+
+            {# Estado badge #}
+            <div class="shrink-0">
+              {% if aus.estado == 'REPORTADA' %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Sin propuesta</span>
+              {% else %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Con propuesta</span>
+              {% endif %}
+            </div>
+
+            {# Info principal #}
+            <div class="flex-1 min-w-0">
+              <p class="font-semibold text-gray-800 text-sm">
+                {{ aus.bloque.consultorio.nombre }} —
+                {{ aus.bloque.get_dia_semana_display }}
+                {{ aus.bloque.hora_inicio|time:"H:i" }}–{{ aus.bloque.hora_fin|time:"H:i" }}
+              </p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                <span class="font-medium text-gray-700">Fecha:</span> {{ aus.fecha_ausencia }}
+                {% if aus.fecha_fin_ausencia and aus.fecha_fin_ausencia != aus.fecha_ausencia %}
+                  <span class="text-gray-400">→ {{ aus.fecha_fin_ausencia }}</span>
+                {% endif %}
+                · <span class="font-medium text-gray-700">Ausente:</span> {{ aus.nombre_profesional_ausente }}
+                · <span class="font-medium text-gray-700">Motivo:</span> {{ aus.get_motivo_display }}
+              </p>
+              {% if aus.residente_sugerido %}
+                <p class="text-xs text-blue-600 mt-0.5">
+                  Sugerido: {{ aus.residente_sugerido.get_full_name|default:aus.residente_sugerido.username }}
+                </p>
+              {% endif %}
+            </div>
+
+            {# Acciones #}
+            <div class="flex items-center gap-2 shrink-0">
+              {% if aus.residente_sugerido %}
+                <form method="post"
+                      action="{% url 'consultorios:confirmar_cobertura' aus.pk aus.residente_sugerido.pk %}">
+                  {% csrf_token %}
+                  <button type="submit"
+                          class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition">
+                    Confirmar sugerido
+                  </button>
+                </form>
+              {% endif %}
+              <a href="{% url 'consultorios:reportar_ausencia' aus.bloque.pk %}"
+                 class="px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 text-xs hover:bg-gray-50 transition">
+                Ver bloque
+              </a>
+            </div>
+
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <div class="text-center py-16 bg-white border border-gray-100 rounded-xl">
+      <div class="flex justify-center mb-3">
+        <i class="fas fa-check-circle text-5xl text-green-400"></i>
+      </div>
+      <p class="text-gray-500 font-semibold text-lg">No hay ausencias pendientes</p>
+      <p class="text-sm text-gray-400 mt-1">Todas las ausencias tienen cobertura confirmada o fueron canceladas.</p>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

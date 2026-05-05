@@ -1,0 +1,115 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Historial de Ausencias{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-purple-600 to-purple-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">📋 Historial de Ausencias</h1>
+        <p class="mt-1 text-purple-100">{{ total }} registro{{ total|pluralize }}</p>
+      </div>
+      <a href="{% url 'consultorios:ausencias_pendientes' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+        <i class="fas fa-hourglass-end"></i> Pendientes
+      </a>
+    </div>
+  </div>
+
+  {# ── Filtros ───────────────────────────────────────────────────────── #}
+  <form method="get" class="flex flex-wrap gap-3 mb-6 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+    <div class="flex-1 min-w-36">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>
+      <select name="estado"
+              class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        <option value="">Todos</option>
+        {% for val, label in estados %}
+          <option value="{{ val }}" {% if val == estado_filter %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex-1 min-w-36">
+      <label class="block text-xs font-medium text-gray-600 mb-1">Consultorio</label>
+      <select name="consultorio"
+              class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+        <option value="">Todos</option>
+        {% for c in consultorios %}
+          <option value="{{ c.pk }}" {% if c.pk|stringformat:"s" == consultorio_filter %}selected{% endif %}>{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end">
+      <button type="submit"
+              class="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition">
+        Filtrar
+      </button>
+      {% if estado_filter or consultorio_filter %}
+        <a href="{% url 'consultorios:ausencias_historial' %}"
+           class="ml-2 px-3 py-1.5 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50 transition">
+          Limpiar
+        </a>
+      {% endif %}
+    </div>
+  </form>
+
+  {# ── Tabla ─────────────────────────────────────────────────────────── #}
+  {% if ausencias %}
+    <div class="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Fecha</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Bloque</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Ausente</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Motivo</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Cobertura</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Estado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for aus in ausencias %}
+            <tr class="hover:bg-gray-50/50 transition">
+              <td class="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">
+                {{ aus.fecha_ausencia }}
+              </td>
+              <td class="px-4 py-3 text-gray-600">
+                <p class="font-medium text-gray-800">{{ aus.bloque.consultorio.nombre }}</p>
+                <p class="text-xs text-gray-400">{{ aus.bloque.get_dia_semana_display }} {{ aus.bloque.hora_inicio|time:"H:i" }}–{{ aus.bloque.hora_fin|time:"H:i" }}</p>
+              </td>
+              <td class="px-4 py-3 text-gray-600">{{ aus.nombre_profesional_ausente }}</td>
+              <td class="px-4 py-3 text-gray-500 text-xs">{{ aus.get_motivo_display }}</td>
+              <td class="px-4 py-3 text-gray-600">
+                {% if aus.residente_asignado %}
+                  <span class="text-emerald-700 font-medium">{{ aus.residente_asignado.get_full_name|default:aus.residente_asignado.username }}</span>
+                {% elif aus.residente_sugerido %}
+                  <span class="text-blue-600">{{ aus.residente_sugerido.get_full_name|default:aus.residente_sugerido.username }} (sugerido)</span>
+                {% else %}
+                  <span class="text-gray-400">—</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3">
+                {% if aus.estado == 'CONFIRMADA' %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Confirmada</span>
+                {% elif aus.estado == 'PROPUESTA' %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Propuesta</span>
+                {% elif aus.estado == 'REPORTADA' %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Sin cobertura</span>
+                {% else %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">{{ aus.get_estado_display }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center py-12 text-gray-400 bg-white border border-gray-100 rounded-xl">
+      No hay ausencias que coincidan con los filtros.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

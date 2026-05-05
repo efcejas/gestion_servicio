@@ -68,14 +68,23 @@ class Consultorio(models.Model):
     
     def equipos_asignados(self):
         """Retorna los equipos actualmente asignados al consultorio"""
+        hoy = timezone.now().date()
         return AsignacionEquipoConsultorio.objects.filter(
-            consultorio=self,
-            es_permanente=True
-        ).select_related('equipo') | AsignacionEquipoConsultorio.objects.filter(
-            consultorio=self,
-            fecha_inicio__lte=timezone.now().date(),
-            fecha_fin__gte=timezone.now().date()
-        ).select_related('equipo')
+            consultorio=self
+        ).filter(
+            models.Q(es_permanente=True) |
+            models.Q(
+                fecha_inicio__lte=hoy,
+                fecha_fin__gte=hoy
+            )
+        ).select_related('equipo').distinct()
+
+
+class CategoriaProfesionalExterno(models.TextChoices):
+    """Categorías operativas para profesionales externos"""
+    STAFF_EXTERNO = 'STAFF_EXT', 'Staff Externo'
+    CARDIOLOGO_EXTERNO = 'CARD_EXT', 'Cardiólogo Externo'
+    OTRO_EXTERNO = 'OTRO_EXT', 'Otro Externo'
 
 
 class ProfesionalExterno(models.Model):
@@ -104,6 +113,13 @@ class ProfesionalExterno(models.Model):
         blank=True,
         null=True,
         help_text="Especialidad médica (ej: 'Ecografía', 'Radiología')"
+    )
+
+    categoria = models.CharField(
+        max_length=20,
+        choices=CategoriaProfesionalExterno.choices,
+        default=CategoriaProfesionalExterno.STAFF_EXTERNO,
+        help_text="Clasificación operativa del profesional externo"
     )
     
     telefono = models.CharField(
@@ -252,6 +268,14 @@ class TipoActividad(models.TextChoices):
     OTRO = 'OTRO', 'Otro'
 
 
+class TipoLista(models.TextChoices):
+    """Clasificación operativa de listas de ecografía"""
+    LISTA_STAFF = 'LISTA_STAFF', 'Lista Staff'
+    LISTA_DOCENTE_COMO_STAFF = 'LISTA_DOCENTE', 'Lista Docente como Staff'
+    LISTA_RESIDENTE_POOL = 'LISTA_POOL', 'Lista Residente Pool'
+    LISTA_ESPECIALIZADA = 'LISTA_ESPEC', 'Lista Especializada'
+
+
 class EstadoBloque(models.TextChoices):
     """Estados posibles de un bloque horario"""
     ACTIVO = 'ACTIVO', 'Activo'
@@ -343,6 +367,30 @@ class BloqueHorario(models.Model):
         default=TipoActividad.ECO_GENERAL,
         help_text="Tipo de estudios a realizar en este bloque"
     )
+
+    tipo_lista = models.CharField(
+        max_length=20,
+        choices=TipoLista.choices,
+        default=TipoLista.LISTA_STAFF,
+        help_text="Tipo de lista operativa para este bloque"
+    )
+
+    permite_cobertura_residente = models.BooleanField(
+        default=False,
+        help_text="Indica si este bloque admite cobertura por residentes"
+    )
+
+    prioridad_cobertura = models.PositiveSmallIntegerField(
+        default=3,
+        help_text="Prioridad operativa de cobertura (1=alta, 5=baja)"
+    )
+
+    competencia_requerida = models.CharField(
+        max_length=120,
+        blank=True,
+        null=True,
+        help_text="Competencia requerida para prestaciones especializadas"
+    )
     
     estado = models.CharField(
         max_length=20,
@@ -413,6 +461,17 @@ class BloqueHorario(models.Model):
             raise ValidationError(
                 "La fecha de inicio de vigencia no puede ser posterior a la fecha de fin."
             )
+
+        # Validaciones de clasificación operativa
+        if self.tipo_lista == TipoLista.LISTA_RESIDENTE_POOL and not self.permite_cobertura_residente:
+            raise ValidationError(
+                "Una lista de residente pool debe permitir cobertura por residentes."
+            )
+
+        if self.tipo_lista == TipoLista.LISTA_ESPECIALIZADA and not self.competencia_requerida:
+            raise ValidationError(
+                "Las listas especializadas deben definir una competencia requerida."
+            )
         
         # Validar que el equipo (si se especifica) esté asignado al consultorio
         if self.equipo:
@@ -473,3 +532,219 @@ class BloqueHorario(models.Model):
         fin = datetime.combine(datetime.today(), self.hora_fin)
         duracion = fin - inicio
         return duracion.total_seconds() / 3600
+
+
+class EstadoAusenciaCobertura(models.TextChoices):
+    """Estados operativos de una ausencia con propuesta/cobertura."""
+    REPORTADA = 'REPORTADA', 'Reportada'
+    PROPUESTA = 'PROPUESTA', 'Propuesta'
+    CONFIRMADA = 'CONFIRMADA', 'Confirmada'
+    CANCELADA = 'CANCELADA', 'Cancelada'
+
+
+class MotivoAusencia(models.TextChoices):
+    """Motivo principal informado para la ausencia."""
+    ENFERMEDAD = 'ENFERMEDAD', 'Enfermedad'
+    LICENCIA = 'LICENCIA', 'Licencia'
+    CAPACITACION = 'CAPACITACION', 'Capacitación'
+    PERSONAL = 'PERSONAL', 'Motivo Personal'
+    OTRO = 'OTRO', 'Otro'
+
+
+class AusenciaCobertura(models.Model):
+    """
+    Registra una ausencia de un bloque y su circuito de cobertura.
+
+    Flujo esperado:
+      - REPORTADA: se informa la ausencia
+      - PROPUESTA: el sistema sugiere un residente
+      - CONFIRMADA: cobertura asignada y aceptada
+      - CANCELADA: se desestima el evento
+    """
+
+    bloque = models.ForeignKey(
+        BloqueHorario,
+        on_delete=models.CASCADE,
+        related_name='ausencias_cobertura',
+        help_text='Bloque afectado por la ausencia'
+    )
+
+    fecha_ausencia = models.DateField(
+        help_text='Fecha de inicio de la ausencia (o única fecha si es un día)'
+    )
+
+    fecha_fin_ausencia = models.DateField(
+        blank=True,
+        null=True,
+        help_text=(
+            'Fecha de fin de la ausencia. Vacío = ausencia de un solo día. '
+            'Si se indica, se generan registros por cada ocurrencia del día de semana del bloque dentro del rango.'
+        )
+    )
+
+    profesional_ausente_interno = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='ausencias_como_profesional_interno',
+        blank=True,
+        null=True,
+        help_text='Profesional interno ausente (si aplica)'
+    )
+
+    profesional_ausente_externo = models.ForeignKey(
+        ProfesionalExterno,
+        on_delete=models.SET_NULL,
+        related_name='ausencias_como_profesional_externo',
+        blank=True,
+        null=True,
+        help_text='Profesional externo ausente (si aplica)'
+    )
+
+    motivo = models.CharField(
+        max_length=20,
+        choices=MotivoAusencia.choices,
+        default=MotivoAusencia.OTRO,
+        help_text='Motivo principal de la ausencia'
+    )
+
+    detalle_motivo = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Detalle adicional del motivo'
+    )
+
+    residente_sugerido = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='coberturas_sugeridas_consultorios',
+        blank=True,
+        null=True,
+        help_text='Residente sugerido automáticamente por el sistema'
+    )
+
+    residente_asignado = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='coberturas_asignadas_consultorios',
+        blank=True,
+        null=True,
+        help_text='Residente finalmente asignado para cubrir'
+    )
+
+    estado = models.CharField(
+        max_length=20,
+        choices=EstadoAusenciaCobertura.choices,
+        default=EstadoAusenciaCobertura.REPORTADA,
+        help_text='Estado del circuito de ausencia/cobertura'
+    )
+
+    observaciones = models.TextField(
+        blank=True,
+        null=True,
+        help_text='Notas operativas de la coordinación'
+    )
+
+    reportado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='ausencias_reportadas_consultorios',
+        blank=True,
+        null=True,
+        help_text='Usuario que reporta la ausencia'
+    )
+
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Ausencia y Cobertura'
+        verbose_name_plural = 'Ausencias y Coberturas'
+        ordering = ['-fecha_ausencia', '-fecha_creacion']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['bloque', 'fecha_ausencia'],
+                name='unique_ausencia_por_bloque_y_fecha'
+            )
+        ]
+        indexes = [
+            models.Index(fields=['fecha_ausencia', 'estado']),
+            models.Index(fields=['residente_asignado', 'estado']),
+        ]
+
+    def __str__(self):
+        return f"{self.bloque.consultorio.nombre} - {self.fecha_ausencia} - {self.get_estado_display()}"
+
+    def clean(self):
+        """Validaciones operativas del circuito de ausencias."""
+        # Validar rango de fechas cuando se indica fecha_fin.
+        if self.fecha_fin_ausencia and self.fecha_ausencia:
+            if self.fecha_fin_ausencia < self.fecha_ausencia:
+                raise ValidationError(
+                    {'fecha_fin_ausencia': 'La fecha de fin no puede ser anterior a la fecha de inicio.'}
+                )
+
+        # Debe existir un ausente interno o externo, pero no ambos.
+        if not self.profesional_ausente_interno and not self.profesional_ausente_externo:
+            raise ValidationError(
+                'Debe indicar el profesional ausente (interno o externo).'
+            )
+
+        if self.profesional_ausente_interno and self.profesional_ausente_externo:
+            raise ValidationError(
+                'No puede registrar simultáneamente ausente interno y externo.'
+            )
+
+        # Debe respetar el tipo de profesional del bloque.
+        if self.bloque.profesional_interno_id and not self.profesional_ausente_interno_id:
+            raise ValidationError(
+                'Este bloque corresponde a un profesional interno; debe registrarlo como ausente interno.'
+            )
+
+        if self.bloque.profesional_externo_id and not self.profesional_ausente_externo_id:
+            raise ValidationError(
+                'Este bloque corresponde a un profesional externo; debe registrarlo como ausente externo.'
+            )
+
+        # El profesional ausente debe coincidir con el profesional asignado en el bloque.
+        if self.profesional_ausente_interno and self.bloque.profesional_interno_id:
+            if self.profesional_ausente_interno_id != self.bloque.profesional_interno_id:
+                raise ValidationError(
+                    'El profesional interno ausente no coincide con el asignado en el bloque.'
+                )
+
+        if self.profesional_ausente_externo and self.bloque.profesional_externo_id:
+            if self.profesional_ausente_externo_id != self.bloque.profesional_externo_id:
+                raise ValidationError(
+                    'El profesional externo ausente no coincide con el asignado en el bloque.'
+                )
+
+        # Si el bloque no admite cobertura, no puede registrarse residente sugerido/asignado.
+        if not self.bloque.permite_cobertura_residente:
+            if self.residente_sugerido_id or self.residente_asignado_id:
+                raise ValidationError(
+                    'Este bloque no admite cobertura por residentes.'
+                )
+
+        # El estado CONFIRMADA requiere residente asignado.
+        if self.estado == EstadoAusenciaCobertura.CONFIRMADA and not self.residente_asignado_id:
+            raise ValidationError(
+                'Para confirmar una cobertura debe indicar residente asignado.'
+            )
+
+        # Sugerido/asignado deben tener rol de residente.
+        for campo, usuario in (
+            ('residente_sugerido', self.residente_sugerido),
+            ('residente_asignado', self.residente_asignado),
+        ):
+            if usuario and getattr(usuario, 'rol', None) != 'medico_residente':
+                raise ValidationError(
+                    {campo: 'El usuario debe tener rol medico_residente.'}
+                )
+
+    def nombre_profesional_ausente(self):
+        """Nombre del profesional ausente para UI y auditoría."""
+        if self.profesional_ausente_interno:
+            return self.profesional_ausente_interno.get_full_name() or self.profesional_ausente_interno.username
+        if self.profesional_ausente_externo:
+            return self.profesional_ausente_externo.nombre_completo()
+        return 'Sin profesional'

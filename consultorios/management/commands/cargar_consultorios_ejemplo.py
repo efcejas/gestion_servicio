@@ -1,359 +1,550 @@
 # -*- coding: utf-8 -*-
 """
-Comando de Django para cargar datos de ejemplo en el sistema de consultorios.
+Comando para cargar datos de ejemplo del modulo consultorios.
 
-Ejecutar:
+Escenarios cubiertos:
+- Staff interno con usuario
+- Staff externo sin usuario
+- Cardiologos como externos
+- Jefes/Instructores operando como staff
+- Pool de residentes para extras/coberturas
+- Listas especializadas con competencia requerida
+
+Uso:
     python manage.py cargar_consultorios_ejemplo
+    python manage.py cargar_consultorios_ejemplo --reset
 """
 
-from django.core.management.base import BaseCommand
+from datetime import date, time, timedelta
+
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from datetime import time, date, timedelta
+from django.core.management.base import BaseCommand
+from django.db import transaction
 
 from consultorios.models import (
-    Consultorio,
-    ProfesionalExterno,
     AsignacionEquipoConsultorio,
     BloqueHorario,
-    TipoActividad,
+    CategoriaProfesionalExterno,
+    Consultorio,
+    DiaSemana,
     EstadoBloque,
-    DiaSemana
+    ProfesionalExterno,
+    TipoActividad,
+    TipoLista,
 )
-from equipos.models import EquipoImagen, AreaServicio
+from equipos.models import AreaServicio, EquipoImagen
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = 'Carga datos de ejemplo para el sistema de consultorios'
+    help = 'Carga datos de ejemplo para pruebas locales del modulo consultorios'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--reset',
+            action='store_true',
+            help='Elimina primero los datos demo de consultorios y los recrea desde cero.'
+        )
+
+    @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write("\n" + "="*60)
-        self.stdout.write(self.style.SUCCESS("CARGANDO DATOS DE EJEMPLO - SISTEMA DE CONSULTORIOS"))
-        self.stdout.write("="*60 + "\n")
-        
-        # 1. CONSULTORIOS
-        self.stdout.write(self.style.WARNING("\nCreando consultorios..."))
-        
+        self.stdout.write('\n' + '=' * 70)
+        self.stdout.write(self.style.SUCCESS('CARGA DE DATOS DEMO - CONSULTORIOS ECOGRAFIA'))
+        self.stdout.write('=' * 70)
+
+        if options['reset']:
+            self._reset_demo_data()
+
+        usuarios = self._crear_usuarios_demo()
+        consultorios = self._crear_consultorios_demo()
+        equipos = self._crear_equipos_demo()
+        self._asignar_equipos(consultorios, equipos)
+        externos = self._crear_profesionales_externos_demo()
+        self._crear_bloques_demo(consultorios, equipos, externos, usuarios)
+
+        self.stdout.write('\n' + '=' * 70)
+        self.stdout.write(self.style.SUCCESS('RESUMEN FINAL'))
+        self.stdout.write('=' * 70)
+        self.stdout.write(f"Consultorios: {Consultorio.objects.count()}")
+        self.stdout.write(f"Profesionales externos: {ProfesionalExterno.objects.count()}")
+        self.stdout.write(f"Bloques activos: {BloqueHorario.objects.filter(estado=EstadoBloque.ACTIVO).count()}")
+        self.stdout.write(f"Bloques pool residentes: {BloqueHorario.objects.filter(tipo_lista=TipoLista.LISTA_RESIDENTE_POOL).count()}")
+        self.stdout.write(f"Bloques especializados: {BloqueHorario.objects.filter(tipo_lista=TipoLista.LISTA_ESPECIALIZADA).count()}")
+        self.stdout.write(self.style.SUCCESS('\nDatos demo cargados OK.'))
+
+    def _reset_demo_data(self):
+        self.stdout.write(self.style.WARNING('\n--reset activo: limpiando datos demo...'))
+
+        usernames_demo = [
+            'demo_staff_eco_1',
+            'demo_staff_eco_2',
+            'demo_jefe_residentes_eco',
+            'demo_instructor_eco',
+            'demo_residente_r1_eco',
+            'demo_residente_r2_eco',
+            'demo_residente_r3_eco',
+        ]
+
+        matriculas_demo = [
+            'DEMO-EXT-001',
+            'DEMO-EXT-002',
+            'DEMO-CARD-001',
+            'DEMO-CARD-002',
+        ]
+
+        nombres_consultorio_demo = ['Eco 1', 'Eco 2', 'Eco 3', 'Eco Intervencionismo']
+
+        BloqueHorario.objects.filter(consultorio__nombre__in=nombres_consultorio_demo).delete()
+        AsignacionEquipoConsultorio.objects.filter(consultorio__nombre__in=nombres_consultorio_demo).delete()
+        Consultorio.objects.filter(nombre__in=nombres_consultorio_demo).delete()
+        ProfesionalExterno.objects.filter(matricula__in=matriculas_demo).delete()
+        User.objects.filter(username__in=usernames_demo).delete()
+        EquipoImagen.objects.filter(nombre__startswith='Demo Eco ').delete()
+
+        self.stdout.write(self.style.SUCCESS('Datos demo previos eliminados.'))
+
+    def _crear_usuarios_demo(self):
+        self.stdout.write(self.style.WARNING('\nCreando usuarios internos demo...'))
+
+        usuarios_data = [
+            {
+                'username': 'demo_staff_eco_1',
+                'first_name': 'Sofia',
+                'last_name': 'Ledesma',
+                'email': 'demo.staff1@clegiales.local',
+                'rol': 'medico_staff',
+                'cargo': 'Ecografia General',
+            },
+            {
+                'username': 'demo_staff_eco_2',
+                'first_name': 'Martin',
+                'last_name': 'Pereyra',
+                'email': 'demo.staff2@clegiales.local',
+                'rol': 'medico_staff',
+                'cargo': 'Doppler',
+            },
+            {
+                'username': 'demo_jefe_residentes_eco',
+                'first_name': 'Luciano',
+                'last_name': 'Gimenez',
+                'email': 'demo.jefe@clegiales.local',
+                'rol': 'jefe_residentes',
+                'cargo': 'Jefe de Residentes',
+            },
+            {
+                'username': 'demo_instructor_eco',
+                'first_name': 'Paula',
+                'last_name': 'Molina',
+                'email': 'demo.instructor@clegiales.local',
+                'rol': 'instructor_residentes',
+                'cargo': 'Instructora',
+            },
+            {
+                'username': 'demo_residente_r1_eco',
+                'first_name': 'Julian',
+                'last_name': 'Ruiz',
+                'email': 'demo.residente.r1@clegiales.local',
+                'rol': 'medico_residente',
+                'cargo': 'Residente',
+                'fecha_ingreso_residencia': date.today() - timedelta(days=90),
+            },
+            {
+                'username': 'demo_residente_r2_eco',
+                'first_name': 'Valeria',
+                'last_name': 'Costa',
+                'email': 'demo.residente.r2@clegiales.local',
+                'rol': 'medico_residente',
+                'cargo': 'Residente',
+                'fecha_ingreso_residencia': date.today() - timedelta(days=450),
+            },
+            {
+                'username': 'demo_residente_r3_eco',
+                'first_name': 'Tomas',
+                'last_name': 'Navarro',
+                'email': 'demo.residente.r3@clegiales.local',
+                'rol': 'medico_residente',
+                'cargo': 'Residente',
+                'fecha_ingreso_residencia': date.today() - timedelta(days=820),
+            },
+        ]
+
+        usuarios = {}
+        for data in usuarios_data:
+            defaults = {
+                'first_name': data['first_name'],
+                'last_name': data['last_name'],
+                'email': data['email'],
+                'rol': data['rol'],
+                'cargo': data['cargo'],
+                'perfil_completo': True,
+            }
+            if 'fecha_ingreso_residencia' in data:
+                defaults['fecha_ingreso_residencia'] = data['fecha_ingreso_residencia']
+
+            user, created = User.objects.update_or_create(
+                username=data['username'],
+                defaults=defaults,
+            )
+            user.set_password('demo1234')
+            user.save()
+
+            if user.rol == 'medico_residente':
+                user.actualizar_anio_residencia()
+
+            usuarios[data['username']] = user
+            estado = 'Creado' if created else 'Actualizado'
+            self.stdout.write(f"  {estado}: {user.username} ({user.rol})")
+
+        return usuarios
+
+    def _crear_consultorios_demo(self):
+        self.stdout.write(self.style.WARNING('\nCreando consultorios demo...'))
+
         consultorios_data = [
+            {'nombre': 'Eco 1', 'ubicacion': 'Piso 2, Ala Norte', 'capacidad_pacientes_hora': 4, 'esta_activo': True},
+            {'nombre': 'Eco 2', 'ubicacion': 'Piso 2, Ala Norte', 'capacidad_pacientes_hora': 4, 'esta_activo': True},
+            {'nombre': 'Eco 3', 'ubicacion': 'Piso 1, Ala Sur', 'capacidad_pacientes_hora': 3, 'esta_activo': True},
             {
-                'nombre': 'Eco 1',
-                'ubicacion': 'Piso 2, Ala Norte',
-                'capacidad_pacientes_hora': 4,
-                'esta_activo': True,
-            },
-            {
-                'nombre': 'Eco 2',
-                'ubicacion': 'Piso 2, Ala Norte',
-                'capacidad_pacientes_hora': 4,
-                'esta_activo': True,
-            },
-            {
-                'nombre': 'Eco 3',
-                'ubicacion': 'Piso 1, Ala Sur',
-                'capacidad_pacientes_hora': 3,
-                'esta_activo': True,
-            },
-            {
-                'nombre': 'Eco VIP',
-                'ubicacion': 'Piso 3',
+                'nombre': 'Eco Intervencionismo',
+                'ubicacion': 'Piso 1, Quirófano Ambulatorio',
                 'capacidad_pacientes_hora': 2,
                 'esta_activo': True,
-                'observaciones': 'Consultorio premium para pacientes VIP'
+                'observaciones': 'Consultorio para punciones, elastografia y procedimientos especiales.',
             },
         ]
-        
+
         consultorios = {}
         for data in consultorios_data:
-            consultorio, created = Consultorio.objects.get_or_create(
+            consultorio, created = Consultorio.objects.update_or_create(
                 nombre=data['nombre'],
-                defaults=data
+                defaults=data,
             )
             consultorios[data['nombre']] = consultorio
-            status = "Creado" if created else "Ya existia"
-            self.stdout.write(f"  {status}: {consultorio.nombre}")
-        
-        # 2. EQUIPOS DE ECOGRAFIA
-        self.stdout.write(self.style.WARNING("\nCreando equipos de ecografia..."))
-        
+            estado = 'Creado' if created else 'Actualizado'
+            self.stdout.write(f"  {estado}: {consultorio.nombre}")
+
+        return consultorios
+
+    def _crear_equipos_demo(self):
+        self.stdout.write(self.style.WARNING('\nCreando equipos de ecografia demo...'))
+
         equipos_data = [
-            {
-                'nombre': 'Ecografo GE Voluson E10',
-                'area': AreaServicio.ECOGRAFIA,
-                'fabricante': 'GE Healthcare',
-                'modelo': 'Voluson E10',
-                'ubicacion': 'Eco 1',
-                'en_servicio': True,
-            },
-            {
-                'nombre': 'Ecografo Philips EPIQ 7',
-                'area': AreaServicio.ECOGRAFIA,
-                'fabricante': 'Philips',
-                'modelo': 'EPIQ 7',
-                'ubicacion': 'Eco 2',
-                'en_servicio': True,
-            },
-            {
-                'nombre': 'Ecografo Samsung HS70A',
-                'area': AreaServicio.ECOGRAFIA,
-                'fabricante': 'Samsung',
-                'modelo': 'HS70A',
-                'ubicacion': 'Eco 3',
-                'en_servicio': True,
-            },
-            {
-                'nombre': 'Ecografo GE Logiq E9',
-                'area': AreaServicio.ECOGRAFIA,
-                'fabricante': 'GE Healthcare',
-                'modelo': 'Logiq E9',
-                'ubicacion': 'Eco VIP',
-                'en_servicio': True,
-            },
+            {'nombre': 'Demo Eco GE Voluson E10', 'area': AreaServicio.ECOGRAFIA, 'fabricante': 'GE', 'modelo': 'Voluson E10', 'en_servicio': True},
+            {'nombre': 'Demo Eco Philips EPIQ 7', 'area': AreaServicio.ECOGRAFIA, 'fabricante': 'Philips', 'modelo': 'EPIQ 7', 'en_servicio': True},
+            {'nombre': 'Demo Eco Samsung HS70A', 'area': AreaServicio.ECOGRAFIA, 'fabricante': 'Samsung', 'modelo': 'HS70A', 'en_servicio': True},
+            {'nombre': 'Demo Eco Mindray Resona', 'area': AreaServicio.ECOGRAFIA, 'fabricante': 'Mindray', 'modelo': 'Resona I9', 'en_servicio': True},
         ]
-        
+
         equipos = {}
         for data in equipos_data:
-            equipo, created = EquipoImagen.objects.get_or_create(
+            equipo, created = EquipoImagen.objects.update_or_create(
                 nombre=data['nombre'],
-                defaults=data
+                defaults=data,
             )
             equipos[data['nombre']] = equipo
-            status = "Creado" if created else "Ya existia"
-            self.stdout.write(f"  {status}: {equipo.nombre}")
-        
-        # 3. ASIGNACIONES EQUIPO-CONSULTORIO
-        self.stdout.write(self.style.WARNING("\nAsignando equipos a consultorios..."))
-        
-        asignaciones_data = [
-            {
-                'consultorio': consultorios['Eco 1'],
-                'equipo': equipos['Ecografo GE Voluson E10'],
-                'es_permanente': True,
-            },
-            {
-                'consultorio': consultorios['Eco 2'],
-                'equipo': equipos['Ecografo Philips EPIQ 7'],
-                'es_permanente': True,
-            },
-            {
-                'consultorio': consultorios['Eco 3'],
-                'equipo': equipos['Ecografo Samsung HS70A'],
-                'es_permanente': True,
-            },
-            {
-                'consultorio': consultorios['Eco VIP'],
-                'equipo': equipos['Ecografo GE Logiq E9'],
-                'es_permanente': True,
-            },
+            estado = 'Creado' if created else 'Actualizado'
+            self.stdout.write(f"  {estado}: {equipo.nombre}")
+
+        return equipos
+
+    def _asignar_equipos(self, consultorios, equipos):
+        self.stdout.write(self.style.WARNING('\nAsignando equipos a consultorios...'))
+
+        asignaciones = [
+            ('Eco 1', 'Demo Eco GE Voluson E10'),
+            ('Eco 2', 'Demo Eco Philips EPIQ 7'),
+            ('Eco 3', 'Demo Eco Samsung HS70A'),
+            ('Eco Intervencionismo', 'Demo Eco Mindray Resona'),
         ]
-        
-        for data in asignaciones_data:
-            asignacion, created = AsignacionEquipoConsultorio.objects.get_or_create(
-                consultorio=data['consultorio'],
-                equipo=data['equipo'],
-                defaults=data
+
+        for nombre_consultorio, nombre_equipo in asignaciones:
+            asig, created = AsignacionEquipoConsultorio.objects.update_or_create(
+                consultorio=consultorios[nombre_consultorio],
+                equipo=equipos[nombre_equipo],
+                defaults={
+                    'es_permanente': True,
+                    'fecha_inicio': date.today(),
+                },
             )
-            status = "Asignado" if created else "Ya asignado"
-            self.stdout.write(f"  {status}: {asignacion.equipo.nombre} -> {asignacion.consultorio.nombre}")
-        
-        # 4. PROFESIONALES EXTERNOS
-        self.stdout.write(self.style.WARNING("\nCreando profesionales externos..."))
-        
-        profesionales_externos_data = [
+            estado = 'Asignado' if created else 'Actualizado'
+            self.stdout.write(f"  {estado}: {asig.equipo.nombre} -> {asig.consultorio.nombre}")
+
+    def _crear_profesionales_externos_demo(self):
+        self.stdout.write(self.style.WARNING('\nCreando profesionales externos demo...'))
+
+        externos_data = [
             {
-                'nombre': 'Maria',
-                'apellido': 'Gonzalez',
-                'matricula': 'MN-98765',
+                'matricula': 'DEMO-EXT-001',
+                'nombre': 'Mariana',
+                'apellido': 'Quiroga',
                 'especialidad': 'Ecografia General',
-                'telefono': '+54 11 4567-8901',
-                'email': 'mgonzalez@ejemplo.com',
-                'esta_activo': True,
+                'categoria': CategoriaProfesionalExterno.STAFF_EXTERNO,
             },
             {
-                'nombre': 'Roberto',
-                'apellido': 'Fernandez',
-                'matricula': 'MN-87654',
+                'matricula': 'DEMO-EXT-002',
+                'nombre': 'Fernando',
+                'apellido': 'Ramos',
                 'especialidad': 'Ecografia Doppler',
-                'telefono': '+54 11 4567-8902',
-                'email': 'rfernandez@ejemplo.com',
-                'esta_activo': True,
+                'categoria': CategoriaProfesionalExterno.STAFF_EXTERNO,
             },
             {
-                'nombre': 'Laura',
-                'apellido': 'Martinez',
-                'matricula': 'MN-76543',
-                'especialidad': 'Ecografia Obstetrica',
-                'telefono': '+54 11 4567-8903',
-                'email': 'lmartinez@ejemplo.com',
-                'esta_activo': True,
+                'matricula': 'DEMO-CARD-001',
+                'nombre': 'Agustin',
+                'apellido': 'Vega',
+                'especialidad': 'Cardiologia',
+                'categoria': CategoriaProfesionalExterno.CARDIOLOGO_EXTERNO,
             },
             {
-                'nombre': 'Diego',
-                'apellido': 'Rodriguez',
-                'matricula': 'MN-65432',
-                'especialidad': 'Ecografia Musculoesqueletica',
-                'telefono': '+54 11 4567-8904',
-                'email': 'drodriguez@ejemplo.com',
-                'esta_activo': True,
+                'matricula': 'DEMO-CARD-002',
+                'nombre': 'Noelia',
+                'apellido': 'Sanchez',
+                'especialidad': 'Cardiologia',
+                'categoria': CategoriaProfesionalExterno.CARDIOLOGO_EXTERNO,
             },
         ]
-        
-        profesionales_externos = {}
-        for data in profesionales_externos_data:
-            profesional, created = ProfesionalExterno.objects.get_or_create(
+
+        externos = {}
+        for data in externos_data:
+            profesional, created = ProfesionalExterno.objects.update_or_create(
                 matricula=data['matricula'],
-                defaults=data
+                defaults={
+                    'nombre': data['nombre'],
+                    'apellido': data['apellido'],
+                    'especialidad': data['especialidad'],
+                    'categoria': data['categoria'],
+                    'esta_activo': True,
+                },
             )
-            profesionales_externos[data['matricula']] = profesional
-            status = "Creado" if created else "Ya existia"
-            self.stdout.write(f"  {status}: Dr./Dra. {profesional.apellido}, {profesional.nombre}")
-        
-        # 5. USUARIOS INTERNOS
-        self.stdout.write(self.style.WARNING("\nVerificando usuarios internos (medicos staff)..."))
-        
-        medicos_internos = User.objects.filter(rol='medico_staff')[:2]
-        
-        if medicos_internos.exists():
-            self.stdout.write(f"  Encontrados {medicos_internos.count()} medicos staff")
-            for medico in medicos_internos:
-                self.stdout.write(f"    - {medico.get_full_name() or medico.username}")
+            externos[data['matricula']] = profesional
+            estado = 'Creado' if created else 'Actualizado'
+            self.stdout.write(f"  {estado}: {profesional.apellido}, {profesional.nombre} ({profesional.get_categoria_display()})")
+
+        return externos
+
+    def _crear_o_actualizar_bloque(self, unique_filter, payload):
+        bloque = BloqueHorario.objects.filter(**unique_filter).first()
+        created = bloque is None
+        if created:
+            bloque = BloqueHorario(**payload)
         else:
-            self.stdout.write("  No se encontraron medicos staff, creando usuario de ejemplo...")
-            medico_ejemplo = User.objects.create_user(
-                username='medico_ejemplo',
-                email='medico@ejemplo.com',
-                first_name='Carlos',
-                last_name='Lopez',
-                rol='medico_staff'
-            )
-            medico_ejemplo.set_password('ejemplo123')
-            medico_ejemplo.save()
-            medicos_internos = [medico_ejemplo]
-            self.stdout.write(f"  Creado: Dr. {medico_ejemplo.last_name}, {medico_ejemplo.first_name}")
-        
-        # 6. BLOQUES HORARIOS
-        self.stdout.write(self.style.WARNING("\nCreando bloques horarios..."))
-        
-        bloques_externos = [
+            for key, value in payload.items():
+                setattr(bloque, key, value)
+        bloque.full_clean()
+        bloque.save()
+        return bloque, created
+
+    def _crear_bloques_demo(self, consultorios, equipos, externos, usuarios):
+        self.stdout.write(self.style.WARNING('\nCreando bloques de ejemplo por escenario real...'))
+
+        escenarios = [
+            # Staff externo tradicional
             {
-                'consultorio': consultorios['Eco 1'],
-                'profesional_externo': profesionales_externos['MN-98765'],
-                'equipo': equipos['Ecografo GE Voluson E10'],
-                'dia_semana': DiaSemana.LUNES,
-                'hora_inicio': time(8, 0),
-                'hora_fin': time(12, 0),
-                'tipo_actividad': TipoActividad.ECO_GENERAL,
-                'estado': EstadoBloque.ACTIVO,
-            },
-            {
-                'consultorio': consultorios['Eco 2'],
-                'profesional_externo': profesionales_externos['MN-87654'],
-                'equipo': equipos['Ecografo Philips EPIQ 7'],
-                'dia_semana': DiaSemana.MARTES,
-                'hora_inicio': time(14, 0),
-                'hora_fin': time(18, 0),
-                'tipo_actividad': TipoActividad.ECO_DOPPLER,
-                'estado': EstadoBloque.ACTIVO,
-            },
-            {
-                'consultorio': consultorios['Eco 3'],
-                'profesional_externo': profesionales_externos['MN-76543'],
-                'equipo': equipos['Ecografo Samsung HS70A'],
-                'dia_semana': DiaSemana.MIERCOLES,
-                'hora_inicio': time(9, 0),
-                'hora_fin': time(13, 0),
-                'tipo_actividad': TipoActividad.ECO_OBSTETRICA,
-                'estado': EstadoBloque.ACTIVO,
-            },
-            {
-                'consultorio': consultorios['Eco 1'],
-                'profesional_externo': profesionales_externos['MN-65432'],
-                'equipo': equipos['Ecografo GE Voluson E10'],
-                'dia_semana': DiaSemana.JUEVES,
-                'hora_inicio': time(15, 0),
-                'hora_fin': time(19, 0),
-                'tipo_actividad': TipoActividad.ECO_MUSCULOESQUELETICA,
-                'estado': EstadoBloque.ACTIVO,
-            },
-            {
-                'consultorio': consultorios['Eco VIP'],
-                'profesional_externo': profesionales_externos['MN-98765'],
-                'equipo': equipos['Ecografo GE Logiq E9'],
-                'dia_semana': DiaSemana.VIERNES,
-                'hora_inicio': time(10, 0),
-                'hora_fin': time(14, 0),
-                'tipo_actividad': TipoActividad.ECO_GENERAL,
-                'estado': EstadoBloque.ACTIVO,
-            },
-        ]
-        
-        for data in bloques_externos:
-            existe = BloqueHorario.objects.filter(
-                consultorio=data['consultorio'],
-                profesional_externo=data['profesional_externo'],
-                dia_semana=data['dia_semana'],
-                hora_inicio=data['hora_inicio']
-            ).exists()
-            
-            if not existe:
-                bloque = BloqueHorario.objects.create(**data)
-                prof = bloque.profesional_externo
-                self.stdout.write(f"  Creado: {bloque.consultorio.nombre} - Dr./Dra. {prof.apellido} - {bloque.get_dia_semana_display()} {bloque.hora_inicio}-{bloque.hora_fin}")
-            else:
-                self.stdout.write(f"  Ya existe: {data['consultorio'].nombre} - {data['dia_semana']} {data['hora_inicio']}")
-        
-        # Bloques con profesionales internos
-        if medicos_internos:
-            bloques_internos = [
-                {
-                    'consultorio': consultorios['Eco 2'],
-                    'profesional_interno': medicos_internos[0],
-                    'equipo': equipos['Ecografo Philips EPIQ 7'],
+                'unique': {
+                    'consultorio': consultorios['Eco 1'],
+                    'profesional_externo': externos['DEMO-EXT-001'],
+                    'dia_semana': DiaSemana.LUNES,
+                    'hora_inicio': time(8, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 1'],
+                    'profesional_externo': externos['DEMO-EXT-001'],
+                    'profesional_interno': None,
+                    'equipo': equipos['Demo Eco GE Voluson E10'],
                     'dia_semana': DiaSemana.LUNES,
                     'hora_inicio': time(8, 0),
                     'hora_fin': time(12, 0),
-                    'tipo_actividad': TipoActividad.ECO_GENERAL,
+                    'fecha_inicio_vigencia': date.today() - timedelta(days=30),
                     'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_GENERAL,
+                    'tipo_lista': TipoLista.LISTA_STAFF,
+                    'permite_cobertura_residente': False,
+                    'prioridad_cobertura': 3,
+                    'competencia_requerida': None,
                 },
-                {
+            },
+            # Staff interno
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_staff_eco_1'],
+                    'dia_semana': DiaSemana.MARTES,
+                    'hora_inicio': time(8, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_staff_eco_1'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Philips EPIQ 7'],
+                    'dia_semana': DiaSemana.MARTES,
+                    'hora_inicio': time(8, 0),
+                    'hora_fin': time(12, 0),
+                    'fecha_inicio_vigencia': date.today() - timedelta(days=15),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_DOPPLER,
+                    'tipo_lista': TipoLista.LISTA_STAFF,
+                    'permite_cobertura_residente': False,
+                    'prioridad_cobertura': 3,
+                    'competencia_requerida': None,
+                },
+            },
+            # Jefe/instructor como staff
+            {
+                'unique': {
                     'consultorio': consultorios['Eco 3'],
-                    'profesional_interno': medicos_internos[0] if len(medicos_internos) == 1 else medicos_internos[1],
-                    'equipo': equipos['Ecografo Samsung HS70A'],
+                    'profesional_interno': usuarios['demo_jefe_residentes_eco'],
+                    'dia_semana': DiaSemana.MIERCOLES,
+                    'hora_inicio': time(13, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 3'],
+                    'profesional_interno': usuarios['demo_jefe_residentes_eco'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Samsung HS70A'],
+                    'dia_semana': DiaSemana.MIERCOLES,
+                    'hora_inicio': time(13, 0),
+                    'hora_fin': time(17, 0),
+                    'fecha_inicio_vigencia': date.today(),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_GENERAL,
+                    'tipo_lista': TipoLista.LISTA_DOCENTE_COMO_STAFF,
+                    'permite_cobertura_residente': False,
+                    'prioridad_cobertura': 2,
+                    'competencia_requerida': None,
+                },
+            },
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco 3'],
+                    'profesional_interno': usuarios['demo_instructor_eco'],
+                    'dia_semana': DiaSemana.JUEVES,
+                    'hora_inicio': time(8, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 3'],
+                    'profesional_interno': usuarios['demo_instructor_eco'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Samsung HS70A'],
+                    'dia_semana': DiaSemana.JUEVES,
+                    'hora_inicio': time(8, 0),
+                    'hora_fin': time(12, 0),
+                    'fecha_inicio_vigencia': date.today(),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_PEDIATRICA,
+                    'tipo_lista': TipoLista.LISTA_DOCENTE_COMO_STAFF,
+                    'permite_cobertura_residente': True,
+                    'prioridad_cobertura': 2,
+                    'competencia_requerida': None,
+                },
+            },
+            # Cardiologos como externos
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco 1'],
+                    'profesional_externo': externos['DEMO-CARD-001'],
                     'dia_semana': DiaSemana.VIERNES,
+                    'hora_inicio': time(9, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 1'],
+                    'profesional_externo': externos['DEMO-CARD-001'],
+                    'profesional_interno': None,
+                    'equipo': equipos['Demo Eco GE Voluson E10'],
+                    'dia_semana': DiaSemana.VIERNES,
+                    'hora_inicio': time(9, 0),
+                    'hora_fin': time(12, 0),
+                    'fecha_inicio_vigencia': date.today() - timedelta(days=10),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_DOPPLER,
+                    'tipo_lista': TipoLista.LISTA_STAFF,
+                    'permite_cobertura_residente': False,
+                    'prioridad_cobertura': 3,
+                    'competencia_requerida': None,
+                },
+            },
+            # Pool residentes (extras/coberturas)
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_residente_r1_eco'],
+                    'dia_semana': DiaSemana.SABADO,
+                    'hora_inicio': time(8, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_residente_r1_eco'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Philips EPIQ 7'],
+                    'dia_semana': DiaSemana.SABADO,
+                    'hora_inicio': time(8, 0),
+                    'hora_fin': time(12, 0),
+                    'fecha_inicio_vigencia': date.today(),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_GENERAL,
+                    'tipo_lista': TipoLista.LISTA_RESIDENTE_POOL,
+                    'permite_cobertura_residente': True,
+                    'prioridad_cobertura': 1,
+                    'competencia_requerida': None,
+                },
+            },
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_residente_r2_eco'],
+                    'dia_semana': DiaSemana.DOMINGO,
+                    'hora_inicio': time(8, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco 2'],
+                    'profesional_interno': usuarios['demo_residente_r2_eco'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Philips EPIQ 7'],
+                    'dia_semana': DiaSemana.DOMINGO,
+                    'hora_inicio': time(8, 0),
+                    'hora_fin': time(12, 0),
+                    'fecha_inicio_vigencia': date.today(),
+                    'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.ECO_GENERAL,
+                    'tipo_lista': TipoLista.LISTA_RESIDENTE_POOL,
+                    'permite_cobertura_residente': True,
+                    'prioridad_cobertura': 1,
+                    'competencia_requerida': None,
+                },
+            },
+            # Lista especializada
+            {
+                'unique': {
+                    'consultorio': consultorios['Eco Intervencionismo'],
+                    'profesional_interno': usuarios['demo_staff_eco_2'],
+                    'dia_semana': DiaSemana.LUNES,
+                    'hora_inicio': time(14, 0),
+                },
+                'payload': {
+                    'consultorio': consultorios['Eco Intervencionismo'],
+                    'profesional_interno': usuarios['demo_staff_eco_2'],
+                    'profesional_externo': None,
+                    'equipo': equipos['Demo Eco Mindray Resona'],
+                    'dia_semana': DiaSemana.LUNES,
                     'hora_inicio': time(14, 0),
                     'hora_fin': time(18, 0),
-                    'tipo_actividad': TipoActividad.ECO_DOPPLER,
+                    'fecha_inicio_vigencia': date.today() - timedelta(days=5),
                     'estado': EstadoBloque.ACTIVO,
+                    'tipo_actividad': TipoActividad.INTERVENCIONISMO,
+                    'tipo_lista': TipoLista.LISTA_ESPECIALIZADA,
+                    'permite_cobertura_residente': False,
+                    'prioridad_cobertura': 1,
+                    'competencia_requerida': 'Puncion mamaria y elastografia',
                 },
-            ]
-            
-            for data in bloques_internos:
-                existe = BloqueHorario.objects.filter(
-                    consultorio=data['consultorio'],
-                    profesional_interno=data['profesional_interno'],
-                    dia_semana=data['dia_semana'],
-                    hora_inicio=data['hora_inicio']
-                ).exists()
-                
-                if not existe:
-                    bloque = BloqueHorario.objects.create(**data)
-                    prof = bloque.profesional_interno
-                    self.stdout.write(f"  Creado: {bloque.consultorio.nombre} - {prof.get_full_name()} - {bloque.get_dia_semana_display()} {bloque.hora_inicio}-{bloque.hora_fin}")
-                else:
-                    self.stdout.write(f"  Ya existe: {data['consultorio'].nombre} - {data['dia_semana']} {data['hora_inicio']}")
-        
-        # RESUMEN FINAL
-        self.stdout.write("\n" + "="*60)
-        self.stdout.write(self.style.SUCCESS("RESUMEN DE DATOS CARGADOS"))
-        self.stdout.write("="*60)
-        self.stdout.write(f"  Consultorios: {Consultorio.objects.count()}")
-        self.stdout.write(f"  Equipos de Ecografia: {EquipoImagen.objects.filter(area=AreaServicio.ECOGRAFIA).count()}")
-        self.stdout.write(f"  Asignaciones Equipo-Consultorio: {AsignacionEquipoConsultorio.objects.count()}")
-        self.stdout.write(f"  Profesionales Externos: {ProfesionalExterno.objects.count()}")
-        self.stdout.write(f"  Bloques Horarios Activos: {BloqueHorario.objects.filter(estado=EstadoBloque.ACTIVO).count()}")
-        self.stdout.write(f"  Total Bloques Horarios: {BloqueHorario.objects.count()}")
-        self.stdout.write("="*60)
-        self.stdout.write(self.style.SUCCESS("\nDatos de ejemplo cargados exitosamente!"))
-        self.stdout.write("\nAccede al admin en: http://localhost:8000/admin/")
-        self.stdout.write("Navega a: Consultorios -> [Consultorios | Profesionales Externos | Bloques Horarios]\n")
+            },
+        ]
+
+        for escenario in escenarios:
+            payload = escenario['payload'].copy()
+            if 'creado_por' not in payload:
+                payload['creado_por'] = usuarios['demo_jefe_residentes_eco']
+            bloque, created = self._crear_o_actualizar_bloque(escenario['unique'], payload)
+            estado = 'Creado' if created else 'Actualizado'
+            self.stdout.write(
+                f"  {estado}: {bloque.get_dia_semana_display()} {bloque.hora_inicio.strftime('%H:%M')} "
+                f"- {bloque.consultorio.nombre} - {bloque.get_tipo_lista_display()}"
+            )

@@ -15,3 +15,5 @@ Documentos de uso frecuente para correr, desplegar, configurar y mantener el sis
 - [DEPLOY_ACTUALIZACION_SEGURIDAD.md](DEPLOY_ACTUALIZACION_SEGURIDAD.md) - Runbook de actualizacion de seguridad en Heroku.
 - [AUDITORIA_USO_LIQUIDACION.md](AUDITORIA_USO_LIQUIDACION.md) - Checklist para validar uso real y poda segura del modulo de liquidacion.
 - [COMANDO_IMPORTAR_ESTUDIOS.md](COMANDO_IMPORTAR_ESTUDIOS.md) - Referencia operativa del comando importar_estudios_eges.
+- [COPILOT_PLAYBOOK_COLEGIALES.md](COPILOT_PLAYBOOK_COLEGIALES.md) - Guia para configurar y usar Copilot con enfoque clinico-operativo en este repo.
+- [COPILOT_MEMORIA_ESTABLE.md](COPILOT_MEMORIA_ESTABLE.md) - Estrategia de continuidad y guardado de contexto entre sesiones.

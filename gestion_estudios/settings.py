@@ -144,6 +144,7 @@ TEMPLATES = [
                 'dictado_informes.context_processors.terminos_activos',
                 'gestion_estudios.context_processors.sanatorio_config',
                 'accounts.context_processors.navbar_links',
+                'consultorios.context_processors.consultorios_context',
             ],
         },
     },

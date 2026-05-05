@@ -1,0 +1,80 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Profesionales Externos{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <!-- Header -->
+  <div class="mb-6 bg-gradient-to-r from-pink-600 to-pink-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">👨‍⚕️ Profesionales Externos</h1>
+        <p class="mt-1 text-pink-100">{{ total }} profesional{{ total|pluralize }} activo{{ total|pluralize }}</p>
+      </div>
+      {% if puede_gestionar %}
+      <a href="{% url 'consultorios:profesional_nuevo' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
+        <i class="fas fa-user-plus"></i> Agregar profesional
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Filtro activos #}
+  <div class="mb-4 flex gap-3">
+    <a href="?activos=1"
+       class="px-3 py-1.5 rounded-lg border text-sm {% if solo_activos %}bg-blue-600 text-white border-blue-600{% else %}border-gray-300 text-gray-600 hover:bg-gray-50{% endif %} transition">
+      Solo activos
+    </a>
+    <a href="?activos=0"
+       class="px-3 py-1.5 rounded-lg border text-sm {% if not solo_activos %}bg-blue-600 text-white border-blue-600{% else %}border-gray-300 text-gray-600 hover:bg-gray-50{% endif %} transition">
+      Todos
+    </a>
+  </div>
+
+  {% if profesionales %}
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nombre</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Especialidad</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Matrícula</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Categoría</th>
+            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Estado</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for p in profesionales %}
+            <tr class="hover:bg-gray-50/50 transition">
+              <td class="px-4 py-3 font-medium text-gray-800">{{ p.apellido }}, {{ p.nombre }}</td>
+              <td class="px-4 py-3 text-gray-600">{{ p.especialidad|default:"—" }}</td>
+              <td class="px-4 py-3 text-gray-500 text-xs">{{ p.matricula|default:"—" }}</td>
+              <td class="px-4 py-3 text-gray-500 text-xs">{{ p.get_categoria_display|default:"—" }}</td>
+              <td class="px-4 py-3">
+                {% if p.esta_activo %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Activo</span>
+                {% else %}
+                  <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">Inactivo</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                {% if puede_gestionar %}
+                <a href="{% url 'consultorios:profesional_editar' p.pk %}"
+                   class="text-xs text-blue-600 hover:underline">Editar</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="text-center py-12 text-gray-400 bg-white border border-gray-200 rounded-xl">
+      No hay profesionales externos registrados.
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

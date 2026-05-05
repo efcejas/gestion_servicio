@@ -1,120 +1,102 @@
-{% extends 'layouts/base_tailwind.html' %}
+{% extends 'consultorios/base_consultorios.html' %}
 {% load static %}
 
-{% block title %}Consultorios{% endblock %}
+{% block modulo_title %}Consultorios{% endblock %}
 
-{% block content %}
-<div class="container mx-auto px-4 py-0">
-    
+{% block modulo_content %}
+<div>
     <!-- Header -->
-    <div class="mb-6 bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-8 text-white">
+    <div class="mb-6 bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold mb-2">
-                    📋 Consultorios
-                </h1>
-                <p class="text-blue-100">
-                    {{ consultorios_activos }} consultorios activos de {{ total_consultorios }} totales
-                </p>
+                <h1 class="text-3xl font-bold">🏥 Consultorios</h1>
+                <p class="mt-1 text-blue-100">{{ consultorios_activos }} activos de {{ total_consultorios }} totales</p>
             </div>
-            <a href="{% url 'consultorios:dashboard' %}" 
-               class="px-4 py-2 bg-white text-blue-700 rounded-lg hover:bg-gray-100 transition">
-                ← Volver al Dashboard
-            </a>
+            {% if puede_gestionar_bloques %}
+            <div class="flex items-center gap-2">
+                <a href="{% url 'consultorios:consultorio_nuevo' %}"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
+                    <i class="fas fa-plus"></i> Nuevo consultorio
+                </a>
+                <a href="{% url 'consultorios:bloque_crear' %}"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+                    <i class="fas fa-calendar-plus"></i> Nuevo bloque
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
-     
-    <!-- Lista de consultorios -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for consultorio in consultorios %}
-            <div class="bg-white rounded-lg shadow hover:shadow-lg transition">
-                <!-- Header del card -->
-                <div class="p-6 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-blue-100 rounded-t-lg">
-                    <div class="flex items-start justify-between mb-3">
-                        <h2 class="text-xl font-semibold text-gray-900">
-                            {{ consultorio.nombre }}
-                        </h2>
+            <article class="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
+                <header class="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-cyan-50">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-start gap-3 flex-1">
+                            <div class="p-2 bg-blue-100 rounded-lg text-blue-600 mt-0.5">
+                                <i class="fas fa-hospital"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-900">{{ consultorio.nombre }}</h2>
+                                {% if consultorio.ubicacion %}
+                                    <p class="text-xs text-gray-500 mt-0.5">📍 {{ consultorio.ubicacion }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
                         {% if consultorio.esta_activo %}
-                            <span class="px-2 py-1 text-xs font-semibold text-white bg-green-600 rounded-full shadow-sm">
-                                Activo
-                            </span>
+                            <span class="px-2 py-0.5 text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full whitespace-nowrap">Activo</span>
                         {% else %}
-                            <span class="px-2 py-1 text-xs font-semibold text-white bg-gray-500 rounded-full shadow-sm">
-                                Inactivo
-                            </span>
+                            <span class="px-2 py-0.5 text-xs font-semibold text-gray-600 bg-gray-100 rounded-full whitespace-nowrap">Inactivo</span>
                         {% endif %}
                     </div>
-                    
-                    {% if consultorio.ubicacion %}
-                        <p class="text-sm text-gray-600">
-                            📍 {{ consultorio.ubicacion }}
-                        </p>
-                    {% endif %}
-                </div>
+                </header>
 
-                <!-- Estadísticas -->
-                <div class="p-6">
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-blue-600">
-                                {{ consultorio.total_bloques }}
-                            </div>
-                            <div class="text-xs text-gray-500">
-                                Bloques activos
-                            </div>
+                <div class="p-5">
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <div class="rounded-lg border border-gray-200 p-3 text-center">
+                            <p class="text-xl font-semibold text-gray-900">{{ consultorio.total_bloques }}</p>
+                            <p class="text-xs text-gray-500">bloques activos</p>
                         </div>
-                        <div class="text-center">
-                            <div class="text-2xl font-bold text-green-600">
-                                {{ consultorio.total_equipos }}
-                            </div>
-                            <div class="text-xs text-gray-500">
-                                Equipos
-                            </div>
+                        <div class="rounded-lg border border-gray-200 p-3 text-center">
+                            <p class="text-xl font-semibold text-gray-900">{{ consultorio.total_equipos }}</p>
+                            <p class="text-xs text-gray-500">equipos</p>
                         </div>
                     </div>
 
-                    <div class="mb-4">
-                        <div class="text-sm text-gray-600 mb-1">
-                            Capacidad
-                        </div>
-                        <div class="text-lg font-semibold text-gray-900">
-                            {{ consultorio.capacidad_pacientes_hora }} pacientes/hora
-                        </div>
-                    </div>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Capacidad: <span class="font-medium text-gray-800">{{ consultorio.capacidad_pacientes_hora }} pacientes/hora</span>
+                    </p>
 
-                    <!-- Botón de ver detalle -->
-                    <a href="{% url 'consultorios:detalle' consultorio.pk %}" 
-                       class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                        Ver Disponibilidad →
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <a href="{% url 'consultorios:detalle' consultorio.pk %}"
+                           class="flex-1 text-center px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
+                            Ver detalle
+                        </a>
+                        {% if puede_gestionar_bloques %}
+                            <a href="{% url 'consultorios:consultorio_editar' consultorio.pk %}"
+                               class="px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition">
+                                Editar
+                            </a>
+                        {% endif %}
+                    </div>
                 </div>
-            </div>
+            </article>
         {% empty %}
-            <div class="col-span-full text-center py-12">
-                <p class="text-gray-500 text-lg mb-4">
-                    No hay consultorios activos
-                </p>
-                {% if user.is_superuser %}
-                <a href="{% url 'admin:consultorios_consultorio_add' %}" 
-                   class="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                    Crear Consultorio
+            <div class="col-span-full text-center py-12 bg-white border border-gray-200 rounded-xl">
+                <p class="text-gray-500 text-lg mb-4">No hay consultorios activos.</p>
+                {% if puede_gestionar_bloques %}
+                <a href="{% url 'consultorios:consultorio_nuevo' %}"
+                   class="inline-block px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Crear consultorio
                 </a>
                 {% endif %}
             </div>
         {% endfor %}
     </div>
 
-    <!-- Resumen de bloques activos -->
     {% if total_bloques_activos > 0 %}
-        <div class="mt-8 p-6 bg-blue-100 border-l-4 border-blue-500 rounded-lg">
-            <div class="text-center">
-                <div class="text-4xl font-bold text-blue-600 mb-2">
-                    {{ total_bloques_activos }}
-                </div>
-                <div class="text-gray-700">
-                    Bloques horarios activos en total
-                </div>
-            </div>
+        <div class="mt-6 p-4 bg-white border border-blue-200 rounded-xl text-center">
+            <p class="text-2xl font-semibold text-blue-700">{{ total_bloques_activos }}</p>
+            <p class="text-sm text-gray-600">Bloques horarios activos en total</p>
         </div>
     {% endif %}
 

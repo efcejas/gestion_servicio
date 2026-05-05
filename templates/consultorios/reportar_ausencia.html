@@ -1,0 +1,265 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Reportar Ausencia — {{ bloque.consultorio.nombre }}{% endblock %}
+
+{% block modulo_content %}
+<div>
+
+  <div class="mb-6 bg-gradient-to-r from-amber-600 to-amber-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold">📝 Reportar ausencia</h1>
+        <p class="mt-1 text-amber-100">{{ bloque.consultorio.nombre }} · {{ bloque.get_dia_semana_display }} {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'consultorios:detalle' bloque.consultorio.pk %}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+          <i class="fas fa-hospital"></i> Consultorio
+        </a>
+        <a href="{% url 'consultorios:grilla_semanal' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+          <i class="fas fa-arrow-left"></i> Grilla
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {# ── Info del bloque ────────────────────────────────────────────────── #}
+  <div class="bg-white border border-gray-100 rounded-xl px-5 py-4 mb-6 shadow-sm">
+    <div class="flex items-start gap-3">
+      <div class="mt-0.5 flex-shrink-0">
+        <i class="fas fa-user-md text-amber-500"></i>
+      </div>
+      <div>
+        <p class="font-semibold text-gray-800">{{ bloque.consultorio.nombre }}</p>
+        <p class="text-sm text-gray-600 mt-0.5">
+          {{ bloque.get_dia_semana_display }} · {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}
+        </p>
+        <p class="text-sm text-gray-700 mt-1">
+          Profesional: <span class="font-medium">{{ bloque.nombre_profesional }}</span>
+        </p>
+        {% if bloque.permite_cobertura_residente %}
+          <span class="inline-block mt-1.5 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+            Admite cobertura por residente
+          </span>
+        {% else %}
+          <span class="inline-block mt-1.5 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">
+            Sin cobertura residente
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Mensajes Django ────────────────────────────────────────────────── #}
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="mb-4 px-4 py-3 rounded-lg
+                  {% if msg.tags == 'success' %}bg-green-50 border border-green-200 text-green-800
+                  {% else %}bg-red-50 border border-red-200 text-red-800{% endif %}">
+        {{ msg }}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if ausencia %}
+    {# ── ÉXITO: ausencia creada ─────────────────────────────────────── #}
+    <div class="bg-green-50 border border-green-200 rounded-xl px-5 py-4 mb-6">
+      <p class="font-semibold text-green-800">Ausencia registrada</p>
+      <p class="text-sm text-green-700 mt-0.5">
+        Fecha: <span class="font-medium">{{ ausencia.fecha_ausencia }}</span>
+        {% if ausencia.fecha_fin_ausencia %}
+          → <span class="font-medium">{{ ausencia.fecha_fin_ausencia }}</span>
+        {% endif %}
+        · Motivo: <span class="font-medium">{{ ausencia.get_motivo_display }}</span>
+        · Estado: <span class="font-medium">{{ ausencia.get_estado_display }}</span>
+      </p>
+    </div>
+
+    {% if error_cobertura %}
+      <div class="bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-3 mb-6 text-sm text-yellow-800">
+        {{ error_cobertura }}
+      </div>
+    {% endif %}
+
+    {% if advertencias %}
+      <div class="bg-yellow-50 border border-yellow-300 rounded-xl px-4 py-3 mb-6 text-sm text-yellow-800 space-y-1">
+        {% for adv in advertencias %}<p>⚠ {{ adv }}</p>{% endfor %}
+      </div>
+    {% endif %}
+
+    {% if candidatos %}
+      <h2 class="text-base font-semibold text-gray-800 mb-3">Candidatos sugeridos para cobertura</h2>
+      <div class="space-y-3">
+        {% for c in candidatos %}
+          <div class="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+            <div>
+              <p class="font-medium text-gray-800">{{ c.nombre }}</p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                Año {{ c.anio_residencia }} · {{ c.coberturas_previas_dia }} cobertura{{ c.coberturas_previas_dia|pluralize }} prev. ese día
+              </p>
+              <p class="text-xs text-blue-600 mt-0.5">{{ c.justificacion }}</p>
+            </div>
+            <form method="post"
+                  action="{% url 'consultorios:confirmar_cobertura' ausencia.pk c.usuario.pk %}">
+              {% csrf_token %}
+              <button type="submit"
+                      class="ml-4 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition whitespace-nowrap">
+                Confirmar
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 text-xs text-gray-400 text-center">
+        Los candidatos se ordenan por menor carga de coberturas previas en el mismo día de semana.
+      </div>
+
+    {% elif not error_cobertura %}
+      {# Bloque no admite cobertura o sin candidatos #}
+      <div class="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 text-sm text-gray-600 text-center">
+        Este bloque no requiere propuesta de cobertura por residente.
+      </div>
+    {% endif %}
+
+    <div class="mt-6 flex gap-3">
+      <a href="{% url 'consultorios:grilla_semanal' %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition">
+        <i class="fas fa-calendar-week"></i>
+        Volver a la grilla
+      </a>
+      <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm hover:bg-gray-50 transition">
+        <i class="fas fa-redo"></i>
+        Reportar otra fecha
+      </a>
+    </div>
+
+  {% else %}
+    {# ── FORMULARIO ─────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="lg:col-span-2">
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm">
+          <div class="px-6 py-4 border-b border-gray-100">
+            <h1 class="text-lg font-semibold text-gray-900">Reportar ausencia</h1>
+            <p class="text-sm text-gray-500 mt-0.5">
+              Completá la fecha y el motivo. El profesional ausente se infiere del bloque automáticamente.
+            </p>
+          </div>
+
+          <form method="post" class="px-6 py-5 space-y-5">
+            {% csrf_token %}
+
+            {# Errores no-field #}
+            {% if form.non_field_errors %}
+              <div class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+              </div>
+            {% endif %}
+
+            {# fecha_ausencia #}
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.fecha_ausencia.label }}
+              </label>
+              {{ form.fecha_ausencia }}
+              {% if form.fecha_ausencia.help_text %}
+                <p class="mt-1 text-xs text-gray-400">{{ form.fecha_ausencia.help_text }}</p>
+              {% endif %}
+              {% if form.fecha_ausencia.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ form.fecha_ausencia.errors.0 }}</p>
+              {% endif %}
+            </div>
+
+            {# fecha_fin_ausencia #}
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.fecha_fin_ausencia.label }}
+              </label>
+              {{ form.fecha_fin_ausencia }}
+              {% if form.fecha_fin_ausencia.help_text %}
+                <p class="mt-1 text-xs text-gray-400">{{ form.fecha_fin_ausencia.help_text }}</p>
+              {% endif %}
+              {% if form.fecha_fin_ausencia.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ form.fecha_fin_ausencia.errors.0 }}</p>
+              {% endif %}
+            </div>
+
+            {# motivo #}
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.motivo.label }}
+              </label>
+              {{ form.motivo }}
+              {% if form.motivo.errors %}
+                <p class="mt-1 text-xs text-red-600">{{ form.motivo.errors.0 }}</p>
+              {% endif %}
+            </div>
+
+            {# detalle_motivo #}
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.detalle_motivo.label }}
+              </label>
+              {{ form.detalle_motivo }}
+            </div>
+
+            <div class="pt-2 flex gap-3">
+              <button type="submit"
+                      class="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-amber-600 text-white font-medium text-sm hover:bg-amber-700 transition">
+                <i class="fas fa-save"></i>
+                Registrar ausencia
+              </button>
+              <a href="{% url 'consultorios:grilla_semanal' %}"
+                 class="px-5 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm hover:bg-gray-50 transition">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+
+        {# Ausencia ya existente: aviso informativo #}
+        {% if ausencia_existente %}
+          <div class="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            <p class="font-medium">Ya hay una ausencia registrada para esa fecha.</p>
+            <p class="mt-0.5">Estado: {{ ausencia_existente.get_estado_display }} · Reportada el {{ ausencia_existente.fecha_creacion|date:"d/m/Y" }}</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="space-y-4">
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm">
+          <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+            <i class="fas fa-info-circle text-blue-500"></i>
+            <h3 class="text-sm font-semibold text-gray-800">Ayuda rápida</h3>
+          </div>
+          <div class="p-5 space-y-4 text-sm text-gray-600">
+            <div class="flex gap-3">
+              <i class="fas fa-calendar-day text-amber-400 mt-0.5 shrink-0"></i>
+              <p><span class="font-semibold text-gray-700">Fecha:</span> si informás solo el inicio, se registra una ausencia de un día.</p>
+            </div>
+            <div class="flex gap-3">
+              <i class="fas fa-calendar-alt text-violet-400 mt-0.5 shrink-0"></i>
+              <p><span class="font-semibold text-gray-700">Fecha fin:</span> permite crear una ausencia por rango (ej. vacaciones o licencia).</p>
+            </div>
+            <div class="flex gap-3">
+              <i class="fas fa-user-check text-emerald-400 mt-0.5 shrink-0"></i>
+              <p><span class="font-semibold text-gray-700">Cobertura:</span> si el bloque lo permite, el sistema sugerirá residentes para confirmar.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-800">
+          <div class="flex gap-2 items-start">
+            <i class="fas fa-exclamation-triangle text-amber-500 mt-0.5 shrink-0"></i>
+            <p>Al confirmar un residente, la ausencia pasa a estado confirmada y sale de pendientes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  {% endif %}
+
+</div>
+{% endblock %}
