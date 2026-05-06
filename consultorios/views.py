@@ -4,6 +4,7 @@ Vistas para la app consultorios.
 """
 
 import hashlib
+from datetime import time
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
@@ -107,6 +108,27 @@ def _estilos_profesional(key_profesional):
     digest = hashlib.sha256(key_profesional.encode('utf-8')).hexdigest()
     indice = int(digest[:8], 16) % len(_PALETA_COLORES_PROFESIONAL)
     return _PALETA_COLORES_PROFESIONAL[indice]
+
+
+def _calcular_franjas_libres(bloques, inicio_jornada=time(8, 0), fin_jornada=time(20, 0)):
+    """Calcula huecos libres en la jornada [08:00, 20:00] para una celda de grilla."""
+    if not bloques:
+        return [(inicio_jornada, fin_jornada)]
+
+    bloques_ordenados = sorted(bloques, key=lambda b: b.hora_inicio)
+    libres = []
+    cursor = inicio_jornada
+
+    for bloque in bloques_ordenados:
+        if bloque.hora_inicio > cursor:
+            libres.append((cursor, bloque.hora_inicio))
+        if bloque.hora_fin > cursor:
+            cursor = bloque.hora_fin
+
+    if cursor < fin_jornada:
+        libres.append((cursor, fin_jornada))
+
+    return libres
 
 
 def usuario_puede_gestionar_bloques(user):
@@ -456,6 +478,7 @@ def grilla_semanal(request):
       ]
     """
     hoy_dia_semana = timezone.now().date().weekday()  # 0=Lunes
+    mostrar_libres = request.GET.get('libres') == '1'
 
     consultorios_activos = (
         Consultorio.objects.activos()
@@ -496,6 +519,7 @@ def grilla_semanal(request):
                 'dia_value': dia.value,
                 'bloques': bloques_celda,
                 'es_hoy': dia.value == hoy_dia_semana,
+                'franjas_libres': _calcular_franjas_libres(bloques_celda) if mostrar_libres else [],
             })
         grilla.append({
             'consultorio': consultorio,
@@ -510,6 +534,7 @@ def grilla_semanal(request):
     context = {
         'grilla': grilla,
         'dias_cabecera': dias_cabecera,
+        'mostrar_libres': mostrar_libres,
         'puede_gestionar_bloques': usuario_puede_gestionar_bloques(request.user),
     }
     return render(request, 'consultorios/grilla_semanal.html', context)

@@ -13,12 +13,25 @@
         <h1 class="text-3xl font-bold">📅 Grilla Semanal</h1>
         <p class="mt-1 text-violet-100">Todos los consultorios × días de la semana</p>
       </div>
-      {% if puede_gestionar_bloques %}
-        <a href="{% url 'consultorios:bloque_crear' %}"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
-          <i class="fas fa-plus"></i> Nuevo Bloque
-        </a>
-      {% endif %}
+      <div class="flex items-center gap-2">
+        {% if mostrar_libres %}
+          <a href="{% url 'consultorios:grilla_semanal' %}"
+             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+            <i class="fa-solid fa-eye-slash"></i> Ocultar franjas libres
+          </a>
+        {% else %}
+          <a href="{% url 'consultorios:grilla_semanal' %}?libres=1"
+             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+            <i class="fa-solid fa-clock"></i> Ver franjas libres (08-20)
+          </a>
+        {% endif %}
+        {% if puede_gestionar_bloques %}
+          <a href="{% url 'consultorios:bloque_crear' %}"
+             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
+            <i class="fas fa-plus"></i> Nuevo Bloque
+          </a>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -98,9 +111,33 @@
                       {% endfor %}
                     </div>
 
+                    {% if mostrar_libres and celda.franjas_libres %}
+                      <div class="mt-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Franjas libres</p>
+                        <div class="mt-0.5 space-y-0.5">
+                          {% for franja in celda.franjas_libres %}
+                            <p class="text-[11px] text-emerald-800 leading-tight">
+                              {{ franja.0|time:"H:i" }}-{{ franja.1|time:"H:i" }}
+                            </p>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endif %}
+
                   {% else %}
                     {# Celda vacía #}
-                    <div class="flex items-center justify-center h-10">
+                    <div class="h-10">
+                      {% if mostrar_libres and celda.franjas_libres %}
+                        <div class="mb-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
+                          <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Franjas libres</p>
+                          {% for franja in celda.franjas_libres %}
+                            <p class="text-[11px] text-emerald-800 leading-tight">
+                              {{ franja.0|time:"H:i" }}-{{ franja.1|time:"H:i" }}
+                            </p>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                      <div class="flex items-center justify-center">
                       {% if puede_gestionar_bloques %}
                         <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}"
                            class="text-gray-300 hover:text-blue-400 transition text-lg font-light"
@@ -110,6 +147,7 @@
                       {% else %}
                         <span class="text-gray-200">—</span>
                       {% endif %}
+                      </div>
                     </div>
                   {% endif %}
 
