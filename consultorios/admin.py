@@ -244,7 +244,7 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
         }),
         ('Profesional', {
             'fields': ('tipo_titular', 'profesional_asignado_temporal', 'profesional_interno', 'profesional_externo'),
-            'description': 'Titular nominal: complete interno o externo. Titular genérico: use R2/R3/Jefes y opcionalmente nombre asignado.',
+            'description': 'Titular nominal: complete interno o externo. Titular genérico: use R1-R4/Jefes y opcionalmente nombre asignado.',
         }),
         ('Horario', {
             'fields': ('dia_semana', 'hora_inicio', 'hora_fin', 'duracion_display')

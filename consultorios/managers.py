@@ -212,12 +212,21 @@ class ConsultorioManager(models.Manager):
         Returns:
             QuerySet anotado con estadísticas
         """
+        hoy = timezone.now().date()
         return self.annotate(
-            total_bloques=Count('bloques_horarios', filter=Q(bloques_horarios__estado='ACTIVO')),
-            total_equipos=Count('asignaciones_equipos', filter=Q(asignaciones_equipos__es_permanente=True) | Q(
-                asignaciones_equipos__fecha_inicio__lte=timezone.now().date(),
-                asignaciones_equipos__fecha_fin__gte=timezone.now().date()
-            ))
+            total_bloques=Count(
+                'bloques_horarios',
+                filter=Q(bloques_horarios__estado='ACTIVO'),
+                distinct=True,
+            ),
+            total_equipos=Count(
+                'asignaciones_equipos__equipo',
+                filter=Q(asignaciones_equipos__es_permanente=True) | Q(
+                    asignaciones_equipos__fecha_inicio__lte=hoy,
+                    asignaciones_equipos__fecha_fin__gte=hoy,
+                ),
+                distinct=True,
+            ),
         ).order_by('nombre')
 
 

@@ -279,8 +279,10 @@ class TipoLista(models.TextChoices):
 class TipoTitularBloque(models.TextChoices):
     """Define si el bloque es nominal o un slot genérico operativo."""
     NOMINAL = 'NOMINAL', 'Nominal (profesional fijo)'
+    RESIDENTE_R1 = 'R1', 'Residente R1'
     RESIDENTE_R2 = 'R2', 'Residente R2'
     RESIDENTE_R3 = 'R3', 'Residente R3'
+    RESIDENTE_R4 = 'R4', 'Residente R4'
     JEFES_RESIDENTES = 'JEFES_RES', 'Jefes de residentes'
 
 
@@ -317,7 +319,7 @@ class BloqueHorario(models.Model):
         max_length=20,
         choices=TipoTitularBloque.choices,
         default=TipoTitularBloque.NOMINAL,
-        help_text='Nominal (profesional fijo) o slot genérico (R2/R3/Jefes).'
+        help_text='Nominal (profesional fijo) o slot genérico (R1-R4/Jefes).'
     )
     
     # Profesional - FLEXIBLE: interno O externo
@@ -484,10 +486,15 @@ class BloqueHorario(models.Model):
 
             if self.profesional_asignado_temporal:
                 rol_asignado = getattr(self.profesional_asignado_temporal, 'rol', None)
-                if self.tipo_titular in (TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3):
+                if self.tipo_titular in (
+                    TipoTitularBloque.RESIDENTE_R1,
+                    TipoTitularBloque.RESIDENTE_R2,
+                    TipoTitularBloque.RESIDENTE_R3,
+                    TipoTitularBloque.RESIDENTE_R4,
+                ):
                     if rol_asignado != 'medico_residente':
                         raise ValidationError(
-                            "Para slots R2/R3, el nombre asignado debe tener rol medico_residente."
+                            "Para slots R1-R4, el nombre asignado debe tener rol medico_residente."
                         )
                 if self.tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
                     if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:

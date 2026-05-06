@@ -113,9 +113,14 @@ class BloqueHorarioForm(forms.ModelForm):
 
             if profesional_asignado_temporal:
                 rol_asignado = getattr(profesional_asignado_temporal, 'rol', None)
-                if tipo_titular in (TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3):
+                if tipo_titular in (
+                    TipoTitularBloque.RESIDENTE_R1,
+                    TipoTitularBloque.RESIDENTE_R2,
+                    TipoTitularBloque.RESIDENTE_R3,
+                    TipoTitularBloque.RESIDENTE_R4,
+                ):
                     if rol_asignado != 'medico_residente':
-                        raise ValidationError('Para bloques R2/R3, el nombre asignado debe ser un medico_residente.')
+                        raise ValidationError('Para bloques R1-R4, el nombre asignado debe ser un medico_residente.')
                 if tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
                     if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:
                         raise ValidationError('Para jefes, el nombre asignado debe ser jefe_residentes o instructor_residentes.')

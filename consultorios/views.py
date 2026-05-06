@@ -472,15 +472,17 @@ def grilla_semanal(request):
 
 @login_required
 def asignacion_rapida_bloques(request):
-    """Asignacion masiva de nombres para bloques genericos (R2/R3/Jefes)."""
+    """Asignacion masiva de nombres para bloques genericos (R1-R4/Jefes)."""
     if not usuario_puede_gestionar_bloques(request.user):
         raise PermissionDenied
 
     bloques = list(
         BloqueHorario.objects.activos()
         .filter(tipo_titular__in=[
+            TipoTitularBloque.RESIDENTE_R1,
             TipoTitularBloque.RESIDENTE_R2,
             TipoTitularBloque.RESIDENTE_R3,
+            TipoTitularBloque.RESIDENTE_R4,
             TipoTitularBloque.JEFES_RESIDENTES,
         ])
         .select_related('consultorio', 'profesional_asignado_temporal')
@@ -517,7 +519,12 @@ def asignacion_rapida_bloques(request):
                 if usuario_id not in usuarios_permitidos:
                     continue
 
-                if bloque.tipo_titular in [TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3]:
+                if bloque.tipo_titular in [
+                    TipoTitularBloque.RESIDENTE_R1,
+                    TipoTitularBloque.RESIDENTE_R2,
+                    TipoTitularBloque.RESIDENTE_R3,
+                    TipoTitularBloque.RESIDENTE_R4,
+                ]:
                     if usuario_id not in residentes_ids:
                         continue
                 elif bloque.tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
@@ -540,7 +547,12 @@ def asignacion_rapida_bloques(request):
 
     filas = []
     for bloque in bloques:
-        if bloque.tipo_titular in [TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3]:
+        if bloque.tipo_titular in [
+            TipoTitularBloque.RESIDENTE_R1,
+            TipoTitularBloque.RESIDENTE_R2,
+            TipoTitularBloque.RESIDENTE_R3,
+            TipoTitularBloque.RESIDENTE_R4,
+        ]:
             candidatos = residentes
         else:
             candidatos = jefes
