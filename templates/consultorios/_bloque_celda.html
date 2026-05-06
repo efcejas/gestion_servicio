@@ -19,21 +19,31 @@
 
 </a>
 {% if puede_gestionar_bloques %}
-  {% if bloque.profesional_interno_id or bloque.profesional_externo_id %}
-    <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
-       class="block mt-0.5 px-2 py-0.5 text-xs text-orange-600 hover:text-orange-800 hover:underline leading-tight"
-       title="Reportar ausencia — {{ bloque.nombre_profesional }}">
-      Reportar ausencia
-    </a>
-  {% endif %}
-  <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}"
-     class="block mt-0.5 px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800 hover:underline leading-tight"
-     title="Duplicar bloque — {{ bloque.nombre_profesional }}">
-    Duplicar bloque
-  </a>
-  <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}&limpiar_destino=1"
-     class="block mt-0.5 px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 hover:underline leading-tight"
-     title="Duplicar en otro consultorio — {{ bloque.nombre_profesional }}">
-    Duplicar en otro consultorio
-  </a>
+  <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+    {% if bloque.profesional_interno_id or bloque.profesional_externo_id %}
+      <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
+         class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition leading-tight"
+         title="Reportar ausencia — {{ bloque.nombre_profesional }}">
+        Ausencia
+      </a>
+    {% endif %}
+
+    <details class="group">
+      <summary class="list-none cursor-pointer px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition leading-tight">
+        Duplicar
+      </summary>
+      <div class="mt-1 pl-2 border-l-2 border-blue-100 space-y-1">
+        <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}"
+           class="block text-blue-700 hover:text-blue-900 hover:underline leading-tight"
+           title="Duplicar bloque — {{ bloque.nombre_profesional }}">
+          Mismo destino
+        </a>
+        <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}&limpiar_destino=1"
+           class="block text-indigo-700 hover:text-indigo-900 hover:underline leading-tight"
+           title="Duplicar en otro consultorio — {{ bloque.nombre_profesional }}">
+          Otro consultorio
+        </a>
+      </div>
+    </details>
+  </div>
 {% endif %}
