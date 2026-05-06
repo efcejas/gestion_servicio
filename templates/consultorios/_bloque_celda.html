@@ -19,9 +19,11 @@
 
 </a>
 {% if puede_gestionar_bloques %}
-  <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
-     class="block mt-0.5 px-2 py-0.5 text-xs text-orange-600 hover:text-orange-800 hover:underline leading-tight"
-     title="Reportar ausencia — {{ bloque.nombre_profesional }}">
-    Reportar ausencia
-  </a>
+  {% if bloque.profesional_interno_id or bloque.profesional_externo_id %}
+    <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
+       class="block mt-0.5 px-2 py-0.5 text-xs text-orange-600 hover:text-orange-800 hover:underline leading-tight"
+       title="Reportar ausencia — {{ bloque.nombre_profesional }}">
+      Reportar ausencia
+    </a>
+  {% endif %}
 {% endif %}

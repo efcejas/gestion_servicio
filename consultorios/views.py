@@ -31,6 +31,7 @@ from .models import (
     SolicitudAgendaExtra,
     TareaAgendaEGES,
     TipoActividad,
+    TipoTitularBloque,
 )
 from .utils import ConflictDetector
 from .forms import BloqueHorarioForm, AusenciaCoberturaForm, ConsultorioForm, ProfesionalExternoForm
@@ -93,6 +94,8 @@ _PALETA_COLORES_PROFESIONAL = [
 
 def _key_profesional_bloque(bloque):
     """Devuelve una key estable por profesional para asignación de color."""
+    if bloque.profesional_asignado_temporal_id:
+        return f't:{bloque.profesional_asignado_temporal_id}'
     if bloque.profesional_interno_id:
         return f'i:{bloque.profesional_interno_id}'
     if bloque.profesional_externo_id:
@@ -465,6 +468,96 @@ def grilla_semanal(request):
         'puede_gestionar_bloques': usuario_puede_gestionar_bloques(request.user),
     }
     return render(request, 'consultorios/grilla_semanal.html', context)
+
+
+@login_required
+def asignacion_rapida_bloques(request):
+    """Asignacion masiva de nombres para bloques genericos (R2/R3/Jefes)."""
+    if not usuario_puede_gestionar_bloques(request.user):
+        raise PermissionDenied
+
+    bloques = list(
+        BloqueHorario.objects.activos()
+        .filter(tipo_titular__in=[
+            TipoTitularBloque.RESIDENTE_R2,
+            TipoTitularBloque.RESIDENTE_R3,
+            TipoTitularBloque.JEFES_RESIDENTES,
+        ])
+        .select_related('consultorio', 'profesional_asignado_temporal')
+        .order_by('consultorio__nombre', 'dia_semana', 'hora_inicio')
+    )
+
+    residentes = list(
+        User.objects.filter(is_active=True, rol='medico_residente')
+        .order_by('last_name', 'first_name', 'username')
+    )
+    jefes = list(
+        User.objects.filter(is_active=True, rol__in=['jefe_residentes', 'instructor_residentes'])
+        .order_by('last_name', 'first_name', 'username')
+    )
+
+    residentes_ids = {u.id for u in residentes}
+    jefes_ids = {u.id for u in jefes}
+    usuarios_permitidos = {u.id: u for u in (residentes + jefes)}
+
+    if request.method == 'POST':
+        actualizados = 0
+
+        for bloque in bloques:
+            field_name = f'asignacion_{bloque.pk}'
+            valor = (request.POST.get(field_name) or '').strip()
+
+            nuevo_usuario = None
+            if valor:
+                try:
+                    usuario_id = int(valor)
+                except ValueError:
+                    continue
+
+                if usuario_id not in usuarios_permitidos:
+                    continue
+
+                if bloque.tipo_titular in [TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3]:
+                    if usuario_id not in residentes_ids:
+                        continue
+                elif bloque.tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
+                    if usuario_id not in jefes_ids:
+                        continue
+
+                nuevo_usuario = usuarios_permitidos[usuario_id]
+
+            if bloque.profesional_asignado_temporal_id != (nuevo_usuario.id if nuevo_usuario else None):
+                bloque.profesional_asignado_temporal = nuevo_usuario
+                bloque.save(update_fields=['profesional_asignado_temporal', 'fecha_modificacion'])
+                actualizados += 1
+
+        if actualizados:
+            messages.success(request, f'Se actualizaron {actualizados} asignaciones de bloques genericos.')
+        else:
+            messages.info(request, 'No hubo cambios de asignacion para guardar.')
+
+        return redirect('consultorios:asignacion_rapida_bloques')
+
+    filas = []
+    for bloque in bloques:
+        if bloque.tipo_titular in [TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3]:
+            candidatos = residentes
+        else:
+            candidatos = jefes
+
+        filas.append({
+            'bloque': bloque,
+            'dia_label': bloque.get_dia_semana_display(),
+            'candidatos': candidatos,
+            'tipo_label': bloque.get_tipo_titular_display(),
+        })
+
+    return render(request, 'consultorios/asignacion_rapida_bloques.html', {
+        'filas': filas,
+        'total_bloques': len(filas),
+        'total_sin_asignar': len([f for f in filas if not f['bloque'].profesional_asignado_temporal_id]),
+        'puede_gestionar_bloques': usuario_puede_gestionar_bloques(request.user),
+    })
 
 
 # ---------------------------------------------------------------------------

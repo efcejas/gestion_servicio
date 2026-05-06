@@ -203,6 +203,7 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
     list_display = [
         'consultorio',
         'profesional_display',
+        'tipo_titular',
         'dia_semana_display',
         'horario_display',
         'tipo_actividad',
@@ -214,6 +215,7 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
     list_filter = [
         'estado',
         'dia_semana',
+        'tipo_titular',
         'tipo_actividad',
         'tipo_lista',
         'permite_cobertura_residente',
@@ -222,6 +224,9 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
     ]
     search_fields = [
         'consultorio__nombre',
+        'profesional_asignado_temporal__username',
+        'profesional_asignado_temporal__first_name',
+        'profesional_asignado_temporal__last_name',
         'profesional_interno__username',
         'profesional_interno__first_name',
         'profesional_interno__last_name',
@@ -238,8 +243,8 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
             'fields': ('consultorio', 'equipo')
         }),
         ('Profesional', {
-            'fields': ('profesional_interno', 'profesional_externo'),
-            'description': 'Seleccione UN profesional (interno O externo, no ambos)',
+            'fields': ('tipo_titular', 'profesional_asignado_temporal', 'profesional_interno', 'profesional_externo'),
+            'description': 'Titular nominal: complete interno o externo. Titular genérico: use R2/R3/Jefes y opcionalmente nombre asignado.',
         }),
         ('Horario', {
             'fields': ('dia_semana', 'hora_inicio', 'hora_fin', 'duracion_display')
@@ -272,6 +277,8 @@ class BloqueHorarioAdmin(admin.ModelAdmin):
 
     def profesional_display(self, obj):
         nombre = obj.nombre_profesional()
+        if obj.tipo_titular != 'NOMINAL':
+            return format_html('<span style="color: #6b21a8;">🧩 {}</span>', nombre)
         if obj.profesional_interno:
             return format_html('<span style="color: blue;">👤 {}</span>', nombre)
         if obj.profesional_externo:

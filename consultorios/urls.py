@@ -13,6 +13,7 @@ urlpatterns = [
 
     # Grilla semanal (todos los consultorios × 7 días)
     path('grilla/', views.grilla_semanal, name='grilla_semanal'),
+    path('grilla/asignacion-rapida/', views.asignacion_rapida_bloques, name='asignacion_rapida_bloques'),
 
     # Gestión de bloques
     path('bloques/nuevo/', views.BloqueHorarioCreateView.as_view(), name='bloque_crear'),

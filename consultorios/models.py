@@ -276,6 +276,14 @@ class TipoLista(models.TextChoices):
     LISTA_ESPECIALIZADA = 'LISTA_ESPEC', 'Lista Especializada'
 
 
+class TipoTitularBloque(models.TextChoices):
+    """Define si el bloque es nominal o un slot genérico operativo."""
+    NOMINAL = 'NOMINAL', 'Nominal (profesional fijo)'
+    RESIDENTE_R2 = 'R2', 'Residente R2'
+    RESIDENTE_R3 = 'R3', 'Residente R3'
+    JEFES_RESIDENTES = 'JEFES_RES', 'Jefes de residentes'
+
+
 class EstadoBloque(models.TextChoices):
     """Estados posibles de un bloque horario"""
     ACTIVO = 'ACTIVO', 'Activo'
@@ -304,6 +312,13 @@ class BloqueHorario(models.Model):
         on_delete=models.CASCADE,
         related_name='bloques_horarios'
     )
+
+    tipo_titular = models.CharField(
+        max_length=20,
+        choices=TipoTitularBloque.choices,
+        default=TipoTitularBloque.NOMINAL,
+        help_text='Nominal (profesional fijo) o slot genérico (R2/R3/Jefes).'
+    )
     
     # Profesional - FLEXIBLE: interno O externo
     profesional_interno = models.ForeignKey(
@@ -322,6 +337,15 @@ class BloqueHorario(models.Model):
         blank=True,
         null=True,
         help_text="Profesional externo (no usuario del sistema)"
+    )
+
+    profesional_asignado_temporal = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='bloques_horarios_asignacion_temporal',
+        blank=True,
+        null=True,
+        help_text='Nombre asignado para el slot genérico (opcional).'
     )
     
     # Equipo específico (opcional, puede usar cualquier equipo del consultorio)
@@ -429,6 +453,7 @@ class BloqueHorario(models.Model):
             models.Index(fields=['consultorio', 'dia_semana', 'estado']),
             models.Index(fields=['profesional_interno', 'estado']),
             models.Index(fields=['profesional_externo', 'estado']),
+            models.Index(fields=['tipo_titular', 'estado']),
         ]
     
     def __str__(self):
@@ -438,17 +463,37 @@ class BloqueHorario(models.Model):
     
     def clean(self):
         """Validaciones del modelo"""
-        # Validar que haya al menos un profesional asignado
-        if not self.profesional_interno and not self.profesional_externo:
-            raise ValidationError(
-                "Debe especificar un profesional interno O un profesional externo."
-            )
-        
-        # Validar que no haya ambos profesionales asignados
-        if self.profesional_interno and self.profesional_externo:
-            raise ValidationError(
-                "No puede asignar un profesional interno Y un profesional externo simultáneamente. Elija uno."
-            )
+        if self.tipo_titular == TipoTitularBloque.NOMINAL:
+            # Validar que haya al menos un profesional asignado
+            if not self.profesional_interno and not self.profesional_externo:
+                raise ValidationError(
+                    "Debe especificar un profesional interno O un profesional externo para un bloque nominal."
+                )
+
+            # Validar que no haya ambos profesionales asignados
+            if self.profesional_interno and self.profesional_externo:
+                raise ValidationError(
+                    "No puede asignar un profesional interno Y un profesional externo simultáneamente. Elija uno."
+                )
+        else:
+            # Slot genérico: no se fija profesional nominal en el bloque.
+            if self.profesional_interno or self.profesional_externo:
+                raise ValidationError(
+                    "En bloques genéricos no se debe completar profesional interno/externo; use 'Nombre asignado (opcional)'."
+                )
+
+            if self.profesional_asignado_temporal:
+                rol_asignado = getattr(self.profesional_asignado_temporal, 'rol', None)
+                if self.tipo_titular in (TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3):
+                    if rol_asignado != 'medico_residente':
+                        raise ValidationError(
+                            "Para slots R2/R3, el nombre asignado debe tener rol medico_residente."
+                        )
+                if self.tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
+                    if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:
+                        raise ValidationError(
+                            "Para slots de jefes, el nombre asignado debe tener rol jefe_residentes o instructor_residentes."
+                        )
         
         # Validar que hora_inicio sea antes que hora_fin
         if self.hora_inicio >= self.hora_fin:
@@ -498,6 +543,13 @@ class BloqueHorario(models.Model):
     
     def nombre_profesional(self):
         """Retorna el nombre del profesional (interno o externo)"""
+        if self.tipo_titular != TipoTitularBloque.NOMINAL:
+            base = self.get_tipo_titular_display()
+            if self.profesional_asignado_temporal:
+                nombre = self.profesional_asignado_temporal.get_full_name() or self.profesional_asignado_temporal.username
+                return f"{base}: {nombre}"
+            return base
+
         if self.profesional_interno:
             return f"{self.profesional_interno.get_full_name() or self.profesional_interno.username}"
         elif self.profesional_externo:

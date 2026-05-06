@@ -90,6 +90,16 @@
           </div>
           <div class="p-6 grid grid-cols-2 gap-4">
             <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Tipo de titular</label>
+              {{ form.tipo_titular }}
+              {% if form.tipo_titular.errors %}<p class="text-xs text-red-600 mt-1">{{ form.tipo_titular.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Nombre asignado <span class="text-gray-400 font-normal">(opcional)</span></label>
+              {{ form.profesional_asignado_temporal }}
+              {% if form.profesional_asignado_temporal.errors %}<p class="text-xs text-red-600 mt-1">{{ form.profesional_asignado_temporal.errors.0 }}</p>{% endif %}
+            </div>
+            <div>
               <label class="block text-sm font-semibold text-gray-700 mb-1">Profesional interno</label>
               {{ form.profesional_interno }}
               {% if form.profesional_interno.errors %}<p class="text-xs text-red-600 mt-1">{{ form.profesional_interno.errors.0 }}</p>{% endif %}
@@ -212,7 +222,7 @@
         <div class="p-5 space-y-4 text-sm text-gray-600">
           <div class="flex gap-3">
             <i class="fas fa-user-md text-purple-400 mt-0.5 shrink-0"></i>
-            <p><span class="font-semibold text-gray-700">Profesional:</span> completar solo uno (interno <em>o</em> externo). No ambos.</p>
+            <p><span class="font-semibold text-gray-700">Titular del bloque:</span> puede ser nominal (interno o externo) o genérico (R2/R3/Jefes). En genéricos podés cargar luego el nombre en "Nombre asignado".</p>
           </div>
           <div class="flex gap-3">
             <i class="fas fa-list-ul text-teal-400 mt-0.5 shrink-0"></i>

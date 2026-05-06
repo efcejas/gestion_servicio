@@ -6,7 +6,15 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-from .models import BloqueHorario, MotivoAusencia, Consultorio, ProfesionalExterno, SolicitudAgendaExtra, TipoActividad
+from .models import (
+    BloqueHorario,
+    Consultorio,
+    MotivoAusencia,
+    ProfesionalExterno,
+    SolicitudAgendaExtra,
+    TipoActividad,
+    TipoTitularBloque,
+)
 from .utils import ConflictDetector
 
 User = get_user_model()
@@ -19,6 +27,8 @@ class BloqueHorarioForm(forms.ModelForm):
         model = BloqueHorario
         fields = [
             'consultorio',
+            'tipo_titular',
+            'profesional_asignado_temporal',
             'profesional_interno',
             'profesional_externo',
             'equipo',
@@ -72,15 +82,43 @@ class BloqueHorarioForm(forms.ModelForm):
             ]
         ).order_by('last_name', 'first_name', 'username')
 
+        self.fields['profesional_asignado_temporal'].queryset = User.objects.filter(
+            is_active=True,
+            rol__in=['medico_residente', 'jefe_residentes', 'instructor_residentes']
+        ).order_by('last_name', 'first_name', 'username')
+        self.fields['profesional_asignado_temporal'].required = False
+
     def clean(self):
         cleaned_data = super().clean()
 
         consultorio = cleaned_data.get('consultorio')
+        tipo_titular = cleaned_data.get('tipo_titular')
+        profesional_asignado_temporal = cleaned_data.get('profesional_asignado_temporal')
         profesional_interno = cleaned_data.get('profesional_interno')
         profesional_externo = cleaned_data.get('profesional_externo')
         dia_semana = cleaned_data.get('dia_semana')
         hora_inicio = cleaned_data.get('hora_inicio')
         hora_fin = cleaned_data.get('hora_fin')
+
+        if tipo_titular == TipoTitularBloque.NOMINAL:
+            if not profesional_interno and not profesional_externo:
+                raise ValidationError('Para titular nominal debe seleccionar profesional interno o externo.')
+            if profesional_interno and profesional_externo:
+                raise ValidationError('Especificar un profesional: interno O externo, no ambos.')
+        else:
+            if profesional_interno or profesional_externo:
+                raise ValidationError(
+                    'En bloques genéricos no completar profesional interno/externo. Use solo Nombre asignado (opcional).'
+                )
+
+            if profesional_asignado_temporal:
+                rol_asignado = getattr(profesional_asignado_temporal, 'rol', None)
+                if tipo_titular in (TipoTitularBloque.RESIDENTE_R2, TipoTitularBloque.RESIDENTE_R3):
+                    if rol_asignado != 'medico_residente':
+                        raise ValidationError('Para bloques R2/R3, el nombre asignado debe ser un medico_residente.')
+                if tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
+                    if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:
+                        raise ValidationError('Para jefes, el nombre asignado debe ser jefe_residentes o instructor_residentes.')
 
         if not all([consultorio, dia_semana is not None, hora_inicio, hora_fin]):
             return cleaned_data
