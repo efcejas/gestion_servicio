@@ -41,6 +41,17 @@
     </div>
   {% endif %}
 
+  {% if modo_duplicado %}
+    <div class="mb-5 rounded-xl border border-indigo-300 bg-indigo-50 p-4 text-indigo-900 text-sm">
+      <p class="font-semibold">Modo duplicado activo</p>
+      {% if duplicado_otro_consultorio %}
+        <p class="mt-1">Se copio la configuracion del bloque y se dejo destino libre para elegir consultorio y dia.</p>
+      {% else %}
+        <p class="mt-1">Se copio la configuracion completa del bloque original. Puede ajustar cualquier campo antes de guardar.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
     <!-- Formulario principal -->

@@ -26,4 +26,14 @@
       Reportar ausencia
     </a>
   {% endif %}
+  <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}"
+     class="block mt-0.5 px-2 py-0.5 text-xs text-blue-600 hover:text-blue-800 hover:underline leading-tight"
+     title="Duplicar bloque — {{ bloque.nombre_profesional }}">
+    Duplicar bloque
+  </a>
+  <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}&limpiar_destino=1"
+     class="block mt-0.5 px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 hover:underline leading-tight"
+     title="Duplicar en otro consultorio — {{ bloque.nombre_profesional }}">
+    Duplicar en otro consultorio
+  </a>
 {% endif %}

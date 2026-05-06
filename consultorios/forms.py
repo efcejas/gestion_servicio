@@ -48,8 +48,8 @@ class BloqueHorarioForm(forms.ModelForm):
         widgets = {
             'hora_inicio': forms.TimeInput(attrs={'type': 'time'}),
             'hora_fin': forms.TimeInput(attrs={'type': 'time'}),
-            'fecha_inicio_vigencia': forms.DateInput(attrs={'type': 'date'}),
-            'fecha_fin_vigencia': forms.DateInput(attrs={'type': 'date'}),
+            'fecha_inicio_vigencia': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+            'fecha_fin_vigencia': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'observaciones': forms.Textarea(attrs={'rows': 3}),
             'competencia_requerida': forms.TextInput(attrs={'placeholder': 'Ej: Puncion mamaria, Elastografia'}),
         }
@@ -87,6 +87,13 @@ class BloqueHorarioForm(forms.ModelForm):
             rol__in=['medico_residente', 'jefe_residentes', 'instructor_residentes']
         ).order_by('last_name', 'first_name', 'username')
         self.fields['profesional_asignado_temporal'].required = False
+
+        # Asegura que el navegador muestre las fechas guardadas en edición.
+        if self.instance and self.instance.pk:
+            if self.instance.fecha_inicio_vigencia:
+                self.initial['fecha_inicio_vigencia'] = self.instance.fecha_inicio_vigencia.strftime('%Y-%m-%d')
+            if self.instance.fecha_fin_vigencia:
+                self.initial['fecha_fin_vigencia'] = self.instance.fecha_fin_vigencia.strftime('%Y-%m-%d')
 
     def clean(self):
         cleaned_data = super().clean()

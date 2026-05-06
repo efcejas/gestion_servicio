@@ -66,11 +66,7 @@
                                             <span class="text-sm font-normal text-gray-400">({{ bloque.duracion_horas|floatformat:1 }}h)</span>
                                         </p>
                                         <p class="text-sm text-gray-600 mt-1">
-                                            {% if bloque.profesional_interno %}
-                                                {{ bloque.profesional_interno.get_full_name }}
-                                            {% elif bloque.profesional_externo %}
-                                                Dr./Dra. {{ bloque.profesional_externo.apellido }}, {{ bloque.profesional_externo.nombre }}
-                                            {% endif %}
+                                            {{ bloque.nombre_profesional }}
                                             · {{ bloque.get_tipo_actividad_display }}
                                             {% if bloque.equipo %}
                                                 · {{ bloque.equipo.nombre }}

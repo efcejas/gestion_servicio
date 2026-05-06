@@ -173,6 +173,7 @@ class ConsultorioDetailView(LoginRequiredMixin, DetailView):
             ).order_by('hora_inicio').select_related(
                 'profesional_interno',
                 'profesional_externo',
+                'profesional_asignado_temporal',
                 'equipo'
             )
             
@@ -214,8 +215,46 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        copiar_de = self.request.GET.get('copiar_de')
+        limpiar_destino = self.request.GET.get('limpiar_destino') == '1'
         consultorio_id = self.request.GET.get('consultorio')
         dia_semana = self.request.GET.get('dia_semana')
+
+        if copiar_de:
+            try:
+                bloque_origen = BloqueHorario.objects.select_related(
+                    'profesional_interno',
+                    'profesional_externo',
+                    'profesional_asignado_temporal',
+                    'equipo',
+                ).get(pk=copiar_de)
+
+                initial.update({
+                    'tipo_titular': bloque_origen.tipo_titular,
+                    'profesional_asignado_temporal': bloque_origen.profesional_asignado_temporal_id,
+                    'profesional_interno': bloque_origen.profesional_interno_id,
+                    'profesional_externo': bloque_origen.profesional_externo_id,
+                    'equipo': bloque_origen.equipo_id,
+                    'hora_inicio': bloque_origen.hora_inicio,
+                    'hora_fin': bloque_origen.hora_fin,
+                    'fecha_inicio_vigencia': bloque_origen.fecha_inicio_vigencia,
+                    'fecha_fin_vigencia': bloque_origen.fecha_fin_vigencia,
+                    'tipo_actividad': bloque_origen.tipo_actividad,
+                    'tipo_lista': bloque_origen.tipo_lista,
+                    'permite_cobertura_residente': bloque_origen.permite_cobertura_residente,
+                    'prioridad_cobertura': bloque_origen.prioridad_cobertura,
+                    'competencia_requerida': bloque_origen.competencia_requerida,
+                    'estado': bloque_origen.estado,
+                    'observaciones': bloque_origen.observaciones,
+                })
+
+                if not limpiar_destino:
+                    initial.update({
+                        'consultorio': bloque_origen.consultorio_id,
+                        'dia_semana': bloque_origen.dia_semana,
+                    })
+            except BloqueHorario.DoesNotExist:
+                pass
 
         if consultorio_id:
             initial['consultorio'] = consultorio_id
@@ -239,6 +278,10 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        copiar_de = self.request.GET.get('copiar_de')
+        if copiar_de:
+            context['modo_duplicado'] = True
+            context['duplicado_otro_consultorio'] = self.request.GET.get('limpiar_destino') == '1'
         context['titulo'] = 'Crear Bloque Horario'
         context['boton_accion'] = 'Crear bloque'
         return context
@@ -287,14 +330,16 @@ def disponibilidad_consultorio_dia(request, pk, dia_semana):
     ).order_by('hora_inicio').select_related(
         'profesional_interno',
         'profesional_externo',
+        'profesional_asignado_temporal',
         'equipo'
     )
     
     # Calcular estadísticas
     total_horas = sum(bloque.duracion_horas() for bloque in bloques)
     profesionales_distintos = len(set(
-        [b.profesional_interno_id for b in bloques if b.profesional_interno] +
-        [b.profesional_externo_id for b in bloques if b.profesional_externo]
+        [f'i:{b.profesional_interno_id}' for b in bloques if b.profesional_interno_id] +
+        [f'e:{b.profesional_externo_id}' for b in bloques if b.profesional_externo_id] +
+        [f't:{b.profesional_asignado_temporal_id}' for b in bloques if b.profesional_asignado_temporal_id]
     ))
     
     # Obtener disponibilidad
@@ -420,7 +465,7 @@ def grilla_semanal(request):
     # Prefetch de todos los bloques activos para evitar N+1
     todos_bloques = (
         BloqueHorario.objects.activos()
-        .select_related('profesional_interno', 'profesional_externo')
+        .select_related('profesional_interno', 'profesional_externo', 'profesional_asignado_temporal')
         .order_by('hora_inicio')
     )
 
