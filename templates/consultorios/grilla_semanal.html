@@ -100,55 +100,53 @@
               {# Celdas por día #}
               {% for celda in fila.dias %}
                 <td class="px-2 py-2 align-top {% if celda.es_hoy %}bg-blue-50/40{% endif %}" style="vertical-align: top;">
-
-                  {% if celda.bloques %}
-                    {# Bloques del día en esta sala #}
+                  {% if mostrar_libres %}
                     <div class="space-y-1">
-                      {% for bloque in celda.bloques %}
-                        {% with bg=bloque.color_bg|default:'bg-gray-100 border-gray-200 hover:bg-gray-200' dot=bloque.color_dot|default:'bg-gray-400' %}
-                          {% include 'consultorios/_bloque_celda.html' with bloque=bloque bg=bg dot=dot consultorio=fila.consultorio %}
-                        {% endwith %}
+                      {% for item in celda.items_celda %}
+                        {% if item.tipo == 'bloque' %}
+                          {% with bloque=item.bloque %}
+                            {% with bg=bloque.color_bg|default:'bg-gray-100 border-gray-200 hover:bg-gray-200' dot=bloque.color_dot|default:'bg-gray-400' %}
+                              {% include 'consultorios/_bloque_celda.html' with bloque=bloque bg=bg dot=dot consultorio=fila.consultorio %}
+                            {% endwith %}
+                          {% endwith %}
+                        {% else %}
+                          <div class="rounded border border-emerald-200 bg-emerald-50 px-2 py-1">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Libre</p>
+                            <p class="text-[11px] text-emerald-800 leading-tight">
+                              {{ item.hora_inicio|time:"H:i" }}-{{ item.hora_fin|time:"H:i" }}
+                            </p>
+                            {% if puede_gestionar_bloques %}
+                              <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}&hora_inicio={{ item.hora_inicio|time:'H:i' }}&hora_fin={{ item.hora_fin|time:'H:i' }}"
+                                 class="inline-block mt-0.5 text-[11px] font-medium text-emerald-700 hover:text-emerald-900 hover:underline">
+                                Tomar
+                              </a>
+                            {% endif %}
+                          </div>
+                        {% endif %}
                       {% endfor %}
                     </div>
-
-                    {% if mostrar_libres and celda.franjas_libres %}
-                      <div class="mt-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
-                        <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Franjas libres</p>
-                        <div class="mt-0.5 space-y-0.5">
-                          {% for franja in celda.franjas_libres %}
-                            <p class="text-[11px] text-emerald-800 leading-tight">
-                              {{ franja.0|time:"H:i" }}-{{ franja.1|time:"H:i" }}
-                            </p>
-                          {% endfor %}
-                        </div>
+                  {% else %}
+                    {% if celda.bloques %}
+                      <div class="space-y-1">
+                        {% for bloque in celda.bloques %}
+                          {% with bg=bloque.color_bg|default:'bg-gray-100 border-gray-200 hover:bg-gray-200' dot=bloque.color_dot|default:'bg-gray-400' %}
+                            {% include 'consultorios/_bloque_celda.html' with bloque=bloque bg=bg dot=dot consultorio=fila.consultorio %}
+                          {% endwith %}
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      <div class="flex items-center justify-center h-10">
+                        {% if puede_gestionar_bloques %}
+                          <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}"
+                             class="text-gray-300 hover:text-blue-400 transition text-lg font-light"
+                             title="Agregar bloque — {{ fila.consultorio.nombre }} {{ celda.dia.label }}">
+                            +
+                          </a>
+                        {% else %}
+                          <span class="text-gray-200">—</span>
+                        {% endif %}
                       </div>
                     {% endif %}
-
-                  {% else %}
-                    {# Celda vacía #}
-                    <div class="h-10">
-                      {% if mostrar_libres and celda.franjas_libres %}
-                        <div class="mb-1 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
-                          <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Franjas libres</p>
-                          {% for franja in celda.franjas_libres %}
-                            <p class="text-[11px] text-emerald-800 leading-tight">
-                              {{ franja.0|time:"H:i" }}-{{ franja.1|time:"H:i" }}
-                            </p>
-                          {% endfor %}
-                        </div>
-                      {% endif %}
-                      <div class="flex items-center justify-center">
-                      {% if puede_gestionar_bloques %}
-                        <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}"
-                           class="text-gray-300 hover:text-blue-400 transition text-lg font-light"
-                           title="Agregar bloque — {{ fila.consultorio.nombre }} {{ celda.dia.label }}">
-                          +
-                        </a>
-                      {% else %}
-                        <span class="text-gray-200">—</span>
-                      {% endif %}
-                      </div>
-                    </div>
                   {% endif %}
 
                 </td>

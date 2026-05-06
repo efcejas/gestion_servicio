@@ -131,6 +131,45 @@ def _calcular_franjas_libres(bloques, inicio_jornada=time(8, 0), fin_jornada=tim
     return libres
 
 
+def _construir_items_celda(bloques, inicio_jornada=time(8, 0), fin_jornada=time(20, 0)):
+    """Construye una lista cronológica intercalada de bloques y franjas libres."""
+    items = []
+    bloques_ordenados = sorted(bloques, key=lambda b: b.hora_inicio)
+    cursor = inicio_jornada
+
+    for bloque in bloques_ordenados:
+        if bloque.hora_inicio > cursor:
+            items.append({
+                'tipo': 'libre',
+                'hora_inicio': cursor,
+                'hora_fin': bloque.hora_inicio,
+            })
+
+        items.append({
+            'tipo': 'bloque',
+            'bloque': bloque,
+        })
+
+        if bloque.hora_fin > cursor:
+            cursor = bloque.hora_fin
+
+    if cursor < fin_jornada:
+        items.append({
+            'tipo': 'libre',
+            'hora_inicio': cursor,
+            'hora_fin': fin_jornada,
+        })
+
+    if not items:
+        items.append({
+            'tipo': 'libre',
+            'hora_inicio': inicio_jornada,
+            'hora_fin': fin_jornada,
+        })
+
+    return items
+
+
 def usuario_puede_gestionar_bloques(user):
     """Permisos para alta/edición de bloques en UI operativa."""
     if not user.is_authenticated:
@@ -241,6 +280,8 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
         limpiar_destino = self.request.GET.get('limpiar_destino') == '1'
         consultorio_id = self.request.GET.get('consultorio')
         dia_semana = self.request.GET.get('dia_semana')
+        hora_inicio = self.request.GET.get('hora_inicio')
+        hora_fin = self.request.GET.get('hora_fin')
 
         if copiar_de:
             try:
@@ -282,6 +323,16 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
             initial['consultorio'] = consultorio_id
         if dia_semana is not None:
             initial['dia_semana'] = dia_semana
+        if hora_inicio:
+            try:
+                initial['hora_inicio'] = time.fromisoformat(hora_inicio)
+            except ValueError:
+                pass
+        if hora_fin:
+            try:
+                initial['hora_fin'] = time.fromisoformat(hora_fin)
+            except ValueError:
+                pass
 
         return initial
 
@@ -301,9 +352,15 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         copiar_de = self.request.GET.get('copiar_de')
+        hora_inicio = self.request.GET.get('hora_inicio')
+        hora_fin = self.request.GET.get('hora_fin')
         if copiar_de:
             context['modo_duplicado'] = True
             context['duplicado_otro_consultorio'] = self.request.GET.get('limpiar_destino') == '1'
+        if hora_inicio and hora_fin:
+            context['modo_tomar_franja'] = True
+            context['franja_hora_inicio'] = hora_inicio
+            context['franja_hora_fin'] = hora_fin
         context['titulo'] = 'Crear Bloque Horario'
         context['boton_accion'] = 'Crear bloque'
         return context
@@ -520,6 +577,7 @@ def grilla_semanal(request):
                 'bloques': bloques_celda,
                 'es_hoy': dia.value == hoy_dia_semana,
                 'franjas_libres': _calcular_franjas_libres(bloques_celda) if mostrar_libres else [],
+                'items_celda': _construir_items_celda(bloques_celda) if mostrar_libres else [],
             })
         grilla.append({
             'consultorio': consultorio,

@@ -52,6 +52,13 @@
     </div>
   {% endif %}
 
+  {% if modo_tomar_franja %}
+    <div class="mb-5 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-emerald-900 text-sm">
+      <p class="font-semibold">Bloque tomado desde franja libre</p>
+      <p class="mt-1">Se precargó el horario {{ franja_hora_inicio }}-{{ franja_hora_fin }}. Puede ajustar otros campos antes de guardar.</p>
+    </div>
+  {% endif %}
+
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
     <!-- Formulario principal -->
