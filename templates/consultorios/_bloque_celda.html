@@ -19,27 +19,27 @@
 
 </a>
 {% if puede_gestionar_bloques %}
-  <div class="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+  <div class="mt-1 flex items-center gap-1.5 text-xs">
     {% if bloque.profesional_interno_id or bloque.profesional_externo_id %}
       <a href="{% url 'consultorios:reportar_ausencia' bloque.pk %}"
-         class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition leading-tight"
+         class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-50 text-orange-700 hover:bg-orange-100 hover:text-orange-800 transition"
          title="Reportar ausencia — {{ bloque.nombre_profesional }}">
-        Ausencia
+        <i class="fa-solid fa-user-xmark text-[11px]"></i>
       </a>
     {% endif %}
 
-    <details class="group">
-      <summary class="list-none cursor-pointer px-2 py-0.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition leading-tight">
-        Duplicar
+    <details class="group relative">
+      <summary class="list-none inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800 transition cursor-pointer" style="list-style: none;">
+        <i class="fa-solid fa-clone text-[11px]"></i>
       </summary>
-      <div class="mt-1 pl-2 border-l-2 border-blue-100 space-y-1">
+      <div class="absolute left-0 top-full z-20 mt-1 min-w-[148px] rounded-lg border border-blue-100 bg-white p-2 shadow-lg space-y-1">
         <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}"
-           class="block text-blue-700 hover:text-blue-900 hover:underline leading-tight"
+           class="block rounded px-2 py-1 text-blue-700 hover:bg-blue-50 hover:text-blue-900 leading-tight"
            title="Duplicar bloque — {{ bloque.nombre_profesional }}">
           Mismo destino
         </a>
         <a href="{% url 'consultorios:bloque_crear' %}?copiar_de={{ bloque.pk }}&limpiar_destino=1"
-           class="block text-indigo-700 hover:text-indigo-900 hover:underline leading-tight"
+           class="block rounded px-2 py-1 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-900 leading-tight"
            title="Duplicar en otro consultorio — {{ bloque.nombre_profesional }}">
           Otro consultorio
         </a>
