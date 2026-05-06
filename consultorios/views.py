@@ -3,6 +3,8 @@
 Vistas para la app consultorios.
 """
 
+import hashlib
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -35,6 +37,73 @@ from .forms import BloqueHorarioForm, AusenciaCoberturaForm, ConsultorioForm, Pr
 from .services import sugerir_cobertura, SinResidentesDisponiblesError, BloqueNoCubreError
 
 User = get_user_model()
+
+
+_PALETA_COLORES_PROFESIONAL = [
+    {
+        'bg': 'bg-red-100 border-red-400 hover:bg-red-200',
+        'dot': 'bg-red-700',
+    },
+    {
+        'bg': 'bg-blue-100 border-blue-400 hover:bg-blue-200',
+        'dot': 'bg-blue-700',
+    },
+    {
+        'bg': 'bg-green-100 border-green-400 hover:bg-green-200',
+        'dot': 'bg-green-700',
+    },
+    {
+        'bg': 'bg-yellow-100 border-yellow-400 hover:bg-yellow-200',
+        'dot': 'bg-yellow-700',
+    },
+    {
+        'bg': 'bg-purple-100 border-purple-400 hover:bg-purple-200',
+        'dot': 'bg-purple-700',
+    },
+    {
+        'bg': 'bg-cyan-100 border-cyan-400 hover:bg-cyan-200',
+        'dot': 'bg-cyan-700',
+    },
+    {
+        'bg': 'bg-lime-100 border-lime-400 hover:bg-lime-200',
+        'dot': 'bg-lime-700',
+    },
+    {
+        'bg': 'bg-fuchsia-100 border-fuchsia-400 hover:bg-fuchsia-200',
+        'dot': 'bg-fuchsia-700',
+    },
+    {
+        'bg': 'bg-orange-100 border-orange-400 hover:bg-orange-200',
+        'dot': 'bg-orange-700',
+    },
+    {
+        'bg': 'bg-teal-100 border-teal-400 hover:bg-teal-200',
+        'dot': 'bg-teal-700',
+    },
+    {
+        'bg': 'bg-pink-100 border-pink-400 hover:bg-pink-200',
+        'dot': 'bg-pink-700',
+    },
+    {
+        'bg': 'bg-indigo-100 border-indigo-400 hover:bg-indigo-200',
+        'dot': 'bg-indigo-700',
+    },
+]
+
+
+def _key_profesional_bloque(bloque):
+    """Devuelve una key estable por profesional para asignación de color."""
+    if bloque.profesional_interno_id:
+        return f'i:{bloque.profesional_interno_id}'
+    if bloque.profesional_externo_id:
+        return f'e:{bloque.profesional_externo_id}'
+    return f'b:{bloque.pk}'
+
+
+def _estilos_profesional(key_profesional):
+    digest = hashlib.sha256(key_profesional.encode('utf-8')).hexdigest()
+    indice = int(digest[:8], 16) % len(_PALETA_COLORES_PROFESIONAL)
+    return _PALETA_COLORES_PROFESIONAL[indice]
 
 
 def usuario_puede_gestionar_bloques(user):
@@ -353,8 +422,17 @@ def grilla_semanal(request):
     )
 
     # Indexar: {(consultorio_id, dia_semana): [bloque, ...]}
+    colores_por_profesional = {}
     indice = {}
     for bloque in todos_bloques:
+        key_profesional = _key_profesional_bloque(bloque)
+        estilos = colores_por_profesional.setdefault(
+            key_profesional,
+            _estilos_profesional(key_profesional),
+        )
+        bloque.color_bg = estilos['bg']
+        bloque.color_dot = estilos['dot']
+
         key = (bloque.consultorio_id, bloque.dia_semana)
         indice.setdefault(key, []).append(bloque)
 
@@ -967,11 +1045,177 @@ def agendas_descubiertas(request):
         for lunes, items in sorted(por_semana.items())
     ]
 
+    # Huecos no cubribles por residentes: potenciales slots reutilizables
+    # para reprogramar otras prácticas cuando falta un especialista.
+    ausencias_no_cubribles = [
+        a for a in ausencias
+        if not a.bloque.permite_cobertura_residente
+    ]
+
+    slots_reutilizables = {
+        (a.fecha_ausencia, a.bloque.consultorio_id, a.bloque.hora_inicio, a.bloque.hora_fin)
+        for a in ausencias_no_cubribles
+    }
+
     return render(request, 'consultorios/agendas_descubiertas.html', {
         'semanas_lista': semanas_lista,
         'total': len(ausencias),
         'semanas': semanas,
         'hasta': hasta,
         'opciones_semanas': [2, 4, 6, 8, 12],
+        'ausencias_no_cubribles_total': len(ausencias_no_cubribles),
+        'slots_reutilizables_total': len(slots_reutilizables),
     })
+
+
+@require_POST
+@login_required
+def generar_tareas_eges_reasignacion(request):
+    """Genera tareas EGES de reasignación para ausencias no cubribles por residentes."""
+    from datetime import timedelta
+
+    user = request.user
+    if not (user.is_superuser or getattr(user, 'rol', None) == 'jefe_servicio'):
+        raise PermissionDenied
+
+    semanas = int(request.POST.get('semanas', 4))
+    semanas = max(1, min(semanas, 12))
+
+    hoy = timezone.now().date()
+    hasta = hoy + timedelta(weeks=semanas)
+
+    ausencias = (
+        AusenciaCobertura.objects
+        .filter(
+            estado__in=[
+                EstadoAusenciaCobertura.REPORTADA,
+                EstadoAusenciaCobertura.PROPUESTA,
+            ],
+            fecha_ausencia__gte=hoy,
+            fecha_ausencia__lte=hasta,
+            bloque__permite_cobertura_residente=False,
+        )
+        .select_related(
+            'bloque__consultorio',
+            'bloque__profesional_interno',
+            'bloque__profesional_externo',
+            'profesional_ausente_interno',
+            'profesional_ausente_externo',
+        )
+        .order_by('fecha_ausencia', 'bloque__consultorio__nombre')
+    )
+
+    creadas = 0
+    omitidas = 0
+    for ausencia in ausencias:
+        bloque = ausencia.bloque
+        existe_pendiente = TareaAgendaEGES.objects.filter(
+            estado=EstadoTareaEGES.PENDIENTE,
+            accion=AccionEGES.REASIGNAR,
+            origen=OrigenTareaEGES.AUSENCIA_SIN_COBERTURA,
+            consultorio=bloque.consultorio,
+            fecha_afectada=ausencia.fecha_ausencia,
+            hora_inicio=bloque.hora_inicio,
+            hora_fin=bloque.hora_fin,
+            profesional_interno=bloque.profesional_interno,
+            profesional_externo=bloque.profesional_externo,
+        ).exists()
+        if existe_pendiente:
+            omitidas += 1
+            continue
+
+        TareaAgendaEGES.objects.create(
+            accion=AccionEGES.REASIGNAR,
+            origen=OrigenTareaEGES.AUSENCIA_SIN_COBERTURA,
+            consultorio=bloque.consultorio,
+            profesional_interno=bloque.profesional_interno,
+            profesional_externo=bloque.profesional_externo,
+            fecha_afectada=ausencia.fecha_ausencia,
+            hora_inicio=bloque.hora_inicio,
+            hora_fin=bloque.hora_fin,
+            notas=(
+                'Bloque no cubrible por residentes. '
+                'Evaluar reutilización del slot para otra práctica en EGES.'
+            ),
+            creado_por=request.user,
+        )
+        creadas += 1
+
+    if creadas:
+        mensaje = f'Se generaron {creadas} tarea{'s' if creadas != 1 else ''} EGES de reasignación.'
+        if omitidas:
+            mensaje += f' {omitidas} ya estaba{'n' if omitidas != 1 else ''} pendiente{'s' if omitidas != 1 else ''}.'
+        messages.success(request, mensaje)
+    else:
+        messages.info(request, 'No se generaron tareas nuevas: ya existían pendientes para esos slots.')
+
+    return redirect(f"{reverse('consultorios:agendas_descubiertas')}?semanas={semanas}")
+
+
+@require_POST
+@login_required
+def generar_tarea_eges_reasignacion_ausencia(request, pk):
+    """Genera una tarea EGES puntual para una ausencia no cubrible por residentes."""
+    user = request.user
+    if not (user.is_superuser or getattr(user, 'rol', None) == 'jefe_servicio'):
+        raise PermissionDenied
+
+    ausencia = get_object_or_404(
+        AusenciaCobertura.objects.select_related(
+            'bloque__consultorio',
+            'bloque__profesional_interno',
+            'bloque__profesional_externo',
+        ),
+        pk=pk,
+    )
+
+    semanas = int(request.POST.get('semanas', 4))
+    semanas = max(1, min(semanas, 12))
+
+    if ausencia.estado not in [
+        EstadoAusenciaCobertura.REPORTADA,
+        EstadoAusenciaCobertura.PROPUESTA,
+    ]:
+        messages.info(request, 'La ausencia seleccionada ya no requiere gestión de cobertura.')
+        return redirect(f"{reverse('consultorios:agendas_descubiertas')}?semanas={semanas}")
+
+    bloque = ausencia.bloque
+    if bloque.permite_cobertura_residente:
+        messages.info(request, 'Este bloque admite cobertura por residentes; no requiere tarea EGES de reasignación.')
+        return redirect(f"{reverse('consultorios:agendas_descubiertas')}?semanas={semanas}")
+
+    existe_pendiente = TareaAgendaEGES.objects.filter(
+        estado=EstadoTareaEGES.PENDIENTE,
+        accion=AccionEGES.REASIGNAR,
+        origen=OrigenTareaEGES.AUSENCIA_SIN_COBERTURA,
+        consultorio=bloque.consultorio,
+        fecha_afectada=ausencia.fecha_ausencia,
+        hora_inicio=bloque.hora_inicio,
+        hora_fin=bloque.hora_fin,
+        profesional_interno=bloque.profesional_interno,
+        profesional_externo=bloque.profesional_externo,
+    ).exists()
+
+    if existe_pendiente:
+        messages.info(request, 'Ya existe una tarea EGES pendiente para ese slot.')
+        return redirect(f"{reverse('consultorios:agendas_descubiertas')}?semanas={semanas}")
+
+    TareaAgendaEGES.objects.create(
+        accion=AccionEGES.REASIGNAR,
+        origen=OrigenTareaEGES.AUSENCIA_SIN_COBERTURA,
+        consultorio=bloque.consultorio,
+        profesional_interno=bloque.profesional_interno,
+        profesional_externo=bloque.profesional_externo,
+        fecha_afectada=ausencia.fecha_ausencia,
+        hora_inicio=bloque.hora_inicio,
+        hora_fin=bloque.hora_fin,
+        notas=(
+            'Bloque no cubrible por residentes. '
+            'Evaluar reutilización del slot para otra práctica en EGES.'
+        ),
+        creado_por=request.user,
+    )
+
+    messages.success(request, 'Tarea EGES de reasignación creada para la ausencia seleccionada.')
+    return redirect(f"{reverse('consultorios:agendas_descubiertas')}?semanas={semanas}")
 

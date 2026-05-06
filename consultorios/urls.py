@@ -54,4 +54,14 @@ urlpatterns = [
 
     # Agendas descubiertas
     path('agendas-descubiertas/', views.agendas_descubiertas, name='agendas_descubiertas'),
+    path(
+        'agendas-descubiertas/generar-tareas-eges-reasignacion/',
+        views.generar_tareas_eges_reasignacion,
+        name='generar_tareas_eges_reasignacion',
+    ),
+    path(
+        'agendas-descubiertas/<int:pk>/generar-tarea-eges-reasignacion/',
+        views.generar_tarea_eges_reasignacion_ausencia,
+        name='generar_tarea_eges_reasignacion_ausencia',
+    ),
 ]

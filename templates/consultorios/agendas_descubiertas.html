@@ -32,6 +32,37 @@
     </div>
   </div>
 
+  {% if ausencias_no_cubribles_total %}
+    <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex items-start gap-3">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-200 text-amber-700">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </span>
+        <div>
+          <p class="text-sm font-semibold text-amber-900">
+            Hay {{ ausencias_no_cubribles_total }} ausencia{{ ausencias_no_cubribles_total|pluralize }} de bloques no cubribles por residentes.
+          </p>
+          <p class="text-sm text-amber-800 mt-0.5">
+            Se detectaron {{ slots_reutilizables_total }} slot{{ slots_reutilizables_total|pluralize }} potencialmente reutilizable{{ slots_reutilizables_total|pluralize }}
+            en consultorios para reasignar otras prácticas.
+          </p>
+        </div>
+        </div>
+
+        <form method="post" action="{% url 'consultorios:generar_tareas_eges_reasignacion' %}">
+          {% csrf_token %}
+          <input type="hidden" name="semanas" value="{{ semanas }}">
+          <button type="submit"
+                  class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium transition">
+            <i class="fa-solid fa-list-check"></i>
+            Generar tareas EGES
+          </button>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+
   {% if not semanas_lista %}
     <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-12 text-center">
       <i class="fa-solid fa-circle-check text-5xl text-green-400 mb-4"></i>
@@ -96,6 +127,13 @@
                       <span class="text-gray-400 text-xs ml-1">({{ ausencia.get_motivo_display }})</span>
                     </p>
 
+                    {% if not ausencia.bloque.permite_cobertura_residente %}
+                      <p class="text-sm text-amber-700 mt-0.5">
+                        <i class="fa-solid fa-bed-pulse mr-1"></i>
+                        Bloque no cubrible por residentes: considerar reutilizar este consultorio para otra práctica.
+                      </p>
+                    {% endif %}
+
                     {% if ausencia.residente_sugerido %}
                       <p class="text-sm text-amber-600 mt-0.5">
                         <i class="fa-solid fa-user-check mr-1"></i>
@@ -106,6 +144,18 @@
 
                   <!-- Acciones -->
                   <div class="flex-shrink-0 flex flex-col gap-2">
+                    {% if not ausencia.bloque.permite_cobertura_residente %}
+                      <form method="post"
+                            action="{% url 'consultorios:generar_tarea_eges_reasignacion_ausencia' ausencia.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="semanas" value="{{ semanas }}">
+                        <button type="submit"
+                                class="w-full inline-flex items-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-lg transition">
+                          <i class="fa-solid fa-list-check"></i> Crear tarea EGES
+                        </button>
+                      </form>
+                    {% endif %}
+
                     {% if ausencia.residente_sugerido %}
                       <form method="post"
                             action="{% url 'consultorios:confirmar_cobertura' ausencia.pk ausencia.residente_sugerido.pk %}">
