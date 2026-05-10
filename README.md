@@ -213,7 +213,7 @@ Uso interno - Sanatorio Colegiales
 
 ## 👨‍💻 Autor
 
-Dr. Eduardo Cejas
+Dr. Enso F. Cejas
 - Email: ecejas@sanatoriocolegiales.com.ar
 - Teléfono: +54 11 6376 1360
 
