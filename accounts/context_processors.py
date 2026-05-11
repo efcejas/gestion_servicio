@@ -6,6 +6,7 @@ Grupos disponibles: Recursos · Docencia · Guardias · Gestión
 Único grupo Django activo: 'Administrativo - Docencia'
 """
 
+from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 
 
@@ -111,6 +112,8 @@ def navbar_links(request):
                     exclude_url_names=['banco'])
 
     def i_pedidos():
+        if not getattr(settings, 'PEDIDOS_ESTUDIOS_HABILITADO', False):
+            return None
         return item('Pedidos de Estudios', 'fa-clipboard-list',
                     'pedidos_estudios:dashboard', active_ns='pedidos_estudios')
 

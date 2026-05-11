@@ -54,6 +54,10 @@ SITE_URL = config('SITE_URL', default='http://localhost:8000')
 # Score mínimo de confianza para aceptar un email como pedido válido (0-100)
 PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 
+# Flag de feature para habilitar/deshabilitar el modulo de pedidos de estudios.
+# Temporalmente queda deshabilitado por defecto hasta retomar el desarrollo.
+PEDIDOS_ESTUDIOS_HABILITADO = config('PEDIDOS_ESTUDIOS_HABILITADO', default=False, cast=bool)
+
 CORREO_RESUMEN_CONFIG = {
     'ENABLED': config('CORREO_RESUMEN_ENABLED', default=False, cast=bool),
     'PROVIDER': config('CORREO_RESUMEN_PROVIDER', default='imap'),

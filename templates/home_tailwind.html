@@ -108,6 +108,7 @@
                 </div>
 
                 <!-- Pedidos de Estudios - Dashboard completo para admin/coordinadores -->
+                {% if pedidos_estudios_habilitado %}
                 {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' or user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                     <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl mb-4">
@@ -122,6 +123,7 @@
                         </a>
                     </div>
                 </div>
+                {% endif %}
                 {% endif %}
 
                 <!-- Novedades -->

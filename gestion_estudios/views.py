@@ -13,6 +13,7 @@ from django.contrib.auth.views import (
     PasswordChangeDoneView
 )
 from django.core.mail import send_mail
+from django.conf import settings
 from functools import wraps
 from django.db.models import Count, Max
 from django.http import HttpResponse, JsonResponse
@@ -131,6 +132,7 @@ class HomeView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = False
+        context['pedidos_estudios_habilitado'] = getattr(settings, 'PEDIDOS_ESTUDIOS_HABILITADO', False)
 
         # Últimos registros médicos
         ultimos_medicos = (
