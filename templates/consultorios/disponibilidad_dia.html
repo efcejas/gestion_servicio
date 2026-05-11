@@ -6,20 +6,27 @@
 {% block modulo_content %}
 <div>
     <div class="mb-6 bg-gradient-to-r from-violet-600 to-violet-800 rounded-xl shadow-lg p-6 text-white">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-4">
             <div>
                 <h1 class="text-3xl font-bold">📅 {{ consultorio.nombre }}</h1>
                 <p class="mt-1 text-violet-100">{{ dia_nombre }}</p>
+                <p class="mt-2 text-sm text-violet-100">Semana operativa del {{ semana_inicio|date:"d/m/Y" }} al {{ semana_fin|date:"d/m/Y" }}. Referencia: {{ fecha_operativa|date:"d/m/Y" }}.</p>
             </div>
-            <a href="{% url 'consultorios:detalle' consultorio.pk %}"
-                 class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
-                <i class="fas fa-arrow-left"></i> Volver al consultorio
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{% url 'consultorios:grilla_semanal' %}?fecha={{ fecha_operativa_iso }}"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+                    <i class="fas fa-table-cells-large"></i> Volver a la grilla
+                </a>
+                <a href="{% url 'consultorios:detalle' consultorio.pk %}"
+                   class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+                    <i class="fas fa-arrow-left"></i> Volver al consultorio
+                </a>
+            </div>
         </div>
 
         <div class="flex gap-2 overflow-x-auto pb-1">
             {% for d in todos_dias %}
-                <a href="{% url 'consultorios:disponibilidad_dia' consultorio.pk d.value %}"
+                <a href="{% url 'consultorios:disponibilidad_dia' consultorio.pk d.value %}?fecha={{ fecha_operativa_iso }}"
                      class="px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition border
                                     {% if d.value == dia_semana %}
                                         bg-white text-violet-700 border-white
@@ -81,9 +88,20 @@
                                         {% else %}
                                             <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600">Finalizado</span>
                                         {% endif %}
+                                        {% if bloque.tipo_titular == 'R1' or bloque.tipo_titular == 'R2' or bloque.tipo_titular == 'R3' or bloque.tipo_titular == 'R4' %}
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">Blanda</span>
+                                        {% elif bloque.tipo_titular == 'JEFES_RES' %}
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Dura</span>
+                                        {% endif %}
                                         {% if puede_gestionar_bloques %}
                                             <a href="{% url 'consultorios:bloque_editar' bloque.pk %}"
                                                  class="text-xs text-blue-600 hover:underline">Editar</a>
+                                            {% if request.user.is_superuser %}
+                                                <a href="{% url 'consultorios:migrar_agenda' bloque.pk %}"
+                                                   class="text-xs text-violet-600 hover:underline">Migrar</a>
+                                                <a href="{% url 'consultorios:bloque_eliminar' bloque.pk %}"
+                                                   class="text-xs text-red-600 hover:underline">Eliminar</a>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
                                 </div>
@@ -99,7 +117,7 @@
                         <i class="fas fa-calendar-day text-4xl mb-3 block"></i>
                         <p class="font-semibold text-gray-500">No hay bloques asignados para este día</p>
                         {% if puede_gestionar_bloques %}
-                            <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ consultorio.pk }}&dia_semana={{ dia_semana }}"
+                            <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ consultorio.pk }}&dia_semana={{ dia_semana }}&fecha_inicio_vigencia={{ fecha_operativa_iso }}"
                                  class="inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
                                 <i class="fas fa-plus"></i> Crear bloque
                             </a>
@@ -158,7 +176,7 @@
                         <h3 class="text-sm font-semibold text-gray-800">Acciones rápidas</h3>
                     </div>
                     <div class="p-5 space-y-2">
-                        <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ consultorio.pk }}&dia_semana={{ dia_semana }}"
+                        <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ consultorio.pk }}&dia_semana={{ dia_semana }}&fecha_inicio_vigencia={{ fecha_operativa_iso }}"
                              class="block w-full px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-center text-sm font-medium transition">Nuevo bloque</a>
                         <a href="{% url 'consultorios:consultorio_editar' consultorio.pk %}"
                              class="block w-full px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-center text-sm font-medium transition">Editar consultorio</a>

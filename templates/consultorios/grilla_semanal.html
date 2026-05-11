@@ -8,32 +8,98 @@
 
   <!-- Header -->
   <div class="mb-6 bg-gradient-to-r from-violet-600 to-violet-800 rounded-xl shadow-lg p-6 text-white">
-    <div class="flex items-center justify-between">
-      <div>
+    <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div class="flex-1">
         <h1 class="text-3xl font-bold">📅 Grilla Semanal</h1>
-        <p class="mt-1 text-violet-100">Todos los consultorios × días de la semana</p>
+        <p class="mt-1 text-sm text-violet-100">
+          {{ semana_inicio|date:"d/m/Y" }} – {{ semana_fin|date:"d/m/Y" }}
+          <span class="font-semibold">·</span> Referencia: {{ fecha_operativa|date:"l d/m" }}
+        </p>
       </div>
-      <div class="flex items-center gap-2">
+      
+      <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ url_semana_anterior }}"
+           class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium border border-white/30 transition">
+          ← Previa
+        </a>
+        <a href="{{ url_semana_actual }}"
+           class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium border border-white/30 transition">
+          Hoy
+        </a>
+        <a href="{{ url_semana_siguiente }}"
+           class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium border border-white/30 transition">
+          Próxima →
+        </a>
+
+        <form method="get" class="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-2 py-1.5">
+          <input id="fecha-operativa" type="date" name="fecha" value="{{ fecha_operativa_iso }}"
+                 class="rounded border-0 bg-white text-gray-800 px-2 py-1 text-xs shadow-sm" style="width: 130px;">
+          {% if mostrar_libres %}
+            <input type="hidden" name="libres" value="1">
+          {% endif %}
+          <button type="submit" class="px-2.5 py-1 bg-white text-violet-700 text-xs font-medium rounded hover:bg-violet-50 transition">
+            Ver
+          </button>
+        </form>
+
         {% if mostrar_libres %}
-          <a href="{% url 'consultorios:grilla_semanal' %}"
-             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
-            <i class="fa-solid fa-eye-slash"></i> Ocultar franjas libres
+          <a href="{% url 'consultorios:grilla_semanal' %}?fecha={{ fecha_operativa_iso }}"
+             title="Ocultar franjas libres"
+             class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium border border-white/30 transition">
+            <i class="fa-solid fa-eye-slash"></i>
           </a>
         {% else %}
-          <a href="{% url 'consultorios:grilla_semanal' %}?libres=1"
-             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
-            <i class="fa-solid fa-clock"></i> Ver franjas libres (08-20)
+          <a href="{% url 'consultorios:grilla_semanal' %}?fecha={{ fecha_operativa_iso }}&libres=1"
+             title="Ver franjas libres (08-20)"
+             class="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white text-sm font-medium border border-white/30 transition">
+            <i class="fa-solid fa-clock"></i>
           </a>
         {% endif %}
+
         {% if puede_gestionar_bloques %}
-          <a href="{% url 'consultorios:bloque_crear' %}"
-             class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
-            <i class="fas fa-plus"></i> Nuevo Bloque
+          <a href="{% url 'consultorios:bloque_crear' %}?fecha_inicio_vigencia={{ fecha_operativa_iso }}"
+             class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition">
+            <i class="fas fa-plus"></i> Bloque
           </a>
         {% endif %}
       </div>
     </div>
   </div>
+
+  {% if bloque_enfocado %}
+    <div class="mb-5 rounded-xl border border-violet-200 bg-violet-50 px-5 py-4 text-violet-900">
+      <p class="text-sm font-semibold">Migración aplicada</p>
+      <p class="mt-1 text-sm">
+        Se resaltó el nuevo bloque en la grilla:
+        <span class="font-medium">{{ bloque_enfocado.consultorio.nombre }} · {{ bloque_enfocado.get_dia_semana_display }} · {{ bloque_enfocado.hora_inicio|time:"H:i" }}–{{ bloque_enfocado.hora_fin|time:"H:i" }}</span>.
+      </p>
+      {% if bloque_origen_migrado %}
+        <p class="mt-1 text-xs text-violet-800">Origen afectado: bloque #{{ bloque_origen_migrado.pk }}{% if bloque_origen_migrado.consultorio %} en {{ bloque_origen_migrado.consultorio.nombre }}{% endif %}.</p>
+      {% endif %}
+      {% if bloques_blandos_pausados %}
+        <div class="mt-3 space-y-2">
+          <p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Bloques blandos pausados</p>
+          {% for bloque in bloques_blandos_pausados %}
+            <div class="flex flex-col gap-2 rounded-lg border border-violet-100 bg-white px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p class="font-medium text-gray-800">{{ bloque.nombre_profesional }}</p>
+                <p class="text-gray-500">{{ bloque.consultorio.nombre }} · {{ bloque.get_dia_semana_display }} · {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}</p>
+              </div>
+              {% if request.user.is_superuser %}
+                <form method="post" action="{% url 'consultorios:bloque_reactivar' bloque.pk %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700 transition font-medium">
+                    <i class="fas fa-rotate-left"></i> Reabrir
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
 
   {# ── Leyenda ─────────────────────────────────────────────────────────── #}
   <div class="flex flex-wrap gap-3 mb-5 text-xs">
@@ -72,10 +138,15 @@
             </th>
             {% for dia in dias_cabecera %}
               <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider
-                         {% if dia.es_hoy %}bg-blue-50 text-blue-700 ring-2 ring-inset ring-blue-200{% else %}text-gray-500{% endif %}">
+                         {% if dia.es_referencia %}bg-violet-50 text-violet-700 ring-2 ring-inset ring-violet-200{% else %}text-gray-500{% endif %}">
                 {{ dia.label }}
+                <span class="mt-0.5 block text-[11px] font-normal normal-case {% if dia.es_referencia %}text-violet-600{% else %}text-gray-400{% endif %}">
+                  {{ dia.fecha|date:"d/m" }}
+                </span>
                 {% if dia.es_hoy %}
                   <span class="block text-blue-500 font-normal normal-case text-xs">Hoy</span>
+                {% elif dia.es_referencia %}
+                  <span class="block text-violet-500 font-normal normal-case text-xs">Referencia</span>
                 {% endif %}
               </th>
             {% endfor %}
@@ -99,7 +170,7 @@
 
               {# Celdas por día #}
               {% for celda in fila.dias %}
-                <td class="px-2 py-2 align-top {% if celda.es_hoy %}bg-blue-50/40{% endif %}" style="vertical-align: top;">
+                <td class="px-2 py-2 align-top {% if celda.es_referencia %}bg-violet-50/40{% endif %}" style="vertical-align: top;">
                   {% if mostrar_libres %}
                     <div class="space-y-1">
                       {% for item in celda.items_celda %}
@@ -116,7 +187,7 @@
                               {{ item.hora_inicio|time:"H:i" }}-{{ item.hora_fin|time:"H:i" }}
                             </p>
                             {% if puede_gestionar_bloques %}
-                              <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}&hora_inicio={{ item.hora_inicio|time:'H:i' }}&hora_fin={{ item.hora_fin|time:'H:i' }}"
+                              <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}&hora_inicio={{ item.hora_inicio|time:'H:i' }}&hora_fin={{ item.hora_fin|time:'H:i' }}&fecha_inicio_vigencia={{ fecha_operativa_iso }}"
                                  class="inline-block mt-0.5 text-[11px] font-medium text-emerald-700 hover:text-emerald-900 hover:underline">
                                 Tomar
                               </a>
@@ -137,7 +208,7 @@
                     {% else %}
                       <div class="flex items-center justify-center h-10">
                         {% if puede_gestionar_bloques %}
-                          <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}"
+                          <a href="{% url 'consultorios:bloque_crear' %}?consultorio={{ fila.consultorio.pk }}&dia_semana={{ celda.dia_value }}&fecha_inicio_vigencia={{ fecha_operativa_iso }}"
                              class="text-gray-300 hover:text-blue-400 transition text-lg font-light"
                              title="Agregar bloque — {{ fila.consultorio.nombre }} {{ celda.dia.label }}">
                             +
@@ -167,4 +238,14 @@
   {% endif %}
 
 </div>
+{% if bloque_enfocado %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const el = document.getElementById('bloque-{{ bloque_enfocado.pk }}');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+    });
+  </script>
+{% endif %}
 {% endblock %}

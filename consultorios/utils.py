@@ -4,6 +4,7 @@ Utilidades para detección de conflictos en el sistema de consultorios.
 """
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from .models import BloqueHorario
 
 
@@ -13,8 +14,19 @@ class ConflictDetector:
     """
     
     @staticmethod
+    def _vigencias_se_superponen(fecha_inicio_a, fecha_fin_a, fecha_inicio_b, fecha_fin_b):
+        """Determina si dos rangos de vigencia se superponen."""
+        if not fecha_inicio_a or not fecha_inicio_b:
+            return True
+
+        fin_a = fecha_fin_a or fecha_inicio_b.__class__.max
+        fin_b = fecha_fin_b or fecha_inicio_a.__class__.max
+        return fecha_inicio_a <= fin_b and fecha_inicio_b <= fin_a
+
+    @staticmethod
     def verificar_conflictos(consultorio, profesional_interno=None, profesional_externo=None,
-                            dia_semana=None, hora_inicio=None, hora_fin=None, excluir_id=None):
+                            dia_semana=None, hora_inicio=None, hora_fin=None, excluir_id=None,
+                            fecha_inicio_vigencia=None, fecha_fin_vigencia=None):
         """
         Verifica todos los tipos de conflictos para un bloque horario.
         
@@ -51,8 +63,17 @@ class ConflictDetector:
             hora_fin=hora_fin,
             excluir_id=excluir_id
         )
+        conflictos_consultorio = [
+            conflicto for conflicto in conflictos_consultorio
+            if ConflictDetector._vigencias_se_superponen(
+                fecha_inicio_vigencia,
+                fecha_fin_vigencia,
+                conflicto.fecha_inicio_vigencia,
+                conflicto.fecha_fin_vigencia,
+            )
+        ]
         
-        if conflictos_consultorio.exists():
+        if conflictos_consultorio:
             resultado['tiene_conflictos'] = True
             resultado['conflictos_consultorio'] = conflictos_consultorio
             
@@ -82,8 +103,18 @@ class ConflictDetector:
                 hora_fin=hora_fin,
                 excluir_id=excluir_id
             )
+        if conflictos_profesional is not None:
+            conflictos_profesional = [
+                conflicto for conflicto in conflictos_profesional
+                if ConflictDetector._vigencias_se_superponen(
+                    fecha_inicio_vigencia,
+                    fecha_fin_vigencia,
+                    conflicto.fecha_inicio_vigencia,
+                    conflicto.fecha_fin_vigencia,
+                )
+            ]
         
-        if conflictos_profesional and conflictos_profesional.exists():
+        if conflictos_profesional:
             resultado['tiene_conflictos'] = True
             resultado['conflictos_profesional'] = conflictos_profesional
             
@@ -120,7 +151,9 @@ class ConflictDetector:
             dia_semana=bloque.dia_semana,
             hora_inicio=bloque.hora_inicio,
             hora_fin=bloque.hora_fin,
-            excluir_id=bloque.id if bloque.id else None
+            excluir_id=bloque.id if bloque.id else None,
+            fecha_inicio_vigencia=bloque.fecha_inicio_vigencia,
+            fecha_fin_vigencia=bloque.fecha_fin_vigencia,
         )
         
         if resultado['tiene_conflictos']:
@@ -129,7 +162,7 @@ class ConflictDetector:
             })
     
     @staticmethod
-    def obtener_disponibilidad_consultorio(consultorio, dia_semana, hora_inicio=None, hora_fin=None):
+    def obtener_disponibilidad_consultorio(consultorio, dia_semana, hora_inicio=None, hora_fin=None, fecha=None):
         """
         Obtiene información sobre la disponibilidad de un consultorio.
         
@@ -142,7 +175,8 @@ class ConflictDetector:
         Returns:
             dict con información de disponibilidad
         """
-        bloques_dia = BloqueHorario.objects.activos().filter(
+        fecha = fecha or timezone.now().date()
+        bloques_dia = BloqueHorario.objects.vigentes(fecha).filter(
             consultorio=consultorio,
             dia_semana=dia_semana
         ).order_by('hora_inicio')
@@ -170,7 +204,7 @@ class ConflictDetector:
         return disponibilidad
     
     @staticmethod
-    def sugerir_horarios_disponibles(consultorio, dia_semana, duracion_horas=4):
+    def sugerir_horarios_disponibles(consultorio, dia_semana, duracion_horas=4, fecha=None):
         """
         Sugiere horarios disponibles en un consultorio para un día específico.
         
@@ -183,8 +217,11 @@ class ConflictDetector:
             list de tuplas (hora_inicio, hora_fin) sugeridas
         """
         from datetime import time, datetime, timedelta
+        from django.utils import timezone
+
+        fecha = fecha or timezone.now().date()
         
-        bloques_ocupados = BloqueHorario.objects.activos().filter(
+        bloques_ocupados = BloqueHorario.objects.vigentes(fecha).filter(
             consultorio=consultorio,
             dia_semana=dia_semana
         ).order_by('hora_inicio')

@@ -1,0 +1,278 @@
+{% extends 'consultorios/base_consultorios.html' %}
+
+{% block modulo_title %}Migrar Agenda{% endblock %}
+
+{% block modulo_content %}
+<div>
+  <div class="mb-6 bg-gradient-to-r from-violet-600 to-violet-800 rounded-xl shadow-lg p-6 text-white">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold flex items-center gap-2"><i class="fa-solid fa-right-left"></i> Migrar agenda</h1>
+        <p class="mt-1 text-violet-100">Evaluá si el destino está libre, es blando o queda bloqueado.</p>
+      </div>
+      <a href="{% url 'consultorios:bloque_editar' bloque_origen.pk %}"
+         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/20 hover:bg-white/30 text-white text-sm font-medium border border-white/30 transition">
+        <i class="fas fa-arrow-left"></i> Volver al bloque
+      </a>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <div class="xl:col-span-2 space-y-6">
+      <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+        <h2 class="text-sm font-semibold text-gray-800 mb-4">Bloque origen</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div>
+            <p class="text-gray-500 uppercase tracking-wide text-xs font-semibold">Consultorio</p>
+            <p class="font-medium text-gray-800">{{ bloque_origen.consultorio.nombre }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 uppercase tracking-wide text-xs font-semibold">Día y horario</p>
+            <p class="font-medium text-gray-800">{{ bloque_origen.get_dia_semana_display }} · {{ bloque_origen.hora_inicio|time:"H:i" }}–{{ bloque_origen.hora_fin|time:"H:i" }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 uppercase tracking-wide text-xs font-semibold">Profesional</p>
+            <p class="font-medium text-gray-800">{{ bloque_origen.nombre_profesional }}</p>
+          </div>
+          <div>
+            <p class="text-gray-500 uppercase tracking-wide text-xs font-semibold">Clasificación</p>
+            <p class="font-medium text-gray-800">{{ bloque_origen.get_tipo_titular_display }} · {{ bloque_origen.get_tipo_lista_display }}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+        <h2 class="text-sm font-semibold text-gray-800 mb-4">Destino propuesto</h2>
+        <form method="post" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {% csrf_token %}
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Consultorio destino</label>
+            {{ form.consultorio_destino }}
+            {% if form.consultorio_destino.errors %}<p class="text-xs text-red-600 mt-1">{{ form.consultorio_destino.errors.0 }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Fecha destino</label>
+            {{ form.fecha_destino }}
+            {% if form.fecha_destino.errors %}<p class="text-xs text-red-600 mt-1">{{ form.fecha_destino.errors.0 }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Hora inicio destino</label>
+            {{ form.hora_inicio_destino }}
+            {% if form.hora_inicio_destino.errors %}<p class="text-xs text-red-600 mt-1">{{ form.hora_inicio_destino.errors.0 }}</p>{% endif %}
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Hora fin destino</label>
+            {{ form.hora_fin_destino }}
+            {% if form.hora_fin_destino.errors %}<p class="text-xs text-red-600 mt-1">{{ form.hora_fin_destino.errors.0 }}</p>{% endif %}
+          </div>
+          <div class="sm:col-span-2 xl:col-span-4 grid grid-cols-1 lg:grid-cols-[auto,1fr] gap-4 items-start pt-2">
+            <button type="submit" name="accion" value="evaluar" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition font-medium">
+              <i class="fas fa-search"></i> Evaluar migración
+            </button>
+            <div class="rounded-lg border border-violet-100 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+              <p class="font-semibold">Cómo se interpreta esta migración</p>
+              <p class="mt-1 text-violet-800">La fecha destino define el día semanal de la nueva agenda. Si elegís un jueves, la agenda quedará para todos los jueves dentro de su vigencia.</p>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {% if resultado %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h2 class="text-sm font-semibold text-gray-800">Resultado</h2>
+            {% if resultado.estado == 'LIBRE' %}
+              <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Libre</span>
+            {% elif resultado.estado == 'BLANDO' %}
+              <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Blando</span>
+            {% else %}
+              <span class="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Bloqueado</span>
+            {% endif %}
+          </div>
+          <p class="text-sm text-gray-700">{{ resultado.mensaje }}</p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 text-sm">
+            <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p class="text-gray-500 uppercase tracking-wide text-xs font-semibold">Destino</p>
+              <p class="font-medium text-gray-800">{{ resultado.consultorio.nombre }}</p>
+              <p class="text-gray-600 mt-1">{{ resultado.fecha_destino }} · {{ resultado.hora_inicio_destino|time:"H:i" }}–{{ resultado.hora_fin_destino|time:"H:i" }}</p>
+            </div>
+            <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+              <p class="text-emerald-700 uppercase tracking-wide text-xs font-semibold">Blandos</p>
+              <p class="font-medium text-emerald-800">{{ resultado.bloques_blandos|length }}</p>
+            </div>
+            <div class="rounded-lg border border-red-100 bg-red-50 p-4">
+              <p class="text-red-700 uppercase tracking-wide text-xs font-semibold">Duros</p>
+              <p class="font-medium text-red-800">{{ resultado.bloques_duros|length }}</p>
+            </div>
+          </div>
+
+          {% if resultado.bloques_conflictivos %}
+            <div class="mt-5 space-y-2">
+              <p class="text-sm font-semibold text-gray-800">Bloques que ocupan el destino</p>
+              {% for bloque in resultado.bloques_conflictivos %}
+                <div class="rounded-lg border border-gray-100 bg-white px-4 py-3 text-sm flex items-center justify-between gap-3">
+                  <div>
+                    <p class="font-medium text-gray-800">{{ bloque.nombre_profesional }}</p>
+                    <p class="text-gray-500">{{ bloque.get_tipo_titular_display }} · {{ bloque.get_dia_semana_display }} · {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}</p>
+                  </div>
+                  {% if bloque.tipo_titular == 'R1' or bloque.tipo_titular == 'R2' or bloque.tipo_titular == 'R3' or bloque.tipo_titular == 'R4' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700">Blanda</span>
+                  {% else %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Dura</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="mt-5">
+            <span class="text-xs text-gray-500">Al aplicar migración: se crea el bloque destino, el bloque origen queda liberado y, si corresponde, los blandos superpuestos se pausan.</span>
+          </div>
+
+          {% if resultado.puede_migrar %}
+            <div class="mt-5 rounded-xl border border-emerald-100 bg-emerald-50 p-5">
+              <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p class="text-sm font-semibold text-emerald-900">Cambios a aplicar</p>
+                  <p class="mt-1 text-sm text-emerald-800">Se liberará el bloque origen y se resaltará en la grilla el nuevo bloque generado.</p>
+                </div>
+                <form method="post" class="flex-shrink-0">
+                  {% csrf_token %}
+                  <input type="hidden" name="consultorio_destino" value="{{ form.consultorio_destino.value }}">
+                  <input type="hidden" name="fecha_destino" value="{{ form.fecha_destino.value }}">
+                  <input type="hidden" name="hora_inicio_destino" value="{{ form.hora_inicio_destino.value }}">
+                  <input type="hidden" name="hora_fin_destino" value="{{ form.hora_fin_destino.value }}">
+                  <button type="submit" name="accion" value="aplicar" class="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition font-medium">
+                    <i class="fas fa-check"></i> Aplicar migración
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if sugerencias_destino %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h2 class="text-sm font-semibold text-gray-800">Sugerencias de destino</h2>
+            <span class="text-xs text-gray-500">Ordenadas por prioridad operativa</span>
+          </div>
+          <div class="space-y-2">
+            {% for sug in sugerencias_destino %}
+              <div class="rounded-lg border border-gray-100 bg-white px-4 py-3 text-sm flex items-center justify-between gap-3">
+                <div>
+                  <p class="font-medium text-gray-800">{{ sug.consultorio.nombre }}</p>
+                  <p class="text-gray-500">{{ sug.fecha_destino }} · {{ sug.hora_inicio_destino|time:"H:i" }}–{{ sug.hora_fin_destino|time:"H:i" }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  {% if sug.estado == 'LIBRE' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Libre</span>
+                  {% elif sug.estado == 'BLANDO' %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Blando</span>
+                  {% else %}
+                    <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Bloqueado</span>
+                  {% endif %}
+                  <span class="text-xs text-gray-500">Blandos: {{ sug.bloques_blandos|length }} · Duros: {{ sug.bloques_duros|length }}</span>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if reubicaciones_blandos %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h2 class="text-sm font-semibold text-gray-800">Reubicación sugerida para bloques blandos afectados</h2>
+            <span class="text-xs text-gray-500">Top 3 por bloque</span>
+          </div>
+
+          <div class="space-y-4">
+            {% for item in reubicaciones_blandos %}
+              <div class="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                <p class="text-sm font-semibold text-gray-800">
+                  {{ item.bloque.get_tipo_titular_display }} · {{ item.bloque.hora_inicio|time:"H:i" }}–{{ item.bloque.hora_fin|time:"H:i" }} · {{ item.bloque.consultorio.nombre }}
+                </p>
+
+                {% if item.sugerencias %}
+                  <div class="mt-3 space-y-2">
+                    {% for sug in item.sugerencias %}
+                      <div class="rounded-lg border border-gray-100 bg-white px-3 py-2 text-sm flex items-center justify-between gap-3">
+                        <div>
+                          <p class="font-medium text-gray-800">{{ sug.consultorio.nombre }}</p>
+                          <p class="text-gray-500">{{ sug.fecha_destino }} · {{ sug.hora_inicio_destino|time:"H:i" }}–{{ sug.hora_fin_destino|time:"H:i" }}</p>
+                        </div>
+                        {% if sug.estado == 'LIBRE' %}
+                          <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Libre</span>
+                        {% elif sug.estado == 'BLANDO' %}
+                          <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Blando</span>
+                        {% else %}
+                          <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">Bloqueado</span>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <p class="mt-2 text-sm text-gray-500">No hay sugerencias disponibles para este bloque en la franja indicada.</p>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+
+      {% if blandos_pausados_recientes %}
+        <div class="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h2 class="text-sm font-semibold text-gray-800">Bloques blandos pausados por esta migración</h2>
+            <span class="text-xs text-gray-500">Podés reabrirlos si necesitás revertir el impacto</span>
+          </div>
+
+          <div class="space-y-2">
+            {% for bloque in blandos_pausados_recientes %}
+              <div class="rounded-lg border border-gray-100 bg-white px-4 py-3 text-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p class="font-medium text-gray-800">{{ bloque.nombre_profesional }}</p>
+                  <p class="text-gray-500">{{ bloque.consultorio.nombre }} · {{ bloque.get_dia_semana_display }} · {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}</p>
+                </div>
+                <form method="post" action="{% url 'consultorios:bloque_reactivar' bloque.pk %}" class="flex items-center gap-2">
+                  {% csrf_token %}
+                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                  <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-sky-600 text-white hover:bg-sky-700 transition font-medium">
+                    <i class="fas fa-rotate-left"></i> Reabrir bloque
+                  </button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-white border border-gray-100 rounded-xl shadow-sm">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+          <i class="fas fa-circle-info text-blue-500"></i>
+          <h3 class="text-sm font-semibold text-gray-800">Ayuda rápida</h3>
+        </div>
+        <div class="p-5 space-y-3 text-sm text-gray-600">
+          <div class="flex gap-3">
+            <i class="fas fa-calendar-day text-violet-400 mt-0.5 shrink-0"></i>
+            <p><span class="font-semibold text-gray-700">Fecha destino:</span> define el día semanal de la nueva agenda. Si elegís un jueves, quedará para todos los jueves dentro de la vigencia.</p>
+          </div>
+          <div class="flex gap-3">
+            <i class="fas fa-clock text-emerald-400 mt-0.5 shrink-0"></i>
+            <p><span class="font-semibold text-gray-700">Horario:</span> podés ajustar hora de inicio y fin para evaluar una franja distinta a la original.</p>
+          </div>
+          <div class="flex gap-3">
+            <i class="fas fa-traffic-light text-amber-400 mt-0.5 shrink-0"></i>
+            <p><span class="font-semibold text-gray-700">Semáforo:</span> Libre = sin choques; Blando = sólo R1-R4; Bloqueado = hay staff/jefes u otro bloque duro.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

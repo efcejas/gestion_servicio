@@ -494,12 +494,12 @@ class BloqueHorario(models.Model):
                 ):
                     if rol_asignado != 'medico_residente':
                         raise ValidationError(
-                            "Para slots R1-R4, el nombre asignado debe tener rol medico_residente."
+                            "Para slots R1-R4, el nombre asignado debe tener rol de médico residente."
                         )
                 if self.tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
                     if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:
                         raise ValidationError(
-                            "Para slots de jefes, el nombre asignado debe tener rol jefe_residentes o instructor_residentes."
+                            "Para slots de jefes, el nombre asignado debe tener rol de jefe de residentes o instructor de residentes."
                         )
         
         # Validar que hora_inicio sea antes que hora_fin

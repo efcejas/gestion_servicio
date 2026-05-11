@@ -1,5 +1,6 @@
-<a href="{% url 'consultorios:disponibilidad_dia' consultorio.pk bloque.dia_semana %}"
-   class="block px-2 py-1.5 rounded border {{ bg }} transition cursor-pointer"
+<a href="{% url 'consultorios:disponibilidad_dia' consultorio.pk bloque.dia_semana %}?fecha={{ fecha_operativa_iso }}"
+  id="bloque-{{ bloque.pk }}"
+  class="block px-2 py-1.5 rounded border {{ bg }} transition cursor-pointer {% if bloque.is_focus %}ring-2 ring-violet-500 ring-offset-2 shadow-lg{% endif %}"
    title="{{ bloque.nombre_profesional }} · {{ bloque.hora_inicio|time:'H:i' }}-{{ bloque.hora_fin|time:'H:i' }}">
 
   <div class="flex items-start gap-1.5">
@@ -8,6 +9,11 @@
       <p class="text-xs font-medium text-gray-800 truncate leading-tight">
         {{ bloque.nombre_profesional }}
       </p>
+      {% if bloque.tipo_titular == 'R1' or bloque.tipo_titular == 'R2' or bloque.tipo_titular == 'R3' or bloque.tipo_titular == 'R4' %}
+        <p class="text-[10px] font-semibold text-sky-700 uppercase tracking-wide leading-tight">Blanda</p>
+      {% elif bloque.tipo_titular == 'JEFES_RES' %}
+        <p class="text-[10px] font-semibold text-slate-700 uppercase tracking-wide leading-tight">Dura</p>
+      {% endif %}
       <p class="text-xs text-gray-500 leading-tight">
         {{ bloque.hora_inicio|time:"H:i" }}–{{ bloque.hora_fin|time:"H:i" }}
       </p>
@@ -45,5 +51,17 @@
         </a>
       </div>
     </details>
+    {% if request.user.is_superuser %}
+      <a href="{% url 'consultorios:migrar_agenda' bloque.pk %}"
+         class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-50 text-violet-700 hover:bg-violet-100 hover:text-violet-800 transition"
+         title="Migrar agenda — {{ bloque.nombre_profesional }}">
+        <i class="fa-solid fa-right-left text-[11px]"></i>
+      </a>
+      <a href="{% url 'consultorios:bloque_eliminar' bloque.pk %}"
+         class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800 transition"
+         title="Eliminar bloque — {{ bloque.nombre_profesional }}">
+        <i class="fa-solid fa-trash text-[11px]"></i>
+      </a>
+    {% endif %}
   </div>
 {% endif %}

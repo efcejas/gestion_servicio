@@ -18,6 +18,9 @@ urlpatterns = [
     # Gestión de bloques
     path('bloques/nuevo/', views.BloqueHorarioCreateView.as_view(), name='bloque_crear'),
     path('bloques/<int:pk>/editar/', views.BloqueHorarioUpdateView.as_view(), name='bloque_editar'),
+    path('bloques/<int:pk>/eliminar/', views.BloqueHorarioDeleteView.as_view(), name='bloque_eliminar'),
+    path('bloques/<int:pk>/migrar/', views.MigracionAgendaView.as_view(), name='migrar_agenda'),
+    path('bloques/<int:pk>/reactivar/', views.reactivar_bloque_migrado, name='bloque_reactivar'),
 
     # Lista de consultorios
     path('lista/', views.ConsultoriosListView.as_view(), name='lista'),

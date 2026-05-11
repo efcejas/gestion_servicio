@@ -4,12 +4,13 @@ Vistas para la app consultorios.
 """
 
 import hashlib
-from datetime import time
+from datetime import date, datetime, time, timedelta
 
 from django.shortcuts import render, get_object_or_404, redirect
+from django.http import QueryDict
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.views.generic import ListView, DetailView, CreateView, UpdateView
+from django.views.generic import DeleteView, DetailView, ListView, CreateView, UpdateView
 from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import PermissionDenied
@@ -36,7 +37,18 @@ from .models import (
 )
 from .utils import ConflictDetector
 from .forms import BloqueHorarioForm, AusenciaCoberturaForm, ConsultorioForm, ProfesionalExternoForm
-from .services import sugerir_cobertura, SinResidentesDisponiblesError, BloqueNoCubreError
+from .forms import MigracionAgendaForm
+from .services import (
+    ConsultoriosError,
+    aplicar_migracion_agenda,
+    reactivar_bloque_blando_migrado,
+    sugerir_cobertura,
+    evaluar_migracion_agenda,
+    sugerir_destinos_migracion,
+    sugerir_reubicacion_bloques_blandos,
+    SinResidentesDisponiblesError,
+    BloqueNoCubreError,
+)
 
 User = get_user_model()
 
@@ -170,6 +182,15 @@ def _construir_items_celda(bloques, inicio_jornada=time(8, 0), fin_jornada=time(
     return items
 
 
+def _parse_fecha_operativa(valor):
+    if not valor:
+        return None
+    try:
+        return date.fromisoformat(valor)
+    except ValueError:
+        return None
+
+
 def usuario_puede_gestionar_bloques(user):
     """Permisos para alta/edición de bloques en UI operativa."""
     if not user.is_authenticated:
@@ -206,9 +227,10 @@ class ConsultoriosListView(LoginRequiredMixin, ListView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        hoy = timezone.now().date()
         context['total_consultorios'] = Consultorio.objects.count()
         context['consultorios_activos'] = Consultorio.objects.activos().count()
-        context['total_bloques_activos'] = BloqueHorario.objects.activos().count()
+        context['total_bloques_activos'] = BloqueHorario.objects.vigentes(hoy).count()
         context['puede_gestionar_bloques'] = usuario_puede_gestionar_bloques(self.request.user)
         return context
 
@@ -224,11 +246,12 @@ class ConsultorioDetailView(LoginRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         consultorio = self.object
+        hoy = timezone.now().date()
         
         # Obtener bloques activos agrupados por día
         dias_semana = []
         for dia in DiaSemana:
-            bloques = BloqueHorario.objects.activos().filter(
+            bloques = BloqueHorario.objects.vigentes(hoy).filter(
                 consultorio=consultorio,
                 dia_semana=dia.value
             ).order_by('hora_inicio').select_related(
@@ -255,12 +278,14 @@ class ConsultorioDetailView(LoginRequiredMixin, DetailView):
         context['equipos_asignados'] = consultorio.equipos_asignados()
         
         # Estadísticas
-        context['total_bloques'] = BloqueHorario.objects.activos().filter(
+        context['total_bloques'] = BloqueHorario.objects.vigentes(hoy).filter(
             consultorio=consultorio
         ).count()
         
         # Ocupación semanal
-        ocupacion = BloqueHorario.objects.ocupacion_semanal(consultorio)
+        ocupacion = {dia: 0 for dia in range(7)}
+        for bloque in BloqueHorario.objects.vigentes(hoy).filter(consultorio=consultorio):
+            ocupacion[bloque.dia_semana] += bloque.duracion_horas()
         context['ocupacion_semanal'] = ocupacion
         context['total_horas_semana'] = sum(ocupacion.values())
         context['puede_gestionar_bloques'] = usuario_puede_gestionar_bloques(self.request.user)
@@ -282,6 +307,7 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
         dia_semana = self.request.GET.get('dia_semana')
         hora_inicio = self.request.GET.get('hora_inicio')
         hora_fin = self.request.GET.get('hora_fin')
+        fecha_inicio_vigencia = self.request.GET.get('fecha_inicio_vigencia')
 
         if copiar_de:
             try:
@@ -331,6 +357,11 @@ class BloqueHorarioCreateView(GestionBloquesMixin, CreateView):
         if hora_fin:
             try:
                 initial['hora_fin'] = time.fromisoformat(hora_fin)
+            except ValueError:
+                pass
+        if fecha_inicio_vigencia:
+            try:
+                initial['fecha_inicio_vigencia'] = date.fromisoformat(fecha_inicio_vigencia)
             except ValueError:
                 pass
 
@@ -388,22 +419,186 @@ class BloqueHorarioUpdateView(GestionBloquesMixin, UpdateView):
         return context
 
 
+class BloqueHorarioDeleteView(GestionBloquesMixin, DeleteView):
+    """Eliminación operativa de bloques horarios desde la UI del módulo."""
+    model = BloqueHorario
+    template_name = 'consultorios/bloque_confirm_delete.html'
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def get_success_url(self):
+        return reverse('consultorios:disponibilidad_dia', kwargs={
+            'pk': self.object.consultorio_id,
+            'dia_semana': self.object.dia_semana,
+        })
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['titulo'] = 'Eliminar Bloque Horario'
+        return context
+
+
+class MigracionAgendaView(GestionBloquesMixin, DetailView):
+    """Asistente para evaluar si una agenda puede migrarse a un destino."""
+    model = BloqueHorario
+    template_name = 'consultorios/migrar_agenda.html'
+    context_object_name = 'bloque_origen'
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = timezone.now().date()
+        dias_hasta_bloque = (self.object.dia_semana - hoy.weekday()) % 7
+        proxima_fecha_mismo_dia = hoy + timedelta(days=dias_hasta_bloque)
+        initial = {
+            'consultorio_destino': self.object.consultorio_id,
+            'fecha_destino': proxima_fecha_mismo_dia,
+            'hora_inicio_destino': self.object.hora_inicio,
+            'hora_fin_destino': self.object.hora_fin,
+        }
+        form = kwargs.get('form') or MigracionAgendaForm(initial=initial)
+        context['form'] = form
+        context['resultado'] = kwargs.get('resultado')
+        context['sugerencias_destino'] = kwargs.get('sugerencias_destino', [])
+        context['reubicaciones_blandos'] = kwargs.get('reubicaciones_blandos', [])
+        pausados_param = (self.request.GET.get('pausados') or '').strip()
+        pausados_ids = [int(valor) for valor in pausados_param.split(',') if valor.isdigit()]
+        context['blandos_pausados_recientes'] = list(
+            BloqueHorario.objects.filter(pk__in=pausados_ids).order_by('hora_inicio')
+        ) if pausados_ids else []
+        context['titulo'] = 'Migrar agenda'
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = MigracionAgendaForm(request.POST)
+        if form.is_valid():
+            cleaned = form.cleaned_data
+            accion = (request.POST.get('accion') or 'evaluar').strip().lower()
+            resultado = evaluar_migracion_agenda(
+                consultorio=cleaned['consultorio_destino'],
+                fecha_destino=cleaned['fecha_destino'],
+                hora_inicio_destino=cleaned['hora_inicio_destino'],
+                hora_fin_destino=cleaned['hora_fin_destino'],
+                excluir_bloque_id=self.object.pk,
+            )
+            sugerencias = sugerir_destinos_migracion(
+                fecha_destino=cleaned['fecha_destino'],
+                hora_inicio_destino=cleaned['hora_inicio_destino'],
+                hora_fin_destino=cleaned['hora_fin_destino'],
+                excluir_bloque_id=self.object.pk,
+            )
+            reubicaciones_blandos = []
+            if resultado['bloques_blandos']:
+                reubicaciones_blandos = sugerir_reubicacion_bloques_blandos(
+                    bloques_blandos=resultado['bloques_blandos'],
+                    fecha_destino=cleaned['fecha_destino'],
+                    excluir_consultorio_id=cleaned['consultorio_destino'].pk,
+                )
+
+            if accion == 'aplicar':
+                try:
+                    migracion = aplicar_migracion_agenda(
+                        bloque_origen=self.object,
+                        consultorio_destino=cleaned['consultorio_destino'],
+                        fecha_destino=cleaned['fecha_destino'],
+                        hora_inicio_destino=cleaned['hora_inicio_destino'],
+                        hora_fin_destino=cleaned['hora_fin_destino'],
+                        usuario=request.user,
+                    )
+                except ConsultoriosError as exc:
+                    messages.error(request, str(exc))
+                    return self.render_to_response(
+                        self.get_context_data(
+                            form=form,
+                            resultado=resultado,
+                            sugerencias_destino=sugerencias,
+                            reubicaciones_blandos=reubicaciones_blandos,
+                        )
+                    )
+
+                nuevo_bloque = migracion['nuevo_bloque']
+                afectados = len(migracion['blandos_pausados'])
+                afectados_diferidos = len(migracion['blandos_diferidos'])
+                if afectados:
+                    messages.warning(
+                        request,
+                        f'Migración aplicada. Se pausaron {afectados} bloque(s) blandos que ocupaban el destino.'
+                    )
+                elif afectados_diferidos:
+                    messages.warning(
+                        request,
+                        f'Migración futura programada. Se recortó la vigencia de {afectados_diferidos} bloque(s) blandos a partir de la fecha elegida.'
+                    )
+                else:
+                    if cleaned['fecha_destino'] > timezone.now().date():
+                        messages.success(request, 'Migración futura programada. El origen se mantiene vigente hasta el día previo y el nuevo bloque comenzará en la fecha indicada.')
+                    else:
+                        messages.success(request, 'Migración aplicada. El bloque original quedó liberado y se creó el nuevo destino.')
+
+                params = QueryDict(mutable=True)
+                params['focus_bloque'] = str(nuevo_bloque.pk)
+                params['origen_bloque'] = str(self.object.pk)
+                params['fecha'] = cleaned['fecha_destino'].isoformat()
+                if migracion['blandos_pausados']:
+                    params['pausados'] = ','.join(str(b.pk) for b in migracion['blandos_pausados'])
+                destino = f"{reverse('consultorios:grilla_semanal')}?{params.urlencode()}"
+                return redirect(destino)
+
+            return self.render_to_response(
+                self.get_context_data(
+                    form=form,
+                    resultado=resultado,
+                    sugerencias_destino=sugerencias,
+                    reubicaciones_blandos=reubicaciones_blandos,
+                )
+            )
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+@require_POST
+@login_required
+def reactivar_bloque_migrado(request, pk):
+    if not request.user.is_superuser:
+        raise PermissionDenied
+
+    bloque = get_object_or_404(BloqueHorario, pk=pk)
+    try:
+        reactivar_bloque_blando_migrado(bloque)
+    except ConsultoriosError as exc:
+        messages.error(request, str(exc))
+    else:
+        messages.success(request, 'Bloque blando reabierto correctamente.')
+
+    siguiente = request.POST.get('next')
+    if siguiente:
+        return redirect(siguiente)
+    return redirect('consultorios:bloque_editar', pk=bloque.pk)
+
+
 @login_required
 def disponibilidad_consultorio_dia(request, pk, dia_semana):
     """
     Vista que muestra la disponibilidad de un consultorio en un día específico.
     """
     consultorio = get_object_or_404(Consultorio, pk=pk)
-    
+
     # Obtener nombre del día
     try:
         dia_obj = DiaSemana(int(dia_semana))
         dia_nombre = dia_obj.label
     except (ValueError, KeyError):
         dia_nombre = f"Día {dia_semana}"
-    
+
+    fecha_referencia = _parse_fecha_operativa(request.GET.get('fecha')) or timezone.now().date()
+    semana_inicio = fecha_referencia - timedelta(days=fecha_referencia.weekday())
+    semana_fin = semana_inicio + timedelta(days=6)
+
     # Obtener bloques del día
-    bloques = BloqueHorario.objects.activos().filter(
+    bloques = BloqueHorario.objects.vigentes(fecha_referencia).filter(
         consultorio=consultorio,
         dia_semana=dia_semana
     ).order_by('hora_inicio').select_related(
@@ -424,14 +619,16 @@ def disponibilidad_consultorio_dia(request, pk, dia_semana):
     # Obtener disponibilidad
     disponibilidad = ConflictDetector.obtener_disponibilidad_consultorio(
         consultorio=consultorio,
-        dia_semana=int(dia_semana)
+        dia_semana=int(dia_semana),
+        fecha=fecha_referencia,
     )
     
     # Sugerencias de horarios disponibles
     sugerencias = ConflictDetector.sugerir_horarios_disponibles(
         consultorio=consultorio,
         dia_semana=int(dia_semana),
-        duracion_horas=4
+        duracion_horas=4,
+        fecha=fecha_referencia,
     )
     
     # Equipos del consultorio
@@ -452,6 +649,10 @@ def disponibilidad_consultorio_dia(request, pk, dia_semana):
         'profesionales_distintos': profesionales_distintos,
         'equipos_disponibles': equipos_disponibles,
         'todos_dias': todos_dias,
+        'fecha_operativa': fecha_referencia,
+        'fecha_operativa_iso': fecha_referencia.isoformat(),
+        'semana_inicio': semana_inicio,
+        'semana_fin': semana_fin,
         'puede_gestionar_bloques': usuario_puede_gestionar_bloques(request.user),
     }
     
@@ -466,7 +667,7 @@ def dashboard_consultorios(request):
     # Estadísticas generales
     total_consultorios = Consultorio.objects.count()
     consultorios_activos = Consultorio.objects.activos().count()
-    total_bloques = BloqueHorario.objects.activos().count()
+    total_bloques = BloqueHorario.objects.vigentes(timezone.now().date()).count()
     total_profesionales_externos = ProfesionalExterno.objects.activos().count()
     
     # Consultorios con más bloques
@@ -534,22 +735,50 @@ def grilla_semanal(request):
         ...
       ]
     """
-    hoy_dia_semana = timezone.now().date().weekday()  # 0=Lunes
+    hoy = timezone.now().date()
     mostrar_libres = request.GET.get('libres') == '1'
+    focus_bloque_id = request.GET.get('focus_bloque')
+    focus_bloque_id = int(focus_bloque_id) if focus_bloque_id and focus_bloque_id.isdigit() else None
+    origen_bloque_id = request.GET.get('origen_bloque')
+    origen_bloque_id = int(origen_bloque_id) if origen_bloque_id and origen_bloque_id.isdigit() else None
+    pausados_param = (request.GET.get('pausados') or '').strip()
+    pausados_ids = [int(valor) for valor in pausados_param.split(',') if valor.isdigit()]
+
+    bloque_enfocado = (
+        BloqueHorario.objects.filter(pk=focus_bloque_id)
+        .select_related('consultorio')
+        .first()
+        if focus_bloque_id else None
+    )
+    bloque_origen_migrado = (
+        BloqueHorario.objects.filter(pk=origen_bloque_id)
+        .select_related('consultorio')
+        .first()
+        if origen_bloque_id else None
+    )
+
+    fecha_referencia = _parse_fecha_operativa(request.GET.get('fecha'))
+    if not fecha_referencia:
+        if bloque_enfocado and bloque_enfocado.fecha_inicio_vigencia and bloque_enfocado.fecha_inicio_vigencia > hoy:
+            fecha_referencia = bloque_enfocado.fecha_inicio_vigencia
+        else:
+            fecha_referencia = hoy
+
+    dia_referencia_semana = fecha_referencia.weekday()
+    semana_inicio = fecha_referencia - timedelta(days=dia_referencia_semana)
+    semana_fin = semana_inicio + timedelta(days=6)
 
     consultorios_activos = (
         Consultorio.objects.activos()
         .order_by('nombre')
     )
 
-    # Prefetch de todos los bloques activos para evitar N+1
     todos_bloques = (
-        BloqueHorario.objects.activos()
+        BloqueHorario.objects.vigentes(fecha_referencia)
         .select_related('profesional_interno', 'profesional_externo', 'profesional_asignado_temporal')
         .order_by('hora_inicio')
     )
 
-    # Indexar: {(consultorio_id, dia_semana): [bloque, ...]}
     colores_por_profesional = {}
     indice = {}
     for bloque in todos_bloques:
@@ -560,6 +789,7 @@ def grilla_semanal(request):
         )
         bloque.color_bg = estilos['bg']
         bloque.color_dot = estilos['dot']
+        bloque.is_focus = bloque.pk == focus_bloque_id
 
         key = (bloque.consultorio_id, bloque.dia_semana)
         indice.setdefault(key, []).append(bloque)
@@ -575,7 +805,7 @@ def grilla_semanal(request):
                 'dia': dia,
                 'dia_value': dia.value,
                 'bloques': bloques_celda,
-                'es_hoy': dia.value == hoy_dia_semana,
+                'es_referencia': dia.value == dia_referencia_semana,
                 'franjas_libres': _calcular_franjas_libres(bloques_celda) if mostrar_libres else [],
                 'items_celda': _construir_items_celda(bloques_celda) if mostrar_libres else [],
             })
@@ -584,16 +814,46 @@ def grilla_semanal(request):
             'dias': dias_fila,
         })
 
-    dias_cabecera = [
-        {'label': dia.label, 'value': dia.value, 'es_hoy': dia.value == hoy_dia_semana}
-        for dia in dias
-    ]
+    dias_cabecera = []
+    for dia in dias:
+        fecha_columna = semana_inicio + timedelta(days=dia.value)
+        dias_cabecera.append({
+            'label': dia.label,
+            'value': dia.value,
+            'fecha': fecha_columna,
+            'es_hoy': fecha_columna == hoy,
+            'es_referencia': dia.value == dia_referencia_semana,
+        })
+
+    params_base = QueryDict(mutable=True)
+    params_base['fecha'] = fecha_referencia.isoformat()
+    if mostrar_libres:
+        params_base['libres'] = '1'
+
+    params_anterior = params_base.copy()
+    params_anterior['fecha'] = (fecha_referencia - timedelta(days=7)).isoformat()
+
+    params_siguiente = params_base.copy()
+    params_siguiente['fecha'] = (fecha_referencia + timedelta(days=7)).isoformat()
+
+    params_hoy = params_base.copy()
+    params_hoy['fecha'] = hoy.isoformat()
 
     context = {
         'grilla': grilla,
         'dias_cabecera': dias_cabecera,
         'mostrar_libres': mostrar_libres,
+        'fecha_operativa': fecha_referencia,
+        'fecha_operativa_iso': fecha_referencia.isoformat(),
+        'semana_inicio': semana_inicio,
+        'semana_fin': semana_fin,
+        'url_semana_anterior': f"{reverse('consultorios:grilla_semanal')}?{params_anterior.urlencode()}",
+        'url_semana_siguiente': f"{reverse('consultorios:grilla_semanal')}?{params_siguiente.urlencode()}",
+        'url_semana_actual': f"{reverse('consultorios:grilla_semanal')}?{params_hoy.urlencode()}",
         'puede_gestionar_bloques': usuario_puede_gestionar_bloques(request.user),
+        'bloque_enfocado': bloque_enfocado,
+        'bloque_origen_migrado': bloque_origen_migrado,
+        'bloques_blandos_pausados': list(BloqueHorario.objects.filter(pk__in=pausados_ids).select_related('consultorio').order_by('hora_inicio')) if pausados_ids else [],
     }
     return render(request, 'consultorios/grilla_semanal.html', context)
 

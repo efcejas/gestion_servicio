@@ -127,10 +127,10 @@ class BloqueHorarioForm(forms.ModelForm):
                     TipoTitularBloque.RESIDENTE_R4,
                 ):
                     if rol_asignado != 'medico_residente':
-                        raise ValidationError('Para bloques R1-R4, el nombre asignado debe ser un medico_residente.')
+                        raise ValidationError('Para bloques R1-R4, el nombre asignado debe ser un médico residente.')
                 if tipo_titular == TipoTitularBloque.JEFES_RESIDENTES:
                     if rol_asignado not in {'jefe_residentes', 'instructor_residentes'}:
-                        raise ValidationError('Para jefes, el nombre asignado debe ser jefe_residentes o instructor_residentes.')
+                        raise ValidationError('Para jefes, el nombre asignado debe ser jefe de residentes o instructor de residentes.')
 
         if not all([consultorio, dia_semana is not None, hora_inicio, hora_fin]):
             return cleaned_data
@@ -143,12 +143,55 @@ class BloqueHorarioForm(forms.ModelForm):
             hora_inicio=hora_inicio,
             hora_fin=hora_fin,
             excluir_id=self.instance.id if self.instance and self.instance.id else None,
+            fecha_inicio_vigencia=cleaned_data.get('fecha_inicio_vigencia'),
+            fecha_fin_vigencia=cleaned_data.get('fecha_fin_vigencia'),
         )
 
         if conflictos['tiene_conflictos']:
             raise ValidationError(conflictos['mensajes'])
 
         return cleaned_data
+
+
+class MigracionAgendaForm(forms.Form):
+    """Formulario para evaluar migración de una agenda a otro destino."""
+
+    consultorio_destino = forms.ModelChoiceField(
+        label='Consultorio destino',
+        queryset=Consultorio.objects.none(),
+    )
+    fecha_destino = forms.DateField(
+        label='Fecha destino',
+        widget=forms.DateInput(attrs={'type': 'date'}),
+    )
+    hora_inicio_destino = forms.TimeField(
+        label='Hora inicio destino',
+        widget=forms.TimeInput(attrs={'type': 'time'}),
+    )
+    hora_fin_destino = forms.TimeField(
+        label='Hora fin destino',
+        widget=forms.TimeInput(attrs={'type': 'time'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['consultorio_destino'].queryset = Consultorio.objects.activos().order_by('nombre')
+
+        for field in self.fields.values():
+            field.widget.attrs.setdefault('class', _FIELD_CLASS)
+            if isinstance(field.widget, (forms.TimeInput, forms.DateInput)):
+                style = field.widget.attrs.get('style', '')
+                if 'color-scheme' not in style:
+                    field.widget.attrs['style'] = (style + '; color-scheme: light;').strip('; ')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        hora_inicio = cleaned_data.get('hora_inicio_destino')
+        hora_fin = cleaned_data.get('hora_fin_destino')
+        if hora_inicio and hora_fin and hora_fin <= hora_inicio:
+            self.add_error('hora_fin_destino', 'La hora de fin debe ser posterior a la hora de inicio.')
+        return cleaned_data
+
 
 
 class AusenciaCoberturaForm(forms.Form):

@@ -214,6 +214,10 @@
             <i class="fas fa-save"></i> {{ boton_accion }}
           </button>
           {% if object %}
+            <a href="{% url 'consultorios:bloque_eliminar' object.pk %}"
+               class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition font-medium border border-red-200">
+              <i class="fas fa-trash-alt"></i> Eliminar
+            </a>
             <a href="{% url 'consultorios:disponibilidad_dia' object.consultorio_id object.dia_semana %}"
                class="px-5 py-2.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition font-medium">
               Cancelar
