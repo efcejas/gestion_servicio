@@ -17,32 +17,34 @@ def add_constraint_trigger_postgresql(apps, schema_editor):
     db_type = schema_editor.connection.settings_dict['ENGINE'].split('.')[-1]
 
     if db_type == 'postgresql':
-        # Crear función trigger
-        schema_editor.execute("""
-            CREATE OR REPLACE FUNCTION fn_check_sesion_abierta_para_practicas()
-            RETURNS TRIGGER AS $$
-            DECLARE
-                estado_sesion VARCHAR(10);
-            BEGIN
-                IF NEW.sesion_contable_id IS NOT NULL THEN
-                    SELECT estado INTO estado_sesion
-                    FROM liquidacion_sesioncontable
-                    WHERE id = NEW.sesion_contable_id;
+        # Usamos cursor directo para evitar que Django llame a mogrify() sobre el SQL.
+        # schema_editor.execute() pasa el SQL por mogrify(sql, params=())
+        # lo que falla cuando el SQL contiene '%' (usado en RAISE EXCEPTION de PL/pgSQL).
+        with schema_editor.connection.cursor() as cursor:
+            cursor.execute("""
+                CREATE OR REPLACE FUNCTION fn_check_sesion_abierta_para_practicas()
+                RETURNS TRIGGER AS $$
+                DECLARE
+                    estado_sesion VARCHAR(10);
+                BEGIN
+                    IF NEW.sesion_contable_id IS NOT NULL THEN
+                        SELECT estado INTO estado_sesion
+                        FROM liquidacion_sesioncontable
+                        WHERE id = NEW.sesion_contable_id;
 
-                    IF estado_sesion IN ('CERRADA', 'FACTURADA', 'PAGADA') THEN
-                        RAISE EXCEPTION 'No se pueden registrar prácticas en una sesión contable con estado %', estado_sesion;
+                        IF estado_sesion IN ('CERRADA', 'FACTURADA', 'PAGADA') THEN
+                            RAISE EXCEPTION 'Sesion contable en estado %. No se pueden registrar practicas.', estado_sesion;
+                        END IF;
                     END IF;
-                END IF;
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-        """)
-        # Crear trigger que dispara antes de INSERT o UPDATE
-        schema_editor.execute("""
-            CREATE TRIGGER tg_check_sesion_abierta_para_practicas
-            BEFORE INSERT OR UPDATE ON liquidacion_registroestudiospormedico
-            FOR EACH ROW EXECUTE FUNCTION fn_check_sesion_abierta_para_practicas();
-        """)
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql;
+            """)
+            cursor.execute("""
+                CREATE TRIGGER tg_check_sesion_abierta_para_practicas
+                BEFORE INSERT OR UPDATE ON liquidacion_registroestudiospormedico
+                FOR EACH ROW EXECUTE FUNCTION fn_check_sesion_abierta_para_practicas();
+            """)
     # SQLite y otros: protección solo a nivel Python (views + models)
 
 
@@ -50,13 +52,14 @@ def remove_constraint_trigger_postgresql(apps, schema_editor):
     db_type = schema_editor.connection.settings_dict['ENGINE'].split('.')[-1]
 
     if db_type == 'postgresql':
-        schema_editor.execute("""
-            DROP TRIGGER IF EXISTS tg_check_sesion_abierta_para_practicas
-            ON liquidacion_registroestudiospormedico;
-        """)
-        schema_editor.execute("""
-            DROP FUNCTION IF EXISTS fn_check_sesion_abierta_para_practicas();
-        """)
+        with schema_editor.connection.cursor() as cursor:
+            cursor.execute("""
+                DROP TRIGGER IF EXISTS tg_check_sesion_abierta_para_practicas
+                ON liquidacion_registroestudiospormedico;
+            """)
+            cursor.execute("""
+                DROP FUNCTION IF EXISTS fn_check_sesion_abierta_para_practicas();
+            """)
 
 
 class Migration(migrations.Migration):
