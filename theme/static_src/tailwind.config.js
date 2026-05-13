@@ -85,7 +85,12 @@ module.exports = {
     'mt-2', 'mt-4', 'mt-6', 'mt-8', 'mb-2', 'mb-4', 'mb-6', 'mb-8',
     'text-white', 'font-semibold', 'font-extrabold',
     'sr-only', 'hidden', 'block', 'inline-flex',
-    'border', 'border-transparent'
+    'border', 'border-transparent',
+    // Breakpoint responsive — display utilities
+    'sm:flex', 'sm:hidden', 'sm:block', 'sm:inline-flex', 'sm:grid',
+    'md:flex', 'md:hidden', 'md:block', 'md:inline-flex', 'md:grid',
+    'lg:flex', 'lg:hidden', 'lg:block', 'lg:inline-flex', 'lg:grid',
+    'xl:flex', 'xl:hidden', 'xl:block', 'xl:inline-flex', 'xl:grid',
   ],
   theme: {
     extend: {

@@ -249,18 +249,6 @@
 
             // Nav dropdowns
             (function () {
-                // Fix: permitir que los dropdowns salgan del contenedor del menú sin generar scroll.
-                var firstGroupButton = document.querySelector('[data-nav-group]');
-                if (firstGroupButton) {
-                    var navDesktopRow = firstGroupButton.parentElement;
-                    while (navDesktopRow && !(navDesktopRow.classList && navDesktopRow.classList.contains('overflow-x-auto'))) {
-                        navDesktopRow = navDesktopRow.parentElement;
-                    }
-                    if (navDesktopRow) {
-                        navDesktopRow.style.overflow = 'visible';
-                    }
-                }
-
                 var allItems = [];
                 document.querySelectorAll('[data-nav-group]').forEach(function (btn) {
                     var id = btn.getAttribute('data-nav-group');
