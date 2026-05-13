@@ -8,47 +8,94 @@ def migrate_m2m_to_through(apps, schema_editor):
     """
     Migra los datos de la tabla M2M antigua a la nueva tabla intermedia.
     Todos los registros existentes tendrán cantidad=1 por defecto.
+    
+    SEGURIDAD:
+    - Usa transaction.atomic para garantizar consistencia
+    - Valida que hay datos para migrar
+    - Log detallado de lo migrado
     """
+    from django.db import transaction
+    
     RegistroEstudiosPorMedico = apps.get_model('liquidacion', 'RegistroEstudiosPorMedico')
     RegistroEstudio = apps.get_model('liquidacion', 'RegistroEstudio')
     
-    # Obtener el nombre de la tabla M2M antigua
-    # Django la nombra como: liquidacion_registroestudiospormedico_estudio
     db_alias = schema_editor.connection.alias
     
-    # Usar el ORM hasta que se cambie la estructura
-    # Necesitamos leer de la tabla M2M antigua antes de que Django la elimine
-    with schema_editor.connection.cursor() as cursor:
-        # Leer todas las relaciones M2M existentes
-        cursor.execute("""
-            SELECT registroestudiospormedico_id, estudios_id
-            FROM liquidacion_registroestudiospormedico_estudio
-        """)
-        
-        rows = cursor.fetchall()
-        
-        # Crear las entradas en la nueva tabla intermedia
-        registro_estudios = []
-        for registro_id, estudio_id in rows:
-            registro_estudios.append(
-                RegistroEstudio(
-                    registro_id=registro_id,
-                    estudio_id=estudio_id,
-                    cantidad=1  # Valor por defecto para datos migrados
-                )
-            )
-        
-        # Insertar en lotes
-        if registro_estudios:
-            RegistroEstudio.objects.bulk_create(registro_estudios)
-            print(f"✓ Migrados {len(registro_estudios)} registros de estudios con cantidad=1")
+    try:
+        with transaction.atomic():  # ← NUEVO: Garantizar consistencia
+            with schema_editor.connection.cursor() as cursor:
+                # Leer todas las relaciones M2M existentes
+                cursor.execute("""
+                    SELECT COUNT(*) FROM liquidacion_registroestudiospormedico_estudio
+                """)
+                count = cursor.fetchone()[0]
+                
+                if count == 0:
+                    print("⚠️  ADVERTENCIA: No hay datos M2M para migrar. Tabla está vacía.")
+                    print("    Si es primera vez, esto es normal.")
+                    print("    Si es migración de producción, VERIFICA BACKUP primero.")
+                
+                # Leer todas las relaciones
+                cursor.execute("""
+                    SELECT registroestudiospormedico_id, estudios_id
+                    FROM liquidacion_registroestudiospormedico_estudio
+                """)
+                
+                rows = cursor.fetchall()
+                
+                # Crear las entradas en la nueva tabla intermedia
+                registro_estudios = []
+                for registro_id, estudio_id in rows:
+                    registro_estudios.append(
+                        RegistroEstudio(
+                            registro_id=registro_id,
+                            estudio_id=estudio_id,
+                            cantidad=1  # Valor por defecto para datos migrados
+                        )
+                    )
+                
+                # Insertar en lotes (más eficiente)
+                if registro_estudios:
+                    batch_size = 500
+                    for i in range(0, len(registro_estudios), batch_size):
+                        batch = registro_estudios[i:i+batch_size]
+                        RegistroEstudio.objects.bulk_create(batch)
+                    print(f"✅ ÉXITO: Migrados {len(registro_estudios)} registros de estudios")
+                else:
+                    print("✅ Sin registros para migrar (OK en ambiente nuevo)")
+    
+    except Exception as e:
+        # ← NUEVO: Error handling explícito
+        raise RuntimeError(
+            f"❌ CRÍTICO: Falló migración 0028\n"
+            f"Error: {str(e)}\n"
+            f"ACCIÓN: Restaurar BD desde backup, revisar logs, reintentar.\n"
+            f"NO CONTINUAR SIN RESOLVER ESTO."
+        ) from e
 
 
 def reverse_migration(apps, schema_editor):
     """
-    No hacemos nada en el reverse - Django recreará la tabla M2M automáticamente
+    NO SE PUEDE REVERTIR ESTA MIGRACIÓN DE FORMA SEGURA.
+    
+    M2M → through es un cambio estructural que requiere:
+    1. Borrar datos de through (RegistroEstudio)
+    2. Recrear tabla M2M antigua
+    3. Repoblar M2M antigua
+    
+    Si la M2M antigua se perdió, estos datos NO SE PUEDEN RECUPERAR.
+    
+    SOLUCIÓN: Restaurar de backup. No hay reverse automático.
     """
-    pass
+    raise NotImplementedError(
+        "Migration 0028 (M2M simple → M2M through) NO PUEDE SER REVERTIDA.\n"
+        "Razón: Es un cambio estructural que pierde datos.\n"
+        "Si necesitas revertir:\n"
+        "  1. Restaurar DB desde backup ANTES de migración 0028\n"
+        "  2. Resolver el problema que requiere rollback\n"
+        "  3. Reintentar migración con correcciones\n"
+        "CONTACTA AL ADMINISTRADOR DE BD."
+    )
 
 
 class Migration(migrations.Migration):

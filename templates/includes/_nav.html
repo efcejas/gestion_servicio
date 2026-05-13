@@ -3,7 +3,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <!-- ── Desktop ─────────────────────────────────────────────────────── -->
-        <div class="hidden sm:flex items-center w-full">
+        <div class="hidden sm:flex items-center w-full overflow-x-auto">
 
             <!-- Dashboard (siempre visible) -->
             <a href="{% url 'home' %}"
@@ -80,12 +80,12 @@
             {% with rol=request.user.rol %}
             {% if tareas_eges_pendientes or solicitudes_extra_pendientes %}
             {% if request.user.is_superuser or rol == 'administrativo' or rol == 'jefe_servicio' %}
-            <div class="ml-auto flex items-center gap-2 pl-4">
+                        <div class="ml-auto flex items-center gap-1.5 pl-2 lg:pl-4 shrink-0">
               {% if tareas_eges_pendientes %}
               <a href="{% url 'consultorios:bandeja_eges' %}"
-                 class="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-xs font-semibold transition">
+                                 class="relative inline-flex items-center gap-1 lg:gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 text-xs font-semibold transition">
                 <i class="fa-solid fa-list-check"></i>
-                EGES
+                                <span class="hidden lg:inline">EGES</span>
                 <span class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-cyan-500 rounded-full">
                   {{ tareas_eges_pendientes }}
                 </span>
@@ -93,9 +93,9 @@
               {% endif %}
               {% if solicitudes_extra_pendientes %}
               <a href="{% url 'consultorios:solicitudes_extra_lista' %}"
-                 class="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold transition">
+                                 class="relative inline-flex items-center gap-1 lg:gap-1.5 px-2.5 lg:px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-semibold transition">
                 <i class="fa-solid fa-calendar-plus"></i>
-                Extra
+                                <span class="hidden lg:inline">Extra</span>
                 <span class="inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-violet-500 rounded-full">
                   {{ solicitudes_extra_pendientes }}
                 </span>

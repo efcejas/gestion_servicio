@@ -6,6 +6,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum, Count, Q, Prefetch
+from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
 import io, json
@@ -140,6 +141,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
 
         return context
 
+    @transaction.atomic
     def form_valid(self, form):
         user = self.request.user
         

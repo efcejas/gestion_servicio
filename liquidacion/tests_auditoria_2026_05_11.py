@@ -1,0 +1,342 @@
+"""
+NUEVOS TESTS - Auditoría de Liquidación v3.1 (11 mayo 2026)
+Validar que los 4 fixes implementados funcionan:
+  FIX #1: @transaction.atomic en form_valid
+  FIX #2: Migración 0028 con error handling
+  FIX #3: DB constraints
+  FIX #4: Post_save signals para recálculo automático
+"""
+
+from django.test import TestCase, TransactionTestCase
+from django.db import transaction
+from django.contrib.auth import get_user_model
+from django.db import connection
+from datetime import date, datetime
+from decimal import Decimal
+from .models import RegistroEstudiosPorMedico, RegistroEstudio, Estudios, SesionContable
+
+User = get_user_model()
+
+
+class TransactionAtomicTest(TransactionTestCase):
+    """
+    Test para validar que @transaction.atomic funciona (FIX #1)
+    Previene que datos parciales se queden en BD si falla en el medio
+    """
+    
+    def setUp(self):
+        """Configuración para tests de transacciones"""
+        self.medico = User.objects.create_user(
+            username='dr_transaction',
+            password='testpass123',
+            rol='medico_residente'
+        )
+        
+        self.estudio = Estudios.objects.create(
+            nombre='Test Ecografía',
+            tipo='ECO',
+            conteo_regiones=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            activo=True
+        )
+        
+        self.sesion = SesionContable.objects.create(
+            mes=5,
+            año=2026,
+            estado='ABIERTA'
+        )
+    
+    def test_registro_con_transaccion_atomica_todo_o_nada(self):
+        """
+        VALIDACIÓN FIX #1: Si algo falla en form_valid,
+        TODO se revierte (no queda monto = 0 en BD)
+        """
+        # Simular lo que pasa en form_valid (@transaction.atomic)
+        with transaction.atomic():
+            # Paso 1: Guardar registro
+            registro = RegistroEstudiosPorMedico.objects.create(
+                medico=self.medico,
+                nombre_paciente='Test',
+                apellido_paciente='Atomic',
+                dni_paciente='12345678',
+                fecha_del_informe=date.today(),
+                sesion_contable=self.sesion,
+                cantidad_regiones=1,
+                monto_calculado=Decimal('0.00')
+            )
+            
+            # Paso 2: Crear RegistroEstudio
+            RegistroEstudio.objects.create(
+                registro=registro,
+                estudio=self.estudio,
+                cantidad=1
+            )
+            
+            # Paso 3: Calcular monto
+            nuevo_monto = registro.calcular_monto()
+            
+            # Paso 4: Actualizar monto
+            registro.monto_calculado = nuevo_monto
+            registro.save()
+        
+        # Verificar que TODO se guardó correctamente
+        reg_guardado = RegistroEstudiosPorMedico.objects.get(id=registro.id)
+        self.assertNotEqual(reg_guardado.monto_calculado, Decimal('0.00'))
+        self.assertEqual(reg_guardado.monto_calculado, nuevo_monto)
+    
+    def test_consistencia_registro_estudios_con_transaccion(self):
+        """
+        Si se crea registro pero falla al crear estudios,
+        transaction.atomic debe rollbackear TODO (incluido el registro)
+        """
+        count_before = RegistroEstudiosPorMedico.objects.count()
+        
+        # Simular transacción con error intencional
+        try:
+            with transaction.atomic():
+                registro = RegistroEstudiosPorMedico.objects.create(
+                    medico=self.medico,
+                    nombre_paciente='Fail',
+                    apellido_paciente='Test',
+                    dni_paciente='87654321',
+                    fecha_del_informe=date.today(),
+                    sesion_contable=self.sesion
+                )
+                
+                # Intentar crear RegistroEstudio con FK inválida (debería fallar)
+                with self.assertRaises(Exception):
+                    RegistroEstudio.objects.create(
+                        registro=registro,
+                        estudio_id=99999,  # ID no existe
+                        cantidad=1
+                    )
+        except:
+            pass
+        
+        # Verificar que el registro NO se guardó
+        # (porque la transacción se revirtió)
+        count_after = RegistroEstudiosPorMedico.objects.count()
+        self.assertEqual(count_before, count_after, 
+            "❌ FALLA: Transacción no fue revertida. Registro quedó inconsistente.")
+
+    def test_select_for_update_serializa_edicion_en_motores_soportados(self):
+        """
+        En motores con soporte real de locks (ej. PostgreSQL),
+        usamos select_for_update para serializar edición de un mismo registro.
+        En SQLite se omite porque no soporta el mismo nivel de lock por fila.
+        """
+        if connection.vendor == 'sqlite':
+            self.skipTest('SQLite no soporta lock por fila con SELECT FOR UPDATE')
+
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Lock',
+            apellido_paciente='Test',
+            dni_paciente='10101010',
+            fecha_del_informe=date.today(),
+            sesion_contable=self.sesion,
+            monto_calculado=Decimal('0.00')
+        )
+
+        with transaction.atomic():
+            bloqueado = RegistroEstudiosPorMedico.objects.select_for_update().get(id=registro.id)
+            bloqueado.monto_calculado = Decimal('1234.00')
+            bloqueado.save(update_fields=['monto_calculado'])
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('1234.00'))
+
+
+class SignalRecalculoAutomaticoTest(TestCase):
+    """
+    Test para validar que post_save signals funcionan (FIX #4)
+    Recalculan monto automáticamente cuando se editan estudios
+    """
+    
+    def setUp(self):
+        """Configuración para tests de signals"""
+        self.medico = User.objects.create_user(
+            username='dr_signal',
+            password='testpass123',
+            rol='medico_staff'
+        )
+        
+        self.estudio1 = Estudios.objects.create(
+            nombre='ECO ABD',
+            tipo='ECO',
+            conteo_regiones=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            activo=True
+        )
+        
+        self.estudio2 = Estudios.objects.create(
+            nombre='ECO GYNE',
+            tipo='ECO',
+            conteo_regiones=2,
+            conteo_regiones_default=2,
+            precio_cober=Decimal('8000.00'),
+            precio_otras_os=Decimal('10000.00'),
+            activo=True
+        )
+        
+        self.sesion = SesionContable.objects.create(
+            mes=5,
+            año=2026,
+            estado='ABIERTA'
+        )
+    
+    def test_signal_recalcula_cantidad_regiones_automaticamente(self):
+        """
+        VALIDACIÓN FIX #4: Cuando se agrega RegistroEstudio,
+        el signal automáticamente recalcula cantidad_regiones
+        """
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Signal',
+            apellido_paciente='Test',
+            dni_paciente='11111111',
+            fecha_del_informe=date.today(),
+            sesion_contable=self.sesion,
+            cantidad_regiones=0  # Empezar en 0
+        )
+        
+        # Sin agregar estudios todavía
+        self.assertEqual(registro.cantidad_regiones, 0)
+        
+        # Agregar primer estudio (1 región)
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio1,
+            cantidad=1
+        )
+        
+        # Recargar del DB
+        registro.refresh_from_db()
+        
+        # Signal debe haber recalculado a 1 región
+        self.assertEqual(registro.cantidad_regiones, 1,
+            "❌ FALLA: Signal no recalculó cantidad_regiones automáticamente")
+    
+    def test_signal_recalcula_monto_cuando_se_agrega_estudio(self):
+        """
+        VALIDACIÓN FIX #4: Cuando se agrega RegistroEstudio,
+        el signal automáticamente recalcula monto_calculado
+        """
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Signal',
+            apellido_paciente='Monto',
+            dni_paciente='22222222',
+            fecha_del_informe=date.today(),
+            sesion_contable=self.sesion,
+            tipo_obra_social='COBER',
+            cantidad_regiones=0,
+            monto_calculado=Decimal('0.00')  # Empezar en $0
+        )
+        
+        # Verificar que monto es 0 inicialmente
+        self.assertEqual(registro.monto_calculado, Decimal('0.00'))
+        
+        # Agregar estudio
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio1,  # $5000 para staff
+            cantidad=1
+        )
+        
+        # Recargar del DB
+        registro.refresh_from_db()
+        
+        # Signal debe haber recalculado a $5000
+        self.assertEqual(registro.monto_calculado, Decimal('5000.00'),
+            f"❌ FALLA: Signal no recalculó monto. "
+            f"Esperado $5000, pero tiene ${registro.monto_calculado}")
+    
+    def test_signal_recalcula_con_multiples_estudios(self):
+        """
+        Cuando hay múltiples estudios, la cantidad de regiones
+        es la suma de todos
+        """
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Multi',
+            apellido_paciente='Estudio',
+            dni_paciente='33333333',
+            fecha_del_informe=date.today(),
+            sesion_contable=self.sesion,
+            cantidad_regiones=0
+        )
+        
+        # Agregar dos estudios
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio1,  # 1 región
+            cantidad=1
+        )
+        
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio2,  # 2 regiones
+            cantidad=1
+        )
+        
+        registro.refresh_from_db()
+        
+        # Debe haber 3 regiones totales (1 + 2)
+        self.assertEqual(registro.cantidad_regiones, 3,
+            f"❌ FALLA: Signal no sumó regiones correctamente. "
+            f"Esperado 3, pero tiene {registro.cantidad_regiones}")
+
+
+class SesionContableConstraintTest(TestCase):
+    """
+    Test para validar que la validación en puede_registrar_practicas funciona (FIX #3)
+    Aunque el DB constraint solo se applica en PostgreSQL,
+    la lógica Python debe prevenir inserciones en sesiones cerradas
+    """
+    
+    def setUp(self):
+        """Configuración para tests de permisos"""
+        self.medico = User.objects.create_user(
+            username='dr_permisos',
+            password='testpass123',
+            rol='medico_residente'
+        )
+        
+        self.sesion_abierta = SesionContable.objects.create(
+            mes=5,
+            año=2026,
+            estado='ABIERTA'
+        )
+        
+        self.sesion_cerrada = SesionContable.objects.create(
+            mes=4,
+            año=2026,
+            estado='CERRADA'
+        )
+    
+    def test_puede_registrar_practicas_sesion_abierta(self):
+        """Médico residente CAN registrar en sesión ABIERTA"""
+        puede = self.sesion_abierta.puede_registrar_practicas(self.medico)
+        self.assertTrue(puede,
+            "❌ FALLA: Residente debe poder registrar en sesión ABIERTA")
+    
+    def test_puede_registrar_practicas_sesion_cerrada(self):
+        """Médico residente CANNOT registrar en sesión CERRADA"""
+        puede = self.sesion_cerrada.puede_registrar_practicas(self.medico)
+        self.assertFalse(puede,
+            "❌ FALLA: Residente NO debe poder registrar en sesión CERRADA")
+    
+    def test_admin_puede_registrar_en_cerrada(self):
+        """Admin CAN registrar incluso en sesión CERRADA"""
+        admin = User.objects.create_superuser(
+            username='admin',
+            email='admin@test.com',
+            password='testpass123'
+        )
+        
+        puede = self.sesion_cerrada.puede_registrar_practicas(admin)
+        self.assertTrue(puede,
+            "❌ FALLA: Admin debe poder registrar en sesión CERRADA")

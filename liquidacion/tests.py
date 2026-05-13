@@ -213,7 +213,9 @@ class LiquidacionViewsTest(TestCase):
         self.user = User.objects.create_user(
             username='drtest',
             password='testpass123',
-            is_staff=True
+            is_staff=True,
+            rol='administrativo',
+            perfil_completo=True
         )
         self.estudio = Estudios.objects.create(
             nombre='Ecografía abdominal',
@@ -225,12 +227,12 @@ class LiquidacionViewsTest(TestCase):
     def test_acceso_sin_autenticacion(self):
         """Verifica que las vistas requieren autenticación"""
         self.client.logout()
-        response = self.client.get(reverse('liquidacion:informados_por_medico_por_mes'))
+        response = self.client.get(reverse('liquidacion:liquidacion_mensual'))
         self.assertEqual(response.status_code, 302)  # Redirige al login
 
     def test_vista_informados_por_medico_por_mes(self):
         """Verifica que la vista de informes por médico funciona"""
-        response = self.client.get(reverse('liquidacion:informados_por_medico_por_mes'))
+        response = self.client.get(reverse('liquidacion:liquidacion_mensual'))
         self.assertEqual(response.status_code, 200)
 
     def test_crear_registro_estudio(self):
