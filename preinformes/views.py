@@ -681,6 +681,8 @@ def lista_revision(request):
             preinformes = preinformes.filter(fecha_envio_revision__date__lte=form.cleaned_data['fecha_hasta'])
         if form.cleaned_data.get('numero_estudio'):
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
+        if form.cleaned_data.get('apellido_paciente'):
+            preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
     
     preinformes = preinformes.order_by('-fecha_envio_revision')
     
