@@ -681,6 +681,12 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     form_class = RegistroEstudiosPorMedicoCreateViewForm
     template_name = 'liquidacion/registroestudios_update_tailwind_v2.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.es_medico():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
         # Filtra los registros que pertenecen al usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
@@ -776,13 +782,19 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         total_monto = self.object.calcular_monto()
         self.object.monto_calculado = total_monto
         
+        # Auditoría: registrar quién y cuándo modificó
+        self.object.modificado_por = self.request.user
+        self.object.fecha_modificacion = now()
+        
         # También guardar campos de bonus urgencia que vienen del formulario
         self.object.save(update_fields=[
-            'cantidad_regiones', 
+            'cantidad_regiones',
             'monto_calculado',
             'paciente_internado',
             'fecha_hora_solicitud',
-            'fecha_hora_informe'
+            'fecha_hora_informe',
+            'modificado_por',
+            'fecha_modificacion',
         ])
         
         # Mostrar desglose del cálculo actualizado
@@ -926,12 +938,16 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
             año = form.cleaned_data.get('año')
 
             # Filtrar TODAS las prácticas (sin excluir ningún tipo)
-            registros = RegistroEstudiosPorMedico.objects.prefetch_related(
-                Prefetch('estudio', queryset=Estudios.objects.all())
+            from liquidacion.models import RegistroEstudio
+            registros = RegistroEstudiosPorMedico.objects.select_related(
+                'medico', 'sesion_contable'
+            ).prefetch_related(
+                Prefetch('estudio', queryset=Estudios.objects.all()),
+                Prefetch('registroestudio_set', queryset=RegistroEstudio.objects.select_related('estudio')),
             ).distinct()
 
             # Filtrar guardias pasivas
-            guardias = GuardiaPasiva.objects.all()
+            guardias = GuardiaPasiva.objects.select_related('medico')
 
             if medico:
                 registros = registros.filter(medico=medico)
@@ -964,7 +980,8 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                 estudios_con_cantidades = []
                 cantidades_por_tipo = defaultdict(int)  # {'RES': 4, 'ECO': 1}
                 
-                for rel in RegistroEstudio.objects.filter(registro=registro).select_related('estudio'):
+                # Usa el prefetch cargado arriba — sin query adicional por registro
+                for rel in registro.registroestudio_set.all():
                     estudios_con_cantidades.append({
                         'estudio': rel.estudio,
                         'cantidad': rel.cantidad,

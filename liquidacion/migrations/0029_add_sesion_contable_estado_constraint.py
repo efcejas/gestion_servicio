@@ -1,45 +1,61 @@
 # Generated migration on 2026-05-11
+# Updated 2026-05-12: PostgreSQL no soporta subqueries en CHECK constraints.
+# La protección equivalente se realiza a nivel Python en:
+#   - SesionContable.puede_registrar_practicas() en models.py
+#   - dispatch() en RegistroEstudiosPorMedicoCreateView y UpdateView en views.py
+#   - Tests en tests_auditoria_2026_05_11.py (SesionContableConstraintTest)
 
-from django.db import migrations, models
+from django.db import migrations
 
 
-def add_constraint_with_db_awareness(apps, schema_editor):
+def add_constraint_trigger_postgresql(apps, schema_editor):
     """
-    Agregar constraint verificador a nivel BD de forma multiplataforma.
-    SQLite y PostgreSQL tienen sintaxis diferente.
+    Agrega un TRIGGER en PostgreSQL para prevenir prácticas en sesiones cerradas.
+    Los triggers SÍ pueden usar subqueries, a diferencia de CHECK constraints.
+    SQLite no soporta triggers con la misma sintaxis — se omite allí.
     """
     db_type = schema_editor.connection.settings_dict['ENGINE'].split('.')[-1]
-    
-    if db_type == 'sqlite3':
-        # SQLite no soporta CHECK constraints en ALTER TABLE en versiones antiguas
-        # Por ahora, enforzamos en Python + signals + tests
-        # En una migración futura, podríamos recrear tabla con CHECK
-        pass
-    else:
-        # PostgreSQL y otros motores
+
+    if db_type == 'postgresql':
+        # Crear función trigger
         schema_editor.execute("""
-            ALTER TABLE liquidacion_registroestudiospormedico
-            ADD CONSTRAINT ck_sesion_abierta_para_practicas CHECK (
-                sesion_contable_id IS NULL OR sesion_contable_id NOT IN (
-                    SELECT id FROM liquidacion_sesioncontable 
-                    WHERE estado IN ('CERRADA', 'FACTURADA', 'PAGADA')
-                )
-            );
+            CREATE OR REPLACE FUNCTION fn_check_sesion_abierta_para_practicas()
+            RETURNS TRIGGER AS $$
+            DECLARE
+                estado_sesion VARCHAR(10);
+            BEGIN
+                IF NEW.sesion_contable_id IS NOT NULL THEN
+                    SELECT estado INTO estado_sesion
+                    FROM liquidacion_sesioncontable
+                    WHERE id = NEW.sesion_contable_id;
+
+                    IF estado_sesion IN ('CERRADA', 'FACTURADA', 'PAGADA') THEN
+                        RAISE EXCEPTION 'No se pueden registrar prácticas en una sesión contable con estado %', estado_sesion;
+                    END IF;
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
         """)
-
-
-def remove_constraint_with_db_awareness(apps, schema_editor):
-    """
-    Remover constraint de forma multiplataforma.
-    """
-    db_type = schema_editor.connection.settings_dict['ENGINE'].split('.')[-1]
-    
-    if db_type == 'sqlite3':
-        pass  # SQLite: no hay nada que remover
-    else:
+        # Crear trigger que dispara antes de INSERT o UPDATE
         schema_editor.execute("""
-            ALTER TABLE liquidacion_registroestudiospormedico
-            DROP CONSTRAINT ck_sesion_abierta_para_practicas;
+            CREATE TRIGGER tg_check_sesion_abierta_para_practicas
+            BEFORE INSERT OR UPDATE ON liquidacion_registroestudiospormedico
+            FOR EACH ROW EXECUTE FUNCTION fn_check_sesion_abierta_para_practicas();
+        """)
+    # SQLite y otros: protección solo a nivel Python (views + models)
+
+
+def remove_constraint_trigger_postgresql(apps, schema_editor):
+    db_type = schema_editor.connection.settings_dict['ENGINE'].split('.')[-1]
+
+    if db_type == 'postgresql':
+        schema_editor.execute("""
+            DROP TRIGGER IF EXISTS tg_check_sesion_abierta_para_practicas
+            ON liquidacion_registroestudiospormedico;
+        """)
+        schema_editor.execute("""
+            DROP FUNCTION IF EXISTS fn_check_sesion_abierta_para_practicas();
         """)
 
 
@@ -50,12 +66,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # CONSTRAINT multiplataforma: Prevenir insertar prácticas en sesiones cerradas
-        migrations.RunPython(add_constraint_with_db_awareness, remove_constraint_with_db_awareness),
-        
-        # NOTA: En SQLite, esta protección es principalmente en Python + signals + tests
-        # En PostgreSQL/Heroku, se enforcement a nivel BD.
-        # Ver: models.py SesionContable.puede_registrar_practicas()
-        #      signals.py para protecciones adicionales
-        #      tests.py para validación de restricciones
+        migrations.RunPython(
+            add_constraint_trigger_postgresql,
+            remove_constraint_trigger_postgresql,
+        ),
     ]
