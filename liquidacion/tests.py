@@ -3,7 +3,16 @@ from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from datetime import date
-from .models import Estudios, RegistroEstudiosPorMedico, DiaSinPacientes
+from decimal import Decimal
+
+from .models import (
+    DiaSinPacientes,
+    Estudios,
+    GrupoTarifario,
+    RegistroEstudiosPorMedico,
+    TarifaGrupoTarifario,
+)
+from .grupo_tarifario_mapping import inferir_codigo_grupo
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
@@ -259,7 +268,19 @@ class CalculoMontosTest(TestCase):
     
     def setUp(self):
         """Configuración inicial para las pruebas de montos"""
-        from decimal import Decimal
+        self.grupo_doppler = GrupoTarifario.objects.create(
+            codigo='ECO_DOPPLER',
+            nombre='Ecografía Doppler',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo_doppler,
+            vigencia_desde=date.today(),
+            precio_cober=Decimal('8500.00'),
+            precio_otras_os=Decimal('10000.00'),
+            motivo_actualizacion='Tarifa base de pruebas',
+        )
         
         # Crear estudio con precios diferenciados
         self.estudio_doppler = Estudios.objects.create(
@@ -268,11 +289,13 @@ class CalculoMontosTest(TestCase):
             tipo='DOP',
             conteo_regiones=1,
             precio_unico=False,
-            precio_cober=Decimal('8500.00'),
-            precio_otras_os=Decimal('10000.00'),
+            precio_cober=Decimal('9200.00'),
+            precio_otras_os=Decimal('11200.00'),
             conteo_regiones_default=1,
             activo=True
         )
+        self.estudio_doppler.grupo_tarifario = self.grupo_doppler
+        self.estudio_doppler.save(update_fields=['grupo_tarifario'])
         
         # Crear segundo estudio para tests de múltiples estudios
         self.estudio_doppler2 = Estudios.objects.create(
@@ -281,8 +304,22 @@ class CalculoMontosTest(TestCase):
             tipo='DOP',
             conteo_regiones=1,
             precio_unico=False,
-            precio_cober=Decimal('8500.00'),
-            precio_otras_os=Decimal('10000.00'),
+            precio_cober=Decimal('9300.00'),
+            precio_otras_os=Decimal('11300.00'),
+            conteo_regiones_default=1,
+            activo=True
+        )
+        self.estudio_doppler2.grupo_tarifario = self.grupo_doppler
+        self.estudio_doppler2.save(update_fields=['grupo_tarifario'])
+
+        self.estudio_legado_sin_grupo = Estudios.objects.create(
+            codigo='902227',
+            nombre='Doppler Legado Sin Grupo',
+            tipo='DOP',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('12345.00'),
+            precio_otras_os=Decimal('23456.00'),
             conteo_regiones_default=1,
             activo=True
         )
@@ -352,8 +389,18 @@ class CalculoMontosTest(TestCase):
         self.assertEqual(
             monto_calculado, 
             esperado,
-            f"❌ FALLA: Residente INTRA debería cobrar $4.250 (50% de $8.500), pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente INTRA debería cobrar $4.250 (50% de la tarifa del grupo), pero cobra ${monto_calculado}"
         )
+
+    def test_precio_para_os_prefiere_tarifa_vigente_del_grupo(self):
+        """Verifica que el estudio prioriza la tarifa del grupo sobre el precio legado."""
+        self.assertEqual(self.estudio_doppler.precio_para_os('COBER', fecha=date.today()), Decimal('8500.00'))
+        self.assertEqual(self.estudio_doppler.precio_para_os('OTRAS_OS', fecha=date.today()), Decimal('10000.00'))
+
+    def test_precio_para_os_sin_grupo_usa_fallback_legado(self):
+        """Verifica que un estudio sin grupo conserva el comportamiento histórico."""
+        self.assertEqual(self.estudio_legado_sin_grupo.precio_para_os('COBER'), Decimal('12345.00'))
+        self.assertEqual(self.estudio_legado_sin_grupo.precio_para_os('OTRAS_OS'), Decimal('23456.00'))
     
     def test_residente_horario_extra_cobra_100_porciento_COBER(self):
         """
@@ -526,13 +573,82 @@ class CalculoMontosTest(TestCase):
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente con 2 estudios INTRA debe cobrar $8.500, pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente con 2 estudios INTRA debe cobrar $8.500 según la tarifa del grupo, pero cobra ${monto_calculado}"
         )
-    
+
+    def test_calcular_monto_sin_grupo_usa_precios_legados(self):
+        """Verifica que el cálculo sigue funcionando si el estudio todavía no tiene grupo asignado."""
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.staff,
+            nombre_paciente='Legado',
+            apellido_paciente='Fallback',
+            dni_paciente='88888888',
+            fecha_del_informe=date.today(),
+            cantidad_regiones=1,
+            tipo_obra_social='OTRAS_OS',
+            horario='EXTRA'
+        )
+        registro.estudio.add(self.estudio_legado_sin_grupo)
+
+        monto_calculado = registro.calcular_monto()
+
+        self.assertEqual(monto_calculado, Decimal('23456.00'))
+
+
+class GrupoTarifarioMappingTest(TestCase):
+    def test_inferir_codigo_grupo_tom_con_contraste(self):
+        self.assertEqual(
+            inferir_codigo_grupo('TOM', 'TC de abdomen con contraste'),
+            'TOM_CONTRASTE',
+        )
+
+    def test_inferir_codigo_grupo_res_sin_contraste(self):
+        self.assertEqual(
+            inferir_codigo_grupo('RES', 'RM de rodilla sin contraste'),
+            'RES_SIN_CONTRASTE',
+        )
+
+    def test_inferir_codigo_grupo_doppler(self):
+        self.assertEqual(
+            inferir_codigo_grupo('DOP', 'Doppler periférico en lecho'),
+            'ECO_DOPPLER',
+        )
+
+    def test_inferir_codigo_grupo_ambiguo_devuelve_none(self):
+        self.assertIsNone(
+            inferir_codigo_grupo('OTRO', 'Estudio sin modalidad clara'),
+        )
+
+class CalculoMontosRegressionTest(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            username='staff_regression',
+            password='testpass123',
+            first_name='Luis',
+            last_name='Staff',
+            rol='medico_staff',
+        )
+        self.residente = User.objects.create_user(
+            username='residente_regression',
+            password='testpass123',
+            first_name='Ana',
+            last_name='Residente',
+            rol='medico_residente',
+        )
+        self.estudio_doppler = Estudios.objects.create(
+            codigo='902228',
+            nombre='Doppler Regression',
+            tipo='DOP',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('8500.00'),
+            precio_otras_os=Decimal('10000.00'),
+            conteo_regiones_default=1,
+            activo=True,
+        )
+
     def test_desglose_monto_incluye_porcentaje_horario(self):
-        """
-        Verificar que get_desglose_monto() muestra correctamente el porcentaje
-        """
+        """Verificar que get_desglose_monto() muestra correctamente el porcentaje."""
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.residente,
             nombre_paciente='Test',
@@ -541,19 +657,17 @@ class CalculoMontosTest(TestCase):
             fecha_del_informe=date.today(),
             cantidad_regiones=1,
             tipo_obra_social='COBER',
-            horario='INTRA'
+            horario='INTRA',
         )
         registro.estudio.add(self.estudio_doppler)
-        
+
         desglose = registro.get_desglose_monto()
-        
+
         self.assertEqual(desglose['porcentaje'], '50%')
         self.assertEqual(desglose['horario'], 'Intra Residencia (50%)')
-    
+
     def test_horario_asignacion_automatica_staff(self):
-        """
-        Verificar que el horario se asigna como 'NA' para staff automáticamente
-        """
+        """Verificar que el horario se asigna como 'NA' para staff automáticamente."""
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.staff,
             nombre_paciente='Auto',
@@ -561,14 +675,13 @@ class CalculoMontosTest(TestCase):
             dni_paciente='77777777',
             fecha_del_informe=date.today(),
             cantidad_regiones=1,
-            tipo_obra_social='COBER'
-            # No especificamos horario, debe asignarse automáticamente
+            tipo_obra_social='COBER',
         )
         registro.estudio.add(self.estudio_doppler)
-        
+
         self.assertEqual(
             registro.horario,
             'NA',
-            "❌ FALLA: Staff debe tener horario 'NA' automáticamente"
+            "❌ FALLA: Staff debe tener horario 'NA' automáticamente",
         )
 

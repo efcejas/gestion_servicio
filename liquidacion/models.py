@@ -152,11 +152,23 @@ class Estudios(models.Model):
             return f'{self.codigo} - {self.nombre}'
         return f'{self.nombre}'
     
-    def precio_para_os(self, tipo_os):
-        """Retorna el precio según el tipo de OS"""
+    def _precio_legado_para_os(self, tipo_os):
+        """Retorna el precio histórico almacenado en el propio estudio."""
         if self.precio_unico:
-            return self.precio_cober  # Si es único, ambos son iguales
+            return self.precio_cober
         return self.precio_cober if tipo_os == 'COBER' else self.precio_otras_os
+
+    def precio_para_os(self, tipo_os, fecha=None):
+        """Retorna el precio vigente por OS priorizando la tarifa del grupo."""
+        tipo_os_normalizado = (tipo_os or '').upper()
+        fecha_ref = fecha or timezone.now().date()
+
+        if self.grupo_tarifario_id:
+            tarifa_vigente = self.grupo_tarifario.get_tarifa_vigente(fecha=fecha_ref)
+            if tarifa_vigente:
+                return tarifa_vigente.precio_cober if tipo_os_normalizado == 'COBER' else tarifa_vigente.precio_otras_os
+
+        return self._precio_legado_para_os(tipo_os_normalizado)
     
     def actualizar_precios(self, nuevo_precio_cober, nuevo_precio_otras_os, usuario, motivo=''):
         """
@@ -631,18 +643,16 @@ class RegistroEstudiosPorMedico(models.Model):
         relaciones = self.registroestudio_set.select_related('estudio').all()
         if not relaciones.exists():
             return Decimal('0.00')
+
+        fecha_referencia = self.fecha_del_informe or timezone.now().date()
         
         # 1. Sumar (precio × cantidad) de todos los estudios según tipo de obra social
         precio_total = Decimal('0.00')
         for rel in relaciones:
             estudio = rel.estudio
             cantidad = rel.cantidad
-            
-            # Determinar precio según tipo de obra social
-            if self.tipo_obra_social == 'COBER':
-                precio_estudio = estudio.precio_cober
-            else:
-                precio_estudio = estudio.precio_otras_os
+
+            precio_estudio = estudio.precio_para_os(self.tipo_obra_social, fecha=fecha_referencia)
             
             precio_total += (precio_estudio * Decimal(str(cantidad)))
         
@@ -712,12 +722,8 @@ class RegistroEstudiosPorMedico(models.Model):
         for rel in relaciones:
             estudio = rel.estudio
             cantidad = rel.cantidad
-            
-            # Determinar precio según tipo de obra social
-            if self.tipo_obra_social == 'COBER':
-                precio_estudio = estudio.precio_cober
-            else:
-                precio_estudio = estudio.precio_otras_os
+
+            precio_estudio = estudio.precio_para_os(self.tipo_obra_social, fecha=self.fecha_del_informe or timezone.now().date())
             
             precio_total += (precio_estudio * Decimal(str(cantidad)))
             

@@ -3,101 +3,16 @@ Comando: backfill_grupo_tarifario_estudios
 
 Asigna grupo_tarifario a estudios existentes basándose en tipo + patrones del nombre.
 
-REGLAS DE MAPEO:
-  TOM + ANGIO en nombre  → TOM_ANGIO
-  TOM + CON CONTRASTE    → TOM_CONTRASTE
-  TOM + SIN CONTRASTE    → TOM_SIN_CONTRASTE
-  TOM (resto)            → TOM_SIMPLE
-
-  RES + ANGIO en nombre  → RES_ANGIO
-  RES (resto)            → RES_SIMPLE
-
-  ECO + DOPPLER          → ECO_DOPPLER
-  ECO (resto)            → ECO_ECOGRAFIA
-
-  DOP                    → ECO_DOPPLER
-  RAD                    → RAD_RADIOGRAFIA
-  MAM                    → MAM_MAMOGRAFIA
-  ECOCAR                 → sin mapeo automático (requiere revisión manual)
-
 Uso:
   python manage.py backfill_grupo_tarifario_estudios --dry-run
   python manage.py backfill_grupo_tarifario_estudios
   python manage.py backfill_grupo_tarifario_estudios --solo-sin-grupo
 """
-import re
-import unicodedata
 
 from django.core.management.base import BaseCommand
 
+from liquidacion.grupo_tarifario_mapping import inferir_codigo_grupo
 from liquidacion.models import Estudios, GrupoTarifario
-
-
-def strip_accents(text):
-    normalized = unicodedata.normalize("NFD", str(text))
-    return "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
-
-
-def normalizado(text):
-    return re.sub(r"\s+", " ", strip_accents(text).upper()).strip()
-
-
-PATRONES_ANGIO = [r"\bANGIO"]
-PATRONES_CON_CONTRASTE = [
-    r"\bCON\s+CONTRASTE\b",
-    r"\bCON\s*/\s*CTE\b",
-    r"\bC/CONTRASTE\b",
-    r"\bC/CONTR\b",
-]
-PATRONES_SIN_CONTRASTE = [
-    r"\bSIN\s+CONTRASTE\b",
-    r"\bSIN\s*/\s*CTE\b",
-    r"\bS/CONTRASTE\b",
-    r"\bS/CONTR\b",
-]
-PATRONES_DOPPLER = [r"\bDOPPLER\b", r"\bECODOPPLER\b"]
-
-
-def detecta(nombre, patrones):
-    texto = normalizado(nombre)
-    return any(re.search(p, texto) for p in patrones)
-
-
-def inferir_codigo_grupo(tipo, nombre):
-    """
-    Retorna el código de GrupoTarifario que corresponde al estudio,
-    o None si no se puede asignar automáticamente.
-    """
-    if tipo == "TOM":
-        if detecta(nombre, PATRONES_ANGIO):
-            return "TOM_ANGIO"
-        if detecta(nombre, PATRONES_CON_CONTRASTE):
-            return "TOM_CONTRASTE"
-        if detecta(nombre, PATRONES_SIN_CONTRASTE):
-            return "TOM_SIN_CONTRASTE"
-        return "TOM_SIMPLE"
-
-    if tipo == "RES":
-        if detecta(nombre, PATRONES_ANGIO):
-            return "RES_ANGIO"
-        return "RES_SIMPLE"
-
-    if tipo == "ECO":
-        if detecta(nombre, PATRONES_DOPPLER):
-            return "ECO_DOPPLER"
-        return "ECO_ECOGRAFIA"
-
-    if tipo == "DOP":
-        return "ECO_DOPPLER"
-
-    if tipo == "RAD":
-        return "RAD_RADIOGRAFIA"
-
-    if tipo == "MAM":
-        return "MAM_MAMOGRAFIA"
-
-    # ECOCAR y otros sin mapeo automático
-    return None
 
 
 class Command(BaseCommand):

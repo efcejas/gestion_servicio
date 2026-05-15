@@ -1668,6 +1668,60 @@ Separar 3 capas:
 6. Guardar `monto_calculado` + snapshot de cálculo (sin recálculo histórico).
 7. Guardias pasivas se suman por separado (monto fijo por día).
 
+### 10.3.1 Matriz operativa de mapeo por texto
+
+Regla práctica para el mapeo automático desde el nombre del estudio:
+
+| Patrón detectado | Grupo tarifario | Observación |
+|---|---|---|
+| `TOM` + `ANGIO` | `TOM_ANGIO` | Tiene prioridad sobre cualquier otro subtipo. |
+| `TOM` + `CON CONTRASTE` / `CON CTE` / `C/CONTRASTE` | `TOM_CONTRASTE` | Región tomográfica con contraste. |
+| `TOM` + `SIN CONTRASTE` / `S/CONTRASTE` | `TOM_SIN_CONTRASTE` | Región tomográfica sin contraste. |
+| `TOM` sin marcas anteriores | `TOM_SIMPLE` | Valor por defecto. |
+| `RES` + `ANGIO` | `RES_ANGIO` | Tiene prioridad sobre el resto. |
+| `RES` + `CON CONTRASTE` / `CTE` / `C/CONTRASTE` | `RES_CONTRASTE` | Variante con contraste. |
+| `RES` + `SIN CONTRASTE` / `S/CONTRASTE` | `RES_SIN_CONTRASTE` | Variante sin contraste. |
+| `RES` sin marcas anteriores | `RES_SIMPLE` | Valor por defecto. |
+| `DOPPLER` / `ECODOPPLER` | `ECO_DOPPLER` | Si la tarifa cambia por lecho/consultorio, revisar manualmente. |
+| `DOPPLER` + `LECHO` / `SERVICIO` | `ECO_DOPPLER` por ahora | Mantener como mismo grupo hasta validar si requiere subgrupo propio. |
+| `ECO` sin doppler | `ECO_ECOGRAFIA` | Ecografía general. |
+| `RAD` | `RAD_RADIOGRAFIA` | Radiografía general. |
+| `MAM` | `MAM_MAMOGRAFIA` | Mamografía general. |
+
+Notas operativas:
+
+1. `COBER` vs `OTRAS_OS` no define un grupo distinto: cambia la tarifa dentro del mismo grupo.
+2. Si un estudio trae texto ambiguo o contradictorio, se deja para revisión manual en admin antes de cerrar la carga.
+3. Si una variante anatómica empieza a modificar precio de forma estable, conviene crear un subgrupo tarifario propio en vez de resolverla solo con precios por estudio.
+
+### 10.3.2 Matriz de lógica automática
+
+Esta es la regla que debe usar el backfill y cualquier alta futura para decidir el grupo tarifario sin intervención manual.
+
+| Orden de evaluación | Condición sobre el nombre | Grupo asignado | Tipo de regla |
+|---|---|---|---|
+| 1 | Modalidad `TOM` y contiene `ANGIO` | `TOM_ANGIO` | Automática, prioridad máxima |
+| 2 | Modalidad `TOM` y contiene `CON CONTRASTE`, `CON CTE`, `C/CONTRASTE` | `TOM_CONTRASTE` | Automática |
+| 3 | Modalidad `TOM` y contiene `SIN CONTRASTE`, `S/CONTRASTE` | `TOM_SIN_CONTRASTE` | Automática |
+| 4 | Modalidad `TOM` sin marcas anteriores | `TOM_SIMPLE` | Automática por defecto |
+| 5 | Modalidad `RES` y contiene `ANGIO` | `RES_ANGIO` | Automática, prioridad máxima |
+| 6 | Modalidad `RES` y contiene `CON CONTRASTE`, `CON CTE`, `C/CONTRASTE` | `RES_CONTRASTE` | Automática |
+| 7 | Modalidad `RES` y contiene `SIN CONTRASTE`, `S/CONTRASTE` | `RES_SIN_CONTRASTE` | Automática |
+| 8 | Modalidad `RES` sin marcas anteriores | `RES_SIMPLE` | Automática por defecto |
+| 9 | Modalidad `ECO` y contiene `DOPPLER` o `ECODOPPLER` | `ECO_DOPPLER` | Automática |
+| 10 | Modalidad `ECO` sin doppler | `ECO_ECOGRAFIA` | Automática |
+| 11 | Modalidad `DOP` | `ECO_DOPPLER` | Automática por compatibilidad histórica |
+| 12 | Modalidad `RAD` | `RAD_RADIOGRAFIA` | Automática |
+| 13 | Modalidad `MAM` | `MAM_MAMOGRAFIA` | Automática |
+| 14 | Texto ambiguo, contradictorio o sin modalidad clara | sin grupo | Revisión manual en admin |
+
+Reglas auxiliares:
+
+1. La detección de `ANGIO` tiene prioridad sobre `CON CONTRASTE` y `SIN CONTRASTE`.
+2. Si un texto contiene `CON CONTRASTE` y `SIN CONTRASTE` a la vez, debe quedar en revisión manual.
+3. `LECHO` y `SERVICIO` no cambian el grupo por ahora; solo se usan para revisión operativa si en el futuro se separan tarifas.
+4. `COBER` y `OTRAS_OS` no cambian el grupo: solo cambian el precio dentro del mismo grupo.
+
 ### 10.4 Estrategia de migración segura (sin corte)
 
 Fase A - Estructura:
