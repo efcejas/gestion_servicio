@@ -1,16 +1,20 @@
 from django.contrib import admin
+
 from .models import (
-    Estudios, 
-    RegistroEstudiosPorMedico, 
-    HistorialPrecioEstudio,
-    SesionContable,
+    Estudios,
+    GrupoTarifario,
     GuardiaPasiva,
+    HistorialPrecioEstudio,
+    RegistroEstudiosPorMedico,
+    SesionContable,
+    TarifaGrupoTarifario,
 )
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
 # Import de DiaSinPacientes eliminado (deprecado para Colegiales)
 # En Colegiales, procedimientos se registran como Estudios
+
 
 # ============================================================================
 # HISTORIALES Y AUDITORÍA
@@ -21,11 +25,11 @@ class HistorialPrecioEstudioInline(admin.TabularInline):
     extra = 0
     can_delete = False
     readonly_fields = (
-        'precio_cober_anterior', 
+        'precio_cober_anterior',
         'precio_otras_os_anterior',
         'precio_cober_nuevo',
         'precio_otras_os_nuevo',
-        'fecha_actualizacion', 
+        'fecha_actualizacion',
         'actualizado_por',
         'motivo_actualizacion',
         'get_variacion_cober',
@@ -42,11 +46,11 @@ class HistorialPrecioEstudioInline(admin.TabularInline):
         'actualizado_por',
         'motivo_actualizacion',
     )
-    
+
     def get_variacion_cober(self, obj):
         return f"{obj.get_variacion_cober()}%"
     get_variacion_cober.short_description = 'Var. COBER (%)'
-    
+
     def get_variacion_otras_os(self, obj):
         return f"{obj.get_variacion_otras_os()}%"
     get_variacion_otras_os.short_description = 'Var. Otras OS (%)'
@@ -55,8 +59,8 @@ class HistorialPrecioEstudioInline(admin.TabularInline):
 @admin.register(HistorialPrecioEstudio)
 class HistorialPrecioEstudioAdmin(admin.ModelAdmin):
     list_display = (
-        'estudio', 
-        'fecha_actualizacion', 
+        'estudio',
+        'fecha_actualizacion',
         'precio_cober_anterior',
         'precio_cober_nuevo',
         'variacion_cober_display',
@@ -75,19 +79,60 @@ class HistorialPrecioEstudioAdmin(admin.ModelAdmin):
     )
     date_hierarchy = 'fecha_actualizacion'
     ordering = ('-fecha_actualizacion',)
-    
+
     def variacion_cober_display(self, obj):
         variacion = obj.get_variacion_cober()
         color = 'red' if variacion > 0 else 'green' if variacion < 0 else 'black'
         return f'<span style="color: {color}; font-weight: bold;">{variacion:+.2f}%</span>'
     variacion_cober_display.short_description = 'Var. COBER (%)'
     variacion_cober_display.allow_tags = True
-    
+
     def has_add_permission(self, request):
         return False  # Solo se crea automáticamente desde Estudios.actualizar_precios()
-    
+
     def has_delete_permission(self, request, obj=None):
         return False  # Nunca eliminar historial de precios
+
+
+# ============================================================================
+# GRUPOS TARIFARIOS
+# ============================================================================
+
+@admin.register(TarifaGrupoTarifario)
+class TarifaGrupoTarifarioAdmin(admin.ModelAdmin):
+    list_display = (
+        'grupo_tarifario',
+        'vigencia_desde',
+        'vigencia_hasta',
+        'precio_cober',
+        'precio_otras_os',
+        'actualizado_por',
+    )
+    list_filter = ('grupo_tarifario__modalidad', 'grupo_tarifario', 'vigencia_desde')
+    search_fields = ('grupo_tarifario__codigo', 'grupo_tarifario__nombre', 'motivo_actualizacion')
+    ordering = ('grupo_tarifario', '-vigencia_desde')
+
+
+class TarifaGrupoTarifarioInline(admin.TabularInline):
+    model = TarifaGrupoTarifario
+    extra = 0
+    fields = (
+        'vigencia_desde',
+        'vigencia_hasta',
+        'precio_cober',
+        'precio_otras_os',
+        'motivo_actualizacion',
+        'actualizado_por',
+    )
+
+
+@admin.register(GrupoTarifario)
+class GrupoTarifarioAdmin(admin.ModelAdmin):
+    list_display = ('codigo', 'nombre', 'modalidad', 'activo', 'fecha_modificacion')
+    list_filter = ('modalidad', 'activo')
+    search_fields = ('codigo', 'nombre')
+    ordering = ('modalidad', 'codigo')
+    inlines = [TarifaGrupoTarifarioInline]
 
 
 # ============================================================================
@@ -98,8 +143,9 @@ class HistorialPrecioEstudioAdmin(admin.ModelAdmin):
 class EstudiosAdmin(admin.ModelAdmin):
     list_display = (
         'codigo',
-        'nombre', 
+        'nombre',
         'tipo',
+        'grupo_tarifario',
         'precio_cober',
         'precio_otras_os',
         'precio_unico',
@@ -107,15 +153,15 @@ class EstudiosAdmin(admin.ModelAdmin):
         'activo',
         'fecha_actualizacion_precios'
     )
-    list_filter = ('tipo', 'precio_unico', 'activo')
+    list_filter = ('tipo', 'grupo_tarifario', 'precio_unico', 'activo')
     search_fields = ('codigo', 'nombre')
     ordering = ('codigo', 'nombre')
     readonly_fields = ('fecha_actualizacion_precios', 'actualizado_por')
     inlines = [HistorialPrecioEstudioInline]
-    
+
     fieldsets = (
         ('Identificación', {
-            'fields': ('codigo', 'nombre', 'tipo')
+            'fields': ('codigo', 'nombre', 'tipo', 'grupo_tarifario')
         }),
         ('Precios', {
             'fields': (
@@ -132,11 +178,9 @@ class EstudiosAdmin(admin.ModelAdmin):
             'fields': ('activo', 'fecha_actualizacion_precios', 'actualizado_por')
         }),
     )
-    
+
     def save_model(self, request, obj, form, change):
         if change and ('precio_cober' in form.changed_data or 'precio_otras_os' in form.changed_data):
-            # Si se cambió el precio, registrar en historial
-            old_obj = Estudios.objects.get(pk=obj.pk)
             obj.actualizar_precios(
                 nuevo_precio_cober=obj.precio_cober,
                 nuevo_precio_otras_os=obj.precio_otras_os,

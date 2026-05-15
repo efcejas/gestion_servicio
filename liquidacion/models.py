@@ -3,6 +3,50 @@ from django.utils import timezone
 from django.conf import settings
 from decimal import Decimal
 
+
+class GrupoTarifario(models.Model):
+    """Grupo de facturación para desacoplar catálogo clínico de reglas de precio."""
+
+    MODALIDAD_CHOICES = (
+        ('ECO', 'Ecografía'),
+        ('RAD', 'Radiografía'),
+        ('TOM', 'Tomografía'),
+        ('RES', 'Resonancia Magnética'),
+    )
+
+    codigo = models.CharField(
+        max_length=40,
+        unique=True,
+        verbose_name='Código',
+        help_text='Ej: TC_SIMPLE, TC_CONTRASTE, DOPPLER_CARDIACO_LECHO',
+    )
+    nombre = models.CharField(max_length=150, verbose_name='Nombre')
+    modalidad = models.CharField(
+        max_length=3,
+        choices=MODALIDAD_CHOICES,
+        verbose_name='Modalidad',
+    )
+    activo = models.BooleanField(default=True, verbose_name='Activo')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Grupo Tarifario'
+        verbose_name_plural = 'Grupos Tarifarios'
+        ordering = ['modalidad', 'codigo']
+
+    def __str__(self):
+        return f"{self.codigo} - {self.nombre}"
+
+    def get_tarifa_vigente(self, fecha=None):
+        """Retorna la tarifa vigente para la fecha indicada (hoy por defecto)."""
+        fecha_ref = fecha or timezone.now().date()
+        return self.tarifas.filter(
+            vigencia_desde__lte=fecha_ref,
+        ).filter(
+            models.Q(vigencia_hasta__isnull=True) | models.Q(vigencia_hasta__gte=fecha_ref)
+        ).order_by('-vigencia_desde').first()
+
 class Estudios(models.Model):
     """
     Catálogo de estudios/prácticas médicas con sus precios
@@ -37,6 +81,15 @@ class Estudios(models.Model):
         choices=TIPO_ESTUDIO_CHOICES,
         default='ECO',
         verbose_name='Tipo de estudio'
+    )
+    grupo_tarifario = models.ForeignKey(
+        'GrupoTarifario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='estudios',
+        verbose_name='Grupo tarifario',
+        help_text='Grupo de facturación para cálculo por tarifas vigentes',
     )
     
     conteo_regiones = models.IntegerField(
@@ -210,6 +263,55 @@ class HistorialPrecioEstudio(models.Model):
             return 0
         variacion = ((self.precio_otras_os_nuevo - self.precio_otras_os_anterior) / self.precio_otras_os_anterior) * 100
         return round(variacion, 2)
+
+
+class TarifaGrupoTarifario(models.Model):
+    """Tarifa versionada por grupo con vigencia temporal."""
+
+    grupo_tarifario = models.ForeignKey(
+        'GrupoTarifario',
+        on_delete=models.CASCADE,
+        related_name='tarifas',
+        verbose_name='Grupo tarifario',
+    )
+    vigencia_desde = models.DateField(verbose_name='Vigencia desde')
+    vigencia_hasta = models.DateField(null=True, blank=True, verbose_name='Vigencia hasta')
+    precio_cober = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Precio COBER')
+    precio_otras_os = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Precio OTRAS OS')
+    motivo_actualizacion = models.TextField(blank=True, verbose_name='Motivo de actualización')
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tarifas_grupo_actualizadas',
+        verbose_name='Actualizado por',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Tarifa de Grupo Tarifario'
+        verbose_name_plural = 'Tarifas de Grupos Tarifarios'
+        ordering = ['grupo_tarifario', '-vigencia_desde']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['grupo_tarifario', 'vigencia_desde'],
+                name='uq_tarifa_grupo_vigencia_desde',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['grupo_tarifario', 'vigencia_desde']),
+            models.Index(fields=['vigencia_desde', 'vigencia_hasta']),
+        ]
+
+    def __str__(self):
+        return f"{self.grupo_tarifario.codigo} desde {self.vigencia_desde}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.vigencia_hasta and self.vigencia_hasta < self.vigencia_desde:
+            raise ValidationError('La vigencia hasta no puede ser anterior a vigencia desde.')
 
 
 class SesionContable(models.Model):

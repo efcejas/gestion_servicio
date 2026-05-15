@@ -245,6 +245,26 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Trazabilidad de correcciones -->
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <label for="id_motivo_modificacion" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Motivo de modificación
+                        {% if requiere_motivo_modificacion %}
+                            <span class="text-red-500">*</span>
+                        {% endif %}
+                    </label>
+                    <textarea
+                        id="id_motivo_modificacion"
+                        name="motivo_modificacion"
+                        rows="3"
+                        class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        placeholder="Describe brevemente por qué se corrige este registro..."
+                    >{{ object.motivo_modificacion|default:'' }}</textarea>
+                    <p class="text-xs text-gray-500 mt-2">
+                        Este campo es obligatorio para correcciones en sesiones cerradas o facturadas.
+                    </p>
+                </div>
             </div>
 
             <!-- Botones de Acción -->

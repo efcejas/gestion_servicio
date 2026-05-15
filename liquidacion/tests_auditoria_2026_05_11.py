@@ -11,6 +11,7 @@ from django.test import TestCase, TransactionTestCase
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.urls import reverse
 from datetime import date, datetime
 from decimal import Decimal
 from .models import RegistroEstudiosPorMedico, RegistroEstudio, Estudios, SesionContable
@@ -340,3 +341,79 @@ class SesionContableConstraintTest(TestCase):
         puede = self.sesion_cerrada.puede_registrar_practicas(admin)
         self.assertTrue(puede,
             "❌ FALLA: Admin debe poder registrar en sesión CERRADA")
+
+
+class PermisosYTrazabilidadViewTest(TestCase):
+    """Tests de regresión para permisos de vistas y operaciones sensibles."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username='admin_liq',
+            password='testpass123',
+            rol='administrativo',
+            perfil_completo=True,
+        )
+        self.jefe_servicio = User.objects.create_user(
+            username='jefe_servicio_liq',
+            password='testpass123',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_res_liq',
+            password='testpass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.instructor = User.objects.create_user(
+            username='inst_liq',
+            password='testpass123',
+            rol='instructor_residentes',
+            perfil_completo=True,
+        )
+        self.medico = User.objects.create_user(
+            username='medico_liq',
+            password='testpass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+    def test_liquidacion_mensual_permite_admin_y_jefe_servicio(self):
+        self.client.login(username='admin_liq', password='testpass123')
+        response_admin = self.client.get(reverse('liquidacion:liquidacion_mensual'))
+        self.assertEqual(response_admin.status_code, 200)
+
+        self.client.logout()
+        self.client.login(username='jefe_servicio_liq', password='testpass123')
+        response_jefe_servicio = self.client.get(reverse('liquidacion:liquidacion_mensual'))
+        self.assertEqual(response_jefe_servicio.status_code, 200)
+
+    def test_liquidacion_mensual_deniega_jefe_residentes_e_instructor(self):
+        self.client.login(username='jefe_res_liq', password='testpass123')
+        response_jefe = self.client.get(reverse('liquidacion:liquidacion_mensual'))
+        self.assertEqual(response_jefe.status_code, 302)
+
+        self.client.logout()
+        self.client.login(username='inst_liq', password='testpass123')
+        response_instructor = self.client.get(reverse('liquidacion:liquidacion_mensual'))
+        self.assertEqual(response_instructor.status_code, 302)
+
+    def test_delete_registro_bloqueado_en_sesion_cerrada_para_medico(self):
+        sesion_cerrada = SesionContable.objects.create(mes=4, año=2026, estado='CERRADA')
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Bloqueo',
+            apellido_paciente='Cerrada',
+            dni_paciente='90909090',
+            fecha_del_informe=date.today(),
+            sesion_contable=sesion_cerrada,
+        )
+
+        self.client.login(username='medico_liq', password='testpass123')
+        response = self.client.post(reverse('liquidacion:registroestudios_delete', kwargs={'pk': registro.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).exists(),
+            '❌ FALLA: Un médico pudo eliminar registro en sesión cerrada.'
+        )

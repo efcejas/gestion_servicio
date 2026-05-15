@@ -1512,7 +1512,7 @@ Antes de implementar, necesito que confirmes:
 
 6. ✅ **¿Quién puede cerrar una sesión contable?**
    - **RESPUESTA:** Admin cierra la sesión del mes.
-   - **IMPORTANTE:** Debe haber posibilidad de **REVISIÓN y CARGA DE FALTANTES** después del cierre.
+    - **IMPORTANTE:** Debe haber posibilidad de **REVISIÓN / DISCONFORMIDAD** y carga de faltantes después del cierre.
    - **Implementación:** Estados: ABIERTA → REVISION → CERRADA → FACTURADA → PAGADA.
 
 7. ✅ **¿Los médicos pueden editar/borrar prácticas después del cierre?**
@@ -1520,18 +1520,26 @@ Antes de implementar, necesito que confirmes:
    - **Implementación:** Permitir registros retroactivos con validación de Admin.
    - Solo Admin puede hacer correcciones después de FACTURADA.
 
+8. ✅ **¿Jefes de residentes e instructores deben ver la liquidación global?**
+    - **RESPUESTA:** NO. Deben ver únicamente sus propios registros, igual que staff y cardiólogos.
+    - **Implementación funcional:** la vista global queda reservada para Administrativo, Jefe de Servicio y Superuser.
+
+9. ✅ **¿Las correcciones deben dejar trazabilidad explícita?**
+    - **RESPUESTA:** SÍ.
+    - **Implementación funcional:** toda corrección fuera del flujo normal debe registrar quién modificó, cuándo modificó y el motivo de la modificación.
+
 ### 8.4 Sobre Regiones
 
-8. ✅ **¿La cantidad de regiones puede ser fraccionaria?**
+10. ✅ **¿La cantidad de regiones puede ser fraccionaria?**
    - **RESPUESTA:** NO. Las regiones NO se fraccionan, siempre números enteros (1, 2, 3, etc.).
 
-9. ✅ **¿Hay estudios que no tienen concepto de "regiones"?**
+11. ✅ **¿Hay estudios que no tienen concepto de "regiones"?**
    - **CONFIRMADO:** Estudios como RX, Mamografía = 1 región fija.
    - Otros como ECO Doppler pueden tener múltiples regiones.
 
 ### 8.5 Sobre RM a Distancia con URGENCIA (NUEVO REQUISITO)
 
-10. ✅ **Médicos de RM a distancia con pacientes internados**
+12. ✅ **Médicos de RM a distancia con pacientes internados**
     - **REQUISITO:** Estudios de pacientes INTERNADOS informados en **menos de 24 horas** → **+20% sobre precio base**
     - **Estado:** Ya aceptado, aún NO implementado
     - **Implementación:** Campos `paciente_internado`, `fecha_hora_solicitud`, `fecha_hora_informe`
@@ -1555,6 +1563,20 @@ Antes de implementar, necesito que confirmes:
 **3. ✅ Cardiólogos son Staff (sin INTRA/EXTRA)**
    - Cardiólogos siempre cobran 100%, no tienen diferenciación de horario
    - **Implementación:** Rol 'cardiólogo' en lista de staff: `['radiólogo_staff', 'jefe_servicio', 'cardiólogo']`
+
+**4. ✅ Jefes e instructores NO tienen vista global por defecto**
+    - Jefes de residentes e instructores trabajan sobre sus propios registros.
+    - La vista global operativa queda para Administrativo, Jefe de Servicio y Superuser.
+    - **Implementación:** ajustar permisos de la vista global y cualquier acceso derivado a reportes generales.
+
+**5. ✅ Correcciones deben ser trazables**
+    - Toda modificación sensible debe registrar usuario, fecha y motivo.
+    - Prioridad alta en CERRADA y FACTURADA.
+    - **Implementación:** reforzar `modificado_por`, `fecha_modificacion` y `motivo_modificacion`.
+
+**6. ✅ Diferencias de variables por rol siguen vigentes**
+    - No conviene homogeneizar todavía la UX o los formularios si detrás hay reglas económicas distintas.
+    - **Implementación funcional:** primero alinear permisos y cálculos; después simplificar interfaz.
 
 ---
 
@@ -1585,6 +1607,111 @@ Antes de implementar, necesito que confirmes:
 7. ✅ Migración de datos existentes
 
 **Tiempo estimado total:** 18-22 horas de desarrollo + 5 horas de testing/deploy
+
+### 🧩 DEUDA FUNCIONAL PENDIENTE (Mayo 2026)
+
+1. Auto-asignación de horario basada en hora actual del servidor.
+    - Estado actual: cuando no se completa manualmente, el sistema asigna INTRA/EXTRA usando la hora del momento de guardado.
+    - Riesgo: puede no reflejar el horario real del estudio informado (especialmente en cargas diferidas).
+    - Impacto: potencial desalineación en liquidación de residentes/instructores/jefes (50% vs 100%).
+    - Resolución propuesta: agregar campo opcional "hora del estudio" en formulario y usarlo como fuente principal para asignar horario; mantener fallback actual solo si el campo está vacío.
+    - Prioridad sugerida: Media-Alta (afecta cálculo económico).
+
+---
+
+## 10. DISEÑO TÉCNICO PROPUESTO (GRUPOS TARIFARIOS)
+
+Objetivo: evitar mantenimiento de precio estudio por estudio y pasar a un esquema escalable por grupos tarifarios + excepciones.
+
+### 10.1 Principio de diseño
+
+Separar 3 capas:
+
+1. Catálogo clínico de estudios (qué selecciona el médico).
+2. Grupo tarifario (cómo se factura ese estudio).
+3. Reglas de cálculo (OS, rol, horario, lecho/consultorio, bonus RM, guardia pasiva).
+
+### 10.2 Nuevas entidades mínimas
+
+1. `GrupoTarifario`
+    - `codigo` (unique) Ej: `TC_SIMPLE`, `TC_CONTRASTE`, `DOPPLER_CARDIACO_LECHO`.
+    - `nombre`.
+    - `modalidad` (`ECO`, `RAD`, `TOM`, `RES`).
+    - `activo`.
+
+2. `TarifaGrupoTarifario`
+    - `grupo_tarifario` (FK).
+    - `vigencia_desde` (date).
+    - `vigencia_hasta` (date, nullable).
+    - `precio_cober` (decimal).
+    - `precio_otras_os` (decimal).
+    - `motivo_actualizacion` (text).
+    - `actualizado_por` (FK user).
+    - Regla: no superponer vigencias del mismo grupo.
+
+3. Extensión de `Estudios`
+    - `grupo_tarifario` (FK nullable al inicio para migración gradual).
+    - Mantener `precio_cober/precio_otras_os` como fallback transitorio.
+
+4. Snapshot de cálculo en `RegistroEstudiosPorMedico`
+    - `version_tarifaria` (string, nullable).
+    - `detalle_calculo_json` (JSONField nullable).
+    - Guarda base, factores y bonus aplicados para auditoría.
+
+### 10.3 Reglas de cálculo (orden canónico)
+
+1. Para cada estudio del registro, buscar tarifa vigente por `grupo_tarifario` y fecha del informe.
+2. Si estudio no tiene grupo, usar fallback legado (`precio_cober/precio_otras_os` del estudio).
+3. Multiplicar por cantidad del estudio (tabla `RegistroEstudio`).
+4. Aplicar factores por rol/horario cuando corresponda.
+5. Aplicar bonus urgencia RM sobre subtotal RM (si condiciones cumplen).
+6. Guardar `monto_calculado` + snapshot de cálculo (sin recálculo histórico).
+7. Guardias pasivas se suman por separado (monto fijo por día).
+
+### 10.4 Estrategia de migración segura (sin corte)
+
+Fase A - Estructura:
+1. Crear tablas `GrupoTarifario` y `TarifaGrupoTarifario`.
+2. Agregar FK `grupo_tarifario` a `Estudios`.
+3. Agregar campos de snapshot en `RegistroEstudiosPorMedico`.
+
+Fase B - Bootstrap:
+1. Cargar grupos iniciales (TC, RM, RX, ECO y subgrupos especiales).
+2. Cargar tarifas vigentes (abril-26) por grupo.
+3. Mapear automáticamente estudios a grupos por código/palabras clave.
+4. Generar reporte de estudios sin grupo para revisión administrativa.
+
+Fase C - Doble cálculo controlado:
+1. En creación/edición, intentar primero cálculo por grupo.
+2. Si falta grupo o tarifa, fallback a cálculo legado.
+3. Loggear cada fallback para terminar de limpiar mapeo.
+
+Fase D - Consolidación:
+1. Cuando cobertura de grupos > 95%, desactivar fallback para nuevos registros.
+2. Mantener histórico legado sin tocar.
+
+### 10.5 Operación administrativa esperada
+
+1. Pantalla "Tarifas por grupo" con edición por vigencia.
+2. Acción masiva "Aumentar por porcentaje" con exclusiones (ej: eco general).
+3. Acción "Duplicar vigencia anterior" para acelerar actualizaciones periódicas.
+4. Reporte de impacto previo (cuántos grupos cambian y nuevo rango de precios).
+
+### 10.6 Riesgos y mitigaciones
+
+1. Riesgo: mapeo incorrecto estudio-grupo.
+    - Mitigación: revisión administrativa de estudios ambiguos + reporte de excepciones.
+2. Riesgo: recálculo accidental de histórico.
+    - Mitigación: snapshot obligatorio por registro y no recalcular registros cerrados.
+3. Riesgo: diferencias entre frontend y backend.
+    - Mitigación: cálculo final siempre server-side; frontend solo preview informativo.
+
+### 10.7 Criterio de éxito (MVP)
+
+1. Nuevos registros de TC/RM/RX/ECO calculan por grupo tarifario sin editar precio estudio por estudio.
+2. Admin actualiza tarifas por grupo sin afectar registros históricos.
+3. Sistema reporta y permite resolver estudios sin grupo asignado.
+4. `monto_calculado` y snapshot quedan trazables por registro.
 
 ---
 

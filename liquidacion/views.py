@@ -694,6 +694,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         registro = self.object
+        sesion = registro.sesion_contable
 
         # Serializar estudios para JS (con todos los datos necesarios)
         estudios_data = []
@@ -729,6 +730,9 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Información del médico para lógica condicional
         context['trabaja_remoto'] = self.request.user.trabaja_remoto
         context['es_staff'] = self.request.user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
+        context['requiere_motivo_modificacion'] = bool(
+            sesion and sesion.estado in ['CERRADA', 'FACTURADA']
+        )
 
         # URL del botón cancelar: vuelve a la lista con mes/año filtrados
         fecha = registro.fecha_del_informe
@@ -737,6 +741,23 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        sesion = self.object.sesion_contable
+        if sesion and not sesion.puede_registrar_practicas(self.request.user):
+            messages.error(
+                self.request,
+                f"❌ La sesión de {sesion.mes}/{sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes editar prácticas."
+            )
+            return redirect(self.get_success_url())
+
+        motivo_modificacion = (self.request.POST.get('motivo_modificacion') or '').strip()
+        if sesion and sesion.estado in ['CERRADA', 'FACTURADA'] and not motivo_modificacion:
+            form.add_error(
+                None,
+                'Debes indicar el motivo de modificación para corregir registros en sesiones cerradas o facturadas.'
+            )
+            return self.form_invalid(form)
+
         # Guardar objeto
         self.object = form.save(commit=False)
         self.object.save()
@@ -785,6 +806,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Auditoría: registrar quién y cuándo modificó
         self.object.modificado_por = self.request.user
         self.object.fecha_modificacion = now()
+        self.object.motivo_modificacion = motivo_modificacion
         
         # También guardar campos de bonus urgencia que vienen del formulario
         self.object.save(update_fields=[
@@ -795,6 +817,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             'fecha_hora_informe',
             'modificado_por',
             'fecha_modificacion',
+            'motivo_modificacion',
         ])
         
         # Mostrar desglose del cálculo actualizado
@@ -849,6 +872,12 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroEstudiosPorMedico
     template_name = 'liquidacion/registroestudios_confirm_delete_tailwind.html'
 
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.es_medico():
+            messages.warning(request, "No tienes permiso para acceder a esta sección.")
+            return redirect('home')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_queryset(self):
         # Limita los registros a los del usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
@@ -875,10 +904,21 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
         })
         return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
 
-    def delete(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         registro = self.get_object()
+        self.object = registro
+
+        sesion = registro.sesion_contable
+        if sesion and not sesion.puede_registrar_practicas(request.user):
+            messages.error(
+                request,
+                f"❌ La sesión de {sesion.mes}/{sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No puedes eliminar prácticas."
+            )
+            return redirect(self.get_success_url())
+
         messages.success(request, "✅ Registro eliminado correctamente.")
-        return super().delete(request, *args, **kwargs)
+        return super().post(request, *args, **kwargs)
 
 # ============================================================
 # [ANULADO - 16 de febrero 2026]
@@ -913,7 +953,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
         """Solo administrativos, jefe de servicio, y superusuarios"""
         return (
             self.request.user.is_superuser or 
-            self.request.user.rol in ['administrativo', 'jefe_servicio', 'jefe_residentes', 'instructor_residentes']
+            self.request.user.rol in ['administrativo', 'jefe_servicio']
         )
     
     def handle_no_permission(self):
