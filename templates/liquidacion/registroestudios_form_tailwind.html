@@ -624,6 +624,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let estudiosFiltrados = [];
     let estudiosSeleccionadosIds = [];
     let estudiosConCantidades = {}; // {id_estudio: cantidad} - CRÍTICO: debe estar declarado
+    let estudiosConContexto = {};   // {id_estudio: 'SERVICIO'|'LECHO'|'QUIROFANO'}
     
     // Variables de usuario (necesarias para visibilidad de secciones)
     const esStaff = {{ es_staff|lower }};
@@ -656,7 +657,20 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!estudio) return;
             
             const cantidad = estudiosConCantidades[id] || 1;
-            
+            const contexto = estudiosConContexto[id] || 'SERVICIO';
+            const tieneContexto = estudio.tiene_contexto_ubicacion;
+
+            const contextoSelector = tieneContexto ? `
+                <select data-contexto-id="${id}"
+                        class="contexto-estudio ml-1 px-1 py-0.5 bg-white/20 border border-white/30 rounded text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
+                        title="Ubicación del estudio"
+                        onclick="event.stopPropagation()"
+                        onchange="actualizarContextoEstudio(${id}, this.value)">
+                    <option value="SERVICIO" ${contexto==='SERVICIO'?'selected':''}>Consultorio</option>
+                    <option value="LECHO" ${contexto==='LECHO'?'selected':''}>Lecho</option>
+                    <option value="QUIROFANO" ${contexto==='QUIROFANO'?'selected':''}>Quirófano</option>
+                </select>` : '';
+
             const tag = document.createElement('div');
             tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
             tag.innerHTML = `
@@ -671,6 +685,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        class="cantidad-estudio w-12 px-1 py-0.5 text-center bg-white/20 border border-white/30 rounded text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
                        onclick="event.stopPropagation()"
                        onchange="actualizarCantidadEstudio(${id}, this.value)">
+                ${contextoSelector}
                 <button type="button" 
                         class="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
                         onclick="eliminarEstudio(${id})">
@@ -681,10 +696,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Función global para actualizar contexto de un estudio
+    window.actualizarContextoEstudio = function(id, contexto) {
+        estudiosConContexto[id] = contexto;
+        calcularMontoTiempoReal();
+    };
+
     // Función global para eliminar estudio
     window.eliminarEstudio = function(id) {
         estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
         delete estudiosConCantidades[id];
+        delete estudiosConContexto[id];
         actualizarSelectOriginal();
         renderizarEstudiosSeleccionados();
         actualizarVisibilidadSecciones();
@@ -704,6 +726,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!estudiosSeleccionadosIds.includes(id)) {
             estudiosSeleccionadosIds.push(id);
             estudiosConCantidades[id] = 1; // Por defecto cantidad = 1
+            estudiosConContexto[id] = 'SERVICIO'; // Por defecto contexto = SERVICIO
             actualizarSelectOriginal();
             renderizarEstudiosSeleccionados();
             actualizarVisibilidadSecciones();
@@ -884,6 +907,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const tipoSeleccionado = this.value;
         estudiosSeleccionadosIds = [];
         estudiosConCantidades = {}; // Resetear cantidades también
+        estudiosConContexto = {};
         
         if (!tipoSeleccionado) {
             estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
@@ -1230,13 +1254,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('cantidades-estudios-container');
         container.innerHTML = '';
         
-        // Crear input hidden por cada estudio con su cantidad
+        // Crear input hidden por cada estudio con su cantidad y contexto
         for (const [estudioId, cantidad] of Object.entries(estudiosConCantidades)) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = `cantidad_estudio_${estudioId}`;
-            input.value = cantidad;
-            container.appendChild(input);
+            const inputCantidad = document.createElement('input');
+            inputCantidad.type = 'hidden';
+            inputCantidad.name = `cantidad_estudio_${estudioId}`;
+            inputCantidad.value = cantidad;
+            container.appendChild(inputCantidad);
+
+            const inputContexto = document.createElement('input');
+            inputContexto.type = 'hidden';
+            inputContexto.name = `contexto_estudio_${estudioId}`;
+            inputContexto.value = estudiosConContexto[estudioId] || 'SERVICIO';
+            container.appendChild(inputContexto);
         }
     });
 });

@@ -12,6 +12,8 @@ class GrupoTarifario(models.Model):
         ('RAD', 'Radiografía'),
         ('TOM', 'Tomografía'),
         ('RES', 'Resonancia Magnética'),
+        ('DOP', 'Doppler'),
+        ('ECOCAR', 'Ecocardiograma'),
     )
 
     codigo = models.CharField(
@@ -22,7 +24,7 @@ class GrupoTarifario(models.Model):
     )
     nombre = models.CharField(max_length=150, verbose_name='Nombre')
     modalidad = models.CharField(
-        max_length=3,
+        max_length=6,
         choices=MODALIDAD_CHOICES,
         verbose_name='Modalidad',
     )
@@ -129,6 +131,11 @@ class Estudios(models.Model):
         verbose_name='Estudio Activo',
         help_text='Desmarcar para ocultar en formularios'
     )
+    tiene_contexto_ubicacion = models.BooleanField(
+        default=False,
+        verbose_name='Requiere contexto de ubicación',
+        help_text='Si True, el médico puede indicar si el estudio fue en Servicio, Lecho o Quirófano (ej: Doppler, ETE)',
+    )
     fecha_actualizacion_precios = models.DateField(
         auto_now=True,
         verbose_name='Última actualización de precios'
@@ -158,12 +165,28 @@ class Estudios(models.Model):
             return self.precio_cober
         return self.precio_cober if tipo_os == 'COBER' else self.precio_otras_os
 
-    def precio_para_os(self, tipo_os, fecha=None):
-        """Retorna el precio vigente por OS priorizando la tarifa del grupo."""
+    def precio_para_os(self, tipo_os, fecha=None, contexto='SERVICIO'):
+        """Retorna el precio vigente por OS priorizando la tarifa del grupo.
+
+        Si el estudio tiene contexto de ubicación (lecho/quirófano), intenta
+        resolver contra un grupo variante ({codigo}_LECHO o {codigo}_QUIROFANO)
+        antes de caer al grupo base.
+        """
         tipo_os_normalizado = (tipo_os or '').upper()
         fecha_ref = fecha or timezone.now().date()
+        contexto_norm = (contexto or 'SERVICIO').upper()
 
         if self.grupo_tarifario_id:
+            # Intentar grupo contextual si el estudio lo soporta y el contexto no es el default
+            if self.tiene_contexto_ubicacion and contexto_norm != 'SERVICIO':
+                codigo_variante = f"{self.grupo_tarifario.codigo}_{contexto_norm}"
+                grupo_variante = GrupoTarifario.objects.filter(codigo=codigo_variante).first()
+                if grupo_variante:
+                    tarifa_variante = grupo_variante.get_tarifa_vigente(fecha=fecha_ref)
+                    if tarifa_variante:
+                        return tarifa_variante.precio_cober if tipo_os_normalizado == 'COBER' else tarifa_variante.precio_otras_os
+
+            # Grupo base (contexto SERVICIO o fallback)
             tarifa_vigente = self.grupo_tarifario.get_tarifa_vigente(fecha=fecha_ref)
             if tarifa_vigente:
                 return tarifa_vigente.precio_cober if tipo_os_normalizado == 'COBER' else tarifa_vigente.precio_otras_os
@@ -491,6 +514,19 @@ class RegistroEstudio(models.Model):
         help_text='Número de veces que se realizó este estudio (ej: 2 para bilateral)'
     )
     
+    CONTEXTO_CHOICES = [
+        ('SERVICIO', 'Consultorio / Servicio'),
+        ('LECHO',    'En Lecho'),
+        ('QUIROFANO', 'Quirófano'),
+    ]
+    contexto = models.CharField(
+        max_length=10,
+        choices=CONTEXTO_CHOICES,
+        default='SERVICIO',
+        verbose_name='Contexto de ubicación',
+        help_text='Indica si el estudio fue en Servicio (consultorio), en Lecho (cama del paciente) o en Quirófano',
+    )
+
     # Metadata
     fecha_agregado = models.DateTimeField(
         auto_now_add=True,
@@ -652,8 +688,11 @@ class RegistroEstudiosPorMedico(models.Model):
             estudio = rel.estudio
             cantidad = rel.cantidad
 
-            precio_estudio = estudio.precio_para_os(self.tipo_obra_social, fecha=fecha_referencia)
-            
+            precio_estudio = estudio.precio_para_os(
+                self.tipo_obra_social,
+                fecha=fecha_referencia,
+                contexto=rel.contexto,
+            )
             precio_total += (precio_estudio * Decimal(str(cantidad)))
         
         if precio_total == Decimal('0.00'):
@@ -723,15 +762,20 @@ class RegistroEstudiosPorMedico(models.Model):
             estudio = rel.estudio
             cantidad = rel.cantidad
 
-            precio_estudio = estudio.precio_para_os(self.tipo_obra_social, fecha=self.fecha_del_informe or timezone.now().date())
-            
+            precio_estudio = estudio.precio_para_os(
+                self.tipo_obra_social,
+                fecha=self.fecha_del_informe or timezone.now().date(),
+                contexto=rel.contexto,
+            )
             precio_total += (precio_estudio * Decimal(str(cantidad)))
-            
-            # Agregar nombre con cantidad si es mayor a 1
+
+            # Agregar nombre con cantidad y contexto si aplica
+            label = estudio.nombre
+            if rel.contexto and rel.contexto != 'SERVICIO':
+                label += f' [{rel.get_contexto_display()}]'
             if cantidad > 1:
-                estudios_nombres.append(f"{estudio.nombre} ×{cantidad}")
-            else:
-                estudios_nombres.append(estudio.nombre)
+                label += f' ×{cantidad}'
+            estudios_nombres.append(label)
         
         # Porcentaje según horario
         porcentaje = 0.5 if self.horario == 'INTRA' else 1.0

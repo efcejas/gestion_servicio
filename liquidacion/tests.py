@@ -608,10 +608,34 @@ class GrupoTarifarioMappingTest(TestCase):
             'RES_SIN_CONTRASTE',
         )
 
-    def test_inferir_codigo_grupo_doppler(self):
+    def test_inferir_codigo_grupo_dop_periferico(self):
         self.assertEqual(
             inferir_codigo_grupo('DOP', 'Doppler periférico en lecho'),
-            'ECO_DOPPLER',
+            'DOP_PERIFERICO',
+        )
+
+    def test_inferir_codigo_grupo_dop_cardiaco(self):
+        self.assertEqual(
+            inferir_codigo_grupo('DOP', 'Doppler cardíaco transtorácico'),
+            'DOP_CARDIACO',
+        )
+
+    def test_inferir_codigo_grupo_ecocar_te(self):
+        self.assertEqual(
+            inferir_codigo_grupo('ECOCAR', 'Ecocardiograma transesofágico (ETE)'),
+            'ECO_TE',
+        )
+
+    def test_inferir_codigo_grupo_ecocar_stress(self):
+        self.assertEqual(
+            inferir_codigo_grupo('ECOCAR', 'Eco stress con dobutamina'),
+            'ECO_STRESS',
+        )
+
+    def test_inferir_codigo_grupo_ecocar_burbuja(self):
+        self.assertEqual(
+            inferir_codigo_grupo('ECOCAR', 'Ecocardiograma con burbuja de contraste'),
+            'ECO_BURBUJA',
         )
 
     def test_inferir_codigo_grupo_ambiguo_devuelve_none(self):
@@ -683,5 +707,96 @@ class CalculoMontosRegressionTest(TestCase):
             registro.horario,
             'NA',
             "❌ FALLA: Staff debe tener horario 'NA' automáticamente",
+        )
+
+
+class ContextoUbicacionTest(TestCase):
+    """Tests de resolución contextual de precios (Doppler/ECOCAR en lecho/quirófano)."""
+
+    def setUp(self):
+        from decimal import Decimal
+        # Grupo base SERVICIO
+        self.grupo_base = GrupoTarifario.objects.create(
+            codigo='DOP_PERIFERICO',
+            nombre='Doppler Periférico (Servicio)',
+            modalidad='DOP',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo_base,
+            vigencia_desde=date.today(),
+            precio_cober=Decimal('9400.00'),
+            precio_otras_os=Decimal('11000.00'),
+            motivo_actualizacion='Tarifa contexto test',
+        )
+        # Grupo variante LECHO
+        self.grupo_lecho = GrupoTarifario.objects.create(
+            codigo='DOP_PERIFERICO_LECHO',
+            nombre='Doppler Periférico (Lecho)',
+            modalidad='DOP',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo_lecho,
+            vigencia_desde=date.today(),
+            precio_cober=Decimal('11600.00'),
+            precio_otras_os=Decimal('13200.00'),
+            motivo_actualizacion='Tarifa lecho test',
+        )
+        # Estudio con tiene_contexto_ubicacion=True
+        self.estudio = Estudios.objects.create(
+            codigo='DOP-TEST',
+            nombre='Doppler Periférico Test',
+            tipo='DOP',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('9400.00'),
+            precio_otras_os=Decimal('11000.00'),
+            conteo_regiones_default=1,
+            activo=True,
+            tiene_contexto_ubicacion=True,
+        )
+        self.estudio.grupo_tarifario = self.grupo_base
+        self.estudio.save(update_fields=['grupo_tarifario'])
+
+    def test_precio_para_os_contexto_servicio_usa_grupo_base(self):
+        from decimal import Decimal
+        self.assertEqual(
+            self.estudio.precio_para_os('COBER', fecha=date.today(), contexto='SERVICIO'),
+            Decimal('9400.00'),
+        )
+
+    def test_precio_para_os_contexto_lecho_usa_grupo_lecho(self):
+        from decimal import Decimal
+        self.assertEqual(
+            self.estudio.precio_para_os('COBER', fecha=date.today(), contexto='LECHO'),
+            Decimal('11600.00'),
+        )
+
+    def test_precio_para_os_contexto_lecho_otras_os(self):
+        from decimal import Decimal
+        self.assertEqual(
+            self.estudio.precio_para_os('OTRAS_OS', fecha=date.today(), contexto='LECHO'),
+            Decimal('13200.00'),
+        )
+
+    def test_precio_para_os_contexto_lecho_fallback_si_no_existe_grupo(self):
+        """Si no existe DOP_PERIFERICO_LECHO, cae al grupo base."""
+        from decimal import Decimal
+        self.grupo_lecho.delete()
+        # Debe caer al precio del grupo base
+        self.assertEqual(
+            self.estudio.precio_para_os('COBER', fecha=date.today(), contexto='LECHO'),
+            Decimal('9400.00'),
+        )
+
+    def test_estudio_sin_tiene_contexto_ignora_contexto(self):
+        """Un estudio sin tiene_contexto_ubicacion siempre usa el grupo base."""
+        from decimal import Decimal
+        self.estudio.tiene_contexto_ubicacion = False
+        self.estudio.save(update_fields=['tiene_contexto_ubicacion'])
+        self.assertEqual(
+            self.estudio.precio_para_os('COBER', fecha=date.today(), contexto='LECHO'),
+            Decimal('9400.00'),
         )
 

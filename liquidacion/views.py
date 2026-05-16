@@ -108,8 +108,8 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # Serializar estudios para JS (convertir Decimals a string)
         estudios_data = []
         for estudio in Estudios.objects.filter(activo=True).values(
-            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os', 
-            'precio_unico', 'conteo_regiones_default'
+            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os',
+            'precio_unico', 'conteo_regiones_default', 'tiene_contexto_ubicacion'
         ):
             estudio_dict = dict(estudio)
             # Convertir Decimals a string para JSON
@@ -209,13 +209,22 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # Importar el modelo intermedio
         from liquidacion.models import RegistroEstudio
         
-        # Crear las relaciones en la tabla intermedia con cantidades
+        # Leer contextos de ubicación desde el POST (para estudios Doppler/ECOCAR)
+        contextos_estudios = {}
+        for key in self.request.POST:
+            if key.startswith('contexto_estudio_'):
+                estudio_id = int(key.replace('contexto_estudio_', ''))
+                contextos_estudios[estudio_id] = self.request.POST[key]
+
+        # Crear las relaciones en la tabla intermedia con cantidades y contexto
         for estudio in estudios_seleccionados:
             cantidad = cantidades_estudios.get(estudio.id, 1)  # Default = 1 si no está en el dict
+            contexto = contextos_estudios.get(estudio.id, 'SERVICIO')  # Default = SERVICIO
             RegistroEstudio.objects.create(
                 registro=self.object,
                 estudio=estudio,
-                cantidad=cantidad
+                cantidad=cantidad,
+                contexto=contexto,
             )
         
         # Calcular cantidad de regiones con las cantidades especificadas

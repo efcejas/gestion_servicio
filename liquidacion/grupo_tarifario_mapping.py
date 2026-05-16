@@ -26,6 +26,20 @@ PATRONES_SIN_CONTRASTE = [
 ]
 PATRONES_DOPPLER = [r"\bDOPPLER\b", r"\bECODOPPLER\b"]
 
+# Doppler cardíaco: palabras que indican estudio cardíaco
+PATRONES_CARDIACO = [
+    r"\bCARDIACO\b", r"\bCARDIAC\b",
+    r"\bCARDIO\b",
+    r"\bECOCARDIO\b",
+]
+
+# Transesofágico
+PATRONES_TE = [r"\bTRANSESOFAGICO\b", r"\bETE\b", r"\bTRANS.?ESOFAGIC"]
+
+# Eco especiales
+PATRONES_STRESS   = [r"\bSTRESS\b", r"\bESTRES\b", r"\bDOBUTAMINA\b", r"\bDOBUTA\b"]
+PATRONES_BURBUJA  = [r"\bBURBUJA\b", r"\bCONTRASTE\b"]  # Eco burbuja = eco con contraste
+
 
 def detecta(nombre, patrones):
     texto = normalizado(nombre)
@@ -33,7 +47,12 @@ def detecta(nombre, patrones):
 
 
 def inferir_codigo_grupo(tipo, nombre):
-    """Retorna el código de grupo tarifario sugerido para un estudio."""
+    """Retorna el código de grupo tarifario base sugerido para un estudio.
+
+    Para estudios con contexto de ubicación (DOP, ECOCAR), retorna el grupo
+    base SERVICIO. El resolver precio_para_os() aplica el sufijo _LECHO o
+    _QUIROFANO dinámicamente según RegistroEstudio.contexto.
+    """
     tipo_normalizado = (tipo or "").upper()
 
     if tipo_normalizado == "TOM":
@@ -60,7 +79,20 @@ def inferir_codigo_grupo(tipo, nombre):
         return "ECO_ECOGRAFIA"
 
     if tipo_normalizado == "DOP":
-        return "ECO_DOPPLER"
+        # Doppler cardíaco vs periférico
+        if detecta(nombre, PATRONES_CARDIACO):
+            return "DOP_CARDIACO"
+        return "DOP_PERIFERICO"
+
+    if tipo_normalizado == "ECOCAR":
+        if detecta(nombre, PATRONES_TE):
+            return "ECO_TE"
+        if detecta(nombre, PATRONES_STRESS):
+            return "ECO_STRESS"
+        if detecta(nombre, PATRONES_BURBUJA):
+            return "ECO_BURBUJA"
+        # Ecocardiograma cardíaco genérico → doppler cardíaco
+        return "DOP_CARDIACO"
 
     if tipo_normalizado == "RAD":
         return "RAD_RADIOGRAFIA"
