@@ -164,8 +164,12 @@
                                                     Ecografía
                                                 </div>
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
-                                                     data-value="RAD">
-                                                    Radiografía
+                                                     data-value="DOP">
+                                                    Doppler
+                                                </div>
+                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
+                                                     data-value="ECOCAR">
+                                                    Ecocardiograma
                                                 </div>
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
                                                      data-value="TOM">
@@ -176,16 +180,12 @@
                                                     Resonancia Magnética
                                                 </div>
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
-                                                     data-value="DOP">
-                                                    Doppler
+                                                     data-value="RAD">
+                                                    Radiografía
                                                 </div>
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
                                                      data-value="MAM">
                                                     Mamografía
-                                                </div>
-                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
-                                                     data-value="ECOCAR">
-                                                    Ecocardiograma
                                                 </div>
                                             </div>
                                         </div>
@@ -666,9 +666,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         title="Ubicación del estudio"
                         onclick="event.stopPropagation()"
                         onchange="actualizarContextoEstudio(${id}, this.value)">
-                    <option value="SERVICIO" ${contexto==='SERVICIO'?'selected':''}>Consultorio</option>
-                    <option value="LECHO" ${contexto==='LECHO'?'selected':''}>Lecho</option>
-                    <option value="QUIROFANO" ${contexto==='QUIROFANO'?'selected':''}>Quirófano</option>
+                    <option value="SERVICIO" style="color:#1f2937;background:#fff" ${contexto==='SERVICIO'?'selected':''}>Consultorio</option>
+                    <option value="LECHO" style="color:#1f2937;background:#fff" ${contexto==='LECHO'?'selected':''}>Lecho</option>
+                    <option value="QUIROFANO" style="color:#1f2937;background:#fff" ${contexto==='QUIROFANO'?'selected':''}>Quirófano</option>
                 </select>` : '';
 
             const tag = document.createElement('div');
