@@ -99,12 +99,12 @@
                                  class="hidden absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
                                 <div data-value="">Seleccione</div>
                                 <div data-value="ECO">Ecografía</div>
-                                <div data-value="RAD">Radiografía</div>
+                                <div data-value="DOP">Doppler</div>
+                                <div data-value="ECOCAR">Ecocardiograma</div>
                                 <div data-value="TOM">Tomografía</div>
                                 <div data-value="RES">Resonancia Magnética</div>
-                                <div data-value="DOP">Doppler</div>
+                                <div data-value="RAD">Radiografía</div>
                                 <div data-value="MAM">Mamografía</div>
-                                <div data-value="ECOCAR">Ecocardiograma</div>
                             </div>
                         </div>
                     </div>
@@ -290,16 +290,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoEstudioSeleccionado = "{{ tipo_estudio_seleccionado|default:'' }}";
     const estudiosSeleccionadosInicial = {{ estudios_seleccionados|safe }};
     const cantidadesInicial = {{ cantidades_estudios|safe }};  // v3.1 - Cantidades desde BD
+    const contextosInicial = {{ contextos_estudios|safe }};    // Contextos desde BD
     const esStaff = {{ es_staff|lower }};
     const trabajaRemoto = {{ trabaja_remoto|lower }};
-    
+
     let estudiosSeleccionadosIds = [...estudiosSeleccionadosInicial];
     let estudiosConCantidades = {};
+    let estudiosConContexto = {};
     let estudiosFiltrados = [];
-    
-    // v3.1 - Marzo 2026: Inicializar cantidades desde la tabla intermedia RegistroEstudio
+
+    // Inicializar cantidades y contextos desde la tabla intermedia
     estudiosSeleccionadosInicial.forEach(id => {
-        estudiosConCantidades[id] = cantidadesInicial[id] || 1;  // Usar cantidad de BD o default 1
+        estudiosConCantidades[id] = cantidadesInicial[id] || 1;
+        estudiosConContexto[id] = contextosInicial[id] || 'SERVICIO';
     });
     
     // Referencias DOM
@@ -368,24 +371,47 @@ document.addEventListener('DOMContentLoaded', function() {
         estudiosSeleccionadosIds.forEach(id => {
             const estudio = estudios.find(e => e.id == id);
             if (!estudio) return;
-            
+
             const cantidad = estudiosConCantidades[id] || 1;
-            
+            const contexto = estudiosConContexto[id] || 'SERVICIO';
+            const contextosDisponibles = Array.isArray(estudio.contextos_disponibles) ? estudio.contextos_disponibles : [];
+            const etiquetasContexto = {
+                'SERVICIO': 'Consultorio',
+                'LECHO': 'Lecho',
+                'QUIROFANO': 'Quirófano'
+            };
+
+            const contextoSelector = contextosDisponibles.length > 1 ? `
+                <span class="relative inline-flex items-center ml-2">
+                    <select data-contexto-id="${id}"
+                            class="contexto-estudio appearance-none bg-white/20 border border-white/30 rounded text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
+                            style="height:1.75rem; min-height:1.75rem; line-height:1.75rem; padding:0 1.75rem 0 0.75rem; min-width:8.5rem;"
+                            title="Ubicación del estudio"
+                            onclick="event.stopPropagation()"
+                            onchange="actualizarContextoEstudio(${id}, this.value)">
+                        ${contextosDisponibles.map((ctx) => `
+                            <option value="${ctx}" style="color:#1f2937;background:#fff" ${contexto===ctx?'selected':''}>${etiquetasContexto[ctx] || ctx}</option>
+                        `).join('')}
+                    </select>
+                    <i class="fas fa-chevron-down pointer-events-none absolute right-2 text-white text-[10px] opacity-90"></i>
+                </span>` : '';
+
             const tag = document.createElement('div');
             tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
             tag.innerHTML = `
                 <i class="fas fa-x-ray"></i>
                 <span>${estudio.nombre}</span>
                 <span class="text-xs opacity-75">×</span>
-                <input type="number" 
-                       min="1" 
-                       max="10" 
+                <input type="number"
+                       min="1"
+                       max="10"
                        value="${cantidad}"
                        data-estudio-id="${id}"
                        class="cantidad-estudio w-12 px-1 py-0.5 text-center bg-white/20 border border-white/30 rounded text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
                        onclick="event.stopPropagation()"
                        onchange="actualizarCantidadEstudio(${id}, this.value)">
-                <button type="button" 
+                ${contextoSelector}
+                <button type="button"
                         class="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors"
                         onclick="eliminarEstudio(${id})">
                     <i class="fas fa-times text-xs"></i>
@@ -397,9 +423,16 @@ document.addEventListener('DOMContentLoaded', function() {
         actualizarSelectOriginal();
     }
 
+    // Función global para actualizar contexto de un estudio
+    window.actualizarContextoEstudio = function(id, contexto) {
+        estudiosConContexto[id] = contexto;
+        calcularMontoTiempoReal();
+    };
+
     window.eliminarEstudio = function(id) {
         estudiosSeleccionadosIds = estudiosSeleccionadosIds.filter(eid => eid != id);
         delete estudiosConCantidades[id];
+        delete estudiosConContexto[id];
         renderizarEstudiosSeleccionados();
         actualizarVisibilidadSecciones();
         actualizarCantidadRegiones();
@@ -416,6 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!estudiosSeleccionadosIds.includes(id)) {
             estudiosSeleccionadosIds.push(id);
             estudiosConCantidades[id] = 1;
+            estudiosConContexto[id] = 'SERVICIO';
             renderizarEstudiosSeleccionados();
             actualizarVisibilidadSecciones();
             actualizarCantidadRegiones();
@@ -738,13 +772,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const container = document.getElementById('cantidades-estudios-container');
         container.innerHTML = '';
         
-        // Crear input hidden por cada estudio con su cantidad
+        // Crear input hidden por cada estudio con su cantidad y contexto
         for (const [estudioId, cantidad] of Object.entries(estudiosConCantidades)) {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = `cantidad_estudio_${estudioId}`;
-            input.value = cantidad;
-            container.appendChild(input);
+            const inputCantidad = document.createElement('input');
+            inputCantidad.type = 'hidden';
+            inputCantidad.name = `cantidad_estudio_${estudioId}`;
+            inputCantidad.value = cantidad;
+            container.appendChild(inputCantidad);
+
+            const inputContexto = document.createElement('input');
+            inputContexto.type = 'hidden';
+            inputContexto.name = `contexto_estudio_${estudioId}`;
+            inputContexto.value = estudiosConContexto[estudioId] || 'SERVICIO';
+            container.appendChild(inputContexto);
         }
     });
 });

@@ -1,0 +1,4885 @@
+[
+{
+  "model": "liquidacion.estudios",
+  "pk": 1,
+  "fields": {
+    "codigo": null,
+    "nombre": "TC DE CEREBRO SIN CONTRASTE EV",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-17",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 2,
+  "fields": {
+    "codigo": null,
+    "nombre": "TC DE CEREBRO CON CONTRASTE EV",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-17",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 3,
+  "fields": {
+    "codigo": null,
+    "nombre": "ECO ABDOMINAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "6500.00",
+    "precio_otras_os": "6500.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-17",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 34,
+  "fields": {
+    "codigo": "901322",
+    "nombre": "ANGIOTAC OTROS ORGANOS CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 35,
+  "fields": {
+    "codigo": "901323",
+    "nombre": "ANGIOTAC OTROS ORGANOS SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 36,
+  "fields": {
+    "codigo": "901311",
+    "nombre": "ANGIOTOMOGRAFIA ABDOMINAL",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 37,
+  "fields": {
+    "codigo": "900166",
+    "nombre": "ANGIOTOMOGRAFIA AORTA ABDOMINAL",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 38,
+  "fields": {
+    "codigo": "900913",
+    "nombre": "ANGIOTOMOGRAFIA ARTERIAL CON RECONSTRUCC",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 39,
+  "fields": {
+    "codigo": "902225",
+    "nombre": "ANGIOTOMOGRAFIA CARDIACA",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "66550.00",
+    "precio_otras_os": "66550.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 40,
+  "fields": {
+    "codigo": "901233",
+    "nombre": "ANGIOTOMOGRAFIA CORONARIA",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "66550.00",
+    "precio_otras_os": "66550.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 41,
+  "fields": {
+    "codigo": "901234",
+    "nombre": "ANGIOTOMOGRAFIA DE CEREBRO",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 42,
+  "fields": {
+    "codigo": "901235",
+    "nombre": "ANGIOTOMOGRAFIA DE CUELLO",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 43,
+  "fields": {
+    "codigo": "901237",
+    "nombre": "ANGIOTOMOGRAFIA DE CUERPO ENTERO",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 44,
+  "fields": {
+    "codigo": "901238",
+    "nombre": "ANGIOTOMOGRAFIA DE MIEMBROS INFERIORES",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 45,
+  "fields": {
+    "codigo": "901239",
+    "nombre": "ANGIOTOMOGRAFIA DE MIEMBROS SUPERIORES",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 46,
+  "fields": {
+    "codigo": "901312",
+    "nombre": "ANGIOTOMOGRAFIA DE VASOS CRANEALES",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 47,
+  "fields": {
+    "codigo": "900167",
+    "nombre": "ANGIOTOMOGRAFIA DE VASOS ILIACOS 3D",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 48,
+  "fields": {
+    "codigo": "902226",
+    "nombre": "ANGIOTOMOGRAFIA PARA TAVI",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "66550.00",
+    "precio_otras_os": "66550.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 49,
+  "fields": {
+    "codigo": "901243",
+    "nombre": "ANGIOTOMOGRAFIA PELVICA",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 50,
+  "fields": {
+    "codigo": "900061",
+    "nombre": "ANGIOTOMOGRAFIA PULMONAR",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 51,
+  "fields": {
+    "codigo": "901310",
+    "nombre": "ANGIOTOMOGRAFIA TORACICA",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 52,
+  "fields": {
+    "codigo": "901242",
+    "nombre": "ANGIOTOMOGRAFIA VASOS PULMONARES",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 53,
+  "fields": {
+    "codigo": "900914",
+    "nombre": "ANGIOTOMOGRAFIA VENOSA CON RECONSTRUCCIO",
+    "tipo": "TOM",
+    "grupo_tarifario": 8,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 54,
+  "fields": {
+    "codigo": "900446",
+    "nombre": "BLOQUEO FACETARIO BAJO TAC",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 55,
+  "fields": {
+    "codigo": "900441",
+    "nombre": "BLOQUEO PERIDURAL BAJO TAC",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 56,
+  "fields": {
+    "codigo": "900413",
+    "nombre": "BLOQUEO RADICULAR BAJO TAC",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 57,
+  "fields": {
+    "codigo": "341317",
+    "nombre": "BLOQUEO RADICULAR Y/O FACETARIO SELECTIV",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 59,
+  "fields": {
+    "codigo": "900082",
+    "nombre": "DRENAJE PERCUTANEO BAJO TAC HELICOIDAL",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 60,
+  "fields": {
+    "codigo": "900034",
+    "nombre": "DRENAJES Y/O PROCEDIMIENTOS SIMILARES BA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 66,
+  "fields": {
+    "codigo": "901244",
+    "nombre": "SCORE DE CALCIO CORONARIO",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 67,
+  "fields": {
+    "codigo": "901302",
+    "nombre": "TAC 3D CADERAS",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 68,
+  "fields": {
+    "codigo": "901300",
+    "nombre": "TAC 3D COLUMNA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 69,
+  "fields": {
+    "codigo": "901301",
+    "nombre": "TAC 3D MACIZO FACIAL",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 70,
+  "fields": {
+    "codigo": "900832",
+    "nombre": "TAC 3D ORBITAS",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 71,
+  "fields": {
+    "codigo": "901303",
+    "nombre": "TAC 3D RODILLA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 72,
+  "fields": {
+    "codigo": "341008",
+    "nombre": "TAC ABDOMEN y PELVIS (cont oral)",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 73,
+  "fields": {
+    "codigo": "900908",
+    "nombre": "TAC ALTA RESOLUCION AMBOS PENASCOS",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 74,
+  "fields": {
+    "codigo": "901217",
+    "nombre": "TAC ALTA RESOLUCION OIDOS",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 75,
+  "fields": {
+    "codigo": "901218",
+    "nombre": "TAC ALTA RESOLUCION OIDOS CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 76,
+  "fields": {
+    "codigo": "901219",
+    "nombre": "TAC ALTA RESOLUCION OTROS ORGANOS",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 77,
+  "fields": {
+    "codigo": "901220",
+    "nombre": "TAC ALTA RESOLUCION OTROS ORGANOS CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 78,
+  "fields": {
+    "codigo": "900911",
+    "nombre": "TAC ALTA RESOLUCION PULMONAR",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 79,
+  "fields": {
+    "codigo": "900912",
+    "nombre": "TAC ALTA RESOLUCION PULMONAR CON CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 80,
+  "fields": {
+    "codigo": "901215",
+    "nombre": "TAC ALTA RESOLUCION TORACICA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 81,
+  "fields": {
+    "codigo": "901216",
+    "nombre": "TAC ALTA RESOLUCION TORACICA CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 82,
+  "fields": {
+    "codigo": "900904",
+    "nombre": "TAC CADERA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 83,
+  "fields": {
+    "codigo": "341001",
+    "nombre": "TAC CEREBRAL (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 84,
+  "fields": {
+    "codigo": "341003",
+    "nombre": "TAC CEREBRAL DE CONTROL (s/contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 85,
+  "fields": {
+    "codigo": "341002",
+    "nombre": "TAC CEREBRAL REFORZADA (con contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 86,
+  "fields": {
+    "codigo": "901619",
+    "nombre": "TAC CODOS UNILATERAL",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 87,
+  "fields": {
+    "codigo": "341013",
+    "nombre": "TAC COLUMNA (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 88,
+  "fields": {
+    "codigo": "900101",
+    "nombre": "TAC DE ABDOMEN C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 89,
+  "fields": {
+    "codigo": "341032",
+    "nombre": "TAC DE PELVIS CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 90,
+  "fields": {
+    "codigo": "341014",
+    "nombre": "TAC DE PELVIS SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 91,
+  "fields": {
+    "codigo": "901211",
+    "nombre": "TAC DINAMICA EN 3 FASES ARTERIALES",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 92,
+  "fields": {
+    "codigo": "900903",
+    "nombre": "TAC FEMUR",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 93,
+  "fields": {
+    "codigo": "341007",
+    "nombre": "TAC GINECOLOGICA (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 94,
+  "fields": {
+    "codigo": "900193",
+    "nombre": "TAC GINECOLOGICA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 95,
+  "fields": {
+    "codigo": "900194",
+    "nombre": "TAC HEPATOBILIAR/RENAL (con contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 96,
+  "fields": {
+    "codigo": "341009",
+    "nombre": "TAC HEPATOBILIAR/RENAL (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 97,
+  "fields": {
+    "codigo": "900909",
+    "nombre": "TAC MACIZO FACIAL CON CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 98,
+  "fields": {
+    "codigo": "900458",
+    "nombre": "TAC MACIZO FACIAL SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 99,
+  "fields": {
+    "codigo": "900192",
+    "nombre": "TAC MAMARIA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 100,
+  "fields": {
+    "codigo": "341006",
+    "nombre": "TAC MAMARIA SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 101,
+  "fields": {
+    "codigo": "900840",
+    "nombre": "TAC MANO CON CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 102,
+  "fields": {
+    "codigo": "900839",
+    "nombre": "TAC MANO SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 103,
+  "fields": {
+    "codigo": "900837",
+    "nombre": "TAC MUNECA CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 104,
+  "fields": {
+    "codigo": "900835",
+    "nombre": "TAC MUNECA SIN CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 105,
+  "fields": {
+    "codigo": "341004",
+    "nombre": "TAC OFTALMOLOGICA    (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 106,
+  "fields": {
+    "codigo": "900190",
+    "nombre": "TAC OFTALMOLOGICA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 107,
+  "fields": {
+    "codigo": "900907",
+    "nombre": "TAC OIDO",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 108,
+  "fields": {
+    "codigo": "900831",
+    "nombre": "TAC ORBITAS CON CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 109,
+  "fields": {
+    "codigo": "900830",
+    "nombre": "TAC ORBITAS SIN CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 110,
+  "fields": {
+    "codigo": "901232",
+    "nombre": "TAC OSTEOARTICULAR 3D CON O SIN SUPRESION METALICA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 111,
+  "fields": {
+    "codigo": "900196",
+    "nombre": "TAC OTROS ORGANOS (con contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 112,
+  "fields": {
+    "codigo": "341012",
+    "nombre": "TAC OTROS ORGANOS (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 113,
+  "fields": {
+    "codigo": "900836",
+    "nombre": "TAC PIE CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 114,
+  "fields": {
+    "codigo": "900900",
+    "nombre": "TAC PIE SIN CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 115,
+  "fields": {
+    "codigo": "900901",
+    "nombre": "TAC PIERNA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 116,
+  "fields": {
+    "codigo": "900915",
+    "nombre": "TAC RECONSTRCCION OSEA 3D",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 117,
+  "fields": {
+    "codigo": "900902",
+    "nombre": "TAC RODILLA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 118,
+  "fields": {
+    "codigo": "900856",
+    "nombre": "TAC RODILLA 3D",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 119,
+  "fields": {
+    "codigo": "901245",
+    "nombre": "TAC SCREENING DE TORAX",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 120,
+  "fields": {
+    "codigo": "341005",
+    "nombre": "TAC TIROIDEA (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 121,
+  "fields": {
+    "codigo": "900191",
+    "nombre": "TAC TIROIDEA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 122,
+  "fields": {
+    "codigo": "900834",
+    "nombre": "TAC TOBILLO CON CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 123,
+  "fields": {
+    "codigo": "900833",
+    "nombre": "TAC TOBILLO SIN CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 124,
+  "fields": {
+    "codigo": "341010",
+    "nombre": "TAC TORACICA (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 125,
+  "fields": {
+    "codigo": "900100",
+    "nombre": "TAC TORACICA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-03-01",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 126,
+  "fields": {
+    "codigo": "902233",
+    "nombre": "TAC TRIPLE RULE OUT",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "66550.00",
+    "precio_otras_os": "66550.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 127,
+  "fields": {
+    "codigo": "341011",
+    "nombre": "TAC VEJIGA Y PROSTATA (sin contraste)",
+    "tipo": "TOM",
+    "grupo_tarifario": 10,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 128,
+  "fields": {
+    "codigo": "900195",
+    "nombre": "TAC VEJIGA Y PROSTATA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 129,
+  "fields": {
+    "codigo": "901195",
+    "nombre": "TAC VEJIGA Y PROSTATA CON CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 130,
+  "fields": {
+    "codigo": "901804",
+    "nombre": "TAC VIA EXCRETORA C/CTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 131,
+  "fields": {
+    "codigo": "900099",
+    "nombre": "TAC.DE COLUMNA C/CONTRASTE",
+    "tipo": "TOM",
+    "grupo_tarifario": 9,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-03-01",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 133,
+  "fields": {
+    "codigo": "901240",
+    "nombre": "UROTOMOGRAFIA",
+    "tipo": "TOM",
+    "grupo_tarifario": 7,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 137,
+  "fields": {
+    "codigo": "901601",
+    "nombre": "ANESTESIA PARA RMN",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 138,
+  "fields": {
+    "codigo": "900332",
+    "nombre": "ANGIORES.ARTER.SUBCL.Y VASOS DIST.M.SUP.",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 139,
+  "fields": {
+    "codigo": "900330",
+    "nombre": "ANGIORES.BY PASS AXILOFEMORAL C/GADOLINO",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 140,
+  "fields": {
+    "codigo": "900329",
+    "nombre": "ANGIORES.BY PASS FEMOROPOPLITEO C/GADOLI",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 141,
+  "fields": {
+    "codigo": "900314",
+    "nombre": "ANGIORESON.DEL ENDOCRANEO S/CONTRASTE",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 142,
+  "fields": {
+    "codigo": "900331",
+    "nombre": "ANGIORESONAN. BY PASS OTROS",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 143,
+  "fields": {
+    "codigo": "900333",
+    "nombre": "ANGIORESONAN. VENAS ESPERMATICAS",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 144,
+  "fields": {
+    "codigo": "901228",
+    "nombre": "ANGIORESONANCIA 3D DE AORTA ABDOMINAL Y",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 145,
+  "fields": {
+    "codigo": "900316",
+    "nombre": "ANGIORESONANCIA AORTA ASCENDENTE C/GADOL",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 146,
+  "fields": {
+    "codigo": "900317",
+    "nombre": "ANGIORESONANCIA AORTA DESCENDENTE C/GADO",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 147,
+  "fields": {
+    "codigo": "900319",
+    "nombre": "ANGIORESONANCIA AORTA TORACICA",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 148,
+  "fields": {
+    "codigo": "900327",
+    "nombre": "ANGIORESONANCIA ARTERIAS M.INFERIOR C/GA",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 149,
+  "fields": {
+    "codigo": "900321",
+    "nombre": "ANGIORESONANCIA ARTERIAS RENALES C/GADO",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 150,
+  "fields": {
+    "codigo": "901229",
+    "nombre": "ANGIORESONANCIA DE ARTERIA PULMONAR Y AM",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 151,
+  "fields": {
+    "codigo": "901230",
+    "nombre": "ANGIORESONANCIA DE EJE ESPLENO PORTAL",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 152,
+  "fields": {
+    "codigo": "900318",
+    "nombre": "ANGIORESONANCIA DEL CAYADO AORTICO C/GAD",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 153,
+  "fields": {
+    "codigo": "900322",
+    "nombre": "ANGIORESONANCIA TRONCO CELIACO Y MESENTE",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 154,
+  "fields": {
+    "codigo": "900323",
+    "nombre": "ANGIORESONANCIA VARICES ESOFAGICAS",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 155,
+  "fields": {
+    "codigo": "900315",
+    "nombre": "ANGIORESONANCIA VASOS DE CUELLO SIN GADO",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 156,
+  "fields": {
+    "codigo": "900326",
+    "nombre": "ANGIORESONANCIA VASOS ILIACOS C/GADOLINO",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 157,
+  "fields": {
+    "codigo": "900260",
+    "nombre": "ANGIORESONANCIA VENA CAVA INFERIOR",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 158,
+  "fields": {
+    "codigo": "900325",
+    "nombre": "ANGIORESONANCIA VENAS SUPRAHEPATICAS",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 159,
+  "fields": {
+    "codigo": "900423",
+    "nombre": "ANGIORRESONANCIA CON CONTRASTE",
+    "tipo": "RES",
+    "grupo_tarifario": 6,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 160,
+  "fields": {
+    "codigo": "900381",
+    "nombre": "ARTRORESONANCIA C/INYECCION DE GADOLINIO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "38720.00",
+    "precio_otras_os": "33275.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 161,
+  "fields": {
+    "codigo": "900346",
+    "nombre": "COLANGIORESONANCIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 164,
+  "fields": {
+    "codigo": "900427",
+    "nombre": "ENTERORESONANCIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 165,
+  "fields": {
+    "codigo": "900275",
+    "nombre": "FLEBORESONANCIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 169,
+  "fields": {
+    "codigo": "901224",
+    "nombre": "RMN 3D DE REGION PARASELAR Y GLANDULA HIPOFISARIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 170,
+  "fields": {
+    "codigo": "901223",
+    "nombre": "RMN 3D DE TRIGEMINO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 171,
+  "fields": {
+    "codigo": "900287",
+    "nombre": "RMN ABDOMEN",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 172,
+  "fields": {
+    "codigo": "900281",
+    "nombre": "RMN ANTEBRAZO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 173,
+  "fields": {
+    "codigo": "900254",
+    "nombre": "RMN ARTICULACION TEMPOROMANDIBULAR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 174,
+  "fields": {
+    "codigo": "900337",
+    "nombre": "RMN BRAZO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 175,
+  "fields": {
+    "codigo": "900301",
+    "nombre": "RMN CADERA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 176,
+  "fields": {
+    "codigo": "900428",
+    "nombre": "RMN CARDIACA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "66550.00",
+    "precio_otras_os": "66550.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 177,
+  "fields": {
+    "codigo": "900245",
+    "nombre": "RMN CEREBRO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 178,
+  "fields": {
+    "codigo": "900279",
+    "nombre": "RMN CODO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 179,
+  "fields": {
+    "codigo": "900262",
+    "nombre": "RMN COLUMNA CERVICAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 180,
+  "fields": {
+    "codigo": "900265",
+    "nombre": "RMN COLUMNA DORSAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 181,
+  "fields": {
+    "codigo": "900267",
+    "nombre": "RMN COLUMNA LUMBAR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 182,
+  "fields": {
+    "codigo": "900269",
+    "nombre": "RMN COLUMNA SACROCOXIGEA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 183,
+  "fields": {
+    "codigo": "901236",
+    "nombre": "RMN CONDUCTO AUDITIVO INTERNO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 184,
+  "fields": {
+    "codigo": "900261",
+    "nombre": "RMN CUELLO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 185,
+  "fields": {
+    "codigo": "900299",
+    "nombre": "RMN CUERPOS CAVERNOSOS",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 186,
+  "fields": {
+    "codigo": "900293",
+    "nombre": "RMN DEL EMBARAZO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 187,
+  "fields": {
+    "codigo": "900312",
+    "nombre": "RMN DIFUSION",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 188,
+  "fields": {
+    "codigo": "900404",
+    "nombre": "RMN DINAMICA DEL LCR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 189,
+  "fields": {
+    "codigo": "900274",
+    "nombre": "RMN FOSA POSTERIOR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 190,
+  "fields": {
+    "codigo": "900405",
+    "nombre": "RMN FUNCIONAL ACTIVADOR CEREBRAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 191,
+  "fields": {
+    "codigo": "900257",
+    "nombre": "RMN GLANDULAS SALIVALES",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 192,
+  "fields": {
+    "codigo": "342038",
+    "nombre": "RMN HEPATOBILIAR ESPLENICA PANCREATICA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 193,
+  "fields": {
+    "codigo": "900335",
+    "nombre": "RMN HOMBRO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 194,
+  "fields": {
+    "codigo": "900426",
+    "nombre": "RMN LINFOGRAFIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 195,
+  "fields": {
+    "codigo": "900253",
+    "nombre": "RMN LOBULO TEMPORAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 196,
+  "fields": {
+    "codigo": "900259",
+    "nombre": "RMN MACIZO FACIAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 197,
+  "fields": {
+    "codigo": "900288",
+    "nombre": "RMN MAMARIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "33500.00",
+    "precio_otras_os": "29000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 198,
+  "fields": {
+    "codigo": "900285",
+    "nombre": "RMN MANO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 199,
+  "fields": {
+    "codigo": "900425",
+    "nombre": "RMN MIELOGRAFIA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 200,
+  "fields": {
+    "codigo": "900283",
+    "nombre": "RMN MUNECA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 201,
+  "fields": {
+    "codigo": "900303",
+    "nombre": "RMN MUSLO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 202,
+  "fields": {
+    "codigo": "900251",
+    "nombre": "RMN ORBITAS",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 203,
+  "fields": {
+    "codigo": "900291",
+    "nombre": "RMN PELVIS",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 204,
+  "fields": {
+    "codigo": "900407",
+    "nombre": "RMN PERFUSION",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 205,
+  "fields": {
+    "codigo": "900311",
+    "nombre": "RMN PIE",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 206,
+  "fields": {
+    "codigo": "900307",
+    "nombre": "RMN PIERNA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 207,
+  "fields": {
+    "codigo": "900424",
+    "nombre": "RMN PISO PELVIANO (DEFECOGRAFIA)",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 208,
+  "fields": {
+    "codigo": "900417",
+    "nombre": "RMN PLEXO BRAQUIAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 209,
+  "fields": {
+    "codigo": "900421",
+    "nombre": "RMN PROSTATA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 210,
+  "fields": {
+    "codigo": "900420",
+    "nombre": "RMN RECTAL",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 211,
+  "fields": {
+    "codigo": "900295",
+    "nombre": "RMN RETROPERITONEO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 212,
+  "fields": {
+    "codigo": "900305",
+    "nombre": "RMN RODILLA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 213,
+  "fields": {
+    "codigo": "900248",
+    "nombre": "RMN SILLA TURCA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 214,
+  "fields": {
+    "codigo": "900419",
+    "nombre": "RMN SISTEMA NERVIOSO PERIFERICO (NEUROGR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 215,
+  "fields": {
+    "codigo": "900297",
+    "nombre": "RMN TESTICULAR",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 216,
+  "fields": {
+    "codigo": "342005",
+    "nombre": "RMN TIROIDEA",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 217,
+  "fields": {
+    "codigo": "900309",
+    "nombre": "RMN TOBILLO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 218,
+  "fields": {
+    "codigo": "900271",
+    "nombre": "RMN TORAX (MEDIASTINO)",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 219,
+  "fields": {
+    "codigo": "900273",
+    "nombre": "RMN TORAX (PULMON)",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 221,
+  "fields": {
+    "codigo": "900355",
+    "nombre": "SUSTANCIA DE CONTRASTE",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 222,
+  "fields": {
+    "codigo": "900185",
+    "nombre": "URORESONANCIA UNA REGION",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 223,
+  "fields": {
+    "codigo": "900137",
+    "nombre": "ECODOPPLER 4 VASOS DE CUELLO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 224,
+  "fields": {
+    "codigo": "900092",
+    "nombre": "ECODOPPLER AORTA ABDOMINAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 225,
+  "fields": {
+    "codigo": "180604",
+    "nombre": "ECODOPPLER AORTA TORACICA",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 226,
+  "fields": {
+    "codigo": "900175",
+    "nombre": "ECODOPPLER AORTA, CAVA, RAMAS VISCERALES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 227,
+  "fields": {
+    "codigo": "180616",
+    "nombre": "ECODOPPLER AORTOILIACO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 228,
+  "fields": {
+    "codigo": "900046",
+    "nombre": "ECODOPPLER ARTERIAL MM INFERIORES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 229,
+  "fields": {
+    "codigo": "900045",
+    "nombre": "ECODOPPLER ARTERIAL MM SUPERIORES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 230,
+  "fields": {
+    "codigo": "180615",
+    "nombre": "ECODOPPLER ARTERIAS SUBCLAVIAS",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 231,
+  "fields": {
+    "codigo": "900009",
+    "nombre": "ECODOPPLER CARDIACO",
+    "tipo": "ECOCAR",
+    "grupo_tarifario": 36,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": true,
+    "fecha_actualizacion_precios": "2026-05-14",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 232,
+  "fields": {
+    "codigo": "900025",
+    "nombre": "ECODOPPLER CAROTIDO VERTEBRAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 233,
+  "fields": {
+    "codigo": "180203",
+    "nombre": "ECODOPPLER CIRCULACION PORTAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 234,
+  "fields": {
+    "codigo": "900688",
+    "nombre": "ECODOPPLER CON ANALISIS DE STRAIN",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 235,
+  "fields": {
+    "codigo": "900689",
+    "nombre": "ECODOPPLER CON PASO DE BURBUJAS",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 236,
+  "fields": {
+    "codigo": "901122",
+    "nombre": "ECODOPPLER DERMATOLOGICO",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 237,
+  "fields": {
+    "codigo": "180204",
+    "nombre": "ECODOPPLER ESPLENICO-CAVA",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 238,
+  "fields": {
+    "codigo": "900199",
+    "nombre": "ECODOPPLER HEPATICO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 239,
+  "fields": {
+    "codigo": "900453",
+    "nombre": "ECODOPPLER HUESOS NASALES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 240,
+  "fields": {
+    "codigo": "900160",
+    "nombre": "ECODOPPLER MAMARIO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 241,
+  "fields": {
+    "codigo": "900401",
+    "nombre": "ECODOPPLER OVARIO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 242,
+  "fields": {
+    "codigo": "180120",
+    "nombre": "ECODOPPLER PARTES BLANDAS",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 243,
+  "fields": {
+    "codigo": "900086",
+    "nombre": "ECODOPPLER PELVIANO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 244,
+  "fields": {
+    "codigo": "900019",
+    "nombre": "ECODOPPLER RENAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 245,
+  "fields": {
+    "codigo": "900029",
+    "nombre": "ECODOPPLER TESTICULAR",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 246,
+  "fields": {
+    "codigo": "900037",
+    "nombre": "ECODOPPLER TIROIDES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 247,
+  "fields": {
+    "codigo": "900402",
+    "nombre": "ECODOPPLER TOCOGINECOLOGICO",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 248,
+  "fields": {
+    "codigo": "900044",
+    "nombre": "ECODOPPLER TRANSVAGINAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 249,
+  "fields": {
+    "codigo": "900374",
+    "nombre": "ECODOPPLER VASOS PENEANOS CON DROGAS VASOACTIVAS",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 250,
+  "fields": {
+    "codigo": "900048",
+    "nombre": "ECODOPPLER VENOSO MM INFERIORES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 251,
+  "fields": {
+    "codigo": "900047",
+    "nombre": "ECODOPPLER VENOSO MM SUPERIORES",
+    "tipo": "ECO",
+    "grupo_tarifario": 1,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 252,
+  "fields": {
+    "codigo": "180304",
+    "nombre": "ECOESTRESS CON EJERCICIO",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 253,
+  "fields": {
+    "codigo": "180117",
+    "nombre": "ECOGRAFIA AORTA ABDOMINAL DINAMICA Y",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 254,
+  "fields": {
+    "codigo": "180107",
+    "nombre": "ECOGRAFIA CEREBRAL -CON MODO B Y A-",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 255,
+  "fields": {
+    "codigo": "180112",
+    "nombre": "ECOGRAFIA COMPLETA DE ABDOMEN",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 256,
+  "fields": {
+    "codigo": "900038",
+    "nombre": "ECOGRAFIA DE CADERA UNI/BILATERAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 257,
+  "fields": {
+    "codigo": "900036",
+    "nombre": "ECOGRAFIA DE MIEMBRO INFERIOR",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 258,
+  "fields": {
+    "codigo": "900022",
+    "nombre": "ECOGRAFIA DE PARTES BLANDAS",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 259,
+  "fields": {
+    "codigo": "180111",
+    "nombre": "ECOGRAFIA DE TESTICULOS",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 260,
+  "fields": {
+    "codigo": "180114",
+    "nombre": "ECOGRAFIA DE VEJIGA O PROSTATA CON O SIN",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 261,
+  "fields": {
+    "codigo": "180113",
+    "nombre": "ECOGRAFIA HEPATICA, BILIAR, ESPLENICA O",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 262,
+  "fields": {
+    "codigo": "180106",
+    "nombre": "ECOGRAFIA MAMARIA UNI O BILATERAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 263,
+  "fields": {
+    "codigo": "180118",
+    "nombre": "ECOGRAFIA PANCREATICA O SUPRARRENAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 264,
+  "fields": {
+    "codigo": "900866",
+    "nombre": "ECOGRAFIA PARTES BLANDAS DOS REGIONES",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 265,
+  "fields": {
+    "codigo": "901801",
+    "nombre": "ECOGRAFIA PROSTATICA TRANSRECTAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 266,
+  "fields": {
+    "codigo": "901833",
+    "nombre": "ECOGRAFIA PROSTATICA TRANSRECTAL RANDOMIZADA CON BIOPSIA",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 267,
+  "fields": {
+    "codigo": "180116",
+    "nombre": "ECOGRAFIA RENAL BILATERAL",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 268,
+  "fields": {
+    "codigo": "180110",
+    "nombre": "ECOGRAFIA TIROIDEA",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 269,
+  "fields": {
+    "codigo": "180104",
+    "nombre": "ECOGRAFIA TOCOGINECOLOGICA",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 270,
+  "fields": {
+    "codigo": "900043",
+    "nombre": "ECOGRAFIA TRANSESOFAGICA",
+    "tipo": "ECOCAR",
+    "grupo_tarifario": 38,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-05-16",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 271,
+  "fields": {
+    "codigo": "900667",
+    "nombre": "ECOGRAFIA TRANSESOFAGICA CON SEDACION",
+    "tipo": "ECOCAR",
+    "grupo_tarifario": 38,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-05-16",
+    "actualizado_por": 1
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 272,
+  "fields": {
+    "codigo": "900023",
+    "nombre": "ECOGRAFIA TRANSVAGINAL SIN BIOPSIA",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 273,
+  "fields": {
+    "codigo": "900653",
+    "nombre": "ELASTOGRAFIA HEPATICA",
+    "tipo": "ECO",
+    "grupo_tarifario": 2,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": false,
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 274,
+  "fields": {
+    "codigo": "340507",
+    "nombre": "CISTOURETROGRAFIA MICCIONAL - CISTOURE",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 275,
+  "fields": {
+    "codigo": "340412",
+    "nombre": "COLON P/ENEMA, EVACUADO Y DOBLE CONTRAS-",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 276,
+  "fields": {
+    "codigo": "340604",
+    "nombre": "HISTEROSALPINGOGRAFIA C/PRUEBA DE COTTE",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 277,
+  "fields": {
+    "codigo": "340103",
+    "nombre": "RADIOSCOP.C/CIRCUITO CERRADO DE TV.",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 278,
+  "fields": {
+    "codigo": "340422",
+    "nombre": "RX ABDOMEN SUBSIGUIENTE",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 279,
+  "fields": {
+    "codigo": "340234",
+    "nombre": "RX BRAZOS + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 280,
+  "fields": {
+    "codigo": "340213",
+    "nombre": "RX CODO,ANTEBRAZO,MUNECA,MANO, DEDOS, RODILLA, PIERNA, TOBILLO Y PIE (dos por placa)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 281,
+  "fields": {
+    "codigo": "340209",
+    "nombre": "RX COLUMNA",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 282,
+  "fields": {
+    "codigo": "340201",
+    "nombre": "RX CRANEO",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 283,
+  "fields": {
+    "codigo": "340421",
+    "nombre": "RX DE ABDOMEN",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 284,
+  "fields": {
+    "codigo": "340236",
+    "nombre": "RX MANO + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 285,
+  "fields": {
+    "codigo": "340238",
+    "nombre": "RX PIERNA + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 286,
+  "fields": {
+    "codigo": "340240",
+    "nombre": "RX RODILLA + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 287,
+  "fields": {
+    "codigo": "340501",
+    "nombre": "RX SIMPLE ARBOL URINARIO",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 288,
+  "fields": {
+    "codigo": "340210",
+    "nombre": "RX SUBSIG. COLUMNA (340210)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 289,
+  "fields": {
+    "codigo": "340202",
+    "nombre": "RX SUBSIG. DE CRANEO",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 290,
+  "fields": {
+    "codigo": "340302",
+    "nombre": "RX SUBSIG. DE TORAX",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 291,
+  "fields": {
+    "codigo": "340212",
+    "nombre": "RX SUBSIG.(de codigo 340211)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 292,
+  "fields": {
+    "codigo": "340237",
+    "nombre": "RX TOBILLO + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 293,
+  "fields": {
+    "codigo": "340249",
+    "nombre": "RX. MUNECA + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 294,
+  "fields": {
+    "codigo": "340247",
+    "nombre": "RX. PIE + SUBSIGUIENTE (340213)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 295,
+  "fields": {
+    "codigo": "340301",
+    "nombre": "RX. TORAX",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 296,
+  "fields": {
+    "codigo": "340211",
+    "nombre": "RX.HOMBRO,HUMERO,PELVIS,CADERA,FEMUR. (primera exposicion)",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 297,
+  "fields": {
+    "codigo": "340405",
+    "nombre": "SERIADA ESOFAGOGASTRODUODENAL",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 298,
+  "fields": {
+    "codigo": "170119",
+    "nombre": "TILT TEST",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 299,
+  "fields": {
+    "codigo": "340407",
+    "nombre": "TRANSITO DE INTESTINO DELGADO O DE COLON",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 300,
+  "fields": {
+    "codigo": "340502",
+    "nombre": "UROGRAMA EXCRET.PIELOGR.DESC.P/EST.",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 301,
+  "fields": {
+    "codigo": "340503",
+    "nombre": "UROGRAMA EXCRETOR CON ESTUDIO VESICAL,",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 302,
+  "fields": {
+    "codigo": "900163",
+    "nombre": "VIDEODEGLUCION",
+    "tipo": "RAD",
+    "grupo_tarifario": 4,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "3000.00",
+    "precio_otras_os": "3000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": null
+  }
+},
+{
+  "model": "liquidacion.estudios",
+  "pk": 303,
+  "fields": {
+    "codigo": null,
+    "nombre": "RMN ABDOMEN CON CONTRASTE",
+    "tipo": "RES",
+    "grupo_tarifario": 5,
+    "conteo_regiones": 1,
+    "conteo_regiones_default": 1,
+    "precio_unico": true,
+    "precio_cober": "6000.00",
+    "precio_otras_os": "6000.00",
+    "activo": true,
+    "tiene_contexto_ubicacion": false,
+    "fecha_actualizacion_precios": "2026-02-18",
+    "actualizado_por": 1
+  }
+}
+]

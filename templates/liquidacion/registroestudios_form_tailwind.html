@@ -100,7 +100,7 @@
                         {% csrf_token %}
                         
                         <!-- Datos del paciente -->
-                        <div class="mb-6">
+                        <div class="mb-4">
                             <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
                                 <i class="fas fa-user mr-2 text-blue-500"></i>Datos del Paciente
                             </h3>
@@ -127,7 +127,7 @@
                         </div>
 
                         <!-- Información del estudio -->
-                        <div class="mb-6">
+                        <div class="mb-4">
                             <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
                                 <i class="fas fa-x-ray mr-2 text-purple-500"></i>Información del Estudio
                             </h3>
@@ -223,6 +223,9 @@
                                             <i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio arriba, luego busca y agrega los estudios realizados
                                         </div>
                                     </div>
+                                    <p class="mt-2 text-xs text-gray-500">
+                                        El contexto (Consultorio/Lecho/Quirófano) aparece dentro de cada estudio cuando corresponde.
+                                    </p>
                                     
                                     <!-- Select oculto para el formulario -->
                                     <div class="hidden">
@@ -232,70 +235,60 @@
                             </div>
                         </div>
 
-                        <!-- Cantidad y fecha -->
-                        <div class="mb-6">
+                        <!-- Fecha + Facturación (compactado) -->
+                        <div class="mb-4">
                             <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
-                                <i class="fas fa-calendar-check mr-2 text-green-500"></i>Detalles del Registro
+                                <i class="fas fa-file-invoice-dollar mr-2 text-amber-500"></i>Fecha y Facturación
                             </h3>
+
+                            <!-- Campo oculto - se calcula automáticamente -->
+                            <input type="hidden" name="cantidad_regiones" id="id_cantidad_regiones" value="">
+                            <!-- Container para cantidades de estudios (se llena con JavaScript antes del submit) -->
+                            <div id="cantidades-estudios-container"></div>
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <!-- Campo oculto - se calcula automáticamente -->
-                                <input type="hidden" name="cantidad_regiones" id="id_cantidad_regiones" value="">
-                                
-                                <!-- Container para cantidades de estudios (se llena con JavaScript antes del submit) -->
-                                <div id="cantidades-estudios-container"></div>
-                                
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                                         Fecha del informe <span class="text-red-500">*</span>
                                     </label>
                                     {{ form.fecha_del_informe }}
                                 </div>
-                            </div>
-                        </div>
 
-                        <!-- Facturación -->
-                        <div class="mb-6">
-                            <h3 class="text-sm font-bold text-gray-700 mb-3 flex items-center border-b border-gray-200 pb-2">
-                                <i class="fas fa-dollar-sign mr-2 text-amber-500"></i>Facturación
-                            </h3>
-                            <div class="space-y-4">
                                 <!-- Tipo de Obra Social (solo si hay estudios con precios diferenciados) -->
                                 <div id="tipo-obra-social-section" style="display: none;">
-                                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">
                                         Tipo de Obra Social <span class="text-red-500">*</span>
                                     </label>
-                                    <div class="grid grid-cols-2 gap-3" id="obra-social-radios">
-                                        <label id="label-cober" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                                    <div class="grid grid-cols-2 gap-2" id="obra-social-radios">
+                                        <label id="label-cober" class="radio-obra-social relative flex items-center justify-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
                                             <input type="radio" name="tipo_obra_social" value="COBER" id="id_tipo_obra_social_cober" class="sr-only" required>
                                             <div class="text-center">
-                                                <i class="fas fa-hospital text-2xl text-blue-600 mb-2"></i>
-                                                <p class="font-semibold text-gray-900">COBER</p>
-                                                <p class="text-xs text-gray-600 mt-1">Cobertura principal</p>
+                                                <i class="fas fa-hospital text-lg text-blue-600 mb-1"></i>
+                                                <p class="font-semibold text-gray-900 text-sm">COBER</p>
+                                                <p class="text-[11px] text-gray-600">Cobertura principal</p>
                                             </div>
-                                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
-                                                <i class="fas fa-check text-white text-xs hidden"></i>
+                                            <div class="radio-check absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                                <i class="fas fa-check text-white text-[10px] hidden"></i>
                                             </div>
                                         </label>
-                                        <label id="label-otras" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+                                        <label id="label-otras" class="radio-obra-social relative flex items-center justify-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
                                             <input type="radio" name="tipo_obra_social" value="OTRAS_OS" id="id_tipo_obra_social_otras" class="sr-only" required checked>
                                             <div class="text-center">
-                                                <i class="fas fa-shield-alt text-2xl text-green-600 mb-2"></i>
-                                                <p class="font-semibold text-gray-900">OTRAS OS</p>
-                                                <p class="text-xs text-gray-600 mt-1">Otras obras sociales</p>
+                                                <i class="fas fa-shield-alt text-lg text-green-600 mb-1"></i>
+                                                <p class="font-semibold text-gray-900 text-sm">OTRAS OS</p>
+                                                <p class="text-[11px] text-gray-600">Resto de obras sociales</p>
                                             </div>
-                                            <div class="radio-check absolute top-2 right-2 w-5 h-5 rounded-full border-2 border-gray-400 flex items-center justify-center">
-                                                <i class="fas fa-check text-white text-xs hidden"></i>
+                                            <div class="radio-check absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                                <i class="fas fa-check text-white text-[10px] hidden"></i>
                                             </div>
                                         </label>
                                     </div>
                                 </div>
-
-                                <!-- HORARIO: Se asigna automáticamente según la hora (8-17 = INTRA, resto = EXTRA) -->
                             </div>
                         </div>
 
                         <!-- Bonus Urgencia (solo para Resonancia Magnética) -->
-                        <div class="mb-6" id="bonus-urgencia-section" style="display: none;">
+                        <div class="mb-4" id="bonus-urgencia-section" style="display: none;">
                             <button type="button" id="toggle-bonus-urgencia" class="w-full flex items-center justify-between p-4 bg-orange-50 border-2 border-orange-200 rounded-lg hover:bg-orange-100 transition-all">
                                 <div class="flex items-center">
                                     <div class="bg-orange-500 rounded-lg p-2 mr-3">
@@ -348,22 +341,6 @@
                             </div>
                         </div>
 
-                        <!-- Preview del Monto Calculado -->
-                        <div class="mb-6 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-300 rounded-xl">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-semibold text-gray-700 mb-1">
-                                        <i class="fas fa-calculator mr-2 text-emerald-600"></i>Monto Total Estimado
-                                    </p>
-                                    <p class="text-xs text-gray-600">Suma de todos los estudios + bonus/descuentos</p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-3xl font-bold text-emerald-700" id="monto-preview">$0.00</p>
-                                    <p class="text-xs text-gray-600 mt-1" id="monto-desglose"></p>
-                                </div>
-                            </div>
-                        </div>
-
                         <!-- Botones -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <button type="submit" 
@@ -403,15 +380,21 @@
                                             <p class="font-bold text-gray-900 mb-1">
                                                 {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
                                             </p>
-                                            <div class="flex items-center gap-4 text-sm text-gray-600">
+                                            <div class="flex items-center gap-4 text-sm text-gray-600 mb-2">
                                                 <span class="flex items-center">
                                                     <i class="fas fa-calendar-alt mr-1 text-teal-600"></i>
                                                     {{ registro.fecha_del_informe|date:"d/m/Y" }}
                                                 </span>
                                                 <span class="flex items-center">
                                                     <i class="fas fa-chart-bar mr-1 text-purple-600"></i>
-                                                    <strong>{{ registro.total_regiones }}</strong> regiones
+                                                    <strong>{{ registro.cantidad_regiones }}</strong> regiones
                                                 </span>
+                                            </div>
+                                            <div class="text-xs text-gray-700 mb-2">
+                                                <span class="font-semibold">Estudios:</span> {{ registro.desglose_backend.estudios }}
+                                            </div>
+                                            <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-bold">
+                                                <i class="fas fa-dollar-sign mr-1"></i>${{ registro.monto_calculado }}
                                             </div>
                                         </div>
                                     </div>
@@ -658,18 +641,27 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const cantidad = estudiosConCantidades[id] || 1;
             const contexto = estudiosConContexto[id] || 'SERVICIO';
-            const tieneContexto = estudio.tiene_contexto_ubicacion;
+            const contextosDisponibles = Array.isArray(estudio.contextos_disponibles) ? estudio.contextos_disponibles : [];
+            const etiquetasContexto = {
+                'SERVICIO': 'Consultorio',
+                'LECHO': 'Lecho',
+                'QUIROFANO': 'Quirófano'
+            };
 
-            const contextoSelector = tieneContexto ? `
-                <select data-contexto-id="${id}"
-                        class="contexto-estudio ml-1 px-1 py-0.5 bg-white/20 border border-white/30 rounded text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
-                        title="Ubicación del estudio"
-                        onclick="event.stopPropagation()"
-                        onchange="actualizarContextoEstudio(${id}, this.value)">
-                    <option value="SERVICIO" style="color:#1f2937;background:#fff" ${contexto==='SERVICIO'?'selected':''}>Consultorio</option>
-                    <option value="LECHO" style="color:#1f2937;background:#fff" ${contexto==='LECHO'?'selected':''}>Lecho</option>
-                    <option value="QUIROFANO" style="color:#1f2937;background:#fff" ${contexto==='QUIROFANO'?'selected':''}>Quirófano</option>
-                </select>` : '';
+            const contextoSelector = contextosDisponibles.length > 1 ? `
+                <span class="relative inline-flex items-center ml-1">
+                    <select data-contexto-id="${id}"
+                            class="contexto-estudio appearance-none bg-white/20 border border-white/30 rounded text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-white/50"
+                            style="height:1.75rem; min-height:1.75rem; line-height:1.75rem; padding:0 1.75rem 0 0.75rem; min-width:8.5rem;"
+                            title="Ubicación del estudio"
+                            onclick="event.stopPropagation()"
+                            onchange="actualizarContextoEstudio(${id}, this.value)">
+                        ${contextosDisponibles.map((ctx) => `
+                            <option value="${ctx}" style="color:#1f2937;background:#fff" ${contexto===ctx?'selected':''}>${etiquetasContexto[ctx] || ctx}</option>
+                        `).join('')}
+                    </select>
+                    <i class="fas fa-chevron-down pointer-events-none absolute right-2 text-white text-[10px] opacity-90"></i>
+                </span>` : '';
 
             const tag = document.createElement('div');
             tag.className = 'estudio-tag inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-full text-sm font-medium shadow-md hover:shadow-lg transition-all';
@@ -1085,131 +1077,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Variables para cálculo
-    const estudiosData = JSON.parse('{{ estudios|escapejs }}');
-    
-    // Función principal: Calcular monto en tiempo real
+    // El monto definitivo se consulta desde backend tras guardar el registro.
+    // Se mantiene esta función para no romper handlers existentes del formulario.
     function calcularMontoTiempoReal() {
-        // Obtener valores del formulario
-        const tipoOS = document.querySelector('input[name="tipo_obra_social"]:checked')?.value;
-        const pacienteInternado = document.getElementById('id_paciente_internado')?.checked || false;
-        const fechaSolicitud = document.getElementById('id_fecha_hora_solicitud')?.value;
-        const fechaInforme = document.getElementById('id_fecha_hora_informe')?.value;
-        
-        // Calcular horario automáticamente según hora actual (8-17 = INTRA, resto = EXTRA)
-        const horaActual = new Date().getHours();
-        const horario = (!esStaff && horaActual >= 8 && horaActual < 17) ? 'INTRA' : 'EXTRA';
-        
-        // Verificar que haya estudios seleccionados
-        if (estudiosSeleccionadosIds.length === 0) {
-            document.getElementById('monto-preview').textContent = '$0.00';
-            document.getElementById('monto-desglose').textContent = '';
-            return;
-        }
-        
-        // Calcular precio total sumando TODOS los estudios seleccionados
-        let precioTotal = 0;
-        let necesitaTipoOS = false;
-        let primerEstudio = null;
-        
-        for (const estudioId of estudiosSeleccionadosIds) {
-            const estudio = estudiosData.find(e => e.id === estudioId);
-            if (!estudio) continue;
-            
-            // Obtener cantidad/multiplicador de este estudio
-            const cantidad = estudiosConCantidades[estudioId] || 1;
-            
-            // Guardar primer estudio para verificar bonus después
-            if (!primerEstudio) {
-                primerEstudio = estudio;
-            }
-            
-            // Determinar precio del estudio actual × cantidad
-            if (estudio.precio_unico) {
-                // Si es precio único, no importa tipo_obra_social
-                precioTotal += parseFloat(estudio.precio_cober) * cantidad;
-            } else {
-                necesitaTipoOS = true;
-                // Si hay diferencia de precios, necesitamos que seleccione tipo_obra_social
-                if (!tipoOS) {
-                    document.getElementById('monto-preview').textContent = '$0.00';
-                    document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
-                    return;
-                }
-                const precioEstudio = tipoOS === 'COBER' 
-                    ? parseFloat(estudio.precio_cober) 
-                    : parseFloat(estudio.precio_otras_os);
-                precioTotal += precioEstudio * cantidad;
-            }
-        }
-        
-        if (precioTotal === 0 || !primerEstudio) {
-            document.getElementById('monto-preview').textContent = '$0.00';
-            return;
-        }
-        
-        // Aplicar porcentaje horario (solo para residentes)
-        let subtotal = precioTotal;
-        let porcentajeHorario = 1.0;
-        if (!esStaff) {
-            if (horario === 'INTRA') {
-                porcentajeHorario = 0.5;
-                subtotal *= 0.5;
-            }
-        }
-        
-        // Calcular bonus urgencia (20%)
-        let bonusUrgencia = 0;
-        let aplicaBonus = false;
-        let mensajeBonus = '';
-        
-        // Verificar si algún estudio es Resonancia para bonus
-        const hayResonancia = estudiosSeleccionadosIds.some(id => {
-            const estudio = estudiosData.find(e => e.id === id);
-            return estudio && estudio.tipo === 'RES';
-        });
-        
-        // Verificar condiciones para bonus urgencia
-        if (hayResonancia) {
-            if (!trabajaRemoto) {
-                mensajeBonus = 'Bonus no aplica: solo para médicos remotos';
-            } else if (!pacienteInternado) {
-                mensajeBonus = 'Marca "Paciente Internado" para bonus';
-            } else if (!fechaSolicitud || !fechaInforme) {
-                mensajeBonus = 'Ingresa ambas fechas para calcular bonus';
-            } else {
-                // Calcular diferencia en horas
-                const solicitud = new Date(fechaSolicitud);
-                const informe = new Date(fechaInforme);
-                const diffHoras = Math.abs(informe - solicitud) / (1000 * 60 * 60);
-                
-                if (diffHoras < 24) {
-                    aplicaBonus = true;
-                    bonusUrgencia = subtotal * 0.20;
-                    subtotal += bonusUrgencia;
-                    mensajeBonus = `✓ Bonus aplicado (${diffHoras.toFixed(1)}hs < 24hs)`;
-                } else {
-                    mensajeBonus = `Bonus no aplica: ${diffHoras.toFixed(1)}hs > 24hs`;
-                }
-            }
-        }
-        
-        // Actualizar preview
-        document.getElementById('monto-preview').textContent = '$' + subtotal.toFixed(2);
-        
-        // Desglose
-        let desglose = '';
-        if (!esStaff && horario === 'INTRA') {
-            desglose = '50% horario INTRA (8:00-16:59)';
-        }
-        if (aplicaBonus) {
-            desglose += (desglose ? ' + ' : '') + '20% bonus urgencia';
-        }
-        // Mostrar mensaje de bonus si hay uno (tanto si aplica como si no)
-        if (mensajeBonus && hayResonancia) {
-            desglose += (desglose ? ' | ' : '') + mensajeBonus;
-        }
-        document.getElementById('monto-desglose').textContent = desglose;
+        return;
     }
     
     // Event listeners para cálculo en tiempo real

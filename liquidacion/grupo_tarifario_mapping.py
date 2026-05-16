@@ -28,7 +28,7 @@ PATRONES_DOPPLER = [r"\bDOPPLER\b", r"\bECODOPPLER\b"]
 
 # Doppler cardíaco: palabras que indican estudio cardíaco
 PATRONES_CARDIACO = [
-    r"\bCARDIACO\b", r"\bCARDIAC\b",
+    r"\bCARDIAC[OA]\b", r"\bCARDIAC\b",
     r"\bCARDIO\b",
     r"\bECOCARDIO\b",
 ]
@@ -44,6 +44,59 @@ PATRONES_BURBUJA  = [r"\bBURBUJA\b", r"\bCONTRASTE\b"]  # Eco burbuja = eco con 
 def detecta(nombre, patrones):
     texto = normalizado(nombre)
     return any(re.search(patron, texto) for patron in patrones)
+
+
+def contextos_disponibles_para_estudio(tipo, nombre, codigo=None):
+    """Retorna los contextos de ubicación que la UI debe ofrecer para un estudio.
+
+    La regla clínica no es uniforme para todos los ECOCAR:
+    - ETE / transesofágicos: Servicio + Quirófano
+    - Eco/Doppler cardíaco transthorácico: Servicio + Lecho
+    - Otros Doppler: Servicio + Lecho
+    - El resto: solo Servicio
+    """
+    tipo_normalizado = (tipo or "").upper()
+    nombre_normalizado = normalizado(nombre)
+    codigo_normalizado = (codigo or "").upper()
+
+    if tipo_normalizado == "ECOCAR":
+        if detecta(nombre_normalizado, PATRONES_TE) or "TRANSESOF" in nombre_normalizado or "ETE" in nombre_normalizado:
+            return ["SERVICIO", "QUIROFANO"]
+        if detecta(nombre_normalizado, PATRONES_CARDIACO) or "ECODOPPLER CARDIACO" in nombre_normalizado or "CARDIACO" in nombre_normalizado:
+            return ["SERVICIO", "LECHO"]
+        return ["SERVICIO"]
+
+    if tipo_normalizado == "DOP":
+        return ["SERVICIO", "LECHO"]
+
+    return ["SERVICIO"]
+
+
+def es_estudio_cardiologico(tipo, nombre, codigo=None):
+    """Determina si un estudio pertenece al circuito de cardiología.
+
+    Reglas actuales de negocio:
+    - Todo ECOCAR se considera cardiológico.
+    - Estudios con nombre que contenga CARDIAC/CARDIO son cardiológicos.
+    - ETE / transesofágicos se consideran cardiológicos aunque no digan CARDIO.
+    """
+    tipo_normalizado = (tipo or "").upper()
+    nombre_normalizado = normalizado(nombre)
+    codigo_normalizado = (codigo or "").upper()
+
+    if tipo_normalizado == "ECOCAR":
+        return True
+
+    if detecta(nombre_normalizado, PATRONES_CARDIACO):
+        return True
+
+    if detecta(nombre_normalizado, PATRONES_TE) or "TRANSESOF" in nombre_normalizado or "ETE" in nombre_normalizado:
+        return True
+
+    if "CARDIO" in codigo_normalizado:
+        return True
+
+    return False
 
 
 def inferir_codigo_grupo(tipo, nombre):

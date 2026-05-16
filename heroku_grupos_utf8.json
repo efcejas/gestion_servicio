@@ -1,0 +1,583 @@
+﻿[OK] Cloudinary configurado correctamente
+[
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 1,
+  "fields": {
+    "codigo": "ECO_DOPPLER",
+    "nombre": "Doppler",
+    "modalidad": "ECO",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:40.971Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.210Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 2,
+  "fields": {
+    "codigo": "ECO_ECOGRAFIA",
+    "nombre": "Ecograf├¡a",
+    "modalidad": "ECO",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:41.951Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.217Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 3,
+  "fields": {
+    "codigo": "MAM_MAMOGRAFIA",
+    "nombre": "Mamograf├¡a",
+    "modalidad": "MAM",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:42.948Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.223Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 4,
+  "fields": {
+    "codigo": "RAD_RADIOGRAFIA",
+    "nombre": "Radiograf├¡a",
+    "modalidad": "RAD",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:43.953Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.230Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 5,
+  "fields": {
+    "codigo": "RES_SIMPLE",
+    "nombre": "Resonancia simple",
+    "modalidad": "RES",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:44.949Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.236Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 6,
+  "fields": {
+    "codigo": "RES_ANGIO",
+    "nombre": "Resonancia Angio",
+    "modalidad": "RES",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:45.958Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.243Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 7,
+  "fields": {
+    "codigo": "TOM_SIMPLE",
+    "nombre": "Tomograf├¡a simple",
+    "modalidad": "TOM",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:46.949Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.249Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 8,
+  "fields": {
+    "codigo": "TOM_ANGIO",
+    "nombre": "Tomograf├¡a Angio",
+    "modalidad": "TOM",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:47.947Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.255Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 9,
+  "fields": {
+    "codigo": "TOM_CONTRASTE",
+    "nombre": "Tomograf├¡a con contraste",
+    "modalidad": "TOM",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:48.963Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.261Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 10,
+  "fields": {
+    "codigo": "TOM_SIN_CONTRASTE",
+    "nombre": "Tomograf├¡a sin contraste",
+    "modalidad": "TOM",
+    "activo": true,
+    "fecha_creacion": "2026-05-15T00:29:49.988Z",
+    "fecha_modificacion": "2026-05-15T01:07:14.268Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 34,
+  "fields": {
+    "codigo": "DOP_PERIFERICO",
+    "nombre": "Doppler Perif├®rico en Servicio",
+    "modalidad": "DOP",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.455Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.455Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 35,
+  "fields": {
+    "codigo": "DOP_PERIFERICO_LECHO",
+    "nombre": "Doppler Perif├®rico en Lecho",
+    "modalidad": "DOP",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.466Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.466Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 36,
+  "fields": {
+    "codigo": "DOP_CARDIACO",
+    "nombre": "Doppler Card├¡aco en Servicio",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.472Z",
+    "fecha_modificacion": "2026-05-16T14:00:02.851Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 37,
+  "fields": {
+    "codigo": "DOP_CARDIACO_LECHO",
+    "nombre": "Doppler Card├¡aco en Lecho",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.477Z",
+    "fecha_modificacion": "2026-05-16T14:00:22.932Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 38,
+  "fields": {
+    "codigo": "ECO_TE",
+    "nombre": "Ecocardiograma Transesof├ígico",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.482Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.482Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 39,
+  "fields": {
+    "codigo": "ECO_TE_QUIROFANO",
+    "nombre": "Ecocardiograma Transesof├ígico en Quir├│fano",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.487Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.487Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 40,
+  "fields": {
+    "codigo": "ECO_STRESS",
+    "nombre": "Ecostress / Ecostress con Dobutamina",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.492Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.492Z"
+  }
+},
+{
+  "model": "liquidacion.grupotarifario",
+  "pk": 41,
+  "fields": {
+    "codigo": "ECO_BURBUJA",
+    "nombre": "Ecocardiograma con Contraste (Burbuja)",
+    "modalidad": "ECOCAR",
+    "activo": true,
+    "fecha_creacion": "2026-05-16T13:28:14.497Z",
+    "fecha_modificacion": "2026-05-16T13:28:14.497Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 1,
+  "fields": {
+    "grupo_tarifario": 7,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:01.447Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 2,
+  "fields": {
+    "grupo_tarifario": 9,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:02.590Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 3,
+  "fields": {
+    "grupo_tarifario": 10,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "4000.00",
+    "precio_otras_os": "4000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:04.224Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 4,
+  "fields": {
+    "grupo_tarifario": 8,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "7000.00",
+    "precio_otras_os": "7000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:06.376Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 5,
+  "fields": {
+    "grupo_tarifario": 5,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "5000.00",
+    "precio_otras_os": "5000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:07.537Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 6,
+  "fields": {
+    "grupo_tarifario": 6,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "8000.00",
+    "precio_otras_os": "8000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:08.702Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 7,
+  "fields": {
+    "grupo_tarifario": 2,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": null,
+    "precio_cober": "6500.00",
+    "precio_otras_os": "6500.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": 1,
+    "fecha_creacion": "2026-05-15T00:33:09.860Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 8,
+  "fields": {
+    "grupo_tarifario": 1,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "8500.00",
+    "precio_otras_os": "10000.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:11.054Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 9,
+  "fields": {
+    "grupo_tarifario": 4,
+    "vigencia_desde": "2026-04-01",
+    "vigencia_hasta": null,
+    "precio_cober": "1650.00",
+    "precio_otras_os": "1650.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:12.213Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 10,
+  "fields": {
+    "grupo_tarifario": 3,
+    "vigencia_desde": "2026-05-14",
+    "vigencia_hasta": "2026-05-16",
+    "precio_cober": "7000.00",
+    "precio_otras_os": "8500.00",
+    "motivo_actualizacion": "Seed inicial de tarifas base EGES",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-15T00:33:13.434Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 34,
+  "fields": {
+    "grupo_tarifario": 34,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "9400.00",
+    "precio_otras_os": "11000.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.511Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 35,
+  "fields": {
+    "grupo_tarifario": 35,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "11600.00",
+    "precio_otras_os": "13200.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.523Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 36,
+  "fields": {
+    "grupo_tarifario": 36,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "11600.00",
+    "precio_otras_os": "13200.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.527Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 37,
+  "fields": {
+    "grupo_tarifario": 37,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "13200.00",
+    "precio_otras_os": "15400.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.531Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 38,
+  "fields": {
+    "grupo_tarifario": 38,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "27500.00",
+    "precio_otras_os": "33000.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.535Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 39,
+  "fields": {
+    "grupo_tarifario": 39,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "49500.00",
+    "precio_otras_os": "55000.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.539Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 40,
+  "fields": {
+    "grupo_tarifario": 40,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "27500.00",
+    "precio_otras_os": "27500.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.543Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 41,
+  "fields": {
+    "grupo_tarifario": 41,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "26500.00",
+    "precio_otras_os": "30500.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.547Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 42,
+  "fields": {
+    "grupo_tarifario": 7,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "4400.00",
+    "precio_otras_os": "4400.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.554Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 43,
+  "fields": {
+    "grupo_tarifario": 9,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "5500.00",
+    "precio_otras_os": "5500.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.560Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 44,
+  "fields": {
+    "grupo_tarifario": 10,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "4400.00",
+    "precio_otras_os": "4400.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.565Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 45,
+  "fields": {
+    "grupo_tarifario": 8,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "7700.00",
+    "precio_otras_os": "7700.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.571Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 46,
+  "fields": {
+    "grupo_tarifario": 5,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "5500.00",
+    "precio_otras_os": "5500.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.577Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 47,
+  "fields": {
+    "grupo_tarifario": 6,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "8800.00",
+    "precio_otras_os": "8800.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.583Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 48,
+  "fields": {
+    "grupo_tarifario": 3,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "1650.00",
+    "precio_otras_os": "1650.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.592Z"
+  }
+},
+{
+  "model": "liquidacion.tarifagrupotarifario",
+  "pk": 49,
+  "fields": {
+    "grupo_tarifario": 1,
+    "vigencia_desde": "2026-05-16",
+    "vigencia_hasta": null,
+    "precio_cober": "9400.00",
+    "precio_otras_os": "11000.00",
+    "motivo_actualizacion": "",
+    "actualizado_por": null,
+    "fecha_creacion": "2026-05-16T13:28:14.597Z"
+  }
+}
+]

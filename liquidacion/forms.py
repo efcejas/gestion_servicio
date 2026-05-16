@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils import timezone
 from decimal import Decimal
+from .grupo_tarifario_mapping import es_estudio_cardiologico
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
@@ -75,7 +76,7 @@ class PracticaForm(forms.ModelForm):
                 'id': 'id_estudio',
             }),
             'cantidad_regiones': forms.NumberInput(attrs={
-                'class': TAILWIND_INPUT_CLASSES,
+                'class': TAILWIND_INPUT_CLASSES + ' h-12',
                 'min': 1,
                 'value': 1,
                 'id': 'id_cantidad_regiones'
@@ -120,8 +121,17 @@ class PracticaForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Cargar estudios activos filtrados por tipo (se actualiza con JavaScript)
-        self.fields['estudio'].queryset = Estudios.objects.filter(activo=True).order_by('tipo', 'nombre')
+        # Cargar estudios activos filtrados por rol
+        estudios_qs = Estudios.objects.filter(activo=True).order_by('tipo', 'nombre')
+        if self.user and self.user.rol != 'cardiologo':
+            estudios_permitidos_ids = [
+                est.id
+                for est in estudios_qs
+                if not es_estudio_cardiologico(est.tipo, est.nombre, est.codigo)
+            ]
+            estudios_qs = Estudios.objects.filter(id__in=estudios_permitidos_ids).order_by('tipo', 'nombre')
+
+        self.fields['estudio'].queryset = estudios_qs
         
         # Precargar fecha actual si es nuevo registro
         if not self.instance.pk and not self.initial.get('fecha_del_informe'):

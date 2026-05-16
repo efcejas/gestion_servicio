@@ -20,6 +20,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
 from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable
+from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -111,20 +112,37 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os',
             'precio_unico', 'conteo_regiones_default', 'tiene_contexto_ubicacion'
         ):
+            if user.rol != 'cardiologo' and es_estudio_cardiologico(
+                estudio['tipo'],
+                estudio['nombre'],
+                estudio['codigo'],
+            ):
+                continue
             estudio_dict = dict(estudio)
             # Convertir Decimals a string para JSON
             estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
             estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudio_dict['contextos_disponibles'] = contextos_disponibles_para_estudio(
+                estudio_dict['tipo'],
+                estudio_dict['nombre'],
+                estudio_dict['codigo'],
+            )
             estudios_data.append(estudio_dict)
         
         context['estudios'] = json.dumps(estudios_data)
         
-        # Registros del mes actual con prefetch de estudios
-        registros = RegistroEstudiosPorMedico.objects.filter(
-            medico=user,
-            sesion_contable=sesion
-        ).prefetch_related('estudio').order_by('-fecha_registro')
-        
+        # Registros de hoy con prefetch para mostrar desglose y monto persistido
+        registros = list(
+            RegistroEstudiosPorMedico.objects.filter(
+                medico=user,
+                sesion_contable=sesion,
+                fecha_registro__date=now().date(),
+            ).prefetch_related('registroestudio_set__estudio').order_by('-fecha_registro')
+        )
+
+        for registro in registros:
+            registro.desglose_backend = registro.get_desglose_monto()
+
         context['registros'] = registros
         
         # Calcular totales del mes
@@ -133,7 +151,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         context['total_regiones_mes'] = total_regiones_mes
         context['total_monto_mes'] = total_monto_mes
-        context['total_practicas_mes'] = registros.count()
+        context['total_practicas_mes'] = len(registros)
         
         # Información del médico
         context['es_staff'] = user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
@@ -167,6 +185,21 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         dni_paciente = form.cleaned_data['dni_paciente']
         fecha_informe = form.cleaned_data['fecha_del_informe']
         estudios_seleccionados = form.cleaned_data['estudio']
+
+        # Regla de acceso: solo cardiólogos pueden registrar estudios cardiológicos
+        if user.rol != 'cardiologo':
+            estudios_bloqueados = [
+                est.nombre for est in estudios_seleccionados
+                if es_estudio_cardiologico(est.tipo, est.nombre, est.codigo)
+            ]
+            if estudios_bloqueados:
+                form.add_error(
+                    'estudio',
+                    'No tienes permisos para registrar estudios cardiológicos. '
+                    f"Detectados: {', '.join(estudios_bloqueados)}"
+                )
+                return self.form_invalid(form)
+
         hace_5_minutos = timezone.now() - timedelta(minutes=5)
         
         # Buscar registros recientes del mismo médico, paciente y fecha
@@ -219,7 +252,10 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # Crear las relaciones en la tabla intermedia con cantidades y contexto
         for estudio in estudios_seleccionados:
             cantidad = cantidades_estudios.get(estudio.id, 1)  # Default = 1 si no está en el dict
-            contexto = contextos_estudios.get(estudio.id, 'SERVICIO')  # Default = SERVICIO
+            contextos_validos = contextos_disponibles_para_estudio(estudio.tipo, estudio.nombre, estudio.codigo)
+            contexto = contextos_estudios.get(estudio.id, contextos_validos[0] if contextos_validos else 'SERVICIO')
+            if contexto not in contextos_validos:
+                contexto = contextos_validos[0] if contextos_validos else 'SERVICIO'
             RegistroEstudio.objects.create(
                 registro=self.object,
                 estudio=estudio,
@@ -581,7 +617,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             medico=self.request.user,
             fecha_del_informe__year=año,
             fecha_del_informe__month=mes
-        ).prefetch_related('estudio')
+        ).prefetch_related('estudio', 'registroestudio_set__estudio')
 
         # Obtener guardias pasivas del mes (por fecha de guardia, no sesión)
         guardias = GuardiaPasiva.objects.filter(
@@ -700,23 +736,40 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Filtra los registros que pertenecen al usuario logueado
         return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         registro = self.object
+        user = self.request.user
         sesion = registro.sesion_contable
 
         # Serializar estudios para JS (con todos los datos necesarios)
         estudios_data = []
         for estudio in Estudios.objects.filter(activo=True).values(
-            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os', 
-            'precio_unico', 'conteo_regiones_default'
+            'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os',
+            'precio_unico', 'conteo_regiones_default', 'tiene_contexto_ubicacion'
         ):
+            if user.rol != 'cardiologo' and es_estudio_cardiologico(
+                estudio['tipo'],
+                estudio['nombre'],
+                estudio['codigo'],
+            ):
+                continue
             estudio_dict = dict(estudio)
             # Convertir Decimals a string para JSON
             estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
             estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudio_dict['contextos_disponibles'] = contextos_disponibles_para_estudio(
+                estudio_dict['tipo'],
+                estudio_dict['nombre'],
+                estudio_dict['codigo'],
+            )
             estudios_data.append(estudio_dict)
-        
+
         context['estudios'] = json.dumps(estudios_data)
         context['estudios_json'] = json.dumps(estudios_data)  # Alias para compatibilidad
 
@@ -724,17 +777,21 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         if registro and registro.estudio.exists():
             context['tipo_estudio_seleccionado'] = registro.estudio.first().tipo
             context['estudios_seleccionados'] = list(registro.estudio.values_list('id', flat=True))
-            
-            # v3.1 - Marzo 2026: Cargar cantidades desde tabla intermedia RegistroEstudio
+
+            # Cargar cantidades y contextos desde tabla intermedia RegistroEstudio
             from liquidacion.models import RegistroEstudio
             cantidades_dict = {}
+            contextos_dict = {}
             for rel in RegistroEstudio.objects.filter(registro=registro).select_related('estudio'):
                 cantidades_dict[rel.estudio_id] = rel.cantidad
+                contextos_dict[rel.estudio_id] = rel.contexto
             context['cantidades_estudios'] = json.dumps(cantidades_dict)
+            context['contextos_estudios'] = json.dumps(contextos_dict)
         else:
             context['tipo_estudio_seleccionado'] = ''
             context['estudios_seleccionados'] = []
-            context['cantidades_estudios'] = '{}'  # Objeto JSON vacío
+            context['cantidades_estudios'] = '{}'
+            context['contextos_estudios'] = '{}'
         
         # Información del médico para lógica condicional
         context['trabaja_remoto'] = self.request.user.trabaja_remoto
@@ -751,6 +808,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         sesion = self.object.sesion_contable
+        user = self.request.user
         if sesion and not sesion.puede_registrar_practicas(self.request.user):
             messages.error(
                 self.request,
@@ -758,6 +816,20 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
                 f"{sesion.get_estado_display()}. No puedes editar prácticas."
             )
             return redirect(self.get_success_url())
+
+        estudios_seleccionados = form.cleaned_data['estudio']
+        if user.rol != 'cardiologo':
+            estudios_bloqueados = [
+                est.nombre for est in estudios_seleccionados
+                if es_estudio_cardiologico(est.tipo, est.nombre, est.codigo)
+            ]
+            if estudios_bloqueados:
+                form.add_error(
+                    'estudio',
+                    'No tienes permisos para registrar estudios cardiológicos. '
+                    f"Detectados: {', '.join(estudios_bloqueados)}"
+                )
+                return self.form_invalid(form)
 
         motivo_modificacion = (self.request.POST.get('motivo_modificacion') or '').strip()
         if sesion and sesion.estado in ['CERRADA', 'FACTURADA'] and not motivo_modificacion:
@@ -785,19 +857,31 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Importar el modelo intermedio
         from liquidacion.models import RegistroEstudio, Estudios
         
+        # Leer contextos de ubicación desde el POST
+        contextos_estudios = {}
+        for key in self.request.POST:
+            if key.startswith('contexto_estudio_'):
+                estudio_id = int(key.replace('contexto_estudio_', ''))
+                contextos_estudios[estudio_id] = self.request.POST[key]
+
         # Limpiar relaciones existentes
         RegistroEstudio.objects.filter(registro=self.object).delete()
-        
+
         # Obtener estudios seleccionados del formulario
         estudios_seleccionados = form.cleaned_data['estudio']
-        
-        # Crear nuevas relaciones con cantidades actualizadas
+
+        # Crear nuevas relaciones con cantidades y contexto actualizados
         for estudio in estudios_seleccionados:
-            cantidad = cantidades_estudios.get(estudio.id, 1)  # Default = 1 si no está en el dict
+            cantidad = cantidades_estudios.get(estudio.id, 1)
+            contextos_validos = contextos_disponibles_para_estudio(estudio.tipo, estudio.nombre, estudio.codigo)
+            contexto = contextos_estudios.get(estudio.id, contextos_validos[0] if contextos_validos else 'SERVICIO')
+            if contexto not in contextos_validos:
+                contexto = contextos_validos[0] if contextos_validos else 'SERVICIO'
             RegistroEstudio.objects.create(
                 registro=self.object,
                 estudio=estudio,
-                cantidad=cantidad
+                cantidad=cantidad,
+                contexto=contexto,
             )
         
         # Recalcular cantidad de regiones con las cantidades especificadas
@@ -1035,6 +1119,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                         'estudio': rel.estudio,
                         'cantidad': rel.cantidad,
                         'tipo': rel.estudio.tipo,
+                        'contexto': rel.contexto,
                     })
                     cantidades_por_tipo[rel.estudio.tipo] += rel.cantidad
                 
