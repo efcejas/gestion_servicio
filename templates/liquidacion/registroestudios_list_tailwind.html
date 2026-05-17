@@ -89,7 +89,7 @@
             <div>
                 <p class="text-indigo-100 text-xs font-medium uppercase mb-1">Prácticas</p>
                 <p class="text-2xl font-bold">${{ total_monto_practicas|floatformat:2 }}</p>
-                <p class="text-xs text-indigo-200 mt-1">{{ registros_eco|length }} ECO + {{ registros_otros|length }} Otros</p>
+                <p class="text-xs text-indigo-200 mt-1">{{ registros_tabla|length }} registros filtrados</p>
             </div>
         </div>
 
@@ -201,8 +201,6 @@
         <div id="filtros-content" class="hidden px-6 pb-6 border-t border-gray-100">
             <form method="get" class="mt-4">
                 {% csrf_token %}
-                <!-- Campo oculto para mantener la pestaña activa -->
-                <input type="hidden" name="tipo_estudio" value="{{ tipo_estudio_activo }}">
                 
                 <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
                     <!-- Búsqueda rápida - más prominente -->
@@ -252,12 +250,12 @@
                 <!-- Filtros rápidos -->
                 <div class="mt-4 flex flex-wrap gap-2 pt-4 border-t border-gray-100">
                     <span class="text-sm font-medium text-gray-600 self-center mr-2">Acceso rápido:</span>
-                    <a href="?filtro_rapido=hoy&tipo_estudio={{ tipo_estudio_activo }}" 
+                    <a href="?filtro_rapido=hoy{% if modalidades_query %}&{{ modalidades_query }}{% endif %}" 
                        class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-all
                               {% if filtro_rapido == 'hoy' %}bg-blue-600 text-white shadow-md{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
                         <i class="fas fa-calendar-day mr-1.5"></i>Registros de hoy
                     </a>
-                    <a href="?mes={{ mes_num }}&año={{ año_num }}&tipo_estudio={{ tipo_estudio_activo }}" 
+                    <a href="?mes={{ mes_num }}&año={{ año_num }}" 
                        class="inline-flex items-center px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium">
                         <i class="fas fa-sync-alt mr-1.5"></i>Restablecer filtros
                     </a>
@@ -267,125 +265,98 @@
                     </span>
                     {% endif %}
                 </div>
+
             </form>
         </div>
     </div>
 
-    <!-- Tabs para alternar entre tipos de estudios -->
-    <div class="mb-6">
-        <div class="border-b border-gray-200">
-            <nav class="flex gap-2" aria-label="Tabs">
-                <button type="button" id="tab-ecografias" 
-                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2 {% if tipo_estudio_activo == 'ecografias' %}active border-blue-600 text-blue-600 bg-blue-50{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}"
-                        onclick="cambiarTab('ecografias')">
-                    <i class="fas fa-heartbeat mr-2"></i>
-                    Ecografías
-                    <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700">{{ registros_eco|length }}</span>
-                </button>
-                <button type="button" id="tab-otros" 
-                        class="tab-button px-6 py-3 font-semibold text-sm rounded-t-lg transition-all border-b-2 {% if tipo_estudio_activo == 'otros' %}active border-teal-600 text-teal-600 bg-teal-50{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}"
-                        onclick="cambiarTab('otros')">
-                    <i class="fas fa-procedures mr-2"></i>
-                    RAD / TOM / RES
-                    <span class="ml-2 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-100 text-teal-700">{{ registros_otros|length }}</span>
-                </button>
-            </nav>
-        </div>
-    </div>
-
-    <!-- Contenedor de tablas con margen consistente -->
-    <div class="mb-6">
-        <!-- Tabla de Ecografías -->
-        <div id="tabla-ecografias" class="bg-white rounded-lg shadow-md overflow-hidden {% if tipo_estudio_activo != 'ecografias' %}hidden{% endif %}">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-blue-700 to-blue-600 text-white px-6 py-4">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+    <div class="mb-6 bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="bg-gradient-to-r from-gray-700 to-gray-600 text-white px-6 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <div>
-                    <h3 class="text-xl font-bold">Ecografías</h3>
-                    <p class="text-blue-100 text-sm mt-1">
-                        <strong>{{ mes }}</strong> de <strong>{{ año }}</strong>
-                    </p>
+                    <h3 class="text-xl font-bold">Registros del período</h3>
+                    <p class="text-gray-200 text-sm"><strong>{{ mes }}</strong> de <strong>{{ año }}</strong></p>
                 </div>
-                <div class="mt-3 md:mt-0 text-left md:text-right space-y-2">
-                    <p class="text-sm flex items-center md:justify-end">
-                        <span class="font-semibold">Pacientes:</span> 
-                        <span class="inline-block bg-blue-800 px-3 py-1.5 rounded ml-2 font-bold">{{ registros_eco|length }}</span>
-                    </p>
-                    <p class="text-sm flex items-center md:justify-end">
-                        <span class="font-semibold">Regiones:</span> 
-                        <span class="inline-block bg-blue-800 px-3 py-1.5 rounded ml-2 font-bold">{{ total_regiones_eco }}</span>
-                    </p>
+                <div class="flex flex-col items-start md:items-end gap-2">
+                    <div class="text-sm text-gray-100">
+                        <span class="font-semibold">Resultados:</span> {{ registros_tabla|length }}
+                    </div>
+                    <div class="flex flex-wrap gap-1">
+                        {% for modalidad in modalidades_toggle %}
+                        <a href="?{{ modalidad.query }}"
+                           class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold border transition-colors {% if modalidad.active %}bg-white text-gray-800 border-white{% else %}bg-gray-600 text-gray-100 border-gray-400 hover:bg-gray-500{% endif %}">
+                            {{ modalidad.label }}
+                        </a>
+                        {% endfor %}
+                        {% if modalidades_seleccionadas %}
+                        <a href="?{{ modalidades_clear_query }}"
+                           class="inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold border border-rose-300 bg-rose-500/20 text-rose-100 hover:bg-rose-500/30 transition-colors">
+                            Limpiar
+                        </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tabla -->
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead class="bg-gray-50 border-b border-gray-200">
+                <thead class="bg-gray-700 border-b border-gray-800 text-white">
                     <tr>
-                        <th scope="col" class="px-4 py-3 text-left">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}"
-                               class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}{% if modalidades_query %}&{{ modalidades_query }}{% endif %}"
+                               class="flex items-center text-white hover:text-gray-200 transition-colors">
                                 Paciente
                                 {% if orden == 'paciente_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                    <i class="fas fa-sort-up ml-1 text-gray-200"></i>
                                 {% elif orden == 'paciente_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                    <i class="fas fa-sort-down ml-1 text-gray-200"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
                                 {% endif %}
                             </a>
                         </th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            DNI
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}"
-                               class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-blue-600 transition-colors">
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">DNI</th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}{% if modalidades_query %}&{{ modalidades_query }}{% endif %}"
+                               class="flex items-center justify-center text-white hover:text-gray-200 transition-colors">
                                 Fecha del Informe
                                 {% if orden == 'fecha_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-blue-600"></i>
+                                    <i class="fas fa-sort-up ml-1 text-gray-200"></i>
                                 {% elif orden == 'fecha_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-blue-600"></i>
+                                    <i class="fas fa-sort-down ml-1 text-gray-200"></i>
                                 {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                    <i class="fas fa-sort ml-1 text-gray-300"></i>
                                 {% endif %}
                             </a>
                         </th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider" style="min-width: 200px;">
-                            Estudios
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="min-width: 160px;">Modalidades</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider" style="min-width: 240px;">Estudios</th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="min-width: 140px;">
+                            {% if mostrar_info_horario_descuento %}OS / Horario{% else %}Obra Social{% endif %}
                         </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider" style="min-width: 140px;">
-                            OS / Horario
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Regiones
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Monto
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Acciones
-                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Regiones</th>
+                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Monto</th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
-                    {% for registro in registros_eco %}
-                    <tr id="registro-{{ registro.pk }}" class="hover:bg-blue-50 transition-colors">
-                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">
-                            {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
+                    {% for registro in registros_tabla %}
+                    <tr id="registro-{{ registro.pk }}" class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ registro.dni_paciente }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <div class="flex flex-wrap gap-1">
+                                {% for rel in registro.registroestudio_set.all %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-xs font-semibold">{{ rel.estudio.get_tipo_display }}</span>
+                                {% endfor %}
+                            </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-600">
-                            {{ registro.dni_paciente }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-center">
-                            {{ registro.fecha_del_informe|date:"d/m/Y" }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-600" style="min-width: 200px;">
+                        <td class="px-4 py-3 text-sm text-gray-600" style="min-width: 240px;">
                             <div class="flex flex-wrap items-center gap-2">
                                 <span>{% for rel in registro.registroestudio_set.all %}{{ rel.estudio.nombre }}{% if rel.contexto == 'LECHO' %} <span class="inline-flex items-center px-1.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold">Lecho</span>{% elif rel.contexto == 'QUIROFANO' %} <span class="inline-flex items-center px-1.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Quirófano</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
-                                {% if registro.paciente_internado %}
+                                {% if mostrar_info_bonus_urgencia and registro.paciente_internado %}
                                 <span class="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap" title="Bonus Urgencia 20%">
                                     <i class="fas fa-bolt mr-1"></i> URGENCIA
                                 </span>
@@ -394,208 +365,84 @@
                         </td>
                         <td class="px-4 py-3" style="min-width: 140px;">
                             <div class="flex flex-col items-center gap-1">
-                                <span class="inline-block px-2 py-1 rounded-lg font-semibold text-xs whitespace-nowrap
-                                    {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                                <span class="inline-block px-2 py-1 rounded-lg font-semibold text-xs whitespace-nowrap {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
                                     {{ registro.get_tipo_obra_social_display }}
                                 </span>
+                                {% if mostrar_info_horario_descuento %}
                                 <span class="text-xs text-gray-600 whitespace-nowrap">{{ registro.get_horario_display }}</span>
+                                {% endif %}
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">
-                            {{ registro.cantidad_regiones }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">
-                            ${{ registro.monto_calculado|floatformat:2 }}
-                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">${{ registro.monto_calculado|floatformat:2 }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-2">
-                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
-                                   class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
-                                   title="Editar registro"
-                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
+                                <button type="button" class="inline-flex items-center justify-center w-8 h-8 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm hover:shadow" title="Ver desglose" onclick="toggleDetalleRegistro('{{ registro.pk }}')">
+                                    <i class="fas fa-calculator text-sm"></i>
+                                </button>
+                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow" title="Editar registro" onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
                                     <i class="fas fa-edit text-sm"></i>
                                 </a>
-                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
-                                   class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
-                                   title="Eliminar registro"
-                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow" title="Eliminar registro" onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                     <i class="fas fa-trash-alt text-sm"></i>
                                 </a>
                             </div>
                         </td>
                     </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">
-                            <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
-                            <p>No se encontraron registros de ecografía para el período seleccionado</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot class="bg-blue-50 border-t-2 border-blue-300 font-bold">
-                    <tr>
-                        <td colspan="5" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales Ecografías</td>
-                        <td class="px-4 py-3 text-sm text-center text-gray-900">{{ total_regiones_eco }}</td>
-                        <td class="px-4 py-3 text-sm text-right text-blue-700">${{ total_monto_eco|floatformat:2 }}</td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        </div>
-
-        <!-- Tabla de Otros Estudios (RAD, TOM, RES) -->
-        <div id="tabla-otros" class="bg-white rounded-lg shadow-md overflow-hidden {% if tipo_estudio_activo != 'otros' %}hidden{% endif %}">
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-teal-600 to-teal-500 text-white px-6 py-4">
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h3 class="text-xl font-bold">Radiografía, Tomografía y Resonancia</h3>
-                    <p class="text-teal-100 text-sm mt-1">
-                        <strong>{{ mes }}</strong> de <strong>{{ año }}</strong>
-                    </p>
-                </div>
-                <div class="mt-3 md:mt-0 text-left md:text-right space-y-2">
-                    <p class="text-sm flex items-center md:justify-end">
-                        <span class="font-semibold">Pacientes:</span> 
-                        <span class="inline-block bg-teal-700 px-3 py-1.5 rounded ml-2 font-bold">{{ registros_otros|length }}</span>
-                    </p>
-                    <p class="text-sm flex items-center md:justify-end">
-                        <span class="font-semibold">Regiones:</span> 
-                        <span class="inline-block bg-teal-700 px-3 py-1.5 rounded ml-2 font-bold">{{ total_regiones_otros }}</span>
-                    </p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tabla -->
-        <div class="overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                        <th scope="col" class="px-4 py-3 text-left">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'paciente_asc' %}paciente_desc{% else %}paciente_asc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}" 
-                               class="flex items-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
-                                Paciente
-                                {% if orden == 'paciente_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
-                                {% elif orden == 'paciente_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                    <tr id="detalle-registro-{{ registro.pk }}" class="hidden bg-gray-50 border-l-4 border-gray-300">
+                        <td colspan="9" class="px-4 py-3">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Precio base</p>
+                                    <p class="font-semibold text-gray-800">${{ registro.detalle_monto.precio_total|floatformat:2 }}</p>
+                                </div>
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Obra social</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.tipo_os }}</p>
+                                </div>
+                                {% if mostrar_info_horario_descuento %}
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Horario</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})</p>
+                                </div>
                                 {% endif %}
-                            </a>
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            DNI
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center">
-                            <a href="?mes={{ mes_num }}&año={{ año_num }}&orden={% if orden == 'fecha_desc' %}fecha_asc{% else %}fecha_desc{% endif %}&filtro_rapido={{ filtro_rapido }}&busqueda={{ busqueda }}&tipo_estudio={{ tipo_estudio_activo }}" 
-                               class="flex items-center justify-center text-xs font-semibold text-gray-700 uppercase tracking-wider hover:text-teal-600 transition-colors">
-                                Fecha del Informe
-                                {% if orden == 'fecha_asc' %}
-                                    <i class="fas fa-sort-up ml-1 text-teal-600"></i>
-                                {% elif orden == 'fecha_desc' %}
-                                    <i class="fas fa-sort-down ml-1 text-teal-600"></i>
-                                {% else %}
-                                    <i class="fas fa-sort ml-1 text-gray-400"></i>
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Estudios / Regiones</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.estudios }} / {{ registro.detalle_monto.regiones }}</p>
+                                </div>
+                                {% if mostrar_info_bonus_urgencia and registro.detalle_monto.bonus_urgencia %}
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Bonus urgencia</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.bonus_urgencia }}</p>
+                                </div>
                                 {% endif %}
-                            </a>
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider" style="min-width: 200px;">
-                            Estudios
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider" style="min-width: 140px;">
-                            OS / Horario
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Regiones
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Monto
-                        </th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                            Acciones
-                        </th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for registro in registros_otros %}
-                    <tr id="registro-{{ registro.pk }}" class="hover:bg-teal-50 transition-colors">
-                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">
-                            {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-600">
-                            {{ registro.dni_paciente }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-600 text-center">
-                            {{ registro.fecha_del_informe|date:"d/m/Y" }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-600" style="min-width: 200px;">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span>{% for rel in registro.registroestudio_set.all %}{{ rel.estudio.nombre }}{% if rel.contexto == 'LECHO' %} <span class="inline-flex items-center px-1.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold">Lecho</span>{% elif rel.contexto == 'QUIROFANO' %} <span class="inline-flex items-center px-1.5 bg-red-100 text-red-700 rounded text-xs font-semibold">Quirófano</span>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
-                                {% if registro.paciente_internado %}
-                                <span class="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap" title="Bonus Urgencia 20%">
-                                    <i class="fas fa-bolt mr-1"></i> URGENCIA
-                                </span>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td class="px-4 py-3" style="min-width: 140px;">
-                            <div class="flex flex-col items-center gap-1">
-                                <span class="inline-block px-2 py-1 rounded-lg font-semibold text-xs whitespace-nowrap
-                                    {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
-                                    {{ registro.get_tipo_obra_social_display }}
-                                </span>
-                                <span class="text-xs text-gray-600 whitespace-nowrap">{{ registro.get_horario_display }}</span>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">
-                            {{ registro.cantidad_regiones }}
-                        </td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">
-                            ${{ registro.monto_calculado|floatformat:2 }}
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <div class="flex items-center justify-center gap-2">
-                                <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" 
-                                   class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow"
-                                   title="Editar registro"
-                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
-                                    <i class="fas fa-edit text-sm"></i>
-                                </a>
-                                <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" 
-                                   class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow"
-                                   title="Eliminar registro"
-                                   onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
-                                    <i class="fas fa-trash-alt text-sm"></i>
-                                </a>
+                                <div class="bg-emerald-50 rounded border border-emerald-200 px-3 py-2">
+                                    <p class="text-emerald-700">Monto final guardado</p>
+                                    <p class="font-bold text-emerald-800">${{ registro.detalle_monto.monto_final|floatformat:2 }}</p>
+                                </div>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
                             <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
-                            <p>No se encontraron registros de otros estudios para el período seleccionado</p>
+                            <p>No se encontraron registros para los filtros seleccionados</p>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
-                <tfoot class="bg-teal-50 border-t-2 border-teal-300 font-bold">
+                <tfoot class="bg-gray-50 border-t-2 border-gray-300 font-bold">
                     <tr>
-                        <td colspan="5" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales Otros Estudios</td>
-                        <td class="px-4 py-3 text-sm text-center text-gray-900">{{ total_regiones_otros }}</td>
-                        <td class="px-4 py-3 text-sm text-right text-teal-700">${{ total_monto_otros|floatformat:2 }}</td>
+                        <td colspan="6" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales del período</td>
+                        <td class="px-4 py-3 text-sm text-center text-gray-900">{{ total_regiones_general }}</td>
+                        <td class="px-4 py-3 text-sm text-right text-gray-700">${{ total_monto_practicas|floatformat:2 }}</td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
         </div>
     </div>
-    </div>
-    <!-- Fin contenedor de tablas -->
 
 </div>
 
@@ -637,8 +484,9 @@
             }
         }
         
-        // Restaurar scroll a registro específico
-        const scrollToRegistro = sessionStorage.getItem('scrollToRegistro');
+        // Restaurar scroll a registro específico (prioriza parámetro de URL tras edición)
+        const focusRegistro = '{{ focus_registro|default:"" }}';
+        const scrollToRegistro = focusRegistro || sessionStorage.getItem('scrollToRegistro');
         if (scrollToRegistro) {
             // Esperar a que el DOM esté completamente renderizado
             setTimeout(() => {
@@ -651,7 +499,9 @@
                         elemento.style.backgroundColor = '';
                     }, 2000);
                 }
-                sessionStorage.removeItem('scrollToRegistro');
+                if (!focusRegistro) {
+                    sessionStorage.removeItem('scrollToRegistro');
+                }
             }, 100);
         }
 
@@ -697,62 +547,12 @@
         }
     });
 
-    // Función para cambiar entre tabs
-    function cambiarTab(tipo) {
-        const tabEco = document.getElementById('tab-ecografias');
-        const tabOtros = document.getElementById('tab-otros');
-        const tablaEco = document.getElementById('tabla-ecografias');
-        const tablaOtros = document.getElementById('tabla-otros');
-
-        if (tipo === 'ecografias') {
-            // Activar tab ecografías
-            tabEco.classList.add('active', 'border-blue-600', 'text-blue-600', 'bg-blue-50');
-            tabEco.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-            
-            // Desactivar tab otros
-            tabOtros.classList.remove('active', 'border-teal-600', 'text-teal-600', 'bg-teal-50');
-            tabOtros.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-            
-            // Mostrar/ocultar tablas
-            tablaEco.classList.remove('hidden');
-            tablaOtros.classList.add('hidden');
-        } else {
-            // Activar tab otros
-            tabOtros.classList.add('active', 'border-teal-600', 'text-teal-600', 'bg-teal-50');
-            tabOtros.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-            
-            // Desactivar tab ecografías
-            tabEco.classList.remove('active', 'border-blue-600', 'text-blue-600', 'bg-blue-50');
-            tabEco.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
-            
-            // Mostrar/ocultar tablas
-            tablaOtros.classList.remove('hidden');
-            tablaEco.classList.add('hidden');
+    function toggleDetalleRegistro(registroId) {
+        const detalleRow = document.getElementById('detalle-registro-' + registroId);
+        if (!detalleRow) {
+            return;
         }
+        detalleRow.classList.toggle('hidden');
     }
-
-    // Las tabs y tablas ya tienen las clases correctas desde el servidor (sin parpadeo)
-    // Solo se usa cambiarTab() cuando el usuario hace click en las tabs
 </script>
-
-<style>
-    /* Estilos para tabs */
-    .tab-button {
-        border-bottom-color: transparent;
-    }
-    
-    .tab-button.active {
-        border-bottom-width: 3px;
-    }
-    
-    .tab-button:not(.active) {
-        color: #6B7280;
-        border-bottom-color: transparent;
-    }
-    
-    .tab-button:not(.active):hover {
-        color: #374151;
-        background-color: #F9FAFB;
-    }
-</style>
 {% endblock %}

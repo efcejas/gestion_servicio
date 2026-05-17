@@ -164,14 +164,6 @@
                                                     Ecografía
                                                 </div>
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
-                                                     data-value="DOP">
-                                                    Doppler
-                                                </div>
-                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
-                                                     data-value="ECOCAR">
-                                                    Ecocardiograma
-                                                </div>
-                                                <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
                                                      data-value="TOM">
                                                     Tomografía
                                                 </div>
@@ -186,6 +178,38 @@
                                                 <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700"
                                                      data-value="MAM">
                                                     Mamografía
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div id="submodalidad-eco-section" class="hidden mt-3">
+                                            <label for="submodalidad-eco" class="block text-sm font-semibold text-gray-700 mb-2">
+                                                Submodalidad de Ecografía
+                                            </label>
+                                            <div class="hidden">
+                                                <select id="submodalidad-eco" class="hidden">
+                                                    <option value="ECO_GENERAL">Ecografía general</option>
+                                                    <option value="DOP_NO_CARDIO">Doppler no cardíaco</option>
+                                                    {% if es_cardiologo %}
+                                                    <option value="DOP_CARDIO">Doppler cardíaco / Ecocardiograma</option>
+                                                    {% endif %}
+                                                </select>
+                                            </div>
+
+                                            <div class="relative">
+                                                <button type="button" id="submodalidad-eco-button"
+                                                        class="w-full px-4 py-2.5 text-left border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white hover:border-gray-400 flex items-center justify-between">
+                                                    <span id="submodalidad-eco-text" class="text-gray-700">Ecografía general</span>
+                                                    <i class="fas fa-chevron-down text-gray-400 transition-transform" id="submodalidad-eco-icon"></i>
+                                                </button>
+
+                                                <div id="submodalidad-eco-dropdown"
+                                                     class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden">
+                                                    <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700" data-value="ECO_GENERAL">Ecografía general</div>
+                                                    <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700" data-value="DOP_NO_CARDIO">Doppler no cardíaco</div>
+                                                    {% if es_cardiologo %}
+                                                    <div class="px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors text-gray-700" data-value="DOP_CARDIO">Doppler cardíaco / Ecocardiograma</div>
+                                                    {% endif %}
                                                 </div>
                                             </div>
                                         </div>
@@ -375,28 +399,104 @@
                             <div class="space-y-3">
                                 {% for registro in registros %}
                                 <div class="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 hover:shadow-md transition-all">
-                                    <div class="flex items-start justify-between">
-                                        <div class="flex-1">
-                                            <p class="font-bold text-gray-900 mb-1">
-                                                {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
-                                            </p>
-                                            <div class="flex items-center gap-4 text-sm text-gray-600 mb-2">
-                                                <span class="flex items-center">
-                                                    <i class="fas fa-calendar-alt mr-1 text-teal-600"></i>
-                                                    {{ registro.fecha_del_informe|date:"d/m/Y" }}
-                                                </span>
-                                                <span class="flex items-center">
-                                                    <i class="fas fa-chart-bar mr-1 text-purple-600"></i>
-                                                    <strong>{{ registro.cantidad_regiones }}</strong> regiones
-                                                </span>
-                                            </div>
-                                            <div class="text-xs text-gray-700 mb-2">
-                                                <span class="font-semibold">Estudios:</span> {{ registro.desglose_backend.estudios }}
-                                            </div>
-                                            <div class="inline-flex items-center px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-bold">
-                                                <i class="fas fa-dollar-sign mr-1"></i>${{ registro.monto_calculado }}
+                                    <div class="flex flex-col gap-3">
+                                        <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                                                    <div>
+                                                        <p class="font-bold text-gray-900 mb-1">
+                                                            {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
+                                                        </p>
+                                                        <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                                                            <span class="flex items-center">
+                                                                <i class="fas fa-calendar-alt mr-1 text-teal-600"></i>
+                                                                {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                                                            </span>
+                                                            <span class="flex items-center">
+                                                                <i class="fas fa-clock mr-1 text-sky-600"></i>
+                                                                {{ registro.fecha_registro|date:"H:i" }}
+                                                            </span>
+                                                            <span class="flex items-center">
+                                                                <i class="fas fa-chart-bar mr-1 text-purple-600"></i>
+                                                                <strong>{{ registro.cantidad_regiones }}</strong> regiones
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                                                            {{ registro.get_tipo_obra_social_display }}
+                                                        </span>
+                                                        <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-bold whitespace-nowrap">
+                                                            <i class="fas fa-dollar-sign mr-1"></i>{{ registro.monto_calculado|floatformat:2 }}
+                                                        </span>
+                                                        <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}"
+                                                           class="inline-flex items-center justify-center w-9 h-9 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+                                                           title="Editar registro">
+                                                            <i class="fas fa-edit text-sm"></i>
+                                                        </a>
+                                                        <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}"
+                                                           class="inline-flex items-center justify-center w-9 h-9 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                                                           title="Eliminar registro"
+                                                           onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                                            <i class="fas fa-trash-alt text-sm"></i>
+                                                        </a>
+                                                    </div>
+                                                </div>
+
+                                                <div class="mt-3 flex flex-wrap gap-2">
+                                                    {% for rel in registro.registroestudio_set.all %}
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-teal-200 text-xs text-gray-700">
+                                                        <span class="font-semibold">{{ rel.estudio.nombre }}</span>
+                                                        {% if rel.cantidad > 1 %}
+                                                        <span class="text-gray-500">x{{ rel.cantidad }}</span>
+                                                        {% endif %}
+                                                        {% if rel.contexto == 'LECHO' %}
+                                                        <span class="inline-flex items-center px-1.5 py-0 rounded bg-orange-100 text-orange-700 font-semibold">Lecho</span>
+                                                        {% elif rel.contexto == 'QUIROFANO' %}
+                                                        <span class="inline-flex items-center px-1.5 py-0 rounded bg-red-100 text-red-700 font-semibold">Quirófano</span>
+                                                        {% endif %}
+                                                    </span>
+                                                    {% endfor %}
+                                                </div>
                                             </div>
                                         </div>
+
+                                        <details class="rounded-lg border border-teal-200 bg-white/70">
+                                            <summary class="cursor-pointer list-none px-3 py-2 text-sm font-medium text-teal-800 flex items-center justify-between">
+                                                <span><i class="fas fa-calculator mr-2"></i>Ver detalle del monto</span>
+                                                <i class="fas fa-chevron-down text-xs"></i>
+                                            </summary>
+                                            <div class="px-3 pb-3 pt-1 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-700 border-t border-teal-100">
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">Valor base:</span>
+                                                    {{ registro.detalle_monto.precio_total|floatformat:2 }}
+                                                </div>
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">OS:</span>
+                                                    {{ registro.detalle_monto.tipo_os }}
+                                                </div>
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">Horario aplicado:</span>
+                                                    {{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})
+                                                </div>
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">Monto final guardado:</span>
+                                                    {{ registro.detalle_monto.monto_final|floatformat:2 }}
+                                                </div>
+                                                {% if registro.detalle_monto.bonus_urgencia %}
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">Bonus urgencia:</span>
+                                                    {{ registro.detalle_monto.bonus_urgencia }}
+                                                </div>
+                                                {% endif %}
+                                                {% if registro.detalle_monto.tiempo_respuesta %}
+                                                <div>
+                                                    <span class="font-semibold text-gray-800">Tiempo respuesta:</span>
+                                                    {{ registro.detalle_monto.tiempo_respuesta }}
+                                                </div>
+                                                {% endif %}
+                                            </div>
+                                        </details>
                                     </div>
                                 </div>
                                 {% endfor %}
@@ -542,6 +642,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoEstudioText = document.getElementById('tipo-estudio-text');
     const tipoEstudioIcon = document.getElementById('tipo-estudio-icon');
     const tipoEstudioDropdown = document.getElementById('tipo-estudio-dropdown');
+    const submodalidadEcoSection = document.getElementById('submodalidad-eco-section');
+    const submodalidadEcoSelect = document.getElementById('submodalidad-eco');
+    const submodalidadEcoButton = document.getElementById('submodalidad-eco-button');
+    const submodalidadEcoText = document.getElementById('submodalidad-eco-text');
+    const submodalidadEcoIcon = document.getElementById('submodalidad-eco-icon');
+    const submodalidadEcoDropdown = document.getElementById('submodalidad-eco-dropdown');
     
     const tiposIconos = {
         '': { icon: 'fa-list', text: 'Seleccione', color: 'text-gray-400' },
@@ -549,38 +655,52 @@ document.addEventListener('DOMContentLoaded', function() {
         'RAD': { icon: 'fa-x-ray', text: 'Radiografía', color: 'text-green-500' },
         'TOM': { icon: 'fa-hospital', text: 'Tomografía', color: 'text-purple-500' },
         'RES': { icon: 'fa-magnet', text: 'Resonancia Magnética', color: 'text-red-500' },
-        'DOP': { icon: 'fa-heartbeat', text: 'Doppler', color: 'text-teal-500' },
-        'MAM': { icon: 'fa-stethoscope', text: 'Mamografía', color: 'text-pink-500' },
-        'ECOCAR': { icon: 'fa-heart', text: 'Ecocardiograma', color: 'text-rose-500' }
+        'MAM': { icon: 'fa-stethoscope', text: 'Mamografía', color: 'text-pink-500' }
     };
-    
-    // Toggle dropdown tipo de estudio
-    tipoEstudioButton.addEventListener('click', function(e) {
-        e.stopPropagation();
-        tipoEstudioDropdown.classList.toggle('hidden');
-        tipoEstudioIcon.classList.toggle('rotate-180');
-    });
-    
-    // Seleccionar opción de tipo de estudio
-    tipoEstudioDropdown.querySelectorAll('[data-value]').forEach(option => {
-        option.addEventListener('click', function() {
-            const value = this.dataset.value;
-            const tipo = tiposIconos[value];
-            
-            // Actualizar el select original
-            tipoEstudioSelect.value = value;
-            
-            // Actualizar el botón personalizado (sin icono)
-            tipoEstudioText.textContent = tipo.text;
-            
-            // Cerrar dropdown
-            tipoEstudioDropdown.classList.add('hidden');
-            tipoEstudioIcon.classList.remove('rotate-180');
-            
-            // Trigger evento change en el select original
-            const event = new Event('change', { bubbles: true });
-            tipoEstudioSelect.dispatchEvent(event);
+
+    function inicializarDropdownPersonalizado({ button, icon, dropdown, onSelect }) {
+        if (!button || !icon || !dropdown) {
+            return;
+        }
+
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
         });
+
+        dropdown.querySelectorAll('[data-value]').forEach(option => {
+            option.addEventListener('click', function() {
+                onSelect(this.dataset.value);
+                dropdown.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            });
+        });
+    }
+    
+    inicializarDropdownPersonalizado({
+        button: tipoEstudioButton,
+        icon: tipoEstudioIcon,
+        dropdown: tipoEstudioDropdown,
+        onSelect: function(value) {
+            const tipo = tiposIconos[value];
+            modalidadPrincipalSeleccionada = value;
+            tipoEstudioText.textContent = tipo.text;
+            aplicarFiltroModalidad(true);
+        }
+    });
+
+    inicializarDropdownPersonalizado({
+        button: submodalidadEcoButton,
+        icon: submodalidadEcoIcon,
+        dropdown: submodalidadEcoDropdown,
+        onSelect: function(value) {
+            submodalidadEcoSelect.value = value;
+            actualizarTextoSubmodalidad();
+            if (modalidadPrincipalSeleccionada === 'ECO') {
+                aplicarFiltroModalidad(true);
+            }
+        }
     });
     
     // === REST DEL CÓDIGO - VERSIÓN MULTI-ESTUDIO v3.1 ===
@@ -611,7 +731,77 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variables de usuario (necesarias para visibilidad de secciones)
     const esStaff = {{ es_staff|lower }};
+    const esCardiologo = {{ es_cardiologo|lower }};
     const trabajaRemoto = {{ trabaja_remoto|lower }};
+    let modalidadPrincipalSeleccionada = '';
+
+    function obtenerTipoBackendSeleccionado() {
+        if (modalidadPrincipalSeleccionada !== 'ECO') {
+            return modalidadPrincipalSeleccionada;
+        }
+        const submodalidad = submodalidadEcoSelect ? submodalidadEcoSelect.value : 'ECO_GENERAL';
+        if (submodalidad === 'DOP_NO_CARDIO') {
+            return 'DOP';
+        }
+        if (submodalidad === 'DOP_CARDIO') {
+            return 'ECOCAR';
+        }
+        return 'ECO';
+    }
+
+    function actualizarTextoSubmodalidad() {
+        if (!submodalidadEcoSelect || !submodalidadEcoText) {
+            return;
+        }
+        const etiquetas = {
+            'ECO_GENERAL': 'Ecografía general',
+            'DOP_NO_CARDIO': 'Doppler no cardíaco',
+            'DOP_CARDIO': 'Doppler cardíaco / Ecocardiograma',
+        };
+        submodalidadEcoText.textContent = etiquetas[submodalidadEcoSelect.value] || 'Ecografía general';
+    }
+
+    function aplicarFiltroModalidad(resetSeleccion = true) {
+        const tipoBackend = obtenerTipoBackendSeleccionado();
+        tipoEstudioSelect.value = tipoBackend;
+
+        if (modalidadPrincipalSeleccionada === 'ECO') {
+            submodalidadEcoSection.classList.remove('hidden');
+        } else {
+            submodalidadEcoSection.classList.add('hidden');
+        }
+
+        if (resetSeleccion) {
+            estudiosSeleccionadosIds = [];
+            estudiosConCantidades = {};
+            estudiosConContexto = {};
+        }
+
+        if (!modalidadPrincipalSeleccionada) {
+            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
+            emptyMessage.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar';
+            renderizarEstudiosSeleccionados();
+            actualizarVisibilidadSecciones();
+            actualizarCantidadRegiones();
+            return;
+        }
+
+        if (modalidadPrincipalSeleccionada !== 'ECO') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === modalidadPrincipalSeleccionada);
+            return;
+        }
+
+        const submodalidad = submodalidadEcoSelect ? submodalidadEcoSelect.value : 'ECO_GENERAL';
+        if (submodalidad === 'ECO_GENERAL') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'ECO');
+        } else if (submodalidad === 'DOP_NO_CARDIO') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'DOP' && !estudio.es_cardiologico);
+        } else {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'ECOCAR' || (estudio.tipo === 'DOP' && estudio.es_cardiologico));
+        }
+    }
     
     // === FUNCIONES PARA MANEJO DE ESTUDIOS MÚLTIPLES ===
     
@@ -691,7 +881,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función global para actualizar contexto de un estudio
     window.actualizarContextoEstudio = function(id, contexto) {
         estudiosConContexto[id] = contexto;
-        calcularMontoTiempoReal();
     };
 
     // Función global para eliminar estudio
@@ -710,7 +899,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const cantidadNum = parseInt(cantidad) || 1;
         estudiosConCantidades[id] = Math.max(1, Math.min(10, cantidadNum));
         actualizarCantidadRegiones();
-        calcularMontoTiempoReal(); // Recalcular monto con nueva cantidad
     };
 
     // Función para agregar estudio
@@ -735,7 +923,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (estudiosSeleccionadosIds.length === 0) {
             cantidadRegionesInput.value = '';
-            calcularMontoTiempoReal(); // Actualizar monto a $0.00
             return;
         }
         
@@ -751,7 +938,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Asignar el valor calculado al campo oculto
         cantidadRegionesInput.value = totalRegiones;
-        calcularMontoTiempoReal();
     }
 
     // Variables para navegación por teclado
@@ -812,9 +998,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Función para cargar estudios según tipo
-    function cargarEstudios(tipoSeleccionado) {
-        estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+    // Función para cargar estudios según filtro
+    function cargarEstudiosPorFiltro(predicate) {
+        estudiosFiltrados = estudios.filter(predicate);
         
         // Actualizar el select original
         estudioSelectOriginal.innerHTML = '';
@@ -894,33 +1080,39 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Evento cambio de tipo de estudio
-    tipoEstudioSelect.addEventListener('change', function() {
-        const tipoSeleccionado = this.value;
-        estudiosSeleccionadosIds = [];
-        estudiosConCantidades = {}; // Resetear cantidades también
-        estudiosConContexto = {};
-        
-        if (!tipoSeleccionado) {
-            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
-            estudioSearch.disabled = true;
-            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
-            emptyMessage.innerHTML = '<i class="fas fa-info-circle mr-1"></i>Selecciona el tipo de estudio para comenzar';
-            renderizarEstudiosSeleccionados();
-            return;
-        }
-        
-        cargarEstudios(tipoSeleccionado);
-    });
+    if (submodalidadEcoSelect) {
+        submodalidadEcoSelect.addEventListener('change', function() {
+            actualizarTextoSubmodalidad();
+            if (modalidadPrincipalSeleccionada === 'ECO') {
+                aplicarFiltroModalidad(true);
+            }
+        });
+    }
 
     // Inicialización
-    if (tipoEstudioSeleccionado) {
-        tipoEstudioSelect.value = tipoEstudioSeleccionado;
+    if (tipoEstudioSeleccionado === 'ECO' || tipoEstudioSeleccionado === 'DOP' || tipoEstudioSeleccionado === 'ECOCAR') {
+        modalidadPrincipalSeleccionada = 'ECO';
+        tipoEstudioText.textContent = 'Ecografía';
+        if (submodalidadEcoSelect) {
+            if (tipoEstudioSeleccionado === 'ECO') {
+                submodalidadEcoSelect.value = 'ECO_GENERAL';
+            } else if (tipoEstudioSeleccionado === 'DOP') {
+                submodalidadEcoSelect.value = 'DOP_NO_CARDIO';
+            } else {
+                submodalidadEcoSelect.value = esCardiologo ? 'DOP_CARDIO' : 'DOP_NO_CARDIO';
+            }
+            actualizarTextoSubmodalidad();
+        }
+        aplicarFiltroModalidad(false);
+    } else if (tipoEstudioSeleccionado) {
+        modalidadPrincipalSeleccionada = tipoEstudioSeleccionado;
         const tipo = tiposIconos[tipoEstudioSeleccionado];
         if (tipo) {
             tipoEstudioText.textContent = tipo.text;
         }
-        cargarEstudios(tipoEstudioSeleccionado);
+        aplicarFiltroModalidad(false);
+    } else {
+        aplicarFiltroModalidad(false);
     }
 
     // Cerrar dropdowns al hacer clic fuera
@@ -928,6 +1120,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!tipoEstudioButton.contains(e.target) && !tipoEstudioDropdown.contains(e.target)) {
             tipoEstudioDropdown.classList.add('hidden');
             tipoEstudioIcon.classList.remove('rotate-180');
+        }
+        if (
+            submodalidadEcoButton && submodalidadEcoDropdown
+            && !submodalidadEcoButton.contains(e.target)
+            && !submodalidadEcoDropdown.contains(e.target)
+        ) {
+            submodalidadEcoDropdown.classList.add('hidden');
+            submodalidadEcoIcon.classList.remove('rotate-180');
         }
         if (!estudioSearch.contains(e.target) && !estudioDropdown.contains(e.target)) {
             estudioDropdown.classList.add('hidden');
@@ -978,7 +1178,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
         radio.addEventListener('change', function() {
             actualizarEstilosRadioOS();
-            calcularMontoTiempoReal();
         });
     });
 
@@ -1028,7 +1227,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        calcularMontoTiempoReal();
         actualizarEstilosRadioOS();
     }
 
@@ -1073,41 +1271,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 fechasUrgenciaSection.classList.add('hidden');
             }
-            calcularMontoTiempoReal();
         });
     }
-    
-    // El monto definitivo se consulta desde backend tras guardar el registro.
-    // Se mantiene esta función para no romper handlers existentes del formulario.
-    function calcularMontoTiempoReal() {
-        return;
-    }
-    
-    // Event listeners para cálculo en tiempo real
-    const cantidadRegionesInput = document.getElementById('id_cantidad_regiones');
-    if (cantidadRegionesInput) {
-        cantidadRegionesInput.addEventListener('input', calcularMontoTiempoReal);
-    }
-    
-    const tipoOSRadios = document.querySelectorAll('input[name="tipo_obra_social"]');
-    tipoOSRadios.forEach(radio => {
-        radio.addEventListener('change', calcularMontoTiempoReal);
-    });
-
-    // Horario se asigna automáticamente según la hora (no hay event listeners)
-
-    const fechaSolicitudInput = document.getElementById('id_fecha_hora_solicitud');
-    if (fechaSolicitudInput) {
-        fechaSolicitudInput.addEventListener('change', calcularMontoTiempoReal);
-    }
-    
-    const fechaInformeInput = document.getElementById('id_fecha_hora_informe');
-    if (fechaInformeInput) {
-        fechaInformeInput.addEventListener('change', calcularMontoTiempoReal);
-    }
-    
-    // El cálculo se dispara automáticamente cuando se agregan/eliminan estudios
-    // mediante las funciones agregarEstudio() y eliminarEstudio()
     
     // Aplicar estilos Tailwind a los nuevos campos
     const newFields = document.querySelectorAll('#id_cantidad_regiones, #id_fecha_hora_solicitud, #id_fecha_hora_informe');
@@ -1121,6 +1286,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // === ENVIAR CANTIDADES AL BACKEND ===
     const form = document.getElementById('registroForm');
     form.addEventListener('submit', function(e) {
+        tipoEstudioSelect.value = obtenerTipoBackendSeleccionado();
+
         // Limpiar container de cantidades
         const container = document.getElementById('cantidades-estudios-container');
         container.innerHTML = '';

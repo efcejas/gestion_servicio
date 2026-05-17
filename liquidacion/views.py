@@ -122,6 +122,11 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             # Convertir Decimals a string para JSON
             estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
             estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudio_dict['es_cardiologico'] = es_estudio_cardiologico(
+                estudio_dict['tipo'],
+                estudio_dict['nombre'],
+                estudio_dict['codigo'],
+            )
             estudio_dict['contextos_disponibles'] = contextos_disponibles_para_estudio(
                 estudio_dict['tipo'],
                 estudio_dict['nombre'],
@@ -141,7 +146,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         )
 
         for registro in registros:
-            registro.desglose_backend = registro.get_desglose_monto()
+            registro.detalle_monto = registro.get_desglose_monto()
 
         context['registros'] = registros
         
@@ -155,6 +160,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         # Información del médico
         context['es_staff'] = user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
+        context['es_cardiologo'] = user.rol == 'cardiologo'
         context['trabaja_remoto'] = user.trabaja_remoto
 
         return context
@@ -630,6 +636,19 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         orden = self.request.GET.get('orden', 'fecha_desc')
         filtro_rapido = self.request.GET.get('filtro_rapido', '')
         busqueda = self.request.GET.get('busqueda', '').strip()
+        modalidades_validas = [valor for valor, _ in Estudios.TIPO_ESTUDIO_CHOICES]
+        modalidades_seleccionadas = [
+            modalidad
+            for modalidad in self.request.GET.getlist('modalidad')
+            if modalidad in modalidades_validas
+        ]
+        base_query_params = self.request.GET.copy()
+        if not base_query_params.get('mes'):
+            base_query_params['mes'] = str(mes)
+        if not base_query_params.get('año'):
+            base_query_params['año'] = str(año)
+        if 'tipo_estudio' in base_query_params:
+            del base_query_params['tipo_estudio']
 
         # Aplicar búsqueda por paciente si existe
         if busqueda:
@@ -643,6 +662,10 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         if filtro_rapido == 'hoy':
             from datetime import date
             registros = registros.filter(fecha_registro__date=date.today())
+
+        # Filtro backend por modalidad (si el usuario selecciona checkboxes)
+        if modalidades_seleccionadas:
+            registros = registros.filter(estudio__tipo__in=modalidades_seleccionadas).distinct()
 
         # Aplicar ordenamiento
         if orden == 'fecha_asc':
@@ -669,10 +692,58 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         }
         context['filtro_rapido'] = filtro_rapido
         context['filtro_rapido_label'] = filtro_labels.get(filtro_rapido, '')
+        context['modalidades_disponibles'] = [
+            {'value': valor, 'label': etiqueta}
+            for valor, etiqueta in Estudios.TIPO_ESTUDIO_CHOICES
+        ]
+        context['modalidades_seleccionadas'] = modalidades_seleccionadas
+        context['modalidades_query'] = urlencode([
+            ('modalidad', modalidad)
+            for modalidad in modalidades_seleccionadas
+        ])
+        modalidades_toggle = []
+        for valor, etiqueta in Estudios.TIPO_ESTUDIO_CHOICES:
+            params_toggle = base_query_params.copy()
+            actuales = [
+                modalidad
+                for modalidad in params_toggle.getlist('modalidad')
+                if modalidad in modalidades_validas
+            ]
+            if valor in actuales:
+                actualizadas = [modalidad for modalidad in actuales if modalidad != valor]
+            else:
+                actualizadas = actuales + [valor]
+            params_toggle.setlist('modalidad', actualizadas)
+            if not actualizadas and 'modalidad' in params_toggle:
+                del params_toggle['modalidad']
+            modalidades_toggle.append({
+                'value': valor,
+                'label': etiqueta,
+                'active': valor in modalidades_seleccionadas,
+                'query': params_toggle.urlencode(),
+            })
+        params_clear_modalidades = base_query_params.copy()
+        if 'modalidad' in params_clear_modalidades:
+            del params_clear_modalidades['modalidad']
+        context['modalidades_toggle'] = modalidades_toggle
+        context['modalidades_clear_query'] = params_clear_modalidades.urlencode()
 
-        # Separar registros por tipo de estudio (ECO vs OTROS)
-        registros_eco = registros.filter(estudio__tipo='ECO').distinct()
-        registros_otros = registros.exclude(estudio__tipo='ECO').distinct()
+        # Lista unificada para tabla principal
+        registros_tabla = list(registros.distinct())
+
+        # Mantener subtotales de compatibilidad para tarjetas superiores
+        registros_eco = [
+            reg for reg in registros_tabla
+            if any(rel.estudio.tipo == 'ECO' for rel in reg.registroestudio_set.all())
+        ]
+        registros_otros = [
+            reg for reg in registros_tabla
+            if not any(rel.estudio.tipo == 'ECO' for rel in reg.registroestudio_set.all())
+        ]
+
+        # Adjuntar desglose calculado por backend para mostrar en la tabla
+        for registro in registros_tabla:
+            registro.detalle_monto = registro.get_desglose_monto()
 
         # Agregar contexto para los controles
         context['orden'] = orden
@@ -693,7 +764,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         total_monto_guardias = sum(g.monto for g in guardias)
         
         # Totales generales del mes
-        total_practicas = registros.count()
+        total_practicas = len(registros_tabla)
         total_regiones_general = total_regiones_eco + total_regiones_otros
         total_monto_practicas = total_monto_eco + total_monto_otros
         total_general = total_monto_practicas + total_monto_guardias
@@ -706,6 +777,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['registros_otros'] = registros_otros
         context['total_regiones_otros'] = total_regiones_otros
         context['total_monto_otros'] = total_monto_otros
+        context['registros_tabla'] = registros_tabla
         
         context['guardias'] = guardias
         context['total_guardias'] = total_guardias
@@ -715,10 +787,14 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['total_regiones_general'] = total_regiones_general
         context['total_monto_practicas'] = total_monto_practicas
         context['total_general'] = total_general
+        context['focus_registro'] = self.request.GET.get('focus_registro', '').strip()
+        context['mostrar_info_horario_descuento'] = self.request.user.rol not in [
+            'medico_staff',
+            'jefe_servicio',
+            'cardiologo',
+        ]
+        context['mostrar_info_bonus_urgencia'] = bool(self.request.user.trabaja_remoto)
         
-        # Determinar qué solapa debe estar activa
-        context['tipo_estudio_activo'] = self.request.GET.get('tipo_estudio', 'ecografias')
-
         return context
 
 class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
@@ -763,6 +839,11 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             # Convertir Decimals a string para JSON
             estudio_dict['precio_cober'] = str(estudio_dict['precio_cober'])
             estudio_dict['precio_otras_os'] = str(estudio_dict['precio_otras_os'])
+            estudio_dict['es_cardiologico'] = es_estudio_cardiologico(
+                estudio_dict['tipo'],
+                estudio_dict['nombre'],
+                estudio_dict['codigo'],
+            )
             estudio_dict['contextos_disponibles'] = contextos_disponibles_para_estudio(
                 estudio_dict['tipo'],
                 estudio_dict['nombre'],
@@ -796,6 +877,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Información del médico para lógica condicional
         context['trabaja_remoto'] = self.request.user.trabaja_remoto
         context['es_staff'] = self.request.user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
+        context['es_cardiologo'] = self.request.user.rol == 'cardiologo'
         context['requiere_motivo_modificacion'] = bool(
             sesion and sesion.estado in ['CERRADA', 'FACTURADA']
         )
@@ -957,7 +1039,8 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         query_string = urlencode({
             'mes': fecha.month, 
             'año': fecha.year,
-            'tipo_estudio': tipo_estudio
+            'tipo_estudio': tipo_estudio,
+            'focus_registro': self.object.pk,
         })
         return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
 

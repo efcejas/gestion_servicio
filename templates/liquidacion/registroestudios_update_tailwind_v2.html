@@ -77,7 +77,7 @@
                 </h2>
             </div>
             <div class="px-6 py-5">
-                <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Tipo de Estudio -->
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -99,8 +99,6 @@
                                  class="hidden absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
                                 <div data-value="">Seleccione</div>
                                 <div data-value="ECO">Ecografía</div>
-                                <div data-value="DOP">Doppler</div>
-                                <div data-value="ECOCAR">Ecocardiograma</div>
                                 <div data-value="TOM">Tomografía</div>
                                 <div data-value="RES">Resonancia Magnética</div>
                                 <div data-value="RAD">Radiografía</div>
@@ -109,8 +107,40 @@
                         </div>
                     </div>
 
+                    <div id="submodalidad-eco-section" class="hidden">
+                        <label for="submodalidad-eco" class="block text-sm font-semibold text-gray-700 mb-2">
+                            Submodalidad de Ecografía
+                        </label>
+                        <div class="hidden">
+                            <select id="submodalidad-eco" class="hidden">
+                                <option value="ECO_GENERAL">Ecografía general</option>
+                                <option value="DOP_NO_CARDIO">Doppler no cardíaco</option>
+                                {% if es_cardiologo %}
+                                <option value="DOP_CARDIO">Doppler cardíaco / Ecocardiograma</option>
+                                {% endif %}
+                            </select>
+                        </div>
+
+                        <div class="relative">
+                            <button type="button" id="submodalidad-eco-button"
+                                    class="w-full px-4 py-3 text-left bg-white border-2 border-gray-300 rounded-lg hover:border-purple-500 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all flex items-center justify-between shadow-sm">
+                                <span id="submodalidad-eco-text" class="text-gray-700 font-medium">Ecografía general</span>
+                                <i id="submodalidad-eco-icon" class="fas fa-chevron-down text-gray-400 transition-transform"></i>
+                            </button>
+
+                            <div id="submodalidad-eco-dropdown"
+                                 class="hidden absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-xl overflow-hidden">
+                                <div data-value="ECO_GENERAL">Ecografía general</div>
+                                <div data-value="DOP_NO_CARDIO">Doppler no cardíaco</div>
+                                {% if es_cardiologo %}
+                                <div data-value="DOP_CARDIO">Doppler cardíaco / Ecocardiograma</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Buscar y agregar estudios -->
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             Buscar y seleccionar estudios <span class="text-red-500">*</span>
                         </label>
@@ -157,18 +187,31 @@
                 </h2>
             </div>
             <div class="px-6 py-5">
+                <!-- Container técnico para inputs hidden (no debe ocupar espacio en el grid) -->
+                <div id="cantidades-estudios-container" class="hidden"></div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Campo oculto - se calcula automáticamente -->
                     <input type="hidden" name="cantidad_regiones" id="id_cantidad_regiones" value="{{ object.cantidad_regiones }}">
-                    
-                    <!-- Container para cantidades de estudios (se llena con JavaScript antes del submit) -->
-                    <div id="cantidades-estudios-container"></div>
                     
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             Fecha del informe <span class="text-red-500">*</span>
                         </label>
                         {{ form.fecha_del_informe }}
+                    </div>
+
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-1">Resumen operativo de edición</p>
+                        <p class="text-xs text-slate-600">
+                            Regiones actuales: <strong>{{ object.cantidad_regiones }}</strong>
+                        </p>
+                        <p class="text-xs text-slate-600 mt-1">
+                            Horario actual aplicado: <strong>{{ object.get_horario_display }}</strong>
+                        </p>
+                        <p class="text-xs text-slate-500 mt-2">
+                            El horario y el monto se validan nuevamente al guardar, según las reglas del sistema.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -185,42 +228,64 @@
             <div class="px-6 py-5 space-y-4">
                 <!-- Tipo de Obra Social -->
                 <div id="tipo-obra-social-section" style="display: none;">
-                    <label class="block text-sm font-semibold text-gray-700 mb-3">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">
                         Tipo de Obra Social <span class="text-red-500">*</span>
                     </label>
+                    <p class="text-xs text-gray-500 mb-3">Este dato impacta directamente en el monto final al guardar.</p>
                     <div class="grid grid-cols-2 gap-3">
-                        <label id="label-cober" class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
-                            {{ form.tipo_obra_social.0 }}
+                        <label id="label-cober" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                            <input type="radio" name="tipo_obra_social" value="COBER" id="id_tipo_obra_social_cober" class="sr-only" required {% if form.tipo_obra_social.value == 'COBER' %}checked{% endif %}>
                             <div class="text-center">
                                 <i class="fas fa-hospital text-2xl text-blue-600 mb-2"></i>
                                 <p class="font-semibold text-gray-900">COBER</p>
+                                <p class="text-[11px] text-gray-600">Cobertura principal</p>
+                            </div>
+                            <div class="radio-check absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                <i class="fas fa-check text-white text-[10px] hidden"></i>
                             </div>
                         </label>
-                         <label id="label-otras" class="relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
-                            {{ form.tipo_obra_social.1 }}
+                         <label id="label-otras" class="radio-obra-social relative flex items-center justify-center p-4 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+                            <input type="radio" name="tipo_obra_social" value="OTRAS_OS" id="id_tipo_obra_social_otras" class="sr-only" required {% if form.tipo_obra_social.value != 'COBER' %}checked{% endif %}>
                             <div class="text-center">
                                 <i class="fas fa-shield-alt text-2xl text-green-600 mb-2"></i>
                                 <p class="font-semibold text-gray-900">OTRAS OS</p>
+                                <p class="text-[11px] text-gray-600">Resto de obras sociales</p>
+                            </div>
+                            <div class="radio-check absolute top-1.5 right-1.5 w-4 h-4 rounded-full border-2 border-gray-400 flex items-center justify-center">
+                                <i class="fas fa-check text-white text-[10px] hidden"></i>
                             </div>
                         </label>
                     </div>
                 </div>
 
                 <!-- Bonus Urgencia -->
+                {% if trabaja_remoto %}
                 <div id="bonus-urgencia-section" class="bg-blue-50 border border-blue-200 rounded-lg p-4" style="display: none;">
-                    <div class="flex items-start">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-blue-900">
+                                <i class="fas fa-bolt text-blue-600 mr-1"></i>Urgencia para Resonancia informada a distancia
+                            </p>
+                            <p class="text-xs text-blue-800 mt-1">
+                                El bonus se evalúa en backend si el informe fue emitido en menos de 24 horas.
+                            </p>
+                        </div>
+                        <span class="inline-flex items-center px-2 py-1 rounded bg-blue-100 text-blue-700 text-[11px] font-semibold whitespace-nowrap">
+                            Solo para RM remota
+                        </span>
+                    </div>
+
+                    <div class="mt-4 flex items-start">
                         <div class="flex items-center h-5">
                             {{ form.paciente_internado }}
                         </div>
                         <div class="ml-3">
-                            <label class="font-medium text-gray-700">
-                                <i class="fas fa-bolt text-blue-500 mr-1"></i>Paciente Internado (Bonus +20%)
-                            </label>
-                            <p class="text-xs text-gray-600 mt-1">Si informas en menos de 24 horas</p>
+                            <label class="font-medium text-gray-700">Paciente internado</label>
+                            <p class="text-xs text-gray-600 mt-1">Marcar solo si corresponde para evaluar plus de urgencia.</p>
                         </div>
                     </div>
                     
-                    <div id="fechas-urgencia-section" class="grid grid-cols-2 gap-4 mt-4" style="{% if not object.paciente_internado %}display: none;{% endif %}">
+                    <div id="fechas-urgencia-section" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4" style="{% if not object.paciente_internado %}display: none;{% endif %}">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Fecha/Hora Solicitud</label>
                             {{ form.fecha_hora_solicitud }}
@@ -231,17 +296,24 @@
                         </div>
                     </div>
                 </div>
+                {% else %}
+                <div id="bonus-urgencia-section" class="bg-gray-50 border border-gray-200 rounded-lg p-4" style="display: none;">
+                    <p class="text-sm font-medium text-gray-700">Plus de urgencia no aplicable</p>
+                    <p class="text-xs text-gray-500 mt-1">Esta opción solo está disponible para usuarios que informan resonancia a distancia.</p>
+                </div>
+                {% endif %}
 
-                <!-- Preview del Monto -->
-                <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-600 mb-1">Monto Estimado</p>
-                            <p id="monto-preview" class="text-3xl font-bold text-green-700">$0.00</p>
-                            <p id="monto-desglose" class="text-xs text-gray-600 mt-2"></p>
+                <!-- Monto backend-first -->
+                <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+                    <div class="flex items-start">
+                        <div class="text-emerald-600 mt-0.5">
+                            <i class="fas fa-shield-alt"></i>
                         </div>
-                        <div class="text-green-600">
-                            <i class="fas fa-calculator text-5xl opacity-20"></i>
+                        <div class="ml-3">
+                            <p class="text-sm font-semibold text-emerald-900">Monto calculado por el sistema</p>
+                            <p class="text-xs text-emerald-800 mt-1">
+                                Para evitar diferencias, el monto final se recalcula y guarda en backend al confirmar la edición.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -291,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const estudiosSeleccionadosInicial = {{ estudios_seleccionados|safe }};
     const cantidadesInicial = {{ cantidades_estudios|safe }};  // v3.1 - Cantidades desde BD
     const contextosInicial = {{ contextos_estudios|safe }};    // Contextos desde BD
-    const esStaff = {{ es_staff|lower }};
+    const esCardiologo = {{ es_cardiologo|lower }};
     const trabajaRemoto = {{ trabaja_remoto|lower }};
 
     let estudiosSeleccionadosIds = [...estudiosSeleccionadosInicial];
@@ -312,41 +384,140 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipoEstudioText = document.getElementById('tipo-estudio-text');
     const tipoEstudioIcon = document.getElementById('tipo-estudio-icon');
     const tipoEstudioDropdown = document.getElementById('tipo-estudio-dropdown');
+    const submodalidadEcoSection = document.getElementById('submodalidad-eco-section');
+    const submodalidadEcoSelect = document.getElementById('submodalidad-eco');
+    const submodalidadEcoButton = document.getElementById('submodalidad-eco-button');
+    const submodalidadEcoText = document.getElementById('submodalidad-eco-text');
+    const submodalidadEcoIcon = document.getElementById('submodalidad-eco-icon');
+    const submodalidadEcoDropdown = document.getElementById('submodalidad-eco-dropdown');
     const estudioSearch = document.getElementById('estudio-search');
     const estudioDropdown = document.getElementById('estudio-dropdown');
     const estudiosSeleccionados = document.getElementById('estudios-seleccionados');
     const emptyMessage = document.getElementById('empty-message');
+    let modalidadPrincipalSeleccionada = '';
 
-    // === DROPDOWN TIPO DE ESTUDIO ===
-    tipoEstudioButton.addEventListener('click', function(e) {
-        e.stopPropagation();
-        tipoEstudioDropdown.classList.toggle('hidden');
-        tipoEstudioIcon.classList.toggle('rotate-180');
-    });
+    function obtenerTipoBackendSeleccionado() {
+        if (modalidadPrincipalSeleccionada !== 'ECO') {
+            return modalidadPrincipalSeleccionada;
+        }
+        const submodalidad = submodalidadEcoSelect ? submodalidadEcoSelect.value : 'ECO_GENERAL';
+        if (submodalidad === 'DOP_NO_CARDIO') {
+            return 'DOP';
+        }
+        if (submodalidad === 'DOP_CARDIO') {
+            return 'ECOCAR';
+        }
+        return 'ECO';
+    }
 
-    tipoEstudioDropdown.querySelectorAll('[data-value]').forEach(option => {
-        option.className = 'px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors text-gray-700';
-        option.addEventListener('click', function() {
-            const value = this.dataset.value;
+    function actualizarTextoSubmodalidad() {
+        if (!submodalidadEcoSelect || !submodalidadEcoText) {
+            return;
+        }
+        const etiquetas = {
+            'ECO_GENERAL': 'Ecografía general',
+            'DOP_NO_CARDIO': 'Doppler no cardíaco',
+            'DOP_CARDIO': 'Doppler cardíaco / Ecocardiograma',
+        };
+        submodalidadEcoText.textContent = etiquetas[submodalidadEcoSelect.value] || 'Ecografía general';
+    }
+
+    function inicializarDropdownPersonalizado({ button, icon, dropdown, optionClass, onSelect }) {
+        if (!button || !icon || !dropdown) {
+            return;
+        }
+
+        button.addEventListener('click', function(e) {
+            e.stopPropagation();
+            dropdown.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+        });
+
+        dropdown.querySelectorAll('[data-value]').forEach(option => {
+            if (optionClass) {
+                option.className = optionClass;
+            }
+            option.addEventListener('click', function() {
+                onSelect(this.dataset.value);
+                dropdown.classList.add('hidden');
+                icon.classList.remove('rotate-180');
+            });
+        });
+    }
+
+    function aplicarFiltroModalidad(resetSeleccion = false) {
+        tipoEstudioSelect.value = obtenerTipoBackendSeleccionado();
+
+        if (modalidadPrincipalSeleccionada === 'ECO') {
+            submodalidadEcoSection.classList.remove('hidden');
+        } else {
+            submodalidadEcoSection.classList.add('hidden');
+        }
+
+        if (resetSeleccion) {
+            estudiosSeleccionadosIds = [];
+            estudiosConCantidades = {};
+            estudiosConContexto = {};
+        }
+
+        if (!modalidadPrincipalSeleccionada) {
+            estudioSelectOriginal.innerHTML = '<option disabled selected>Seleccione tipo de estudio primero</option>';
+            estudioSearch.disabled = true;
+            estudioSearch.placeholder = 'Primero selecciona el tipo de estudio';
+            renderizarEstudiosSeleccionados();
+            actualizarVisibilidadSecciones();
+            actualizarCantidadRegiones();
+            return;
+        }
+
+        if (modalidadPrincipalSeleccionada !== 'ECO') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === modalidadPrincipalSeleccionada);
+            return;
+        }
+
+        const submodalidad = submodalidadEcoSelect ? submodalidadEcoSelect.value : 'ECO_GENERAL';
+        if (submodalidad === 'ECO_GENERAL') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'ECO');
+        } else if (submodalidad === 'DOP_NO_CARDIO') {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'DOP' && !estudio.es_cardiologico);
+        } else {
+            cargarEstudiosPorFiltro((estudio) => estudio.tipo === 'ECOCAR' || (estudio.tipo === 'DOP' && estudio.es_cardiologico));
+        }
+    }
+
+    // === DROPDOWNS PERSONALIZADOS ===
+    inicializarDropdownPersonalizado({
+        button: tipoEstudioButton,
+        icon: tipoEstudioIcon,
+        dropdown: tipoEstudioDropdown,
+        optionClass: 'px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors text-gray-700',
+        onSelect: function(value) {
             const textos = {
                 '': 'Seleccione',
                 'ECO': 'Ecografía',
                 'RAD': 'Radiografía',
                 'TOM': 'Tomografía',
                 'RES': 'Resonancia Magnética',
-                'DOP': 'Doppler',
-                'MAM': 'Mamografía',
-                'ECOCAR': 'Ecocardiograma'
+                'MAM': 'Mamografía'
             };
-            
-            tipoEstudioSelect.value = value;
+            modalidadPrincipalSeleccionada = value;
             tipoEstudioText.textContent = textos[value];
-            tipoEstudioDropdown.classList.add('hidden');
-            tipoEstudioIcon.classList.remove('rotate-180');
-            
-            // No resetear estudios seleccionados al cambiar tipo (modo edición)
-            cargarEstudios(value);
-        });
+            aplicarFiltroModalidad(true);
+        }
+    });
+
+    inicializarDropdownPersonalizado({
+        button: submodalidadEcoButton,
+        icon: submodalidadEcoIcon,
+        dropdown: submodalidadEcoDropdown,
+        optionClass: 'px-4 py-2.5 cursor-pointer hover:bg-purple-50 transition-colors text-gray-700',
+        onSelect: function(value) {
+            submodalidadEcoSelect.value = value;
+            actualizarTextoSubmodalidad();
+            if (modalidadPrincipalSeleccionada === 'ECO') {
+                aplicarFiltroModalidad(true);
+            }
+        }
     });
 
     // === FUNCIONES MULTI-ESTUDIO ===
@@ -426,7 +597,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función global para actualizar contexto de un estudio
     window.actualizarContextoEstudio = function(id, contexto) {
         estudiosConContexto[id] = contexto;
-        calcularMontoTiempoReal();
     };
 
     window.eliminarEstudio = function(id) {
@@ -442,7 +612,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const cantidadNum = parseInt(cantidad) || 1;
         estudiosConCantidades[id] = Math.max(1, Math.min(10, cantidadNum));
         actualizarCantidadRegiones();
-        calcularMontoTiempoReal();
     };
 
     function agregarEstudio(id) {
@@ -464,7 +633,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (estudiosSeleccionadosIds.length === 0) {
             cantidadRegionesInput.value = '';
-            calcularMontoTiempoReal();
             return;
         }
         
@@ -478,7 +646,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         cantidadRegionesInput.value = totalRegiones;
-        calcularMontoTiempoReal();
     }
 
     // === BÚSQUEDA Y NAVEGACIÓN ===
@@ -521,8 +688,8 @@ document.addEventListener('DOMContentLoaded', function() {
         estudioDropdown.classList.remove('hidden');
     }
 
-    function cargarEstudios(tipoSeleccionado) {
-        estudiosFiltrados = estudios.filter(estudio => estudio.tipo === tipoSeleccionado);
+    function cargarEstudiosPorFiltro(predicate) {
+        estudiosFiltrados = estudios.filter(predicate);
         
         estudioSelectOriginal.innerHTML = '';
         
@@ -587,6 +754,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const obraSocialSection = document.getElementById('tipo-obra-social-section');
         const bonusSection = document.getElementById('bonus-urgencia-section');
         const radiosObraSocial = document.querySelectorAll('input[name="tipo_obra_social"]');
+        const radioCober = document.getElementById('id_tipo_obra_social_cober');
+        const radioOtras = document.getElementById('id_tipo_obra_social_otras');
+        const pacienteInternado = document.getElementById('id_paciente_internado');
+        const fechasSection = document.getElementById('fechas-urgencia-section');
+        const fechaSolicitud = document.getElementById('id_fecha_hora_solicitud');
+        const fechaInforme = document.getElementById('id_fecha_hora_informe');
         
         if (estudiosSeleccionadosIds.length === 0) {
             obraSocialSection.style.display = 'none';
@@ -595,6 +768,19 @@ document.addEventListener('DOMContentLoaded', function() {
             radiosObraSocial.forEach(radio => {
                 radio.removeAttribute('required');
             });
+            if (pacienteInternado) {
+                pacienteInternado.checked = false;
+            }
+            if (fechasSection) {
+                fechasSection.style.display = 'none';
+            }
+            if (fechaSolicitud) {
+                fechaSolicitud.removeAttribute('required');
+            }
+            if (fechaInforme) {
+                fechaInforme.removeAttribute('required');
+            }
+            actualizarEstilosRadioOS();
             return;
         }
 
@@ -624,116 +810,100 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (index === 1) radio.checked = true;
             });
         }
-        
+        if (!radioCober?.checked && !radioOtras?.checked && radioOtras) {
+            radioOtras.checked = true;
+        }
+
         bonusSection.style.display = (hayResonancia && trabajaRemoto) ? 'block' : 'none';
-        
-        calcularMontoTiempoReal();
-    }
 
-    // === CÁLCULO DE MONTO EN TIEMPO REAL ===
-    function calcularMontoTiempoReal() {
-        const tipoOS = document.querySelector('input[name="tipo_obra_social"]:checked')?.value;
-        const pacienteInternado = document.getElementById('id_paciente_internado')?.checked || false;
-        const fechaSolicitud = document.getElementById('id_fecha_hora_solicitud')?.value;
-        const fechaInforme = document.getElementById('id_fecha_hora_informe')?.value;
-        
-        const horaActual = new Date().getHours();
-        const horario = (!esStaff && horaActual >= 8 && horaActual < 17) ? 'INTRA' : 'EXTRA';
-        
-        if (estudiosSeleccionadosIds.length === 0) {
-            document.getElementById('monto-preview').textContent = '$0.00';
-            document.getElementById('monto-desglose').textContent = '';
-            return;
-        }
-        
-        let precioTotal = 0;
-        let necesitaTipoOS = false;
-        
-        for (const estudioId of estudiosSeleccionadosIds) {
-            const estudio = estudios.find(e => e.id === estudioId);
-            if (!estudio) continue;
-            
-            const cantidad = estudiosConCantidades[estudioId] || 1;
-            
-            if (estudio.precio_unico) {
-                precioTotal += parseFloat(estudio.precio_cober) * cantidad;
-            } else {
-                necesitaTipoOS = true;
-                if (!tipoOS) {
-                    document.getElementById('monto-preview').textContent = '$0.00';
-                    document.getElementById('monto-desglose').textContent = 'Selecciona tipo de obra social';
-                    return;
-                }
-                const precioEstudio = tipoOS === 'COBER' 
-                    ? parseFloat(estudio.precio_cober) 
-                    : parseFloat(estudio.precio_otras_os);
-                precioTotal += precioEstudio * cantidad;
+        if (!(hayResonancia && trabajaRemoto)) {
+            if (pacienteInternado) {
+                pacienteInternado.checked = false;
+            }
+            if (fechasSection) {
+                fechasSection.style.display = 'none';
+            }
+            if (fechaSolicitud) {
+                fechaSolicitud.removeAttribute('required');
+            }
+            if (fechaInforme) {
+                fechaInforme.removeAttribute('required');
             }
         }
-        
-        if (precioTotal === 0) {
-            document.getElementById('monto-preview').textContent = '$0.00';
+
+        actualizarEstilosRadioOS();
+    }
+
+    function actualizarEstilosRadioOS() {
+        const radioCober = document.getElementById('id_tipo_obra_social_cober');
+        const radioOtras = document.getElementById('id_tipo_obra_social_otras');
+        const labelCober = document.getElementById('label-cober');
+        const labelOtras = document.getElementById('label-otras');
+
+        if (!radioCober || !radioOtras || !labelCober || !labelOtras) {
             return;
         }
-        
-        let subtotal = precioTotal;
-        if (!esStaff && horario === 'INTRA') {
-            subtotal *= 0.5;
-        }
-        
-        const hayResonancia = estudiosSeleccionadosIds.some(id => {
-            const estudio = estudios.find(e => e.id === id);
-            return estudio && estudio.tipo === 'RES';
+
+        [labelCober, labelOtras].forEach((label) => {
+            label.classList.remove('border-blue-600', 'bg-blue-50', 'border-green-600', 'bg-green-50');
+            label.classList.add('border-gray-300');
+            const check = label.querySelector('.radio-check');
+            const icon = check?.querySelector('i');
+            check?.classList.remove('border-blue-600', 'bg-blue-600', 'border-green-600', 'bg-green-600');
+            check?.classList.add('border-gray-400');
+            icon?.classList.add('hidden');
         });
-        
-        let aplicaBonus = false;
-        if (hayResonancia && trabajaRemoto && pacienteInternado && fechaSolicitud && fechaInforme) {
-            const solicitud = new Date(fechaSolicitud);
-            const informe = new Date(fechaInforme);
-            const diffHoras = Math.abs(informe - solicitud) / (1000 * 60 * 60);
-            
-            if (diffHoras < 24) {
-                aplicaBonus = true;
-                subtotal += subtotal * 0.20;
-            }
+
+        if (radioCober.checked) {
+            labelCober.classList.remove('border-gray-300');
+            labelCober.classList.add('border-blue-600', 'bg-blue-50');
+            const check = labelCober.querySelector('.radio-check');
+            const icon = check?.querySelector('i');
+            check?.classList.remove('border-gray-400');
+            check?.classList.add('border-blue-600', 'bg-blue-600');
+            icon?.classList.remove('hidden');
         }
-        
-        document.getElementById('monto-preview').textContent = '$' + subtotal.toFixed(2);
-        
-        let desglose = '';
-        if (!esStaff && horario === 'INTRA') {
-            desglose = '50% horario INTRA';
+
+        if (radioOtras.checked) {
+            labelOtras.classList.remove('border-gray-300');
+            labelOtras.classList.add('border-green-600', 'bg-green-50');
+            const check = labelOtras.querySelector('.radio-check');
+            const icon = check?.querySelector('i');
+            check?.classList.remove('border-gray-400');
+            check?.classList.add('border-green-600', 'bg-green-600');
+            icon?.classList.remove('hidden');
         }
-        if (aplicaBonus) {
-            desglose += (desglose ? ' + ' : '') + '20% bonus urgencia';
-        }
-        document.getElementById('monto-desglose').textContent = desglose;
     }
 
-    // Event listeners
-    document.querySelectorAll('input[name="tipo_obra_social"]').forEach(radio => {
-        radio.addEventListener('change', calcularMontoTiempoReal);
+    document.querySelectorAll('input[name="tipo_obra_social"]').forEach((radio) => {
+        radio.addEventListener('change', actualizarEstilosRadioOS);
     });
 
     const pacienteInternadoCheckbox = document.getElementById('id_paciente_internado');
     if (pacienteInternadoCheckbox) {
         pacienteInternadoCheckbox.addEventListener('change', function() {
             const fechasSection = document.getElementById('fechas-urgencia-section');
+            const fechaSolicitud = document.getElementById('id_fecha_hora_solicitud');
+            const fechaInforme = document.getElementById('id_fecha_hora_informe');
             if (this.checked) {
                 fechasSection.style.display = 'grid';
+                if (fechaSolicitud) {
+                    fechaSolicitud.setAttribute('required', 'required');
+                }
+                if (fechaInforme) {
+                    fechaInforme.setAttribute('required', 'required');
+                }
             } else {
                 fechasSection.style.display = 'none';
+                if (fechaSolicitud) {
+                    fechaSolicitud.removeAttribute('required');
+                }
+                if (fechaInforme) {
+                    fechaInforme.removeAttribute('required');
+                }
             }
-            calcularMontoTiempoReal();
         });
     }
-
-    ['id_fecha_hora_solicitud', 'id_fecha_hora_informe'].forEach(id => {
-        const input = document.getElementById(id);
-        if (input) {
-            input.addEventListener('change', calcularMontoTiempoReal);
-        }
-    });
 
     // Cerrar dropdowns al hacer click fuera
     document.addEventListener('click', function(e) {
@@ -741,33 +911,75 @@ document.addEventListener('DOMContentLoaded', function() {
             tipoEstudioDropdown.classList.add('hidden');
             tipoEstudioIcon.classList.remove('rotate-180');
         }
+        if (
+            submodalidadEcoButton && submodalidadEcoDropdown
+            && !submodalidadEcoButton.contains(e.target)
+            && !submodalidadEcoDropdown.contains(e.target)
+        ) {
+            submodalidadEcoDropdown.classList.add('hidden');
+            submodalidadEcoIcon.classList.remove('rotate-180');
+        }
         if (!estudioSearch.contains(e.target) && !estudioDropdown.contains(e.target)) {
             estudioDropdown.classList.add('hidden');
         }
     });
 
     // === INICIALIZACIÓN ===
-    if (tipoEstudioSeleccionado) {
-        tipoEstudioSelect.value = tipoEstudioSeleccionado;
-        const textos = {
-            'ECO': 'Ecografía',
-            'RAD': 'Radiografía',
-            'TOM': 'Tomografía',
-            'RES': 'Resonancia Magnética',
-            'DOP': 'Doppler',
-            'MAM': 'Mamografía',
-            'ECOCAR': 'Ecocardiograma'
-        };
-        tipoEstudioText.textContent = textos[tipoEstudioSeleccionado] || 'Seleccione';
-        cargarEstudios(tipoEstudioSeleccionado);
+    const textosTipoEstudio = {
+        'ECO': 'Ecografía',
+        'RAD': 'Radiografía',
+        'TOM': 'Tomografía',
+        'RES': 'Resonancia Magnética',
+        'MAM': 'Mamografía'
+    };
+
+    if (submodalidadEcoSelect) {
+        submodalidadEcoSelect.addEventListener('change', function() {
+            actualizarTextoSubmodalidad();
+            if (modalidadPrincipalSeleccionada === 'ECO') {
+                aplicarFiltroModalidad(true);
+            }
+        });
+    }
+
+    let tipoInicial = tipoEstudioSeleccionado;
+    if (!tipoInicial && estudiosSeleccionadosIds.length > 0) {
+        const primerEstudioSeleccionado = estudios.find(e => e.id == estudiosSeleccionadosIds[0]);
+        if (primerEstudioSeleccionado) {
+            tipoInicial = primerEstudioSeleccionado.tipo;
+        }
+    }
+
+    if (tipoInicial === 'ECO' || tipoInicial === 'DOP' || tipoInicial === 'ECOCAR') {
+        modalidadPrincipalSeleccionada = 'ECO';
+        tipoEstudioText.textContent = 'Ecografía';
+        if (submodalidadEcoSelect) {
+            if (tipoInicial === 'ECO') {
+                submodalidadEcoSelect.value = 'ECO_GENERAL';
+            } else if (tipoInicial === 'DOP') {
+                submodalidadEcoSelect.value = 'DOP_NO_CARDIO';
+            } else {
+                submodalidadEcoSelect.value = esCardiologo ? 'DOP_CARDIO' : 'DOP_NO_CARDIO';
+            }
+            actualizarTextoSubmodalidad();
+        }
+        aplicarFiltroModalidad(false);
+    } else if (tipoInicial) {
+        modalidadPrincipalSeleccionada = tipoInicial;
+        tipoEstudioText.textContent = textosTipoEstudio[tipoInicial] || 'Seleccione';
+        aplicarFiltroModalidad(false);
+    } else {
+        modalidadPrincipalSeleccionada = '';
+        renderizarEstudiosSeleccionados();
     }
     
     actualizarVisibilidadSecciones();
-    calcularMontoTiempoReal();
     
     // === ENVIAR CANTIDADES AL BACKEND ===
     const form = document.getElementById('form-edicion');
     form.addEventListener('submit', function(e) {
+        tipoEstudioSelect.value = obtenerTipoBackendSeleccionado();
+
         // Limpiar container de cantidades
         const container = document.getElementById('cantidades-estudios-container');
         container.innerHTML = '';
