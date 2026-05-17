@@ -21,6 +21,26 @@ def _has_group(user, group_name):
     return user.groups.filter(name=group_name).exists()
 
 
+def _usuario_en_rollout_navbar(user):
+    """
+    Rollout personal de navbar híbrido para superusuarios.
+    Configuración opcional en settings:
+    NAVBAR_HIBRIDO_USUARIOS = ['username', 'email@dominio.com', '123']
+    """
+    configurados = getattr(settings, 'NAVBAR_HIBRIDO_USUARIOS', [])
+    if isinstance(configurados, str):
+        configurados = [valor.strip() for valor in configurados.split(',') if valor.strip()]
+
+    if not configurados:
+        return False
+
+    claves = {str(valor).strip().lower() for valor in configurados}
+    username = (getattr(user, 'username', '') or '').strip().lower()
+    email = (getattr(user, 'email', '') or '').strip().lower()
+    user_id = str(getattr(user, 'id', '')).strip().lower()
+    return username in claves or email in claves or user_id in claves
+
+
 def _is_active(request, ns=None, url_names=None, exclude_url_names=None):
     match = request.resolver_match
     if not match:
@@ -134,6 +154,26 @@ def navbar_links(request):
         return item('Consultorios', 'fa-door-open',
                     'consultorios:dashboard', active_ns='consultorios')
 
+    def i_liquidacion_portal():
+        return item('Portal Liquidación', 'fa-money-check-dollar',
+                    'liquidacion:portal_inicio', active_ns='liquidacion')
+
+    def i_liquidacion_registro():
+        return item('Registrar Estudios', 'fa-notes-medical',
+                    'liquidacion:registroestudios_nuevo', active_ns='liquidacion')
+
+    def i_liquidacion_registros():
+        return item('Mis Registros', 'fa-list-check',
+                    'liquidacion:registroestudios_list', active_ns='liquidacion')
+
+    def i_liquidacion_guardias():
+        return item('Guardia Pasiva', 'fa-shield-heart',
+                    'liquidacion:registrar_guardia_pasiva', active_ns='liquidacion')
+
+    def i_liquidacion_mensual():
+        return item('Liquidación Mensual', 'fa-chart-line',
+                    'liquidacion:liquidacion_mensual', active_ns='liquidacion')
+
     groups = []
 
     # ── SUPERUSUARIO ──────────────────────────────────────────────────────────
@@ -164,10 +204,28 @@ def navbar_links(request):
                      'control_guardias:index', active_ns='control_guardias'),
             ),
             group('Gestión', 'fa-cogs',
+                i_liquidacion_portal(),
+                i_liquidacion_registro(),
+                i_liquidacion_registros(),
+                i_liquidacion_guardias(),
+                i_liquidacion_mensual(),
                 i_pedidos(),
                 i_consultorios(),
             ),
         ] if g]
+
+        if _usuario_en_rollout_navbar(user):
+              grupo_operativo = group('Operativo', 'fa-briefcase-medical',
+                item('Inicio', 'fa-house', 'home', active_url_names=['home']),
+                item('Registrar Estudios', 'fa-notes-medical',
+                     'liquidacion:registroestudios_nuevo', active_ns='liquidacion'),
+                item('Mis Registros', 'fa-list-check',
+                     'liquidacion:registroestudios_list', active_ns='liquidacion'),
+                item('Guardia Pasiva', 'fa-shield-heart',
+                     'liquidacion:registrar_guardia_pasiva', active_ns='liquidacion'),
+              )
+              if grupo_operativo:
+                 groups.append(grupo_operativo)
 
     # ── MÉDICO RESIDENTE ───────────────────────────────────────────────────────
     elif user.rol == 'medico_residente':
@@ -237,6 +295,11 @@ def navbar_links(request):
                 i_revision(),
             ),
             group('Gestión', 'fa-cogs',
+                i_liquidacion_portal(),
+                i_liquidacion_registro(),
+                i_liquidacion_registros(),
+                i_liquidacion_guardias(),
+                i_liquidacion_mensual(),
                 i_pedidos(),
                 i_consultorios(),
             ),

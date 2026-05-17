@@ -19,7 +19,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable
+from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable, ConfiguracionGuardiaPasiva
 from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
@@ -47,6 +47,18 @@ class PortalLiquidacionInicioView(TemplateView):
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 
+
+def _puede_acceder_panel_medico(user):
+    return user.is_superuser or user.es_medico()
+
+
+def _puede_acceder_guardia_pasiva(user):
+    return user.is_superuser or user.es_medico() or user.rol == 'administrativo'
+
+
+def _puede_editar_monto_guardia(user):
+    return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
+
 class EstudiosCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = Estudios
     fields = ['nombre', 'tipo', 'conteo_regiones']
@@ -73,7 +85,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
 
     def dispatch(self, request, *args, **kwargs):
         # Validar que sea médico (por rol, no por grupo)
-        if not request.user.es_medico():
+        if not _puede_acceder_panel_medico(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
@@ -112,7 +124,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os',
             'precio_unico', 'conteo_regiones_default', 'tiene_contexto_ubicacion'
         ):
-            if user.rol != 'cardiologo' and es_estudio_cardiologico(
+            if (not user.is_superuser) and user.rol != 'cardiologo' and es_estudio_cardiologico(
                 estudio['tipo'],
                 estudio['nombre'],
                 estudio['codigo'],
@@ -160,7 +172,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         # Información del médico
         context['es_staff'] = user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
-        context['es_cardiologo'] = user.rol == 'cardiologo'
+        context['es_cardiologo'] = user.is_superuser or user.rol == 'cardiologo'
         context['trabaja_remoto'] = user.trabaja_remoto
 
         return context
@@ -193,7 +205,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         estudios_seleccionados = form.cleaned_data['estudio']
 
         # Regla de acceso: solo cardiólogos pueden registrar estudios cardiológicos
-        if user.rol != 'cardiologo':
+        if (not user.is_superuser) and user.rol != 'cardiologo':
             estudios_bloqueados = [
                 est.nombre for est in estudios_seleccionados
                 if es_estudio_cardiologico(est.tipo, est.nombre, est.codigo)
@@ -351,7 +363,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
 
 class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     """
-    Vista para registrar guardias pasivas ($36.500 por día)
+    Vista para registrar guardias pasivas con valor tomado desde configuración vigente.
     Solo disponible para médicos
     """
     model = GuardiaPasiva
@@ -361,11 +373,16 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
     success_message = "✅ Guardia pasiva registrada exitosamente"
 
     def dispatch(self, request, *args, **kwargs):
-        # Solo médicos pueden registrar guardias
-        if not request.user.es_medico():
+        # Médicos y administración pueden registrar guardias
+        if not _puede_acceder_guardia_pasiva(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -394,6 +411,7 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
         guardias_mes_actual = guardias.filter(sesion_contable=sesion)
         context['total_guardias_mes'] = guardias_mes_actual.count()
         context['total_monto_guardias_mes'] = sum(g.monto for g in guardias_mes_actual)
+        context['monto_guardia_vigente'] = ConfiguracionGuardiaPasiva.get_config().monto_vigente
 
         return context
 
@@ -424,7 +442,7 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
             )
             return redirect(self.success_url)
         
-        # Asignar médico
+        # Asignar médico y tomar el monto vigente desde la configuración
         form.instance.medico = user
         
         response = super().form_valid(form)
@@ -434,7 +452,6 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
             self.request,
             f"✅ Guardia pasiva registrada | "
             f"Fecha: {fecha_guardia.strftime('%d/%m/%Y')} | "
-            f"Tipo: {form.instance.get_tipo_guardia_display()} | "
             f"Monto: ${form.instance.monto}"
         )
         
@@ -453,15 +470,22 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
     success_message = "✅ Guardia pasiva actualizada correctamente"
 
     def dispatch(self, request, *args, **kwargs):
-        # Solo médicos pueden editar guardias
-        if not request.user.es_medico():
+        # Médicos y administración pueden editar guardias
+        if not _puede_acceder_guardia_pasiva(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        # Solo puede editar sus propias guardias
+        # Administración y superusuarios ven todas; el resto solo las propias
+        if _puede_editar_monto_guardia(self.request.user):
+            return GuardiaPasiva.objects.all()
         return GuardiaPasiva.objects.filter(medico=self.request.user)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -470,6 +494,7 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         # Sesión contable de la guardia
         context['sesion_contable'] = guardia.sesion_contable
         context['puede_editar'] = guardia.sesion_contable.puede_registrar_practicas(self.request.user)
+        context['monto_guardia_vigente'] = ConfiguracionGuardiaPasiva.get_config().monto_vigente
         
         return context
 
@@ -512,14 +537,16 @@ class GuardiaPasivaDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy('liquidacion:registrar_guardia_pasiva')
 
     def dispatch(self, request, *args, **kwargs):
-        # Solo médicos pueden eliminar guardias
-        if not request.user.es_medico():
+        # Médicos y administración pueden eliminar guardias
+        if not _puede_acceder_guardia_pasiva(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
-        # Solo puede eliminar sus propias guardias
+        # Administración y superusuarios ven todas; el resto solo las propias
+        if _puede_editar_monto_guardia(self.request.user):
+            return GuardiaPasiva.objects.all()
         return GuardiaPasiva.objects.filter(medico=self.request.user)
 
     def get_context_data(self, **kwargs):
@@ -548,14 +575,13 @@ class GuardiaPasivaDeleteView(LoginRequiredMixin, DeleteView):
         
         # Guardar datos para el mensaje antes de eliminar
         fecha = guardia.fecha_guardia.strftime('%d/%m/%Y')
-        tipo = guardia.get_tipo_guardia_display()
         monto = guardia.monto
         
         response = super().delete(request, *args, **kwargs)
         
         messages.success(
             request,
-            f"🗑️ Guardia eliminada | Fecha: {fecha} | Tipo: {tipo} | Monto: ${monto}"
+            f"🗑️ Guardia eliminada | Fecha: {fecha} | Monto: ${monto}"
         )
         
         return response
@@ -803,7 +829,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     template_name = 'liquidacion/registroestudios_update_tailwind_v2.html'
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.es_medico():
+        if not _puede_acceder_panel_medico(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)
@@ -829,7 +855,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             'id', 'nombre', 'tipo', 'codigo', 'precio_cober', 'precio_otras_os',
             'precio_unico', 'conteo_regiones_default', 'tiene_contexto_ubicacion'
         ):
-            if user.rol != 'cardiologo' and es_estudio_cardiologico(
+            if (not user.is_superuser) and user.rol != 'cardiologo' and es_estudio_cardiologico(
                 estudio['tipo'],
                 estudio['nombre'],
                 estudio['codigo'],
@@ -877,7 +903,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # Información del médico para lógica condicional
         context['trabaja_remoto'] = self.request.user.trabaja_remoto
         context['es_staff'] = self.request.user.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']
-        context['es_cardiologo'] = self.request.user.rol == 'cardiologo'
+        context['es_cardiologo'] = self.request.user.is_superuser or self.request.user.rol == 'cardiologo'
         context['requiere_motivo_modificacion'] = bool(
             sesion and sesion.estado in ['CERRADA', 'FACTURADA']
         )
@@ -900,7 +926,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             return redirect(self.get_success_url())
 
         estudios_seleccionados = form.cleaned_data['estudio']
-        if user.rol != 'cardiologo':
+        if (not user.is_superuser) and user.rol != 'cardiologo':
             estudios_bloqueados = [
                 est.nombre for est in estudios_seleccionados
                 if es_estudio_cardiologico(est.tipo, est.nombre, est.codigo)
@@ -1049,7 +1075,7 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'liquidacion/registroestudios_confirm_delete_tailwind.html'
 
     def dispatch(self, request, *args, **kwargs):
-        if not request.user.es_medico():
+        if not _puede_acceder_panel_medico(request.user):
             messages.warning(request, "No tienes permiso para acceder a esta sección.")
             return redirect('home')
         return super().dispatch(request, *args, **kwargs)

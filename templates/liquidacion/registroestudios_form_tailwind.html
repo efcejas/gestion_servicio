@@ -429,17 +429,6 @@
                                                         <span class="inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-sm font-bold whitespace-nowrap">
                                                             <i class="fas fa-dollar-sign mr-1"></i>{{ registro.monto_calculado|floatformat:2 }}
                                                         </span>
-                                                        <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}"
-                                                           class="inline-flex items-center justify-center w-9 h-9 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
-                                                           title="Editar registro">
-                                                            <i class="fas fa-edit text-sm"></i>
-                                                        </a>
-                                                        <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}"
-                                                           class="inline-flex items-center justify-center w-9 h-9 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
-                                                           title="Eliminar registro"
-                                                           onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
-                                                            <i class="fas fa-trash-alt text-sm"></i>
-                                                        </a>
                                                     </div>
                                                 </div>
 
@@ -461,42 +450,60 @@
                                             </div>
                                         </div>
 
-                                        <details class="rounded-lg border border-teal-200 bg-white/70">
-                                            <summary class="cursor-pointer list-none px-3 py-2 text-sm font-medium text-teal-800 flex items-center justify-between">
-                                                <span><i class="fas fa-calculator mr-2"></i>Ver detalle del monto</span>
-                                                <i class="fas fa-chevron-down text-xs"></i>
-                                            </summary>
-                                            <div class="px-3 pb-3 pt-1 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-700 border-t border-teal-100">
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">Valor base:</span>
-                                                    {{ registro.detalle_monto.precio_total|floatformat:2 }}
+                                        <div class="flex items-center gap-2">
+                                            <details class="flex-1 rounded-lg border border-teal-200 bg-white/70">
+                                                <summary class="cursor-pointer list-none px-3 py-2 text-sm font-medium text-teal-800 flex items-center justify-between">
+                                                    <span><i class="fas fa-calculator mr-2"></i>Ver detalle del monto</span>
+                                                    <i class="fas fa-chevron-down text-xs"></i>
+                                                </summary>
+                                                <div class="px-3 pb-3 pt-1 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-700 border-t border-teal-100">
+                                                    <div>
+                                                        {% if registro.detalle_monto.mostrar_formula_base %}
+                                                        <span class="font-semibold text-gray-800">Cálculo valor base:</span>
+                                                        {{ registro.detalle_monto.valor_base_unitario|floatformat:2 }} × {{ registro.detalle_monto.regiones }} = {{ registro.detalle_monto.precio_total|floatformat:2 }}
+                                                        {% else %}
+                                                        <span class="font-semibold text-gray-800">Valor base:</span>
+                                                        {{ registro.detalle_monto.precio_total|floatformat:2 }}
+                                                        {% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">OS:</span>
+                                                        {{ registro.detalle_monto.tipo_os }}
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Horario aplicado:</span>
+                                                        {{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Monto final guardado:</span>
+                                                        {{ registro.detalle_monto.monto_final|floatformat:2 }}
+                                                    </div>
+                                                    {% if registro.detalle_monto.bonus_urgencia %}
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Bonus urgencia:</span>
+                                                        {{ registro.detalle_monto.bonus_urgencia }}
+                                                    </div>
+                                                    {% endif %}
+                                                    {% if registro.detalle_monto.tiempo_respuesta %}
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Tiempo respuesta:</span>
+                                                        {{ registro.detalle_monto.tiempo_respuesta }}
+                                                    </div>
+                                                    {% endif %}
                                                 </div>
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">OS:</span>
-                                                    {{ registro.detalle_monto.tipo_os }}
-                                                </div>
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">Horario aplicado:</span>
-                                                    {{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})
-                                                </div>
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">Monto final guardado:</span>
-                                                    {{ registro.detalle_monto.monto_final|floatformat:2 }}
-                                                </div>
-                                                {% if registro.detalle_monto.bonus_urgencia %}
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">Bonus urgencia:</span>
-                                                    {{ registro.detalle_monto.bonus_urgencia }}
-                                                </div>
-                                                {% endif %}
-                                                {% if registro.detalle_monto.tiempo_respuesta %}
-                                                <div>
-                                                    <span class="font-semibold text-gray-800">Tiempo respuesta:</span>
-                                                    {{ registro.detalle_monto.tiempo_respuesta }}
-                                                </div>
-                                                {% endif %}
-                                            </div>
-                                        </details>
+                                            </details>
+                                            <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}"
+                                               class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm"
+                                               title="Editar registro">
+                                                <i class="fas fa-edit text-xs"></i>
+                                            </a>
+                                            <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}"
+                                               class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                                               title="Eliminar registro"
+                                               onclick="return confirm('¿Estás seguro de que deseas eliminar este registro?');">
+                                                <i class="fas fa-trash-alt text-xs"></i>
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
                                 {% endfor %}

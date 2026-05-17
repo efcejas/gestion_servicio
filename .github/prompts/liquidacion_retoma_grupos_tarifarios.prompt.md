@@ -61,7 +61,7 @@ Estos estudios aparecen en la matriz real pero **no tienen grupo tarifario propi
 | ARTRO RMN | $36.600 | $42.500 |
 | RMN Difusión | $8.800 | $8.800 |
 | RMN Mama (informe) | — | — |
-| Guardia Pasiva (valor día) | $40.200 | — |
+| Guardia Pasiva (valor día) | Valor vigente administrado por backend | Con historial |
 
 ---
 

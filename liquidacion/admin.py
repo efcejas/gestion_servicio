@@ -4,6 +4,8 @@ from .models import (
     Estudios,
     GrupoTarifario,
     GuardiaPasiva,
+    ConfiguracionGuardiaPasiva,
+    HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
     RegistroEstudiosPorMedico,
     SesionContable,
@@ -274,7 +276,7 @@ class GuardiaPasivaAdmin(admin.ModelAdmin):
     )
     list_filter = ('tipo_guardia', 'sesion_contable__año', 'sesion_contable__mes')
     search_fields = ('medico__first_name', 'medico__last_name', 'observaciones')
-    readonly_fields = ('sesion_contable', 'fecha_registro')
+    readonly_fields = ('sesion_contable', 'fecha_registro', 'monto')
     date_hierarchy = 'fecha_guardia'
     ordering = ('-fecha_guardia',)
     
@@ -291,6 +293,67 @@ class GuardiaPasivaAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+class HistorialConfiguracionGuardiaPasivaInline(admin.TabularInline):
+    model = HistorialConfiguracionGuardiaPasiva
+    extra = 0
+    can_delete = False
+    fields = (
+        'fecha_cambio',
+        'monto_anterior',
+        'monto_nuevo',
+        'vigente_desde_anterior',
+        'vigente_desde_nueva',
+        'motivo_actualizacion',
+        'actualizado_por',
+    )
+    readonly_fields = fields
+    ordering = ('-fecha_cambio',)
+
+
+@admin.register(ConfiguracionGuardiaPasiva)
+class ConfiguracionGuardiaPasivaAdmin(admin.ModelAdmin):
+    list_display = ('monto_vigente', 'vigente_desde', 'actualizado_por', 'fecha_actualizacion')
+    search_fields = ('motivo_actualizacion',)
+    readonly_fields = ('fecha_actualizacion',)
+    inlines = [HistorialConfiguracionGuardiaPasivaInline]
+
+    def has_add_permission(self, request):
+        return not ConfiguracionGuardiaPasiva.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistorialConfiguracionGuardiaPasiva)
+class HistorialConfiguracionGuardiaPasivaAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha_cambio',
+        'monto_anterior',
+        'monto_nuevo',
+        'vigente_desde_anterior',
+        'vigente_desde_nueva',
+        'actualizado_por',
+    )
+    list_filter = ('fecha_cambio', 'actualizado_por')
+    readonly_fields = (
+        'configuracion',
+        'monto_anterior',
+        'monto_nuevo',
+        'vigente_desde_anterior',
+        'vigente_desde_nueva',
+        'motivo_actualizacion',
+        'actualizado_por',
+        'fecha_cambio',
+    )
+    date_hierarchy = 'fecha_cambio'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 # ============================================================================

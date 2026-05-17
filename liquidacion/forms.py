@@ -123,7 +123,7 @@ class PracticaForm(forms.ModelForm):
 
         # Cargar estudios activos filtrados por rol
         estudios_qs = Estudios.objects.filter(activo=True).order_by('tipo', 'nombre')
-        if self.user and self.user.rol != 'cardiologo':
+        if self.user and not self.user.is_superuser and self.user.rol != 'cardiologo':
             estudios_permitidos_ids = [
                 est.id
                 for est in estudios_qs
@@ -190,27 +190,18 @@ class PracticaForm(forms.ModelForm):
 
 class GuardiaPasivaForm(forms.ModelForm):
     """
-    Formulario para registro de guardias pasivas ($36.500 por día)
+    Formulario para registro de guardias pasivas.
     """
     class Meta:
         model = GuardiaPasiva
         fields = [
             'fecha_guardia',
-            'tipo_guardia',
-            'monto',
             'observaciones',
         ]
         widgets = {
             'fecha_guardia': forms.DateInput(attrs={
                 'type': 'date',
                 'class': TAILWIND_INPUT_CLASSES,
-            }),
-            'tipo_guardia': forms.RadioSelect(attrs={
-                'class': TAILWIND_RADIO_CLASSES,
-            }),
-            'monto': forms.NumberInput(attrs={
-                'class': TAILWIND_INPUT_CLASSES,
-                'step': '0.01',
             }),
             'observaciones': forms.Textarea(attrs={
                 'class': TAILWIND_INPUT_CLASSES,
@@ -220,16 +211,12 @@ class GuardiaPasivaForm(forms.ModelForm):
         }
         labels = {
             'fecha_guardia': 'Fecha de la Guardia',
-            'tipo_guardia': 'Tipo de Guardia',
-            'monto': 'Monto',
             'observaciones': 'Observaciones',
         }
 
     def __init__(self, *args, **kwargs):
+        kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        # Valor por defecto: $36.500
-        if not self.instance.pk and not self.initial.get('monto'):
-            self.fields['monto'].initial = Decimal('36500.00')
 
 
 # ============================================================================

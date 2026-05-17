@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -417,11 +418,117 @@ class SesionContable(models.Model):
         return False
 
 
+class ConfiguracionGuardiaPasiva(models.Model):
+    """Configuración vigente del valor de la guardia pasiva."""
+
+    monto_vigente = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name='Monto vigente',
+        help_text='Valor actual definido por administración para nuevas guardias.',
+    )
+    vigente_desde = models.DateField(
+        verbose_name='Vigente desde',
+        help_text='Fecha desde la cual rige este valor.',
+    )
+    motivo_actualizacion = models.TextField(
+        blank=True,
+        verbose_name='Motivo de actualización',
+        help_text='Detalle del cambio para trazabilidad.',
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='configuraciones_guardia_pasiva_actualizadas',
+        verbose_name='Actualizado por',
+    )
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Configuración de Guardia Pasiva'
+        verbose_name_plural = 'Configuración de Guardia Pasiva'
+        ordering = ['-fecha_actualizacion']
+
+    def __str__(self):
+        return f'Guardia pasiva: {self.monto_vigente} desde {self.vigente_desde}'
+
+    def clean(self):
+        if self.monto_vigente is not None and self.monto_vigente < 0:
+            raise ValidationError('El monto vigente no puede ser negativo.')
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            anterior = ConfiguracionGuardiaPasiva.objects.filter(pk=self.pk).first()
+            if anterior and (
+                anterior.monto_vigente != self.monto_vigente
+                or anterior.vigente_desde != self.vigente_desde
+                or anterior.motivo_actualizacion != self.motivo_actualizacion
+            ):
+                HistorialConfiguracionGuardiaPasiva.objects.create(
+                    configuracion=self,
+                    monto_anterior=anterior.monto_vigente,
+                    monto_nuevo=self.monto_vigente,
+                    vigente_desde_anterior=anterior.vigente_desde,
+                    vigente_desde_nueva=self.vigente_desde,
+                    motivo_actualizacion=self.motivo_actualizacion,
+                    actualizado_por=self.actualizado_por,
+                )
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get_config(cls):
+        """Retorna la configuración vigente, creando una por defecto si no existe."""
+        config = cls.objects.first()
+        if config:
+            return config
+
+        return cls.objects.create(
+            monto_vigente=Decimal('36500.00'),
+            vigente_desde=timezone.now().date(),
+            motivo_actualizacion='Valor inicial por defecto',
+        )
+
+
+class HistorialConfiguracionGuardiaPasiva(models.Model):
+    """Historial de cambios del valor de guardia pasiva."""
+
+    configuracion = models.ForeignKey(
+        ConfiguracionGuardiaPasiva,
+        on_delete=models.CASCADE,
+        related_name='historial_cambios',
+        verbose_name='Configuración',
+    )
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto anterior')
+    monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto nuevo')
+    vigente_desde_anterior = models.DateField(verbose_name='Vigente desde anterior')
+    vigente_desde_nueva = models.DateField(verbose_name='Vigente desde nueva')
+    motivo_actualizacion = models.TextField(blank=True, verbose_name='Motivo de actualización')
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_configuraciones_guardia_pasiva',
+        verbose_name='Actualizado por',
+    )
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Historial de configuración de Guardia Pasiva'
+        verbose_name_plural = 'Historial de configuración de Guardia Pasiva'
+        ordering = ['-fecha_cambio']
+
+    def __str__(self):
+        return f'{self.configuracion_id} - {self.monto_anterior} -> {self.monto_nuevo}'
+
+
 class GuardiaPasiva(models.Model):
     """
     Registro de guardias pasivas
     Se registra por DÍA completo, no por práctica individual
-    Valor fijo por día (ej: $36.500)
+    El monto se fija al crear el registro desde la configuración vigente.
     """
     sesion_contable = models.ForeignKey(
         'SesionContable',
@@ -455,7 +562,7 @@ class GuardiaPasiva(models.Model):
         decimal_places=2,
         default=Decimal('36500.00'),
         verbose_name='Monto por Día',
-        help_text='Valor fijo de la guardia pasiva'
+        help_text='Valor histórico guardado por guardia; se fija desde la configuración vigente.'
     )
     
     observaciones = models.TextField(blank=True)
@@ -483,6 +590,9 @@ class GuardiaPasiva(models.Model):
                 defaults={'estado': 'ABIERTA'}
             )
             self.sesion_contable = sesion
+
+        if not self.pk:
+            self.monto = ConfiguracionGuardiaPasiva.get_config().monto_vigente
         
         super().save(*args, **kwargs)
 
@@ -792,6 +902,13 @@ class RegistroEstudiosPorMedico(models.Model):
             'porcentaje': f"{int(porcentaje * 100)}%",
             'monto_final': self.monto_calculado,
         }
+
+        # Exponer ecuacion base desde backend para UI (ej: 6500 x 2 = 13000)
+        regiones = self.cantidad_regiones or 0
+        if regiones > 0:
+            valor_base_unitario = precio_total / Decimal(str(regiones))
+            desglose['valor_base_unitario'] = valor_base_unitario
+            desglose['mostrar_formula_base'] = regiones > 1
         
         # Agregar info de urgencia si aplica
         if bonus_urgencia > 0:

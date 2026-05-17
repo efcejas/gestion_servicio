@@ -9,6 +9,8 @@ from .models import (
     DiaSinPacientes,
     Estudios,
     GrupoTarifario,
+    GuardiaPasiva,
+    ConfiguracionGuardiaPasiva,
     RegistroEstudiosPorMedico,
     TarifaGrupoTarifario,
 )
@@ -206,6 +208,48 @@ class DiaSinPacientesModelTest(TestCase):
                 medico=self.user,
                 fecha=date.today()  # Misma fecha para el mismo médico
             )
+
+
+class GuardiaPasivaConfiguracionTest(TestCase):
+    """Pruebas para la configuración y registro de guardias pasivas."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='drguardias',
+            password='testpass123',
+            first_name='Guardia',
+            last_name='Test'
+        )
+
+    def test_guardia_pasiva_toma_monto_vigente_desde_backend(self):
+        ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('41000.00'),
+            vigente_desde=date.today(),
+            motivo_actualizacion='Ajuste de prueba',
+        )
+
+        guardia = GuardiaPasiva.objects.create(
+            medico=self.user,
+            fecha_guardia=date.today(),
+        )
+
+        self.assertEqual(guardia.monto, Decimal('41000.00'))
+
+    def test_configuracion_guardia_pasiva_genera_historial_al_cambiar_monto(self):
+        config = ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('36500.00'),
+            vigente_desde=date.today(),
+            motivo_actualizacion='Valor inicial',
+        )
+
+        config.monto_vigente = Decimal('42000.00')
+        config.motivo_actualizacion = 'Aumento por actualización arancelaria'
+        config.save()
+
+        historial = config.historial_cambios.first()
+        self.assertIsNotNone(historial)
+        self.assertEqual(historial.monto_anterior, Decimal('36500.00'))
+        self.assertEqual(historial.monto_nuevo, Decimal('42000.00'))
 
 
 # [ANULADO - 16 de febrero 2026]

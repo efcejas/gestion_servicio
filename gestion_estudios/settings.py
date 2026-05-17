@@ -58,6 +58,11 @@ PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 # Temporalmente queda deshabilitado por defecto hasta retomar el desarrollo.
 PEDIDOS_ESTUDIOS_HABILITADO = config('PEDIDOS_ESTUDIOS_HABILITADO', default=False, cast=bool)
 
+# Rollout personal: superusuarios que verán un grupo Operativo extra en el navbar
+NAVBAR_HIBRIDO_USUARIOS = [
+    valor.strip() for valor in config('NAVBAR_HIBRIDO_USUARIOS', default='').split(',') if valor.strip()
+]
+
 CORREO_RESUMEN_CONFIG = {
     'ENABLED': config('CORREO_RESUMEN_ENABLED', default=False, cast=bool),
     'PROVIDER': config('CORREO_RESUMEN_PROVIDER', default='imap'),

@@ -701,7 +701,7 @@ class GuardiaPasiva(models.Model):
     """
     Registro de guardias pasivas
     Se registra por DÍA completo, no por práctica individual
-    Valor fijo por día (ej: $36.500)
+    El monto se fija desde la configuración vigente y queda guardado por registro.
     """
     sesion_contable = models.ForeignKey(
         'SesionContable',
@@ -720,7 +720,7 @@ class GuardiaPasiva(models.Model):
     )
     
     TIPO_GUARDIA_CHOICES = [
-        ('COBER', 'COBER - $36.500'),  # Precio ejemplo
+        ('COBER', 'COBER'),
         # Agregar más tipos si hay variaciones
     ]
     tipo_guardia = models.CharField(
@@ -735,7 +735,7 @@ class GuardiaPasiva(models.Model):
         decimal_places=2,
         default=36500.00,
         verbose_name='Monto por Día',
-        help_text='Valor fijo de la guardia pasiva'
+        help_text='Valor histórico de la guardia pasiva; se toma desde la configuración vigente al crear el registro'
     )
     
     observaciones = models.TextField(blank=True)
@@ -1332,7 +1332,7 @@ class Command(BaseCommand):
 | 12/11 | Ruiz P. | Doppler Cardíaco Lecho | COBER | EXTRA | 2 | $12.000 × 2 × 100% = $24.000 | - |
 | 15/11 | Díaz S. | TAC con contraste | OTRAS | INTRA | 1 | $5.000 × 1 × 50% = $2.500 | - |
 | 18/11 | Fernández L. | RMN Cardíaca | COBER | EXTRA | 1 | $66.550 × 1 × 100% × 1.20 = $79.860 | **+20% (Internado, <24hs)** |
-| 14/11 | (Guardia Pasiva - Sábado) | - | COBER | - | - | $36.500 (fijo por día) | - |
+| 14/11 | (Guardia Pasiva - Sábado) | - | COBER | - | - | Valor vigente administrado por backend | - |
 | ... | ... | ... | ... | ... | ... | ... | ... |
 
 **Totales calculados:**
@@ -1360,7 +1360,7 @@ total_a_cobrar = 412500
 
 # Guardias Pasivas (ejemplo: 4 días en el mes)
 guardias_pasivas = 4
-total_guardias = 4 * 36500  # $146.000
+total_guardias = 4 * valor_vigente_guardia_pasiva  # configurable por administración
 
 # TOTAL GENERAL
 total_general = total_a_cobrar + total_guardias  # $558.500
@@ -1389,7 +1389,7 @@ Bonus Urgencia (RM <24hs):
   Internados:    2 →  $ 26.620,00  (+20%)
 
 Guardias Pasivas:
-  4 días × $36.500 →  $146.000,00
+    4 días × valor vigente →  monto calculado por backend
 
 ════════════════════════════════════════════
 TOTAL A COBRAR:         $559.120,00
