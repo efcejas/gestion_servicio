@@ -60,6 +60,8 @@
                             <p class="text-white/90 text-lg">Como jefe de residentes, coordina la formación y accede a los recursos del servicio. ¡Gracias por tu liderazgo!</p>
                         {% elif user.rol == 'instructor_residentes' %}
                             <p class="text-white/90 text-lg">Guía la formación de los residentes con las herramientas del servicio. ¡Gracias por tu dedicación!</p>
+                        {% elif user.rol == 'cardiologo' %}
+                            <p class="text-white/90 text-lg">Accedé rápido a tus estudios, al resumen mensual y a las herramientas clínicas del servicio.</p>
                         {% else %}
                             <p class="text-white/90 text-lg">Gestiona tus estudios, procedimientos y accede a los protocolos del servicio. ¡Gracias por tu compromiso!</p>
                         {% endif %}
@@ -75,7 +77,94 @@
         <!-- ========== CARDS SEGÚN EL ROL DEL USUARIO ========== -->
         
         <!-- RESIDENTES (médico_residente, jefe_residentes, instructor_residentes) -->
-        {% if user.es_medico and user.rol != 'medico_staff' and user.rol != 'jefe_servicio' or user.is_superuser %}
+        {% if user.rol == 'cardiologo' %}
+        <div class="container mx-auto mt-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-stethoscope text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar estudio</h5>
+                    <p class="text-gray-600 mb-4">Cargá el estudio del día con el cálculo automático de liquidación.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_nuevo' %}"
+                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Registrar
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl mb-4">
+                        <i class="fas fa-list-check text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis registros</h5>
+                    <p class="text-gray-600 mb-4">Revisá lo cargado hoy y el historial reciente del mes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_list' %}"
+                           class="inline-flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">
+                            Ver registros
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Registros de hoy</p>
+                    <p class="text-3xl font-bold text-gray-900">{{ cardiologo_registros_hoy_count }}</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Registros del mes</p>
+                    <p class="text-3xl font-bold text-gray-900">{{ cardiologo_registros_mes_count }}</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Regiones del mes</p>
+                    <p class="text-3xl font-bold text-gray-900">{{ cardiologo_total_regiones_mes }}</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-5">
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Total estimado</p>
+                    <p class="text-3xl font-bold text-gray-900">${{ cardiologo_total_monto_mes|floatformat:0 }}</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">Últimos registros del mes</h3>
+                        <p class="text-sm text-gray-500">Vista rápida de tu carga reciente.</p>
+                    </div>
+                    <a href="{% url 'liquidacion:registroestudios_list' %}" class="text-sm font-medium text-blue-600 hover:text-blue-700">Ver todo</a>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-left text-gray-500 uppercase text-xs border-b border-gray-200">
+                            <tr>
+                                <th class="py-3 pr-4">Fecha</th>
+                                <th class="py-3 pr-4">Paciente</th>
+                                <th class="py-3 pr-4">Estudio</th>
+                                <th class="py-3 pr-4 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for registro in cardiologo_ultimos_registros %}
+                            <tr class="border-b border-gray-100 last:border-b-0">
+                                <td class="py-3 pr-4 text-gray-700 whitespace-nowrap">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                                <td class="py-3 pr-4 text-gray-800">{{ registro.apellido_paciente }}, {{ registro.nombre_paciente|default:"-" }}</td>
+                                <td class="py-3 pr-4 text-gray-600">{{ registro.estudio.first.nombre|default:"-" }}</td>
+                                <td class="py-3 pr-4 text-right font-semibold text-gray-900">${{ registro.monto_calculado|floatformat:0 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="py-6 text-center text-gray-500">Todavía no registraste estudios este mes.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% elif user.es_medico and user.rol != 'medico_staff' and user.rol != 'jefe_servicio' or user.is_superuser %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <!-- Clases -->

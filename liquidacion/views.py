@@ -21,6 +21,7 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable, ConfiguracionGuardiaPasiva
 from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
+from .permisos import puede_ver_desglose_administrativo
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -157,10 +158,16 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             ).prefetch_related('registroestudio_set__estudio').order_by('-fecha_registro')
         )
 
+        puede_admin = puede_ver_desglose_administrativo(user)
         for registro in registros:
-            registro.detalle_monto = registro.get_desglose_monto()
+            registro.detalle_monto = (
+                registro.get_desglose_monto_administrativo()
+                if puede_admin
+                else registro.get_desglose_monto_simple()
+            )
 
         context['registros'] = registros
+        context['puede_ver_desglose_admin'] = puede_admin
         
         # Calcular totales del mes
         total_regiones_mes = sum(reg.cantidad_regiones for reg in registros)
@@ -768,8 +775,14 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         ]
 
         # Adjuntar desglose calculado por backend para mostrar en la tabla
+        puede_admin = puede_ver_desglose_administrativo(self.request.user)
         for registro in registros_tabla:
-            registro.detalle_monto = registro.get_desglose_monto()
+            registro.detalle_monto = (
+                registro.get_desglose_monto_administrativo()
+                if puede_admin
+                else registro.get_desglose_monto_simple()
+            )
+        context['puede_ver_desglose_admin'] = puede_admin
 
         # Agregar contexto para los controles
         context['orden'] = orden
@@ -907,6 +920,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         context['requiere_motivo_modificacion'] = bool(
             sesion and sesion.estado in ['CERRADA', 'FACTURADA']
         )
+        context['puede_ver_desglose_admin'] = puede_ver_desglose_administrativo(self.request.user)
 
         # URL del botón cancelar: vuelve a la lista con mes/año filtrados
         fecha = registro.fecha_del_informe

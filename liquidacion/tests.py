@@ -505,9 +505,10 @@ class CalculoMontosTest(TestCase):
             f"❌ FALLA: Residente INTRA con OTRAS OS debería cobrar $5.000 (50% de $10.000), pero cobra ${monto_calculado}"
         )
     
-    def test_jefe_residentes_horario_intra_descuento_50_porciento(self):
+    def test_jefe_residentes_dop_intra_sin_descuento(self):
         """
-        Jefe de Residentes en INTRA también tiene descuento del 50%
+        Jefe de Residentes + DOP + INTRA: NO aplica descuento (100%).
+        Regla v3.2: solo ECO general recibe INTRA 50% para jefe/instructor.
         """
         from decimal import Decimal
         
@@ -524,17 +525,18 @@ class CalculoMontosTest(TestCase):
         registro.estudio.add(self.estudio_doppler)
         
         monto_calculado = registro.calcular_monto()
-        esperado = Decimal('4250.00')  # 50% de $8.500
+        esperado = Decimal('8500.00')  # DOP sin descuento INTRA para jefe
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Jefe Residentes INTRA debe cobrar $4.250, pero cobra ${monto_calculado}"
+            f"FALLA: Jefe Residentes + DOP + INTRA debe cobrar $8.500 (sin descuento), pero cobra ${monto_calculado}"
         )
     
-    def test_instructor_horario_intra_descuento_50_porciento(self):
+    def test_instructor_dop_intra_sin_descuento(self):
         """
-        Instructor en INTRA también tiene descuento del 50%
+        Instructor + DOP + INTRA: NO aplica descuento (100%).
+        Regla v3.2: solo ECO general recibe INTRA 50% para jefe/instructor.
         """
         from decimal import Decimal
         
@@ -551,12 +553,12 @@ class CalculoMontosTest(TestCase):
         registro.estudio.add(self.estudio_doppler)
         
         monto_calculado = registro.calcular_monto()
-        esperado = Decimal('4250.00')  # 50% de $8.500
+        esperado = Decimal('8500.00')  # DOP sin descuento INTRA para instructor
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Instructor INTRA debe cobrar $4.250, pero cobra ${monto_calculado}"
+            f"FALLA: Instructor + DOP + INTRA debe cobrar $8.500 (sin descuento), pero cobra ${monto_calculado}"
         )
     
     def test_staff_siempre_cobra_100_porciento_sin_descuento(self):
@@ -843,4 +845,347 @@ class ContextoUbicacionTest(TestCase):
             self.estudio.precio_para_os('COBER', fecha=date.today(), contexto='LECHO'),
             Decimal('9400.00'),
         )
+
+
+class PermisosDesgloseTest(TestCase):
+    """Tests para Fase 1: helpers de permisos y métodos de desglose por rol (v3.2 - Mayo 2026)"""
+
+    def setUp(self):
+        """Preparar usuarios con diferentes roles y registros de prueba."""
+        from decimal import Decimal
+        
+        # Crear usuarios con distintos roles
+        self.medico = User.objects.create_user(
+            username='medico_test',
+            email='medico@test.com',
+            password='testpass123',
+            rol='medico_staff'
+        )
+        self.residente = User.objects.create_user(
+            username='residente_test',
+            email='residente@test.com',
+            password='testpass123',
+            rol='medico_residente'
+        )
+        self.administrativo = User.objects.create_user(
+            username='admin_test',
+            email='admin@test.com',
+            password='testpass123',
+            rol='administrativo'
+        )
+        self.jefe = User.objects.create_user(
+            username='jefe_test',
+            email='jefe@test.com',
+            password='testpass123',
+            rol='jefe_servicio'
+        )
+        self.superuser = User.objects.create_superuser(
+            username='super_test',
+            email='super@test.com',
+            password='testpass123'
+        )
+        
+        # Crear grupo tarifario con tarifa vigente
+        self.grupo = GrupoTarifario.objects.create(
+            codigo='RM_CONTRASTE_TEST',
+            nombre='RM con Contraste - Test',
+            modalidad='RM',
+            activo=True
+        )
+        today = date.today()
+        self.tarifa = TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo,
+            vigencia_desde=today,
+            vigencia_hasta=date(2099, 12, 31),
+            precio_cober=Decimal('5500.00'),
+            precio_otras_os=Decimal('6200.00'),
+            motivo_actualizacion='Test Fase 1'
+        )
+        
+        # Crear estudio vinculado al grupo
+        self.estudio = Estudios.objects.create(
+            codigo='RM-ABDOMEN-TEST',
+            nombre='RM Abdomen con Contraste',
+            tipo='RM',
+            conteo_regiones=1,
+            precio_unico=False,
+            precio_cober=Decimal('5500.00'),
+            precio_otras_os=Decimal('6200.00'),
+            conteo_regiones_default=1,
+            activo=True,
+            grupo_tarifario=self.grupo
+        )
+        
+        # Crear registro de estudios para test
+        self.registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            cantidad_regiones=1,
+            monto_calculado=Decimal('2750.00'),  # 5500 * 0.5 (INTRA)
+            fecha_del_informe=today
+        )
+        
+        # Vincular estudio al registro
+        from liquidacion.models import RegistroEstudio
+        RegistroEstudio.objects.create(
+            registro=self.registro,
+            estudio=self.estudio,
+            cantidad=1,
+            contexto='SERVICIO'
+        )
+
+    def test_puede_ver_desglose_administrativo_medico_retorna_false(self):
+        """Helper: médico no puede ver desglose administrativo."""
+        from liquidacion.permisos import puede_ver_desglose_administrativo
+        
+        self.assertFalse(
+            puede_ver_desglose_administrativo(self.medico),
+            "❌ FALLA: Médico no debe poder ver desglose administrativo"
+        )
+
+    def test_puede_ver_desglose_administrativo_residente_retorna_false(self):
+        """Helper: residente no puede ver desglose administrativo."""
+        from liquidacion.permisos import puede_ver_desglose_administrativo
+        
+        self.assertFalse(
+            puede_ver_desglose_administrativo(self.residente),
+            "❌ FALLA: Residente no debe poder ver desglose administrativo"
+        )
+
+    def test_puede_ver_desglose_administrativo_administrativo_retorna_true(self):
+        """Helper: administrativo SÍ puede ver desglose administrativo."""
+        from liquidacion.permisos import puede_ver_desglose_administrativo
+        
+        self.assertTrue(
+            puede_ver_desglose_administrativo(self.administrativo),
+            "❌ FALLA: Administrativo debe poder ver desglose administrativo"
+        )
+
+    def test_puede_ver_desglose_administrativo_jefe_retorna_true(self):
+        """Helper: jefe_servicio SÍ puede ver desglose administrativo."""
+        from liquidacion.permisos import puede_ver_desglose_administrativo
+        
+        self.assertTrue(
+            puede_ver_desglose_administrativo(self.jefe),
+            "❌ FALLA: Jefe servicio debe poder ver desglose administrativo"
+        )
+
+    def test_puede_ver_desglose_administrativo_superuser_retorna_true(self):
+        """Helper: superuser SÍ puede ver desglose administrativo."""
+        from liquidacion.permisos import puede_ver_desglose_administrativo
+        
+        self.assertTrue(
+            puede_ver_desglose_administrativo(self.superuser),
+            "❌ FALLA: Superuser debe poder ver desglose administrativo"
+        )
+
+    def test_get_desglose_monto_simple_no_incluye_grupo_tarifario(self):
+        """get_desglose_monto_simple(): NO incluye grupo_tarifario_codigo."""
+        desglose = self.registro.get_desglose_monto_simple()
+        
+        self.assertNotIn(
+            'grupo_tarifario_codigo',
+            desglose,
+            "❌ FALLA: Desglose simple no debe incluir grupo_tarifario_codigo"
+        )
+
+    def test_get_desglose_monto_simple_no_incluye_tarifa_vigencia(self):
+        """get_desglose_monto_simple(): NO incluye tarifa_vigencia_desde."""
+        desglose = self.registro.get_desglose_monto_simple()
+        
+        self.assertNotIn(
+            'tarifa_vigencia_desde',
+            desglose,
+            "❌ FALLA: Desglose simple no debe incluye tarifa_vigencia_desde"
+        )
+
+    def test_get_desglose_monto_simple_incluye_estudios_regiones_monto(self):
+        """get_desglose_monto_simple(): SÍ incluye estudios, regiones, monto_final."""
+        desglose = self.registro.get_desglose_monto_simple()
+        
+        self.assertIn('estudios', desglose)
+        self.assertIn('regiones', desglose)
+        self.assertIn('monto_final', desglose)
+        self.assertEqual(desglose['regiones'], 1)
+        self.assertEqual(desglose['monto_final'], Decimal('2750.00'))
+
+    def test_get_desglose_monto_administrativo_incluye_grupo_tarifario(self):
+        """get_desglose_monto_administrativo(): SÍ incluye grupo_tarifario_codigo."""
+        desglose = self.registro.get_desglose_monto_administrativo()
+        
+        self.assertIn(
+            'grupo_tarifario_codigo',
+            desglose,
+            "❌ FALLA: Desglose administrativo debe incluir grupo_tarifario_codigo"
+        )
+        self.assertEqual(desglose['grupo_tarifario_codigo'], 'RM_CONTRASTE_TEST')
+
+    def test_get_desglose_monto_administrativo_incluye_tarifa_vigencia(self):
+        """get_desglose_monto_administrativo(): SÍ incluye tarifa_vigencia_desde."""
+        desglose = self.registro.get_desglose_monto_administrativo()
+        
+        self.assertIn(
+            'tarifa_vigencia_desde',
+            desglose,
+            "❌ FALLA: Desglose administrativo debe incluir tarifa_vigencia_desde"
+        )
+        self.assertEqual(desglose['tarifa_vigencia_desde'], date.today())
+
+    def test_get_desglose_monto_administrativo_incluye_precio_tarifa(self):
+        """get_desglose_monto_administrativo(): SÍ incluye tarifa_precio_cober."""
+        desglose = self.registro.get_desglose_monto_administrativo()
+        
+        self.assertIn(
+            'tarifa_precio_cober',
+            desglose,
+            "❌ FALLA: Desglose administrativo debe incluir tarifa_precio_cober"
+        )
+        self.assertEqual(desglose['tarifa_precio_cober'], Decimal('5500.00'))
+
+    def test_calcular_monto_sin_cambios(self):
+        """Validar que calcular_monto() NO cambio: sigue retornando lo esperado."""
+        # Recrear calculo esperado
+        from decimal import Decimal
+        precio_total = Decimal('5500.00') * 1  # 1 estudio
+        # medico_staff cobra siempre 100% (el 50% INTRA solo aplica a residentes)
+        esperado = precio_total  # sin descuento de horario
+        
+        resultado = self.registro.calcular_monto()
+        
+        self.assertEqual(
+            resultado,
+            esperado,
+            f"FALLA: calcular_monto() cambio. Esperado {esperado}, obtuvo {resultado}"
+        )
+
+
+class FactorIntraRolTipoEstudioTest(TestCase):
+    """
+    Tests para regla INTRA diferenciada por rol y tipo de estudio (v3.2 - Mayo 2026).
+
+    Regla:
+      - medico_residente: INTRA (50%) aplica a TODOS los estudios.
+      - jefe_residentes / instructor_residentes: INTRA (50%) solo a ECO general.
+        Doppler (DOP) y otros siempre al 100% para estos roles.
+      - medico_staff: sin factor horario, siempre 100%.
+    """
+
+    def setUp(self):
+        from liquidacion.models import RegistroEstudio
+        
+        self.jefe = User.objects.create_user(
+            username='jefe_intra_test', email='jefe@test.com',
+            password='x', rol='jefe_residentes'
+        )
+        self.instructor = User.objects.create_user(
+            username='instructor_intra_test', email='instructor@test.com',
+            password='x', rol='instructor_residentes'
+        )
+        self.residente = User.objects.create_user(
+            username='residente_intra_test', email='residente@test.com',
+            password='x', rol='medico_residente'
+        )
+        
+        today = date.today()
+        
+        # Grupo y tarifa para ECO general
+        grupo_eco = GrupoTarifario.objects.create(
+            codigo='ECO_ABDOMEN_TEST', nombre='Eco Abdominal Test', modalidad='ECO', activo=True
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo_eco, vigencia_desde=today,
+            precio_cober=Decimal('4000.00'), precio_otras_os=Decimal('5000.00'),
+            motivo_actualizacion='Test INTRA'
+        )
+        self.estudio_eco = Estudios.objects.create(
+            codigo='ECO-TEST', nombre='Eco Abdominal Test', tipo='ECO',
+            conteo_regiones=1, precio_unico=False,
+            precio_cober=Decimal('4000.00'), precio_otras_os=Decimal('5000.00'),
+            conteo_regiones_default=1, activo=True, grupo_tarifario=grupo_eco
+        )
+        
+        # Grupo y tarifa para Doppler
+        grupo_dop = GrupoTarifario.objects.create(
+            codigo='DOP_TEST', nombre='Doppler Test', modalidad='DOP', activo=True
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo_dop, vigencia_desde=today,
+            precio_cober=Decimal('6000.00'), precio_otras_os=Decimal('7000.00'),
+            motivo_actualizacion='Test INTRA DOP'
+        )
+        self.estudio_dop = Estudios.objects.create(
+            codigo='DOP-TEST', nombre='Doppler Periferico Test', tipo='DOP',
+            conteo_regiones=1, precio_unico=False,
+            precio_cober=Decimal('6000.00'), precio_otras_os=Decimal('7000.00'),
+            conteo_regiones_default=1, activo=True, grupo_tarifario=grupo_dop
+        )
+        
+        self.RegistroEstudio = RegistroEstudio
+        self.today = today
+
+    def _crear_registro(self, medico, estudio, horario='INTRA'):
+        """Helper: crea un RegistroEstudiosPorMedico con un estudio vinculado."""
+        reg = RegistroEstudiosPorMedico.objects.create(
+            medico=medico,
+            tipo_obra_social='COBER',
+            horario=horario,
+            cantidad_regiones=1,
+            monto_calculado=Decimal('0.00'),
+            fecha_del_informe=self.today
+        )
+        self.RegistroEstudio.objects.create(registro=reg, estudio=estudio, cantidad=1, contexto='SERVICIO')
+        return reg
+
+    def test_jefe_eco_intra_aplica_50_porciento(self):
+        """Jefe residente + ECO + INTRA: monto = 4000 * 0.5 = 2000."""
+        reg = self._crear_registro(self.jefe, self.estudio_eco, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
+
+    def test_jefe_dop_intra_no_aplica_factor(self):
+        """Jefe residente + DOP + INTRA: monto = 6000 (sin descuento)."""
+        reg = self._crear_registro(self.jefe, self.estudio_dop, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('6000.00'))
+
+    def test_instructor_eco_intra_aplica_50_porciento(self):
+        """Instructor residente + ECO + INTRA: monto = 4000 * 0.5 = 2000."""
+        reg = self._crear_registro(self.instructor, self.estudio_eco, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
+
+    def test_instructor_dop_intra_no_aplica_factor(self):
+        """Instructor residente + DOP + INTRA: monto = 6000 (sin descuento)."""
+        reg = self._crear_registro(self.instructor, self.estudio_dop, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('6000.00'))
+
+    def test_residente_eco_intra_aplica_50_porciento(self):
+        """Residente + ECO + INTRA: monto = 4000 * 0.5 = 2000 (sin cambio)."""
+        reg = self._crear_registro(self.residente, self.estudio_eco, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
+
+    def test_residente_dop_intra_aplica_50_porciento(self):
+        """Residente + DOP + INTRA: monto = 6000 * 0.5 = 3000 (INTRA aplica a todos)."""
+        reg = self._crear_registro(self.residente, self.estudio_dop, horario='INTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('3000.00'))
+
+    def test_jefe_eco_extra_sin_descuento(self):
+        """Jefe residente + ECO + EXTRA: monto = 4000 (EXTRA nunca descuenta)."""
+        reg = self._crear_registro(self.jefe, self.estudio_eco, horario='EXTRA')
+        self.assertEqual(reg.calcular_monto(), Decimal('4000.00'))
+
+    def test_jefe_mix_eco_dop_intra_aplica_solo_a_eco(self):
+        """
+        Jefe + registro mixto (ECO 4000 + DOP 6000) + INTRA:
+        monto = (4000 * 0.5) + 6000 = 2000 + 6000 = 8000.
+        """
+        reg = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe,
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            cantidad_regiones=2,
+            monto_calculado=Decimal('0.00'),
+            fecha_del_informe=self.today
+        )
+        self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
+        self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
+        self.assertEqual(reg.calcular_monto(), Decimal('8000.00'))
 

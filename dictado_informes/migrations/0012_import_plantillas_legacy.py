@@ -203,14 +203,14 @@ def import_plantillas_legacy(apps, schema_editor):
         else:
             updated_count += 1
     
-    print(f"✅ Migración de plantillas: {created_count} creadas, {updated_count} actualizadas")
+    print(f"[OK] Migracion de plantillas: {created_count} creadas, {updated_count} actualizadas")
 
 
 def reverse_plantillas_legacy(apps, schema_editor):
     """Reverse: elimina solo las plantillas legacy."""
     PlantillaEstructurada = apps.get_model('dictado_informes', 'PlantillaEstructurada')
     deleted_count, _ = PlantillaEstructurada.objects.filter(origen='legacy').delete()
-    print(f"⚠️ Reverse: {deleted_count} plantillas legacy eliminadas")
+    print(f"[WARN] Reverse: {deleted_count} plantillas legacy eliminadas")
 
 
 class Migration(migrations.Migration):

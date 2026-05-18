@@ -393,12 +393,17 @@
                         <td colspan="9" class="px-4 py-3">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                                 <div class="bg-white rounded border border-gray-200 px-3 py-2">
-                                    <p class="text-gray-500">Precio base</p>
-                                    <p class="font-semibold text-gray-800">${{ registro.detalle_monto.precio_total|floatformat:2 }}</p>
-                                </div>
-                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
                                     <p class="text-gray-500">Obra social</p>
                                     <p class="font-semibold text-gray-800">{{ registro.detalle_monto.tipo_os }}</p>
+                                </div>
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Estudios / Regiones</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.estudios }} / {{ registro.detalle_monto.regiones }}</p>
+                                </div>
+                                {% if puede_ver_desglose_admin %}
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Precio base</p>
+                                    <p class="font-semibold text-gray-800">${{ registro.detalle_monto.precio_total|floatformat:2 }}</p>
                                 </div>
                                 {% if mostrar_info_horario_descuento %}
                                 <div class="bg-white rounded border border-gray-200 px-3 py-2">
@@ -406,15 +411,31 @@
                                     <p class="font-semibold text-gray-800">{{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})</p>
                                 </div>
                                 {% endif %}
-                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
-                                    <p class="text-gray-500">Estudios / Regiones</p>
-                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.estudios }} / {{ registro.detalle_monto.regiones }}</p>
-                                </div>
                                 {% if mostrar_info_bonus_urgencia and registro.detalle_monto.bonus_urgencia %}
                                 <div class="bg-white rounded border border-gray-200 px-3 py-2">
                                     <p class="text-gray-500">Bonus urgencia</p>
                                     <p class="font-semibold text-gray-800">{{ registro.detalle_monto.bonus_urgencia }}</p>
                                 </div>
+                                {% endif %}
+                                {% if registro.detalle_monto.grupo_tarifario_codigo %}
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Grupo tarifario</p>
+                                    <p class="font-semibold text-gray-800">{{ registro.detalle_monto.grupo_tarifario_codigo }} — {{ registro.detalle_monto.grupo_tarifario_nombre }}</p>
+                                </div>
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Vigencia tarifa</p>
+                                    <p class="font-semibold text-gray-800">desde {{ registro.detalle_monto.tarifa_vigencia_desde }}{% if registro.detalle_monto.tarifa_vigencia_hasta %} hasta {{ registro.detalle_monto.tarifa_vigencia_hasta }}{% endif %}</p>
+                                </div>
+                                <div class="bg-white rounded border border-gray-200 px-3 py-2">
+                                    <p class="text-gray-500">Precios tarifa</p>
+                                    <p class="font-semibold text-gray-800">COBER ${{ registro.detalle_monto.tarifa_precio_cober|floatformat:2 }} / Otras ${{ registro.detalle_monto.tarifa_precio_otras_os|floatformat:2 }}</p>
+                                </div>
+                                {% if registro.detalle_monto.alerta_fecha_anterior_tarifa %}
+                                <div class="bg-amber-50 rounded border border-amber-200 px-3 py-2 md:col-span-2 lg:col-span-3">
+                                    <p class="text-amber-700">{{ registro.detalle_monto.alerta_mensaje }}</p>
+                                </div>
+                                {% endif %}
+                                {% endif %}
                                 {% endif %}
                                 <div class="bg-emerald-50 rounded border border-emerald-200 px-3 py-2">
                                     <p class="text-emerald-700">Monto final guardado</p>

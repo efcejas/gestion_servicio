@@ -458,6 +458,15 @@
                                                 </summary>
                                                 <div class="px-3 pb-3 pt-1 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-700 border-t border-teal-100">
                                                     <div>
+                                                        <span class="font-semibold text-gray-800">OS:</span>
+                                                        {{ registro.detalle_monto.tipo_os }}
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Monto final guardado:</span>
+                                                        {{ registro.detalle_monto.monto_final|floatformat:2 }}
+                                                    </div>
+                                                    {% if puede_ver_desglose_admin %}
+                                                    <div>
                                                         {% if registro.detalle_monto.mostrar_formula_base %}
                                                         <span class="font-semibold text-gray-800">Cálculo valor base:</span>
                                                         {{ registro.detalle_monto.valor_base_unitario|floatformat:2 }} × {{ registro.detalle_monto.regiones }} = {{ registro.detalle_monto.precio_total|floatformat:2 }}
@@ -467,16 +476,8 @@
                                                         {% endif %}
                                                     </div>
                                                     <div>
-                                                        <span class="font-semibold text-gray-800">OS:</span>
-                                                        {{ registro.detalle_monto.tipo_os }}
-                                                    </div>
-                                                    <div>
                                                         <span class="font-semibold text-gray-800">Horario aplicado:</span>
                                                         {{ registro.detalle_monto.horario }} ({{ registro.detalle_monto.porcentaje }})
-                                                    </div>
-                                                    <div>
-                                                        <span class="font-semibold text-gray-800">Monto final guardado:</span>
-                                                        {{ registro.detalle_monto.monto_final|floatformat:2 }}
                                                     </div>
                                                     {% if registro.detalle_monto.bonus_urgencia %}
                                                     <div>
@@ -489,6 +490,26 @@
                                                         <span class="font-semibold text-gray-800">Tiempo respuesta:</span>
                                                         {{ registro.detalle_monto.tiempo_respuesta }}
                                                     </div>
+                                                    {% endif %}
+                                                    {% if registro.detalle_monto.grupo_tarifario_codigo %}
+                                                    <div class="md:col-span-2 border-t border-teal-100 pt-2 mt-1">
+                                                        <span class="font-semibold text-gray-800">Grupo tarifario:</span>
+                                                        {{ registro.detalle_monto.grupo_tarifario_codigo }} — {{ registro.detalle_monto.grupo_tarifario_nombre }}
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Vigencia tarifa:</span>
+                                                        desde {{ registro.detalle_monto.tarifa_vigencia_desde }}{% if registro.detalle_monto.tarifa_vigencia_hasta %} hasta {{ registro.detalle_monto.tarifa_vigencia_hasta }}{% endif %}
+                                                    </div>
+                                                    <div>
+                                                        <span class="font-semibold text-gray-800">Precios:</span>
+                                                        COBER ${{ registro.detalle_monto.tarifa_precio_cober|floatformat:2 }} / Otras ${{ registro.detalle_monto.tarifa_precio_otras_os|floatformat:2 }}
+                                                    </div>
+                                                    {% if registro.detalle_monto.alerta_fecha_anterior_tarifa %}
+                                                    <div class="md:col-span-2 text-amber-700 bg-amber-50 rounded px-2 py-1">
+                                                        {{ registro.detalle_monto.alerta_mensaje }}
+                                                    </div>
+                                                    {% endif %}
+                                                    {% endif %}
                                                     {% endif %}
                                                 </div>
                                             </details>

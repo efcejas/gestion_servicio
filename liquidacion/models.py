@@ -781,9 +781,14 @@ class RegistroEstudiosPorMedico(models.Model):
     
     def calcular_monto(self):
         """
-        Calcula el monto a facturar por esta práctica
-        v3.1 - Marzo 2026: Lee cantidades desde tabla intermedia RegistroEstudio
-        Suma: (precio_estudio × cantidad) × factor_horario × bonus_urgencia
+        Calcula el monto a facturar por esta práctica.
+        v3.2 - Mayo 2026: Factor INTRA diferenciado por rol y tipo de estudio.
+
+        Reglas de factor horario INTRA (50%):
+          - medico_residente: aplica a TODOS los estudios.
+          - jefe_residentes / instructor_residentes: aplica SOLO a ECO general.
+            Los Doppler (DOP) siempre al 100% para estos roles.
+          - staff / otros roles: sin descuento horario, siempre 100%.
         """
         # Si no hay estudios asignados, retornar 0
         relaciones = self.registroestudio_set.select_related('estudio').all()
@@ -792,8 +797,11 @@ class RegistroEstudiosPorMedico(models.Model):
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
         
-        # 1. Sumar (precio × cantidad) de todos los estudios según tipo de obra social
+        # 1. Sumar (precio × cantidad) separando ECO del resto (para INTRA diferenciado)
         precio_total = Decimal('0.00')
+        precio_total_eco = Decimal('0.00')    # ECO general — tiene INTRA para jefe/instructor
+        precio_total_resto = Decimal('0.00')  # DOP y otros — sin INTRA para jefe/instructor
+        
         for rel in relaciones:
             estudio = rel.estudio
             cantidad = rel.cantidad
@@ -803,18 +811,27 @@ class RegistroEstudiosPorMedico(models.Model):
                 fecha=fecha_referencia,
                 contexto=rel.contexto,
             )
-            precio_total += (precio_estudio * Decimal(str(cantidad)))
+            precio_rel = precio_estudio * Decimal(str(cantidad))
+            precio_total += precio_rel
+            if estudio.tipo == 'ECO':
+                precio_total_eco += precio_rel
+            else:
+                precio_total_resto += precio_rel
         
         if precio_total == Decimal('0.00'):
             return Decimal('0.00')
         
-        # 2. Aplicar factor horario (solo para residentes)
+        # 2. Aplicar factor horario según rol
         subtotal = precio_total
-        if self.medico.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente']:
-            if self.horario == 'INTRA':
-                subtotal = subtotal * Decimal('0.5')  # 50%
-            # EXTRA es 100%, no hace falta multiplicar
-        # Staff siempre cobra 100%
+        if self.horario == 'INTRA':
+            if self.medico.rol == 'medico_residente':
+                # Residentes: INTRA (50%) aplica a todos los estudios
+                subtotal = subtotal * Decimal('0.5')
+            elif self.medico.rol in ['jefe_residentes', 'instructor_residentes']:
+                # Jefe/instructor: INTRA solo aplica a ECO general, Doppler y otros al 100%
+                subtotal = (precio_total_eco * Decimal('0.5')) + precio_total_resto
+            # EXTRA para cualquier rol: sin cambio (100%)
+        # Staff / otros roles: sin factor horario (100%)
         
         # 3. Bonus urgencia para RM con pacientes internados (solo remotos)
         bonus_urgencia = self.calcular_bonus_urgencia()
@@ -918,6 +935,101 @@ class RegistroEstudiosPorMedico(models.Model):
                 delta = self.fecha_hora_informe - self.fecha_hora_solicitud
                 horas = delta.total_seconds() / 3600
                 desglose['tiempo_respuesta'] = f"{horas:.1f} horas"
+        
+        return desglose
+    
+    def get_desglose_monto_simple(self):
+        """
+        Desglose simplificado para usuarios médicos/residentes (v3.2 - Mayo 2026).
+        
+        Solo retorna información operacional sin detalles administrativos:
+        - Estudios realizados
+        - Cantidad de regiones
+        - Monto final guardado
+        
+        Sin mostrar: grupo tarifario, tarifa vigente, vigencia, precio base.
+        
+        Returns:
+            dict: Información básica del cálculo
+        """
+        relaciones = self.registroestudio_set.select_related('estudio').all()
+        if not relaciones.exists():
+            return {}
+        
+        # Listar estudios con cantidad y contexto
+        estudios_nombres = []
+        for rel in relaciones:
+            estudio = rel.estudio
+            cantidad = rel.cantidad
+            label = estudio.nombre
+            if rel.contexto and rel.contexto != 'SERVICIO':
+                label += f' [{rel.get_contexto_display()}]'
+            if cantidad > 1:
+                label += f' ×{cantidad}'
+            estudios_nombres.append(label)
+        
+        return {
+            'estudios': ", ".join(estudios_nombres),
+            'regiones': self.cantidad_regiones,
+            'monto_final': self.monto_calculado,
+            'tipo_os': self.get_tipo_obra_social_display(),
+        }
+    
+    def get_desglose_monto_administrativo(self):
+        """
+        Desglose completo para roles administrativos/contables (v3.2 - Mayo 2026).
+        
+        Retorna información operacional + administrativa:
+        - Estudios, regiones, monto (igual a `get_desglose_monto_simple()`)
+        - Grupo tarifario y tarifa vigente aplicados
+        - Vigencia de la tarifa (desde/hasta)
+        - Precios de la tarifa (COBER, OTRAS_OS)
+        - Alertas: si fecha_del_informe cae fuera de vigencia
+        
+        Este método extiende `get_desglose_monto()` con información administrativa.
+        
+        Returns:
+            dict: Información completa incluyendo tarifas y vigencia
+        """
+        # Obtener desglose base (operacional)
+        desglose = self.get_desglose_monto()
+        
+        # Agregar información administrativa de tarifas
+        relaciones = self.registroestudio_set.select_related(
+            'estudio',
+            'estudio__grupo_tarifario'
+        ).all()
+        
+        if relaciones.exists():
+            # Usar el primer estudio para obtener grupo (asumiendo todos del mismo grupo para el registro)
+            # En futuro, si hay registros multi-grupo, se puede expandir este lógica
+            primer_estudio = relaciones.first().estudio
+            
+            if primer_estudio.grupo_tarifario:
+                grupo = primer_estudio.grupo_tarifario
+                tarifa_vigente = grupo.get_tarifa_vigente(
+                    fecha=self.fecha_del_informe or timezone.now().date()
+                )
+                
+                # Información del grupo
+                desglose['grupo_tarifario_codigo'] = grupo.codigo
+                desglose['grupo_tarifario_nombre'] = grupo.nombre
+                
+                # Información de la tarifa vigente
+                if tarifa_vigente:
+                    desglose['tarifa_vigencia_desde'] = tarifa_vigente.vigencia_desde
+                    desglose['tarifa_vigencia_hasta'] = tarifa_vigente.vigencia_hasta
+                    desglose['tarifa_precio_cober'] = tarifa_vigente.precio_cober
+                    desglose['tarifa_precio_otras_os'] = tarifa_vigente.precio_otras_os
+                    
+                    # Alerta si la fecha del informe es anterior a la tarifa vigente más reciente
+                    if self.fecha_del_informe and self.fecha_del_informe < tarifa_vigente.vigencia_desde:
+                        desglose['alerta_fecha_anterior_tarifa'] = True
+                        desglose['alerta_mensaje'] = (
+                            f"⚠️ Fecha del informe ({self.fecha_del_informe.strftime('%d/%m/%Y')}) "
+                            f"es anterior a la vigencia de la tarifa ({tarifa_vigente.vigencia_desde.strftime('%d/%m/%Y')}). "
+                            f"Monto calculado con tarifa vigente en esa fecha."
+                        )
         
         return desglose
     

@@ -31,9 +31,9 @@ def migrate_m2m_to_through(apps, schema_editor):
                 count = cursor.fetchone()[0]
                 
                 if count == 0:
-                    print("⚠️  ADVERTENCIA: No hay datos M2M para migrar. Tabla está vacía.")
+                    print("[WARN] ADVERTENCIA: No hay datos M2M para migrar. Tabla esta vacia.")
                     print("    Si es primera vez, esto es normal.")
-                    print("    Si es migración de producción, VERIFICA BACKUP primero.")
+                    print("    Si es migracion de produccion, VERIFICA BACKUP primero.")
                 
                 # Leer todas las relaciones
                 cursor.execute("""
@@ -60,16 +60,16 @@ def migrate_m2m_to_through(apps, schema_editor):
                     for i in range(0, len(registro_estudios), batch_size):
                         batch = registro_estudios[i:i+batch_size]
                         RegistroEstudio.objects.bulk_create(batch)
-                    print(f"✅ ÉXITO: Migrados {len(registro_estudios)} registros de estudios")
+                    print(f"[OK] EXITO: Migrados {len(registro_estudios)} registros de estudios")
                 else:
-                    print("✅ Sin registros para migrar (OK en ambiente nuevo)")
+                    print("[OK] Sin registros para migrar (OK en ambiente nuevo")
     
     except Exception as e:
-        # ← NUEVO: Error handling explícito
+        # <- NUEVO: Error handling explicito
         raise RuntimeError(
-            f"❌ CRÍTICO: Falló migración 0028\n"
+            f"[ERROR] CRITICO: Fallo migracion 0028\n"
             f"Error: {str(e)}\n"
-            f"ACCIÓN: Restaurar BD desde backup, revisar logs, reintentar.\n"
+            f"ACCION: Restaurar BD desde backup, revisar logs, reintentar.\n"
             f"NO CONTINUAR SIN RESOLVER ESTO."
         ) from e
 

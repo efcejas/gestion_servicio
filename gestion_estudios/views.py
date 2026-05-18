@@ -133,6 +133,8 @@ class HomeView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context['hide_navbar'] = False
         context['pedidos_estudios_habilitado'] = getattr(settings, 'PEDIDOS_ESTUDIOS_HABILITADO', False)
+        user = self.request.user
+        hoy = timezone.now().date()
 
         # Últimos registros médicos
         ultimos_medicos = (
@@ -148,6 +150,34 @@ class HomeView(LoginRequiredMixin, TemplateView):
         ).order_by('-fecha_registro')
 
         context['ultimos_registros_medicos'] = ultimos_registros
+
+        if user.is_authenticated and user.rol == 'cardiologo':
+            registros_cardiologo = list(
+                RegistroEstudiosPorMedico.objects.filter(
+                    medico=user,
+                    fecha_registro__date=hoy,
+                ).prefetch_related('registroestudio_set__estudio').order_by('-fecha_registro')
+            )
+
+            for registro in registros_cardiologo:
+                registro.detalle_monto = registro.get_desglose_monto()
+
+            registros_mes_cardiologo = list(
+                RegistroEstudiosPorMedico.objects.filter(
+                    medico=user,
+                    sesion_contable__mes=hoy.month,
+                    sesion_contable__año=hoy.year,
+                ).prefetch_related('registroestudio_set__estudio').order_by('-fecha_registro')
+            )
+
+            context.update({
+                'cardiologo_registros_hoy': registros_cardiologo,
+                'cardiologo_registros_hoy_count': len(registros_cardiologo),
+                'cardiologo_registros_mes_count': len(registros_mes_cardiologo),
+                'cardiologo_total_monto_mes': sum(registro.monto_calculado for registro in registros_mes_cardiologo),
+                'cardiologo_total_regiones_mes': sum(registro.cantidad_regiones for registro in registros_mes_cardiologo),
+                'cardiologo_ultimos_registros': registros_mes_cardiologo[:4],
+            })
 
         # Datos de eventos actuales (estados válidos: abierto, en_revision, resuelto)
         eventos_abiertos = EventoServicio.objects.filter(estado__in=['abierto', 'en_revision'])
