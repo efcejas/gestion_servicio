@@ -266,10 +266,11 @@ def navbar_links(request):
                 item('Portal de Guardias', 'fa-calendar-alt',
                      'control_guardias:index', active_ns='control_guardias'),
             ),
-            # Para habilitar Pedidos de Estudios, agregar aquí:
-            # group('Gestión', 'fa-cogs',
-            #     i_pedidos(),
-            # ),
+            group('Gestión', 'fa-cogs',
+                i_liquidacion_registro(),
+                i_liquidacion_registros(),
+                i_liquidacion_guardias(),
+            ),
         ] if g]
     elif user.rol == 'medico_staff':
         groups = [g for g in [

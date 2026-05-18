@@ -167,6 +167,62 @@
         {% elif user.es_medico and user.rol != 'medico_staff' and user.rol != 'jefe_servicio' or user.is_superuser %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Prioridad jefe/instructor: los 4 accesos más usados van primero -->
+                {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
+                <div class="bg-white rounded-2xl shadow-lg border border-yellow-200 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
+                        <i class="fas fa-check-circle text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Revisar Preinformes</h5>
+                    <p class="text-gray-600 mb-4">Revisa y finaliza preinformes pendientes de residentes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:lista_revision' %}"
+                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                            Revisar preinformes
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-emerald-200 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl mb-4">
+                        <i class="fas fa-notes-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Registrar Estudios</h5>
+                    <p class="text-gray-600 mb-4">Cargá los estudios informados del día para tu liquidación.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_nuevo' %}"
+                           class="inline-flex items-center px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors">
+                            Registrar estudios
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-blue-200 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-list-check text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Registros</h5>
+                    <p class="text-gray-600 mb-4">Historial de estudios cargados y totales del período.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'liquidacion:registroestudios_list' %}"
+                           class="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Ver mis registros
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-indigo-200 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl mb-4">
+                        <i class="fas fa-file-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Preinformes</h5>
+                    <p class="text-gray-600 mb-4">Ver y gestionar tus preinformes enviados.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:dashboard_residente' %}"
+                           class="inline-flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
+                            Ver mis preinformes
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
                 <!-- Clases -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
                     <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
@@ -279,39 +335,7 @@
                 </div>
                 {% endif %}
 
-                <!-- Mis Preinformes - solo jefes e instructores de residentes -->
-                {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl mb-4">
-                        <i class="fas fa-file-medical text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Mis Preinformes</h5>
-                    <p class="text-gray-600 mb-4">Ver y gestionar tus preinformes enviados.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'preinformes:dashboard_residente' %}"
-                           class="inline-flex items-center px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors">
-                            Ver mis preinformes
-                        </a>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Revisar Preinformes (solo jefes e instructores de residentes) -->
-                {% if user.rol == 'jefe_residentes' or user.rol == 'instructor_residentes' %}
-                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">
-                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl mb-4">
-                        <i class="fas fa-check-circle text-2xl text-white"></i>
-                    </div>
-                    <h5 class="text-xl font-bold text-gray-900 mb-2">Revisar Preinformes</h5>
-                    <p class="text-gray-600 mb-4">Revisa y finaliza preinformes pendientes.</p>
-                    <div class="flex justify-end">
-                        <a href="{% url 'preinformes:lista_revision' %}" 
-                           class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
-                            Revisar preinformes
-                        </a>
-                    </div>
-                </div>
-                {% endif %}
+                <!-- Mis Preinformes y Revisar: movidos al bloque prioritario del inicio para jefe/instructor -->
             </div>
         </div>
 
