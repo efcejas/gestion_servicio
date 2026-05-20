@@ -183,10 +183,8 @@
                                 <i class="fas fa-spell-check"></i>
                                 Corrector ortográfico activado para EGES. Las palabras subrayadas en rojo pueden tener errores.
                             </div>
-                            {{ form.informe_final_html.as_widget(attrs={'spellcheck': 'true'}) }}
-                        {% else %}
-                            {{ form.informe_final_html.as_widget(attrs={'spellcheck': 'false'}) }}
                         {% endif %}
+                        {{ form.informe_final_html }}
                     </div>
                     
                     {% if form.informe_final_html.errors %}

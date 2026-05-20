@@ -289,12 +289,24 @@ class RevisionPreinformeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         preinforme = kwargs.pop('preinforme', None)
         super().__init__(*args, **kwargs)
-        
+
+        # Setear spellcheck solo si el destino es EGES
+        sistema_destino = None
+        if preinforme:
+            sistema_destino = getattr(preinforme, 'sistema_destino', None)
+        elif hasattr(self.instance, 'preinforme') and self.instance.preinforme:
+            sistema_destino = getattr(self.instance.preinforme, 'sistema_destino', None)
+
+        if sistema_destino == 'eges':
+            self.fields['informe_final_html'].widget.attrs['spellcheck'] = 'true'
+        else:
+            self.fields['informe_final_html'].widget.attrs['spellcheck'] = 'false'
+
         # La vista ya maneja la pre-carga de informe_final_html
         # Aquí solo necesitamos asignar el preinforme si es nuevo
         if preinforme and not self.instance.pk:
             self.instance.preinforme = preinforme
-        
+
         # Seguridad adicional: si por alguna razón llegamos aquí sin contenido,
         # usar el snapshot como initial value
         if self.instance.pk and not self.instance.informe_final_html:
