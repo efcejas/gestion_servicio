@@ -450,6 +450,10 @@ def mis_preinformes(request):
             preinformes = preinformes.filter(fecha_creacion__date__lte=form.cleaned_data['fecha_hasta'])
         if form.cleaned_data['numero_estudio']:
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
+        if form.cleaned_data['apellido_paciente']:
+            preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
+        if form.cleaned_data['nombre_paciente']:
+            preinformes = preinformes.filter(nombre_paciente__icontains=form.cleaned_data['nombre_paciente'])
     
     # Filtro por etiquetas (parámetro GET)
     etiquetas_ids = request.GET.getlist('etiquetas')

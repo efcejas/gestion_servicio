@@ -178,7 +178,15 @@
                     
                     <!-- Contenedor del editor (oculto inicialmente) -->
                     <div id="editor-container" style="opacity: 0; transition: opacity 0.3s ease-in;">
-                        {{ form.informe_final_html }}
+                        {% if preinforme.sistema_destino == 'eges' %}
+                            <div class="mb-2 p-2 rounded bg-blue-50 border border-blue-200 text-blue-800 text-sm flex items-center gap-2">
+                                <i class="fas fa-spell-check"></i>
+                                Corrector ortográfico activado para EGES. Las palabras subrayadas en rojo pueden tener errores.
+                            </div>
+                            {{ form.informe_final_html.as_widget(attrs={'spellcheck': 'true'}) }}
+                        {% else %}
+                            {{ form.informe_final_html.as_widget(attrs={'spellcheck': 'false'}) }}
+                        {% endif %}
                     </div>
                     
                     {% if form.informe_final_html.errors %}

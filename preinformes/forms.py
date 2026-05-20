@@ -251,6 +251,14 @@ class FiltroPreinformesForm(forms.Form):
         })
     )
 
+    nombre_paciente = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'placeholder': 'Buscar por nombre de paciente...'
+        })
+    )
+
 
 class RevisionPreinformeForm(forms.ModelForm):
     """Formulario para revisar preinformes"""
