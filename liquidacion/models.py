@@ -408,7 +408,7 @@ class SesionContable(models.Model):
     def puede_registrar_practicas(self, usuario):
         """Verifica si se pueden registrar prácticas en esta sesión"""
         # Medicos solo en ABIERTA o REVISION
-        if usuario.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente', 'medico_staff', 'cardiologo']:
+        if usuario.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente', 'medico_staff', 'cardiologo', 'jefe_servicio']:
             return self.estado in ['ABIERTA', 'REVISION']
         
         # Admin puede cargar incluso en CERRADA

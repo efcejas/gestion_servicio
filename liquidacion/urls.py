@@ -14,7 +14,9 @@ from .views import (
     GuardiaPasivaUpdateView,  # [NUEVO v3.2]
     GuardiaPasivaDeleteView,  # [NUEVO v3.2]
     CargaMasivaView,
-    PortalLiquidacionInicioView
+    PortalLiquidacionInicioView,
+    SesionContableListView,       # [NUEVO Fase B] Gestión del ciclo contable
+    sesion_contable_transicion,   # [NUEVO Fase B] Transición de estado
 )
 
 # [ELIMINADO - 16 de feb 2026] 
@@ -63,4 +65,8 @@ urlpatterns = [
 
     # Ruta para la carga masiva de estudios (solo admin)
     path('carga-excel/', CargaMasivaView.as_view(), name='carga-masiva'),
+
+    # ===== GESTIÓN DE SESIONES CONTABLES (Fase B) =====
+    path('sesiones/', SesionContableListView.as_view(), name='sesiones_list'),
+    path('sesiones/<int:pk>/transicion/', sesion_contable_transicion, name='sesion_transicion'),
 ]

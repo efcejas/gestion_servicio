@@ -5,6 +5,7 @@ from django.views.generic.edit import FormView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q, Prefetch
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
@@ -60,18 +61,30 @@ def _puede_acceder_guardia_pasiva(user):
 def _puede_editar_monto_guardia(user):
     return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
 
-class EstudiosCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+
+def _mes_nombre(mes):
+    meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    return meses[mes] if 1 <= mes <= 12 else str(mes)
+
+class EstudiosCreateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, CreateView):
     model = Estudios
     fields = ['nombre', 'tipo', 'conteo_regiones']
     template_name = 'liquidacion/estudios_form.html'
     success_url = reverse_lazy('estudios_list')
-    success_message = "El estudio fue registrado exitosamente"  # Mensaje de éxito
+    success_message = "El estudio fue registrado exitosamente"
 
-class EstudiosListView(LoginRequiredMixin, ListView):
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+
+
+class EstudiosListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = Estudios
     template_name = 'liquidacion/estudios_list.html'
-    # Asegúrate de usar el nombre correcto en la plantilla
     context_object_name = 'estudios'
+
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
 
 class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     """
@@ -436,7 +449,7 @@ class RegistrarGuardiaPasivaView(LoginRequiredMixin, SuccessMessageMixin, Create
         if not sesion.puede_registrar_practicas(user):
             messages.error(
                 self.request,
-                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
                 f"{sesion.get_estado_display()}. No puedes registrar guardias."
             )
             return redirect(self.success_url)
@@ -515,7 +528,7 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         if not sesion.puede_registrar_practicas(user):
             messages.error(
                 self.request,
-                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
                 f"{sesion.get_estado_display()}. No puedes editar guardias."
             )
             return redirect(self.success_url)
@@ -566,31 +579,27 @@ class GuardiaPasivaDeleteView(LoginRequiredMixin, DeleteView):
         
         return context
 
-    def delete(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         guardia = self.get_object()
-        user = request.user
-        
-        # Validar que la sesión permita eliminar
+        self.object = guardia
+
         sesion = guardia.sesion_contable
-        if not sesion.puede_registrar_practicas(user):
+        if not sesion.puede_registrar_practicas(request.user):
             messages.error(
                 request,
-                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
                 f"{sesion.get_estado_display()}. No puedes eliminar guardias."
             )
             return redirect(self.success_url)
-        
-        # Guardar datos para el mensaje antes de eliminar
+
         fecha = guardia.fecha_guardia.strftime('%d/%m/%Y')
         monto = guardia.monto
-        
-        response = super().delete(request, *args, **kwargs)
-        
+
+        response = super().post(request, *args, **kwargs)
         messages.success(
             request,
             f"🗑️ Guardia eliminada | Fecha: {fecha} | Monto: ${monto}"
         )
-        
         return response
 
 
@@ -1311,6 +1320,7 @@ def generar_pdf_liquidacion(request):
 # EXPORTACIÓN UNIFICADA - v3.0 (Feb 2026)
 # ========================================
 
+@login_required
 def exportar_excel_liquidacion(request):
     """
     Exportar liquidación completa a Excel - v3.1 UNIFICADA (Una sola solapa)
@@ -1320,6 +1330,10 @@ def exportar_excel_liquidacion(request):
     - Guardias pasivas
     - Total general
     """
+    if not (request.user.is_superuser or request.user.rol in ['administrativo', 'jefe_servicio']):
+        messages.error(request, '❌ No tienes permisos para exportar datos de liquidación.')
+        return redirect('home')
+
     from .services import generar_buffer_excel_liquidacion
 
     medico_id = request.GET.get('medico')
@@ -1418,6 +1432,7 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         return self.render_to_response(context)
 
     def confirmar_carga(self, request):
+        from liquidacion.models import RegistroEstudio
         try:
             registros_json = request.POST.get('datos_serializados')
             registros = json.loads(registros_json)
@@ -1437,15 +1452,30 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                     ).first()
                     if not estudio:
                         continue
-                    registro = RegistroEstudiosPorMedico.objects.create(
-                        medico=medico,
-                        nombre_paciente=item['nombre'],
-                        apellido_paciente=item['apellido'],
-                        dni_paciente=item['dni'],
-                        fecha_del_informe=item['fecha'],
-                        estudio=estudio,
-                        cantidad_regiones=1
+                    fecha = datetime.strptime(item['fecha'], '%Y-%m-%d').date()
+                    sesion, _ = SesionContable.objects.get_or_create(
+                        mes=fecha.month,
+                        año=fecha.year,
+                        defaults={'estado': 'ABIERTA'},
                     )
+                    with transaction.atomic():
+                        registro = RegistroEstudiosPorMedico.objects.create(
+                            medico=medico,
+                            nombre_paciente=item['nombre'],
+                            apellido_paciente=item['apellido'],
+                            dni_paciente=item['dni'],
+                            fecha_del_informe=fecha,
+                            sesion_contable=sesion,
+                            cantidad_regiones=estudio.conteo_regiones_default,
+                        )
+                        RegistroEstudio.objects.create(
+                            registro=registro,
+                            estudio=estudio,
+                            cantidad=1,
+                            contexto='SERVICIO',
+                        )
+                        registro.monto_calculado = registro.calcular_monto()
+                        registro.save(update_fields=['monto_calculado'])
                     cargados += 1
                 except Exception:
                     errores += 1
@@ -1454,3 +1484,132 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         except Exception as e:
             messages.error(request, f"❌ Error procesando la carga: {str(e)}")
         return redirect('carga-masiva')
+
+
+# ============================================================================
+# GESTIÓN DE SESIONES CONTABLES — Fase B (Mayo 2026)
+# ============================================================================
+
+class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """
+    Vista administrativa para gestionar el ciclo de vida de SesionContable.
+    Permisos: administrativo, jefe_servicio, superuser.
+    """
+    model = SesionContable
+    template_name = 'liquidacion/sesion_contable_list.html'
+    context_object_name = 'sesiones'
+
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+
+    def handle_no_permission(self):
+        messages.error(self.request, '❌ No tienes permisos para gestionar sesiones contables.')
+        return redirect('home')
+
+    def get_queryset(self):
+        return SesionContable.objects.prefetch_related(
+            'practicas', 'guardias_pasivas'
+        ).order_by('-año', '-mes')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        _MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+        _SIGUIENTE = {
+            'ABIERTA': 'REVISION',
+            'REVISION': 'CERRADA',
+            'CERRADA': 'FACTURADA',
+            'FACTURADA': 'PAGADA',
+        }
+        _ROLES_TRANSICION = {
+            'ABIERTA':   ['administrativo', 'jefe_servicio'],
+            'REVISION':  ['administrativo', 'jefe_servicio'],
+            'CERRADA':   ['administrativo'],
+            'FACTURADA': ['administrativo'],
+        }
+
+        sesiones_data = []
+        for sesion in context['sesiones']:
+            total_monto = (
+                sesion.practicas.aggregate(t=Sum('monto_calculado'))['t'] or 0
+            )
+            total_guardias_monto = (
+                sesion.guardias_pasivas.aggregate(t=Sum('monto'))['t'] or 0
+            )
+            siguiente = _SIGUIENTE.get(sesion.estado)
+            roles_ok = _ROLES_TRANSICION.get(sesion.estado, [])
+            puede = user.is_superuser or user.rol in roles_ok
+
+            sesiones_data.append({
+                'sesion': sesion,
+                'mes_nombre': _MESES[sesion.mes] if 1 <= sesion.mes <= 12 else str(sesion.mes),
+                'count_practicas': sesion.practicas.count(),
+                'count_guardias': sesion.guardias_pasivas.count(),
+                'total_monto_practicas': total_monto,
+                'total_monto_guardias': total_guardias_monto,
+                'total_general': total_monto + total_guardias_monto,
+                'siguiente_estado': siguiente,
+                'puede_transicionar': puede,
+            })
+
+        context['sesiones_data'] = sesiones_data
+        return context
+
+
+@login_required
+def sesion_contable_transicion(request, pk):
+    """
+    Avanza el estado de una SesionContable al siguiente paso del flujo.
+    Solo acepta POST. Valida permisos por rol y estado actual.
+
+    Flujo: ABIERTA → REVISION → CERRADA → FACTURADA → PAGADA
+    - jefe_servicio puede avanzar hasta CERRADA
+    - administrativo/superuser pueden avanzar hasta PAGADA
+    """
+    if request.method != 'POST':
+        return redirect('liquidacion:sesiones_list')
+
+    sesion = get_object_or_404(SesionContable, pk=pk)
+    user = request.user
+
+    FLUJO = {
+        'ABIERTA':   {'siguiente': 'REVISION',   'roles': ['administrativo', 'jefe_servicio']},
+        'REVISION':  {'siguiente': 'CERRADA',     'roles': ['administrativo', 'jefe_servicio']},
+        'CERRADA':   {'siguiente': 'FACTURADA',   'roles': ['administrativo']},
+        'FACTURADA': {'siguiente': 'PAGADA',      'roles': ['administrativo']},
+    }
+
+    config = FLUJO.get(sesion.estado)
+    if not config:
+        messages.error(request, '❌ Esta sesión ya está en estado final (PAGADA).')
+        return redirect('liquidacion:sesiones_list')
+
+    if not (user.is_superuser or user.rol in config['roles']):
+        messages.error(request, '❌ No tienes permisos para esta transición.')
+        return redirect('liquidacion:sesiones_list')
+
+    from django.utils import timezone as tz
+
+    estado_anterior = sesion.estado
+    sesion.estado = config['siguiente']
+
+    if config['siguiente'] == 'CERRADA':
+        sesion.fecha_cierre = tz.now()
+        sesion.cerrada_por = user
+    elif config['siguiente'] == 'FACTURADA':
+        sesion.fecha_facturacion = tz.now()
+    elif config['siguiente'] == 'PAGADA':
+        sesion.fecha_pago = tz.now()
+
+    sesion.save()
+
+    meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+             'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    mes_nombre = meses[sesion.mes] if 1 <= sesion.mes <= 12 else str(sesion.mes)
+    messages.success(
+        request,
+        f'✅ {mes_nombre} {sesion.año}: {estado_anterior} → {sesion.estado}'
+    )
+    return redirect('liquidacion:sesiones_list')

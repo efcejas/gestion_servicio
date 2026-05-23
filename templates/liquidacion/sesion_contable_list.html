@@ -1,0 +1,193 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% load static %}
+{% block title %}Sesiones Contables{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+
+    <!-- Header -->
+        <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+            style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Gestión de Sesiones Contables</h1>
+                <p class="text-slate-300 text-sm">Ciclo de facturación mensual — apertura, revisión, cierre y pago</p>
+            </div>
+            <a href="{% url 'liquidacion:liquidacion_mensual' %}"
+               class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all shrink-0">
+                <i class="fas fa-chart-line"></i> Ver Liquidación
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabla de sesiones -->
+    <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
+        <div class="overflow-x-auto w-full">
+            <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
+                <colgroup>
+                    <col style="width: 28%;">
+                    <col style="width: 14%;">
+                    <col style="width: 12%;">
+                    <col style="width: 12%;">
+                    <col style="width: 16%;">
+                    <col style="width: 18%;">
+                </colgroup>
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Prácticas</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Guardias</th>
+                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total general</th>
+                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for dato in sesiones_data %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+
+                        <!-- Período -->
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-semibold text-gray-900">{{ dato.mes_nombre }} {{ dato.sesion.año }}</div>
+                            <div class="text-xs text-gray-400 mt-0.5">Apertura: {{ dato.sesion.fecha_apertura|date:"d/m/Y" }}</div>
+                            {% if dato.sesion.fecha_cierre %}
+                            <div class="text-xs text-gray-400">Cierre: {{ dato.sesion.fecha_cierre|date:"d/m/Y H:i" }}</div>
+                            {% endif %}
+                            {% if dato.sesion.cerrada_por %}
+                            <div class="text-xs text-gray-400">Por: {{ dato.sesion.cerrada_por.get_full_name }}</div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Estado badge -->
+                        <td class="px-6 py-4">
+                            {% if dato.sesion.estado == 'ABIERTA' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-green-500"></span>
+                                Abierta
+                            </span>
+                            {% elif dato.sesion.estado == 'REVISION' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">
+                                <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-yellow-500"></span>
+                                En Revisión
+                            </span>
+                            {% elif dato.sesion.estado == 'CERRADA' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                                <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-blue-500"></span>
+                                Cerrada
+                            </span>
+                            {% elif dato.sesion.estado == 'FACTURADA' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                                <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-purple-500"></span>
+                                Facturada
+                            </span>
+                            {% elif dato.sesion.estado == 'PAGADA' %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                                <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-gray-400"></span>
+                                Pagada
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Prácticas -->
+                        <td class="px-6 py-4 text-right">
+                            <div class="text-sm font-semibold text-gray-900">{{ dato.count_practicas }}</div>
+                            <div class="text-xs text-gray-400">${{ dato.total_monto_practicas|floatformat:0 }}</div>
+                        </td>
+
+                        <!-- Guardias -->
+                        <td class="px-6 py-4 text-right">
+                            <div class="text-sm font-semibold text-gray-900">{{ dato.count_guardias }}</div>
+                            <div class="text-xs text-gray-400">${{ dato.total_monto_guardias|floatformat:0 }}</div>
+                        </td>
+
+                        <!-- Total general -->
+                        <td class="px-6 py-4 text-right">
+                            <div class="text-sm font-bold text-gray-900">${{ dato.total_general|floatformat:0 }}</div>
+                        </td>
+
+                        <!-- Acción de transición -->
+                        <td class="px-6 py-4 text-center">
+                            {% if dato.puede_transicionar and dato.siguiente_estado %}
+                                {% if dato.sesion.estado == 'ABIERTA' %}
+                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                      onsubmit="return confirm('¿Pasar {{ dato.sesion }} a REVISIÓN?\nLos médicos seguirán pudiendo registrar.')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-yellow-500 hover:bg-yellow-600 rounded-lg transition-colors">
+                                        <i class="fas fa-search"></i> Pasar a Revisión
+                                    </button>
+                                </form>
+                                {% elif dato.sesion.estado == 'REVISION' %}
+                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                      onsubmit="return confirm('¿Cerrar {{ dato.sesion }}?\nSolo admin podrá cargar registros faltantes.')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                                        <i class="fas fa-lock"></i> Cerrar sesión
+                                    </button>
+                                </form>
+                                {% elif dato.sesion.estado == 'CERRADA' %}
+                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                      onsubmit="return confirm('¿Marcar {{ dato.sesion }} como FACTURADA?\nLos montos quedan definitivos.')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+                                        <i class="fas fa-file-invoice-dollar"></i> Marcar Facturada
+                                    </button>
+                                </form>
+                                {% elif dato.sesion.estado == 'FACTURADA' %}
+                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                      onsubmit="return confirm('¿Marcar {{ dato.sesion }} como PAGADA?\nEsta acción es irreversible.')">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
+                                        <i class="fas fa-check-double"></i> Marcar Pagada
+                                    </button>
+                                </form>
+                                {% endif %}
+                            {% elif dato.sesion.estado == 'PAGADA' %}
+                            <span class="text-xs text-gray-400 italic">Liquidada</span>
+                            {% else %}
+                            <span class="text-xs text-gray-400 italic">Sin permiso</span>
+                            {% endif %}
+                        </td>
+
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <i class="fas fa-calendar-times text-4xl text-gray-200 block mb-3"></i>
+                            <p class="text-gray-500 text-sm">No hay sesiones contables registradas todavía.</p>
+                            <p class="text-gray-400 text-xs mt-1">Se crean automáticamente al registrar la primera práctica del mes.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leyenda del flujo y permisos -->
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Flujo del ciclo contable</p>
+        <div class="flex flex-wrap items-center gap-2 text-xs mb-4">
+            <span class="px-2 py-1 bg-green-100 text-green-800 rounded font-medium">Abierta</span>
+            <i class="fas fa-arrow-right text-gray-300"></i>
+            <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded font-medium">En Revisión</span>
+            <i class="fas fa-arrow-right text-gray-300"></i>
+            <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded font-medium">Cerrada</span>
+            <i class="fas fa-arrow-right text-gray-300"></i>
+            <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded font-medium">Facturada</span>
+            <i class="fas fa-arrow-right text-gray-300"></i>
+            <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium">Pagada</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-500">
+            <div><span class="font-medium text-green-700">Abierta / En Revisión:</span> médicos pueden cargar prácticas y guardias</div>
+            <div><span class="font-medium text-blue-700">Cerrada:</span> solo admin puede cargar registros faltantes</div>
+            <div><span class="font-medium text-purple-700">Facturada / Pagada:</span> solo lectura, correcciones requieren motivo</div>
+            <div><span class="font-medium text-slate-700">Facturada → Pagada:</span> solo administrativo y superusuario</div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

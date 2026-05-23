@@ -14,7 +14,7 @@ from django.db import connection
 from django.urls import reverse
 from datetime import date, datetime
 from decimal import Decimal
-from .models import RegistroEstudiosPorMedico, RegistroEstudio, Estudios, SesionContable
+from .models import RegistroEstudiosPorMedico, RegistroEstudio, Estudios, SesionContable, GuardiaPasiva
 
 User = get_user_model()
 
@@ -417,3 +417,279 @@ class PermisosYTrazabilidadViewTest(TestCase):
             RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).exists(),
             '❌ FALLA: Un médico pudo eliminar registro en sesión cerrada.'
         )
+
+
+class SesionContableWorkflowPermissionsTest(TestCase):
+    """Blindaje de permisos y flujo de transiciones de SesionContable."""
+
+    def setUp(self):
+        self.password = 'testpass123'
+        self._mes_seq = 1
+        self.superuser = User.objects.create_superuser(
+            username='root_sesiones',
+            email='root_sesiones@test.com',
+            password=self.password,
+        )
+        self.admin = User.objects.create_user(
+            username='admin_sesiones',
+            password=self.password,
+            rol='administrativo',
+            perfil_completo=True,
+        )
+        self.jefe_servicio = User.objects.create_user(
+            username='jefe_servicio_sesiones',
+            password=self.password,
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.medico_staff = User.objects.create_user(
+            username='staff_sesiones',
+            password=self.password,
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.medico_residente = User.objects.create_user(
+            username='residente_sesiones',
+            password=self.password,
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_res_sesiones',
+            password=self.password,
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.instructor = User.objects.create_user(
+            username='instructor_sesiones',
+            password=self.password,
+            rol='instructor_residentes',
+            perfil_completo=True,
+        )
+
+    def _login(self, user):
+        self.client.force_login(user)
+
+    def _crear_sesion(self, estado):
+        sesion = SesionContable.objects.create(mes=self._mes_seq, año=2026, estado=estado)
+        self._mes_seq += 1
+        return sesion
+
+    def test_sesiones_list_requiere_login(self):
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+        self.assertEqual(response.status_code, 302)
+        # En este proyecto el middleware global puede redirigir anónimos a '/'.
+        self.assertTrue(response.url.startswith('/'))
+
+    def test_sesiones_list_permite_super_admin_y_jefe_servicio(self):
+        for user in [self.superuser, self.admin, self.jefe_servicio]:
+            self.client.logout()
+            self._login(user)
+            response = self.client.get(reverse('liquidacion:sesiones_list'))
+            self.assertEqual(
+                response.status_code,
+                200,
+                f"❌ FALLA: {user.username} debería acceder a sesiones_list",
+            )
+
+    def test_sesiones_list_deniega_roles_medicos_y_docencia(self):
+        for user in [self.medico_staff, self.medico_residente, self.jefe_residentes, self.instructor]:
+            self.client.logout()
+            self._login(user)
+            response = self.client.get(reverse('liquidacion:sesiones_list'))
+            self.assertEqual(
+                response.status_code,
+                302,
+                f"❌ FALLA: {user.username} NO debería acceder a sesiones_list",
+            )
+
+    def test_transicion_get_no_modifica_estado(self):
+        sesion = self._crear_sesion('ABIERTA')
+        self._login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'ABIERTA')
+
+    def test_transicion_put_no_modifica_estado(self):
+        sesion = self._crear_sesion('ABIERTA')
+        self._login(self.admin)
+
+        response = self.client.generic('PUT', reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'ABIERTA')
+
+    def test_transicion_abierta_a_revision_permitida_para_admin_y_jefe_servicio(self):
+        for user in [self.admin, self.jefe_servicio, self.superuser]:
+            sesion = self._crear_sesion('ABIERTA')
+            self.client.logout()
+            self._login(user)
+            response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+            self.assertEqual(response.status_code, 302)
+            sesion.refresh_from_db()
+            self.assertEqual(sesion.estado, 'REVISION')
+
+    def test_transicion_revision_a_cerrada_permitida_para_admin_y_jefe_servicio(self):
+        for user in [self.admin, self.jefe_servicio, self.superuser]:
+            sesion = self._crear_sesion('REVISION')
+            self.client.logout()
+            self._login(user)
+            response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+            self.assertEqual(response.status_code, 302)
+            sesion.refresh_from_db()
+            self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_transicion_financiera_denegada_para_jefe_servicio(self):
+        sesion = self._crear_sesion('CERRADA')
+        self._login(self.jefe_servicio)
+
+        response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_transicion_financiera_permitida_para_admin_y_superuser(self):
+        for user in [self.admin, self.superuser]:
+            sesion = self._crear_sesion('CERRADA')
+            self.client.logout()
+            self._login(user)
+            response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+            self.assertEqual(response.status_code, 302)
+            sesion.refresh_from_db()
+            self.assertEqual(sesion.estado, 'FACTURADA')
+
+    def test_transicion_denegada_para_roles_no_administrativos(self):
+        sesion = self._crear_sesion('ABIERTA')
+        self._login(self.medico_staff)
+
+        response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(response.status_code, 302)
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'ABIERTA')
+
+    def test_sesion_pagada_no_transiciona_ni_con_admin_ni_superuser(self):
+        for user in [self.admin, self.superuser]:
+            sesion = self._crear_sesion('PAGADA')
+            self.client.logout()
+            self._login(user)
+            response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+            self.assertEqual(response.status_code, 302)
+            sesion.refresh_from_db()
+            self.assertEqual(sesion.estado, 'PAGADA')
+
+
+class SesionContableFinalStateLockTest(TestCase):
+    """Bloqueos operativos en estados FACTURADA/PAGADA para prácticas y guardias."""
+
+    def setUp(self):
+        self.password = 'testpass123'
+        self.medico = User.objects.create_user(
+            username='medico_lock',
+            password=self.password,
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+        self.sesion_facturada = SesionContable.objects.create(mes=6, año=2026, estado='FACTURADA')
+        self.sesion_pagada = SesionContable.objects.create(mes=7, año=2026, estado='PAGADA')
+
+        self.registro_facturado = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Facturado',
+            dni_paciente='12121212',
+            fecha_del_informe=date(2026, 6, 10),
+            sesion_contable=self.sesion_facturada,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('1000.00'),
+        )
+
+        self.registro_pagado = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Pagado',
+            dni_paciente='34343434',
+            fecha_del_informe=date(2026, 7, 10),
+            sesion_contable=self.sesion_pagada,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('1000.00'),
+        )
+
+        self.guardia_facturada = GuardiaPasiva.objects.create(
+            sesion_contable=self.sesion_facturada,
+            medico=self.medico,
+            fecha_guardia=date(2026, 6, 11),
+            tipo_guardia='COBER',
+            monto=Decimal('36500.00'),
+        )
+
+        self.guardia_pagada = GuardiaPasiva.objects.create(
+            sesion_contable=self.sesion_pagada,
+            medico=self.medico,
+            fecha_guardia=date(2026, 7, 11),
+            tipo_guardia='COBER',
+            monto=Decimal('36500.00'),
+        )
+
+        self.client.force_login(self.medico)
+
+    def test_delete_practica_bloqueado_en_facturada(self):
+        response = self.client.post(
+            reverse('liquidacion:registroestudios_delete', kwargs={'pk': self.registro_facturado.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            RegistroEstudiosPorMedico.objects.filter(pk=self.registro_facturado.pk).exists(),
+            '❌ FALLA: se eliminó una práctica en FACTURADA.',
+        )
+
+    def test_delete_practica_bloqueado_en_pagada(self):
+        response = self.client.post(
+            reverse('liquidacion:registroestudios_delete', kwargs={'pk': self.registro_pagado.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            RegistroEstudiosPorMedico.objects.filter(pk=self.registro_pagado.pk).exists(),
+            '❌ FALLA: se eliminó una práctica en PAGADA.',
+        )
+
+    def test_delete_guardia_bloqueado_en_facturada(self):
+        response = self.client.post(
+            reverse('liquidacion:eliminar_guardia_pasiva', kwargs={'pk': self.guardia_facturada.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            GuardiaPasiva.objects.filter(pk=self.guardia_facturada.pk).exists(),
+            '❌ FALLA: se eliminó una guardia en FACTURADA.',
+        )
+
+    def test_delete_guardia_bloqueado_en_pagada(self):
+        response = self.client.post(
+            reverse('liquidacion:eliminar_guardia_pasiva', kwargs={'pk': self.guardia_pagada.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            GuardiaPasiva.objects.filter(pk=self.guardia_pagada.pk).exists(),
+            '❌ FALLA: se eliminó una guardia en PAGADA.',
+        )
+
+    def test_update_guardia_bloqueado_en_facturada(self):
+        response = self.client.post(
+            reverse('liquidacion:editar_guardia_pasiva', kwargs={'pk': self.guardia_facturada.pk}),
+            data={
+                'fecha_guardia': '2026-06-11',
+                'tipo_guardia': 'COBER',
+                'observaciones': 'Intento de edición bloqueada',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.guardia_facturada.refresh_from_db()
+        self.assertEqual(self.guardia_facturada.observaciones, '')
