@@ -211,7 +211,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         if not sesion.puede_registrar_practicas(user):
             messages.error(
                 self.request,
-                f"❌ La sesión de {sesion.get_mes_display()} {sesion.año} está en estado "
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
                 f"{sesion.get_estado_display()}. No puedes registrar prácticas."
             )
             return redirect(self.success_url)
@@ -525,6 +525,14 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         
         # Validar que la sesión permita editar
         sesion = guardia.sesion_contable
+        if sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(
+                self.request,
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No se pueden editar guardias en este estado."
+            )
+            return redirect(self.success_url)
+
         if not sesion.puede_registrar_practicas(user):
             messages.error(
                 self.request,
@@ -584,6 +592,14 @@ class GuardiaPasivaDeleteView(LoginRequiredMixin, DeleteView):
         self.object = guardia
 
         sesion = guardia.sesion_contable
+        if sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(
+                request,
+                f"❌ La sesión de {_mes_nombre(sesion.mes)} {sesion.año} está en estado "
+                f"{sesion.get_estado_display()}. No se pueden eliminar guardias en este estado."
+            )
+            return redirect(self.success_url)
+
         if not sesion.puede_registrar_practicas(request.user):
             messages.error(
                 request,
