@@ -86,6 +86,18 @@
                                 Pagada
                             </span>
                             {% endif %}
+                            <div class="mt-2 space-y-1">
+                                {% if dato.gate_bloqueantes_count %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-700">
+                                    {{ dato.gate_bloqueantes_count }} bloqueante(s)
+                                </span>
+                                {% endif %}
+                                {% if dato.gate_advertencias_count %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">
+                                    {{ dato.gate_advertencias_count }} advertencia(s)
+                                </span>
+                                {% endif %}
+                            </div>
                         </td>
 
                         <!-- Prácticas -->
@@ -130,6 +142,10 @@
                                 <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
                                       onsubmit="return confirm('¿Marcar {{ dato.sesion }} como FACTURADA?\nLos montos quedan definitivos.')">
                                     {% csrf_token %}
+                                    <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
+                                    <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
+                                              placeholder="Motivo obligatorio para FACTURAR"
+                                              class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
                                     <button type="submit"
                                             class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
                                         <i class="fas fa-file-invoice-dollar"></i> Marcar Facturada
@@ -139,6 +155,10 @@
                                 <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
                                       onsubmit="return confirm('¿Marcar {{ dato.sesion }} como PAGADA?\nEsta acción es irreversible.')">
                                     {% csrf_token %}
+                                    <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
+                                    <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
+                                              placeholder="Motivo obligatorio para PAGAR"
+                                              class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500"></textarea>
                                     <button type="submit"
                                             class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
                                         <i class="fas fa-check-double"></i> Marcar Pagada
@@ -152,6 +172,81 @@
                             {% endif %}
                         </td>
 
+                    </tr>
+                    <tr class="bg-gray-50/70">
+                        <td colspan="6" class="px-6 py-4">
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="lg:col-span-1">
+                                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Exportación</p>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <a href="{% url 'liquidacion:exportar_excel_liquidacion' %}?mes={{ dato.sesion.mes }}&año={{ dato.sesion.año }}"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
+                                            <i class="fas fa-file-export"></i> Exportar PRELIMINAR
+                                        </a>
+                                        {% if dato.sesion.estado == 'FACTURADA' or dato.sesion.estado == 'PAGADA' %}
+                                        <a href="{% url 'liquidacion:exportar_excel_liquidacion_definitiva' %}?mes={{ dato.sesion.mes }}&año={{ dato.sesion.año }}"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors">
+                                            <i class="fas fa-file-signature"></i> Exportar DEFINITIVA
+                                        </a>
+                                        {% else %}
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-gray-100 text-gray-400 cursor-not-allowed"
+                                              title="Disponible solo cuando la sesión está FACTURADA o PAGADA.">
+                                            <i class="fas fa-lock"></i> Exportar DEFINITIVA
+                                        </span>
+                                        <span class="text-[11px] text-gray-400">Definitiva habilitada solo en FACTURADA/PAGADA.</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="lg:col-span-1">
+                                    <details class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <span>Preview gate administrativo</span>
+                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
+                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                        </summary>
+                                        <div class="mt-2 space-y-1 text-xs">
+                                            {% if dato.gate_bloqueantes_preview %}
+                                                {% for issue in dato.gate_bloqueantes_preview %}
+                                                <p class="text-red-700">• {{ issue }}</p>
+                                                {% endfor %}
+                                            {% endif %}
+                                            {% if dato.gate_advertencias_preview %}
+                                                {% for issue in dato.gate_advertencias_preview %}
+                                                <p class="text-amber-700">• {{ issue }}</p>
+                                                {% endfor %}
+                                            {% endif %}
+                                            {% if not dato.gate_bloqueantes_preview and not dato.gate_advertencias_preview %}
+                                            <p class="text-gray-500">Sin hallazgos para la próxima transición.</p>
+                                            {% endif %}
+                                        </div>
+                                    </details>
+                                </div>
+
+                                <div class="lg:col-span-1">
+                                    <details class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <span>Historial ({{ dato.historial_count }})</span>
+                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
+                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                        </summary>
+                                        <div class="mt-2 space-y-2">
+                                            {% for mov in dato.historial_reciente %}
+                                            <div class="text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white">
+                                                <p class="text-gray-700 font-medium">{{ mov.estado_anterior }} → {{ mov.estado_nuevo }}</p>
+                                                <p class="text-gray-500">{{ mov.fecha|date:"d/m/Y H:i" }} · {{ mov.origen }} · {{ mov.usuario|default:"Sistema" }}</p>
+                                                {% if mov.motivo %}
+                                                <p class="text-gray-600 mt-0.5">Motivo: {{ mov.motivo }}</p>
+                                                {% endif %}
+                                            </div>
+                                            {% empty %}
+                                            <p class="text-xs text-gray-500">Sin transiciones registradas.</p>
+                                            {% endfor %}
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>

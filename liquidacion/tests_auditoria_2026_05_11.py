@@ -7,14 +7,24 @@ Validar que los 4 fixes implementados funcionan:
   FIX #4: Post_save signals para recálculo automático
 """
 
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, RequestFactory
+from django.contrib.admin.sites import AdminSite
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.urls import reverse
 from datetime import date, datetime
 from decimal import Decimal
-from .models import RegistroEstudiosPorMedico, RegistroEstudio, Estudios, SesionContable, GuardiaPasiva
+from .models import (
+    RegistroEstudiosPorMedico,
+    RegistroEstudio,
+    Estudios,
+    SesionContable,
+    HistorialSesionContable,
+    GuardiaPasiva,
+    GrupoTarifario,
+    TarifaGrupoTarifario,
+)
 
 User = get_user_model()
 
@@ -475,6 +485,33 @@ class SesionContableWorkflowPermissionsTest(TestCase):
         self._mes_seq += 1
         return sesion
 
+    def test_portal_inicio_requiere_login(self):
+        response = self.client.get(reverse('liquidacion:portal_inicio'))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith('/'))
+
+    def test_portal_inicio_permite_super_admin_y_jefe_servicio(self):
+        for user in [self.superuser, self.admin, self.jefe_servicio]:
+            self.client.logout()
+            self._login(user)
+            response = self.client.get(reverse('liquidacion:portal_inicio'))
+            self.assertEqual(
+                response.status_code,
+                200,
+                f"❌ FALLA: {user.username} debería acceder al portal administrativo",
+            )
+
+    def test_portal_inicio_deniega_roles_no_administrativos(self):
+        for user in [self.medico_staff, self.medico_residente, self.jefe_residentes, self.instructor]:
+            self.client.logout()
+            self._login(user)
+            response = self.client.get(reverse('liquidacion:portal_inicio'))
+            self.assertEqual(
+                response.status_code,
+                302,
+                f"❌ FALLA: {user.username} NO debería acceder al portal administrativo",
+            )
+
     def test_sesiones_list_requiere_login(self):
         response = self.client.get(reverse('liquidacion:sesiones_list'))
         self.assertEqual(response.status_code, 302)
@@ -556,9 +593,52 @@ class SesionContableWorkflowPermissionsTest(TestCase):
     def test_transicion_financiera_permitida_para_admin_y_superuser(self):
         for user in [self.admin, self.superuser]:
             sesion = self._crear_sesion('CERRADA')
+            grupo = GrupoTarifario.objects.create(
+                codigo=f'ECO_FACT_{sesion.pk}_{user.pk}',
+                nombre='Grupo facturacion valida',
+                modalidad='ECO',
+                activo=True,
+            )
+            TarifaGrupoTarifario.objects.create(
+                grupo_tarifario=grupo,
+                vigencia_desde=date(2026, 1, 1),
+                precio_cober=Decimal('5000.00'),
+                precio_otras_os=Decimal('7000.00'),
+            )
+            estudio = Estudios.objects.create(
+                nombre=f'ECO FACT {sesion.pk}_{user.pk}',
+                tipo='ECO',
+                conteo_regiones=1,
+                conteo_regiones_default=1,
+                precio_cober=Decimal('5000.00'),
+                precio_otras_os=Decimal('7000.00'),
+                grupo_tarifario=grupo,
+                activo=True,
+            )
+            registro = RegistroEstudiosPorMedico.objects.create(
+                medico=self.medico_staff,
+                nombre_paciente='Facturacion',
+                apellido_paciente='Valida',
+                dni_paciente='55443322',
+                fecha_del_informe=date(2026, sesion.mes, 10),
+                sesion_contable=sesion,
+                tipo_obra_social='COBER',
+                horario='NA',
+                monto_calculado=Decimal('5000.00'),
+            )
+            RegistroEstudio.objects.create(
+                registro=registro,
+                estudio=estudio,
+                cantidad=1,
+                contexto='SERVICIO',
+            )
+
             self.client.logout()
             self._login(user)
-            response = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+            response = self.client.post(
+                reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+                data={'motivo': 'Cierre de facturacion del periodo'},
+            )
             self.assertEqual(response.status_code, 302)
             sesion.refresh_from_db()
             self.assertEqual(sesion.estado, 'FACTURADA')
@@ -582,6 +662,395 @@ class SesionContableWorkflowPermissionsTest(TestCase):
             self.assertEqual(response.status_code, 302)
             sesion.refresh_from_db()
             self.assertEqual(sesion.estado, 'PAGADA')
+
+    def test_flujo_valido_completo_abierta_a_pagada(self):
+        sesion = self._crear_sesion('ABIERTA')
+        grupo = GrupoTarifario.objects.create(
+            codigo=f'ECO_FLUJO_{sesion.pk}',
+            nombre='Grupo flujo valido',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+        )
+        estudio = Estudios.objects.create(
+            nombre=f'ECO FLUJO {sesion.pk}',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            grupo_tarifario=grupo,
+            activo=True,
+        )
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico_staff,
+            nombre_paciente='Flujo',
+            apellido_paciente='Valido',
+            dni_paciente='99887766',
+            fecha_del_informe=date(2026, sesion.mes, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('5000.00'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+
+        self._login(self.admin)
+
+        r1 = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(r1.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'REVISION')
+
+        r2 = self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        self.assertEqual(r2.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+        r3 = self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion validada por administracion'},
+        )
+        self.assertEqual(r3.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
+
+        r4 = self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Pago confirmado por tesoreria'},
+        )
+        self.assertEqual(r4.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'PAGADA')
+
+
+class SesionContableAdminGovernanceTest(TestCase):
+    """Fase 1: blindaje de bypass de estado desde Django admin."""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_user(
+            username='admin_governance',
+            password='testpass123',
+            rol='administrativo',
+            perfil_completo=True,
+            is_staff=True,
+        )
+        self.rf = RequestFactory()
+        self.site = AdminSite()
+
+    def test_admin_estado_es_readonly(self):
+        from liquidacion.admin import SesionContableAdmin
+
+        model_admin = SesionContableAdmin(SesionContable, self.site)
+        request = self.rf.get('/admin/liquidacion/sesioncontable/1/change/')
+        request.user = self.admin_user
+
+        readonly = model_admin.get_readonly_fields(request)
+        self.assertIn('estado', readonly)
+
+    def test_admin_action_no_permite_salto_abierta_a_pagada(self):
+        from liquidacion.admin import SesionContableAdmin
+
+        sesion = SesionContable.objects.create(mes=10, año=2026, estado='ABIERTA')
+        model_admin = SesionContableAdmin(SesionContable, self.site)
+        model_admin.message_user = lambda *args, **kwargs: None
+        request = self.rf.post('/admin/liquidacion/sesioncontable/')
+        request.user = self.admin_user
+
+        model_admin.marcar_pagada(request, SesionContable.objects.filter(pk=sesion.pk))
+        sesion.refresh_from_db()
+
+        self.assertEqual(
+            sesion.estado,
+            'ABIERTA',
+            '❌ FALLA: se permitió salto arbitrario de ABIERTA a PAGADA desde admin action.',
+        )
+
+
+class SesionContableConsistencyGateTest(TestCase):
+    """Fase 2: Gate de consistencia pre-cierre/pre-facturacion."""
+
+    def setUp(self):
+        self.password = 'testpass123'
+        self.admin = User.objects.create_user(
+            username='admin_gate',
+            password=self.password,
+            rol='administrativo',
+            perfil_completo=True,
+            is_staff=True,
+        )
+        self.medico = User.objects.create_user(
+            username='medico_gate',
+            password=self.password,
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+        self.grupo = GrupoTarifario.objects.create(
+            codigo='ECO_GATE',
+            nombre='Ecografia Gate',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+        )
+
+        self.estudio_con_grupo = Estudios.objects.create(
+            nombre='ECO GATE OK',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            grupo_tarifario=self.grupo,
+            activo=True,
+        )
+
+        self.estudio_sin_grupo_legacy = Estudios.objects.create(
+            nombre='ECO LEGACY OK',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('4000.00'),
+            precio_otras_os=Decimal('6000.00'),
+            activo=True,
+        )
+
+        self.estudio_grupo_sin_tarifa = Estudios.objects.create(
+            nombre='ECO SIN TARIFA VIGENTE',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('4000.00'),
+            precio_otras_os=Decimal('6000.00'),
+            grupo_tarifario=GrupoTarifario.objects.create(
+                codigo='ECO_SIN_TARIFA',
+                nombre='Grupo sin tarifa',
+                modalidad='ECO',
+                activo=True,
+            ),
+            activo=True,
+        )
+
+        self.estudio_contextual = Estudios.objects.create(
+            nombre='DOP CONTEXTUAL',
+            tipo='DOP',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('11000.00'),
+            precio_otras_os=Decimal('12000.00'),
+            grupo_tarifario=GrupoTarifario.objects.create(
+                codigo='DOP_CTX',
+                nombre='Doppler Contextual Base',
+                modalidad='DOP',
+                activo=True,
+            ),
+            tiene_contexto_ubicacion=True,
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.estudio_contextual.grupo_tarifario,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('11000.00'),
+            precio_otras_os=Decimal('12000.00'),
+        )
+
+    def _login_admin(self):
+        self.client.force_login(self.admin)
+
+    def _crear_registro(self, sesion, estudio, monto=Decimal('5000.00')):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Gate',
+            dni_paciente=f'{sesion.pk:02}123456',
+            fecha_del_informe=date(2026, sesion.mes, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=monto,
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        return registro
+
+    def test_bloquea_revision_a_cerrada_si_registro_sin_registroestudio(self):
+        sesion = SesionContable.objects.create(mes=8, año=2026, estado='REVISION')
+        RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Sin',
+            apellido_paciente='Estudio',
+            dni_paciente='80808080',
+            fecha_del_informe=date(2026, 8, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('5000.00'),
+        )
+
+        self._login_admin()
+        self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'REVISION')
+
+    def test_bloquea_revision_a_cerrada_si_monto_cero_con_estudios(self):
+        sesion = SesionContable.objects.create(mes=9, año=2026, estado='REVISION')
+        registro = self._crear_registro(sesion, self.estudio_con_grupo, monto=Decimal('5000.00'))
+        registro.monto_calculado = Decimal('0.00')
+        registro.save(update_fields=['monto_calculado'])
+
+        self._login_admin()
+        self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'REVISION')
+
+    def test_bloquea_revision_a_cerrada_si_guardia_monto_invalido(self):
+        sesion = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        guardia = GuardiaPasiva.objects.create(
+            sesion_contable=sesion,
+            medico=self.medico,
+            fecha_guardia=date(2026, 10, 10),
+            tipo_guardia='COBER',
+        )
+        guardia.monto = Decimal('0.00')
+        guardia.save(update_fields=['monto'])
+
+        self._login_admin()
+        self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'REVISION')
+
+    def test_bloquea_cerrada_a_facturada_si_sesion_vacia(self):
+        sesion = SesionContable.objects.create(mes=11, año=2026, estado='CERRADA')
+
+        self._login_admin()
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Intento de facturacion vacia'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_bloquea_facturada_a_pagada_si_sesion_vacia(self):
+        sesion = SesionContable.objects.create(mes=12, año=2026, estado='FACTURADA')
+
+        self._login_admin()
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Intento de pago sin contenido'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
+
+    def test_bloquea_cerrada_a_facturada_si_grupo_sin_tarifa_vigente(self):
+        sesion = SesionContable.objects.create(mes=1, año=2027, estado='CERRADA')
+        self._crear_registro(sesion, self.estudio_grupo_sin_tarifa, monto=Decimal('4000.00'))
+
+        self._login_admin()
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion con tarifa ausente'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_bloquea_cerrada_a_facturada_si_contexto_lecho_sin_tarifa_contextual(self):
+        sesion = SesionContable.objects.create(mes=2, año=2027, estado='CERRADA')
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Contexto',
+            dni_paciente='22222222',
+            fecha_del_informe=date(2027, 2, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('11000.00'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_contextual,
+            cantidad=1,
+            contexto='LECHO',
+        )
+
+        self._login_admin()
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion sin tarifa contextual'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_advertencia_no_bloquea_sin_grupo_con_fallback_legacy_valido(self):
+        sesion = SesionContable.objects.create(mes=3, año=2027, estado='CERRADA')
+        self._crear_registro(sesion, self.estudio_sin_grupo_legacy, monto=Decimal('4000.00'))
+
+        self._login_admin()
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion legacy con fallback'},
+            follow=True,
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
+
+    def test_flujo_sano_completo_permite_cerrar_facturar_pagar(self):
+        sesion = SesionContable.objects.create(mes=4, año=2027, estado='REVISION')
+        self._crear_registro(sesion, self.estudio_con_grupo, monto=Decimal('5000.00'))
+
+        self._login_admin()
+
+        self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion de cierre mensual'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
+
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Pago acreditado'},
+        )
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'PAGADA')
+
+    def test_admin_actions_respetan_gate_que_bloquea_facturacion(self):
+        from liquidacion.admin import SesionContableAdmin
+
+        sesion = SesionContable.objects.create(mes=5, año=2027, estado='CERRADA')
+        self._crear_registro(sesion, self.estudio_grupo_sin_tarifa, monto=Decimal('4000.00'))
+
+        model_admin = SesionContableAdmin(SesionContable, AdminSite())
+        model_admin.message_user = lambda *args, **kwargs: None
+        request = RequestFactory().post('/admin/liquidacion/sesioncontable/')
+        request.user = self.admin
+
+        model_admin.marcar_facturada(request, SesionContable.objects.filter(pk=sesion.pk))
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
 
 
 class SesionContableFinalStateLockTest(TestCase):
@@ -693,3 +1162,248 @@ class SesionContableFinalStateLockTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.guardia_facturada.refresh_from_db()
         self.assertEqual(self.guardia_facturada.observaciones, '')
+
+
+class SesionContableFase3TrazabilidadYExportTest(TestCase):
+    """Fase 3: trazabilidad de transiciones y política de exportación."""
+
+    def setUp(self):
+        self.password = 'testpass123'
+        self.admin = User.objects.create_user(
+            username='admin_fase3',
+            password=self.password,
+            rol='administrativo',
+            perfil_completo=True,
+            is_staff=True,
+        )
+        self.medico = User.objects.create_user(
+            username='medico_fase3',
+            password=self.password,
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+        self.grupo = GrupoTarifario.objects.create(
+            codigo='ECO_FASE3',
+            nombre='Ecografia fase 3',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=self.grupo,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+        )
+        self.estudio = Estudios.objects.create(
+            nombre='ECO FASE 3',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            grupo_tarifario=self.grupo,
+            activo=True,
+        )
+
+    def _crear_sesion_con_datos(self, estado, mes):
+        sesion = SesionContable.objects.create(mes=mes, año=2027, estado=estado)
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Fase3',
+            dni_paciente=f'77{mes:02}1234',
+            fecha_del_informe=date(2027, mes, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='NA',
+            monto_calculado=Decimal('5000.00'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        return sesion
+
+    def test_motivo_obligatorio_en_cerrada_a_facturada(self):
+        sesion = self._crear_sesion_con_datos('CERRADA', 5)
+        self.client.force_login(self.admin)
+
+        self.client.post(reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}))
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+        self.assertFalse(HistorialSesionContable.objects.filter(sesion_contable=sesion).exists())
+
+    def test_historial_web_guarda_usuario_origen_y_motivo(self):
+        sesion = self._crear_sesion_con_datos('CERRADA', 6)
+        self.client.force_login(self.admin)
+
+        self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion mensual aprobada'},
+        )
+
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
+
+        historial = HistorialSesionContable.objects.get(sesion_contable=sesion)
+        self.assertEqual(historial.estado_anterior, 'CERRADA')
+        self.assertEqual(historial.estado_nuevo, 'FACTURADA')
+        self.assertEqual(historial.usuario, self.admin)
+        self.assertEqual(historial.origen, HistorialSesionContable.ORIGEN_WEB)
+        self.assertEqual(historial.motivo, 'Facturacion mensual aprobada')
+
+    def test_export_definitiva_bloqueada_en_cerrada(self):
+        sesion = self._crear_sesion_con_datos('CERRADA', 7)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion_definitiva'),
+            data={'mes': sesion.mes, 'año': sesion.año},
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_export_definitiva_permitida_en_facturada(self):
+        sesion = self._crear_sesion_con_datos('FACTURADA', 8)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion_definitiva'),
+            data={'mes': sesion.mes, 'año': sesion.año},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('DEFINITIVA', response['Content-Disposition'])
+
+    def test_export_preliminar_permitida_en_cualquier_estado_para_admin(self):
+        sesion = self._crear_sesion_con_datos('ABIERTA', 9)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion'),
+            data={'mes': sesion.mes, 'año': sesion.año},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('PRELIMINAR', response['Content-Disposition'])
+
+    def test_exportes_denegadas_para_medico(self):
+        sesion = self._crear_sesion_con_datos('PAGADA', 10)
+        self.client.force_login(self.medico)
+
+        response_pre = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion'),
+            data={'mes': sesion.mes, 'año': sesion.año},
+        )
+        response_def = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion_definitiva'),
+            data={'mes': sesion.mes, 'año': sesion.año},
+        )
+
+        self.assertEqual(response_pre.status_code, 302)
+        self.assertEqual(response_def.status_code, 302)
+
+    def test_sesiones_list_muestra_motivo_requerido_en_cerrada_y_facturada(self):
+        sesion_cerrada = self._crear_sesion_con_datos('CERRADA', 11)
+        sesion_facturada = self._crear_sesion_con_datos('FACTURADA', 12)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'id="motivo_sesion_{sesion_cerrada.pk}"')
+        self.assertContains(response, f'id="motivo_sesion_{sesion_facturada.pk}"')
+        self.assertContains(response, 'name="motivo"', count=2)
+
+    def test_sesiones_list_no_muestra_motivo_en_abierta_y_revision(self):
+        sesion_abierta = self._crear_sesion_con_datos('ABIERTA', 1)
+        sesion_revision = self._crear_sesion_con_datos('REVISION', 2)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, f'id="motivo_sesion_{sesion_abierta.pk}"')
+        self.assertNotContains(response, f'id="motivo_sesion_{sesion_revision.pk}"')
+
+    def test_sesiones_list_muestra_historial_si_existe(self):
+        sesion = self._crear_sesion_con_datos('CERRADA', 3)
+        HistorialSesionContable.objects.create(
+            sesion_contable=sesion,
+            estado_anterior='REVISION',
+            estado_nuevo='CERRADA',
+            usuario=self.admin,
+            origen=HistorialSesionContable.ORIGEN_WEB,
+            motivo='Cierre operativo',
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'REVISION → CERRADA')
+        self.assertContains(response, 'Motivo: Cierre operativo')
+
+    def test_sesiones_list_muestra_exportacion_preliminar(self):
+        sesion = self._crear_sesion_con_datos('ABIERTA', 4)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '{}?mes={}&año={}'.format(
+                reverse('liquidacion:exportar_excel_liquidacion'),
+                sesion.mes,
+                sesion.año,
+            ),
+            html=False,
+        )
+        self.assertContains(response, 'Exportar PRELIMINAR')
+
+    def test_sesiones_list_exportacion_definitiva_habilitada_solo_facturada_pagada(self):
+        sesion_abierta = self._crear_sesion_con_datos('ABIERTA', 5)
+        sesion_facturada = self._crear_sesion_con_datos('FACTURADA', 6)
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Definitiva habilitada solo en FACTURADA/PAGADA.')
+        self.assertContains(
+            response,
+            '{}?mes={}&año={}'.format(
+                reverse('liquidacion:exportar_excel_liquidacion_definitiva'),
+                sesion_facturada.mes,
+                sesion_facturada.año,
+            ),
+            html=False,
+        )
+        self.assertNotContains(
+            response,
+            '{}?mes={}&año={}'.format(
+                reverse('liquidacion:exportar_excel_liquidacion_definitiva'),
+                sesion_abierta.mes,
+                sesion_abierta.año,
+            ),
+            html=False,
+        )
+
+    def test_sesiones_list_restringida_para_medico_residente(self):
+        self._crear_sesion_con_datos('ABIERTA', 7)
+        medico_residente = User.objects.create_user(
+            username='residente_fase3',
+            password=self.password,
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.client.force_login(medico_residente)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 302)

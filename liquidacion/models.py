@@ -418,6 +418,66 @@ class SesionContable(models.Model):
         return False
 
 
+class HistorialSesionContable(models.Model):
+    """Historial de transiciones de estado de una sesión contable."""
+
+    ORIGEN_WEB = 'WEB'
+    ORIGEN_ADMIN = 'ADMIN'
+    ORIGEN_CHOICES = [
+        (ORIGEN_WEB, 'Portal Web'),
+        (ORIGEN_ADMIN, 'Django Admin'),
+    ]
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.CASCADE,
+        related_name='historial_transiciones',
+        verbose_name='Sesión Contable',
+    )
+    estado_anterior = models.CharField(
+        max_length=10,
+        choices=SesionContable.ESTADO_CHOICES,
+        verbose_name='Estado anterior',
+    )
+    estado_nuevo = models.CharField(
+        max_length=10,
+        choices=SesionContable.ESTADO_CHOICES,
+        verbose_name='Estado nuevo',
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='historial_sesiones_contables',
+        verbose_name='Usuario',
+    )
+    fecha = models.DateTimeField(auto_now_add=True, verbose_name='Fecha')
+    motivo = models.TextField(blank=True, verbose_name='Motivo')
+    origen = models.CharField(
+        max_length=10,
+        choices=ORIGEN_CHOICES,
+        default=ORIGEN_WEB,
+        verbose_name='Origen',
+    )
+    observacion_sistema = models.TextField(blank=True, verbose_name='Observación sistema')
+
+    class Meta:
+        verbose_name = 'Historial de Sesión Contable'
+        verbose_name_plural = 'Historiales de Sesión Contable'
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha']),
+            models.Index(fields=['origen', '-fecha']),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.sesion_contable} | {self.estado_anterior} -> {self.estado_nuevo} "
+            f"({self.origen})"
+        )
+
+
 class ConfiguracionGuardiaPasiva(models.Model):
     """Configuración vigente del valor de la guardia pasiva."""
 

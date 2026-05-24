@@ -15,7 +15,7 @@
         <div class="relative z-10">
             <h2 class="text-3xl font-bold text-white mb-3">Bienvenido al Portal de Liquidación</h2>
             <p class="text-white/90 text-lg mb-4">
-                Seleccione el tipo de registros médicos que desea consultar
+                Panel administrativo operativo para sesiones, liquidación, exportaciones y gestión de carga
             </p>
             
             {% if user.is_authenticated and user.is_superuser %}
@@ -33,43 +33,103 @@
         </div>
     </div>
 
-    <!-- Opciones de consulta -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl mx-auto">
-        
-        <!-- Liquidación Mensual Completa (PRINCIPAL v3.0) -->
-        <a href="{% url 'liquidacion:liquidacion_mensual' %}" 
-           class="group bg-white rounded-xl shadow-lg border-2 border-indigo-300 hover:border-indigo-600 transition-all p-8 hover:shadow-2xl transform hover:-translate-y-2 md:col-span-2">
-            <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl mb-4 group-hover:from-indigo-200 group-hover:to-purple-200 transition-colors mx-auto">
-                <i class="fas fa-chart-line text-3xl text-indigo-600"></i>
-            </div>
-            <h3 class="text-2xl font-bold text-gray-800 mb-3 text-center">Liquidación Mensual Completa</h3>
-            <p class="text-gray-600 text-center mb-6">
-                Consulte <strong>todas las prácticas</strong> (Ecografías, Radiografías, Tomografías, Resonancias) y <strong>guardias pasivas</strong> en un solo lugar
-            </p>
-            <div class="flex items-center justify-center text-indigo-600 font-bold text-lg group-hover:scale-110 transition-transform">
-                <span class="mr-2">Acceder a Liquidación</span>
-                <i class="fas fa-arrow-right"></i>
-            </div>
-            <div class="mt-4 pt-4 border-t border-gray-200">
-                <div class="flex flex-wrap justify-center gap-2">
-                    <span class="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
-                        <i class="fas fa-ultrasound mr-1"></i> ECO
-                    </span>
-                    <span class="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
-                        <i class="fas fa-x-ray mr-1"></i> RAD
-                    </span>
-                    <span class="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-semibold">
-                        <i class="fas fa-head-side-cough mr-1"></i> TOM
-                    </span>
-                    <span class="inline-flex items-center px-3 py-1 bg-pink-100 text-pink-700 rounded-full text-xs font-semibold">
-                        <i class="fas fa-brain mr-1"></i> RES
-                    </span>
-                    <span class="inline-flex items-center px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-semibold">
-                        <i class="fas fa-user-md mr-1"></i> Guardias
-                    </span>
+    <!-- Módulos administrativos -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <a href="{% url 'liquidacion:sesiones_list' %}"
+           class="group bg-white rounded-xl shadow-md border border-slate-200 hover:border-blue-400 transition-all p-6 hover:shadow-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <i class="fas fa-calendar-check text-xl"></i>
                 </div>
+                <h3 class="text-lg font-bold text-gray-800">Sesiones contables</h3>
             </div>
+            <p class="text-sm text-gray-600">Abrir, revisar, cerrar, facturar y pagar sesiones con control de estado y trazabilidad.</p>
+            <div class="mt-4 text-sm font-semibold text-blue-700 group-hover:text-blue-800">Ir a sesiones contables <i class="fas fa-arrow-right ml-1"></i></div>
         </a>
+
+        <a href="{% url 'liquidacion:liquidacion_mensual' %}"
+           class="group bg-white rounded-xl shadow-md border border-slate-200 hover:border-indigo-400 transition-all p-6 hover:shadow-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                    <i class="fas fa-chart-line text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Liquidación mensual</h3>
+            </div>
+            <p class="text-sm text-gray-600">Revisar liquidación por médico, mes y totales generales en la vista operativa unificada.</p>
+            <div class="mt-4 text-sm font-semibold text-indigo-700 group-hover:text-indigo-800">Ir a liquidación mensual <i class="fas fa-arrow-right ml-1"></i></div>
+        </a>
+
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <i class="fas fa-file-export text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Exportaciones</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">Acceso operativo desde sesiones contables: exportación PRELIMINAR y DEFINITIVA según estado.</p>
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'liquidacion:sesiones_list' %}"
+                   class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors">
+                    <i class="fas fa-list"></i> Ir a sesiones para exportar
+                </a>
+                <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
+                    <i class="fas fa-info-circle"></i> Definitiva solo FACTURADA/PAGADA
+                </span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 opacity-90">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
+                    <i class="fas fa-stethoscope text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Gestión de estudios</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde Django admin.</p>
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
+                <i class="fas fa-lock"></i> Acceso deshabilitado en este portal
+            </span>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 opacity-90">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-violet-100 text-violet-700 flex items-center justify-center">
+                    <i class="fas fa-file-excel text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Carga masiva Excel</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde Django admin.</p>
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
+                <i class="fas fa-lock"></i> Acceso deshabilitado en este portal
+            </span>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 opacity-90">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <i class="fas fa-shield-heart text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800">Guardias pasivas</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde el circuito operativo correspondiente.</p>
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
+                <i class="fas fa-lock"></i> Acceso deshabilitado en este portal
+            </span>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-dashed border-gray-300 p-6">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-11 h-11 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
+                    <i class="fas fa-coins text-xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-700">Configuración económica / tarifas</h3>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde Django admin.</p>
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
+                <i class="fas fa-lock"></i> Sin pantalla dedicada en el portal
+            </span>
+        </div>
 
     </div>
 
@@ -84,19 +144,19 @@
             <ul class="text-indigo-800 text-sm space-y-2">
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Vista Unificada:</strong> Todas las prácticas y guardias en un solo lugar</span>
+                    <span><strong>Gestión centralizada:</strong> sesiones, liquidación, estudios, guardias y carga masiva desde un único portal.</span>
                 </li>
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>No requiere login:</strong> Acceso directo para consultas</span>
+                    <span><strong>Acceso restringido:</strong> solo administrativo, jefe de servicio y superusuario.</span>
                 </li>
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Filtros flexibles:</strong> Por médico, mes y año</span>
+                    <span><strong>Sesiones contables:</strong> ciclo operativo completo de apertura, revisión, cierre, facturación y pago.</span>
                 </li>
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Exportación Excel:</strong> Descarga completa con todos los detalles</span>
+                    <span><strong>Exportaciones:</strong> preliminar siempre disponible y definitiva según estado de sesión.</span>
                 </li>
             </ul>
         </div>

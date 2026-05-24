@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import (
     Estudios,
@@ -7,10 +7,12 @@ from .models import (
     ConfiguracionGuardiaPasiva,
     HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
+    HistorialSesionContable,
     RegistroEstudiosPorMedico,
     SesionContable,
     TarifaGrupoTarifario,
 )
+from .services_auditoria import evaluar_gate_consistencia_sesion
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
@@ -210,7 +212,7 @@ class SesionContableAdmin(admin.ModelAdmin):
     )
     list_filter = ('estado', 'año', 'mes')
     search_fields = ('observaciones',)
-    readonly_fields = ('fecha_apertura', 'fecha_cierre', 'fecha_facturacion', 'fecha_pago')
+    readonly_fields = ('estado', 'fecha_apertura', 'fecha_cierre', 'fecha_facturacion', 'fecha_pago')
     ordering = ('-año', '-mes')
     
     fieldsets = (
@@ -248,21 +250,88 @@ class SesionContableAdmin(admin.ModelAdmin):
     count_guardias.short_description = 'Guardias'
     
     actions = ['pasar_a_revision', 'cerrar_sesion']
+
+    def _puede_transicionar_hasta_cerrada(self, user):
+        return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
+
+    def _puede_transicionar_financiera(self, user):
+        return user.is_superuser or user.rol == 'administrativo'
     
     def pasar_a_revision(self, request, queryset):
-        updated = queryset.filter(estado='ABIERTA').update(estado='REVISION')
-        self.message_user(request, f"{updated} sesiones pasadas a REVISIÓN")
+        if not self._puede_transicionar_hasta_cerrada(request.user):
+            self.message_user(request, 'No tienes permisos para pasar sesiones a REVISIÓN.', level=messages.ERROR)
+            return
+        updated = 0
+        advertencias = 0
+        for sesion in queryset.filter(estado='ABIERTA'):
+            gate = evaluar_gate_consistencia_sesion(sesion, 'REVISION')
+            if gate['advertencias']:
+                advertencias += len(gate['advertencias'])
+            estado_anterior = sesion.estado
+            sesion.estado = 'REVISION'
+            sesion.save(update_fields=['estado'])
+            HistorialSesionContable.objects.create(
+                sesion_contable=sesion,
+                estado_anterior=estado_anterior,
+                estado_nuevo=sesion.estado,
+                usuario=request.user,
+                origen=HistorialSesionContable.ORIGEN_ADMIN,
+                observacion_sistema='Accion admin: pasar a revision',
+            )
+            updated += 1
+        msg = f"{updated} sesiones pasadas a REVISIÓN"
+        if advertencias:
+            msg += f" (con {advertencias} advertencia(s) de consistencia)"
+        self.message_user(request, msg)
     pasar_a_revision.short_description = "Pasar a REVISIÓN"
     
     def cerrar_sesion(self, request, queryset):
+        if not self._puede_transicionar_hasta_cerrada(request.user):
+            self.message_user(request, 'No tienes permisos para cerrar sesiones.', level=messages.ERROR)
+            return
         from django.utils import timezone
+        cerradas = 0
+        bloqueadas = 0
         for sesion in queryset.filter(estado='REVISION'):
+            gate = evaluar_gate_consistencia_sesion(sesion, 'CERRADA')
+            if gate['bloqueantes']:
+                bloqueadas += 1
+                continue
+            estado_anterior = sesion.estado
             sesion.estado = 'CERRADA'
             sesion.fecha_cierre = timezone.now()
             sesion.cerrada_por = request.user
             sesion.save()
-        self.message_user(request, f"{queryset.count()} sesiones CERRADAS")
+            HistorialSesionContable.objects.create(
+                sesion_contable=sesion,
+                estado_anterior=estado_anterior,
+                estado_nuevo=sesion.estado,
+                usuario=request.user,
+                origen=HistorialSesionContable.ORIGEN_ADMIN,
+                observacion_sistema='Accion admin: cerrar sesion',
+            )
+            cerradas += 1
+        msg = f"{cerradas} sesiones CERRADAS"
+        if bloqueadas:
+            msg += f" | {bloqueadas} bloqueadas por inconsistencias"
+        self.message_user(request, msg)
     cerrar_sesion.short_description = "Cerrar sesiones"
+
+    def marcar_facturada(self, request, queryset):
+        self.message_user(
+            request,
+            'Transicion financiera deshabilitada en acciones admin. Usa el portal administrativo de liquidacion.',
+            level=messages.WARNING,
+        )
+    marcar_facturada.short_description = "Marcar como FACTURADA"
+
+    def marcar_pagada(self, request, queryset):
+        self.message_user(
+            request,
+            'Transicion financiera deshabilitada en acciones admin. Usa el portal administrativo de liquidacion.',
+            level=messages.WARNING,
+        )
+    marcar_pagada.short_description = "Marcar como PAGADA"
 
 
 @admin.register(GuardiaPasiva)

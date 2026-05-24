@@ -20,9 +20,17 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.units import inch
-from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable, ConfiguracionGuardiaPasiva
+from .models import (
+    Estudios,
+    RegistroEstudiosPorMedico,
+    GuardiaPasiva,
+    SesionContable,
+    ConfiguracionGuardiaPasiva,
+    HistorialSesionContable,
+)
 from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
 from .permisos import puede_ver_desglose_administrativo
+from .services_auditoria import evaluar_gate_consistencia_sesion
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -39,11 +47,26 @@ from django.utils.timezone import now
 from openpyxl import Workbook
 from django.urls import reverse
 
-# ===== PORTAL ADMINISTRATIVO (Sin Login) =====
+# ===== PORTAL ADMINISTRATIVO =====
 
-class PortalLiquidacionInicioView(TemplateView):
+
+def _puede_acceder_panel_administrativo(user):
+    return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
+
+
+class PortalLiquidacionInicioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """Vista de inicio del portal administrativo de liquidación"""
     template_name = 'liquidacion/portal_inicio.html'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para acceder al portal administrativo de liquidación.'
+        )
+        return redirect('home')
 
 # ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode
@@ -1336,20 +1359,11 @@ def generar_pdf_liquidacion(request):
 # EXPORTACIÓN UNIFICADA - v3.0 (Feb 2026)
 # ========================================
 
-@login_required
-def exportar_excel_liquidacion(request):
-    """
-    Exportar liquidación completa a Excel - v3.1 UNIFICADA (Una sola solapa)
+def _es_usuario_exportacion_liquidacion(user):
+    return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
 
-    Incluye en una sola hoja:
-    - Todas las prácticas (ECO + RAD + TOM + RES)
-    - Guardias pasivas
-    - Total general
-    """
-    if not (request.user.is_superuser or request.user.rol in ['administrativo', 'jefe_servicio']):
-        messages.error(request, '❌ No tienes permisos para exportar datos de liquidación.')
-        return redirect('home')
 
+def _generar_respuesta_exportacion_liquidacion(request, etiqueta_archivo):
     from .services import generar_buffer_excel_liquidacion
 
     medico_id = request.GET.get('medico')
@@ -1366,10 +1380,43 @@ def exportar_excel_liquidacion(request):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
     response["Content-Disposition"] = (
-        f'attachment; filename="liquidacion_completa_{nombre_medico}_{mes}_{año}.xlsx"'
+        f'attachment; filename="liquidacion_{etiqueta_archivo}_{nombre_medico}_{mes}_{año}.xlsx"'
     )
     response.write(buffer.read())
     return response
+
+
+@login_required
+def exportar_excel_liquidacion(request):
+    """Exportación preliminar para seguimiento interno administrativo."""
+    if not _es_usuario_exportacion_liquidacion(request.user):
+        messages.error(request, '❌ No tienes permisos para exportar datos de liquidación.')
+        return redirect('home')
+    return _generar_respuesta_exportacion_liquidacion(request, etiqueta_archivo='PRELIMINAR')
+
+
+@login_required
+def exportar_excel_liquidacion_definitiva(request):
+    """Exportación definitiva permitida solo con sesión FACTURADA/PAGADA."""
+    if not _es_usuario_exportacion_liquidacion(request.user):
+        messages.error(request, '❌ No tienes permisos para exportar datos de liquidación.')
+        return redirect('home')
+
+    mes = request.GET.get('mes')
+    año = request.GET.get('año')
+    if not mes or not año:
+        messages.error(request, '❌ Debes indicar mes y año para exportación definitiva.')
+        return redirect('liquidacion:sesiones_list')
+
+    sesion = get_object_or_404(SesionContable, mes=mes, año=año)
+    if sesion.estado not in ['FACTURADA', 'PAGADA']:
+        messages.error(
+            request,
+            '❌ La exportación definitiva solo está habilitada para sesiones FACTURADAS o PAGADAS.',
+        )
+        return redirect('liquidacion:sesiones_list')
+
+    return _generar_respuesta_exportacion_liquidacion(request, etiqueta_archivo='DEFINITIVA')
 
 # A continuación, se agrega el formulario para carga masiva de estudios
 
@@ -1524,7 +1571,13 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
     def get_queryset(self):
         return SesionContable.objects.prefetch_related(
-            'practicas', 'guardias_pasivas'
+            'practicas',
+            'guardias_pasivas',
+            Prefetch(
+                'historial_transiciones',
+                queryset=HistorialSesionContable.objects.select_related('usuario').order_by('-fecha'),
+                to_attr='historial_ordenado',
+            ),
         ).order_by('-año', '-mes')
 
     def get_context_data(self, **kwargs):
@@ -1557,6 +1610,11 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             siguiente = _SIGUIENTE.get(sesion.estado)
             roles_ok = _ROLES_TRANSICION.get(sesion.estado, [])
             puede = user.is_superuser or user.rol in roles_ok
+            gate_preview = {'bloqueantes': [], 'advertencias': []}
+            if siguiente:
+                gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
+
+            historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
             sesiones_data.append({
                 'sesion': sesion,
@@ -1568,6 +1626,16 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'total_general': total_monto + total_guardias_monto,
                 'siguiente_estado': siguiente,
                 'puede_transicionar': puede,
+                'requiere_motivo': (sesion.estado, siguiente) in [
+                    ('CERRADA', 'FACTURADA'),
+                    ('FACTURADA', 'PAGADA'),
+                ],
+                'gate_bloqueantes_count': len(gate_preview['bloqueantes']),
+                'gate_advertencias_count': len(gate_preview['advertencias']),
+                'gate_bloqueantes_preview': gate_preview['bloqueantes'][:3],
+                'gate_advertencias_preview': gate_preview['advertencias'][:3],
+                'historial_reciente': historial_ordenado[:5],
+                'historial_count': len(historial_ordenado),
             })
 
         context['sesiones_data'] = sesiones_data
@@ -1606,6 +1674,38 @@ def sesion_contable_transicion(request, pk):
         messages.error(request, '❌ No tienes permisos para esta transición.')
         return redirect('liquidacion:sesiones_list')
 
+    motivo = (request.POST.get('motivo') or '').strip()
+    transicion_financiera = (sesion.estado, config['siguiente']) in [
+        ('CERRADA', 'FACTURADA'),
+        ('FACTURADA', 'PAGADA'),
+    ]
+    if transicion_financiera and not motivo:
+        messages.error(
+            request,
+            '❌ Debes indicar un motivo para transiciones financieras (FACTURADA/PAGADA).'
+        )
+        return redirect('liquidacion:sesiones_list')
+
+    auditoria = evaluar_gate_consistencia_sesion(sesion, config['siguiente'])
+    if auditoria['bloqueantes']:
+        detalle = ' | '.join(auditoria['bloqueantes'][:3])
+        if len(auditoria['bloqueantes']) > 3:
+            detalle += f" | +{len(auditoria['bloqueantes']) - 3} inconsistencia(s)"
+        messages.error(
+            request,
+            f"❌ No se puede pasar a {config['siguiente']}. Inconsistencias bloqueantes: {detalle}"
+        )
+        return redirect('liquidacion:sesiones_list')
+
+    if auditoria['advertencias']:
+        detalle = ' | '.join(auditoria['advertencias'][:2])
+        if len(auditoria['advertencias']) > 2:
+            detalle += f" | +{len(auditoria['advertencias']) - 2} advertencia(s)"
+        messages.warning(
+            request,
+            f"⚠️ Advertencias de consistencia: {detalle}"
+        )
+
     from django.utils import timezone as tz
 
     estado_anterior = sesion.estado
@@ -1620,6 +1720,15 @@ def sesion_contable_transicion(request, pk):
         sesion.fecha_pago = tz.now()
 
     sesion.save()
+
+    HistorialSesionContable.objects.create(
+        sesion_contable=sesion,
+        estado_anterior=estado_anterior,
+        estado_nuevo=sesion.estado,
+        usuario=user,
+        motivo=motivo,
+        origen=HistorialSesionContable.ORIGEN_WEB,
+    )
 
     meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
              'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']

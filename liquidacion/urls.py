@@ -9,6 +9,7 @@ from .views import (
     generar_pdf_liquidacion,
     LiquidacionPorMedicoPorMesListView,  # [NUEVO v3.0] Vista unificada
     exportar_excel_liquidacion,  # [NUEVO v3.0] Exportación unificada
+    exportar_excel_liquidacion_definitiva,
     # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
     RegistrarGuardiaPasivaView,  # [NUEVO v2.0]
     GuardiaPasivaUpdateView,  # [NUEVO v3.2]
@@ -35,6 +36,11 @@ urlpatterns = [
     # [NUEVO v3.0 - VISTA UNIFICADA RECOMENDADA]
     path('liquidacion-mensual/', LiquidacionPorMedicoPorMesListView.as_view(), name='liquidacion_mensual'),
     path('exportar_excel_liquidacion/', exportar_excel_liquidacion, name='exportar_excel_liquidacion'),
+    path(
+        'exportar_excel_liquidacion_definitiva/',
+        exportar_excel_liquidacion_definitiva,
+        name='exportar_excel_liquidacion_definitiva',
+    ),
 
     # ===== RUTAS INTERNAS (Requieren Login) =====
     path('estudios/nuevo/', EstudiosCreateView.as_view(), name='estudios_nuevo'),
