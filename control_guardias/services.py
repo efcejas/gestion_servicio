@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.db import transaction
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     AjusteCuotaGuardia,
@@ -87,6 +88,21 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     primer_dia = date(anio, mes, 1)
     ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
+    hoy = timezone.localdate()
+
+    if ultimo_dia < hoy:
+        raise DistribucionError(
+            f"No se puede generar un borrador para {_nombre_mes(mes)} {anio} porque el mes ya finalizó."
+        )
+
+    guardias_publicadas_o_historicas = AsignacionGuardia.objects.filter(
+        fecha__gte=primer_dia,
+        fecha__lte=ultimo_dia,
+    ).exclude(estado='BORRADOR')
+    if guardias_publicadas_o_historicas.exists():
+        raise DistribucionError(
+            f"No se puede generar un borrador para {_nombre_mes(mes)} {anio} porque ese mes ya fue publicado."
+        )
 
     # Verificar borradores existentes
     borradores_existentes = AsignacionGuardia.objects.filter(

@@ -713,6 +713,18 @@ class DistribucionView(JefeInstructorMixin, TemplateView):
             context['form'] = GenerarDistribucionForm()
         else:
             context['form'] = kwargs['form']
+
+        meses_publicados = (
+            AsignacionGuardia.objects
+            .exclude(estado='BORRADOR')
+            .values_list('fecha__year', 'fecha__month')
+            .distinct()
+        )
+        context['meses_publicados'] = [
+            f"{anio:04d}-{mes:02d}"
+            for anio, mes in meses_publicados
+        ]
+
         # Borradores activos
         borradores = (
             AsignacionGuardia.objects
