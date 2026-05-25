@@ -42,9 +42,9 @@
                         <td class="px-4 py-3 text-sm text-gray-700">{{ dato.grupo.get_modalidad_display }}</td>
                         <td class="px-4 py-3 text-center text-sm">
                             {% if dato.grupo.activo %}
-                            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Si</span>
+                            <span class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">Sí</span>
                             {% else %}
-                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">No</span>
+                            <span class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-600">No</span>
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-center text-sm text-gray-700">{{ dato.grupo.cantidad_estudios }}</td>
@@ -61,14 +61,14 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Con tarifa vigente</span>
+                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Con tarifa vigente</span>
                         </td>
                         {% else %}
                         <td class="px-4 py-3 text-right text-sm text-gray-400">-</td>
                         <td class="px-4 py-3 text-right text-sm text-gray-400">-</td>
                         <td class="px-4 py-3 text-sm text-gray-400">Sin vigencia activa</td>
                         <td class="px-4 py-3 text-sm">
-                            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">Sin tarifa vigente</span>
+                            <span class="inline-flex items-center rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">Sin tarifa vigente</span>
                         </td>
                         {% endif %}
                         <td class="px-4 py-3 text-sm">
