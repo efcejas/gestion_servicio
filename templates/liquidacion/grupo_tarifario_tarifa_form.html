@@ -22,7 +22,7 @@
             {% csrf_token %}
 
             {% if form.non_field_errors %}
-            <div class="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+            <div class="rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">
                 {{ form.non_field_errors }}
             </div>
             {% endif %}
@@ -31,21 +31,25 @@
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1" for="{{ form.vigencia_desde.id_for_label }}">Vigencia desde</label>
                     {{ form.vigencia_desde }}
+                    {% if form.vigencia_desde.help_text %}<p class="mt-1 text-xs text-gray-500">{{ form.vigencia_desde.help_text }}</p>{% endif %}
                     {% if form.vigencia_desde.errors %}<p class="mt-1 text-xs text-red-600">{{ form.vigencia_desde.errors.0 }}</p>{% endif %}
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1" for="{{ form.vigencia_hasta.id_for_label }}">Vigencia hasta (opcional)</label>
                     {{ form.vigencia_hasta }}
+                    {% if form.vigencia_hasta.help_text %}<p class="mt-1 text-xs text-gray-500">{{ form.vigencia_hasta.help_text }}</p>{% endif %}
                     {% if form.vigencia_hasta.errors %}<p class="mt-1 text-xs text-red-600">{{ form.vigencia_hasta.errors.0 }}</p>{% endif %}
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1" for="{{ form.precio_cober.id_for_label }}">Precio COBER</label>
                     {{ form.precio_cober }}
+                    {% if form.precio_cober.help_text %}<p class="mt-1 text-xs text-gray-500">{{ form.precio_cober.help_text }}</p>{% endif %}
                     {% if form.precio_cober.errors %}<p class="mt-1 text-xs text-red-600">{{ form.precio_cober.errors.0 }}</p>{% endif %}
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-1" for="{{ form.precio_otras_os.id_for_label }}">Precio Otras OS</label>
                     {{ form.precio_otras_os }}
+                    {% if form.precio_otras_os.help_text %}<p class="mt-1 text-xs text-gray-500">{{ form.precio_otras_os.help_text }}</p>{% endif %}
                     {% if form.precio_otras_os.errors %}<p class="mt-1 text-xs text-red-600">{{ form.precio_otras_os.errors.0 }}</p>{% endif %}
                 </div>
             </div>
@@ -53,10 +57,11 @@
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1" for="{{ form.motivo_actualizacion.id_for_label }}">Motivo / observaciones</label>
                 {{ form.motivo_actualizacion }}
+                {% if form.motivo_actualizacion.help_text %}<p class="mt-1 text-xs text-gray-500">{{ form.motivo_actualizacion.help_text }}</p>{% endif %}
                 {% if form.motivo_actualizacion.errors %}<p class="mt-1 text-xs text-red-600">{{ form.motivo_actualizacion.errors.0 }}</p>{% endif %}
             </div>
 
-            <div class="flex items-center gap-3 pt-2">
+            <div class="flex flex-wrap items-center gap-3 pt-2">
                 <button type="submit"
                         class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
                     Guardar tarifa
