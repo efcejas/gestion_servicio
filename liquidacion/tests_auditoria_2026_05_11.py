@@ -357,34 +357,46 @@ class PermisosYTrazabilidadViewTest(TestCase):
     """Tests de regresión para permisos de vistas y operaciones sensibles."""
 
     def setUp(self):
+        self.password = 'testpass123'
+        self.superuser = User.objects.create_superuser(
+            username='root_liq',
+            email='root_liq@test.com',
+            password=self.password,
+        )
         self.admin = User.objects.create_user(
             username='admin_liq',
-            password='testpass123',
+            password=self.password,
             rol='administrativo',
             perfil_completo=True,
         )
         self.jefe_servicio = User.objects.create_user(
             username='jefe_servicio_liq',
-            password='testpass123',
+            password=self.password,
             rol='jefe_servicio',
             perfil_completo=True,
         )
         self.jefe_residentes = User.objects.create_user(
             username='jefe_res_liq',
-            password='testpass123',
+            password=self.password,
             rol='jefe_residentes',
             perfil_completo=True,
         )
         self.instructor = User.objects.create_user(
             username='inst_liq',
-            password='testpass123',
+            password=self.password,
             rol='instructor_residentes',
             perfil_completo=True,
         )
         self.medico = User.objects.create_user(
             username='medico_liq',
-            password='testpass123',
+            password=self.password,
             rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.residente = User.objects.create_user(
+            username='residente_liq',
+            password=self.password,
+            rol='medico_residente',
             perfil_completo=True,
         )
 
@@ -426,6 +438,492 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertTrue(
             RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).exists(),
             '❌ FALLA: Un médico pudo eliminar registro en sesión cerrada.'
+        )
+
+    def test_estudios_list_permite_admin_jefe_y_superuser(self):
+        self.client.force_login(self.superuser)
+        response_super = self.client.get(reverse('liquidacion:estudios_list'))
+        self.assertEqual(response_super.status_code, 200)
+
+        self.client.force_login(self.admin)
+        response_admin = self.client.get(reverse('liquidacion:estudios_list'))
+        self.assertEqual(response_admin.status_code, 200)
+
+        self.client.force_login(self.jefe_servicio)
+        response_jefe = self.client.get(reverse('liquidacion:estudios_list'))
+        self.assertEqual(response_jefe.status_code, 200)
+
+    def test_estudios_list_deniega_medico_y_residente(self):
+        self.client.force_login(self.medico)
+        response_medico = self.client.get(reverse('liquidacion:estudios_list'))
+        self.assertIn(response_medico.status_code, [302, 403])
+
+        self.client.force_login(self.residente)
+        response_residente = self.client.get(reverse('liquidacion:estudios_list'))
+        self.assertIn(response_residente.status_code, [302, 403])
+
+    def test_estudios_list_renderiza_sin_noreversematch_y_con_namespace(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('liquidacion:estudios_nuevo'))
+
+    def test_estudios_form_renderiza_sin_noreversematch_y_con_namespace(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_nuevo'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('liquidacion:estudios_list'))
+
+    def test_portal_inicio_muestra_tarjeta_estudios_activa(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:portal_inicio'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Gestión de estudios')
+        self.assertContains(response, reverse('liquidacion:estudios_list'))
+
+    def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
+        self.client.force_login(self.superuser)
+        response_super = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+        self.assertEqual(response_super.status_code, 200)
+
+        self.client.force_login(self.admin)
+        response_admin = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+        self.assertEqual(response_admin.status_code, 200)
+
+        self.client.force_login(self.jefe_servicio)
+        response_jefe = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+        self.assertEqual(response_jefe.status_code, 200)
+
+    def test_grupos_tarifarios_list_deniega_medico_y_residente(self):
+        self.client.force_login(self.medico)
+        response_medico = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+        self.assertIn(response_medico.status_code, [302, 403])
+
+        self.client.force_login(self.residente)
+        response_residente = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+        self.assertIn(response_residente.status_code, [302, 403])
+
+    def test_grupos_tarifarios_list_renderiza_grupo_con_tarifa_y_sin_tarifa(self):
+        grupo_con_tarifa = GrupoTarifario.objects.create(
+            codigo='ECO_AUDIT_1',
+            nombre='Grupo con tarifa vigente',
+            modalidad='ECO',
+            activo=True,
+        )
+        grupo_sin_tarifa = GrupoTarifario.objects.create(
+            codigo='RAD_AUDIT_2',
+            nombre='Grupo sin tarifa vigente',
+            modalidad='RAD',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo_con_tarifa,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+        )
+        Estudios.objects.create(
+            nombre='ESTUDIO AUDIT 1',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            grupo_tarifario=grupo_con_tarifa,
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, grupo_con_tarifa.codigo)
+        self.assertContains(response, grupo_sin_tarifa.codigo)
+        self.assertContains(response, 'Con tarifa vigente')
+        self.assertContains(response, 'Sin tarifa vigente')
+
+    def test_portal_inicio_muestra_tarjeta_tarifas_activa(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:portal_inicio'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Configuración económica / tarifas')
+        self.assertContains(response, reverse('liquidacion:grupos_tarifarios_list'))
+
+    def test_grupo_tarifario_detalle_permite_super_admin_y_jefe_servicio(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_ALLOW_1',
+            nombre='Grupo detalle acceso',
+            modalidad='ECO',
+            activo=True,
+        )
+
+        self.client.force_login(self.superuser)
+        response_super = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+        self.assertEqual(response_super.status_code, 200)
+
+        self.client.force_login(self.admin)
+        response_admin = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+        self.assertEqual(response_admin.status_code, 200)
+
+        self.client.force_login(self.jefe_servicio)
+        response_jefe = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+        self.assertEqual(response_jefe.status_code, 200)
+
+    def test_grupo_tarifario_detalle_deniega_medico_y_residente(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_DENY_1',
+            nombre='Grupo detalle denegado',
+            modalidad='RAD',
+            activo=True,
+        )
+
+        self.client.force_login(self.medico)
+        response_medico = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+        self.assertIn(response_medico.status_code, [302, 403])
+
+        self.client.force_login(self.residente)
+        response_residente = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+        self.assertIn(response_residente.status_code, [302, 403])
+
+    def test_grupo_tarifario_detalle_renderiza_con_tarifa_vigente(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_VIG_1',
+            nombre='Grupo con vigente',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('2200.00'),
+            precio_otras_os=Decimal('2500.00'),
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, grupo.codigo)
+        self.assertContains(response, 'Con tarifa vigente')
+
+    def test_grupo_tarifario_detalle_renderiza_sin_tarifa_vigente_con_advertencia(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_SIN_1',
+            nombre='Grupo sin vigente',
+            modalidad='RAD',
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Advertencia: este grupo no tiene tarifa vigente activa.')
+
+    def test_grupo_tarifario_detalle_muestra_estudios_asociados(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_EST_1',
+            nombre='Grupo con estudios',
+            modalidad='ECO',
+            activo=True,
+        )
+        estudio = Estudios.objects.create(
+            nombre='Estudio detalle asociado',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('3000.00'),
+            precio_otras_os=Decimal('3500.00'),
+            grupo_tarifario=grupo,
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, estudio.nombre)
+        self.assertContains(response, 'Total: 1 estudio(s).')
+
+    def test_grupos_tarifarios_list_contiene_link_a_detalle(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='LIST_DET_1',
+            nombre='Grupo link detalle',
+            modalidad='ECO',
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk}),
+        )
+
+    def test_grupo_tarifario_tarifa_nueva_permite_super_admin_y_jefe_servicio(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_NEW_ALLOW',
+            nombre='Grupo alta permitida',
+            modalidad='ECO',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.superuser)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+        self.client.force_login(self.jefe_servicio)
+        self.assertEqual(self.client.get(url).status_code, 200)
+
+    def test_grupo_tarifario_tarifa_nueva_deniega_medico_y_residente(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_NEW_DENY',
+            nombre='Grupo alta denegada',
+            modalidad='RAD',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.medico)
+        self.assertIn(self.client.get(url).status_code, [302, 403])
+
+        self.client.force_login(self.residente)
+        self.assertIn(self.client.get(url).status_code, [302, 403])
+
+    def test_grupo_tarifario_tarifa_nueva_crea_tarifa_valida(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_NEW_OK_1',
+            nombre='Grupo alta valida',
+            modalidad='ECO',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2027-01-01',
+                'vigencia_hasta': '2027-12-31',
+                'precio_cober': '2000.00',
+                'precio_otras_os': '2500.00',
+                'motivo_actualizacion': 'Ajuste anual',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            TarifaGrupoTarifario.objects.filter(
+                grupo_tarifario=grupo,
+                vigencia_desde=date(2027, 1, 1),
+            ).exists()
+        )
+
+    def test_grupo_tarifario_tarifa_nueva_setea_actualizado_por(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_NEW_OK_2',
+            nombre='Grupo audit user',
+            modalidad='TOM',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2028-01-01',
+                'vigencia_hasta': '',
+                'precio_cober': '3000.00',
+                'precio_otras_os': '3500.00',
+                'motivo_actualizacion': 'Ajuste por convenio',
+            },
+        )
+        tarifa = TarifaGrupoTarifario.objects.get(grupo_tarifario=grupo, vigencia_desde=date(2028, 1, 1))
+        self.assertEqual(tarifa.actualizado_por, self.admin)
+
+    def test_grupo_tarifario_tarifa_nueva_rechaza_precio_cober_menor_igual_cero(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_COBER',
+            nombre='Grupo valida cober',
+            modalidad='ECO',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2029-01-01',
+                'vigencia_hasta': '',
+                'precio_cober': '0',
+                'precio_otras_os': '2200.00',
+                'motivo_actualizacion': 'Test inválido',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'El precio COBER debe ser mayor a 0.')
+
+    def test_grupo_tarifario_tarifa_nueva_rechaza_precio_otras_os_menor_igual_cero(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_OTRAS',
+            nombre='Grupo valida otras',
+            modalidad='RAD',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2029-02-01',
+                'vigencia_hasta': '',
+                'precio_cober': '2200.00',
+                'precio_otras_os': '0',
+                'motivo_actualizacion': 'Test inválido',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'El precio OTRAS OS debe ser mayor a 0.')
+
+    def test_grupo_tarifario_tarifa_nueva_rechaza_vigencia_hasta_anterior(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_FECHA',
+            nombre='Grupo valida fechas',
+            modalidad='RES',
+            activo=True,
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2029-03-10',
+                'vigencia_hasta': '2029-03-01',
+                'precio_cober': '3000.00',
+                'precio_otras_os': '3200.00',
+                'motivo_actualizacion': 'Test fechas',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'La vigencia hasta no puede ser anterior a vigencia desde.')
+
+    def test_grupo_tarifario_tarifa_nueva_rechaza_solapamiento_vigencias(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_SOLAP',
+            nombre='Grupo valida solap',
+            modalidad='DOP',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2029, 1, 1),
+            vigencia_hasta=None,
+            precio_cober=Decimal('2500.00'),
+            precio_otras_os=Decimal('2700.00'),
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2029-06-01',
+                'vigencia_hasta': '',
+                'precio_cober': '2800.00',
+                'precio_otras_os': '3000.00',
+                'motivo_actualizacion': 'Intento solapado',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ya existe una tarifa con vigencia que se solapa para este grupo tarifario.')
+
+    def test_grupo_tarifario_tarifa_nueva_permite_tarifa_futura_no_solapada(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_FUTURA',
+            nombre='Grupo valida futura',
+            modalidad='ECOCAR',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2029, 1, 1),
+            vigencia_hasta=date(2029, 12, 31),
+            precio_cober=Decimal('4000.00'),
+            precio_otras_os=Decimal('4300.00'),
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2030-01-01',
+                'vigencia_hasta': '',
+                'precio_cober': '4500.00',
+                'precio_otras_os': '4700.00',
+                'motivo_actualizacion': 'Nueva vigencia anual',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            TarifaGrupoTarifario.objects.filter(
+                grupo_tarifario=grupo,
+                vigencia_desde=date(2030, 1, 1),
+            ).exists()
+        )
+
+    def test_grupo_tarifario_detalle_muestra_boton_nueva_tarifa(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='DET_BTN_TAR',
+            nombre='Grupo botón tarifa',
+            modalidad='ECO',
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': grupo.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Nueva tarifa')
+        self.assertContains(
+            response,
+            reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk}),
         )
 
 

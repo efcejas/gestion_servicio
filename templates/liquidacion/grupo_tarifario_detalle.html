@@ -1,0 +1,161 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Detalle de Grupo Tarifario{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <a href="{% url 'liquidacion:grupos_tarifarios_list' %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver a grupos tarifarios
+        </a>
+        {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' %}
+        <a href="{% url 'liquidacion:grupo_tarifario_tarifa_nueva' grupo.pk %}"
+           class="ml-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
+            <i class="fas fa-plus"></i>
+            Nueva tarifa
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <h1 class="text-2xl font-bold mb-1">Detalle de grupo tarifario</h1>
+        <p class="text-slate-300 text-sm">Auditoria administrativa de vigencias, historial de tarifas y estudios asociados.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Datos del grupo</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="text-gray-500">Codigo</p>
+                    <p class="font-semibold text-gray-900">{{ grupo.codigo }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Nombre</p>
+                    <p class="font-semibold text-gray-900">{{ grupo.nombre }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Modalidad</p>
+                    <p class="font-semibold text-gray-900">{{ grupo.get_modalidad_display }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Estado</p>
+                    {% if grupo.activo %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Activo</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">Inactivo</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <p class="text-gray-500">Cantidad de estudios asociados</p>
+                    <p class="font-semibold text-gray-900">{{ cantidad_estudios_asociados }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Tarifa vigente</h2>
+            {% if tiene_tarifa_vigente %}
+            <div class="space-y-2 text-sm">
+                <p><span class="text-gray-500">Cober:</span> <span class="font-semibold text-gray-900">${{ tarifa_vigente.precio_cober|floatformat:2 }}</span></p>
+                <p><span class="text-gray-500">Otras OS:</span> <span class="font-semibold text-gray-900">${{ tarifa_vigente.precio_otras_os|floatformat:2 }}</span></p>
+                <p><span class="text-gray-500">Vigencia desde:</span> <span class="font-semibold text-gray-900">{{ tarifa_vigente.vigencia_desde|date:"d/m/Y" }}</span></p>
+                <p><span class="text-gray-500">Vigencia hasta:</span>
+                    <span class="font-semibold text-gray-900">
+                    {% if tarifa_vigente.vigencia_hasta %}
+                        {{ tarifa_vigente.vigencia_hasta|date:"d/m/Y" }}
+                    {% else %}
+                        Vigente
+                    {% endif %}
+                    </span>
+                </p>
+                <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Con tarifa vigente</span>
+            </div>
+            {% else %}
+            <div class="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                Advertencia: este grupo no tiene tarifa vigente activa.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800">Historial de tarifas</h2>
+                <p class="text-sm text-gray-500">Ordenado por vigencia desde descendente.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vigencia desde</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vigencia hasta</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">COBER</th>
+                            <th class="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Otras OS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for tarifa in historial_tarifas %}
+                        <tr>
+                            <td class="px-4 py-3 text-sm text-gray-800">{{ tarifa.vigencia_desde|date:"d/m/Y" }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-700">
+                                {% if tarifa.vigencia_hasta %}
+                                    {{ tarifa.vigencia_hasta|date:"d/m/Y" }}
+                                {% else %}
+                                    Vigente
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900">${{ tarifa.precio_cober|floatformat:2 }}</td>
+                            <td class="px-4 py-3 text-sm text-right font-semibold text-gray-900">${{ tarifa.precio_otras_os|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500">No hay tarifas historicas cargadas para este grupo.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-bold text-gray-800">Estudios asociados</h2>
+                <p class="text-sm text-gray-500">Total: {{ cantidad_estudios_asociados }} estudio(s).</p>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% for estudio in estudios_asociados %}
+                <div class="px-6 py-4 flex items-center justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900">{{ estudio.nombre }}</p>
+                        <p class="text-xs text-gray-500">Codigo: {{ estudio.codigo }} | Tipo: {{ estudio.get_tipo_display }}</p>
+                    </div>
+                    {% if estudio.activo %}
+                    <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">Activo</span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">Inactivo</span>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <div class="px-6 py-8 text-sm text-gray-500">No hay estudios asociados a este grupo tarifario.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-indigo-50 border-l-4 border-indigo-500 rounded-lg p-5 mt-6">
+        <h4 class="text-indigo-900 font-bold mb-2 flex items-center">
+            <i class="fas fa-info-circle mr-2"></i>
+            Ayuda operativa
+        </h4>
+        <ul class="text-indigo-800 text-sm space-y-1.5">
+            <li>Validá primero el bloque <strong>Tarifa vigente</strong> para confirmar cobertura activa del grupo.</li>
+            <li>Revisá <strong>Historial de tarifas</strong> antes de cargar una nueva vigencia para evitar errores operativos.</li>
+            <li>La acción <strong>Nueva tarifa</strong> no modifica tarifas históricas existentes.</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

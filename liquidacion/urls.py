@@ -16,6 +16,9 @@ from .views import (
     GuardiaPasivaDeleteView,  # [NUEVO v3.2]
     CargaMasivaView,
     PortalLiquidacionInicioView,
+    GruposTarifariosListView,
+    GrupoTarifarioDetalleView,
+    GrupoTarifarioTarifaNuevaView,
     SesionContableListView,       # [NUEVO Fase B] Gestión del ciclo contable
     sesion_contable_transicion,   # [NUEVO Fase B] Transición de estado
 )
@@ -32,6 +35,13 @@ urlpatterns = [
 
     # ===== PORTAL ADMINISTRATIVO (Sin Login) =====
     path('portal/', PortalLiquidacionInicioView.as_view(), name='portal_inicio'),
+    path('grupos-tarifarios/', GruposTarifariosListView.as_view(), name='grupos_tarifarios_list'),
+    path('grupos-tarifarios/<int:pk>/', GrupoTarifarioDetalleView.as_view(), name='grupo_tarifario_detalle'),
+    path(
+        'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',
+        GrupoTarifarioTarifaNuevaView.as_view(),
+        name='grupo_tarifario_tarifa_nueva',
+    ),
     
     # [NUEVO v3.0 - VISTA UNIFICADA RECOMENDADA]
     path('liquidacion-mensual/', LiquidacionPorMedicoPorMesListView.as_view(), name='liquidacion_mensual'),

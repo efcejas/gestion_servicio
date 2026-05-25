@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable
 from datetime import datetime
 from django.contrib.auth import get_user_model
@@ -316,6 +317,81 @@ class CargaExcelForm(forms.Form):
         label="Subí el archivo Excel",
         help_text="Formato: .xlsx con columnas: Fecha, Paciente, DNI, Estudio, OS, Horario, Regiones"
     )
+
+
+class TarifaGrupoTarifarioAdminForm(forms.ModelForm):
+    """Alta administrativa de nueva tarifa para un grupo tarifario existente."""
+
+    class Meta:
+        from .models import TarifaGrupoTarifario
+
+        model = TarifaGrupoTarifario
+        fields = [
+            'vigencia_desde',
+            'vigencia_hasta',
+            'precio_cober',
+            'precio_otras_os',
+            'motivo_actualizacion',
+        ]
+        widgets = {
+            'vigencia_desde': forms.DateInput(attrs={'type': 'date', 'class': TAILWIND_INPUT_CLASSES}),
+            'vigencia_hasta': forms.DateInput(attrs={'type': 'date', 'class': TAILWIND_INPUT_CLASSES}),
+            'precio_cober': forms.NumberInput(attrs={'class': TAILWIND_INPUT_CLASSES, 'step': '0.01', 'min': '0.01'}),
+            'precio_otras_os': forms.NumberInput(attrs={'class': TAILWIND_INPUT_CLASSES, 'step': '0.01', 'min': '0.01'}),
+            'motivo_actualizacion': forms.Textarea(
+                attrs={
+                    'class': TAILWIND_INPUT_CLASSES,
+                    'rows': 3,
+                    'placeholder': 'Motivo u observaciones de la actualización',
+                }
+            ),
+        }
+        labels = {
+            'motivo_actualizacion': 'Motivo / observaciones',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.grupo_tarifario = kwargs.pop('grupo_tarifario', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_precio_cober(self):
+        precio_cober = self.cleaned_data.get('precio_cober')
+        if precio_cober is None or precio_cober <= 0:
+            raise forms.ValidationError('El precio COBER debe ser mayor a 0.')
+        return precio_cober
+
+    def clean_precio_otras_os(self):
+        precio_otras_os = self.cleaned_data.get('precio_otras_os')
+        if precio_otras_os is None or precio_otras_os <= 0:
+            raise forms.ValidationError('El precio OTRAS OS debe ser mayor a 0.')
+        return precio_otras_os
+
+    def clean(self):
+        cleaned_data = super().clean()
+        vigencia_desde = cleaned_data.get('vigencia_desde')
+        vigencia_hasta = cleaned_data.get('vigencia_hasta')
+
+        if vigencia_desde and vigencia_hasta and vigencia_hasta < vigencia_desde:
+            self.add_error('vigencia_hasta', 'La vigencia hasta no puede ser anterior a vigencia desde.')
+
+        if not self.grupo_tarifario or not vigencia_desde:
+            return cleaned_data
+
+        # Solapamiento de vigencias para el mismo grupo (null = rango abierto)
+        tarifas_qs = (
+            self._meta.model.objects
+            .filter(grupo_tarifario=self.grupo_tarifario)
+            .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=vigencia_desde))
+        )
+        if vigencia_hasta:
+            tarifas_qs = tarifas_qs.filter(vigencia_desde__lte=vigencia_hasta)
+
+        if tarifas_qs.exists():
+            raise forms.ValidationError(
+                'Ya existe una tarifa con vigencia que se solapa para este grupo tarifario.'
+            )
+
+        return cleaned_data
 
 
 class FiltroSesionContableForm(forms.Form):

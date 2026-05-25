@@ -2,35 +2,27 @@
 {% block title %}Portal de Liquidación - Inicio{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 max-w-6xl">
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
 
-    <!-- Bienvenida -->
-    <div class="bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-600 rounded-2xl shadow-xl p-8 mb-8 text-center relative overflow-hidden">
-        <!-- Patrón de fondo decorativo -->
-        <div class="absolute inset-0 opacity-10">
-            <div class="absolute top-0 left-0 w-64 h-64 bg-white rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-            <div class="absolute bottom-0 right-0 w-96 h-96 bg-white rounded-full translate-x-1/2 translate-y-1/2"></div>
-        </div>
-        
-        <div class="relative z-10">
-            <h2 class="text-3xl font-bold text-white mb-3">Bienvenido al Portal de Liquidación</h2>
-            <p class="text-white/90 text-lg mb-4">
-                Panel administrativo operativo para sesiones, liquidación, exportaciones y gestión de carga
-            </p>
-            
-            {% if user.is_authenticated and user.is_superuser %}
-            <!-- Botón para volver al dashboard administrativo (solo superusuarios) -->
-            <div class="mt-6">
-                <a href="{% url 'admin_dashboard' %}" 
-                   class="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-700 rounded-lg font-semibold hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                    <span>Volver al Dashboard Administrativo</span>
-                </a>
-            </div>
-            {% endif %}
-        </div>
+    <div class="mb-4 flex items-center justify-between gap-3">
+        <a href="{% url 'home' %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver al inicio general
+        </a>
+        {% if user.is_authenticated and user.is_superuser %}
+        <a href="{% url 'admin_dashboard' %}"
+           class="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors">
+            <i class="fas fa-columns"></i>
+            Dashboard administrativo
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <h1 class="text-2xl font-bold mb-1">Portal de Liquidación</h1>
+        <p class="text-slate-300 text-sm">Panel administrativo operativo para sesiones, liquidación, exportaciones y configuración económica.</p>
     </div>
 
     <!-- Módulos administrativos -->
@@ -79,18 +71,17 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 opacity-90">
+        <a href="{% url 'liquidacion:estudios_list' %}"
+           class="group bg-white rounded-xl shadow-md border border-slate-200 hover:border-cyan-400 transition-all p-6 hover:shadow-xl">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
                     <i class="fas fa-stethoscope text-xl"></i>
                 </div>
                 <h3 class="text-lg font-bold text-gray-800">Gestión de estudios</h3>
             </div>
-            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde Django admin.</p>
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
-                <i class="fas fa-lock"></i> Acceso deshabilitado en este portal
-            </span>
-        </div>
+            <p class="text-sm text-gray-600">Administración del catálogo de estudios, modalidades y parámetros básicos.</p>
+            <div class="mt-4 text-sm font-semibold text-cyan-700 group-hover:text-cyan-800">Ir a gestión de estudios <i class="fas fa-arrow-right ml-1"></i></div>
+        </a>
 
         <div class="bg-white rounded-xl shadow-md border border-slate-200 p-6 opacity-90">
             <div class="flex items-center gap-3 mb-3">
@@ -118,45 +109,39 @@
             </span>
         </div>
 
-        <div class="bg-white rounded-xl shadow-md border border-dashed border-gray-300 p-6">
+        <a href="{% url 'liquidacion:grupos_tarifarios_list' %}"
+           class="group bg-white rounded-xl shadow-md border border-slate-200 hover:border-amber-400 transition-all p-6 hover:shadow-xl">
             <div class="flex items-center gap-3 mb-3">
                 <div class="w-11 h-11 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
                     <i class="fas fa-coins text-xl"></i>
                 </div>
                 <h3 class="text-lg font-bold text-gray-700">Configuración económica / tarifas</h3>
             </div>
-            <p class="text-sm text-gray-600 mb-4">Pendiente de interfaz administrativa. Actualmente se gestiona desde Django admin.</p>
-            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-gray-100 text-gray-600">
-                <i class="fas fa-lock"></i> Sin pantalla dedicada en el portal
-            </span>
-        </div>
+            <p class="text-sm text-gray-600">Monitoreo administrativo de grupos tarifarios, vigencias y estado de cobertura.</p>
+            <div class="mt-4 text-sm font-semibold text-amber-700 group-hover:text-amber-800">Ir a configuración económica <i class="fas fa-arrow-right ml-1"></i></div>
+        </a>
 
     </div>
 
 
-    <!-- Información adicional -->
     <div class="bg-indigo-50 border-l-4 border-indigo-500 rounded-lg p-6 mt-8">
         <div>
             <h4 class="text-indigo-900 font-bold mb-3 flex items-center">
                 <i class="fas fa-info-circle mr-2"></i>
-                Información del Portal
+                Ayuda operativa
             </h4>
             <ul class="text-indigo-800 text-sm space-y-2">
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Gestión centralizada:</strong> sesiones, liquidación, estudios, guardias y carga masiva desde un único portal.</span>
+                    <span>Comenzá por <strong>Sesiones contables</strong> para validar estado operativo y exportaciones habilitadas.</span>
                 </li>
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Acceso restringido:</strong> solo administrativo, jefe de servicio y superusuario.</span>
+                    <span>Usá <strong>Configuración económica / tarifas</strong> para auditar vigencias y gestionar nuevas tarifas.</span>
                 </li>
                 <li class="flex items-start">
                     <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Sesiones contables:</strong> ciclo operativo completo de apertura, revisión, cierre, facturación y pago.</span>
-                </li>
-                <li class="flex items-start">
-                    <i class="fas fa-check-circle text-indigo-600 mr-2 mt-0.5"></i>
-                    <span><strong>Exportaciones:</strong> preliminar siempre disponible y definitiva según estado de sesión.</span>
+                    <span>Recordatorio: este portal mantiene <strong>acceso administrativo</strong> y flujo de trabajo con trazabilidad.</span>
                 </li>
             </ul>
         </div>

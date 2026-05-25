@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView
+from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView, DetailView
 from django.views.generic.edit import FormView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
@@ -22,6 +22,8 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.units import inch
 from .models import (
     Estudios,
+    GrupoTarifario,
+    TarifaGrupoTarifario,
     RegistroEstudiosPorMedico,
     GuardiaPasiva,
     SesionContable,
@@ -38,6 +40,7 @@ from .forms import (
     FiltroMedicoMesForm, 
     FiltroEstudiosPorMedicoForm,
     CargaExcelForm,
+    TarifaGrupoTarifarioAdminForm,
 )
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -68,6 +71,156 @@ class PortalLiquidacionInicioView(LoginRequiredMixin, UserPassesTestMixin, Templ
         )
         return redirect('home')
 
+
+class GruposTarifariosListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """Listado administrativo global de grupos tarifarios y su estado de vigencia."""
+
+    model = GrupoTarifario
+    template_name = 'liquidacion/grupos_tarifarios_list.html'
+    context_object_name = 'grupos'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para acceder a la configuración económica de liquidación.'
+        )
+        return redirect('home')
+
+    def get_queryset(self):
+        return (
+            GrupoTarifario.objects
+            .annotate(cantidad_estudios=Count('estudios', distinct=True))
+            .prefetch_related(
+                Prefetch(
+                    'tarifas',
+                    queryset=TarifaGrupoTarifario.objects.order_by('-vigencia_desde'),
+                    to_attr='tarifas_ordenadas',
+                )
+            )
+            .order_by('modalidad', 'codigo')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = date.today()
+        grupos_data = []
+
+        for grupo in context['grupos']:
+            tarifa_vigente = None
+            for tarifa in getattr(grupo, 'tarifas_ordenadas', []):
+                if tarifa.vigencia_desde <= hoy and (
+                    tarifa.vigencia_hasta is None or tarifa.vigencia_hasta >= hoy
+                ):
+                    tarifa_vigente = tarifa
+                    break
+
+            grupos_data.append({
+                'grupo': grupo,
+                'tarifa_vigente': tarifa_vigente,
+                'tiene_tarifa_vigente': tarifa_vigente is not None,
+            })
+
+        context['grupos_data'] = grupos_data
+        return context
+
+
+class GrupoTarifarioDetalleView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    """Detalle administrativo de un grupo tarifario (solo lectura)."""
+
+    model = GrupoTarifario
+    template_name = 'liquidacion/grupo_tarifario_detalle.html'
+    context_object_name = 'grupo'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para acceder al detalle de grupos tarifarios.'
+        )
+        return redirect('home')
+
+    def get_queryset(self):
+        return (
+            GrupoTarifario.objects
+            .prefetch_related(
+                Prefetch(
+                    'tarifas',
+                    queryset=TarifaGrupoTarifario.objects.order_by('-vigencia_desde'),
+                    to_attr='tarifas_ordenadas',
+                ),
+                Prefetch('estudios', queryset=Estudios.objects.order_by('nombre')),
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = date.today()
+        grupo = context['grupo']
+        historial_tarifas = list(getattr(grupo, 'tarifas_ordenadas', []))
+        tarifa_vigente = None
+
+        for tarifa in historial_tarifas:
+            if tarifa.vigencia_desde <= hoy and (
+                tarifa.vigencia_hasta is None or tarifa.vigencia_hasta >= hoy
+            ):
+                tarifa_vigente = tarifa
+                break
+
+        estudios_asociados = list(grupo.estudios.all())
+
+        context['tarifa_vigente'] = tarifa_vigente
+        context['historial_tarifas'] = historial_tarifas
+        context['estudios_asociados'] = estudios_asociados
+        context['cantidad_estudios_asociados'] = len(estudios_asociados)
+        context['tiene_tarifa_vigente'] = tarifa_vigente is not None
+        return context
+
+
+class GrupoTarifarioTarifaNuevaView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, CreateView):
+    """Alta administrativa de nueva tarifa para un grupo tarifario."""
+
+    model = TarifaGrupoTarifario
+    form_class = TarifaGrupoTarifarioAdminForm
+    template_name = 'liquidacion/grupo_tarifario_tarifa_form.html'
+    success_message = 'Tarifa creada correctamente.'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para crear tarifas de grupos tarifarios.'
+        )
+        return redirect('home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.grupo_tarifario = get_object_or_404(GrupoTarifario, pk=kwargs['grupo_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['grupo_tarifario'] = self.grupo_tarifario
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.grupo_tarifario = self.grupo_tarifario
+        form.instance.actualizado_por = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': self.grupo_tarifario.pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['grupo'] = self.grupo_tarifario
+        return context
+
 # ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
@@ -94,7 +247,7 @@ class EstudiosCreateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessage
     model = Estudios
     fields = ['nombre', 'tipo', 'conteo_regiones']
     template_name = 'liquidacion/estudios_form.html'
-    success_url = reverse_lazy('estudios_list')
+    success_url = reverse_lazy('liquidacion:estudios_list')
     success_message = "El estudio fue registrado exitosamente"
 
     def test_func(self):
