@@ -58,6 +58,10 @@ PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 # Temporalmente queda deshabilitado por defecto hasta retomar el desarrollo.
 PEDIDOS_ESTUDIOS_HABILITADO = config('PEDIDOS_ESTUDIOS_HABILITADO', default=False, cast=bool)
 
+# Flag de feature para dictado en cursor dentro de preinformes (fase 1).
+# Por defecto deshabilitado para rollout controlado.
+PREINFORMES_DICTADO_CURSOR_HABILITADO = config('PREINFORMES_DICTADO_CURSOR_HABILITADO', default=True, cast=bool)
+
 # Rollout personal: superusuarios que verán un grupo Operativo extra en el navbar
 NAVBAR_HIBRIDO_USUARIOS = [
     valor.strip() for valor in config('NAVBAR_HIBRIDO_USUARIOS', default='').split(',') if valor.strip()

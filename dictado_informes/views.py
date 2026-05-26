@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
@@ -28,6 +29,26 @@ logger = logging.getLogger(__name__)
 
 def user_can_access_dictado_module(user):
     return user.is_authenticated and getattr(user, 'puede_acceder_dictado_ia', lambda: False)()
+
+
+def user_can_access_transcripcion_preinformes(user):
+    """Permite transcripción desde preinformes cuando el rollout está habilitado."""
+    if not user.is_authenticated:
+        return False
+
+    if user_can_access_dictado_module(user):
+        return True
+
+    if not getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False):
+        return False
+
+    return getattr(user, 'rol', None) in {
+        'medico_residente',
+        'medico_staff',
+        'jefe_residentes',
+        'instructor_residentes',
+        'jefe_servicio',
+    }
 
 
 def get_plantillas_estructuradas_visibles(user, solo_activas=False):
@@ -574,7 +595,7 @@ def transcribir_audio_whisper(request):
     
     Seguridad: CSRF protegido, requiere autenticación y superuser
     """
-    if not user_can_access_dictado_module(request.user):
+    if not user_can_access_transcripcion_preinformes(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
     
     # 📊 FASE 4: Iniciar medición de tiempo

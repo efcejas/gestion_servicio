@@ -248,10 +248,26 @@
         <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
             <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
-                    <h2 class="text-xl font-semibold text-gray-900 flex items-center">
-                        <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
-                        Contenido del Preinforme
-                    </h2>
+                    <div>
+                        <h2 class="text-xl font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-file-medical-alt text-purple-600 mr-3"></i>
+                            Contenido del Preinforme
+                        </h2>
+                        {% if dictado_cursor_habilitado %}
+                        <div class="mt-2 flex items-center gap-2">
+                            <button
+                                type="button"
+                                id="dictado-toggle"
+                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
+                                title="Atajo: Alt + Shift + D"
+                            >
+                                <i class="fas fa-microphone mr-2"></i>
+                                Iniciar dictado
+                            </button>
+                            <span id="dictado-status" class="text-xs text-gray-600">Dictado en cursor listo (Alt + Shift + D).</span>
+                        </div>
+                        {% endif %}
+                    </div>
                     <div id="autosave-indicator" class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 transition-colors duration-200">
                         <i class="fas fa-circle text-gray-400 mr-1" id="autosave-icon"></i>
                         <span id="autosave-status">Listo</span>
@@ -268,7 +284,23 @@
                         Pega directamente desde Word o escribe tu informe completo aquí. 
                         Incluye técnica, hallazgos y conclusión con el formato que prefieras.
                     </p>
-                    {{ form.informe_html }}
+
+                    <!-- Estado de carga para evitar flash de textarea sin estilo -->
+                    <div id="editor-loading" class="flex items-center justify-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                        <div class="text-center">
+                            <svg class="animate-spin h-8 w-8 text-purple-600 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="text-sm text-gray-600 font-medium">Cargando editor...</p>
+                            <p class="text-xs text-gray-500 mt-1">Preparando el campo de dictado y redacción</p>
+                        </div>
+                    </div>
+
+                    <div id="editor-container" style="opacity: 0; transition: opacity 0.25s ease-in;">
+                        {{ form.informe_html }}
+                    </div>
+
                     {% if form.informe_html.errors %}
                         <div class="text-red-600 text-sm mt-1">{{ form.informe_html.errors.0 }}</div>
                     {% endif %}
@@ -432,6 +464,14 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const DICTADO_CURSOR_HABILITADO = {{ dictado_cursor_habilitado|yesno:'true,false' }};
+    const TRANSCRIBIR_URL = '{% url "dictado_informes:transcribir_whisper" %}';
+    const dictadoToggleButton = document.getElementById('dictado-toggle');
+    const dictadoStatusLabel = document.getElementById('dictado-status');
+    let dictadoMediaRecorder = null;
+    let dictadoChunks = [];
+    let dictadoActivo = false;
+
     const tipoEstudioSelect = document.getElementById('id_tipo_estudio');
     const regionSelect = document.getElementById('id_region');
     const plantillaSelect = document.getElementById('id_plantilla');
@@ -439,8 +479,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewImagenesWrapper = document.getElementById('preview-imagenes-residente');
     const previewImagenesGrid = document.getElementById('preview-imagenes-residente-grid');
     const resumenImagenesResidente = document.getElementById('imagenes-residente-resumen');
+    const editorLoading = document.getElementById('editor-loading');
+    const editorContainer = document.getElementById('editor-container');
     const LIMITE_IMAGENES_RESIDENTE = 3;
     let archivosSeleccionadosResidente = [];
+
+    function mostrarEditorListo() {
+        if (editorLoading) editorLoading.style.display = 'none';
+        if (editorContainer) editorContainer.style.opacity = '1';
+    }
 
     if (inputImagenesResidente && previewImagenesWrapper && previewImagenesGrid && resumenImagenesResidente) {
         function serializarArchivo(file) {
@@ -585,6 +632,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const editorElement = ckEditorContainer.querySelector('.ck-content');
                         if (editorElement && editorElement.ckeditorInstance) {
                             window.ckeditorInstance = editorElement.ckeditorInstance;
+                            mostrarEditorListo();
                             console.log('✅ Editor CKEditor5 encontrado y registrado');
                         }
                     } catch (error) {
@@ -592,6 +640,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             }
+        }
+        if (window.ckeditorInstance) {
+            mostrarEditorListo();
         }
         return window.ckeditorInstance;
     }
@@ -620,6 +671,202 @@ document.addEventListener('DOMContentLoaded', function() {
             // Fallback a textarea
             textarea.value = content;
             textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    function setDictadoStatus(message, isError = false) {
+        if (!dictadoStatusLabel) return;
+        dictadoStatusLabel.textContent = message;
+        dictadoStatusLabel.className = isError ? 'text-xs text-red-600' : 'text-xs text-gray-600';
+    }
+
+    function normalizarTextoDictado(texto) {
+        if (!texto) return '';
+
+        // Normalización conservadora: solo colapsa puntuación repetida.
+        return texto
+            .trim()
+            .replace(/\r\n/g, '\n')
+            .replace(/\n\s*[.!?]\s*(?=\S)/g, '\n')
+            .replace(/\n\s*[.!?]\s*$/g, '')
+            .replace(/\.{2,}/g, '.')
+            .replace(/!{2,}/g, '!')
+            .replace(/\?{2,}/g, '?')
+            .replace(/,{2,}/g, ',')
+            .replace(/;{2,}/g, ';')
+            .replace(/:{2,}/g, ':');
+    }
+
+    function ajustarPuntuacionPorContexto(texto, charBefore, charAfter) {
+        if (!texto) return '';
+        const before = (charBefore || '').trim();
+        const after = (charAfter || '').trim();
+
+        // Si el cursor ya está justo antes de una puntuación de cierre,
+        // no duplicar cierre al insertar el dictado.
+        if (/[.!?]$/.test(texto) && /^[.!?]/.test(after)) {
+            const sinCierre = texto.replace(/[.!?]+$/, '').trimEnd();
+            return sinCierre || texto;
+        }
+
+        // Si lo dictado empieza con cierre y ya hay cierre antes del cursor,
+        // quitar el cierre inicial huérfano.
+        if (/^[.!?]/.test(texto) && /^[.!?]/.test(before)) {
+            const sinApertura = texto.replace(/^[.!?]+\s*/, '');
+            return sinApertura || texto;
+        }
+
+        return texto;
+    }
+
+    function getCkEditorNeighborChars(position) {
+        let charBefore = '';
+        let charAfter = '';
+
+        if (!position) return { charBefore, charAfter };
+
+        const textNode = position.textNode;
+        if (textNode && typeof textNode.data === 'string') {
+            const data = textNode.data;
+            if (position.offset > 0 && position.offset <= data.length) {
+                charBefore = data.charAt(position.offset - 1);
+            }
+            if (position.offset < data.length) {
+                charAfter = data.charAt(position.offset);
+            }
+        }
+
+        if (!charBefore && position.nodeBefore && typeof position.nodeBefore.data === 'string') {
+            charBefore = position.nodeBefore.data.slice(-1);
+        }
+
+        if (!charAfter && position.nodeAfter && typeof position.nodeAfter.data === 'string') {
+            charAfter = position.nodeAfter.data.charAt(0);
+        }
+
+        return { charBefore, charAfter };
+    }
+
+    function insertTextAtCursor(texto) {
+        if (!texto || !texto.trim()) return;
+        let textoLimpio = normalizarTextoDictado(texto);
+
+        const editor = initializeEditorIfNeeded();
+        if (editor && editor.model) {
+            editor.model.change((writer) => {
+                const insertPosition = editor.model.document.selection.getFirstPosition();
+                const { charBefore, charAfter } = getCkEditorNeighborChars(insertPosition);
+                textoLimpio = ajustarPuntuacionPorContexto(textoLimpio, charBefore, charAfter);
+                const textNode = writer.createText(textoLimpio);
+                editor.model.insertContent(textNode, editor.model.document.selection);
+            });
+            return;
+        }
+
+        const textarea = document.getElementById('id_informe_html');
+        if (!textarea) return;
+        const start = textarea.selectionStart || 0;
+        const end = textarea.selectionEnd || 0;
+        const charBefore = start > 0 ? (textarea.value || '').charAt(start - 1) : '';
+        const charAfter = (textarea.value || '').charAt(end);
+        textoLimpio = ajustarPuntuacionPorContexto(textoLimpio, charBefore, charAfter);
+        const textoInsertado = textoLimpio;
+        const contenidoActual = textarea.value || '';
+        textarea.value = contenidoActual.slice(0, start) + textoInsertado + contenidoActual.slice(end);
+        textarea.selectionStart = textarea.selectionEnd = start + textoInsertado.length;
+        textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function blobToDataURL(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async function procesarDictadoGrabado() {
+        if (!dictadoChunks.length) {
+            setDictadoStatus('No se detectó audio para transcribir.', true);
+            return;
+        }
+
+        const mimeType = (dictadoMediaRecorder && dictadoMediaRecorder.mimeType) || 'audio/webm';
+        const audioBlob = new Blob(dictadoChunks, { type: mimeType });
+        if (audioBlob.size < 500) {
+            setDictadoStatus('Audio muy corto. Dicta al menos 1 segundo.', true);
+            return;
+        }
+
+        setDictadoStatus('Transcribiendo...');
+
+        try {
+            const audioBase64 = await blobToDataURL(audioBlob);
+            const response = await fetch(TRANSCRIBIR_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ audio: audioBase64 })
+            });
+
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo transcribir el audio');
+            }
+
+            insertTextAtCursor(data.texto_transcrito || '');
+            setDictadoStatus('Texto insertado en la posición del cursor.');
+        } catch (error) {
+            setDictadoStatus(error.message || 'Error durante transcripción.', true);
+        }
+    }
+
+    async function iniciarDictado() {
+        if (!DICTADO_CURSOR_HABILITADO) return;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            let mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/webm';
+            }
+
+            dictadoMediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+            dictadoChunks = [];
+
+            dictadoMediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    dictadoChunks.push(event.data);
+                }
+            };
+
+            dictadoMediaRecorder.onstop = async () => {
+                stream.getTracks().forEach((track) => track.stop());
+                await procesarDictadoGrabado();
+            };
+
+            dictadoMediaRecorder.start(500);
+            dictadoActivo = true;
+
+            if (dictadoToggleButton) {
+                dictadoToggleButton.innerHTML = '<i class="fas fa-stop mr-2"></i>Detener dictado';
+                dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition';
+            }
+            setDictadoStatus('Grabando... hablá y luego presiona detener.');
+        } catch (error) {
+            setDictadoStatus('No se pudo acceder al micrófono.', true);
+        }
+    }
+
+    function detenerDictado() {
+        if (!dictadoMediaRecorder || dictadoMediaRecorder.state === 'inactive') return;
+        dictadoMediaRecorder.stop();
+        dictadoActivo = false;
+        if (dictadoToggleButton) {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
+            dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition';
         }
     }
 
@@ -939,6 +1186,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // --- localStorage helpers ---
+        function parseDraftPayload(rawValue) {
+            if (!rawValue) return null;
+
+            try {
+                const parsed = JSON.parse(rawValue);
+                if (parsed && typeof parsed.content === 'string') {
+                    return {
+                        content: parsed.content,
+                        savedAt: parsed.savedAt || null,
+                    };
+                }
+            } catch (e) {
+                // Compatibilidad con formato anterior (string plano)
+            }
+
+            return { content: rawValue, savedAt: null };
+        }
+
         function getEditorContent() {
             const ck = window.ckeditorInstance;
             if (ck && typeof ck.getData === 'function') return ck.getData() || '';
@@ -948,7 +1213,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function saveDraftLocal() {
             try {
-                localStorage.setItem(LOCAL_KEY, getEditorContent());
+                const payload = {
+                    content: getEditorContent(),
+                    savedAt: new Date().toISOString(),
+                };
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
             } catch(e) { /* cuota llena, ignorar */ }
         }
 
@@ -957,13 +1226,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         function getDraftLocal() {
-            try { return localStorage.getItem(LOCAL_KEY); } catch(e) { return null; }
+            try {
+                return parseDraftPayload(localStorage.getItem(LOCAL_KEY));
+            } catch(e) {
+                return null;
+            }
         }
 
         // --- Restaurar borrador local al cargar ---
         function maybeRestoreDraft() {
             const draft = getDraftLocal();
-            if (!draft || draft.trim() === '') return;
+            if (!draft || !draft.content || draft.content.trim() === '') return;
 
             // Si hay plantilla_id en la URL, no restaurar silenciosamente
             const params = new URLSearchParams(window.location.search);
@@ -974,15 +1247,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Sólo restaurar si el editor está vacío
             const current = getEditorContent();
-            if (current && current.trim() !== '') return;
+            const currentTrim = (current || '').trim();
+            const draftTrim = draft.content.trim();
+
+            let shouldRestore = false;
+            if (!currentTrim) {
+                shouldRestore = true;
+            } else if (currentTrim !== draftTrim) {
+                const whenText = draft.savedAt
+                    ? `\n\nÚltimo guardado local: ${new Date(draft.savedAt).toLocaleString()}`
+                    : '';
+                shouldRestore = window.confirm(
+                    'Se encontró un borrador local distinto al contenido actual. ¿Deseas restaurarlo?' + whenText
+                );
+            }
+
+            if (!shouldRestore) return;
 
             function doRestore() {
                 const ck = window.ckeditorInstance;
                 if (ck && typeof ck.setData === 'function') {
-                    ck.setData(draft);
+                    ck.setData(draft.content);
                 } else {
                     const ta = document.getElementById('id_informe_html');
-                    if (ta) ta.value = draft;
+                    if (ta) ta.value = draft.content;
                 }
                 setIndicator('local', 'Borrador local restaurado');
                 setTimeout(() => setIndicator('ready', 'Listo'), 3000);
@@ -1086,6 +1374,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (ck && ck.model && ck.model.document) {
                 ck.model.document.on('change:data', onContentChange);
                 editorReady = true;
+                mostrarEditorListo();
                 setIndicator('ready', 'Listo');
                 maybeRestoreDraft();
                 return true;
@@ -1102,6 +1391,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const ta = document.getElementById('id_informe_html');
                 if (ta) ta.addEventListener('input', onContentChange);
                 editorReady = true;
+                mostrarEditorListo();
                 setIndicator('ready', 'Listo');
                 maybeRestoreDraft();
             }
@@ -1531,6 +1821,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Cerrar modal con tecla Escape
     document.addEventListener('keydown', function(e) {
+        if (DICTADO_CURSOR_HABILITADO && e.altKey && e.shiftKey && e.code === 'KeyD') {
+            e.preventDefault();
+            if (dictadoActivo) {
+                detenerDictado();
+            } else {
+                iniciarDictado();
+            }
+            return;
+        }
+
         if (e.key === 'Escape') {
             const modal = document.getElementById('modal-duplicados');
             if (modal && !modal.classList.contains('hidden')) {
@@ -1545,6 +1845,16 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    if (DICTADO_CURSOR_HABILITADO && dictadoToggleButton) {
+        dictadoToggleButton.addEventListener('click', function() {
+            if (dictadoActivo) {
+                detenerDictado();
+            } else {
+                iniciarDictado();
+            }
+        });
+    }
 });
 </script>
 

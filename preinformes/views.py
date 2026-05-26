@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import models, IntegrityError, transaction
@@ -349,6 +350,7 @@ def crear_preinforme(request):
         'form': form,
         'adjuntos_residente': [],
         'adjuntos_revisor': [],
+        'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
         'title': 'Nuevo Preinforme'
     }
     
@@ -423,6 +425,7 @@ def editar_preinforme(request, pk):
         'preinforme': preinforme,
         'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
+        'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
         'title': 'Editar Preinforme'
     }
 
@@ -885,6 +888,7 @@ def revisar_preinforme(request, pk):
         'revision': revision,
         'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
+        'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
         'title': f'Revisar Preinforme {preinforme.numero_estudio}'
     }
     
