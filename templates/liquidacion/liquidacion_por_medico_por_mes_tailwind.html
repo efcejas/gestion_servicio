@@ -115,43 +115,43 @@
             </div>
 
             <!-- Tabla de registros -->
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
+            <div class="overflow-x-auto w-full">
+                <table class="w-full min-w-[1080px] border-separate border-spacing-0">
+                    <thead class="bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                 <i class="fas fa-user mr-1"></i>Paciente
                             </th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                 <i class="fas fa-id-card mr-1"></i>DNI
                             </th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider" style="min-width: 220px;">
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide" style="min-width: 220px;">
                                 <i class="fas fa-x-ray mr-1"></i>Estudio / Tipo
                             </th>
-                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                 <i class="fas fa-calendar-check mr-1"></i>Fecha
                             </th>
-                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider" style="min-width: 120px;">
+                            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wide" style="min-width: 120px;">
                                 <i class="fas fa-hospital mr-1"></i>OS / Horario
                             </th>
-                            <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                 <i class="fas fa-layer-group mr-1"></i>Regiones
                             </th>
-                            <th class="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                 <i class="fas fa-dollar-sign mr-1"></i>Monto
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-200">
+                    <tbody class="divide-y divide-slate-100">
                         {% for registro in data.registros %}
-                        <tr class="hover:bg-indigo-50 transition-colors">
-                            <td class="px-4 py-3 text-sm font-medium text-gray-900">
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900 align-top">
                                 {{ registro.apellido_paciente|upper }}, {{ registro.nombre_paciente|title }}
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600">
+                            <td class="px-4 py-3 text-sm text-gray-600 align-top">
                                 {{ registro.dni_paciente|default:"-" }}
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-700" style="min-width: 220px;">
+                            <td class="px-4 py-3 text-sm text-gray-700 align-top" style="min-width: 220px;">
                                 <div class="flex flex-col gap-1">
                                     <!-- v3.1 - Marzo 2026: Mostrar estudios con cantidades individuales -->
                                     {% for item in registro.estudios_con_cantidades %}
@@ -187,10 +187,10 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-600 text-center">
+                            <td class="px-4 py-3 text-sm text-gray-600 text-center align-top">
                                 {{ registro.fecha_del_informe|date:"d/m/Y" }}
                             </td>
-                            <td class="px-4 py-3" style="min-width: 120px;">
+                            <td class="px-4 py-3 align-top" style="min-width: 120px;">
                                 <div class="flex flex-col items-center gap-1">
                                     <span class="inline-block px-2 py-1 rounded-lg font-semibold text-xs whitespace-nowrap
                                         {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
@@ -199,12 +199,12 @@
                                     <span class="text-xs text-gray-600 whitespace-nowrap">{{ registro.get_horario_display }}</span>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-center">
+                            <td class="px-4 py-3 text-center align-top">
                                 <span class="inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">
                                     {{ registro.cantidad_regiones }}
                                 </span>
                             </td>
-                            <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">
+                            <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right align-top">
                                 ${{ registro.monto_calculado|floatformat:2 }}
                             </td>
                         </tr>
@@ -240,24 +240,24 @@
                         {{ data.total_guardias }} guardia{{ data.total_guardias|pluralize }}
                     </span>
                 </h4>
-                <div class="overflow-x-auto bg-white rounded-lg">
-                    <table class="w-full">
-                        <thead class="bg-gray-50 border-b border-gray-200">
+                <div class="overflow-x-auto w-full bg-white rounded-lg">
+                    <table class="w-full min-w-[560px] border-separate border-spacing-0">
+                        <thead class="bg-slate-50 border-b border-slate-200">
                             <tr>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                     <i class="fas fa-calendar mr-1"></i>Fecha
                                 </th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                     <i class="fas fa-tag mr-1"></i>Tipo
                                 </th>
-                                <th class="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">
+                                <th class="px-4 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
                                     <i class="fas fa-dollar-sign mr-1"></i>Monto
                                 </th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200">
+                        <tbody class="divide-y divide-slate-100">
                             {% for guardia in data.guardias %}
-                            <tr class="hover:bg-emerald-50 transition-colors">
+                            <tr class="hover:bg-slate-50 transition-colors">
                                 <td class="px-4 py-3 text-sm text-gray-900">
                                     {{ guardia.fecha_guardia|date:"d/m/Y" }}
                                 </td>

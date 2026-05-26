@@ -31,7 +31,7 @@
     <!-- Tabla de sesiones -->
     <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
         <div class="overflow-x-auto w-full">
-            <table class="w-full min-w-full table-fixed divide-y divide-gray-200">
+            <table class="w-full min-w-[1024px] table-fixed divide-y divide-slate-200">
                 <colgroup>
                     <col style="width: 28%;">
                     <col style="width: 14%;">
@@ -40,22 +40,22 @@
                     <col style="width: 16%;">
                     <col style="width: 18%;">
                 </colgroup>
-                <thead class="bg-gray-50">
+                <thead class="bg-slate-50 border-b border-slate-200">
                     <tr>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Período</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
-                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Prácticas</th>
-                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Guardias</th>
-                        <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total general</th>
-                        <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Acción</th>
+                        <th class="px-6 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Período</th>
+                        <th class="px-6 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Estado</th>
+                        <th class="px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Prácticas</th>
+                        <th class="px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Guardias</th>
+                        <th class="px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Total general</th>
+                        <th class="px-6 py-3 text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Acción</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white divide-y divide-gray-100">
+                <tbody class="bg-white divide-y divide-slate-100">
                     {% for dato in sesiones_data %}
-                    <tr class="hover:bg-gray-50 transition-colors">
+                    <tr class="hover:bg-slate-50 transition-colors">
 
                         <!-- Período -->
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-3.5 align-top">
                             <div class="text-sm font-semibold text-gray-900">{{ dato.mes_nombre }} {{ dato.sesion.año }}</div>
                             <div class="text-xs text-gray-400 mt-0.5">Apertura: {{ dato.sesion.fecha_apertura|date:"d/m/Y" }}</div>
                             {% if dato.sesion.fecha_cierre %}
@@ -67,7 +67,7 @@
                         </td>
 
                         <!-- Estado badge -->
-                        <td class="px-6 py-4">
+                        <td class="px-6 py-3.5 align-top">
                             {% if dato.sesion.estado == 'ABIERTA' %}
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
                                 <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-green-500"></span>
@@ -109,24 +109,24 @@
                         </td>
 
                         <!-- Prácticas -->
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-6 py-3.5 text-right align-top">
                             <div class="text-sm font-semibold text-gray-900">{{ dato.count_practicas }}</div>
                             <div class="text-xs text-gray-400">${{ dato.total_monto_practicas|floatformat:0 }}</div>
                         </td>
 
                         <!-- Guardias -->
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-6 py-3.5 text-right align-top">
                             <div class="text-sm font-semibold text-gray-900">{{ dato.count_guardias }}</div>
                             <div class="text-xs text-gray-400">${{ dato.total_monto_guardias|floatformat:0 }}</div>
                         </td>
 
                         <!-- Total general -->
-                        <td class="px-6 py-4 text-right">
+                        <td class="px-6 py-3.5 text-right align-top">
                             <div class="text-sm font-bold text-gray-900">${{ dato.total_general|floatformat:0 }}</div>
                         </td>
 
                         <!-- Acción de transición -->
-                        <td class="px-6 py-4 text-center">
+                        <td class="px-6 py-3.5 text-center align-top">
                             {% if dato.puede_transicionar and dato.siguiente_estado %}
                                 {% if dato.sesion.estado == 'ABIERTA' %}
                                 <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
@@ -181,7 +181,7 @@
                         </td>
 
                     </tr>
-                    <tr class="bg-gray-50/70">
+                    <tr class="bg-slate-50/70">
                         <td colspan="6" class="px-6 py-4">
                             <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
                                 <div class="lg:col-span-1">
