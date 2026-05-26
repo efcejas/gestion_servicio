@@ -5,9 +5,17 @@
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
 
+    <div class="mb-4">
+        <a href="{% url 'liquidacion:portal_inicio' %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver al portal administrativo
+        </a>
+    </div>
+
     <!-- Header -->
-        <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
-            style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+    <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold mb-1">Gestión de Sesiones Contables</h1>
@@ -262,9 +270,9 @@
         </div>
     </div>
 
-    <!-- Leyenda del flujo y permisos -->
+    <!-- Ayuda operativa -->
     <div class="bg-white rounded-xl border border-gray-200 p-5">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Flujo del ciclo contable</p>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Ayuda operativa</p>
         <div class="flex flex-wrap items-center gap-2 text-xs mb-4">
             <span class="px-2 py-1 bg-green-100 text-green-800 rounded font-medium">Abierta</span>
             <i class="fas fa-arrow-right text-gray-300"></i>
@@ -276,11 +284,10 @@
             <i class="fas fa-arrow-right text-gray-300"></i>
             <span class="px-2 py-1 bg-gray-100 text-gray-600 rounded font-medium">Pagada</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-500">
-            <div><span class="font-medium text-green-700">Abierta / En Revisión:</span> médicos pueden cargar prácticas y guardias</div>
-            <div><span class="font-medium text-blue-700">Cerrada:</span> solo admin puede cargar registros faltantes</div>
-            <div><span class="font-medium text-purple-700">Facturada / Pagada:</span> solo lectura, correcciones requieren motivo</div>
-            <div><span class="font-medium text-slate-700">Facturada → Pagada:</span> solo administrativo y superusuario</div>
+        <div class="grid grid-cols-1 sm:grid-cols-1 gap-2 text-xs text-gray-500">
+            <div><span class="font-medium text-green-700">Abierta / En Revisión:</span> médicos pueden cargar prácticas y guardias.</div>
+            <div><span class="font-medium text-blue-700">Cerrada:</span> solo administración puede cargar faltantes y preparar facturación.</div>
+            <div><span class="font-medium text-slate-700">Facturada / Pagada:</span> el flujo queda restringido y las transiciones financieras requieren motivo.</div>
         </div>
     </div>
 
