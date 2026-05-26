@@ -158,16 +158,16 @@
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-gray-800">{{ item.estudio.nombre }}</span>
                                         {% if item.cantidad > 1 %}
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold whitespace-nowrap bg-indigo-100 text-indigo-700">
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap bg-indigo-100 text-indigo-800">
                                             ×{{ item.cantidad }}
                                         </span>
                                         {% endif %}
                                         {% if item.contexto == 'LECHO' %}
-                                        <span class="inline-flex items-center px-1.5 py-0 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap">Lecho</span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap bg-orange-100 text-orange-700">Lecho</span>
                                         {% elif item.contexto == 'QUIROFANO' %}
-                                        <span class="inline-flex items-center px-1.5 py-0 bg-red-100 text-red-700 rounded text-xs font-semibold whitespace-nowrap">Quirófano</span>
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap bg-red-100 text-red-700">Quirófano</span>
                                         {% endif %}
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap
                                             {% if item.tipo == 'ECO' %}bg-blue-100 text-blue-700
                                             {% elif item.tipo == 'RAD' %}bg-green-100 text-green-700
                                             {% elif item.tipo == 'TOM' %}bg-purple-100 text-purple-700
@@ -181,7 +181,7 @@
                                     </div>
                                     {% endfor %}
                                     {% if registro.paciente_internado %}
-                                    <span class="inline-flex items-center px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-semibold whitespace-nowrap mt-1" title="Bonus Urgencia 20%">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap mt-1 bg-orange-100 text-orange-700" title="Bonus Urgencia 20%">
                                         <i class="fas fa-bolt mr-1"></i> URGENCIA
                                     </span>
                                     {% endif %}
@@ -192,7 +192,7 @@
                             </td>
                             <td class="px-4 py-3 align-top" style="min-width: 120px;">
                                 <div class="flex flex-col items-center gap-1">
-                                    <span class="inline-block px-2 py-1 rounded-lg font-semibold text-xs whitespace-nowrap
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap
                                         {% if registro.tipo_obra_social == 'COBER' %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
                                         {{ registro.get_tipo_obra_social_display }}
                                     </span>
@@ -262,7 +262,7 @@
                                     {{ guardia.fecha_guardia|date:"d/m/Y" }}
                                 </td>
                                 <td class="px-4 py-3 text-sm text-gray-700">
-                                    <span class="inline-block px-2 py-1 rounded bg-emerald-100 text-emerald-700 font-semibold text-xs">
+                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">
                                         {{ guardia.get_tipo_guardia_display }}
                                     </span>
                                 </td>
