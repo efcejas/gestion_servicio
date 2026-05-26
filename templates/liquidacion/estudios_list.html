@@ -1,17 +1,31 @@
-{% extends "layouts/base_tailwind.html" %}
+{% extends "layouts/base_portal_liquidacion.html" %}
 {% block title %}Listado de Estudios{% endblock %}
 
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
-    <div class="mb-6 flex items-center justify-between">
-        <h3 class="text-2xl font-bold text-gray-800">Listado de estudios</h3>
-        <a href="{% url 'liquidacion:estudios_nuevo' %}" 
-           class="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-700 hover:to-emerald-700 focus:outline-none focus:ring-4 focus:ring-green-300 dark:focus:ring-green-800">
-            <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
-            </svg>
-            Agregar Estudio
+    <div class="mb-4">
+        <a href="{% url 'liquidacion:portal_inicio' %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver al portal administrativo
         </a>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Listado de estudios</h1>
+                <p class="text-slate-300 text-sm">Catálogo administrativo de prácticas y modalidades disponibles.</p>
+            </div>
+            <a href="{% url 'liquidacion:estudios_nuevo' %}" 
+               class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700">
+                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
+                </svg>
+                Agregar Estudio
+            </a>
+        </div>
     </div>
     
     {% if messages %}

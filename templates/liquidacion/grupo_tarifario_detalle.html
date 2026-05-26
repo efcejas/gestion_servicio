@@ -9,19 +9,23 @@
             <i class="fas fa-arrow-left"></i>
             Volver a grupos tarifarios
         </a>
-        {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' %}
-        <a href="{% url 'liquidacion:grupo_tarifario_tarifa_nueva' grupo.pk %}"
-           class="ml-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
-            <i class="fas fa-plus"></i>
-            Nueva tarifa
-        </a>
-        {% endif %}
     </div>
 
     <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
          style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
-        <h1 class="text-2xl font-bold mb-1">Detalle de grupo tarifario</h1>
-        <p class="text-slate-300 text-sm">Auditoria administrativa de vigencias, historial de tarifas y estudios asociados.</p>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Detalle de grupo tarifario</h1>
+                <p class="text-slate-300 text-sm">Auditoria administrativa de vigencias, historial de tarifas y estudios asociados.</p>
+            </div>
+            {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' %}
+            <a href="{% url 'liquidacion:grupo_tarifario_tarifa_nueva' grupo.pk %}"
+               class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shrink-0">
+                <i class="fas fa-plus"></i>
+                Nueva tarifa
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
