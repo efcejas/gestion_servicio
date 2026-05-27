@@ -309,14 +309,23 @@
             </li>
 
             {% if SANATORIO_MODULOS.eges_import %}
-            <!-- Lotes EGES -->
+            <!-- EGES Importación y análisis -->
             <li>
                 <a href="{% url 'eges_import:lista_batches' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.app_name == 'eges_import' and request.resolver_match.url_name != 'estadisticas' %}bg-blue-900{% endif %}">
                     <!-- Ícono: upload/importar -->
                     <svg class="w-5 h-5 {% if request.resolver_match.app_name == 'eges_import' and request.resolver_match.url_name != 'estadisticas' %}text-blue-400{% else %}text-gray-400{% endif %} group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                         <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
                     </svg>
-                    <span class="flex-1 ms-3 whitespace-nowrap">Lotes EGES</span>
+                    <span class="flex-1 ms-3 whitespace-nowrap">EGES: Lotes e importación</span>
+                </a>
+            </li>
+            <!-- Importar EGES (nuevo mes) -->
+            <li>
+                <a href="{% url 'eges_import:importar' %}" class="flex items-center p-2 ml-3 text-white rounded-lg transition-colors hover:bg-gray-700 group {% if request.resolver_match.app_name == 'eges_import' and request.resolver_match.url_name == 'importar' %}bg-blue-900{% endif %}">
+                    <svg class="w-4 h-4 mr-2 {% if request.resolver_match.app_name == 'eges_import' and request.resolver_match.url_name == 'importar' %}text-blue-400{% else %}text-gray-500{% endif %} group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    <span class="ms-2 text-sm text-gray-300 group-hover:text-white transition-colors">Importar mes EGES</span>
                 </a>
             </li>
             <!-- Estadísticas EGES -->
@@ -331,18 +340,6 @@
             </li>
             {% endif %}
 
-            {% if SANATORIO_MODULOS.liquidacion or user.is_superuser or user.rol == 'jefe_servicio' %}
-            <!-- Carga Masiva -->
-            <li>
-                <a href="{% url 'liquidacion:carga-masiva' %}" class="flex items-center p-2 text-white rounded-lg transition-colors hover:bg-green-900 group">
-                    <!-- Ícono: tabla/hoja de cálculo -->
-                    <svg class="w-5 h-5 text-green-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fill-rule="evenodd" d="M5 4a3 3 0 00-3 3v6a3 3 0 003 3h10a3 3 0 003-3V7a3 3 0 00-3-3H5zm-1 9v-1h5v2H5a1 1 0 01-1-1zm7 1h4a1 1 0 001-1v-1h-5v2zm0-4h5V8h-5v2zM9 8H4v2h5V8z" clip-rule="evenodd"/>
-                    </svg>
-                    <span class="flex-1 ms-3 whitespace-nowrap">Carga Masiva</span>
-                </a>
-            </li>
-            {% endif %}
             {% endif %}{# fin superuser #}
 
             {# ══════════════════════════════════ #}
