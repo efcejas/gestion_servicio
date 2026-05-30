@@ -280,6 +280,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_clases(),
                 i_revision(),
             ),
         ] if g]
