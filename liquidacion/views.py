@@ -33,6 +33,7 @@ from .models import (
 from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import evaluar_gate_consistencia_sesion
+from .services import clasificar_horario_residencia_por_proxy
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -484,6 +485,15 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             total_regiones += (estudio.conteo_regiones_default * cantidad)
         
         self.object.cantidad_regiones = total_regiones
+
+        # Fuente canónica para residencia+ECO: clasificación explícita post-M2M.
+        nuevo_horario = clasificar_horario_residencia_por_proxy(
+            rol=user.rol,
+            fecha_registro=self.object.fecha_registro,
+            tiene_eco=any(est.tipo == 'ECO' for est in estudios_seleccionados),
+        )
+        if nuevo_horario:
+            self.object.horario = nuevo_horario
         
         # v3.1: Calcular monto usando método unificado del modelo (lee cantidades de RegistroEstudio)
         total_monto = self.object.calcular_monto()
@@ -492,6 +502,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # También guardar campos de bonus urgencia que vienen del formulario
         self.object.save(update_fields=[
             'cantidad_regiones', 
+            'horario',
             'monto_calculado',
             'paciente_internado',
             'fecha_hora_solicitud',
@@ -1214,6 +1225,15 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             total_regiones += (estudio.conteo_regiones_default * cantidad)
         
         self.object.cantidad_regiones = total_regiones
+
+        # Fuente canónica para residencia+ECO: clasificación explícita post-M2M.
+        nuevo_horario = clasificar_horario_residencia_por_proxy(
+            rol=user.rol,
+            fecha_registro=self.object.fecha_registro,
+            tiene_eco=any(est.tipo == 'ECO' for est in estudios_seleccionados),
+        )
+        if nuevo_horario:
+            self.object.horario = nuevo_horario
         
         # v3.1: Recalcular monto usando método unificado del modelo
         total_monto = self.object.calcular_monto()
@@ -1227,6 +1247,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         # También guardar campos de bonus urgencia que vienen del formulario
         self.object.save(update_fields=[
             'cantidad_regiones',
+            'horario',
             'monto_calculado',
             'paciente_internado',
             'fecha_hora_solicitud',
@@ -1690,8 +1711,15 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                             cantidad=1,
                             contexto='SERVICIO',
                         )
+                        nuevo_horario = clasificar_horario_residencia_por_proxy(
+                            rol=medico.rol,
+                            fecha_registro=registro.fecha_registro,
+                            tiene_eco=(estudio.tipo == 'ECO'),
+                        )
+                        if nuevo_horario:
+                            registro.horario = nuevo_horario
                         registro.monto_calculado = registro.calcular_monto()
-                        registro.save(update_fields=['monto_calculado'])
+                        registro.save(update_fields=['horario', 'monto_calculado'])
                     cargados += 1
                 except Exception:
                     errores += 1

@@ -10,6 +10,7 @@ Implementan comportamientos automáticos en base a eventos de modelos:
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import RegistroEstudiosPorMedico, RegistroEstudio
+from .services import clasificar_horario_residencia_por_proxy
 import logging
 
 logger = logging.getLogger('liquidacion.signals')
@@ -47,6 +48,24 @@ def recalcular_cantidad_regiones_cuando_estudio_cambia(sender, instance, created
         RegistroEstudiosPorMedico.objects.filter(id=registro.id).update(
             cantidad_regiones=total_regiones
         )
+
+    # Clasificación canónica residencia+ECO una vez que existe M2M real.
+    tiene_eco = registro.registroestudio_set.filter(estudio__tipo='ECO').exists()
+    nuevo_horario = clasificar_horario_residencia_por_proxy(
+        rol=registro.medico.rol,
+        fecha_registro=registro.fecha_registro,
+        tiene_eco=tiene_eco,
+    )
+    if nuevo_horario and registro.horario in [None, '', 'NA']:
+        logger.info(
+            f"✅ Recalculando horario automático (post-M2M): "
+            f"Registro #{registro.id} | "
+            f"{registro.horario} → {nuevo_horario}"
+        )
+        RegistroEstudiosPorMedico.objects.filter(id=registro.id).update(
+            horario=nuevo_horario
+        )
+        registro.horario = nuevo_horario
     
     # También recalcular monto (ya que regiones afectan el monto)
     nuevo_monto = registro.calcular_monto()

@@ -7,9 +7,44 @@ Las funciones retornan buffers (BytesIO) listos para ser enviados como descarga.
 import io
 from datetime import datetime
 
+from django.utils import timezone
 from django.db.models import Prefetch
 
 from .models import Estudios, GuardiaPasiva, RegistroEstudiosPorMedico
+
+
+ROLES_RESIDENCIA = {
+    'medico_residente',
+    'jefe_residentes',
+    'instructor_residentes',
+}
+
+
+def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco):
+    """
+    Clasifica horario INTRA/EXTRA para residencia usando fecha_registro como proxy.
+
+    Retorna:
+        'INTRA', 'EXTRA' o None (cuando no aplica la regla)
+    """
+    if rol not in ROLES_RESIDENCIA:
+        return None
+    if not tiene_eco:
+        return None
+    if not fecha_registro:
+        return None
+
+    fecha_local = timezone.localtime(fecha_registro)
+
+    # Feriados institucionales centralizados en control_guardias.
+    from control_guardias.models import Feriado
+
+    if fecha_local.weekday() >= 5:
+        return 'EXTRA'
+    if Feriado.objects.filter(fecha=fecha_local.date()).exists():
+        return 'EXTRA'
+
+    return 'INTRA' if 8 <= fecha_local.hour < 17 else 'EXTRA'
 
 
 def generar_buffer_pdf_liquidacion():

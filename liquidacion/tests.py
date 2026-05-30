@@ -2,9 +2,12 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
+from control_guardias.models import Feriado
+
+from .forms import PracticaForm
 from .models import (
     DiaSinPacientes,
     Estudios,
@@ -15,6 +18,7 @@ from .models import (
     TarifaGrupoTarifario,
 )
 from .grupo_tarifario_mapping import inferir_codigo_grupo
+from .services import clasificar_horario_residencia_por_proxy
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
@@ -1188,4 +1192,196 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
         self.assertEqual(reg.calcular_monto(), Decimal('8000.00'))
+
+
+class ClasificacionHorarioResidenciaProxyTest(TestCase):
+    def setUp(self):
+        from liquidacion.models import RegistroEstudio
+
+        self.client = Client()
+        self.residente = User.objects.create_user(
+            username='residente_proxy',
+            password='testpass123',
+            rol='medico_residente',
+        )
+        self.staff = User.objects.create_user(
+            username='staff_proxy',
+            password='testpass123',
+            rol='medico_staff',
+        )
+        self.estudio_eco = Estudios.objects.create(
+            nombre='Eco Proxy',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        self.estudio_no_eco = Estudios.objects.create(
+            nombre='Doppler Proxy',
+            tipo='DOP',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        self.RegistroEstudio = RegistroEstudio
+
+    def _aware(self, year, month, day, hour, minute=0):
+        return timezone.make_aware(datetime(year, month, day, hour, minute))
+
+    def test_habil_1030_intra(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=self._aware(2026, 5, 27, 10, 30),  # miércoles
+            tiene_eco=True,
+        )
+        self.assertEqual(resultado, 'INTRA')
+
+    def test_habil_1700_extra(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=self._aware(2026, 5, 27, 17, 0),
+            tiene_eco=True,
+        )
+        self.assertEqual(resultado, 'EXTRA')
+
+    def test_sabado_extra(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=self._aware(2026, 5, 30, 10, 0),  # sábado
+            tiene_eco=True,
+        )
+        self.assertEqual(resultado, 'EXTRA')
+
+    def test_domingo_extra(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=self._aware(2026, 5, 31, 10, 0),  # domingo
+            tiene_eco=True,
+        )
+        self.assertEqual(resultado, 'EXTRA')
+
+    def test_feriado_extra(self):
+        fecha = self._aware(2026, 5, 29, 10, 0)
+        Feriado.objects.create(fecha=fecha.date(), descripcion='Feriado test')
+
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=fecha,
+            tiene_eco=True,
+        )
+        self.assertEqual(resultado, 'EXTRA')
+
+    def test_no_aplica_si_no_hay_eco(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tiene_eco=False,
+        )
+        self.assertIsNone(resultado)
+
+    def test_no_aplica_a_staff(self):
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_staff',
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tiene_eco=True,
+        )
+        self.assertIsNone(resultado)
+
+    def test_no_pisa_horario_ya_definido_en_fallback_save(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='No',
+            apellido_paciente='Pisa',
+            dni_paciente='90000001',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            horario='EXTRA',
+            tipo_obra_social='COBER',
+        )
+        registro.save()
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+
+    def test_integracion_create_post_m2m_aplica_clasificacion(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Ana',
+            apellido_paciente='CreateFlow',
+            dni_paciente='90000002',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 17, 10),
+            tipo_obra_social='COBER',
+            horario='NA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+
+    def test_integracion_update_post_m2m_aplica_clasificacion(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Ana',
+            apellido_paciente='UpdateFlow',
+            dni_paciente='90000003',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 30),
+            tipo_obra_social='COBER',
+            horario='NA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_no_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'NA')
+
+        # Simula edición: cambia M2M a ECO y dispara reclasificación post-M2M.
+        registro.registroestudio_set.all().delete()
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+
+    def test_signal_clasifica_cuando_se_crea_registroestudio(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Signal',
+            apellido_paciente='Eco',
+            dni_paciente='90000004',
+            fecha_del_informe=date(2026, 5, 30),
+            fecha_registro=self._aware(2026, 5, 30, 10, 0),  # sábado
+            tipo_obra_social='COBER',
+            horario='NA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+
+    def test_form_no_expone_horario(self):
+        form = PracticaForm(user=self.residente)
+        self.assertNotIn('horario', form.fields)
 

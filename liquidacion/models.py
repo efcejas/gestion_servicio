@@ -1121,16 +1121,17 @@ class RegistroEstudiosPorMedico(models.Model):
             )
             self.sesion_contable = sesion
         
-        # Validación: Asignar horario automáticamente según rol y hora
-        # SOLO si no está ya especificado o está vacío
+        # Fallback conservador legacy: solo aplica si no hay horario definido.
+        # La fuente canónica para residencia+ECO vive en flujo post-M2M (services.py).
         if not self.horario or self.horario == '':
             if self.medico.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']:
                 # Staff no tiene horario INTRA/EXTRA
                 self.horario = 'NA'
             else:
-                # Residentes, jefe residentes, instructores: auto-asignar según hora
+                # Sin M2M aún no inferimos ECO/no ECO; usamos proxy por fecha_registro.
                 from django.utils import timezone
-                hora_actual = timezone.localtime(timezone.now()).hour
+                referencia = self.fecha_registro or timezone.now()
+                hora_actual = timezone.localtime(referencia).hour
                 
                 # 8:00 a 16:59 → INTRA (17:00 ya es EXTRA)
                 if 8 <= hora_actual < 17:

@@ -154,7 +154,7 @@ class PracticaForm(forms.ModelForm):
         # Hacer campo required para evitar envío vacío
         self.fields['tipo_obra_social'].required = True
 
-        # Horario se asigna automáticamente en models.RegistroEstudiosPorMedico.save()
+        # Horario: clasificación canónica post-M2M en services.py; save() deja fallback legacy.
 
     def clean_cantidad_regiones(self):
         cantidad = self.cleaned_data.get('cantidad_regiones')
