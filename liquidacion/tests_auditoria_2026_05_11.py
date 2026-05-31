@@ -26,6 +26,7 @@ from .models import (
     GrupoTarifario,
     TarifaGrupoTarifario,
 )
+from accounts.context_processors import navbar_links
 
 User = get_user_model()
 
@@ -1951,3 +1952,66 @@ class SesionContableFase3TrazabilidadYExportTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Auditoría residentes ECO')
         self.assertContains(response, 'Detalle próximamente.')
+
+
+class NavegacionLiquidacionResidentesTest(TestCase):
+    """Valida acceso visible a Registrar estudios para perfiles de residencia."""
+
+    def setUp(self):
+        self.password = 'testpass123'
+        self.request_factory = RequestFactory()
+        self.registro_url = reverse('liquidacion:registroestudios_nuevo')
+
+        self.medico_residente = User.objects.create_user(
+            username='residente_nav',
+            password=self.password,
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_nav',
+            password=self.password,
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.instructor_residentes = User.objects.create_user(
+            username='instructor_nav',
+            password=self.password,
+            rol='instructor_residentes',
+            perfil_completo=True,
+        )
+
+    def _labels_nav(self, user):
+        request = self.request_factory.get(reverse('home'))
+        request.user = user
+        grupos = navbar_links(request)['nav_groups']
+        return [item['label'] for grupo in grupos for item in grupo['items']]
+
+    def test_navbar_medico_residente_incluye_registrar_estudios(self):
+        labels = self._labels_nav(self.medico_residente)
+        self.assertIn('Registrar Estudios', labels)
+
+    def test_navbar_residencia_no_pierde_registrar_estudios_jefe_e_instructor(self):
+        labels_jefe = self._labels_nav(self.jefe_residentes)
+        labels_instructor = self._labels_nav(self.instructor_residentes)
+
+        self.assertIn('Registrar Estudios', labels_jefe)
+        self.assertIn('Registrar Estudios', labels_instructor)
+
+    def test_home_medico_residente_muestra_cta_registrar_estudios(self):
+        self.client.force_login(self.medico_residente)
+
+        response = self.client.get(reverse('home'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Registrar estudios')
+        self.assertContains(response, 'Carga los estudios informados del dia.')
+        self.assertContains(response, f'href="{self.registro_url}"', html=False)
+
+    def test_link_registrar_estudios_apunta_a_url_correcta_para_roles_residencia(self):
+        for user in [self.medico_residente, self.jefe_residentes, self.instructor_residentes]:
+            self.client.force_login(user)
+            response = self.client.get(reverse('home'))
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, f'href="{self.registro_url}"', html=False)
