@@ -15,10 +15,12 @@ from .models import (
     GuardiaPasiva,
     ConfiguracionGuardiaPasiva,
     RegistroEstudiosPorMedico,
+    SesionContable,
     TarifaGrupoTarifario,
 )
 from .grupo_tarifario_mapping import inferir_codigo_grupo
 from .services import clasificar_horario_residencia_por_proxy
+from .services_auditoria import auditar_residentes_eco_por_sesion
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado
@@ -1384,4 +1386,183 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
     def test_form_no_expone_horario(self):
         form = PracticaForm(user=self.residente)
         self.assertNotIn('horario', form.fields)
+
+
+class AuditoriaResidentesEcoServiceTest(TestCase):
+    def setUp(self):
+        from liquidacion.models import RegistroEstudio
+
+        self.residente = User.objects.create_user(
+            username='res_audit',
+            password='testpass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_audit',
+            password='testpass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.instructor = User.objects.create_user(
+            username='inst_audit',
+            password='testpass123',
+            rol='instructor_residentes',
+            perfil_completo=True,
+        )
+        self.staff = User.objects.create_user(
+            username='staff_audit',
+            password='testpass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+        self.sesion = SesionContable.objects.create(mes=5, año=2026, estado='ABIERTA')
+        self.sesion_otra = SesionContable.objects.create(mes=6, año=2026, estado='ABIERTA')
+
+        self.estudio_eco = Estudios.objects.create(
+            nombre='ECO Audit',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        self.estudio_dop = Estudios.objects.create(
+            nombre='DOP Audit',
+            tipo='DOP',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        self.RegistroEstudio = RegistroEstudio
+
+    def _aware(self, y, m, d, h, minute=0):
+        return timezone.make_aware(datetime(y, m, d, h, minute))
+
+    def _crear_registro(self, medico, sesion, dt, horario='EXTRA', estudio=None, monto='1000.00'):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=medico,
+            sesion_contable=sesion,
+            nombre_paciente='Paciente',
+            apellido_paciente='Audit',
+            dni_paciente=f"{medico.id}{dt.day:02d}{dt.hour:02d}"[:8],
+            fecha_del_informe=dt.date(),
+            fecha_registro=dt,
+            tipo_obra_social='COBER',
+            horario=horario,
+            monto_calculado=Decimal(monto),
+        )
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio or self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        return registro
+
+    def test_servicio_filtra_por_sesion(self):
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10), horario='INTRA')
+        self._crear_registro(self.residente, self.sesion_otra, self._aware(2026, 6, 12, 10), horario='EXTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        item = data['items'][0]
+        self.assertEqual(data['sesion_id'], self.sesion.id)
+        self.assertEqual(item['total_eco'], 1)
+
+    def test_servicio_filtra_roles_permitidos(self):
+        self._crear_registro(self.staff, self.sesion, self._aware(2026, 5, 12, 10), horario='EXTRA')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10), horario='INTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['total_residentes'], 1)
+        self.assertEqual(data['items'][0]['medico_id'], self.residente.id)
+
+    def test_servicio_filtra_solo_eco(self):
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10), horario='EXTRA', estudio=self.estudio_dop)
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['total_residentes'], 0)
+        self.assertEqual(data['items'], [])
+
+    def test_calcula_intra_extra_proporcion(self):
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10), horario='INTRA')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 17), horario='EXTRA')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 13, 17), horario='EXTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        item = data['items'][0]
+        self.assertEqual(item['intra'], 1)
+        self.assertEqual(item['extra'], 2)
+        self.assertAlmostEqual(item['proporcion_extra'], 2 / 3, places=6)
+
+    def test_detecta_nocturnos(self):
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 23), horario='EXTRA')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 13, 5), horario='EXTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['items'][0]['nocturnos'], 2)
+
+    def test_detecta_finde_y_feriado(self):
+        Feriado.objects.create(fecha=date(2026, 5, 13), descripcion='Feriado audit')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 30, 10), horario='EXTRA')  # sábado
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 13, 10), horario='EXTRA')  # feriado
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['items'][0]['finde_feriado'], 2)
+
+    def test_detecta_max_eco_dia_y_dias_pico(self):
+        for i in range(14):
+            self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10, i % 59), horario='INTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        item = data['items'][0]
+        self.assertEqual(item['max_eco_dia'], 14)
+        self.assertIn('2026-05-12', item['dias_pico'])
+
+    def test_severidad_roja(self):
+        for i in range(50):
+            self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 17, i % 59), horario='EXTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        item = data['items'][0]
+        self.assertEqual(item['severidad'], 'roja')
+        self.assertTrue(any(a['severidad'] == 'roja' for a in item['alertas']))
+
+    def test_severidad_amarilla(self):
+        for i in range(7):
+            self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 17, i % 59), horario='EXTRA')
+        for i in range(13):
+            self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 13, 10, i % 59), horario='INTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['items'][0]['severidad'], 'amarilla')
+
+    def test_severidad_ok(self):
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 10), horario='INTRA')
+        self._crear_registro(self.residente, self.sesion, self._aware(2026, 5, 12, 11), horario='INTRA')
+
+        data = auditar_residentes_eco_por_sesion(self.sesion)
+        self.assertEqual(data['items'][0]['severidad'], 'ok')
+
+    def test_no_modifica_monto_ni_horario(self):
+        registro = self._crear_registro(
+            self.residente,
+            self.sesion,
+            self._aware(2026, 5, 12, 17),
+            horario='EXTRA',
+            monto='4321.00',
+        )
+        registro.refresh_from_db()
+
+        monto_antes = registro.monto_calculado
+        horario_antes = registro.horario
+
+        auditar_residentes_eco_por_sesion(self.sesion)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, horario_antes)
+        self.assertEqual(registro.monto_calculado, monto_antes)
 

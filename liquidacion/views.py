@@ -32,7 +32,7 @@ from .models import (
 )
 from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
 from .permisos import puede_ver_desglose_administrativo
-from .services_auditoria import evaluar_gate_consistencia_sesion
+from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
 from .services import clasificar_horario_residencia_por_proxy
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
@@ -1794,6 +1794,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             gate_preview = {'bloqueantes': [], 'advertencias': []}
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
+            auditoria_residentes_eco = auditar_residentes_eco_por_sesion(sesion)
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
@@ -1815,6 +1816,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'gate_advertencias_count': len(gate_preview['advertencias']),
                 'gate_bloqueantes_preview': gate_preview['bloqueantes'][:3],
                 'gate_advertencias_preview': gate_preview['advertencias'][:3],
+                'auditoria_residentes_eco': auditoria_residentes_eco,
                 'historial_reciente': historial_ordenado[:5],
                 'historial_count': len(historial_ordenado),
             })

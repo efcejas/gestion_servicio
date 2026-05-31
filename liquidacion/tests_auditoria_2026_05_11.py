@@ -13,6 +13,7 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.urls import reverse
+from django.utils import timezone
 from datetime import date, datetime
 from decimal import Decimal
 from .models import (
@@ -1905,3 +1906,48 @@ class SesionContableFase3TrazabilidadYExportTest(TestCase):
         response = self.client.get(reverse('liquidacion:sesiones_list'))
 
         self.assertEqual(response.status_code, 302)
+
+    def test_sesiones_list_incluye_resumen_auditoria_residentes_eco_para_admin(self):
+        sesion = self._crear_sesion_con_datos('ABIERTA', 8)
+        residente = User.objects.create_user(
+            username='residente_auditoria_sesion',
+            password=self.password,
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        estudio_eco = Estudios.objects.create(
+            nombre='ECO Auditoria Sesion',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            activo=True,
+        )
+        for i in range(35):
+            registro = RegistroEstudiosPorMedico.objects.create(
+                medico=residente,
+                nombre_paciente='Audit',
+                apellido_paciente='Sesion',
+                dni_paciente=f"77{i:06d}"[:8],
+                fecha_del_informe=date(2026, 8, 12),
+                fecha_registro=timezone.make_aware(datetime(2026, 8, 12, 17, i % 59)),
+                sesion_contable=sesion,
+                tipo_obra_social='COBER',
+                horario='EXTRA',
+                monto_calculado=Decimal('5000.00'),
+                cantidad_regiones=1,
+            )
+            RegistroEstudio.objects.create(
+                registro=registro,
+                estudio=estudio_eco,
+                cantidad=1,
+                contexto='SERVICIO',
+            )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:sesiones_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Auditoría residentes ECO')
+        self.assertContains(response, 'Detalle próximamente.')

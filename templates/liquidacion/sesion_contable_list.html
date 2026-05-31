@@ -234,6 +234,48 @@
                                 <div class="lg:col-span-1">
                                     <details class="group">
                                         <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                            <span>Auditoría residentes ECO</span>
+                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
+                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                        </summary>
+                                        <div class="mt-2 space-y-2 text-xs">
+                                            <p class="text-gray-700">
+                                                Residentes con alertas: <span class="font-semibold">{{ dato.auditoria_residentes_eco.residentes_con_alertas }} / {{ dato.auditoria_residentes_eco.total_residentes }}</span>
+                                            </p>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 whitespace-nowrap">
+                                                    Rojas: {{ dato.auditoria_residentes_eco.alertas_rojas }}
+                                                </span>
+                                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap">
+                                                    Amarillas: {{ dato.auditoria_residentes_eco.alertas_amarillas }}
+                                                </span>
+                                            </div>
+
+                                            {% if dato.auditoria_residentes_eco.top_alertas %}
+                                                <div class="space-y-1">
+                                                    {% for item in dato.auditoria_residentes_eco.top_alertas %}
+                                                        <p class="text-gray-700 flex flex-wrap items-center gap-2">
+                                                            <span class="font-medium">{{ item.medico_nombre }}</span>
+                                                            {% if item.severidad == 'roja' %}
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800">Roja</span>
+                                                            {% else %}
+                                                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800">Amarilla</span>
+                                                            {% endif %}
+                                                            <span class="text-gray-500">({{ item.cantidad_alertas }} alerta{{ item.cantidad_alertas|pluralize:'s' }})</span>
+                                                        </p>
+                                                    {% endfor %}
+                                                </div>
+                                                <p class="text-gray-500">Detalle próximamente.</p>
+                                            {% else %}
+                                                <p class="text-gray-500">Sin alertas de auditoría ECO en esta sesión.</p>
+                                            {% endif %}
+                                        </div>
+                                    </details>
+                                </div>
+
+                                <div class="lg:col-span-1">
+                                    <details class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                                             <span>Historial ({{ dato.historial_count }})</span>
                                             <span class="text-gray-400 group-open:hidden">(ver)</span>
                                             <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
