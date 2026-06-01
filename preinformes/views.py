@@ -443,6 +443,8 @@ def mis_preinformes(request):
     if form.is_valid():
         if form.cleaned_data['estado']:
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
+        if form.cleaned_data['sistema_destino']:
+            preinformes = preinformes.filter(sistema_destino=form.cleaned_data['sistema_destino'])
         if form.cleaned_data['tipo_estudio']:
             preinformes = preinformes.filter(tipo_estudio=form.cleaned_data['tipo_estudio'])
         if form.cleaned_data['region']:
@@ -676,6 +678,8 @@ def lista_revision(request):
     if form.is_valid():
         if form.cleaned_data.get('estado'):
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
+        if form.cleaned_data.get('sistema_destino'):
+            preinformes = preinformes.filter(sistema_destino=form.cleaned_data['sistema_destino'])
         if form.cleaned_data.get('tipo_estudio'):
             preinformes = preinformes.filter(tipo_estudio=form.cleaned_data['tipo_estudio'])
         if form.cleaned_data.get('region'):

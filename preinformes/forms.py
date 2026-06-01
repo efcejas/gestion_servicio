@@ -197,6 +197,12 @@ class FiltroPreinformesForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'})
     )
+
+    sistema_destino = forms.ChoiceField(
+        choices=[('', 'Todos los sistemas')] + list(Preinforme.SISTEMA_CHOICES),
+        required=False,
+        widget=forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'})
+    )
     
     tipo_estudio = forms.ModelChoiceField(
         queryset=TipoEstudio.objects.filter(activo=True),
