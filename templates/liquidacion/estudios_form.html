@@ -19,14 +19,19 @@
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-md max-w-3xl">
         <div class="px-6 py-6">
+            <div class="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Cambiar el grupo tarifario afecta cálculos futuros y registros que se recalculen; no modifica liquidaciones cerradas/facturadas/pagadas.
+            </div>
             <form method="post" class="space-y-5">
                 {% csrf_token %}
                 <div class="space-y-4">
                     {% for field in form %}
                     <div>
+                        {% if field.field.widget.input_type != 'checkbox' %}
                         <label for="{{ field.id_for_label }}" class="mb-1 block text-sm font-semibold text-gray-700">
                             {{ field.label }}
                         </label>
+                        {% endif %}
                         {% if field.field.widget.input_type == 'select' %}
                             <select name="{{ field.name }}" id="{{ field.id_for_label }}"
                                     class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:ring-indigo-500"
@@ -39,6 +44,13 @@
                             <textarea name="{{ field.name }}" id="{{ field.id_for_label }}" rows="3"
                                       class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-500 focus:ring-indigo-500"
                                       {% if field.field.required %}required{% endif %}>{{ field.value|default:'' }}</textarea>
+                        {% elif field.field.widget.input_type == 'checkbox' %}
+                            <label class="inline-flex items-center gap-2">
+                                <input type="checkbox" name="{{ field.name }}" id="{{ field.id_for_label }}"
+                                       class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                       {% if field.value %}checked{% endif %}>
+                                <span class="text-sm text-gray-700">{{ field.label }}</span>
+                            </label>
                         {% else %}
                             <input type="{{ field.field.widget.input_type }}" name="{{ field.name }}" id="{{ field.id_for_label }}"
                                    value="{{ field.value|default:'' }}"

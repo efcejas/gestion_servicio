@@ -39,6 +39,7 @@ from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
 from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 from .forms import (
+    EstudiosAdminForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
     GuardiaPasivaForm,
@@ -250,13 +251,24 @@ def _mes_nombre(mes):
 
 class EstudiosCreateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, CreateView):
     model = Estudios
-    fields = ['nombre', 'tipo', 'conteo_regiones']
+    form_class = EstudiosAdminForm
     template_name = 'liquidacion/estudios_form.html'
     success_url = reverse_lazy('liquidacion:estudios_list')
     success_message = "El estudio fue registrado exitosamente"
 
     def test_func(self):
-        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+
+class EstudiosUpdateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessageMixin, UpdateView):
+    model = Estudios
+    form_class = EstudiosAdminForm
+    template_name = 'liquidacion/estudios_form.html'
+    success_url = reverse_lazy('liquidacion:estudios_list')
+    success_message = "El estudio fue actualizado exitosamente"
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
 
 
 class EstudiosListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -265,7 +277,19 @@ class EstudiosListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     context_object_name = 'estudios'
 
     def test_func(self):
-        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def get_queryset(self):
+        queryset = Estudios.objects.select_related('grupo_tarifario').order_by('tipo', 'nombre')
+        if self.request.GET.get('sin_grupo') == '1':
+            queryset = queryset.filter(grupo_tarifario__isnull=True)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtro_sin_grupo_activo'] = self.request.GET.get('sin_grupo') == '1'
+        context['cantidad_sin_grupo'] = Estudios.objects.filter(grupo_tarifario__isnull=True).count()
+        return context
 
 class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     """

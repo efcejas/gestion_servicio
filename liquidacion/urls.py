@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     EstudiosCreateView,
     EstudiosListView,
+    EstudiosUpdateView,
     RegistroEstudiosPorMedicoCreateView,
     RegistroEstudiosPorMedicoListView,
     RegistroEstudiosPorMedicoUpdateView,
@@ -55,6 +56,7 @@ urlpatterns = [
     # ===== RUTAS INTERNAS (Requieren Login) =====
     path('estudios/nuevo/', EstudiosCreateView.as_view(), name='estudios_nuevo'),
     path('estudios/', EstudiosListView.as_view(), name='estudios_list'),
+    path('estudios/<int:pk>/editar/', EstudiosUpdateView.as_view(), name='estudios_edit'),
 
     # Rutas para Registro de Estudios por Medico
     path('registro_estudios_por_medico/nuevo/', RegistroEstudiosPorMedicoCreateView.as_view(), name='registroestudios_nuevo'),

@@ -20,6 +20,38 @@ TAILWIND_CHECKBOX_CLASSES = 'h-5 w-5 text-indigo-600 border-gray-300 rounded foc
 TAILWIND_RADIO_CLASSES = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
 
 
+class EstudiosAdminForm(forms.ModelForm):
+    """Formulario administrativo mínimo para alta/edición de estudios."""
+
+    class Meta:
+        model = Estudios
+        fields = ['nombre', 'tipo', 'grupo_tarifario', 'activo', 'conteo_regiones']
+        widgets = {
+            'nombre': forms.TextInput(attrs={
+                'class': TAILWIND_INPUT_CLASSES,
+                'placeholder': 'Nombre del estudio',
+            }),
+            'tipo': forms.Select(attrs={'class': TAILWIND_SELECT_CLASSES}),
+            'grupo_tarifario': forms.Select(attrs={'class': TAILWIND_SELECT_CLASSES}),
+            'activo': forms.CheckboxInput(attrs={'class': TAILWIND_CHECKBOX_CLASSES}),
+            'conteo_regiones': forms.NumberInput(attrs={
+                'class': TAILWIND_INPUT_CLASSES,
+                'min': 1,
+            }),
+        }
+        labels = {
+            'nombre': 'Nombre',
+            'tipo': 'Tipo de estudio',
+            'grupo_tarifario': 'Grupo tarifario',
+            'activo': 'Activo',
+            'conteo_regiones': 'Cantidad de regiones',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['grupo_tarifario'].queryset = self.fields['grupo_tarifario'].queryset.order_by('codigo')
+
+
 # ============================================================================
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================

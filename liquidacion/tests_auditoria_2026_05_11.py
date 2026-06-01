@@ -478,6 +478,160 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse('liquidacion:estudios_list'))
 
+    def test_estudios_edit_permite_super_admin_y_jefe_servicio(self):
+        estudio = Estudios.objects.create(
+            nombre='EDIT ALLOW TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+
+        self.client.force_login(self.superuser)
+        response_super = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+        self.assertEqual(response_super.status_code, 200)
+
+        self.client.force_login(self.admin)
+        response_admin = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+        self.assertEqual(response_admin.status_code, 200)
+
+        self.client.force_login(self.jefe_servicio)
+        response_jefe = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+        self.assertEqual(response_jefe.status_code, 200)
+
+    def test_estudios_edit_deniega_medico_y_residente(self):
+        estudio = Estudios.objects.create(
+            nombre='EDIT DENY TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+
+        self.client.force_login(self.medico)
+        response_medico = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+        self.assertIn(response_medico.status_code, [302, 403])
+
+        self.client.force_login(self.residente)
+        response_residente = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+        self.assertIn(response_residente.status_code, [302, 403])
+
+    def test_estudios_edit_get_renderiza_campo_grupo_tarifario(self):
+        estudio = Estudios.objects.create(
+            nombre='EDIT FIELD TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="grupo_tarifario"')
+
+    def test_estudios_edit_post_guarda_cambio_de_grupo(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='EDIT_GRP_1',
+            nombre='Grupo edición test',
+            modalidad='ECO',
+            activo=True,
+        )
+        estudio = Estudios.objects.create(
+            nombre='EDIT SAVE TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:estudios_edit', kwargs={'pk': estudio.pk}),
+            {
+                'nombre': estudio.nombre,
+                'tipo': estudio.tipo,
+                'grupo_tarifario': grupo.pk,
+                'activo': 'on',
+                'conteo_regiones': 2,
+            }
+        )
+
+        self.assertEqual(response.status_code, 302)
+        estudio.refresh_from_db()
+        self.assertEqual(estudio.grupo_tarifario_id, grupo.id)
+        self.assertEqual(estudio.conteo_regiones, 2)
+
+    def test_estudios_list_muestra_badge_sin_grupo(self):
+        Estudios.objects.create(
+            nombre='SIN GRUPO LIST TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+            grupo_tarifario=None,
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sin grupo')
+
+    def test_estudios_list_filtro_sin_grupo_muestra_solo_sin_grupo(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='FILTRO_GRP_1',
+            nombre='Grupo filtro test',
+            modalidad='ECO',
+            activo=True,
+        )
+        estudio_sin_grupo = Estudios.objects.create(
+            nombre='FILTRO SIN GRUPO TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+            grupo_tarifario=None,
+        )
+        Estudios.objects.create(
+            nombre='FILTRO CON GRUPO TEST',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+            grupo_tarifario=grupo,
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_list') + '?sin_grupo=1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, estudio_sin_grupo.nombre)
+        self.assertNotContains(response, 'FILTRO CON GRUPO TEST')
+
+    def test_estudios_form_muestra_advertencia_operativa(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:estudios_nuevo'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'Cambiar el grupo tarifario afecta cálculos futuros y registros que se recalculen; no modifica liquidaciones cerradas/facturadas/pagadas.',
+        )
+
     def test_portal_inicio_muestra_tarjeta_estudios_activa(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse('liquidacion:portal_inicio'))
