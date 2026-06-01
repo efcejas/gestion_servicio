@@ -22,6 +22,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from accounts import views
+from liquidacion.views import EstudiosUpdateView
 from .views import (
     CustomLoginView, 
     CustomPasswordResetView,
@@ -59,6 +60,8 @@ urlpatterns = [
     path('agenda/', include('agenda.urls')),  # URLs para agenda y notas
     path('control_guardias/', include('control_guardias.urls')),  # URLs para el control de guardias
     path('liquidacion/', include('liquidacion.urls')),  # URLs para liquidación
+    # Alias de compatibilidad: permite reverse('estudios_edit') sin namespace.
+    path('liquidacion/estudios/<int:pk>/editar/', EstudiosUpdateView.as_view(), name='estudios_edit'),
     path('gestion_eventos/', include('gestion_eventos.urls')),  # URLs para la gestión de eventos
     path('protocolos/', include('protocolos.urls')),  # URLs para protocolos
     path('equipos/', include('equipos.urls')),  # URLs para equipos
