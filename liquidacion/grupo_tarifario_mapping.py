@@ -46,6 +46,47 @@ def detecta(nombre, patrones):
     return any(re.search(patron, texto) for patron in patrones)
 
 
+def es_eco_general_real(tipo, nombre, codigo=None, modalidad_grupo=None):
+    """Retorna True solo para ecografia general real.
+
+    Exclusiones duras:
+    - tipo DOP
+    - tipo ECOCAR
+    - nombre/codigo con patrones de Doppler (incluye catologo mal tipado como ECO)
+    - modalidad de grupo tarifario DOP o ECOCAR
+    """
+    tipo_norm = (tipo or "").upper()
+    nombre_norm = normalizado(nombre)
+    codigo_norm = normalizado(codigo or "")
+    modalidad_norm = (modalidad_grupo or "").upper()
+
+    if tipo_norm in {"DOP", "ECOCAR"}:
+        return False
+
+    if modalidad_norm in {"DOP", "ECOCAR"}:
+        return False
+
+    if detecta(nombre_norm, PATRONES_DOPPLER):
+        return False
+
+    if detecta(codigo_norm, [r"\bDOP\b", r"\bECODOPPLER\b", r"\bDOPPLER\b"]):
+        return False
+
+    return tipo_norm == "ECO"
+
+
+def es_eco_general_real_estudio(estudio):
+    """Wrapper para instancias de Estudios."""
+    grupo = getattr(estudio, 'grupo_tarifario', None)
+    modalidad_grupo = getattr(grupo, 'modalidad', None)
+    return es_eco_general_real(
+        tipo=getattr(estudio, 'tipo', None),
+        nombre=getattr(estudio, 'nombre', None),
+        codigo=getattr(estudio, 'codigo', None),
+        modalidad_grupo=modalidad_grupo,
+    )
+
+
 def contextos_disponibles_para_estudio(tipo, nombre, codigo=None):
     """Retorna los contextos de ubicación que la UI debe ofrecer para un estudio.
 

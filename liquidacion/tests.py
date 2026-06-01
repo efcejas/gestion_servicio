@@ -413,8 +413,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_horario_intra_descuento_50_porciento_COBER(self):
         """
-        CRÍTICO: Residente en horario INTRA residencia debe cobrar 50% del valor
-        Fórmula: precio_cober × regiones × 0.5 (INTRA)
+        Residente + DOP + INTRA: DOP no recibe descuento (100%).
         """
         from decimal import Decimal
         
@@ -433,13 +432,13 @@ class CalculoMontosTest(TestCase):
         # Recalcular monto
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: $8.500 (COBER) × 1 región × 0.5 (INTRA) = $4.250
-        esperado = Decimal('4250.00')
+        # Esperado: $8.500 (COBER) × 1 región = $8.500
+        esperado = Decimal('8500.00')
         
         self.assertEqual(
             monto_calculado, 
             esperado,
-            f"❌ FALLA: Residente INTRA debería cobrar $4.250 (50% de la tarifa del grupo), pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + DOP + INTRA debe cobrar $8.500 (sin descuento), pero cobra ${monto_calculado}"
         )
 
     def test_precio_para_os_prefiere_tarifa_vigente_del_grupo(self):
@@ -484,7 +483,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_horario_intra_descuento_50_porciento_OTRAS_OS(self):
         """
-        Residente INTRA con OTRAS OS: 50% del precio otras_os
+        Residente + DOP + INTRA con OTRAS OS: DOP no recibe descuento (100%).
         """
         from decimal import Decimal
         
@@ -502,13 +501,13 @@ class CalculoMontosTest(TestCase):
         
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: $10.000 (OTRAS_OS) × 1 región × 0.5 (INTRA) = $5.000
-        esperado = Decimal('5000.00')
+        # Esperado: $10.000 (OTRAS_OS) × 1 región = $10.000
+        esperado = Decimal('10000.00')
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente INTRA con OTRAS OS debería cobrar $5.000 (50% de $10.000), pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + DOP + INTRA con OTRAS OS debe cobrar $10.000, pero cobra ${monto_calculado}"
         )
     
     def test_jefe_residentes_dop_intra_sin_descuento(self):
@@ -600,8 +599,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_multiples_regiones_intra(self):
         """
-        Verificar que el cálculo funciona con múltiples estudios (regiones)
-        Fórmula v3.1 M2M: Σ(precio estudios) × porcentaje_horario
+        Residente + DOP múltiple + INTRA: DOP no recibe descuento.
         """
         from decimal import Decimal
         
@@ -619,13 +617,13 @@ class CalculoMontosTest(TestCase):
         
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: ($8.500 + $8.500) × 0.5 (INTRA) = $8.500
-        esperado = Decimal('8500.00')
+        # Esperado: ($8.500 + $8.500) = $17.000
+        esperado = Decimal('17000.00')
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente con 2 estudios INTRA debe cobrar $8.500 según la tarifa del grupo, pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + 2 DOP + INTRA debe cobrar $17.000, pero cobra ${monto_calculado}"
         )
 
     def test_calcular_monto_sin_grupo_usa_precios_legados(self):
@@ -1071,7 +1069,7 @@ class FactorIntraRolTipoEstudioTest(TestCase):
     Tests para regla INTRA diferenciada por rol y tipo de estudio (v3.2 - Mayo 2026).
 
     Regla:
-      - medico_residente: INTRA (50%) aplica a TODOS los estudios.
+            - medico_residente: INTRA (50%) aplica SOLO a ECO general real.
       - jefe_residentes / instructor_residentes: INTRA (50%) solo a ECO general.
         Doppler (DOP) y otros siempre al 100% para estos roles.
       - medico_staff: sin factor horario, siempre 100%.
@@ -1168,10 +1166,10 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         reg = self._crear_registro(self.residente, self.estudio_eco, horario='INTRA')
         self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
 
-    def test_residente_dop_intra_aplica_50_porciento(self):
-        """Residente + DOP + INTRA: monto = 6000 * 0.5 = 3000 (INTRA aplica a todos)."""
+    def test_residente_dop_intra_no_aplica_factor(self):
+        """Residente + DOP + INTRA: monto = 6000 (sin descuento)."""
         reg = self._crear_registro(self.residente, self.estudio_dop, horario='INTRA')
-        self.assertEqual(reg.calcular_monto(), Decimal('3000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('6000.00'))
 
     def test_jefe_eco_extra_sin_descuento(self):
         """Jefe residente + ECO + EXTRA: monto = 4000 (EXTRA nunca descuenta)."""
@@ -1190,6 +1188,20 @@ class FactorIntraRolTipoEstudioTest(TestCase):
             cantidad_regiones=2,
             monto_calculado=Decimal('0.00'),
             fecha_del_informe=self.today
+        )
+        self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
+        self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
+        self.assertEqual(reg.calcular_monto(), Decimal('8000.00'))
+
+    def test_residente_mix_eco_dop_intra_aplica_solo_a_eco(self):
+        """Residente + (ECO 4000 + DOP 6000) + INTRA => 2000 + 6000 = 8000."""
+        reg = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            cantidad_regiones=2,
+            monto_calculado=Decimal('0.00'),
+            fecha_del_informe=self.today,
         )
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
@@ -1229,6 +1241,24 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
             precio_otras_os=Decimal('1000.00'),
             activo=True,
         )
+        self.estudio_doppler_mal_tipado_eco = Estudios.objects.create(
+            nombre='ECODOPPLER Mal Tipado',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        self.estudio_ecocar = Estudios.objects.create(
+            nombre='Ecocardiograma Test',
+            tipo='ECOCAR',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
         self.RegistroEstudio = RegistroEstudio
 
     def _aware(self, year, month, day, hour, minute=0):
@@ -1238,7 +1268,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=self._aware(2026, 5, 27, 10, 30),  # miércoles
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertEqual(resultado, 'INTRA')
 
@@ -1246,7 +1276,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=self._aware(2026, 5, 27, 17, 0),
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertEqual(resultado, 'EXTRA')
 
@@ -1254,7 +1284,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=self._aware(2026, 5, 30, 10, 0),  # sábado
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertEqual(resultado, 'EXTRA')
 
@@ -1262,7 +1292,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=self._aware(2026, 5, 31, 10, 0),  # domingo
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertEqual(resultado, 'EXTRA')
 
@@ -1273,7 +1303,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=fecha,
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertEqual(resultado, 'EXTRA')
 
@@ -1281,7 +1311,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',
             fecha_registro=self._aware(2026, 5, 27, 10, 0),
-            tiene_eco=False,
+            tiene_eco_general=False,
         )
         self.assertIsNone(resultado)
 
@@ -1289,7 +1319,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_staff',
             fecha_registro=self._aware(2026, 5, 27, 10, 0),
-            tiene_eco=True,
+            tiene_eco_general=True,
         )
         self.assertIsNone(resultado)
 
@@ -1328,6 +1358,27 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         )
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'EXTRA')
+
+    def test_integracion_create_post_m2m_dop_only_queda_na(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Ana',
+            apellido_paciente='CreateDop',
+            dni_paciente='90000012',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 30),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_no_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'NA')
 
     def test_integracion_update_post_m2m_aplica_clasificacion(self):
         registro = RegistroEstudiosPorMedico.objects.create(
@@ -1382,6 +1433,51 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         )
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'EXTRA')
+
+    def test_estudio_doppler_mal_tipado_como_eco_no_activa_intra(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Signal',
+            apellido_paciente='DopplerNombre',
+            dni_paciente='90000013',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_doppler_mal_tipado_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'NA')
+
+    def test_estudio_ecocar_only_no_descuenta_intra_y_queda_na(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Signal',
+            apellido_paciente='EcocarOnly',
+            dni_paciente='90000014',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_ecocar,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+
+        self.assertNotEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.calcular_monto(), Decimal('1000.00'))
 
     def test_form_no_expone_horario(self):
         form = PracticaForm(user=self.residente)

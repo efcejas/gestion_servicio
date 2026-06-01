@@ -30,10 +30,14 @@ from .models import (
     ConfiguracionGuardiaPasiva,
     HistorialSesionContable,
 )
-from .grupo_tarifario_mapping import contextos_disponibles_para_estudio, es_estudio_cardiologico
+from .grupo_tarifario_mapping import (
+    contextos_disponibles_para_estudio,
+    es_estudio_cardiologico,
+    es_eco_general_real_estudio,
+)
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
-from .services import clasificar_horario_residencia_por_proxy
+from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 from .forms import (
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -486,14 +490,21 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         self.object.cantidad_regiones = total_regiones
 
-        # Fuente canónica para residencia+ECO: clasificación explícita post-M2M.
-        nuevo_horario = clasificar_horario_residencia_por_proxy(
-            rol=user.rol,
-            fecha_registro=self.object.fecha_registro,
-            tiene_eco=any(est.tipo == 'ECO' for est in estudios_seleccionados),
-        )
-        if nuevo_horario:
-            self.object.horario = nuevo_horario
+        # Fuente canónica para residencia+ECO general real: clasificación explícita post-M2M.
+        if user.rol in ROLES_RESIDENCIA:
+            tiene_eco_general = any(
+                es_eco_general_real_estudio(est)
+                for est in estudios_seleccionados
+            )
+            if tiene_eco_general:
+                nuevo_horario = clasificar_horario_residencia_por_proxy(
+                    rol=user.rol,
+                    fecha_registro=self.object.fecha_registro,
+                    tiene_eco_general=True,
+                )
+                self.object.horario = nuevo_horario or 'NA'
+            else:
+                self.object.horario = 'NA'
         
         # v3.1: Calcular monto usando método unificado del modelo (lee cantidades de RegistroEstudio)
         total_monto = self.object.calcular_monto()
@@ -1226,14 +1237,21 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         
         self.object.cantidad_regiones = total_regiones
 
-        # Fuente canónica para residencia+ECO: clasificación explícita post-M2M.
-        nuevo_horario = clasificar_horario_residencia_por_proxy(
-            rol=user.rol,
-            fecha_registro=self.object.fecha_registro,
-            tiene_eco=any(est.tipo == 'ECO' for est in estudios_seleccionados),
-        )
-        if nuevo_horario:
-            self.object.horario = nuevo_horario
+        # Fuente canónica para residencia+ECO general real: clasificación explícita post-M2M.
+        if user.rol in ROLES_RESIDENCIA:
+            tiene_eco_general = any(
+                es_eco_general_real_estudio(est)
+                for est in estudios_seleccionados
+            )
+            if tiene_eco_general:
+                nuevo_horario = clasificar_horario_residencia_por_proxy(
+                    rol=user.rol,
+                    fecha_registro=self.object.fecha_registro,
+                    tiene_eco_general=True,
+                )
+                self.object.horario = nuevo_horario or 'NA'
+            else:
+                self.object.horario = 'NA'
         
         # v3.1: Recalcular monto usando método unificado del modelo
         total_monto = self.object.calcular_monto()
@@ -1711,13 +1729,17 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                             cantidad=1,
                             contexto='SERVICIO',
                         )
-                        nuevo_horario = clasificar_horario_residencia_por_proxy(
-                            rol=medico.rol,
-                            fecha_registro=registro.fecha_registro,
-                            tiene_eco=(estudio.tipo == 'ECO'),
-                        )
-                        if nuevo_horario:
-                            registro.horario = nuevo_horario
+                        if medico.rol in ROLES_RESIDENCIA:
+                            tiene_eco_general = es_eco_general_real_estudio(estudio)
+                            if tiene_eco_general:
+                                nuevo_horario = clasificar_horario_residencia_por_proxy(
+                                    rol=medico.rol,
+                                    fecha_registro=registro.fecha_registro,
+                                    tiene_eco_general=True,
+                                )
+                                registro.horario = nuevo_horario or 'NA'
+                            else:
+                                registro.horario = 'NA'
                         registro.monto_calculado = registro.calcular_monto()
                         registro.save(update_fields=['horario', 'monto_calculado'])
                     cargados += 1

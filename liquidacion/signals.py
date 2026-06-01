@@ -10,7 +10,8 @@ Implementan comportamientos automáticos en base a eventos de modelos:
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import RegistroEstudiosPorMedico, RegistroEstudio
-from .services import clasificar_horario_residencia_por_proxy
+from .grupo_tarifario_mapping import es_eco_general_real_estudio
+from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 import logging
 
 logger = logging.getLogger('liquidacion.signals')
@@ -49,23 +50,37 @@ def recalcular_cantidad_regiones_cuando_estudio_cambia(sender, instance, created
             cantidad_regiones=total_regiones
         )
 
-    # Clasificación canónica residencia+ECO una vez que existe M2M real.
-    tiene_eco = registro.registroestudio_set.filter(estudio__tipo='ECO').exists()
-    nuevo_horario = clasificar_horario_residencia_por_proxy(
-        rol=registro.medico.rol,
-        fecha_registro=registro.fecha_registro,
-        tiene_eco=tiene_eco,
-    )
-    if nuevo_horario and registro.horario in [None, '', 'NA']:
-        logger.info(
-            f"✅ Recalculando horario automático (post-M2M): "
-            f"Registro #{registro.id} | "
-            f"{registro.horario} → {nuevo_horario}"
+    # Clasificación canónica residencia+ECO general real una vez que existe M2M real.
+    if registro.medico.rol in ROLES_RESIDENCIA:
+        relaciones = list(registro.registroestudio_set.select_related('estudio__grupo_tarifario').all())
+        tiene_eco_general = any(
+            es_eco_general_real_estudio(rel.estudio)
+            for rel in relaciones
         )
-        RegistroEstudiosPorMedico.objects.filter(id=registro.id).update(
-            horario=nuevo_horario
-        )
-        registro.horario = nuevo_horario
+        if tiene_eco_general:
+            if registro.horario in [None, '', 'NA']:
+                nuevo_horario = clasificar_horario_residencia_por_proxy(
+                    rol=registro.medico.rol,
+                    fecha_registro=registro.fecha_registro,
+                    tiene_eco_general=True,
+                )
+                horario_objetivo = nuevo_horario or 'NA'
+            else:
+                horario_objetivo = registro.horario
+        else:
+            # Sin ECO general real, residencia no debe conservar INTRA/EXTRA.
+            horario_objetivo = 'NA'
+
+        if registro.horario != horario_objetivo:
+            logger.info(
+                f"✅ Recalculando horario automático (post-M2M): "
+                f"Registro #{registro.id} | "
+                f"{registro.horario} → {horario_objetivo}"
+            )
+            RegistroEstudiosPorMedico.objects.filter(id=registro.id).update(
+                horario=horario_objetivo
+            )
+            registro.horario = horario_objetivo
     
     # También recalcular monto (ya que regiones afectan el monto)
     nuevo_monto = registro.calcular_monto()

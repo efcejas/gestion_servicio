@@ -843,24 +843,27 @@ class RegistroEstudiosPorMedico(models.Model):
         """
         Calcula el monto a facturar por esta práctica.
         v3.2 - Mayo 2026: Factor INTRA diferenciado por rol y tipo de estudio.
+        v3.3 - Mayo 2026: INTRA aplica solo a ECO general real.
 
         Reglas de factor horario INTRA (50%):
-          - medico_residente: aplica a TODOS los estudios.
-          - jefe_residentes / instructor_residentes: aplica SOLO a ECO general.
-            Los Doppler (DOP) siempre al 100% para estos roles.
+          - medico_residente / jefe_residentes / instructor_residentes:
+            aplica SOLO a ECO general real.
+            Doppler (DOP), ECOCAR y otros siempre al 100%.
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
+        from .grupo_tarifario_mapping import es_eco_general_real_estudio
+
         # Si no hay estudios asignados, retornar 0
-        relaciones = self.registroestudio_set.select_related('estudio').all()
+        relaciones = self.registroestudio_set.select_related('estudio__grupo_tarifario').all()
         if not relaciones.exists():
             return Decimal('0.00')
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
         
-        # 1. Sumar (precio × cantidad) separando ECO del resto (para INTRA diferenciado)
+        # 1. Sumar (precio × cantidad) separando ECO general real del resto.
         precio_total = Decimal('0.00')
-        precio_total_eco = Decimal('0.00')    # ECO general — tiene INTRA para jefe/instructor
-        precio_total_resto = Decimal('0.00')  # DOP y otros — sin INTRA para jefe/instructor
+        precio_total_eco_general = Decimal('0.00')
+        precio_total_resto = Decimal('0.00')
         
         for rel in relaciones:
             estudio = rel.estudio
@@ -873,8 +876,8 @@ class RegistroEstudiosPorMedico(models.Model):
             )
             precio_rel = precio_estudio * Decimal(str(cantidad))
             precio_total += precio_rel
-            if estudio.tipo == 'ECO':
-                precio_total_eco += precio_rel
+            if es_eco_general_real_estudio(estudio):
+                precio_total_eco_general += precio_rel
             else:
                 precio_total_resto += precio_rel
         
@@ -884,12 +887,9 @@ class RegistroEstudiosPorMedico(models.Model):
         # 2. Aplicar factor horario según rol
         subtotal = precio_total
         if self.horario == 'INTRA':
-            if self.medico.rol == 'medico_residente':
-                # Residentes: INTRA (50%) aplica a todos los estudios
-                subtotal = subtotal * Decimal('0.5')
-            elif self.medico.rol in ['jefe_residentes', 'instructor_residentes']:
-                # Jefe/instructor: INTRA solo aplica a ECO general, Doppler y otros al 100%
-                subtotal = (precio_total_eco * Decimal('0.5')) + precio_total_resto
+            if self.medico.rol in ['medico_residente', 'jefe_residentes', 'instructor_residentes']:
+                # Residencia: INTRA solo aplica a ECO general real.
+                subtotal = (precio_total_eco_general * Decimal('0.5')) + precio_total_resto
             # EXTRA para cualquier rol: sin cambio (100%)
         # Staff / otros roles: sin factor horario (100%)
         

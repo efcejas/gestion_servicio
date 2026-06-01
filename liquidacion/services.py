@@ -20,7 +20,7 @@ ROLES_RESIDENCIA = {
 }
 
 
-def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco):
+def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco_general):
     """
     Clasifica horario INTRA/EXTRA para residencia usando fecha_registro como proxy.
 
@@ -29,7 +29,7 @@ def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco):
     """
     if rol not in ROLES_RESIDENCIA:
         return None
-    if not tiene_eco:
+    if not tiene_eco_general:
         return None
     if not fecha_registro:
         return None
