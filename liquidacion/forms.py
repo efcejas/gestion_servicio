@@ -1,6 +1,6 @@
 from django import forms
 from django.db.models import Q
-from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable
+from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable, SolicitudRevisionHorarioRegistro
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -50,6 +50,35 @@ class EstudiosAdminForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['grupo_tarifario'].queryset = self.fields['grupo_tarifario'].queryset.order_by('codigo')
+
+
+class SolicitudRevisionHorarioRegistroForm(forms.ModelForm):
+    """Formulario médico para solicitar revisión de horario de un registro."""
+
+    class Meta:
+        model = SolicitudRevisionHorarioRegistro
+        fields = ['horario_solicitado', 'fecha_hora_real_declarada', 'motivo_solicitud']
+        widgets = {
+            'horario_solicitado': forms.Select(attrs={'class': TAILWIND_SELECT_CLASSES}),
+            'fecha_hora_real_declarada': forms.DateTimeInput(
+                attrs={
+                    'type': 'datetime-local',
+                    'class': TAILWIND_INPUT_CLASSES,
+                }
+            ),
+            'motivo_solicitud': forms.Textarea(
+                attrs={
+                    'class': TAILWIND_INPUT_CLASSES,
+                    'rows': 4,
+                    'placeholder': 'Describa brevemente el motivo de la revisión solicitada',
+                }
+            ),
+        }
+        labels = {
+            'horario_solicitado': 'Horario solicitado',
+            'fecha_hora_real_declarada': 'Fecha/Hora real declarada',
+            'motivo_solicitud': 'Motivo de solicitud',
+        }
 
 
 # ============================================================================

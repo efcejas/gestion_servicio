@@ -20,6 +20,7 @@ from .models import (
     RegistroEstudiosPorMedico,
     RegistroEstudio,
     Estudios,
+    SolicitudRevisionHorarioRegistro,
     SesionContable,
     HistorialSesionContable,
     GuardiaPasiva,
@@ -639,6 +640,188 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Gestión de estudios')
         self.assertContains(response, reverse('liquidacion:estudios_list'))
+
+    def _crear_registro_para_revision(self, medico, sesion_estado='ABIERTA'):
+        mes_sesion = (SesionContable.objects.count() % 12) + 1
+        sesion = SesionContable.objects.create(mes=mes_sesion, año=2026, estado=sesion_estado)
+        return RegistroEstudiosPorMedico.objects.create(
+            medico=medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Revision',
+            dni_paciente='12345678',
+            fecha_del_informe=date(2026, 6, 1),
+            fecha_registro=timezone.now(),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            monto_calculado=Decimal('5000.00'),
+            sesion_contable=sesion,
+            cantidad_regiones=1,
+        )
+
+    def test_residente_puede_solicitar_revision_de_registro_propio(self):
+        registro = self._crear_registro_para_revision(self.residente)
+
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+            {
+                'horario_solicitado': 'EXTRA',
+                'fecha_hora_real_declarada': '2026-06-01T18:30',
+                'motivo_solicitud': 'Carga diferida por validación posterior.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            SolicitudRevisionHorarioRegistro.objects.filter(
+                registro=registro,
+                solicitado_por=self.residente,
+                estado='PENDIENTE',
+            ).exists()
+        )
+
+    def test_no_puede_solicitar_revision_de_registro_ajeno(self):
+        registro = self._crear_registro_para_revision(self.medico)
+
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+            {
+                'horario_solicitado': 'EXTRA',
+                'fecha_hora_real_declarada': '2026-06-01T18:30',
+                'motivo_solicitud': 'Intento ajeno',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            SolicitudRevisionHorarioRegistro.objects.filter(
+                registro=registro,
+                solicitado_por=self.residente,
+            ).exists()
+        )
+
+    def test_solicitar_no_modifica_horario_ni_monto(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        horario_inicial = registro.horario
+        monto_inicial = registro.monto_calculado
+
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+            {
+                'horario_solicitado': 'EXTRA',
+                'fecha_hora_real_declarada': '2026-06-01T18:30',
+                'motivo_solicitud': 'Validación PACS posterior.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, horario_inicial)
+        self.assertEqual(registro.monto_calculado, monto_inicial)
+
+    def test_no_permite_duplicar_solicitud_pendiente(self):
+        registro = self._crear_registro_para_revision(self.residente)
+
+        SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro,
+            solicitado_por=self.residente,
+            horario_solicitado='EXTRA',
+            fecha_hora_real_declarada=timezone.now(),
+            motivo_solicitud='Solicitud previa',
+            estado='PENDIENTE',
+        )
+
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+            {
+                'horario_solicitado': 'INTRA',
+                'fecha_hora_real_declarada': '2026-06-01T10:00',
+                'motivo_solicitud': 'Intento duplicado',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            SolicitudRevisionHorarioRegistro.objects.filter(
+                registro=registro,
+                estado='PENDIENTE',
+            ).count(),
+            1,
+        )
+
+    def test_no_permite_solicitar_si_sesion_facturada_o_pagada(self):
+        for estado in ['FACTURADA', 'PAGADA']:
+            registro = self._crear_registro_para_revision(self.residente, sesion_estado=estado)
+            self.client.force_login(self.residente)
+
+            response = self.client.post(
+                reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+                {
+                    'horario_solicitado': 'EXTRA',
+                    'fecha_hora_real_declarada': '2026-06-01T18:30',
+                    'motivo_solicitud': f'Intento en sesión {estado}',
+                },
+            )
+
+            self.assertEqual(response.status_code, 302)
+            self.assertFalse(
+                SolicitudRevisionHorarioRegistro.objects.filter(
+                    registro=registro,
+                    estado='PENDIENTE',
+                ).exists()
+            )
+
+    def test_formulario_no_muestra_monto_ni_desglose_economico(self):
+        registro = self._crear_registro_para_revision(self.residente)
+
+        self.client.force_login(self.residente)
+        response = self.client.get(
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="monto_calculado"')
+        self.assertNotContains(response, 'detalle_monto')
+
+    def test_boton_aparece_en_lista_propia_cuando_corresponde(self):
+        registro = self._crear_registro_para_revision(self.residente)
+
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('liquidacion:registroestudios_list') + '?mes=6&año=2026')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro.pk}),
+        )
+
+    def test_boton_no_aparece_si_hay_pendiente_o_sesion_no_permite(self):
+        registro_pendiente = self._crear_registro_para_revision(self.residente)
+        SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro_pendiente,
+            solicitado_por=self.residente,
+            horario_solicitado='EXTRA',
+            fecha_hora_real_declarada=timezone.now(),
+            motivo_solicitud='Pendiente existente',
+            estado='PENDIENTE',
+        )
+        registro_facturada = self._crear_registro_para_revision(self.residente, sesion_estado='FACTURADA')
+
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('liquidacion:registroestudios_list') + '?mes=6&año=2026')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro_pendiente.pk}),
+        )
+        self.assertNotContains(
+            response,
+            reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro_facturada.pk}),
+        )
 
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)

@@ -380,6 +380,18 @@
                                 <button type="button" class="inline-flex items-center justify-center w-8 h-8 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm hover:shadow" title="Ver desglose" onclick="toggleDetalleRegistro('{{ registro.pk }}')">
                                     <i class="fas fa-calculator text-sm"></i>
                                 </button>
+                                {% if registro.puede_solicitar_revision %}
+                                <a href="{% url 'liquidacion:solicitud_revision_horario_nueva' registro.pk %}"
+                                   class="inline-flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm hover:shadow"
+                                   title="Solicitar revisión de horario">
+                                    <i class="fas fa-clipboard-check text-sm"></i>
+                                </a>
+                                {% elif registro.tiene_revision_pendiente %}
+                                <span class="inline-flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-lg"
+                                      title="Ya existe una solicitud pendiente">
+                                    <i class="fas fa-clock text-sm"></i>
+                                </span>
+                                {% endif %}
                                 <a href="{% url 'liquidacion:registroestudios_edit' registro.pk %}" class="inline-flex items-center justify-center w-8 h-8 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm hover:shadow" title="Editar registro" onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden'));">
                                     <i class="fas fa-edit text-sm"></i>
                                 </a>

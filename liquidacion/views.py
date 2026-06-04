@@ -25,6 +25,7 @@ from .models import (
     GrupoTarifario,
     TarifaGrupoTarifario,
     RegistroEstudiosPorMedico,
+    SolicitudRevisionHorarioRegistro,
     GuardiaPasiva,
     SesionContable,
     ConfiguracionGuardiaPasiva,
@@ -40,6 +41,7 @@ from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_reside
 from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 from .forms import (
     EstudiosAdminForm,
+    SolicitudRevisionHorarioRegistroForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
     GuardiaPasivaForm,
@@ -1023,11 +1025,27 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 
         # Adjuntar desglose calculado por backend para mostrar en la tabla
         puede_admin = puede_ver_desglose_administrativo(self.request.user)
+        registros_ids = [registro.id for registro in registros_tabla]
+        pendientes_ids = set(
+            SolicitudRevisionHorarioRegistro.objects.filter(
+                registro_id__in=registros_ids,
+                estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
+            ).values_list('registro_id', flat=True)
+        )
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
                 if puede_admin
                 else registro.get_desglose_monto_simple()
+            )
+            sesion_bloqueada_revision = bool(
+                registro.sesion_contable
+                and registro.sesion_contable.estado in ['FACTURADA', 'PAGADA']
+            )
+            registro.tiene_revision_pendiente = registro.id in pendientes_ids
+            registro.puede_solicitar_revision = (
+                (not sesion_bloqueada_revision)
+                and (not registro.tiene_revision_pendiente)
             )
         context['puede_ver_desglose_admin'] = puede_admin
 
@@ -1347,6 +1365,61 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             'focus_registro': self.object.pk,
         })
         return f"{reverse('liquidacion:registroestudios_list')}?{query_string}"
+
+
+class SolicitudRevisionHorarioRegistroCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+    """Alta médica de solicitud de revisión de horario (Fase A, sin impacto económico)."""
+
+    model = SolicitudRevisionHorarioRegistro
+    form_class = SolicitudRevisionHorarioRegistroForm
+    template_name = 'liquidacion/revision_horario_solicitud_form.html'
+    success_message = '✅ Solicitud de revisión enviada correctamente.'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not _puede_acceder_panel_medico(request.user):
+            messages.warning(request, 'No tienes permiso para acceder a esta sección.')
+            return redirect('home')
+
+        self.registro = get_object_or_404(
+            RegistroEstudiosPorMedico.objects.select_related('sesion_contable', 'medico'),
+            pk=kwargs['registro_pk'],
+        )
+
+        if self.registro.medico_id != request.user.id:
+            messages.error(request, '❌ No puedes solicitar revisión sobre registros de otro usuario.')
+            return redirect('liquidacion:registroestudios_list')
+
+        if self.registro.sesion_contable and self.registro.sesion_contable.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(
+                request,
+                '❌ No se puede solicitar revisión en sesiones FACTURADAS o PAGADAS.',
+            )
+            return redirect('liquidacion:registroestudios_list')
+
+        if SolicitudRevisionHorarioRegistro.objects.filter(
+            registro=self.registro,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
+        ).exists():
+            messages.warning(
+                request,
+                '⚠️ Ya existe una solicitud de revisión pendiente para este registro.',
+            )
+            return redirect('liquidacion:registroestudios_list')
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.registro = self.registro
+        form.instance.solicitado_por = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('liquidacion:registroestudios_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['registro'] = self.registro
+        return context
 
 class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
     model = RegistroEstudiosPorMedico

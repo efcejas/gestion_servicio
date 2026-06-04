@@ -1145,6 +1145,75 @@ class RegistroEstudiosPorMedico(models.Model):
         # Secuencia: save() → crear RegistroEstudio → calcular_monto() → save(update_fields)
         
         super().save(*args, **kwargs)
+
+
+class SolicitudRevisionHorarioRegistro(models.Model):
+    """Solicitud médica de revisión de horario para un registro ya cargado.
+
+    Fase A: solo crea solicitud pendiente. No modifica horario ni monto.
+    """
+
+    ESTADO_PENDIENTE = 'PENDIENTE'
+    ESTADO_APROBADA = 'APROBADA'
+    ESTADO_RECHAZADA = 'RECHAZADA'
+    ESTADO_CHOICES = [
+        (ESTADO_PENDIENTE, 'Pendiente'),
+        (ESTADO_APROBADA, 'Aprobada'),
+        (ESTADO_RECHAZADA, 'Rechazada'),
+    ]
+
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.CASCADE,
+        related_name='solicitudes_revision_horario',
+        verbose_name='Registro',
+    )
+    solicitado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='solicitudes_revision_horario_realizadas',
+        verbose_name='Solicitado por',
+    )
+    fecha_solicitud = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de solicitud')
+
+    HORARIO_CHOICES = [
+        ('INTRA', 'Intra Residencia (50%)'),
+        ('EXTRA', 'Extra Residencia (100%)'),
+        ('NA', 'No Aplica (Staff)'),
+    ]
+    horario_solicitado = models.CharField(
+        max_length=6,
+        choices=HORARIO_CHOICES,
+        verbose_name='Horario solicitado',
+    )
+    fecha_hora_real_declarada = models.DateTimeField(verbose_name='Fecha/Hora real declarada')
+    motivo_solicitud = models.TextField(verbose_name='Motivo de solicitud')
+
+    estado = models.CharField(
+        max_length=10,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_PENDIENTE,
+        verbose_name='Estado',
+    )
+
+    class Meta:
+        verbose_name = 'Solicitud de revisión de horario'
+        verbose_name_plural = 'Solicitudes de revisión de horario'
+        ordering = ['-fecha_solicitud']
+        indexes = [
+            models.Index(fields=['estado', '-fecha_solicitud']),
+            models.Index(fields=['registro', 'estado']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['registro'],
+                condition=models.Q(estado='PENDIENTE'),
+                name='uniq_revision_horario_pendiente_por_registro',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Solicitud #{self.pk} - Registro #{self.registro_id} - {self.estado}"
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================
