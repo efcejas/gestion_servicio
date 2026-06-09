@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
 from django.db import transaction
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -29,10 +30,27 @@ class Command(BaseCommand):
             action="store_true",
             help="Permite ejecutar aun cuando DEBUG=False (solo si sabes lo que estas haciendo).",
         )
+        parser.add_argument(
+            "--cleanup",
+            action="store_true",
+            help="Elimina datos demo creados por este comando (solo local).",
+        )
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            help="Muestra que se borraria en cleanup sin aplicar cambios.",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
         force = options.get("force", False)
+        cleanup = options.get("cleanup", False)
+        dry_run = options.get("dry_run", False)
+
+        if cleanup and not settings.DEBUG:
+            raise CommandError(
+                "Cleanup demo bloqueado fuera de DEBUG=True. No se permite borrar datos demo en entornos desplegados."
+            )
 
         if not settings.DEBUG and not force:
             raise CommandError(
@@ -40,6 +58,10 @@ class Command(BaseCommand):
             )
 
         self._ensure_required_tables()
+
+        if cleanup:
+            self._cleanup_demo_data(dry_run=dry_run)
+            return
 
         users = self._get_required_users()
         sesion, sesion_status = self._get_or_create_sesion_actual()
@@ -132,6 +154,74 @@ class Command(BaseCommand):
             solicitud_demo=solicitud_demo,
             solicitud_estado=solicitud_estado,
         )
+
+    def _cleanup_demo_data(self, dry_run=False):
+        registros_qs = self._get_demo_registros_queryset()
+        registro_ids = list(registros_qs.values_list("id", flat=True))
+
+        solicitudes_qs = SolicitudRevisionHorarioRegistro.objects.filter(registro_id__in=registro_ids)
+        registroestudio_qs = RegistroEstudio.objects.filter(registro_id__in=registro_ids)
+        estudios_demo_qs = Estudios.objects.filter(nombre__in=self._demo_study_names())
+
+        estudios_demo_deletable_ids = []
+        for estudio in estudios_demo_qs:
+            tiene_asociacion_fuera_demo = RegistroEstudio.objects.filter(estudio=estudio).exclude(
+                registro_id__in=registro_ids
+            ).exists()
+            if not tiene_asociacion_fuera_demo:
+                estudios_demo_deletable_ids.append(estudio.id)
+
+        self.stdout.write("\n" + "=" * 78)
+        self.stdout.write(self.style.WARNING("CLEANUP DEMO FASE A - REVISION HORARIO"))
+        self.stdout.write("=" * 78)
+        self.stdout.write(f"- Dry run: {'SI' if dry_run else 'NO'}")
+        self.stdout.write("\nObjetos detectados para limpieza:")
+        self.stdout.write(f"- Registros demo: {len(registro_ids)} -> {registro_ids}")
+        self.stdout.write(
+            f"- RegistroEstudio asociados: {registroestudio_qs.count()} -> "
+            f"{list(registroestudio_qs.values_list('id', flat=True))}"
+        )
+        self.stdout.write(
+            f"- SolicitudesRevisionHorarioRegistro asociadas: {solicitudes_qs.count()} -> "
+            f"{list(solicitudes_qs.values_list('id', flat=True))}"
+        )
+
+        estudios_demo_ids = list(estudios_demo_qs.values_list("id", flat=True))
+        self.stdout.write(f"- Estudios demo detectados: {len(estudios_demo_ids)} -> {estudios_demo_ids}")
+        self.stdout.write(
+            f"- Estudios demo eliminables (sin uso fuera de demo): {len(estudios_demo_deletable_ids)} "
+            f"-> {estudios_demo_deletable_ids}"
+        )
+
+        if (
+            not registro_ids
+            and not solicitudes_qs.exists()
+            and not registroestudio_qs.exists()
+            and not estudios_demo_deletable_ids
+        ):
+            self.stdout.write("\nNo se encontraron datos demo para eliminar. Finaliza OK.")
+            self.stdout.write("=" * 78)
+            return
+
+        if dry_run:
+            self.stdout.write("\nModo dry-run: no se aplicaron borrados.")
+            self.stdout.write("=" * 78)
+            return
+
+        solicitudes_eliminadas = solicitudes_qs.delete()[0]
+        registroestudio_eliminados = registroestudio_qs.delete()[0]
+        registros_eliminados = registros_qs.delete()[0]
+
+        estudios_eliminados = 0
+        if estudios_demo_deletable_ids:
+            estudios_eliminados = Estudios.objects.filter(id__in=estudios_demo_deletable_ids).delete()[0]
+
+        self.stdout.write("\nBorrado aplicado:")
+        self.stdout.write(f"- Solicitudes eliminadas: {solicitudes_eliminadas}")
+        self.stdout.write(f"- RegistroEstudio eliminados: {registroestudio_eliminados}")
+        self.stdout.write(f"- Registros eliminados: {registros_eliminados}")
+        self.stdout.write(f"- Estudios demo eliminados: {estudios_eliminados}")
+        self.stdout.write("=" * 78)
 
     def _ensure_required_tables(self):
         required_tables = {
@@ -326,6 +416,26 @@ class Command(BaseCommand):
             "instructor_eco_candidato": "99000005",
         }
         return mapping[caso_key]
+
+    def _demo_dnis(self):
+        return [
+            "99000001",
+            "99000002",
+            "99000003",
+            "99000004",
+            "99000005",
+        ]
+
+    def _demo_study_names(self):
+        return ["ECO general demo", "Doppler demo"]
+
+    def _get_demo_registros_queryset(self):
+        criterio_demo = (
+            Q(dni_paciente__in=self._demo_dnis())
+            | Q(apellido_paciente="DEMO", nombre_paciente__startswith="REV_")
+            | Q(nombre_paciente="DEMO", apellido_paciente__startswith="REV_")
+        )
+        return RegistroEstudiosPorMedico.objects.filter(criterio_demo).distinct()
 
     def _print_summary(
         self,
