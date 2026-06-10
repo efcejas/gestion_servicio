@@ -18,7 +18,7 @@
         }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-gray-50 min-h-screen flex flex-col">
 
     <!-- Header del Portal -->
     <header class="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 shadow-xl no-print">
@@ -62,12 +62,12 @@
     </header>
 
     <!-- Contenido principal -->
-    <main class="py-6">
+    <main class="py-6 flex-1">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-t border-slate-600 mt-12 py-6 no-print">
+    <footer class="bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800 border-t border-slate-600 mt-auto py-6 no-print">
         <div class="container mx-auto px-4 text-center">
             <p class="text-slate-300 text-sm">
                 &copy; {% now "Y" %} Sistema de Gestión de Servicios - Portal de Liquidación
