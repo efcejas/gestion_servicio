@@ -1,0 +1,116 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Detalle de Solicitud de Revision{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Detalle de solicitud de revision de horario</h1>
+            <p class="text-sm text-gray-600 mt-1">Solicitud #{{ solicitud.id }}</p>
+        </div>
+        <a href="{% url 'liquidacion:solicitudes_revision_horario_list' %}"
+           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+            <i class="fas fa-arrow-left"></i>
+            Volver a bandeja
+        </a>
+    </div>
+
+    <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
+            <div>
+                <p class="text-sm font-semibold text-amber-900">Esta pantalla es solo de revision. No modifica horario ni monto.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <section class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Datos de la solicitud</h2>
+            <dl class="space-y-3 text-sm">
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Estado</dt>
+                    <dd class="col-span-2 font-semibold text-gray-900">{{ solicitud.get_estado_display }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Fecha solicitud</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Solicitado por</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.solicitado_por.get_full_name|default:solicitud.solicitado_por.username }} ({{ solicitud.solicitado_por.rol }})</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Horario actual</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.get_horario_display }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Horario solicitado</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.get_horario_solicitado_display }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Fecha/hora real declarada</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.fecha_hora_real_declarada|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Motivo</dt>
+                    <dd class="col-span-2 text-gray-800 whitespace-pre-line">{{ solicitud.motivo_solicitud }}</dd>
+                </div>
+            </dl>
+        </section>
+
+        <section class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Datos del registro asociado</h2>
+            <dl class="space-y-3 text-sm">
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Registro ID</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.id }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Medico</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.medico.get_full_name|default:solicitud.registro.medico.username }} ({{ solicitud.registro.medico.rol }})</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Paciente</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.apellido_paciente }}, {{ solicitud.registro.nombre_paciente }} - DNI {{ solicitud.registro.dni_paciente }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Fecha informe</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.fecha_del_informe|date:"d/m/Y" }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Fecha registro</dt>
+                    <dd class="col-span-2 text-gray-800">{{ solicitud.registro.fecha_registro|date:"d/m/Y H:i" }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Monto calculado</dt>
+                    <dd class="col-span-2 font-semibold text-gray-900">${{ solicitud.registro.monto_calculado|floatformat:2 }}</dd>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <dt class="text-gray-500">Sesion contable</dt>
+                    <dd class="col-span-2 text-gray-800">
+                        {% if solicitud.registro.sesion_contable %}
+                            {{ solicitud.registro.sesion_contable.mes }}/{{ solicitud.registro.sesion_contable.año }} ({{ solicitud.registro.sesion_contable.get_estado_display }})
+                        {% else %}
+                            Sin sesion
+                        {% endif %}
+                    </dd>
+                </div>
+            </dl>
+
+            <div class="mt-5">
+                <h3 class="text-sm font-semibold text-gray-900 mb-2">Estudios asociados</h3>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    {% for rel in solicitud.registro.registroestudio_set.all %}
+                    <li class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                        {{ rel.estudio.nombre }}{% if rel.cantidad > 1 %} x{{ rel.cantidad }}{% endif %}
+                    </li>
+                    {% empty %}
+                    <li class="text-gray-500">Sin estudios asociados.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -658,6 +658,16 @@ class PermisosYTrazabilidadViewTest(TestCase):
             cantidad_regiones=1,
         )
 
+    def _crear_solicitud_revision(self, registro, solicitado_por, estado='PENDIENTE', motivo='Motivo test'):
+        return SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro,
+            solicitado_por=solicitado_por,
+            horario_solicitado='EXTRA',
+            fecha_hora_real_declarada=timezone.now(),
+            motivo_solicitud=motivo,
+            estado=estado,
+        )
+
     def test_residente_puede_solicitar_revision_de_registro_propio(self):
         registro = self._crear_registro_para_revision(self.residente)
 
@@ -822,6 +832,105 @@ class PermisosYTrazabilidadViewTest(TestCase):
             response,
             reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro_facturada.pk}),
         )
+
+    def test_bandeja_revision_horario_permite_administrativo(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_bandeja_revision_horario_permite_jefe_servicio(self):
+        self.client.force_login(self.jefe_servicio)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_bandeja_revision_horario_permite_superuser(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_bandeja_revision_horario_deniega_residente(self):
+        self.client.force_login(self.residente)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_bandeja_revision_horario_deniega_medico_comun(self):
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_detalle_revision_horario_muestra_solicitud_y_registro_asociado(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            motivo='Detalle visible para admin',
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_detalle', kwargs={'pk': solicitud.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'Solicitud #{solicitud.id}')
+        self.assertContains(response, registro.dni_paciente)
+        self.assertContains(response, 'Detalle visible para admin')
+        self.assertContains(response, 'Esta pantalla es solo de revision. No modifica horario ni monto.')
+
+    def test_detalle_revision_horario_no_modifica_horario_ni_monto(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        horario_original = registro.horario
+        monto_original = registro.monto_calculado
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_detalle', kwargs={'pk': solicitud.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, horario_original)
+        self.assertEqual(registro.monto_calculado, monto_original)
+
+    def test_bandeja_revision_horario_muestra_solicitudes_pendientes(self):
+        registro_pendiente = self._crear_registro_para_revision(self.residente)
+        registro_pendiente.apellido_paciente = 'Pendiente'
+        registro_pendiente.nombre_paciente = 'Caso'
+        registro_pendiente.dni_paciente = '90000001'
+        registro_pendiente.save(update_fields=['apellido_paciente', 'nombre_paciente', 'dni_paciente'])
+
+        solicitud_pendiente = self._crear_solicitud_revision(
+            registro=registro_pendiente,
+            solicitado_por=self.residente,
+            estado='PENDIENTE',
+            motivo='Revision pendiente del horario declarado.',
+        )
+
+        registro_aprobada = self._crear_registro_para_revision(self.residente)
+        registro_aprobada.apellido_paciente = 'Aprobada'
+        registro_aprobada.nombre_paciente = 'Caso'
+        registro_aprobada.dni_paciente = '90000002'
+        registro_aprobada.save(update_fields=['apellido_paciente', 'nombre_paciente', 'dni_paciente'])
+
+        self._crear_solicitud_revision(
+            registro=registro_aprobada,
+            solicitado_por=self.residente,
+            estado='APROBADA',
+            motivo='Revision ya resuelta.',
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, registro_pendiente.apellido_paciente)
+        self.assertContains(response, registro_aprobada.apellido_paciente)
+        self.assertContains(response, 'Pendiente')
+
+        html = response.content.decode('utf-8')
+        self.assertLess(html.index(registro_pendiente.apellido_paciente), html.index(registro_aprobada.apellido_paciente))
+        self.assertEqual(solicitud_pendiente.estado, 'PENDIENTE')
 
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)

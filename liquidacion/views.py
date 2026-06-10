@@ -6,7 +6,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q, Prefetch
+from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
@@ -24,6 +24,7 @@ from .models import (
     Estudios,
     GrupoTarifario,
     TarifaGrupoTarifario,
+    RegistroEstudio,
     RegistroEstudiosPorMedico,
     SolicitudRevisionHorarioRegistro,
     GuardiaPasiva,
@@ -228,6 +229,114 @@ class GrupoTarifarioTarifaNuevaView(LoginRequiredMixin, UserPassesTestMixin, Suc
         context = super().get_context_data(**kwargs)
         context['grupo'] = self.grupo_tarifario
         return context
+
+
+class SolicitudRevisionHorarioAdminListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+    """Bandeja administrativa de solicitudes de revision de horario (solo lectura)."""
+
+    model = SolicitudRevisionHorarioRegistro
+    template_name = 'liquidacion/solicitudes_revision_horario_list.html'
+    context_object_name = 'solicitudes'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para acceder a la bandeja de revisión de horarios.',
+        )
+        return redirect('home')
+
+    def get_queryset(self):
+        queryset = (
+            SolicitudRevisionHorarioRegistro.objects
+            .select_related(
+                'solicitado_por',
+                'registro',
+                'registro__medico',
+                'registro__sesion_contable',
+            )
+            .prefetch_related(
+                Prefetch(
+                    'registro__registroestudio_set',
+                    queryset=RegistroEstudio.objects.select_related('estudio').order_by('id'),
+                )
+            )
+        )
+
+        estado = (self.request.GET.get('estado') or '').strip()
+        medico_id = (self.request.GET.get('medico') or '').strip()
+        sesion_id = (self.request.GET.get('sesion') or '').strip()
+
+        if estado:
+            queryset = queryset.filter(estado=estado)
+        if medico_id:
+            queryset = queryset.filter(registro__medico_id=medico_id)
+        if sesion_id:
+            queryset = queryset.filter(registro__sesion_contable_id=sesion_id)
+
+        return queryset.annotate(
+            prioridad_estado=Case(
+                When(estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE, then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        ).order_by('prioridad_estado', '-fecha_solicitud')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        base_qs = SolicitudRevisionHorarioRegistro.objects.select_related(
+            'registro__medico',
+            'registro__sesion_contable',
+        )
+        medico_ids = base_qs.values_list('registro__medico_id', flat=True).distinct()
+        sesion_ids = base_qs.values_list('registro__sesion_contable_id', flat=True).distinct()
+
+        User = get_user_model()
+        context['medicos_filtro'] = User.objects.filter(id__in=medico_ids).order_by('username')
+        context['sesiones_filtro'] = SesionContable.objects.filter(id__in=sesion_ids).order_by('-año', '-mes')
+        context['estado_choices'] = SolicitudRevisionHorarioRegistro.ESTADO_CHOICES
+        context['estado_actual'] = (self.request.GET.get('estado') or '').strip()
+        context['medico_actual'] = (self.request.GET.get('medico') or '').strip()
+        context['sesion_actual'] = (self.request.GET.get('sesion') or '').strip()
+        return context
+
+
+class SolicitudRevisionHorarioAdminDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    """Detalle administrativo de una solicitud de revision de horario (solo lectura)."""
+
+    model = SolicitudRevisionHorarioRegistro
+    template_name = 'liquidacion/solicitud_revision_horario_detalle.html'
+    context_object_name = 'solicitud'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para ver el detalle de revisión de horario.',
+        )
+        return redirect('home')
+
+    def get_queryset(self):
+        return (
+            SolicitudRevisionHorarioRegistro.objects
+            .select_related(
+                'solicitado_por',
+                'registro',
+                'registro__medico',
+                'registro__sesion_contable',
+            )
+            .prefetch_related(
+                Prefetch(
+                    'registro__registroestudio_set',
+                    queryset=RegistroEstudio.objects.select_related('estudio').order_by('id'),
+                )
+            )
+        )
 
 # ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode

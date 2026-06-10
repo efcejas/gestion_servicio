@@ -18,6 +18,8 @@ from .views import (
     GuardiaPasivaDeleteView,  # [NUEVO v3.2]
     CargaMasivaView,
     PortalLiquidacionInicioView,
+    SolicitudRevisionHorarioAdminListView,
+    SolicitudRevisionHorarioAdminDetailView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -39,6 +41,16 @@ urlpatterns = [
     path('portal/', PortalLiquidacionInicioView.as_view(), name='portal_inicio'),
     path('grupos-tarifarios/', GruposTarifariosListView.as_view(), name='grupos_tarifarios_list'),
     path('grupos-tarifarios/<int:pk>/', GrupoTarifarioDetalleView.as_view(), name='grupo_tarifario_detalle'),
+    path(
+        'solicitudes-revision-horario/',
+        SolicitudRevisionHorarioAdminListView.as_view(),
+        name='solicitudes_revision_horario_list',
+    ),
+    path(
+        'solicitudes-revision-horario/<int:pk>/',
+        SolicitudRevisionHorarioAdminDetailView.as_view(),
+        name='solicitudes_revision_horario_detalle',
+    ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',
         GrupoTarifarioTarifaNuevaView.as_view(),
