@@ -348,7 +348,7 @@ def _puede_acceder_panel_medico(user):
 
 
 def _puede_acceder_guardia_pasiva(user):
-    return user.is_superuser or user.es_medico() or user.rol == 'administrativo'
+    return user.rol in ['jefe_residentes', 'instructor_residentes']
 
 
 def _puede_editar_monto_guardia(user):
@@ -1000,6 +1000,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         )
         context['sesion_contable'] = sesion
         context['puede_registrar'] = sesion.puede_registrar_practicas(self.request.user)
+        context['puede_registrar_guardia_pasiva'] = _puede_acceder_guardia_pasiva(self.request.user)
 
         # Pasar los valores base al contexto
         context['form'] = form

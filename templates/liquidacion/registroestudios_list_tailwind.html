@@ -34,11 +34,13 @@
                    {% if not puede_registrar %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
                     <i class="fas fa-plus-circle mr-2"></i>Nueva Práctica
                 </a>
+                {% if puede_registrar_guardia_pasiva %}
                 <a href="{% url 'liquidacion:registrar_guardia_pasiva' %}" 
                    class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5
                    {% if not puede_registrar %}opacity-50 cursor-not-allowed pointer-events-none{% endif %}">
                     <i class="fas fa-moon mr-2"></i>Nueva Guardia
                 </a>
+                {% endif %}
             </div>
         </div>
     </div>
