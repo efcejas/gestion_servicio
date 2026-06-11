@@ -10,6 +10,7 @@ from .models import (
     HistorialSesionContable,
     RegistroEstudiosPorMedico,
     SesionContable,
+    SolicitudRevisionHorarioRegistro,
     TarifaGrupoTarifario,
 )
 from .services_auditoria import evaluar_gate_consistencia_sesion
@@ -537,6 +538,67 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         return html
     desglose_monto_display.short_description = 'Desglose del Monto'
     desglose_monto_display.allow_tags = True
+
+
+@admin.register(SolicitudRevisionHorarioRegistro)
+class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'estado',
+        'fecha_solicitud',
+        'registro_id',
+        'solicitado_por',
+        'horario_solicitado',
+        'fecha_hora_real_declarada',
+    )
+    list_filter = ('estado', 'horario_solicitado', 'fecha_solicitud', 'solicitado_por')
+    search_fields = (
+        'id',
+        'registro__id',
+        'registro__dni_paciente',
+        'registro__apellido_paciente',
+        'registro__nombre_paciente',
+        'solicitado_por__first_name',
+        'solicitado_por__last_name',
+    )
+    readonly_fields = (
+        'registro',
+        'solicitado_por',
+        'fecha_solicitud',
+        'horario_solicitado',
+        'fecha_hora_real_declarada',
+        'motivo_solicitud',
+        'estado',
+    )
+    ordering = ('-fecha_solicitud',)
+    date_hierarchy = 'fecha_solicitud'
+
+    fieldsets = (
+        ('Solicitud', {
+            'fields': (
+                'registro',
+                'solicitado_por',
+                'fecha_solicitud',
+                'estado',
+            )
+        }),
+        ('Detalle declarado', {
+            'fields': (
+                'horario_solicitado',
+                'fecha_hora_real_declarada',
+                'motivo_solicitud',
+            )
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 # ============================================================================
