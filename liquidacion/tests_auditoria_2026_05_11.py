@@ -932,6 +932,227 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertLess(html.index(registro_pendiente.apellido_paciente), html.index(registro_aprobada.apellido_paciente))
         self.assertEqual(solicitud_pendiente.estado, 'PENDIENTE')
 
+    def test_resolucion_aprobar_pendiente_guarda_auditoria(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Validado por administracion.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'APROBADA')
+        self.assertEqual(solicitud.revisado_por, self.admin)
+        self.assertIsNotNone(solicitud.fecha_revision)
+        self.assertEqual(solicitud.observacion_revision, 'Validado por administracion.')
+
+    def test_resolucion_rechazar_pendiente_guarda_auditoria(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.jefe_servicio)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'RECHAZAR', 'observacion_revision': 'No corresponde ajuste de horario.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'RECHAZADA')
+        self.assertEqual(solicitud.revisado_por, self.jefe_servicio)
+        self.assertIsNotNone(solicitud.fecha_revision)
+        self.assertEqual(solicitud.observacion_revision, 'No corresponde ajuste de horario.')
+
+    def test_resolucion_solo_post_no_permite_get(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk})
+        )
+        self.assertEqual(response.status_code, 405)
+
+    def test_resolucion_denegada_para_rol_no_administrativo(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.medico)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Intento sin permisos.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertIsNone(solicitud.revisado_por)
+
+    def test_resolucion_bloqueada_si_estado_no_pendiente_aprobada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado='APROBADA',
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'RECHAZAR', 'observacion_revision': 'No debe sobrescribir.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'APROBADA')
+
+    def test_resolucion_bloqueada_si_estado_no_pendiente_rechazada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado='RECHAZADA',
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'No debe sobrescribir.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'RECHAZADA')
+
+    def test_resolucion_bloqueada_en_sesion_facturada(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='FACTURADA')
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Sesion facturada.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertIsNone(solicitud.revisado_por)
+
+    def test_resolucion_bloqueada_en_sesion_pagada(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='PAGADA')
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'RECHAZAR', 'observacion_revision': 'Sesion pagada.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertIsNone(solicitud.revisado_por)
+
+    def test_resolucion_bloquea_auto_revision_mismo_usuario_solicitante(self):
+        registro = self._crear_registro_para_revision(self.admin)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.admin)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Auto revision no permitida.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertIsNone(solicitud.revisado_por)
+
+    def test_superuser_respeta_bloqueo_auto_revision(self):
+        registro = self._crear_registro_para_revision(self.superuser)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.superuser)
+
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Auto revision superuser no permitida.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertIsNone(solicitud.revisado_por)
+
+    def test_resolucion_no_modifica_horario_del_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        horario_original = registro.horario
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Sin impacto sobre horario del registro.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, horario_original)
+
+    def test_resolucion_no_modifica_monto_calculado_del_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        monto_original = registro.monto_calculado
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'RECHAZAR', 'observacion_revision': 'Sin impacto economico.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+
+    def test_resolucion_no_recalcula_monto(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        registro.monto_calculado = Decimal('7777.77')
+        registro.save(update_fields=['monto_calculado'])
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'No recalcular.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('7777.77'))
+
+    def test_resolucion_concurrente_segunda_operacion_falla_por_no_pendiente(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        first_response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Primera resolucion valida.'},
+        )
+        second_response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'RECHAZAR', 'observacion_revision': 'Segunda resolucion no valida.'},
+        )
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'APROBADA')
+        self.assertEqual(solicitud.observacion_revision, 'Primera resolucion valida.')
+
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)
         response_super = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))

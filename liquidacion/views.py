@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView, DetailView
 from django.views.generic.edit import FormView
 from django.contrib.messages.views import SuccessMessageMixin
@@ -43,6 +44,7 @@ from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 from .forms import (
     EstudiosAdminForm,
     SolicitudRevisionHorarioRegistroForm,
+    SolicitudRevisionHorarioResolucionForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
     GuardiaPasivaForm,
@@ -337,6 +339,80 @@ class SolicitudRevisionHorarioAdminDetailView(LoginRequiredMixin, UserPassesTest
                 )
             )
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['resolucion_form'] = SolicitudRevisionHorarioResolucionForm()
+        return context
+
+
+class SolicitudRevisionHorarioResolverView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Resolución administrativa B1 (solo POST, sin impacto económico)."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para resolver solicitudes de revisión de horario.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        solicitud = get_object_or_404(
+            SolicitudRevisionHorarioRegistro.objects.select_related('registro__sesion_contable', 'solicitado_por'),
+            pk=kwargs['pk'],
+        )
+
+        if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE:
+            messages.error(request, '❌ Solo se puede resolver una solicitud en estado PENDIENTE.')
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+        sesion = solicitud.registro.sesion_contable
+        if sesion and sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(
+                request,
+                '❌ No se puede resolver la solicitud porque la sesión contable está FACTURADA o PAGADA.',
+            )
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+        if solicitud.solicitado_por_id == request.user.id:
+            messages.error(
+                request,
+                '❌ No se permite auto-revisión: el solicitante no puede resolver su propia solicitud.',
+            )
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+        form = SolicitudRevisionHorarioResolucionForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, '❌ Debes indicar una decisión válida para resolver la solicitud.')
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+        decision = form.cleaned_data['decision']
+        observacion_revision = form.cleaned_data['observacion_revision']
+        estado_nuevo = (
+            SolicitudRevisionHorarioRegistro.ESTADO_APROBADA
+            if decision == SolicitudRevisionHorarioResolucionForm.DECISION_APROBAR
+            else SolicitudRevisionHorarioRegistro.ESTADO_RECHAZADA
+        )
+
+        actualizado = SolicitudRevisionHorarioRegistro.objects.filter(
+            pk=solicitud.pk,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
+        ).update(
+            estado=estado_nuevo,
+            revisado_por=request.user,
+            fecha_revision=now(),
+            observacion_revision=observacion_revision,
+        )
+
+        if actualizado == 0:
+            messages.error(request, '❌ La solicitud ya no está pendiente y no puede resolverse nuevamente.')
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+        messages.success(request, f'✅ Solicitud {estado_nuevo.lower()} correctamente.')
+        return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
 # ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode

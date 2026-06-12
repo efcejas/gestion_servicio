@@ -20,6 +20,7 @@ from .views import (
     PortalLiquidacionInicioView,
     SolicitudRevisionHorarioAdminListView,
     SolicitudRevisionHorarioAdminDetailView,
+    SolicitudRevisionHorarioResolverView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -50,6 +51,11 @@ urlpatterns = [
         'solicitudes-revision-horario/<int:pk>/',
         SolicitudRevisionHorarioAdminDetailView.as_view(),
         name='solicitudes_revision_horario_detalle',
+    ),
+    path(
+        'solicitudes-revision-horario/<int:pk>/resolver/',
+        SolicitudRevisionHorarioResolverView.as_view(),
+        name='solicitud_revision_horario_resolver',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',

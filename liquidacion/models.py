@@ -1195,6 +1195,24 @@ class SolicitudRevisionHorarioRegistro(models.Model):
         default=ESTADO_PENDIENTE,
         verbose_name='Estado',
     )
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='solicitudes_revision_horario_revisadas',
+        null=True,
+        blank=True,
+        verbose_name='Revisado por',
+    )
+    fecha_revision = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de revision',
+    )
+    observacion_revision = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Observacion de revision',
+    )
 
     class Meta:
         verbose_name = 'Solicitud de revisión de horario'

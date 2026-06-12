@@ -20,6 +20,8 @@
             <i class="fas fa-exclamation-triangle text-amber-600 mt-1"></i>
             <div>
                 <p class="text-sm font-semibold text-amber-900">Esta pantalla es solo de revision. No modifica horario ni monto.</p>
+                <p class="text-sm text-amber-900 mt-1">Esta resolución es administrativa y solo cambia el estado de la solicitud. No modifica horario del registro, no modifica monto_calculado y no recalcula importes.</p>
+                <p class="text-sm text-amber-900 mt-1">Solo se puede resolver si está PENDIENTE. Se bloquea en sesiones FACTURADA/PAGADA y no se permite auto-revisión del solicitante.</p>
             </div>
         </div>
     </div>
@@ -112,5 +114,47 @@
             </div>
         </section>
     </div>
+
+    <section class="mt-6 bg-white rounded-xl shadow-md border border-gray-200 p-6">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">Resolución administrativa</h2>
+
+        {% if solicitud.estado == 'PENDIENTE' %}
+        <form method="post" action="{% url 'liquidacion:solicitud_revision_horario_resolver' solicitud.pk %}" class="space-y-4">
+            {% csrf_token %}
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Decisión administrativa</label>
+                <div class="space-y-2 text-sm text-gray-800">
+                    {% for radio in resolucion_form.decision %}
+                    <label class="flex items-center gap-2">
+                        {{ radio.tag }}
+                        <span>{{ radio.choice_label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div>
+                <label for="id_observacion_revision" class="block text-sm font-semibold text-gray-700 mb-2">Observación de revisión</label>
+                {{ resolucion_form.observacion_revision }}
+            </div>
+
+            <div class="flex flex-wrap gap-2">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors">
+                    <i class="fas fa-check-circle"></i>
+                    Confirmar resolución
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+            <p><span class="font-semibold">Estado actual:</span> {{ solicitud.get_estado_display }}</p>
+            <p class="mt-1"><span class="font-semibold">Revisado por:</span> {{ solicitud.revisado_por.get_full_name|default:solicitud.revisado_por.username|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Fecha de revisión:</span> {{ solicitud.fecha_revision|date:"d/m/Y H:i"|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Observación de revisión:</span></p>
+            <p class="mt-1 whitespace-pre-line">{{ solicitud.observacion_revision|default:'-' }}</p>
+        </div>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}

@@ -81,6 +81,34 @@ class SolicitudRevisionHorarioRegistroForm(forms.ModelForm):
         }
 
 
+class SolicitudRevisionHorarioResolucionForm(forms.Form):
+    """Formulario administrativo para resolver solicitudes de revisión de horario."""
+
+    DECISION_APROBAR = 'APROBAR'
+    DECISION_RECHAZAR = 'RECHAZAR'
+    DECISION_CHOICES = [
+        (DECISION_APROBAR, 'Aprobar'),
+        (DECISION_RECHAZAR, 'Rechazar'),
+    ]
+
+    decision = forms.ChoiceField(
+        choices=DECISION_CHOICES,
+        widget=forms.RadioSelect,
+        label='Decision administrativa',
+    )
+    observacion_revision = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                'class': TAILWIND_INPUT_CLASSES,
+                'rows': 3,
+                'placeholder': 'Observacion administrativa (opcional)',
+            }
+        ),
+        label='Observacion de revision',
+    )
+
+
 # ============================================================================
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================

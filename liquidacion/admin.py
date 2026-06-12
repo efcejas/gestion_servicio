@@ -548,6 +548,8 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
         'fecha_solicitud',
         'registro_id',
         'solicitado_por',
+        'revisado_por',
+        'fecha_revision',
         'horario_solicitado',
         'fecha_hora_real_declarada',
     )
@@ -569,6 +571,9 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
         'fecha_hora_real_declarada',
         'motivo_solicitud',
         'estado',
+        'revisado_por',
+        'fecha_revision',
+        'observacion_revision',
     )
     ordering = ('-fecha_solicitud',)
     date_hierarchy = 'fecha_solicitud'
@@ -587,6 +592,13 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
                 'horario_solicitado',
                 'fecha_hora_real_declarada',
                 'motivo_solicitud',
+            )
+        }),
+        ('Resolucion administrativa', {
+            'fields': (
+                'revisado_por',
+                'fecha_revision',
+                'observacion_revision',
             )
         }),
     )
