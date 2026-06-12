@@ -337,6 +337,7 @@
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider" style="min-width: 140px;">
                             {% if mostrar_info_horario_descuento %}OS / Horario{% else %}Obra Social{% endif %}
                         </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Revisión</th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Regiones</th>
                         <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Monto</th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Acciones</th>
@@ -374,6 +375,23 @@
                                 <span class="text-xs text-gray-600 whitespace-nowrap">{{ registro.get_horario_display }}</span>
                                 {% endif %}
                             </div>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            {% if registro.tiene_revision %}
+                            <div class="flex flex-col items-center gap-1.5">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap {{ registro.revision_badge_classes }}">
+                                    {{ registro.revision_badge_label }}
+                                </span>
+                                <button type="button"
+                                        class="inline-flex items-center px-2 py-0.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-[11px] font-semibold leading-tight"
+                                        title="Ver detalle de revisión"
+                                        onclick="toggleDetalleRevision('{{ registro.pk }}')">
+                                    Ver detalle
+                                </button>
+                            </div>
+                            {% else %}
+                            <span class="text-[11px] text-gray-400">Sin revisión</span>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">${{ registro.monto_calculado|floatformat:2 }}</td>
@@ -458,9 +476,62 @@
                             </div>
                         </td>
                     </tr>
+                    {% if registro.tiene_revision %}
+                    <tr id="detalle-revision-{{ registro.pk }}" class="hidden bg-indigo-50 border-l-4 border-indigo-300">
+                        <td colspan="10" class="px-4 py-3">
+                            <div class="bg-white rounded-md border border-indigo-200 p-3">
+                                <h4 class="text-xs font-bold text-indigo-900 mb-2 uppercase tracking-wide">Detalle de revisión (solo lectura)</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-[11px] leading-snug">
+                                    <div class="rounded border border-gray-200 px-2 py-1.5 md:col-span-2 lg:col-span-3">
+                                        <p class="text-gray-500">Motivo solicitud</p>
+                                        <p class="font-medium text-gray-800 whitespace-pre-line">{{ registro.revision_info.motivo_solicitud|default:"-" }}</p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5 md:col-span-2 lg:col-span-3">
+                                        <p class="text-gray-500">Obs. revisión</p>
+                                        <p class="font-medium text-gray-800 whitespace-pre-line">{{ registro.revision_info.observacion_revision|default:"-" }}</p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5 md:col-span-2 lg:col-span-3">
+                                        <p class="text-gray-500">Obs. aplicación</p>
+                                        <p class="font-medium text-gray-800 whitespace-pre-line">{{ registro.revision_info.observacion_aplicacion|default:"-" }}</p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5">
+                                        <p class="text-gray-500">Horario</p>
+                                        <p class="font-medium text-gray-800">{{ registro.revision_info.horario_anterior|default:"-" }} → {{ registro.revision_info.horario_aplicado|default:"-" }}</p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5">
+                                        <p class="text-gray-500">Monto</p>
+                                        <p class="font-medium text-gray-800">
+                                            {% if registro.revision_info.monto_anterior is not None %}${{ registro.revision_info.monto_anterior|floatformat:2 }}{% else %}-{% endif %}
+                                            →
+                                            {% if registro.revision_info.monto_aplicado is not None %}${{ registro.revision_info.monto_aplicado|floatformat:2 }}{% else %}-{% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5">
+                                        <p class="text-gray-500">Estado</p>
+                                        <p class="font-medium text-gray-800">{{ registro.revision_badge_label }}</p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5">
+                                        <p class="text-gray-500">Revisado por / fecha</p>
+                                        <p class="font-medium text-gray-800">
+                                            {% if registro.revision_info.revisado_por %}{{ registro.revision_info.revisado_por.get_full_name|default:registro.revision_info.revisado_por.username }}{% else %}-{% endif %}
+                                            {% if registro.revision_info.fecha_revision %}<span class="text-gray-500">({{ registro.revision_info.fecha_revision|date:"d/m/Y H:i" }})</span>{% endif %}
+                                        </p>
+                                    </div>
+                                    <div class="rounded border border-gray-200 px-2 py-1.5">
+                                        <p class="text-gray-500">Aplicado por / fecha</p>
+                                        <p class="font-medium text-gray-800">
+                                            {% if registro.revision_info.aplicado_por %}{{ registro.revision_info.aplicado_por.get_full_name|default:registro.revision_info.aplicado_por.username }}{% else %}-{% endif %}
+                                            {% if registro.revision_info.fecha_aplicacion %}<span class="text-gray-500">({{ registro.revision_info.fecha_aplicacion|date:"d/m/Y H:i" }})</span>{% endif %}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endif %}
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="10" class="px-4 py-8 text-center text-gray-500">
                             <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
                             <p>No se encontraron registros para los filtros seleccionados</p>
                         </td>
@@ -469,7 +540,7 @@
                 </tbody>
                 <tfoot class="bg-gray-50 border-t-2 border-gray-300 font-bold">
                     <tr>
-                        <td colspan="6" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales del período</td>
+                        <td colspan="7" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales del período</td>
                         <td class="px-4 py-3 text-sm text-center text-gray-900">{{ total_regiones_general }}</td>
                         <td class="px-4 py-3 text-sm text-right text-gray-700">${{ total_monto_practicas|floatformat:2 }}</td>
                         <td></td>
@@ -584,6 +655,14 @@
 
     function toggleDetalleRegistro(registroId) {
         const detalleRow = document.getElementById('detalle-registro-' + registroId);
+        if (!detalleRow) {
+            return;
+        }
+        detalleRow.classList.toggle('hidden');
+    }
+
+    function toggleDetalleRevision(registroId) {
+        const detalleRow = document.getElementById('detalle-revision-' + registroId);
         if (!detalleRow) {
             return;
         }

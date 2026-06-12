@@ -1309,6 +1309,18 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
                 estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
             ).values_list('registro_id', flat=True)
         )
+
+        revisiones_qs = (
+            SolicitudRevisionHorarioRegistro.objects
+            .filter(registro_id__in=registros_ids)
+            .select_related('solicitado_por', 'revisado_por', 'aplicado_por')
+            .order_by('registro_id', '-fecha_solicitud')
+        )
+        ultima_revision_por_registro = {}
+        for revision in revisiones_qs:
+            if revision.registro_id not in ultima_revision_por_registro:
+                ultima_revision_por_registro[revision.registro_id] = revision
+
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
@@ -1324,6 +1336,27 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
                 (not sesion_bloqueada_revision)
                 and (not registro.tiene_revision_pendiente)
             )
+
+            revision = ultima_revision_por_registro.get(registro.id)
+            registro.revision_info = revision
+            registro.tiene_revision = revision is not None
+            registro.revision_badge_label = ''
+            registro.revision_badge_classes = ''
+
+            if revision:
+                if revision.fecha_aplicacion:
+                    registro.revision_badge_label = 'Corrección aplicada'
+                    registro.revision_badge_classes = 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                elif revision.estado == SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE:
+                    registro.revision_badge_label = 'Revisión pendiente'
+                    registro.revision_badge_classes = 'bg-amber-100 text-amber-800 border border-amber-200'
+                elif revision.estado == SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
+                    registro.revision_badge_label = 'Revisión aprobada'
+                    registro.revision_badge_classes = 'bg-blue-100 text-blue-800 border border-blue-200'
+                elif revision.estado == SolicitudRevisionHorarioRegistro.ESTADO_RECHAZADA:
+                    registro.revision_badge_label = 'Revisión rechazada'
+                    registro.revision_badge_classes = 'bg-rose-100 text-rose-800 border border-rose-200'
+
         context['puede_ver_desglose_admin'] = puede_admin
 
         # Agregar contexto para los controles
