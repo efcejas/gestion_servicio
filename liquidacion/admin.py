@@ -550,6 +550,8 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
         'solicitado_por',
         'revisado_por',
         'fecha_revision',
+        'aplicado_por',
+        'fecha_aplicacion',
         'horario_solicitado',
         'fecha_hora_real_declarada',
     )
@@ -574,6 +576,13 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
         'revisado_por',
         'fecha_revision',
         'observacion_revision',
+        'aplicado_por',
+        'fecha_aplicacion',
+        'horario_anterior',
+        'horario_aplicado',
+        'monto_anterior',
+        'monto_aplicado',
+        'observacion_aplicacion',
     )
     ordering = ('-fecha_solicitud',)
     date_hierarchy = 'fecha_solicitud'
@@ -599,6 +608,17 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
                 'revisado_por',
                 'fecha_revision',
                 'observacion_revision',
+            )
+        }),
+        ('Aplicacion economica', {
+            'fields': (
+                'aplicado_por',
+                'fecha_aplicacion',
+                'horario_anterior',
+                'horario_aplicado',
+                'monto_anterior',
+                'monto_aplicado',
+                'observacion_aplicacion',
             )
         }),
     )

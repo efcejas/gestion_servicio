@@ -1213,6 +1213,50 @@ class SolicitudRevisionHorarioRegistro(models.Model):
         default='',
         verbose_name='Observacion de revision',
     )
+    aplicado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='solicitudes_revision_horario_aplicadas',
+        null=True,
+        blank=True,
+        verbose_name='Aplicado por',
+    )
+    fecha_aplicacion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Fecha de aplicacion',
+    )
+    horario_anterior = models.CharField(
+        max_length=6,
+        null=True,
+        blank=True,
+        verbose_name='Horario anterior',
+    )
+    horario_aplicado = models.CharField(
+        max_length=6,
+        null=True,
+        blank=True,
+        verbose_name='Horario aplicado',
+    )
+    monto_anterior = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Monto anterior',
+    )
+    monto_aplicado = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Monto aplicado',
+    )
+    observacion_aplicacion = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='Observacion de aplicacion',
+    )
 
     class Meta:
         verbose_name = 'Solicitud de revisión de horario'

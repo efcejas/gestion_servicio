@@ -109,6 +109,22 @@ class SolicitudRevisionHorarioResolucionForm(forms.Form):
     )
 
 
+class SolicitudRevisionHorarioAplicarForm(forms.Form):
+    """Formulario administrativo para aplicar corrección económica B2."""
+
+    observacion_aplicacion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                'class': TAILWIND_INPUT_CLASSES,
+                'rows': 3,
+                'placeholder': 'Observacion de aplicación (opcional)',
+            }
+        ),
+        label='Observacion de aplicacion',
+    )
+
+
 # ============================================================================
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================

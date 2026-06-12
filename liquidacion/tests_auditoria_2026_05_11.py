@@ -668,6 +668,23 @@ class PermisosYTrazabilidadViewTest(TestCase):
             estado=estado,
         )
 
+    def _resolver_aprobada(self, solicitud, revisor):
+        self.client.force_login(revisor)
+        response = self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
+            {'decision': 'APROBAR', 'observacion_revision': 'Aprobada para aplicar B2.'},
+        )
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, 'APROBADA')
+
+    def _aplicar_solicitud(self, solicitud, usuario, observacion='Aplicación B2 test'):
+        self.client.force_login(usuario)
+        return self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_aplicar', kwargs={'pk': solicitud.pk}),
+            {'observacion_aplicacion': observacion},
+        )
+
     def test_residente_puede_solicitar_revision_de_registro_propio(self):
         registro = self._crear_registro_para_revision(self.residente)
 
@@ -1152,6 +1169,273 @@ class PermisosYTrazabilidadViewTest(TestCase):
         solicitud.refresh_from_db()
         self.assertEqual(solicitud.estado, 'APROBADA')
         self.assertEqual(solicitud.observacion_revision, 'Primera resolucion valida.')
+
+    def test_aplicar_aprobada_modifica_horario_del_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, solicitud.horario_solicitado)
+
+    def test_aplicar_aprobada_recalcula_monto_del_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        monto_inicial = registro.monto_calculado
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertNotEqual(registro.monto_calculado, monto_inicial)
+
+    def test_aplicar_guarda_snapshot_horario_anterior_y_aplicado(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.admin)
+
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.horario_anterior, 'INTRA')
+        self.assertEqual(solicitud.horario_aplicado, solicitud.horario_solicitado)
+
+    def test_aplicar_guarda_snapshot_monto_anterior_y_aplicado(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.admin)
+
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.monto_anterior, Decimal('5000.00'))
+        self.assertEqual(solicitud.monto_aplicado, Decimal('0.00'))
+
+    def test_aplicar_guarda_aplicado_por_y_fecha_aplicacion(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.jefe_servicio)
+
+        self._aplicar_solicitud(solicitud, self.jefe_servicio)
+
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.aplicado_por, self.jefe_servicio)
+        self.assertIsNotNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_solo_post_no_permite_get(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente, estado='APROBADA')
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('liquidacion:solicitud_revision_horario_aplicar', kwargs={'pk': solicitud.pk}))
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_aplicar_denegada_para_rol_no_administrativo(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.medico)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_si_estado_pendiente(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente, estado='PENDIENTE')
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_si_estado_rechazada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente, estado='RECHAZADA')
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_si_ya_aplicada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+        first_response = self._aplicar_solicitud(solicitud, self.admin)
+        second_response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNotNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_en_sesion_cerrada(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='CERRADA')
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_en_sesion_facturada(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='FACTURADA')
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado='APROBADA',
+        )
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_bloqueada_en_sesion_pagada(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='PAGADA')
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado='APROBADA',
+        )
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_permitida_en_sesion_revision(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='REVISION')
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertIsNotNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_concurrente_segunda_operacion_falla_por_ya_aplicada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        first_response = self._aplicar_solicitud(solicitud, self.admin, observacion='Primera aplicación')
+        second_response = self._aplicar_solicitud(solicitud, self.jefe_servicio, observacion='Segunda aplicación')
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.observacion_aplicacion, 'Primera aplicación')
+        self.assertEqual(solicitud.aplicado_por, self.admin)
+
+    def test_superuser_puede_aplicar_aprobada_en_sesion_abierta(self):
+        registro = self._crear_registro_para_revision(self.residente, sesion_estado='ABIERTA')
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.superuser)
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.aplicado_por, self.superuser)
+        self.assertIsNotNone(solicitud.fecha_aplicacion)
+
+    def test_aplicar_horario_igual_al_actual_igual_recalcula(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        solicitud.horario_solicitado = 'INTRA'
+        solicitud.save(update_fields=['horario_solicitado'])
+        self._resolver_aprobada(solicitud, self.admin)
+
+        response = self._aplicar_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        solicitud.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(solicitud.horario_anterior, 'INTRA')
+        self.assertEqual(solicitud.horario_aplicado, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('0.00'))
+
+    def test_aplicar_actualiza_modificado_por_en_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.jefe_servicio)
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.modificado_por, self.jefe_servicio)
+
+    def test_aplicar_actualiza_fecha_modificacion_en_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.admin)
+
+        registro.refresh_from_db()
+        self.assertIsNotNone(registro.fecha_modificacion)
+
+    def test_aplicar_actualiza_motivo_modificacion_en_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.admin)
+
+        registro.refresh_from_db()
+        self.assertEqual(
+            registro.motivo_modificacion,
+            (
+                f"Corrección de horario por solicitud de revisión #{solicitud.pk} aprobada administrativamente. "
+                f"Horario: INTRA → EXTRA. Monto: $5000.00 → $0.00."
+            ),
+        )
+
+    def test_aplicar_no_dispara_signal_de_registroestudio(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        estudio = Estudios.objects.create(
+            codigo='B2_SIG_TEST',
+            nombre='ECO SIGNAL B2',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        cantidad_regiones_inicial = registro.cantidad_regiones
+        relaciones_iniciales = RegistroEstudio.objects.filter(registro=registro).count()
+
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+        self._resolver_aprobada(solicitud, self.admin)
+
+        self._aplicar_solicitud(solicitud, self.admin)
+
+        registro.refresh_from_db()
+        self.assertEqual(RegistroEstudio.objects.filter(registro=registro).count(), relaciones_iniciales)
+        self.assertEqual(registro.cantidad_regiones, cantidad_regiones_inicial)
 
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)

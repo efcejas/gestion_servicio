@@ -154,6 +154,37 @@
             <p class="mt-1"><span class="font-semibold">Observación de revisión:</span></p>
             <p class="mt-1 whitespace-pre-line">{{ solicitud.observacion_revision|default:'-' }}</p>
         </div>
+
+        {% if solicitud.estado == 'APROBADA' and not solicitud.fecha_aplicacion %}
+        <div class="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <p class="text-sm text-indigo-900 font-semibold">Aplicación económica B2</p>
+            <p class="text-sm text-indigo-900 mt-1">Disponible solo en sesiones ABIERTA o REVISION. En CERRADA, FACTURADA y PAGADA está bloqueado.</p>
+
+            <form method="post" action="{% url 'liquidacion:solicitud_revision_horario_aplicar' solicitud.pk %}" class="space-y-4 mt-4">
+                {% csrf_token %}
+                <div>
+                    <label for="id_observacion_aplicacion" class="block text-sm font-semibold text-gray-700 mb-2">Observación de aplicación</label>
+                    {{ aplicar_form.observacion_aplicacion }}
+                </div>
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors">
+                    <i class="fas fa-bolt"></i>
+                    Aplicar corrección económica
+                </button>
+            </form>
+        </div>
+        {% endif %}
+
+        {% if solicitud.fecha_aplicacion %}
+        <div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p class="font-semibold">Aplicación económica registrada</p>
+            <p class="mt-1"><span class="font-semibold">Aplicado por:</span> {{ solicitud.aplicado_por.get_full_name|default:solicitud.aplicado_por.username|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Fecha de aplicación:</span> {{ solicitud.fecha_aplicacion|date:"d/m/Y H:i"|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Horario:</span> {{ solicitud.horario_anterior|default:'-' }} → {{ solicitud.horario_aplicado|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Monto:</span> ${{ solicitud.monto_anterior|floatformat:2|default:'-' }} → ${{ solicitud.monto_aplicado|floatformat:2|default:'-' }}</p>
+            <p class="mt-1"><span class="font-semibold">Observación de aplicación:</span></p>
+            <p class="mt-1 whitespace-pre-line">{{ solicitud.observacion_aplicacion|default:'-' }}</p>
+        </div>
+        {% endif %}
         {% endif %}
     </section>
 </div>
