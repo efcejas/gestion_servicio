@@ -950,14 +950,16 @@ class RegistroEstudiosPorMedico(models.Model):
         Calcula el monto a facturar por esta práctica.
         v3.2 - Mayo 2026: Factor INTRA diferenciado por rol y tipo de estudio.
         v3.3 - Mayo 2026: INTRA aplica solo a ECO general real.
+        v3.4 - Junio 2026: INTRA residencia usa reglas explicitas de elegibilidad.
 
         Reglas de factor horario INTRA (50%):
           - medico_residente / jefe_residentes / instructor_residentes:
-            aplica SOLO a ECO general real.
-            Doppler (DOP), ECOCAR y otros siempre al 100%.
+            aplica a estudios elegibles por ReglaDescuentoResidencia.
+            Sin regla explicita conserva fallback legado: ECO general real si;
+            Doppler (DOP), ECOCAR y otros no.
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
-        from .grupo_tarifario_mapping import es_eco_general_real_estudio
+        from .services import ROLES_RESIDENCIA, estudio_aplica_descuento_residencia
 
         # Si no hay estudios asignados, retornar 0
         relaciones = self.registroestudio_set.select_related('estudio__grupo_tarifario').all()
@@ -965,11 +967,12 @@ class RegistroEstudiosPorMedico(models.Model):
             return Decimal('0.00')
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
+        rol_residencia_intra = self.horario == 'INTRA' and self.medico.rol in ROLES_RESIDENCIA
         
-        # 1. Sumar (precio × cantidad) separando ECO general real del resto.
+        # 1. Sumar (precio × cantidad) separando elegibles para descuento residencia.
         precio_total = Decimal('0.00')
-        precio_total_eco_general = Decimal('0.00')
-        precio_total_resto = Decimal('0.00')
+        precio_total_descuento_residencia = Decimal('0.00')
+        precio_total_sin_descuento_residencia = Decimal('0.00')
         
         for rel in relaciones:
             estudio = rel.estudio
@@ -982,20 +985,24 @@ class RegistroEstudiosPorMedico(models.Model):
             )
             precio_rel = precio_estudio * Decimal(str(cantidad))
             precio_total += precio_rel
-            if es_eco_general_real_estudio(estudio):
-                precio_total_eco_general += precio_rel
+            if rol_residencia_intra and estudio_aplica_descuento_residencia(
+                estudio,
+                self.medico.rol,
+                fecha_referencia,
+            )['aplica']:
+                precio_total_descuento_residencia += precio_rel
             else:
-                precio_total_resto += precio_rel
+                precio_total_sin_descuento_residencia += precio_rel
         
         if precio_total == Decimal('0.00'):
             return Decimal('0.00')
         
         # 2. Aplicar factor horario según rol
         subtotal = precio_total
-        if self.horario == 'INTRA':
-            if self.medico.rol in ['medico_residente', 'jefe_residentes', 'instructor_residentes']:
-                # Residencia: INTRA solo aplica a ECO general real.
-                subtotal = (precio_total_eco_general * Decimal('0.5')) + precio_total_resto
+        if rol_residencia_intra:
+            subtotal = (
+                precio_total_descuento_residencia * Decimal('0.5')
+            ) + precio_total_sin_descuento_residencia
             # EXTRA para cualquier rol: sin cambio (100%)
         # Staff / otros roles: sin factor horario (100%)
         
