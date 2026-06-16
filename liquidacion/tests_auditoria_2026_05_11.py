@@ -1342,6 +1342,51 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(solicitud.observacion_aplicacion, 'Primera aplicación')
         self.assertEqual(solicitud.aplicado_por, self.admin)
 
+    def test_aplicar_concurrente_segunda_operacion_no_modifica_registro_si_ya_aplicada(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        fecha_modificacion_original = timezone.now()
+        registro.modificado_por = self.admin
+        registro.fecha_modificacion = fecha_modificacion_original
+        registro.motivo_modificacion = 'Modificacion previa'
+        registro.save(update_fields=['modificado_por', 'fecha_modificacion', 'motivo_modificacion'])
+
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado='APROBADA',
+        )
+        solicitud.aplicado_por = self.admin
+        solicitud.fecha_aplicacion = timezone.now()
+        solicitud.horario_anterior = registro.horario
+        solicitud.horario_aplicado = 'EXTRA'
+        solicitud.monto_anterior = registro.monto_calculado
+        solicitud.monto_aplicado = Decimal('0.00')
+        solicitud.observacion_aplicacion = 'Aplicacion previa'
+        solicitud.save(update_fields=[
+            'aplicado_por',
+            'fecha_aplicacion',
+            'horario_anterior',
+            'horario_aplicado',
+            'monto_anterior',
+            'monto_aplicado',
+            'observacion_aplicacion',
+        ])
+
+        horario_original = registro.horario
+        monto_original = registro.monto_calculado
+        modificado_por_original = registro.modificado_por
+        motivo_original = registro.motivo_modificacion
+
+        response = self._aplicar_solicitud(solicitud, self.jefe_servicio, observacion='Segundo intento')
+
+        self.assertIn(response.status_code, [301, 302])
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, horario_original)
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertEqual(registro.modificado_por, modificado_por_original)
+        self.assertEqual(registro.fecha_modificacion, fecha_modificacion_original)
+        self.assertEqual(registro.motivo_modificacion, motivo_original)
+
     def test_superuser_puede_aplicar_aprobada_en_sesion_abierta(self):
         registro = self._crear_registro_para_revision(self.residente, sesion_estado='ABIERTA')
         solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
@@ -1402,11 +1447,10 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(
             registro.motivo_modificacion,
             (
-                f"Corrección de horario por solicitud de revisión #{solicitud.pk} aprobada administrativamente. "
-                f"Horario: INTRA → EXTRA. Monto: $5000.00 → $0.00."
+                f"Correccion de horario por solicitud de revision #{solicitud.pk} aprobada administrativamente. "
+                f"Horario: INTRA -> EXTRA. Monto: $5000.00 -> $0.00."
             ),
         )
-
     def test_aplicar_no_dispara_signal_de_registroestudio(self):
         registro = self._crear_registro_para_revision(self.residente)
         estudio = Estudios.objects.create(
