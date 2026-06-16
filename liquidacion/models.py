@@ -350,6 +350,112 @@ class TarifaGrupoTarifario(models.Model):
             raise ValidationError('La vigencia hasta no puede ser anterior a vigencia desde.')
 
 
+class ReglaDescuentoResidencia(models.Model):
+    """Regla explicita de elegibilidad para descuento de residencia."""
+
+    estudio = models.ForeignKey(
+        'Estudios',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='reglas_descuento_residencia',
+        verbose_name='Estudio',
+    )
+    grupo_tarifario = models.ForeignKey(
+        'GrupoTarifario',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='reglas_descuento_residencia',
+        verbose_name='Grupo tarifario',
+    )
+    aplica_medico_residente = models.BooleanField(default=False)
+    aplica_jefe_residentes = models.BooleanField(default=False)
+    aplica_instructor_residentes = models.BooleanField(default=False)
+    vigencia_desde = models.DateField(default=timezone.localdate)
+    vigencia_hasta = models.DateField(null=True, blank=True)
+    activo = models.BooleanField(default=True)
+    observacion = models.TextField(blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reglas_descuento_residencia_creadas',
+    )
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reglas_descuento_residencia_actualizadas',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Regla de descuento residencia'
+        verbose_name_plural = 'Reglas de descuento residencia'
+        ordering = ['-vigencia_desde', '-id']
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(estudio__isnull=False, grupo_tarifario__isnull=True)
+                    | models.Q(estudio__isnull=True, grupo_tarifario__isnull=False)
+                ),
+                name='ck_regla_desc_residencia_entidad_exclusiva',
+            ),
+            models.UniqueConstraint(
+                fields=['estudio', 'vigencia_desde', 'activo'],
+                condition=models.Q(estudio__isnull=False),
+                name='uq_regla_desc_residencia_estudio_vigencia_activo',
+            ),
+            models.UniqueConstraint(
+                fields=['grupo_tarifario', 'vigencia_desde', 'activo'],
+                condition=models.Q(grupo_tarifario__isnull=False),
+                name='uq_regla_desc_residencia_grupo_vigencia_activo',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['estudio', 'activo', 'vigencia_desde']),
+            models.Index(fields=['grupo_tarifario', 'activo', 'vigencia_desde']),
+        ]
+
+    def __str__(self):
+        entidad = self.estudio or self.grupo_tarifario
+        return f"{entidad} desde {self.vigencia_desde}"
+
+    def clean(self):
+        super().clean()
+
+        if bool(self.estudio_id) == bool(self.grupo_tarifario_id):
+            raise ValidationError('La regla debe tener estudio o grupo tarifario, pero no ambos.')
+
+        if self.vigencia_hasta and self.vigencia_hasta < self.vigencia_desde:
+            raise ValidationError('La vigencia hasta no puede ser anterior a vigencia desde.')
+
+        if not self.activo:
+            return
+
+        solapadas = ReglaDescuentoResidencia.objects.filter(activo=True)
+        if self.pk:
+            solapadas = solapadas.exclude(pk=self.pk)
+
+        if self.estudio_id:
+            solapadas = solapadas.filter(estudio_id=self.estudio_id)
+        else:
+            solapadas = solapadas.filter(grupo_tarifario_id=self.grupo_tarifario_id)
+
+        solapadas = solapadas.filter(
+            models.Q(vigencia_hasta__isnull=True) | models.Q(vigencia_hasta__gte=self.vigencia_desde)
+        )
+        if self.vigencia_hasta:
+            solapadas = solapadas.filter(vigencia_desde__lte=self.vigencia_hasta)
+
+        if solapadas.exists():
+            raise ValidationError('Ya existe una regla activa con vigencia solapada para esta entidad.')
+
+
 class SesionContable(models.Model):
     """
     Período de facturación mensual

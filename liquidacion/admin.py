@@ -8,6 +8,7 @@ from .models import (
     HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
     HistorialSesionContable,
+    ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
@@ -138,6 +139,65 @@ class GrupoTarifarioAdmin(admin.ModelAdmin):
     search_fields = ('codigo', 'nombre')
     ordering = ('modalidad', 'codigo')
     inlines = [TarifaGrupoTarifarioInline]
+
+
+@admin.register(ReglaDescuentoResidencia)
+class ReglaDescuentoResidenciaAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'estudio',
+        'grupo_tarifario',
+        'activo',
+        'vigencia_desde',
+        'vigencia_hasta',
+        'aplica_medico_residente',
+        'aplica_jefe_residentes',
+        'aplica_instructor_residentes',
+    )
+    list_filter = (
+        'activo',
+        'vigencia_desde',
+        'vigencia_hasta',
+        'aplica_medico_residente',
+        'aplica_jefe_residentes',
+        'aplica_instructor_residentes',
+    )
+    search_fields = (
+        'estudio__nombre',
+        'estudio__codigo',
+        'grupo_tarifario__codigo',
+        'grupo_tarifario__nombre',
+        'observacion',
+    )
+    readonly_fields = ('fecha_creacion', 'fecha_actualizacion', 'creado_por', 'actualizado_por')
+    ordering = ('-vigencia_desde', '-id')
+    fieldsets = (
+        ('Entidad', {
+            'fields': ('estudio', 'grupo_tarifario', 'activo'),
+            'description': 'Definir una regla por estudio o por grupo tarifario, no ambas.',
+        }),
+        ('Roles residencia', {
+            'fields': (
+                'aplica_medico_residente',
+                'aplica_jefe_residentes',
+                'aplica_instructor_residentes',
+            ),
+        }),
+        ('Vigencia', {
+            'fields': ('vigencia_desde', 'vigencia_hasta'),
+        }),
+        ('Auditoria', {
+            'fields': ('observacion', 'creado_por', 'actualizado_por', 'fecha_creacion', 'fecha_actualizacion'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            obj.creado_por = request.user
+        obj.actualizado_por = request.user
+        obj.full_clean()
+        super().save_model(request, obj, form, change)
 
 
 # ============================================================================

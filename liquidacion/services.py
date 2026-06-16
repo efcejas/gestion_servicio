@@ -8,9 +8,10 @@ import io
 from datetime import datetime
 
 from django.utils import timezone
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
-from .models import Estudios, GuardiaPasiva, RegistroEstudiosPorMedico
+from .grupo_tarifario_mapping import es_eco_general_real_estudio
+from .models import Estudios, GuardiaPasiva, ReglaDescuentoResidencia, RegistroEstudiosPorMedico
 
 
 ROLES_RESIDENCIA = {
@@ -18,6 +19,92 @@ ROLES_RESIDENCIA = {
     'jefe_residentes',
     'instructor_residentes',
 }
+
+CAMPO_REGLA_DESCUENTO_POR_ROL = {
+    'medico_residente': 'aplica_medico_residente',
+    'jefe_residentes': 'aplica_jefe_residentes',
+    'instructor_residentes': 'aplica_instructor_residentes',
+}
+
+
+def _resultado_descuento_residencia(aplica, fuente, regla_id=None, motivo=''):
+    return {
+        'aplica': bool(aplica),
+        'fuente': fuente,
+        'regla_id': regla_id,
+        'motivo': motivo,
+    }
+
+
+def _regla_vigente_para_estudio(estudio, fecha_ref):
+    return (
+        ReglaDescuentoResidencia.objects
+        .filter(
+            estudio=estudio,
+            activo=True,
+            vigencia_desde__lte=fecha_ref,
+        )
+        .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=fecha_ref))
+        .order_by('-vigencia_desde', '-id')
+        .first()
+    )
+
+
+def _regla_vigente_para_grupo(grupo_tarifario, fecha_ref):
+    if not grupo_tarifario:
+        return None
+
+    return (
+        ReglaDescuentoResidencia.objects
+        .filter(
+            grupo_tarifario=grupo_tarifario,
+            activo=True,
+            vigencia_desde__lte=fecha_ref,
+        )
+        .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=fecha_ref))
+        .order_by('-vigencia_desde', '-id')
+        .first()
+    )
+
+
+def _resultado_desde_regla(regla, rol, fuente):
+    campo_rol = CAMPO_REGLA_DESCUENTO_POR_ROL[rol]
+    aplica = getattr(regla, campo_rol)
+    return _resultado_descuento_residencia(
+        aplica=aplica,
+        fuente=fuente,
+        regla_id=regla.id,
+        motivo=f"Regla explicita por {fuente}.",
+    )
+
+
+def estudio_aplica_descuento_residencia(estudio, rol, fecha=None):
+    """Resuelve elegibilidad de descuento residencia sin modificar calculos.
+
+    Precedencia: regla por estudio > regla por grupo tarifario > fallback legado.
+    """
+    if rol not in ROLES_RESIDENCIA:
+        return _resultado_descuento_residencia(
+            aplica=False,
+            fuente='rol_no_residencia',
+            motivo='El rol no pertenece a residencia.',
+        )
+
+    fecha_ref = fecha or timezone.localdate()
+    regla_estudio = _regla_vigente_para_estudio(estudio, fecha_ref)
+    if regla_estudio:
+        return _resultado_desde_regla(regla_estudio, rol, fuente='estudio')
+
+    regla_grupo = _regla_vigente_para_grupo(getattr(estudio, 'grupo_tarifario', None), fecha_ref)
+    if regla_grupo:
+        return _resultado_desde_regla(regla_grupo, rol, fuente='grupo')
+
+    aplica_fallback = es_eco_general_real_estudio(estudio)
+    return _resultado_descuento_residencia(
+        aplica=aplica_fallback,
+        fuente='fallback_legado',
+        motivo='Fallback legado ECO general real.' if aplica_fallback else 'Fallback legado sin descuento.',
+    )
 
 
 def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco_general):
