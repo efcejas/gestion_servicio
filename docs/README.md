@@ -30,6 +30,8 @@
 - **[producto/NOTIFICACIONES_TOKEN_README.md](producto/NOTIFICACIONES_TOKEN_README.md)** - Acceso por token y notificaciones para médicos.
 - **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
 
+- **[liquidacion/reglas-descuento-residencia.md](liquidacion/reglas-descuento-residencia.md)** - Reglas vigentes de descuento residencia, B2/B3 y diagnostico de recalculo.
+
 ### IA y dictado
 
 - **[arquitectura/README.md](arquitectura/README.md)** - Índice de documentación técnica.
