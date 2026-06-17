@@ -41,7 +41,11 @@ from .grupo_tarifario_mapping import (
 )
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
-from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
+from .services import (
+    ROLES_RESIDENCIA,
+    clasificar_horario_residencia_por_proxy,
+    estudio_aplica_descuento_residencia,
+)
 from .forms import (
     EstudiosAdminForm,
     SolicitudRevisionHorarioRegistroForm,
@@ -69,6 +73,78 @@ from django.urls import reverse
 
 def _puede_acceder_panel_administrativo(user):
     return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
+
+
+def _build_diagnostico_recalculo_b3(solicitud):
+    """Diagnostico solo lectura para explicar el recalculo B3."""
+    if not solicitud.fecha_aplicacion:
+        return None
+
+    registro = solicitud.registro
+    horario_aplicado = solicitud.horario_aplicado
+    rol_medico = getattr(registro.medico, 'rol', None)
+    fecha_referencia = registro.fecha_del_informe
+    monto_actual = registro.monto_calculado
+    advertencias = []
+
+    horario_original = registro.horario
+    try:
+        registro.horario = horario_aplicado
+        monto_simulado = registro.calcular_monto()
+    finally:
+        registro.horario = horario_original
+
+    diferencia = monto_simulado - monto_actual
+    if diferencia == 0:
+        advertencias.append('El recálculo no cambiaría el monto actual.')
+    if horario_aplicado != 'INTRA':
+        advertencias.append('No aplica descuento porque el horario aplicado no es INTRA.')
+
+    estudios = []
+    relaciones = (
+        registro.registroestudio_set
+        .select_related('estudio__grupo_tarifario')
+        .order_by('id')
+    )
+    for rel in relaciones:
+        estudio = rel.estudio
+        resultado = estudio_aplica_descuento_residencia(
+            estudio,
+            rol_medico,
+            fecha_referencia,
+        )
+        grupo = getattr(estudio, 'grupo_tarifario', None)
+        advertencia = ''
+        if horario_aplicado != 'INTRA':
+            advertencia = 'No aplica descuento porque el horario aplicado no es INTRA.'
+        elif (
+            (estudio.tipo or '').upper() == 'DOP'
+            and not resultado['aplica']
+            and resultado['fuente'] == 'fallback_legado'
+        ):
+            advertencia = 'No existe regla activa aplicable para este estudio en la fecha del informe.'
+
+        estudios.append({
+            'nombre': estudio.nombre,
+            'tipo': estudio.tipo,
+            'grupo_tarifario': grupo.codigo if grupo else '',
+            'aplica': resultado['aplica'],
+            'fuente': resultado['fuente'],
+            'regla_id': resultado['regla_id'],
+            'motivo': resultado['motivo'],
+            'advertencia': advertencia,
+        })
+
+    return {
+        'horario_aplicado': horario_aplicado,
+        'rol_medico': rol_medico,
+        'fecha_referencia': fecha_referencia,
+        'monto_actual_registro': monto_actual,
+        'monto_simulado_con_reglas_vigentes': monto_simulado,
+        'diferencia': diferencia,
+        'estudios': estudios,
+        'advertencias': advertencias,
+    }
 
 
 class PortalLiquidacionInicioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -356,6 +432,7 @@ class SolicitudRevisionHorarioAdminDetailView(LoginRequiredMixin, UserPassesTest
             and bool(sesion)
             and sesion.estado in ['ABIERTA', 'REVISION']
         )
+        context['diagnostico_recalculo_b3'] = _build_diagnostico_recalculo_b3(self.object)
         return context
 
 

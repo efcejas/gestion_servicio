@@ -1716,6 +1716,57 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(registro.monto_calculado, Decimal('100.000'))
         self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.filter(solicitud=solicitud).count(), 1)
 
+    def test_b3_diagnostico_muestra_monto_actual_simulado_y_diferencia(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_detalle', kwargs={'pk': solicitud.pk}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Diagnóstico de recálculo')
+        self.assertContains(response, 'Monto actual')
+        self.assertContains(response, '$200,00')
+        self.assertContains(response, 'Monto simulado')
+        self.assertContains(response, '$100,00')
+        self.assertContains(response, 'Diferencia esperada')
+        self.assertContains(response, '$-100,00')
+
+    def test_b3_diagnostico_muestra_mensaje_doppler_sin_regla(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_detalle', kwargs={'pk': solicitud.pk}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'No existe regla activa aplicable para este estudio en la fecha del informe.',
+        )
+        self.assertContains(response, 'El recálculo no cambiaría el monto actual.')
+
+    def test_b3_diagnostico_muestra_mensaje_si_horario_aplicado_no_es_intra(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(horario_aplicado='EXTRA')
+        self._crear_regla_b3(estudio)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_detalle', kwargs={'pk': solicitud.pk}),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'No aplica descuento porque el horario aplicado no es INTRA.',
+        )
+
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)
         response_super = self.client.get(reverse('liquidacion:grupos_tarifarios_list'))
