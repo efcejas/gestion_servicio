@@ -450,12 +450,11 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
 
         with transaction.atomic():
             solicitud = get_object_or_404(
-                SolicitudRevisionHorarioRegistro.objects.select_for_update().select_related(
-                    'registro__sesion_contable',
-                    'registro',
-                    'solicitado_por',
-                ),
+                SolicitudRevisionHorarioRegistro.objects.select_for_update(),
                 pk=solicitud_pk,
+            )
+            registro = RegistroEstudiosPorMedico.objects.select_for_update().get(
+                pk=solicitud.registro_id,
             )
 
             if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
@@ -466,7 +465,9 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
                 messages.error(request, 'La solicitud ya fue aplicada anteriormente.')
                 return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
-            sesion = solicitud.registro.sesion_contable
+            sesion = None
+            if registro.sesion_contable_id:
+                sesion = SesionContable.objects.get(pk=registro.sesion_contable_id)
             if not sesion or sesion.estado not in ['ABIERTA', 'REVISION']:
                 messages.error(
                     request,
@@ -474,7 +475,6 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
                 )
                 return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
-            registro = solicitud.registro
             horario_anterior = registro.horario
             monto_anterior = registro.monto_calculado
             horario_aplicado = solicitud.horario_solicitado

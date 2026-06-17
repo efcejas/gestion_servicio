@@ -675,6 +675,7 @@ class PermisosYTrazabilidadViewTest(TestCase):
         response = self.client.post(
             reverse('liquidacion:solicitud_revision_horario_resolver', kwargs={'pk': solicitud.pk}),
             {'decision': 'APROBAR', 'observacion_revision': 'Aprobada para aplicar B2.'},
+            secure=True,
         )
         self.assertEqual(response.status_code, 302)
         solicitud.refresh_from_db()
@@ -685,6 +686,7 @@ class PermisosYTrazabilidadViewTest(TestCase):
         return self.client.post(
             reverse('liquidacion:solicitud_revision_horario_aplicar', kwargs={'pk': solicitud.pk}),
             {'observacion_aplicacion': observacion},
+            secure=True,
         )
 
     def test_residente_puede_solicitar_revision_de_registro_propio(self):
