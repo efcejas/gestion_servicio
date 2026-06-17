@@ -125,6 +125,22 @@ class SolicitudRevisionHorarioAplicarForm(forms.Form):
     )
 
 
+class SolicitudRevisionHorarioRecalcularAplicacionForm(forms.Form):
+    """Formulario administrativo para recalculo puntual B3."""
+
+    observacion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                'class': TAILWIND_INPUT_CLASSES,
+                'rows': 3,
+                'placeholder': 'Observacion del recalculo (opcional)',
+            }
+        ),
+        label='Observacion del recalculo',
+    )
+
+
 # ============================================================================
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================

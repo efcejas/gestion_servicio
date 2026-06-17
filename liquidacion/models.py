@@ -1389,6 +1389,62 @@ class SolicitudRevisionHorarioRegistro(models.Model):
 
     def __str__(self):
         return f"Solicitud #{self.pk} - Registro #{self.registro_id} - {self.estado}"
+
+
+class HistorialRecalculoSolicitudRevisionHorario(models.Model):
+    """Historial de recalculos puntuales B3 sobre solicitudes ya aplicadas."""
+
+    solicitud = models.ForeignKey(
+        'SolicitudRevisionHorarioRegistro',
+        on_delete=models.CASCADE,
+        related_name='historial_recalculos',
+        verbose_name='Solicitud',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.CASCADE,
+        related_name='historial_recalculos_revision_horario',
+        verbose_name='Registro',
+    )
+    recalculado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='recalculos_revision_horario_realizados',
+        verbose_name='Recalculado por',
+    )
+    fecha_recalculo = models.DateTimeField(auto_now_add=True, verbose_name='Fecha de recalculo')
+    horario_usado = models.CharField(max_length=6, verbose_name='Horario usado')
+    monto_registro_anterior = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name='Monto registro anterior',
+    )
+    monto_aplicado_anterior = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name='Monto aplicado anterior',
+    )
+    monto_recalculado = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name='Monto recalculado',
+    )
+    observacion = models.TextField(blank=True, default='', verbose_name='Observacion')
+    motivo_sistema = models.TextField(blank=True, default='', verbose_name='Motivo sistema')
+
+    class Meta:
+        verbose_name = 'Historial de recalculo de solicitud de revision'
+        verbose_name_plural = 'Historiales de recalculo de solicitudes de revision'
+        ordering = ['-fecha_recalculo']
+        indexes = [
+            models.Index(fields=['solicitud', '-fecha_recalculo']),
+            models.Index(fields=['registro', '-fecha_recalculo']),
+        ]
+
+    def __str__(self):
+        return f"Recalculo solicitud #{self.solicitud_id}: {self.monto_registro_anterior} -> {self.monto_recalculado}"
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================

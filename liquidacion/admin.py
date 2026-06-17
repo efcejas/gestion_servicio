@@ -7,6 +7,7 @@ from .models import (
     ConfiguracionGuardiaPasiva,
     HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
+    HistorialRecalculoSolicitudRevisionHorario,
     HistorialSesionContable,
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
@@ -60,6 +61,26 @@ class HistorialPrecioEstudioInline(admin.TabularInline):
     def get_variacion_otras_os(self, obj):
         return f"{obj.get_variacion_otras_os()}%"
     get_variacion_otras_os.short_description = 'Var. Otras OS (%)'
+
+
+class HistorialRecalculoSolicitudRevisionHorarioInline(admin.TabularInline):
+    model = HistorialRecalculoSolicitudRevisionHorario
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        'fecha_recalculo',
+        'recalculado_por',
+        'horario_usado',
+        'monto_registro_anterior',
+        'monto_aplicado_anterior',
+        'monto_recalculado',
+        'observacion',
+        'motivo_sistema',
+    )
+    fields = readonly_fields
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(HistorialPrecioEstudio)
@@ -602,6 +623,7 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
 
 @admin.register(SolicitudRevisionHorarioRegistro)
 class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
+    inlines = [HistorialRecalculoSolicitudRevisionHorarioInline]
     list_display = (
         'id',
         'estado',
@@ -682,6 +704,44 @@ class SolicitudRevisionHorarioRegistroAdmin(admin.ModelAdmin):
             )
         }),
     )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistorialRecalculoSolicitudRevisionHorario)
+class HistorialRecalculoSolicitudRevisionHorarioAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'solicitud',
+        'registro',
+        'recalculado_por',
+        'fecha_recalculo',
+        'horario_usado',
+        'monto_registro_anterior',
+        'monto_recalculado',
+    )
+    list_filter = ('fecha_recalculo', 'horario_usado', 'recalculado_por')
+    search_fields = ('solicitud__id', 'registro__id')
+    readonly_fields = (
+        'solicitud',
+        'registro',
+        'recalculado_por',
+        'fecha_recalculo',
+        'horario_usado',
+        'monto_registro_anterior',
+        'monto_aplicado_anterior',
+        'monto_recalculado',
+        'observacion',
+        'motivo_sistema',
+    )
+    ordering = ('-fecha_recalculo',)
 
     def has_add_permission(self, request):
         return False

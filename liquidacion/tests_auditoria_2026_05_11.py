@@ -20,11 +20,13 @@ from .models import (
     RegistroEstudiosPorMedico,
     RegistroEstudio,
     Estudios,
+    HistorialRecalculoSolicitudRevisionHorario,
     SolicitudRevisionHorarioRegistro,
     SesionContable,
     HistorialSesionContable,
     GuardiaPasiva,
     GrupoTarifario,
+    ReglaDescuentoResidencia,
     TarifaGrupoTarifario,
 )
 from accounts.context_processors import navbar_links
@@ -1480,6 +1482,237 @@ class PermisosYTrazabilidadViewTest(TestCase):
         registro.refresh_from_db()
         self.assertEqual(RegistroEstudio.objects.filter(registro=registro).count(), relaciones_iniciales)
         self.assertEqual(registro.cantidad_regiones, cantidad_regiones_inicial)
+
+    def _crear_solicitud_aplicada_b3(
+        self,
+        sesion_estado='ABIERTA',
+        estado='APROBADA',
+        fecha_aplicacion=True,
+        horario_aplicado='INTRA',
+    ):
+        sesion = SesionContable.objects.create(
+            mes=(SesionContable.objects.count() % 12) + 1,
+            año=2026,
+            estado=sesion_estado,
+        )
+        grupo_dop = GrupoTarifario.objects.create(
+            codigo=f'DOP_B3_{SesionContable.objects.count()}',
+            nombre='Doppler B3',
+            modalidad='DOP',
+            activo=True,
+        )
+        estudio_dop = Estudios.objects.create(
+            codigo=f'DB3{SesionContable.objects.count()}',
+            nombre=f'Doppler B3 {SesionContable.objects.count()}',
+            tipo='DOP',
+            grupo_tarifario=grupo_dop,
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('200.00'),
+            precio_otras_os=Decimal('200.00'),
+            activo=True,
+        )
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Paciente',
+            apellido_paciente='B3',
+            dni_paciente='33333333',
+            fecha_del_informe=date(2026, 6, 16),
+            fecha_registro=timezone.now(),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            monto_calculado=Decimal('200.00'),
+            sesion_contable=sesion,
+            cantidad_regiones=1,
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio_dop,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            horario='INTRA',
+            monto_calculado=Decimal('200.00'),
+        )
+        registro.refresh_from_db()
+        solicitud = SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro,
+            solicitado_por=self.residente,
+            horario_solicitado='INTRA',
+            fecha_hora_real_declarada=timezone.now(),
+            motivo_solicitud='Solicitud B3 aplicada antes de C2',
+            estado=estado,
+            revisado_por=self.admin if estado != 'PENDIENTE' else None,
+            fecha_revision=timezone.now() if estado != 'PENDIENTE' else None,
+            observacion_revision='Revision B3',
+            aplicado_por=self.admin if fecha_aplicacion else None,
+            fecha_aplicacion=timezone.now() if fecha_aplicacion else None,
+            horario_anterior='EXTRA' if fecha_aplicacion else None,
+            horario_aplicado=horario_aplicado,
+            monto_anterior=Decimal('200.00') if fecha_aplicacion else None,
+            monto_aplicado=Decimal('200.00') if fecha_aplicacion else None,
+            observacion_aplicacion='Aplicacion pre C2' if fecha_aplicacion else '',
+        )
+        return solicitud, registro, estudio_dop
+
+    def _crear_regla_b3(self, estudio):
+        return ReglaDescuentoResidencia.objects.create(
+            estudio=estudio,
+            aplica_medico_residente=True,
+            vigencia_desde=date(2026, 1, 1),
+        )
+
+    def _recalcular_solicitud(self, solicitud, usuario, observacion='Recalculo B3 test'):
+        self.client.force_login(usuario)
+        return self.client.post(
+            reverse('liquidacion:solicitud_revision_horario_recalcular_aplicacion', kwargs={'pk': solicitud.pk}),
+            {'observacion': observacion},
+            secure=True,
+        )
+
+    def test_b3_recalcula_solicitud_aplicada_dop_residente_intra_con_regla_activa(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+
+        response = self._recalcular_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        solicitud.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('100.000'))
+        self.assertEqual(solicitud.monto_aplicado, Decimal('100.000'))
+
+    def test_b3_no_permite_recalcular_solicitud_no_aplicada(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(fecha_aplicacion=False)
+        self._crear_regla_b3(estudio)
+
+        response = self._recalcular_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.count(), 0)
+
+    def test_b3_no_permite_estado_pendiente(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(estado='PENDIENTE')
+        self._crear_regla_b3(estudio)
+
+        response = self._recalcular_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+
+    def test_b3_no_permite_estado_rechazada(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(estado='RECHAZADA')
+        self._crear_regla_b3(estudio)
+
+        response = self._recalcular_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+
+    def test_b3_bloquea_sesiones_cerrada_facturada_y_pagada(self):
+        for estado_sesion in ['CERRADA', 'FACTURADA', 'PAGADA']:
+            solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(sesion_estado=estado_sesion)
+            self._crear_regla_b3(estudio)
+
+            response = self._recalcular_solicitud(solicitud, self.admin)
+
+            self.assertEqual(response.status_code, 302)
+            registro.refresh_from_db()
+            self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.count(), 0)
+
+    def test_b3_usa_horario_aplicado_para_recalcular(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3(horario_aplicado='EXTRA')
+        self._crear_regla_b3(estudio)
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('250.00'))
+
+        self._recalcular_solicitud(solicitud, self.admin)
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.count(), 1)
+
+    def test_b3_actualiza_registro_solicitud_y_conserva_snapshot_b2(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+        monto_anterior_b2 = solicitud.monto_anterior
+        horario_anterior_b2 = solicitud.horario_anterior
+        fecha_aplicacion_b2 = solicitud.fecha_aplicacion
+        aplicado_por_b2 = solicitud.aplicado_por
+
+        self._recalcular_solicitud(solicitud, self.jefe_servicio, observacion='Auditoria B3')
+
+        registro.refresh_from_db()
+        solicitud.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('100.000'))
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(solicitud.monto_aplicado, Decimal('100.000'))
+        self.assertEqual(solicitud.monto_anterior, monto_anterior_b2)
+        self.assertEqual(solicitud.horario_anterior, horario_anterior_b2)
+        self.assertEqual(solicitud.fecha_aplicacion, fecha_aplicacion_b2)
+        self.assertEqual(solicitud.aplicado_por, aplicado_por_b2)
+        self.assertEqual(registro.modificado_por, self.jefe_servicio)
+        self.assertIsNotNone(registro.fecha_modificacion)
+        self.assertEqual(
+            registro.motivo_modificacion,
+            f"Recalculo puntual de solicitud de revisión #{solicitud.pk} con reglas vigentes. "
+            f"Monto: $200.00 → $100.0000.",
+        )
+
+    def test_b3_crea_historial_con_monto_anterior_y_recalculado(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+
+        self._recalcular_solicitud(solicitud, self.admin, observacion='Historial B3')
+
+        historial = HistorialRecalculoSolicitudRevisionHorario.objects.get(solicitud=solicitud)
+        self.assertEqual(historial.registro, registro)
+        self.assertEqual(historial.recalculado_por, self.admin)
+        self.assertEqual(historial.horario_usado, 'INTRA')
+        self.assertEqual(historial.monto_registro_anterior, Decimal('200.00'))
+        self.assertEqual(historial.monto_aplicado_anterior, Decimal('200.00'))
+        self.assertEqual(historial.monto_recalculado, Decimal('100.000'))
+        self.assertEqual(historial.observacion, 'Historial B3')
+
+    def test_b3_si_monto_no_cambia_no_crea_historial(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('100.000'))
+
+        response = self._recalcular_solicitud(solicitud, self.admin)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.count(), 0)
+
+    def test_b3_medico_no_puede_recalcular(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+
+        response = self._recalcular_solicitud(solicitud, self.residente)
+
+        self.assertIn(response.status_code, [302, 403])
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.count(), 0)
+
+    def test_b3_concurrencia_basica_segundo_post_sin_cambio_no_duplica_historial(self):
+        solicitud, registro, estudio = self._crear_solicitud_aplicada_b3()
+        self._crear_regla_b3(estudio)
+
+        first_response = self._recalcular_solicitud(solicitud, self.admin)
+        second_response = self._recalcular_solicitud(solicitud, self.jefe_servicio)
+
+        self.assertEqual(first_response.status_code, 302)
+        self.assertEqual(second_response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('100.000'))
+        self.assertEqual(HistorialRecalculoSolicitudRevisionHorario.objects.filter(solicitud=solicitud).count(), 1)
 
     def test_grupos_tarifarios_list_permite_super_admin_y_jefe_servicio(self):
         self.client.force_login(self.superuser)

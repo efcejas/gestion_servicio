@@ -28,6 +28,7 @@ from .models import (
     RegistroEstudio,
     RegistroEstudiosPorMedico,
     SolicitudRevisionHorarioRegistro,
+    HistorialRecalculoSolicitudRevisionHorario,
     GuardiaPasiva,
     SesionContable,
     ConfiguracionGuardiaPasiva,
@@ -46,6 +47,7 @@ from .forms import (
     SolicitudRevisionHorarioRegistroForm,
     SolicitudRevisionHorarioResolucionForm,
     SolicitudRevisionHorarioAplicarForm,
+    SolicitudRevisionHorarioRecalcularAplicacionForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
     GuardiaPasivaForm,
@@ -345,6 +347,15 @@ class SolicitudRevisionHorarioAdminDetailView(LoginRequiredMixin, UserPassesTest
         context = super().get_context_data(**kwargs)
         context['resolucion_form'] = SolicitudRevisionHorarioResolucionForm()
         context['aplicar_form'] = SolicitudRevisionHorarioAplicarForm()
+        context['recalcular_aplicacion_form'] = SolicitudRevisionHorarioRecalcularAplicacionForm()
+        sesion = self.object.registro.sesion_contable
+        context['puede_recalcular_aplicacion'] = (
+            self.object.estado == SolicitudRevisionHorarioRegistro.ESTADO_APROBADA
+            and bool(self.object.fecha_aplicacion)
+            and bool(self.object.horario_aplicado)
+            and bool(sesion)
+            and sesion.estado in ['ABIERTA', 'REVISION']
+        )
         return context
 
 
@@ -508,6 +519,100 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
             ])
 
         messages.success(request, 'Aplicacion economica realizada correctamente.')
+        return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+
+class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Recalculo puntual B3 de una solicitud ya aplicada."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            'No tienes permisos para recalcular solicitudes de revision de horario.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        solicitud_pk = kwargs['pk']
+        form = SolicitudRevisionHorarioRecalcularAplicacionForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Datos invalidos para recalcular la solicitud.')
+            return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud_pk)
+
+        with transaction.atomic():
+            solicitud = get_object_or_404(
+                SolicitudRevisionHorarioRegistro.objects.select_for_update().select_related(
+                    'registro__sesion_contable',
+                    'registro',
+                ),
+                pk=solicitud_pk,
+            )
+
+            if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
+                messages.error(request, 'Solo se puede recalcular una solicitud en estado APROBADA.')
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+            if not solicitud.fecha_aplicacion:
+                messages.error(request, 'Solo se puede recalcular una solicitud ya aplicada.')
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+            if not solicitud.horario_aplicado:
+                messages.error(request, 'La solicitud aplicada no tiene horario aplicado registrado.')
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+            sesion = solicitud.registro.sesion_contable
+            if not sesion or sesion.estado not in ['ABIERTA', 'REVISION']:
+                messages.error(
+                    request,
+                    'Solo se puede recalcular en sesiones ABIERTA o REVISION. En CERRADA, FACTURADA o PAGADA esta bloqueado.',
+                )
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+            registro = solicitud.registro
+            monto_anterior = registro.monto_calculado
+            monto_aplicado_anterior = solicitud.monto_aplicado
+            horario_aplicado = solicitud.horario_aplicado
+
+            registro.horario = horario_aplicado
+            monto_nuevo = registro.calcular_monto()
+
+            if monto_nuevo == monto_anterior:
+                messages.info(request, 'El monto recalculado coincide con el monto actual.')
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+
+            fecha_recalculo = now()
+            motivo_modificacion = (
+                f"Recalculo puntual de solicitud de revisión #{solicitud.pk} con reglas vigentes. "
+                f"Monto: ${monto_anterior} → ${monto_nuevo}."
+            )
+
+            RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+                horario=horario_aplicado,
+                monto_calculado=monto_nuevo,
+                modificado_por=request.user,
+                fecha_modificacion=fecha_recalculo,
+                motivo_modificacion=motivo_modificacion,
+            )
+
+            solicitud.monto_aplicado = monto_nuevo
+            solicitud.save(update_fields=['monto_aplicado'])
+
+            HistorialRecalculoSolicitudRevisionHorario.objects.create(
+                solicitud=solicitud,
+                registro=registro,
+                recalculado_por=request.user,
+                horario_usado=horario_aplicado,
+                monto_registro_anterior=monto_anterior,
+                monto_aplicado_anterior=monto_aplicado_anterior,
+                monto_recalculado=monto_nuevo,
+                observacion=form.cleaned_data['observacion'],
+                motivo_sistema=motivo_modificacion,
+            )
+
+        messages.success(request, 'Recalculo puntual realizado correctamente.')
         return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 # ===== VISTAS REGULARES (Requieren Login) =====
 from django.utils.http import urlencode
