@@ -544,11 +544,11 @@ class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserP
 
         with transaction.atomic():
             solicitud = get_object_or_404(
-                SolicitudRevisionHorarioRegistro.objects.select_for_update().select_related(
-                    'registro__sesion_contable',
-                    'registro',
-                ),
+                SolicitudRevisionHorarioRegistro.objects.select_for_update(),
                 pk=solicitud_pk,
+            )
+            registro = RegistroEstudiosPorMedico.objects.select_related('sesion_contable').get(
+                pk=solicitud.registro_id,
             )
 
             if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
@@ -563,7 +563,7 @@ class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserP
                 messages.error(request, 'La solicitud aplicada no tiene horario aplicado registrado.')
                 return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
-            sesion = solicitud.registro.sesion_contable
+            sesion = registro.sesion_contable
             if not sesion or sesion.estado not in ['ABIERTA', 'REVISION']:
                 messages.error(
                     request,
@@ -571,7 +571,6 @@ class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserP
                 )
                 return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
-            registro = solicitud.registro
             monto_anterior = registro.monto_calculado
             monto_aplicado_anterior = solicitud.monto_aplicado
             horario_aplicado = solicitud.horario_aplicado
