@@ -1,6 +1,13 @@
 from django import forms
 from django.db.models import Q
-from .models import Estudios, RegistroEstudiosPorMedico, GuardiaPasiva, SesionContable, SolicitudRevisionHorarioRegistro
+from .models import (
+    Estudios,
+    RegistroEstudiosPorMedico,
+    GuardiaPasiva,
+    ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
+    SesionContable,
+    SolicitudRevisionHorarioRegistro,
+)
 from datetime import datetime
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -167,6 +174,7 @@ class PracticaForm(forms.ModelForm):
             'estudio',
             'cantidad_regiones',
             'tipo_obra_social',
+            'liquidar_como_extra_residencia',
             'paciente_internado',
             'fecha_hora_solicitud',
             'fecha_hora_informe',
@@ -210,6 +218,10 @@ class PracticaForm(forms.ModelForm):
                 'class': TAILWIND_CHECKBOX_CLASSES,
                 'id': 'id_paciente_internado'
             }),
+            'liquidar_como_extra_residencia': forms.CheckboxInput(attrs={
+                'class': TAILWIND_CHECKBOX_CLASSES,
+                'id': 'id_liquidar_como_extra_residencia'
+            }),
             'fecha_hora_solicitud': forms.DateTimeInput(attrs={
                 'type': 'datetime-local',
                 'class': TAILWIND_INPUT_CLASSES,
@@ -229,6 +241,7 @@ class PracticaForm(forms.ModelForm):
             'estudio': 'Estudios Realizados',
             'cantidad_regiones': 'Cantidad de Regiones',
             'tipo_obra_social': 'Obra Social',
+            'liquidar_como_extra_residencia': 'Actividad asistencial fuera de rol docente / liquidar como Extra Residencia',
             'paciente_internado': '¿Paciente internado? (para bonus urgencia RM)',
             'fecha_hora_solicitud': 'Fecha/Hora Solicitud',
             'fecha_hora_informe': 'Fecha/Hora Informe',
@@ -236,6 +249,7 @@ class PracticaForm(forms.ModelForm):
         help_texts = {
             'estudio': 'Selecciona todos los estudios realizados a este paciente',
             'cantidad_regiones': 'Se calcula automáticamente sumando las regiones de cada estudio',
+            'liquidar_como_extra_residencia': 'Usar cuando la práctica corresponde a una lista asistencial fuera de la actividad docente habitual. El registro se liquidará como Extra Residencia.',
             'paciente_internado': 'Solo para estudios de Resonancia Magnética (RM) con médicos remotos. Bonus +20% si informe <24hs.',
         }
 
@@ -274,6 +288,12 @@ class PracticaForm(forms.ModelForm):
         
         # Hacer campo required para evitar envío vacío
         self.fields['tipo_obra_social'].required = True
+
+        if (
+            not self.user
+            or self.user.rol not in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+        ):
+            self.fields.pop('liquidar_como_extra_residencia', None)
 
         # Horario: clasificación canónica post-M2M en services.py; save() deja fallback legacy.
 

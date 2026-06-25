@@ -15,6 +15,7 @@ from .models import (
     GuardiaPasiva,
     ConfiguracionGuardiaPasiva,
     RegistroEstudiosPorMedico,
+    RegistroEstudio,
     SesionContable,
     TarifaGrupoTarifario,
 )
@@ -1217,11 +1218,25 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
             username='residente_proxy',
             password='testpass123',
             rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.jefe_residentes = User.objects.create_user(
+            username='jefe_proxy',
+            password='testpass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.instructor_residentes = User.objects.create_user(
+            username='instructor_proxy',
+            password='testpass123',
+            rol='instructor_residentes',
+            perfil_completo=True,
         )
         self.staff = User.objects.create_user(
             username='staff_proxy',
             password='testpass123',
             rol='medico_staff',
+            perfil_completo=True,
         )
         self.estudio_eco = Estudios.objects.create(
             nombre='Eco Proxy',
@@ -1478,6 +1493,218 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         self.assertNotEqual(registro.horario, 'INTRA')
         self.assertEqual(registro.horario, 'NA')
         self.assertEqual(registro.calcular_monto(), Decimal('1000.00'))
+
+    def test_form_muestra_extra_residencia_solo_para_jefe_e_instructor(self):
+        self.assertIn(
+            'liquidar_como_extra_residencia',
+            PracticaForm(user=self.jefe_residentes).fields,
+        )
+        self.assertIn(
+            'liquidar_como_extra_residencia',
+            PracticaForm(user=self.instructor_residentes).fields,
+        )
+        self.assertNotIn(
+            'liquidar_como_extra_residencia',
+            PracticaForm(user=self.residente).fields,
+        )
+        self.assertNotIn(
+            'liquidar_como_extra_residencia',
+            PracticaForm(user=self.staff).fields,
+        )
+
+    def test_post_manipulado_residente_no_puede_usar_extra_residencia(self):
+        form = PracticaForm(
+            data={
+                'tipo_estudio': 'ECO',
+                'fecha_del_informe': '2026-05-27',
+                'nombre_paciente': 'Post',
+                'apellido_paciente': 'Manipulado',
+                'dni_paciente': '90000020',
+                'estudio': [str(self.estudio_eco.id)],
+                'cantidad_regiones': '1',
+                'tipo_obra_social': 'COBER',
+                'liquidar_como_extra_residencia': 'on',
+            },
+            user=self.residente,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn('liquidar_como_extra_residencia', form.cleaned_data)
+
+    def test_signal_respeta_extra_residencia_jefe_eco_intra_y_monto_100(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Jefe',
+            apellido_paciente='Extra',
+            dni_paciente='90000021',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            liquidar_como_extra_residencia=True,
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def test_signal_respeta_extra_residencia_instructor_eco_y_monto_100(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.instructor_residentes,
+            nombre_paciente='Instructor',
+            apellido_paciente='Extra',
+            dni_paciente='90000022',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            liquidar_como_extra_residencia=True,
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def test_jefe_sin_flag_mantiene_clasificacion_actual(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Jefe',
+            apellido_paciente='Intra',
+            dni_paciente='90000023',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='NA',
+            liquidar_como_extra_residencia=False,
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+
+    def test_doppler_jefe_con_flag_queda_extra(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Jefe',
+            apellido_paciente='Doppler',
+            dni_paciente='90000024',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            liquidar_como_extra_residencia=True,
+        )
+
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_no_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        registro.refresh_from_db()
+
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def _post_update_registro_extra_residencia(self, registro, marcado):
+        data = {
+            'tipo_estudio': 'ECO',
+            'fecha_del_informe': registro.fecha_del_informe.strftime('%Y-%m-%d'),
+            'nombre_paciente': registro.nombre_paciente,
+            'apellido_paciente': registro.apellido_paciente,
+            'dni_paciente': registro.dni_paciente,
+            'estudio': [str(self.estudio_eco.id)],
+            'cantidad_regiones': '1',
+            'tipo_obra_social': 'COBER',
+            f'cantidad_estudio_{self.estudio_eco.id}': '1',
+            f'contexto_estudio_{self.estudio_eco.id}': 'SERVICIO',
+        }
+        if marcado:
+            data['liquidar_como_extra_residencia'] = 'on'
+
+        self.client.force_login(self.jefe_residentes)
+        return self.client.post(
+            reverse('liquidacion:registroestudios_edit', args=[registro.pk]),
+            data,
+            secure=True,
+        )
+
+    def test_update_activar_flag_cambia_a_extra(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Update',
+            apellido_paciente='Activa',
+            dni_paciente='90000025',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            monto_calculado=Decimal('500.00'),
+            liquidar_como_extra_residencia=False,
+        )
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+
+        response = self._post_update_registro_extra_residencia(registro, marcado=True)
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+
+        self.assertTrue(registro.liquidar_como_extra_residencia)
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def test_update_desactivar_flag_vuelve_a_clasificacion_automatica(self):
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Update',
+            apellido_paciente='Desactiva',
+            dni_paciente='90000026',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='EXTRA',
+            monto_calculado=Decimal('1000.00'),
+            liquidar_como_extra_residencia=True,
+        )
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+
+        response = self._post_update_registro_extra_residencia(registro, marcado=False)
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+
+        self.assertFalse(registro.liquidar_como_extra_residencia)
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
 
     def test_form_no_expone_horario(self):
         form = PracticaForm(user=self.residente)

@@ -5,6 +5,12 @@ from django.conf import settings
 from decimal import Decimal
 
 
+ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA = {
+    'jefe_residentes',
+    'instructor_residentes',
+}
+
+
 class GrupoTarifario(models.Model):
     """Grupo de facturación para desacoplar catálogo clínico de reglas de precio."""
 
@@ -891,6 +897,11 @@ class RegistroEstudiosPorMedico(models.Model):
         default='NA',
         verbose_name='Horario',
         blank=True
+    )
+    liquidar_como_extra_residencia = models.BooleanField(
+        default=False,
+        verbose_name='Actividad asistencial fuera de rol docente / liquidar como Extra Residencia',
+        help_text='Usar cuando la práctica corresponde a una lista asistencial fuera de la actividad docente habitual. El registro se liquidará como Extra Residencia.',
     )
     
     # Monto calculado (INMUTABLE - se guarda al crear/editar)

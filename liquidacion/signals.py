@@ -9,7 +9,11 @@ Implementan comportamientos automáticos en base a eventos de modelos:
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import RegistroEstudiosPorMedico, RegistroEstudio
+from .models import (
+    RegistroEstudiosPorMedico,
+    RegistroEstudio,
+    ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
+)
 from .grupo_tarifario_mapping import es_eco_general_real_estudio
 from .services import ROLES_RESIDENCIA, clasificar_horario_residencia_por_proxy
 import logging
@@ -51,7 +55,22 @@ def recalcular_cantidad_regiones_cuando_estudio_cambia(sender, instance, created
         )
 
     # Clasificación canónica residencia+ECO general real una vez que existe M2M real.
-    if registro.medico.rol in ROLES_RESIDENCIA:
+    if (
+        registro.medico.rol in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+        and registro.liquidar_como_extra_residencia
+    ):
+        horario_objetivo = 'EXTRA'
+        if registro.horario != horario_objetivo:
+            logger.info(
+                f"✅ Respetando liquidación como Extra Residencia: "
+                f"Registro #{registro.id} | "
+                f"{registro.horario} → {horario_objetivo}"
+            )
+            RegistroEstudiosPorMedico.objects.filter(id=registro.id).update(
+                horario=horario_objetivo
+            )
+            registro.horario = horario_objetivo
+    elif registro.medico.rol in ROLES_RESIDENCIA:
         relaciones = list(registro.registroestudio_set.select_related('estudio__grupo_tarifario').all())
         tiene_eco_general = any(
             es_eco_general_real_estudio(rel.estudio)

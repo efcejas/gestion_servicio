@@ -27,6 +27,7 @@ from .models import (
     TarifaGrupoTarifario,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
     SolicitudRevisionHorarioRegistro,
     HistorialRecalculoSolicitudRevisionHorario,
     GuardiaPasiva,
@@ -934,6 +935,8 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         self.object = form.save(commit=False)
         self.object.medico = user
         self.object.sesion_contable = sesion
+        if user.rol not in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA:
+            self.object.liquidar_como_extra_residencia = False
         self.object.save()
         
         # v3.1 - Marzo 2026: NO usar save_m2m() con through model
@@ -980,7 +983,12 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         self.object.cantidad_regiones = total_regiones
 
         # Fuente canónica para residencia+ECO general real: clasificación explícita post-M2M.
-        if user.rol in ROLES_RESIDENCIA:
+        if (
+            user.rol in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+            and self.object.liquidar_como_extra_residencia
+        ):
+            self.object.horario = 'EXTRA'
+        elif user.rol in ROLES_RESIDENCIA:
             tiene_eco_general = any(
                 es_eco_general_real_estudio(est)
                 for est in estudios_seleccionados
@@ -1003,6 +1011,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         self.object.save(update_fields=[
             'cantidad_regiones', 
             'horario',
+            'liquidar_como_extra_residencia',
             'monto_calculado',
             'paciente_internado',
             'fecha_hora_solicitud',
@@ -1725,6 +1734,8 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
 
         # Guardar objeto
         self.object = form.save(commit=False)
+        if user.rol not in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA:
+            self.object.liquidar_como_extra_residencia = False
         self.object.save()
         
         # v3.1 - Marzo 2026: NO usar save_m2m() con through model
@@ -1777,7 +1788,12 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         self.object.cantidad_regiones = total_regiones
 
         # Fuente canónica para residencia+ECO general real: clasificación explícita post-M2M.
-        if user.rol in ROLES_RESIDENCIA:
+        if (
+            user.rol in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+            and self.object.liquidar_como_extra_residencia
+        ):
+            self.object.horario = 'EXTRA'
+        elif user.rol in ROLES_RESIDENCIA:
             tiene_eco_general = any(
                 es_eco_general_real_estudio(est)
                 for est in estudios_seleccionados
@@ -1805,6 +1821,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
         self.object.save(update_fields=[
             'cantidad_regiones',
             'horario',
+            'liquidar_como_extra_residencia',
             'monto_calculado',
             'paciente_internado',
             'fecha_hora_solicitud',
