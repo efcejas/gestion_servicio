@@ -1650,6 +1650,142 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
             secure=True,
         )
 
+    def _post_create_registro_extra_residencia(self, user, marcado, dni):
+        data = {
+            'tipo_estudio': 'ECO',
+            'fecha_del_informe': '2026-05-27',
+            'nombre_paciente': 'Create',
+            'apellido_paciente': 'Sesion',
+            'dni_paciente': dni,
+            'estudio': [str(self.estudio_eco.id)],
+            'cantidad_regiones': '1',
+            'tipo_obra_social': 'COBER',
+            f'cantidad_estudio_{self.estudio_eco.id}': '1',
+            f'contexto_estudio_{self.estudio_eco.id}': 'SERVICIO',
+        }
+        if marcado:
+            data['liquidar_como_extra_residencia'] = 'on'
+
+        self.client.force_login(user)
+        return self.client.post(
+            reverse('liquidacion:registroestudios_nuevo'),
+            data,
+            secure=True,
+        )
+
+    def _get_create_form(self, user):
+        self.client.force_login(user)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_nuevo'),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        return response.context['form']
+
+    def test_create_jefe_recuerda_checkbox_tildado_en_sesion(self):
+        response = self._post_create_registro_extra_residencia(
+            self.jefe_residentes,
+            marcado=True,
+            dni='90000030',
+        )
+        self.assertEqual(response.status_code, 302)
+
+        form = self._get_create_form(self.jefe_residentes)
+        self.assertTrue(form.initial.get('liquidar_como_extra_residencia'))
+
+    def test_create_jefe_recuerda_checkbox_destildado_en_sesion(self):
+        session = self.client.session
+        session['liquidacion_liquidar_como_extra_residencia_default'] = True
+        session.save()
+
+        response = self._post_create_registro_extra_residencia(
+            self.jefe_residentes,
+            marcado=False,
+            dni='90000031',
+        )
+        self.assertEqual(response.status_code, 302)
+
+        form = self._get_create_form(self.jefe_residentes)
+        self.assertFalse(form.initial.get('liquidar_como_extra_residencia'))
+
+    def test_create_instructor_recuerda_checkbox_en_sesion(self):
+        response = self._post_create_registro_extra_residencia(
+            self.instructor_residentes,
+            marcado=True,
+            dni='90000032',
+        )
+        self.assertEqual(response.status_code, 302)
+
+        form = self._get_create_form(self.instructor_residentes)
+        self.assertTrue(form.initial.get('liquidar_como_extra_residencia'))
+
+    def test_create_instructor_recuerda_checkbox_destildado_en_sesion(self):
+        session = self.client.session
+        session['liquidacion_liquidar_como_extra_residencia_default'] = True
+        session.save()
+
+        response = self._post_create_registro_extra_residencia(
+            self.instructor_residentes,
+            marcado=False,
+            dni='90000035',
+        )
+        self.assertEqual(response.status_code, 302)
+
+        form = self._get_create_form(self.instructor_residentes)
+        self.assertFalse(form.initial.get('liquidar_como_extra_residencia'))
+
+    def test_create_residente_no_lee_ni_escribe_default_de_sesion(self):
+        session = self.client.session
+        session['liquidacion_liquidar_como_extra_residencia_default'] = False
+        session.save()
+
+        form = self._get_create_form(self.residente)
+        self.assertNotIn('liquidar_como_extra_residencia', form.fields)
+
+        response = self._post_create_registro_extra_residencia(
+            self.residente,
+            marcado=True,
+            dni='90000033',
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            self.client.session['liquidacion_liquidar_como_extra_residencia_default']
+        )
+
+    def test_update_usa_valor_del_registro_no_default_de_sesion(self):
+        session = self.client.session
+        session['liquidacion_liquidar_como_extra_residencia_default'] = True
+        session.save()
+
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.jefe_residentes,
+            nombre_paciente='Update',
+            apellido_paciente='Sesion',
+            dni_paciente='90000034',
+            fecha_del_informe=date(2026, 5, 27),
+            fecha_registro=self._aware(2026, 5, 27, 10, 0),
+            tipo_obra_social='COBER',
+            horario='INTRA',
+            monto_calculado=Decimal('500.00'),
+            liquidar_como_extra_residencia=False,
+        )
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+
+        self.client.force_login(self.jefe_residentes)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_edit', args=[registro.pk]),
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+
+        self.assertFalse(form['liquidar_como_extra_residencia'].value())
+
     def test_update_activar_flag_cambia_a_extra(self):
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.jefe_residentes,

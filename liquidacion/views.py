@@ -702,6 +702,25 @@ def _puede_acceder_panel_medico(user):
     return user.is_superuser or user.es_medico()
 
 
+LIQUIDAR_COMO_EXTRA_RESIDENCIA_SESSION_KEY = (
+    'liquidacion_liquidar_como_extra_residencia_default'
+)
+
+
+def _puede_persistir_extra_residencia_en_sesion(user):
+    return getattr(user, 'rol', None) in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+
+
+def _guardar_extra_residencia_en_sesion(request, form):
+    if (
+        _puede_persistir_extra_residencia_en_sesion(request.user)
+        and 'liquidar_como_extra_residencia' in form.cleaned_data
+    ):
+        request.session[LIQUIDAR_COMO_EXTRA_RESIDENCIA_SESSION_KEY] = bool(
+            form.cleaned_data['liquidar_como_extra_residencia']
+        )
+
+
 def _puede_acceder_guardia_pasiva(user):
     return user.rol in ['jefe_residentes', 'instructor_residentes']
 
@@ -778,6 +797,13 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user  # Pasar usuario al form para lógica condicional
+        if _puede_persistir_extra_residencia_en_sesion(self.request.user):
+            session = self.request.session
+            if LIQUIDAR_COMO_EXTRA_RESIDENCIA_SESSION_KEY in session:
+                initial = kwargs.setdefault('initial', {})
+                initial['liquidar_como_extra_residencia'] = bool(
+                    session[LIQUIDAR_COMO_EXTRA_RESIDENCIA_SESSION_KEY]
+                )
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -1009,7 +1035,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         
         # También guardar campos de bonus urgencia que vienen del formulario
         self.object.save(update_fields=[
-            'cantidad_regiones', 
+            'cantidad_regiones',
             'horario',
             'liquidar_como_extra_residencia',
             'monto_calculado',
@@ -1017,6 +1043,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             'fecha_hora_solicitud',
             'fecha_hora_informe'
         ])
+        _guardar_extra_residencia_en_sesion(self.request, form)
         
         # Mostrar desglose del cálculo
         desglose = self.object.get_desglose_monto()
@@ -1830,6 +1857,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
             'fecha_modificacion',
             'motivo_modificacion',
         ])
+        _guardar_extra_residencia_en_sesion(self.request, form)
         
         # Mostrar desglose del cálculo actualizado
         desglose = self.object.get_desglose_monto()
