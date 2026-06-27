@@ -70,6 +70,7 @@ from .services_rrhh import (
     cuerpo_default_rrhh,
     proxima_version_preparacion_rrhh,
 )
+from .services_cierre import construir_checklist_cierre_sesion
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -2465,6 +2466,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
             auditoria_residentes_eco = auditar_residentes_eco_por_sesion(sesion)
+            checklist_cierre = construir_checklist_cierre_sesion(sesion, user=user)
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
@@ -2487,6 +2489,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'gate_bloqueantes_preview': gate_preview['bloqueantes'][:3],
                 'gate_advertencias_preview': gate_preview['advertencias'][:3],
                 'auditoria_residentes_eco': auditoria_residentes_eco,
+                'checklist_cierre': checklist_cierre,
                 'historial_reciente': historial_ordenado[:5],
                 'historial_count': len(historial_ordenado),
             })
