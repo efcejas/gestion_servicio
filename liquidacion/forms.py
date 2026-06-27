@@ -1,5 +1,7 @@
 from django import forms
 from django.db.models import Q
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from .models import (
     Estudios,
     RegistroEstudiosPorMedico,
@@ -25,6 +27,60 @@ TAILWIND_INPUT_CLASSES = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg f
 TAILWIND_SELECT_CLASSES = 'w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all bg-white'
 TAILWIND_CHECKBOX_CLASSES = 'h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500'
 TAILWIND_RADIO_CLASSES = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500'
+
+
+def _parse_email_list(value):
+    if not value:
+        return []
+    raw_items = []
+    for chunk in str(value).replace('\n', ',').split(','):
+        email = chunk.strip()
+        if email:
+            raw_items.append(email)
+    for email in raw_items:
+        try:
+            validate_email(email)
+        except ValidationError:
+            raise forms.ValidationError(f'Email invalido: {email}')
+    return raw_items
+
+
+class PreparacionLiquidacionRRHHForm(forms.Form):
+    destinatarios = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': TAILWIND_INPUT_CLASSES,
+            'rows': 2,
+            'placeholder': 'rrhh@ejemplo.com, liquidaciones@ejemplo.com',
+        }),
+        label='Destinatarios',
+        help_text='Separar multiples emails con coma o salto de linea.',
+    )
+    cc = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': TAILWIND_INPUT_CLASSES,
+            'rows': 2,
+            'placeholder': 'copia@ejemplo.com',
+        }),
+        label='CC',
+        help_text='Opcional. Separar multiples emails con coma o salto de linea.',
+    )
+    asunto = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': TAILWIND_INPUT_CLASSES}),
+        label='Asunto',
+    )
+    cuerpo = forms.CharField(
+        widget=forms.Textarea(attrs={'class': TAILWIND_INPUT_CLASSES, 'rows': 8}),
+        label='Cuerpo',
+    )
+
+    def clean_destinatarios(self):
+        return _parse_email_list(self.cleaned_data.get('destinatarios'))
+
+    def clean_cc(self):
+        return _parse_email_list(self.cleaned_data.get('cc'))
 
 
 class EstudiosAdminForm(forms.ModelForm):

@@ -30,6 +30,7 @@ from .models import (
     ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
     SolicitudRevisionHorarioRegistro,
     HistorialRecalculoSolicitudRevisionHorario,
+    PreparacionLiquidacionRRHH,
     GuardiaPasiva,
     SesionContable,
     ConfiguracionGuardiaPasiva,
@@ -53,6 +54,7 @@ from .forms import (
     SolicitudRevisionHorarioResolucionForm,
     SolicitudRevisionHorarioAplicarForm,
     SolicitudRevisionHorarioRecalcularAplicacionForm,
+    PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
     GuardiaPasivaForm,
@@ -60,6 +62,13 @@ from .forms import (
     FiltroEstudiosPorMedicoForm,
     CargaExcelForm,
     TarifaGrupoTarifarioAdminForm,
+)
+from .services_rrhh import (
+    asunto_default_rrhh,
+    calcular_hash_snapshot,
+    construir_snapshot_liquidacion_rrhh,
+    cuerpo_default_rrhh,
+    proxima_version_preparacion_rrhh,
 )
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -2484,6 +2493,93 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
         context['sesiones_data'] = sesiones_data
         return context
+
+
+class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    """Preview D1 de liquidacion residencia para RRHH. No envia emails."""
+
+    template_name = 'liquidacion/preparacion_rrhh_preview.html'
+    form_class = PreparacionLiquidacionRRHHForm
+
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para preparar liquidacion RRHH.')
+        return redirect('home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        if self.sesion.estado not in ['CERRADA', 'FACTURADA', 'PAGADA']:
+            messages.error(
+                request,
+                'La preparacion RRHH solo esta disponible desde sesiones CERRADA, FACTURADA o PAGADA.',
+            )
+            return redirect('liquidacion:sesiones_list')
+        self.snapshot = construir_snapshot_liquidacion_rrhh(self.sesion)
+        self.snapshot_hash = calcular_hash_snapshot(self.snapshot)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial.update({
+            'asunto': asunto_default_rrhh(self.sesion),
+            'cuerpo': cuerpo_default_rrhh(self.snapshot),
+        })
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'sesion': self.sesion,
+            'snapshot': self.snapshot,
+            'snapshot_hash': self.snapshot_hash,
+            'proxima_version': proxima_version_preparacion_rrhh(self.sesion),
+            'preparaciones_previas': (
+                PreparacionLiquidacionRRHH.objects
+                .filter(sesion_contable=self.sesion)
+                .select_related('creado_por', 'actualizado_por')
+                .order_by('-version')[:5]
+            ),
+        })
+        return context
+
+    @transaction.atomic
+    def form_valid(self, form):
+        estado = (
+            PreparacionLiquidacionRRHH.ESTADO_PREPARADO
+            if 'guardar_preparado' in self.request.POST
+            else PreparacionLiquidacionRRHH.ESTADO_BORRADOR
+        )
+        destinatarios = form.cleaned_data['destinatarios']
+        bloqueantes = list(self.snapshot['validaciones']['bloqueantes'])
+
+        if estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO and not destinatarios:
+            bloqueantes.append('PREPARADO requiere al menos un destinatario.')
+
+        if estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO and bloqueantes:
+            for issue in bloqueantes[:5]:
+                messages.error(self.request, issue)
+            return self.form_invalid(form)
+
+        preparacion = PreparacionLiquidacionRRHH.objects.create(
+            sesion_contable=self.sesion,
+            version=proxima_version_preparacion_rrhh(self.sesion),
+            estado=estado,
+            destinatarios_json=destinatarios,
+            cc_json=form.cleaned_data['cc'],
+            asunto=form.cleaned_data['asunto'],
+            cuerpo=form.cleaned_data['cuerpo'],
+            resumen_json=self.snapshot,
+            snapshot_hash=self.snapshot_hash,
+            creado_por=self.request.user,
+            actualizado_por=self.request.user,
+        )
+        messages.success(
+            self.request,
+            f'Preparacion RRHH v{preparacion.version} guardada como {preparacion.estado}.',
+        )
+        return redirect('liquidacion:preparacion_rrhh_preview', pk=self.sesion.pk)
 
 
 @login_required

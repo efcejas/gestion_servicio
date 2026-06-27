@@ -9,6 +9,7 @@ from .models import (
     HistorialPrecioEstudio,
     HistorialRecalculoSolicitudRevisionHorario,
     HistorialSesionContable,
+    PreparacionLiquidacionRRHH,
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
     SesionContable,
@@ -119,6 +120,41 @@ class HistorialPrecioEstudioAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False  # Nunca eliminar historial de precios
+
+
+@admin.register(PreparacionLiquidacionRRHH)
+class PreparacionLiquidacionRRHHAdmin(admin.ModelAdmin):
+    list_display = (
+        'sesion_contable',
+        'version',
+        'estado',
+        'creado_por',
+        'fecha_creacion',
+        'snapshot_hash',
+    )
+    list_filter = ('estado', 'sesion_contable__año', 'sesion_contable__mes')
+    search_fields = ('asunto', 'snapshot_hash', 'creado_por__username')
+    readonly_fields = (
+        'sesion_contable',
+        'version',
+        'estado',
+        'destinatarios_json',
+        'cc_json',
+        'asunto',
+        'cuerpo',
+        'resumen_json',
+        'snapshot_hash',
+        'creado_por',
+        'fecha_creacion',
+        'actualizado_por',
+        'fecha_actualizacion',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 # ============================================================================

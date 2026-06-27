@@ -1456,6 +1456,64 @@ class HistorialRecalculoSolicitudRevisionHorario(models.Model):
 
     def __str__(self):
         return f"Recalculo solicitud #{self.solicitud_id}: {self.monto_registro_anterior} -> {self.monto_recalculado}"
+
+
+class PreparacionLiquidacionRRHH(models.Model):
+    """Snapshot auditable D1 para preparar liquidacion de residencia a RRHH."""
+
+    ESTADO_BORRADOR = 'BORRADOR'
+    ESTADO_PREPARADO = 'PREPARADO'
+    ESTADO_CHOICES = [
+        (ESTADO_BORRADOR, 'Borrador'),
+        (ESTADO_PREPARADO, 'Preparado'),
+    ]
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='preparaciones_rrhh',
+        verbose_name='Sesion contable',
+    )
+    version = models.PositiveIntegerField(verbose_name='Version')
+    estado = models.CharField(
+        max_length=10,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_BORRADOR,
+        verbose_name='Estado',
+    )
+    destinatarios_json = models.JSONField(default=list, blank=True, verbose_name='Destinatarios')
+    cc_json = models.JSONField(default=list, blank=True, verbose_name='CC')
+    asunto = models.CharField(max_length=255, verbose_name='Asunto')
+    cuerpo = models.TextField(verbose_name='Cuerpo')
+    resumen_json = models.JSONField(verbose_name='Resumen snapshot')
+    snapshot_hash = models.CharField(max_length=64, verbose_name='Hash snapshot')
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='preparaciones_rrhh_creadas',
+        verbose_name='Creado por',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha creacion')
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='preparaciones_rrhh_actualizadas',
+        verbose_name='Actualizado por',
+    )
+    fecha_actualizacion = models.DateTimeField(auto_now=True, verbose_name='Fecha actualizacion')
+
+    class Meta:
+        verbose_name = 'Preparacion liquidacion RRHH'
+        verbose_name_plural = 'Preparaciones liquidacion RRHH'
+        ordering = ['-sesion_contable__año', '-sesion_contable__mes', '-version']
+        unique_together = ('sesion_contable', 'version')
+        indexes = [
+            models.Index(fields=['sesion_contable', '-version']),
+            models.Index(fields=['estado', '-fecha_creacion']),
+        ]
+
+    def __str__(self):
+        return f"{self.sesion_contable} - RRHH v{self.version} ({self.estado})"
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================
