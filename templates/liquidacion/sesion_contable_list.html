@@ -297,13 +297,16 @@
                                 </div>
 
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                                    <details id="gate-sesion-{{ dato.sesion.pk }}" class="group">
+                                    <details id="gate-sesion-{{ dato.sesion.pk }}" class="group scroll-mt-24" data-gate-administrativo>
                                         <summary class="cursor-pointer list-none text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                                            <span>Preview gate administrativo</span>
+                                            <span>Registros: bloqueantes y advertencias</span>
                                             <span class="text-slate-400 group-open:hidden">(ver)</span>
                                             <span class="text-slate-400 hidden group-open:inline">(ocultar)</span>
                                         </summary>
                                         <div class="mt-2 space-y-1.5 text-xs">
+                                            <p class="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-slate-600">
+                                                Revisa estos hallazgos antes de avanzar la sesion. Usa las acciones sugeridas para inspeccionar o corregir cada caso.
+                                            </p>
                                             {% if dato.gate_bloqueantes_accionables %}
                                                 {% for issue in dato.gate_bloqueantes_accionables %}
                                                 <div class="rounded-md border border-red-100 bg-red-50 px-2 py-1.5">
@@ -451,4 +454,39 @@
     </div>
 
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    function abrirGateDesdeHash(hash) {
+        if (!hash || !hash.startsWith('#gate-sesion-')) {
+            return;
+        }
+
+        const gate = document.querySelector(hash);
+        if (!gate || !gate.matches('[data-gate-administrativo]')) {
+            return;
+        }
+
+        gate.open = true;
+        gate.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+        setTimeout(function () {
+            gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 80);
+        setTimeout(function () {
+            gate.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+        }, 2600);
+    }
+
+    abrirGateDesdeHash(window.location.hash || '');
+
+    window.addEventListener('hashchange', function () {
+        abrirGateDesdeHash(window.location.hash || '');
+    });
+
+    document.querySelectorAll('a[href^="#gate-sesion-"]').forEach(function (link) {
+        link.addEventListener('click', function () {
+            abrirGateDesdeHash(link.getAttribute('href'));
+        });
+    });
+});
+</script>
 {% endblock %}
