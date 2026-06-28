@@ -96,6 +96,9 @@ applyTo: "liquidacion/**/*.py"
 - D1 usa `monto_calculado` persistido; no recalcula.
 - D1 incluye solo roles residencia: `medico_residente`, `jefe_residentes`, `instructor_residentes`.
 - `PREPARADO` requiere destinatarios; `BORRADOR` puede guardarse sin destinatarios.
+- Si una sesion no tiene practicas de residencia, RRHH queda como `No requerido` y no bloquea facturacion.
+- Si una sesion `CERRADA` tiene practicas de residencia, no puede pasar a `FACTURADA` sin una `PreparacionLiquidacionRRHH` en estado `PREPARADO`.
+- Una preparacion `BORRADOR` no habilita facturacion.
 - No agregar envio real de email salvo fase especifica aprobada.
 
 ## Checklist de cierre E1
@@ -129,5 +132,6 @@ applyTo: "liquidacion/**/*.py"
 - Cambio B2/B3 o sesiones: usar tests focales en `liquidacion.tests_auditoria_2026_05_11` antes de suites largas.
 - Cambio RRHH D1: `python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1`.
 - Cambio checklist E1: `python manage.py test liquidacion.tests_checklist_cierre --verbosity=1`.
+- Cambio de transicion `CERRADA -> FACTURADA`: agregar/ejecutar test focal en `liquidacion.tests_auditoria_2026_05_11.SesionContableWorkflowPermissionsTest`.
 - Si se toca modelo: `python manage.py makemigrations --check --dry-run`.
 - Correr suite completa `python manage.py test liquidacion --verbosity=1` solo cuando el alcance/riesgo lo justifique o el usuario lo pida.

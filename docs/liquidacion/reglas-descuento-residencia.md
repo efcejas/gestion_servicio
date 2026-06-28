@@ -1,6 +1,6 @@
 # Reglas de descuento residencia
 
-Documento vigente del flujo de descuento INTRA residencia para liquidacion.
+Documento vigente del flujo de descuento INTRA residencia y cierre operativo de liquidacion de residencia.
 
 Ultima actualizacion: junio 2026.
 
@@ -188,6 +188,83 @@ La simulacion es solo lectura:
 - no dispara signals;
 - no recalcula historicos.
 
+## Cierre operativo de liquidacion residencia
+
+La primera etapa de cierre administrativo liquida solo practicas registradas en `RegistroEstudiosPorMedico` para roles de residencia:
+
+- `medico_residente`
+- `jefe_residentes`
+- `instructor_residentes`
+
+No incluye guardias en esta fase. Si el snapshot RRHH conserva campos de guardias, deben quedar explicitamente en `0`.
+
+### D1 - Preparacion RRHH sin email real
+
+`PreparacionLiquidacionRRHH`
+
+Es un snapshot auditable para preparar la liquidacion de residencia a RRHH.
+
+Reglas:
+
+- disponible desde sesiones `CERRADA`, `FACTURADA` o `PAGADA`;
+- no cambia el estado de la sesion;
+- no envia email real;
+- usa `monto_calculado` persistido;
+- no llama a `calcular_monto()`;
+- incluye solo roles de residencia;
+- permite multiples versiones por sesion;
+- `BORRADOR` puede guardarse sin destinatarios;
+- `PREPARADO` requiere destinatarios y no debe tener bloqueantes.
+
+Validaciones bloqueantes principales para `PREPARADO`:
+
+- solicitudes de revision horaria `PENDIENTE`;
+- solicitudes `APROBADA` sin `fecha_aplicacion`;
+- registros con estudios asociados y `monto_calculado <= 0`;
+- destinatarios faltantes;
+- intento de preparar `PREPARADO` cuando no hay practicas de residencia.
+
+Si la sesion no tiene practicas de residencia:
+
+- RRHH se marca como **No requerido**;
+- no bloquea la facturacion;
+- el snapshot muestra profesionales `0`, guardias `0` y total general de residencia `0`.
+
+### E1 - Checklist de cierre
+
+`construir_checklist_cierre_sesion(sesion, user=None)`
+
+Resume el avance operativo de una sesion:
+
+- registros validos;
+- solicitudes pendientes;
+- aprobadas sin aplicar;
+- auditoria residentes ECO;
+- preparacion RRHH;
+- lista para facturar;
+- sesion pagada.
+
+El checklist es orientacion visual/operativa. No es fuente de verdad economica y no recalcula montos.
+
+### Regla de facturacion con RRHH
+
+Para pasar una sesion de `CERRADA` a `FACTURADA`:
+
+- si hay practicas de residencia, debe existir una `PreparacionLiquidacionRRHH` ultima o vigente en estado `PREPARADO`;
+- si no hay practicas de residencia, RRHH queda como **No requerido** y no bloquea;
+- una preparacion `BORRADOR` no habilita facturacion;
+- esta regla se valida en backend en la transicion de sesion.
+
+La pantalla administrativa de sesiones muestra:
+
+- estado global de cierre;
+- proximo paso recomendado;
+- estado RRHH residencia;
+- ultima version preparada o borrador;
+- hash corto del snapshot;
+- destinatarios si existen;
+- acceso directo a **Preparar RRHH** desde sesiones `CERRADA`, `FACTURADA` o `PAGADA`.
+
 ## Operacion manual para corregir un caso real
 
 1. Identificar la solicitud aplicada y el registro asociado.
@@ -231,6 +308,9 @@ Tests principales:
 - `liquidacion.tests_regla_descuento_residencia`
 - `liquidacion.tests_regla_descuento_residencia_calculo`
 - tests `test_b3_*` en `liquidacion.tests_auditoria_2026_05_11.PermisosYTrazabilidadViewTest`
+- `liquidacion.tests_preparacion_rrhh`
+- `liquidacion.tests_checklist_cierre`
+- tests de transicion `CERRADA -> FACTURADA` en `liquidacion.tests_auditoria_2026_05_11.SesionContableWorkflowPermissionsTest`
 
 Comandos utiles:
 
@@ -238,5 +318,7 @@ Comandos utiles:
 python manage.py test liquidacion.tests_regla_descuento_residencia --verbosity=1
 python manage.py test liquidacion.tests_regla_descuento_residencia_calculo --verbosity=1
 python manage.py test liquidacion.tests_auditoria_2026_05_11.PermisosYTrazabilidadViewTest.test_b3_recalcula_solicitud_aplicada_dop_residente_intra_con_regla_activa --verbosity=2
+python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1
+python manage.py test liquidacion.tests_checklist_cierre --verbosity=1
 python manage.py makemigrations --check --dry-run
 ```

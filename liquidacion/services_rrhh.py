@@ -18,6 +18,62 @@ from .services_auditoria import evaluar_gate_consistencia_sesion
 ESTADOS_SESION_PREPARACION_RRHH = {'CERRADA', 'FACTURADA', 'PAGADA'}
 
 
+def _fecha_issue(value):
+    return value.isoformat() if hasattr(value, 'isoformat') else value
+
+
+def sesion_tiene_practicas_residencia(sesion):
+    return RegistroEstudiosPorMedico.objects.filter(
+        sesion_contable=sesion,
+        medico__rol__in=ROLES_RESIDENCIA,
+    ).exists()
+
+
+def ultima_preparacion_rrhh(sesion):
+    return (
+        PreparacionLiquidacionRRHH.objects
+        .filter(sesion_contable=sesion)
+        .order_by('-version')
+        .first()
+    )
+
+
+def evaluar_requisito_rrhh_para_facturar(sesion):
+    requiere = sesion_tiene_practicas_residencia(sesion)
+    ultima = ultima_preparacion_rrhh(sesion)
+
+    if not requiere:
+        return {
+            'ok': True,
+            'requiere_rrhh': False,
+            'ultima_preparacion': ultima,
+            'mensaje': 'No hay practicas de residencia en la sesion; RRHH no requerido.',
+        }
+
+    if not ultima:
+        return {
+            'ok': False,
+            'requiere_rrhh': True,
+            'ultima_preparacion': None,
+            'mensaje': 'La sesion tiene practicas de residencia y requiere una preparacion RRHH en estado PREPARADO.',
+        }
+
+    if ultima.estado != PreparacionLiquidacionRRHH.ESTADO_PREPARADO:
+        return {
+            'ok': False,
+            'requiere_rrhh': True,
+            'ultima_preparacion': ultima,
+            'mensaje': f'La ultima preparacion RRHH esta en estado {ultima.estado}; debe estar PREPARADO para facturar.',
+        }
+
+    return {
+        'ok': True,
+        'requiere_rrhh': True,
+        'ultima_preparacion': ultima,
+        'mensaje': f'Preparacion RRHH v{ultima.version} preparada.',
+    }
+
+
 def decimal_to_str(value):
     return str(Decimal(value or 0).quantize(Decimal('0.01')))
 
@@ -58,8 +114,9 @@ def cuerpo_default_rrhh(snapshot):
 def _validaciones_revision_horaria(sesion, registro_ids):
     bloqueantes = []
     advertencias = []
+    items = []
     if not registro_ids:
-        return bloqueantes, advertencias
+        return bloqueantes, advertencias, items
 
     solicitudes = SolicitudRevisionHorarioRegistro.objects.filter(
         registro_id__in=registro_ids
@@ -69,36 +126,63 @@ def _validaciones_revision_horaria(sesion, registro_ids):
         estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE
     ).count()
     if pendientes:
-        bloqueantes.append(
-            f'{pendientes} solicitud(es) de revision horaria pendientes en la sesion.'
-        )
+        mensaje = f'{pendientes} solicitud(es) de revision horaria pendientes en la sesion.'
+        bloqueantes.append(mensaje)
+        items.append({
+            'tipo': 'revision_horaria_pendiente',
+            'estado': 'bloqueante',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+            'estado_solicitud': SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
+            'count': pendientes,
+        })
 
     aprobadas_sin_aplicar = solicitudes.filter(
         estado=SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
         fecha_aplicacion__isnull=True,
     ).count()
     if aprobadas_sin_aplicar:
-        bloqueantes.append(
-            f'{aprobadas_sin_aplicar} solicitud(es) aprobadas sin aplicar en la sesion.'
-        )
+        mensaje = f'{aprobadas_sin_aplicar} solicitud(es) aprobadas sin aplicar en la sesion.'
+        bloqueantes.append(mensaje)
+        items.append({
+            'tipo': 'revision_horaria_aprobada_sin_aplicar',
+            'estado': 'bloqueante',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+            'estado_solicitud': SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
+            'count': aprobadas_sin_aplicar,
+        })
 
     rechazadas = solicitudes.filter(
         estado=SolicitudRevisionHorarioRegistro.ESTADO_RECHAZADA
     ).count()
     if rechazadas:
-        advertencias.append(
-            f'{rechazadas} solicitud(es) de revision horaria rechazadas en la sesion.'
-        )
+        mensaje = f'{rechazadas} solicitud(es) de revision horaria rechazadas en la sesion.'
+        advertencias.append(mensaje)
+        items.append({
+            'tipo': 'revision_horaria_rechazada',
+            'estado': 'advertencia',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+            'estado_solicitud': SolicitudRevisionHorarioRegistro.ESTADO_RECHAZADA,
+            'count': rechazadas,
+        })
 
     recalculos = HistorialRecalculoSolicitudRevisionHorario.objects.filter(
         registro_id__in=registro_ids
     ).count()
     if recalculos:
-        advertencias.append(
-            f'{recalculos} recalculo(s) puntual(es) B3 registrados en la sesion.'
-        )
+        mensaje = f'{recalculos} recalculo(s) puntual(es) B3 registrados en la sesion.'
+        advertencias.append(mensaje)
+        items.append({
+            'tipo': 'recalculo_b3',
+            'estado': 'advertencia',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+            'count': recalculos,
+        })
 
-    return bloqueantes, advertencias
+    return bloqueantes, advertencias, items
 
 
 def construir_snapshot_liquidacion_rrhh(sesion):
@@ -114,32 +198,61 @@ def construir_snapshot_liquidacion_rrhh(sesion):
 
     bloqueantes = []
     advertencias = []
+    validaciones_items = []
 
     if sesion.estado not in ESTADOS_SESION_PREPARACION_RRHH:
-        bloqueantes.append(
-            'La preparacion RRHH solo esta disponible desde sesiones CERRADA, FACTURADA o PAGADA.'
-        )
+        mensaje = 'La preparacion RRHH solo esta disponible desde sesiones CERRADA, FACTURADA o PAGADA.'
+        bloqueantes.append(mensaje)
+        validaciones_items.append({
+            'tipo': 'sesion_estado_no_habilitado_rrhh',
+            'estado': 'bloqueante',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+        })
 
+    requiere_rrhh = bool(registros)
     if not registros:
-        bloqueantes.append('Sesion vacia para roles de residencia.')
+        mensaje = 'No hay practicas de residencia en la sesion; RRHH no requerido.'
+        advertencias.append(mensaje)
+        validaciones_items.append({
+            'tipo': 'rrhh_no_requerido',
+            'estado': 'advertencia',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+        })
 
     for registro in registros:
         if registro.registroestudio_set.all() and Decimal(registro.monto_calculado or 0) <= Decimal('0'):
-            bloqueantes.append(
-                f'Registro #{registro.pk} con estudios asociados y monto_calculado <= 0.'
-            )
+            mensaje = f'Registro #{registro.pk} con estudios asociados y monto_calculado <= 0.'
+            bloqueantes.append(mensaje)
+            validaciones_items.append({
+                'tipo': 'monto_cero_con_estudios',
+                'estado': 'bloqueante',
+                'mensaje': mensaje,
+                'registro_id': registro.pk,
+                'fecha': _fecha_issue(registro.fecha_del_informe),
+            })
 
     gate = evaluar_gate_consistencia_sesion(sesion, 'FACTURADA')
     bloqueantes.extend(gate['bloqueantes'])
     advertencias.extend(gate['advertencias'])
+    validaciones_items.extend(gate.get('items', []))
 
     if sesion.estado == 'CERRADA':
-        advertencias.append('La sesion esta CERRADA pero todavia no FACTURADA.')
+        mensaje = 'La sesion esta CERRADA pero todavia no FACTURADA.'
+        advertencias.append(mensaje)
+        validaciones_items.append({
+            'tipo': 'sesion_cerrada_no_facturada',
+            'estado': 'advertencia',
+            'mensaje': mensaje,
+            'sesion_id': sesion.pk,
+        })
 
     registro_ids = [registro.pk for registro in registros]
-    rev_bloqueantes, rev_advertencias = _validaciones_revision_horaria(sesion, registro_ids)
+    rev_bloqueantes, rev_advertencias, rev_items = _validaciones_revision_horaria(sesion, registro_ids)
     bloqueantes.extend(rev_bloqueantes)
     advertencias.extend(rev_advertencias)
+    validaciones_items.extend(rev_items)
 
     por_medico = {}
     for registro in registros:
@@ -178,6 +291,7 @@ def construir_snapshot_liquidacion_rrhh(sesion):
             'mes': sesion.mes,
             'año': sesion.año,
             'estado': sesion.estado,
+            'requiere_rrhh': requiere_rrhh,
         },
         'profesionales': profesionales,
         'totales': {
@@ -191,5 +305,6 @@ def construir_snapshot_liquidacion_rrhh(sesion):
         'validaciones': {
             'bloqueantes': bloqueantes,
             'advertencias': advertencias,
+            'items': validaciones_items,
         },
     }

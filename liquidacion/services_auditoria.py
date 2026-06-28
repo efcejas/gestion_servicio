@@ -86,9 +86,26 @@ def _debe_bloquear(tipo, estado_destino):
     return False
 
 
-def _agregar_issue(resultado, tipo, mensaje, estado_destino):
-    destino = resultado['bloqueantes'] if _debe_bloquear(tipo, estado_destino) else resultado['advertencias']
+def _serializar_metadata_issue(metadata):
+    serializada = {}
+    for key, value in metadata.items():
+        if hasattr(value, 'isoformat'):
+            serializada[key] = value.isoformat()
+        else:
+            serializada[key] = value
+    return serializada
+
+
+def _agregar_issue(resultado, tipo, mensaje, estado_destino, **metadata):
+    es_bloqueante = _debe_bloquear(tipo, estado_destino)
+    destino = resultado['bloqueantes'] if es_bloqueante else resultado['advertencias']
     destino.append(mensaje)
+    resultado.setdefault('items', []).append({
+        'tipo': tipo,
+        'mensaje': mensaje,
+        'estado': 'bloqueante' if es_bloqueante else 'advertencia',
+        **_serializar_metadata_issue(metadata),
+    })
 
 
 def evaluar_gate_consistencia_sesion(sesion, estado_destino):
@@ -101,7 +118,7 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
         'advertencias': [...],
       }
     """
-    resultado = {'bloqueantes': [], 'advertencias': []}
+    resultado = {'bloqueantes': [], 'advertencias': [], 'items': []}
 
     practicas = list(
         sesion.practicas.select_related('medico', 'sesion_contable').prefetch_related('registroestudio_set__estudio')
@@ -125,6 +142,8 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                 TIPO_SIN_REGISTRO_ESTUDIO,
                 f'Registro #{registro.pk} sin estudios asociados en RegistroEstudio.',
                 estado_destino,
+                registro_id=registro.pk,
+                fecha=registro.fecha_del_informe,
             )
             continue
 
@@ -134,6 +153,8 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                 TIPO_MONTO_CERO_CON_ESTUDIOS,
                 f'Registro #{registro.pk} con estudios asociados y monto_calculado <= 0.',
                 estado_destino,
+                registro_id=registro.pk,
+                fecha=registro.fecha_del_informe,
             )
 
         for rel in relaciones:
@@ -147,12 +168,17 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                     _agregar_issue(
                         resultado,
                         TIPO_SIN_TARIFA_VIGENTE_GRUPO,
-                        (
-                            f'Registro #{registro.pk} estudio {estudio.nombre}: '
-                            f'grupo {estudio.grupo_tarifario.codigo} sin tarifa vigente para {fecha_ref}.'
-                        ),
-                        estado_destino,
-                    )
+                            (
+                                f'Registro #{registro.pk} estudio {estudio.nombre}: '
+                                f'grupo {estudio.grupo_tarifario.codigo} sin tarifa vigente para {fecha_ref}.'
+                            ),
+                            estado_destino,
+                            registro_id=registro.pk,
+                            estudio_id=estudio.pk,
+                            grupo_id=estudio.grupo_tarifario_id,
+                            grupo_codigo=estudio.grupo_tarifario.codigo,
+                            fecha=fecha_ref,
+                        )
 
                 if contexto in {'LECHO', 'QUIROFANO'}:
                     codigo_ctx = f'{estudio.grupo_tarifario.codigo}_{contexto}'
@@ -161,12 +187,17 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                         _agregar_issue(
                             resultado,
                             TIPO_CONTEXTUAL_SIN_GRUPO,
-                            (
-                                f'Registro #{registro.pk} estudio {estudio.nombre}: '
-                                f'contexto {contexto} sin grupo contextual {codigo_ctx}.'
-                            ),
-                            estado_destino,
-                        )
+                                (
+                                    f'Registro #{registro.pk} estudio {estudio.nombre}: '
+                                    f'contexto {contexto} sin grupo contextual {codigo_ctx}.'
+                                ),
+                                estado_destino,
+                                registro_id=registro.pk,
+                                estudio_id=estudio.pk,
+                                grupo_codigo=codigo_ctx,
+                                contexto=contexto,
+                                fecha=fecha_ref,
+                            )
                     else:
                         tarifa_ctx = grupo_ctx.get_tarifa_vigente(fecha=fecha_ref)
                         if not tarifa_ctx:
@@ -178,6 +209,12 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                                     f'grupo contextual {codigo_ctx} sin tarifa vigente para {fecha_ref}.'
                                 ),
                                 estado_destino,
+                                registro_id=registro.pk,
+                                estudio_id=estudio.pk,
+                                grupo_id=grupo_ctx.pk,
+                                grupo_codigo=codigo_ctx,
+                                contexto=contexto,
+                                fecha=fecha_ref,
                             )
             else:
                 precio_legado = estudio.precio_para_os(
@@ -194,6 +231,9 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                             'sin grupo y sin precio legado valido (>0).'
                         ),
                         estado_destino,
+                        registro_id=registro.pk,
+                        estudio_id=estudio.pk,
+                        fecha=fecha_ref,
                     )
                 else:
                     _agregar_issue(
@@ -204,6 +244,9 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                             'sin grupo tarifario (se usa fallback legado).'
                         ),
                         estado_destino,
+                        registro_id=registro.pk,
+                        estudio_id=estudio.pk,
+                        fecha=fecha_ref,
                     )
 
     for guardia in guardias:
@@ -213,6 +256,8 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                 TIPO_GUARDIA_MONTO_INVALIDO,
                 f'Guardia #{guardia.pk} con monto <= 0.',
                 estado_destino,
+                guardia_id=guardia.pk,
+                fecha=getattr(guardia, 'fecha_guardia', None),
             )
 
     return resultado

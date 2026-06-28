@@ -68,6 +68,7 @@ from .services_rrhh import (
     calcular_hash_snapshot,
     construir_snapshot_liquidacion_rrhh,
     cuerpo_default_rrhh,
+    evaluar_requisito_rrhh_para_facturar,
     proxima_version_preparacion_rrhh,
 )
 from .services_cierre import construir_checklist_cierre_sesion
@@ -128,7 +129,9 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         item['detalle_corto'] = ''
 
         if key == 'preparacion_rrhh':
-            if not sesion_rrhh_habilitada:
+            if item.get('detalle') == 'No requerido':
+                item['detalle_corto'] = 'No requerido'
+            elif not sesion_rrhh_habilitada:
                 item['detalle_corto'] = 'No disponible'
             elif item.get('estado') == 'ok':
                 item['detalle_corto'] = 'Preparado'
@@ -144,6 +147,87 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         proximo_paso['url'] = urls_por_item.get(proximo_paso.get('key'))
 
     return checklist
+
+
+def _registro_focus_url(registro_id, fecha=None):
+    params = {'focus_registro': registro_id}
+    if fecha:
+        if isinstance(fecha, str):
+            partes_fecha = fecha.split('-')
+            if len(partes_fecha) >= 2:
+                params.update({'mes': partes_fecha[1], 'año': partes_fecha[0]})
+        else:
+            params.update({'mes': fecha.month, 'año': fecha.year})
+    return f"{reverse('liquidacion:registroestudios_list')}?{urlencode(params)}#registro-{registro_id}"
+
+
+def _accion_para_issue_cierre(issue, sesion=None):
+    tipo = issue.get('tipo')
+    registro_id = issue.get('registro_id')
+    estudio_id = issue.get('estudio_id')
+    grupo_id = issue.get('grupo_id')
+    guardia_id = issue.get('guardia_id')
+    sesion_id = issue.get('sesion_id') or getattr(sesion, 'pk', None)
+    fecha = issue.get('fecha')
+
+    if tipo in {'revision_horaria_pendiente', 'revision_horaria_aprobada_sin_aplicar', 'revision_horaria_rechazada'}:
+        params = {}
+        if sesion_id:
+            params['sesion'] = sesion_id
+        if issue.get('estado_solicitud'):
+            params['estado'] = issue['estado_solicitud']
+        return {
+            'label': 'Ver solicitudes',
+            'url': f"{reverse('liquidacion:solicitudes_revision_horario_list')}?{urlencode(params)}",
+        }
+
+    if tipo == 'recalculo_b3' and sesion_id:
+        return {
+            'label': 'Ver solicitudes',
+            'url': f"{reverse('liquidacion:solicitudes_revision_horario_list')}?{urlencode({'sesion': sesion_id})}",
+        }
+
+    if tipo in {'sin_tarifa_vigente_grupo', 'contextual_sin_tarifa'} and grupo_id:
+        return {
+            'label': 'Cargar tarifa',
+            'url': reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo_id}),
+        }
+
+    if tipo == 'contextual_sin_grupo':
+        return {
+            'label': 'Ver grupos',
+            'url': reverse('liquidacion:grupos_tarifarios_list'),
+        }
+
+    if tipo in {'sin_precio_resoluble', 'sin_grupo_con_fallback'} and estudio_id:
+        return {
+            'label': 'Ver estudio',
+            'url': reverse('liquidacion:estudios_edit', kwargs={'pk': estudio_id}),
+        }
+
+    if guardia_id:
+        return {
+            'label': 'Editar guardia',
+            'url': reverse('liquidacion:editar_guardia_pasiva', kwargs={'pk': guardia_id}),
+        }
+
+    if registro_id:
+        return {
+            'label': 'Ver registro',
+            'url': _registro_focus_url(registro_id, fecha),
+        }
+
+    return None
+
+
+def _enriquecer_issues_cierre(issues, sesion=None, limite=None):
+    enriquecidos = []
+    issues_iterables = issues[:limite] if limite else issues
+    for issue in issues_iterables:
+        item = dict(issue)
+        item['accion'] = _accion_para_issue_cierre(item, sesion=sesion)
+        enriquecidos.append(item)
+    return enriquecidos
 
 
 def _build_diagnostico_recalculo_b3(solicitud):
@@ -2530,6 +2614,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 construir_checklist_cierre_sesion(sesion, user=user),
                 sesion,
             )
+            requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
@@ -2551,8 +2636,26 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'gate_advertencias_count': len(gate_preview['advertencias']),
                 'gate_bloqueantes_preview': gate_preview['bloqueantes'][:3],
                 'gate_advertencias_preview': gate_preview['advertencias'][:3],
+                'gate_bloqueantes_accionables': _enriquecer_issues_cierre(
+                    [
+                        item for item in gate_preview.get('items', [])
+                        if item.get('estado') == 'bloqueante'
+                    ],
+                    sesion=sesion,
+                    limite=3,
+                ),
+                'gate_advertencias_accionables': _enriquecer_issues_cierre(
+                    [
+                        item for item in gate_preview.get('items', [])
+                        if item.get('estado') == 'advertencia'
+                    ],
+                    sesion=sesion,
+                    limite=3,
+                ),
                 'auditoria_residentes_eco': auditoria_residentes_eco,
                 'checklist_cierre': checklist_cierre,
+                'requisito_rrhh': requisito_rrhh,
+                'ultima_preparacion_rrhh': requisito_rrhh['ultima_preparacion'],
                 'historial_reciente': historial_ordenado[:5],
                 'historial_count': len(historial_ordenado),
             })
@@ -2596,6 +2699,10 @@ class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        validaciones_accionables = _enriquecer_issues_cierre(
+            self.snapshot['validaciones'].get('items', []),
+            sesion=self.sesion,
+        )
         context.update({
             'sesion': self.sesion,
             'snapshot': self.snapshot,
@@ -2607,6 +2714,14 @@ class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMi
                 .select_related('creado_por', 'actualizado_por')
                 .order_by('-version')[:5]
             ),
+            'validaciones_accionables_bloqueantes': [
+                item for item in validaciones_accionables
+                if item.get('estado') == 'bloqueante'
+            ],
+            'validaciones_accionables_advertencias': [
+                item for item in validaciones_accionables
+                if item.get('estado') == 'advertencia'
+            ],
         })
         return context
 
@@ -2622,6 +2737,9 @@ class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMi
 
         if estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO and not destinatarios:
             bloqueantes.append('PREPARADO requiere al menos un destinatario.')
+
+        if estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO and not self.snapshot['sesion']['requiere_rrhh']:
+            bloqueantes.append('No hay practicas de residencia para preparar RRHH en esta sesion.')
 
         if estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO and bloqueantes:
             for issue in bloqueantes[:5]:
@@ -2711,6 +2829,15 @@ def sesion_contable_transicion(request, pk):
             request,
             f"⚠️ Advertencias de consistencia: {detalle}"
         )
+
+    if config['siguiente'] == 'FACTURADA':
+        requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
+        if not requisito_rrhh['ok']:
+            messages.error(
+                request,
+                f"No se puede pasar a FACTURADA. {requisito_rrhh['mensaje']}",
+            )
+            return redirect('liquidacion:sesiones_list')
 
     from django.utils import timezone as tz
 

@@ -12,6 +12,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Confirmar alcance exacto: calculo, permisos, B2/B3, residencia, RRHH, checklist, UI o docs.
 - Leer `.github/instructions/liquidacion.instructions.md` antes de tocar codigo del modulo.
 - Identificar si el cambio toca dinero persistido, historial, snapshot o estado de sesion.
+- Si el cambio toca facturacion, verificar requisito RRHH: con practicas de residencia requiere preparacion `PREPARADO`; sin residencia es `No requerido`.
 - Mantener la logica economica fuera de templates.
 - Usar servicios existentes antes de crear nuevas reglas.
 - Evitar recalculos masivos.
@@ -24,7 +25,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Residencia, Doppler, C1/C2, B2/B3: `docs/liquidacion/reglas-descuento-residencia.md`.
 - Modelos y calculo: `liquidacion/models.py`.
 - Servicio de reglas residencia: `liquidacion/services.py`.
-- Snapshot RRHH D1: `liquidacion/services_rrhh.py`.
+- Snapshot RRHH D1 y requisito para facturar: `liquidacion/services_rrhh.py`.
 - Checklist E1: `liquidacion/services_cierre.py`.
 - Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
 - Clasificacion automatica y override: `liquidacion/signals.py`.
@@ -34,7 +35,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - `liquidacion/models.py`: `calcular_monto`, sesiones, reglas, snapshots, historial.
 - `liquidacion/views.py`: escrituras criticas, B2/B3, D1, sesiones.
 - `liquidacion/services.py`: reglas de residencia y servicios compartidos.
-- `liquidacion/services_rrhh.py`: snapshot auditable para RRHH; no recalcula.
+- `liquidacion/services_rrhh.py`: snapshot auditable para RRHH, deteccion de practicas de residencia y requisito para facturar; no recalcula.
 - `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
 - `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
 - `templates/liquidacion/*`: UX; no fuente de verdad economica.
@@ -73,6 +74,8 @@ python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1
 python manage.py makemigrations --check --dry-run
 ```
 
+Si el cambio afecta `CERRADA -> FACTURADA`, agregar test focal en `liquidacion.tests_auditoria_2026_05_11.SesionContableWorkflowPermissionsTest`.
+
 ### Checklist E1
 
 ```bash
@@ -101,6 +104,7 @@ No correr tests Django para cambios puramente documentales salvo pedido explicit
 - El cambio toca `calcular_monto()`.
 - El cambio modifica `signals.py`.
 - El cambio permite operar en `CERRADA`, `FACTURADA` o `PAGADA`.
+- El cambio altera la transicion `CERRADA -> FACTURADA`.
 - El cambio actualiza mas de un registro.
 - El cambio combina `select_for_update()` con `select_related()`.
 - El cambio crea o modifica snapshots/historial.

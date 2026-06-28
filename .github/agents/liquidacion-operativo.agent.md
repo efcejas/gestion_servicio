@@ -19,7 +19,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - Revision horaria: solicitudes A/B1, aplicacion economica B2 y recalculo puntual B3.
 - Residencia: `ReglaDescuentoResidencia`, fallback legado ECO/DOP y override "liquidar como Extra Residencia".
 - Cierre mensual: estados `ABIERTA`, `REVISION`, `CERRADA`, `FACTURADA`, `PAGADA`, gate administrativo e historial.
-- RRHH D1: `PreparacionLiquidacionRRHH`, snapshot auditable y preview sin envio real.
+- RRHH D1: `PreparacionLiquidacionRRHH`, snapshot auditable, preview sin envio real y requisito para facturar cuando hay practicas de residencia.
 - Checklist E1: resumen visual de cierre por sesion; orienta, no calcula.
 
 ## Como auditar antes de tocar codigo
@@ -42,7 +42,8 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 
 - Si afecta `calcular_monto()`, tratarlo como cambio de alto riesgo y pedir/usar tests focales de calculo.
 - Si afecta B2/B3, priorizar atomicidad, concurrencia y snapshots antes que UX.
-- Si afecta RRHH, recordar que D1 no envia email y usa `monto_calculado` persistido.
+- Si afecta RRHH, recordar que D1 no envia email, usa `monto_calculado` persistido y puede bloquear `CERRADA -> FACTURADA` cuando hay practicas de residencia sin preparacion `PREPARADO`.
+- Si afecta facturacion, verificar si la sesion tiene practicas de residencia: con residencia requiere RRHH `PREPARADO`; sin residencia RRHH queda como `No requerido`.
 - Si afecta checklist E1, mantenerlo como resumen visual; no mover reglas economicas al template.
 - Si el usuario pide "solo disenar", no implementar.
 - Si el usuario pide "no modificar codigo", limitarse a auditoria/comandos de lectura.
@@ -52,6 +53,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 
 - ¿Puede cambiar un monto ya liquidado?
 - ¿Puede modificar una sesion `CERRADA`, `FACTURADA` o `PAGADA`?
+- ¿Una sesion `CERRADA` con practicas de residencia intenta pasar a `FACTURADA` sin RRHH `PREPARADO`?
 - ¿Puede afectar a mas de un registro cuando se pidio uno puntual?
 - ¿Hay riesgo de doble aplicacion o concurrencia?
 - ¿Falta trazabilidad (`modificado_por`, fecha, motivo, historial o snapshot)?
@@ -80,6 +82,8 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 
 - No hacer recalculos masivos sin aprobacion explicita.
 - No enviar email real desde D1 ni desde previews.
+- No permitir `CERRADA -> FACTURADA` con practicas de residencia si la ultima preparacion RRHH no esta `PREPARADO`.
+- No bloquear facturacion por RRHH cuando no hay practicas de residencia; en ese caso debe figurar como `No requerido`.
 - No modificar migraciones aplicadas.
 - No convertir templates/checklists en fuente de reglas economicas.
 - No usar `select_for_update().select_related(...)` en flujos con relaciones nullable.

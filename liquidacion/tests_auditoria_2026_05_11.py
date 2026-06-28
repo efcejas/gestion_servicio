@@ -26,6 +26,7 @@ from .models import (
     HistorialSesionContable,
     GuardiaPasiva,
     GrupoTarifario,
+    PreparacionLiquidacionRRHH,
     ReglaDescuentoResidencia,
     TarifaGrupoTarifario,
 )
@@ -2266,6 +2267,48 @@ class SesionContableWorkflowPermissionsTest(TestCase):
         self._mes_seq += 1
         return sesion
 
+    def _crear_registro_facturable(self, sesion, medico):
+        grupo = GrupoTarifario.objects.create(
+            codigo=f'ECO_SES_{sesion.pk}_{medico.pk}',
+            nombre='Grupo sesion facturable',
+            modalidad='ECO',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2026, 1, 1),
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+        )
+        estudio = Estudios.objects.create(
+            nombre=f'ECO SESION {sesion.pk}_{medico.pk}',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('5000.00'),
+            precio_otras_os=Decimal('7000.00'),
+            grupo_tarifario=grupo,
+            activo=True,
+        )
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=medico,
+            nombre_paciente='Facturacion',
+            apellido_paciente='Residencia',
+            dni_paciente=f'{sesion.pk:02}{medico.pk:06}',
+            fecha_del_informe=date(2026, sesion.mes, 10),
+            sesion_contable=sesion,
+            tipo_obra_social='COBER',
+            horario='EXTRA' if medico.rol in ['medico_residente', 'jefe_residentes', 'instructor_residentes'] else 'NA',
+            monto_calculado=Decimal('5000.00'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=estudio,
+            cantidad=1,
+            contexto='SERVICIO',
+        )
+        return registro
+
     def test_portal_inicio_requiere_login(self):
         response = self.client.get(reverse('liquidacion:portal_inicio'))
         self.assertEqual(response.status_code, 302)
@@ -2423,6 +2466,48 @@ class SesionContableWorkflowPermissionsTest(TestCase):
             self.assertEqual(response.status_code, 302)
             sesion.refresh_from_db()
             self.assertEqual(sesion.estado, 'FACTURADA')
+
+    def test_cerrada_a_facturada_bloquea_si_hay_residencia_sin_rrhh_preparado(self):
+        sesion = self._crear_sesion('CERRADA')
+        self._crear_registro_facturable(sesion, self.medico_residente)
+        self._login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion residencia sin RRHH'},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+
+    def test_cerrada_a_facturada_permite_si_hay_residencia_con_rrhh_preparado(self):
+        sesion = self._crear_sesion('CERRADA')
+        self._crear_registro_facturable(sesion, self.medico_residente)
+        PreparacionLiquidacionRRHH.objects.create(
+            sesion_contable=sesion,
+            version=1,
+            estado=PreparacionLiquidacionRRHH.ESTADO_PREPARADO,
+            destinatarios_json=['rrhh@test.com'],
+            asunto='Liquidacion residencia test',
+            cuerpo='Preview sin envio real',
+            resumen_json={},
+            snapshot_hash='a' * 64,
+            creado_por=self.admin,
+            actualizado_por=self.admin,
+        )
+        self._login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:sesion_transicion', kwargs={'pk': sesion.pk}),
+            data={'motivo': 'Facturacion residencia con RRHH preparado'},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'FACTURADA')
 
     def test_transicion_denegada_para_roles_no_administrativos(self):
         sesion = self._crear_sesion('ABIERTA')

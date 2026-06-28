@@ -1,5 +1,6 @@
 from .models import PreparacionLiquidacionRRHH, SolicitudRevisionHorarioRegistro
 from .services_auditoria import auditar_residentes_eco_por_sesion, evaluar_gate_consistencia_sesion
+from .services_rrhh import evaluar_requisito_rrhh_para_facturar
 
 
 ESTADOS_CHECKLIST = {'ok', 'pendiente', 'advertencia', 'bloqueante'}
@@ -85,13 +86,12 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         estado_auditoria = 'ok'
         detalle_auditoria = 'Sin alertas'
 
-    ultima_preparacion = (
-        PreparacionLiquidacionRRHH.objects
-        .filter(sesion_contable=sesion)
-        .order_by('-version')
-        .first()
-    )
-    if sesion.estado in {'ABIERTA', 'REVISION'}:
+    requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
+    ultima_preparacion = requisito_rrhh['ultima_preparacion']
+    if not requisito_rrhh['requiere_rrhh']:
+        estado_rrhh = 'ok'
+        detalle_rrhh = 'No requerido'
+    elif sesion.estado in {'ABIERTA', 'REVISION'}:
         estado_rrhh = 'pendiente'
         detalle_rrhh = 'Disponible desde CERRADA'
     elif not ultima_preparacion:
@@ -104,10 +104,7 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         estado_rrhh = 'ok'
         detalle_rrhh = f'Preparado v{ultima_preparacion.version}'
 
-    rrhh_preparado = bool(
-        ultima_preparacion
-        and ultima_preparacion.estado == PreparacionLiquidacionRRHH.ESTADO_PREPARADO
-    )
+    rrhh_preparado = requisito_rrhh['ok']
     sin_bloqueantes_operativos = (
         not gate['bloqueantes']
         and pendientes_count == 0

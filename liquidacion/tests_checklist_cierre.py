@@ -37,6 +37,14 @@ class ChecklistCierreSesionTest(TestCase):
             last_name='Checklist',
             perfil_completo=True,
         )
+        self.staff = User.objects.create_user(
+            username='staff_checklist',
+            password='x',
+            rol='medico_staff',
+            first_name='Staff',
+            last_name='Checklist',
+            perfil_completo=True,
+        )
         self.sesion = SesionContable.objects.create(mes=6, año=2026, estado='CERRADA')
         self.grupo = GrupoTarifario.objects.create(
             codigo='ECO_CHECKLIST',
@@ -62,10 +70,10 @@ class ChecklistCierreSesionTest(TestCase):
             grupo_tarifario=self.grupo,
         )
 
-    def _crear_registro(self, sesion=None, monto=Decimal('1000.00')):
+    def _crear_registro(self, sesion=None, monto=Decimal('1000.00'), medico=None):
         registro = RegistroEstudiosPorMedico.objects.create(
             sesion_contable=sesion or self.sesion,
-            medico=self.residente,
+            medico=medico or self.residente,
             nombre_paciente='Paciente',
             apellido_paciente='Checklist',
             dni_paciente='12345678',
@@ -151,6 +159,22 @@ class ChecklistCierreSesionTest(TestCase):
 
         self.assertEqual(self._item(checklist, 'preparacion_rrhh')['estado'], 'pendiente')
 
+    def test_preparacion_rrhh_no_requerida_sin_practicas_residencia_devuelve_ok(self):
+        self._crear_registro(medico=self.staff)
+
+        checklist = construir_checklist_cierre_sesion(self.sesion)
+
+        item = self._item(checklist, 'preparacion_rrhh')
+        self.assertEqual(item['estado'], 'ok')
+        self.assertEqual(item['detalle'], 'No requerido')
+
+    def test_cerrada_con_residencia_sin_rrhh_preparado_no_esta_lista_para_facturar(self):
+        self._crear_registro()
+
+        checklist = construir_checklist_cierre_sesion(self.sesion)
+
+        self.assertEqual(self._item(checklist, 'lista_para_facturar')['estado'], 'pendiente')
+
     def test_preparacion_rrhh_borrador_devuelve_advertencia(self):
         self._crear_registro()
         PreparacionLiquidacionRRHH.objects.create(
@@ -186,6 +210,7 @@ class ChecklistCierreSesionTest(TestCase):
         checklist = construir_checklist_cierre_sesion(self.sesion)
 
         self.assertEqual(self._item(checklist, 'preparacion_rrhh')['estado'], 'ok')
+        self.assertEqual(self._item(checklist, 'lista_para_facturar')['estado'], 'ok')
 
     def test_sesion_facturada_marca_lista_para_facturar_ok(self):
         self.sesion.estado = 'FACTURADA'
@@ -216,3 +241,21 @@ class ChecklistCierreSesionTest(TestCase):
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
         self.assertIn('checklist_cierre', dato)
         self.assertEqual(dato['checklist_cierre']['sesion_id'], self.sesion.pk)
+
+    def test_vista_sesion_contable_incluye_accion_para_bloqueante_de_registro(self):
+        registro = self._crear_registro(monto=Decimal('0.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        sesiones_data = response.context['sesiones_data']
+        dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
+        acciones = [
+            issue.get('accion')
+            for issue in dato['gate_advertencias_accionables']
+            if issue.get('registro_id') == registro.pk
+        ]
+        self.assertTrue(acciones)
+        self.assertEqual(acciones[0]['label'], 'Ver registro')
+        self.assertIn(f'focus_registro={registro.pk}', acciones[0]['url'])

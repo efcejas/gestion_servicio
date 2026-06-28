@@ -202,6 +202,30 @@ class PreparacionLiquidacionRRHHTest(TestCase):
 
         self.assertEqual(snapshot['totales']['monto_practicas'], '1234.00')
 
+    def test_snapshot_sin_practicas_residencia_marca_rrhh_no_requerido(self):
+        self._crear_registro(self.staff, Decimal('4321.00'))
+
+        with patch.object(
+            RegistroEstudiosPorMedico,
+            'calcular_monto',
+            side_effect=AssertionError('No debe recalcular'),
+        ):
+            snapshot = construir_snapshot_liquidacion_rrhh(self.sesion)
+
+        self.assertFalse(snapshot['sesion']['requiere_rrhh'])
+        self.assertEqual(snapshot['totales']['profesionales'], 0)
+        self.assertEqual(snapshot['totales']['cantidad_guardias'], 0)
+        self.assertEqual(snapshot['totales']['monto_guardias'], '0.00')
+        self.assertIn('RRHH no requerido', ' '.join(snapshot['validaciones']['advertencias']))
+
+    def test_preparado_sin_practicas_residencia_bloqueado(self):
+        self._crear_registro(self.staff, Decimal('4321.00'))
+
+        response = self._post_preparacion(self.admin, estado='PREPARADO', destinatarios='rrhh@test.com')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(PreparacionLiquidacionRRHH.objects.exists())
+
     def test_bloquea_abierta_y_revision(self):
         for estado in ['ABIERTA', 'REVISION']:
             sesion = SesionContable.objects.create(mes=7 if estado == 'ABIERTA' else 8, año=2026, estado=estado)
@@ -222,6 +246,25 @@ class PreparacionLiquidacionRRHHTest(TestCase):
             secure=True,
         )
         self.assertEqual(response.status_code, 200)
+
+    def test_preview_muestra_accion_para_bloqueante_de_registro(self):
+        registro = self._crear_registro(self.residente, Decimal('0.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:preparacion_rrhh_preview', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        acciones = [
+            issue.get('accion')
+            for issue in response.context['validaciones_accionables_bloqueantes']
+            if issue.get('registro_id') == registro.pk
+        ]
+        self.assertTrue(acciones)
+        self.assertEqual(acciones[0]['label'], 'Ver registro')
+        self.assertIn(f'focus_registro={registro.pk}', acciones[0]['url'])
 
     def test_bloquea_solicitud_pendiente(self):
         registro = self._crear_registro(self.residente)
