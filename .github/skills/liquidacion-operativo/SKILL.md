@@ -1,57 +1,116 @@
 ---
 name: liquidacion-operativo
-description: "Skill para evolucionar el modulo liquidacion con foco en reglas por rol, trazabilidad, cierre mensual, calculo economico y seguridad operativa. Usar cuando: se cambien permisos de carga/edicion/borrado, se ajusten reglas por estado de sesion, se modifique calcular_monto/bonus, se agreguen validaciones de cierre, se optimicen listados globales, o se escriban tests criticos del modulo."
+description: "Skill para cambios focales en liquidacion: calculo, reglas residencia, B2/B3, cierre mensual, RRHH, checklist, permisos y trazabilidad. Usar cuando el cambio pueda afectar dinero, estados de sesion o registros historicos."
 ---
 
 # Skill: Liquidacion Operativa
 
-> Ultima actualizacion: 13/05/2026
+> Ultima actualizacion: 28/06/2026
 
-## Objetivo
+## Checklist rapida
 
-Mejorar `liquidacion/` con enfoque de produccion clinica: exactitud de facturacion, control por rol, trazabilidad y bajo riesgo de regresion.
+- Confirmar alcance exacto: calculo, permisos, B2/B3, residencia, RRHH, checklist, UI o docs.
+- Leer `.github/instructions/liquidacion.instructions.md` antes de tocar codigo del modulo.
+- Identificar si el cambio toca dinero persistido, historial, snapshot o estado de sesion.
+- Mantener la logica economica fuera de templates.
+- Usar servicios existentes antes de crear nuevas reglas.
+- Evitar recalculos masivos.
+- No enviar emails reales salvo fase especifica aprobada.
+- Si hay locks, usar `select_for_update()` sobre queryset simple, sin `select_related()` nullable.
 
-## Principios de trabajo
+## Fuentes de verdad
 
-1. Impacto clinico/operativo primero.
-2. Seguridad y trazabilidad antes que conveniencia.
-3. Cambios pequenos, testeables y reversibles.
-4. Nada de sobreingenieria.
+- Reglas duras del modulo: `.github/instructions/liquidacion.instructions.md`.
+- Residencia, Doppler, C1/C2, B2/B3: `docs/liquidacion/reglas-descuento-residencia.md`.
+- Modelos y calculo: `liquidacion/models.py`.
+- Servicio de reglas residencia: `liquidacion/services.py`.
+- Snapshot RRHH D1: `liquidacion/services_rrhh.py`.
+- Checklist E1: `liquidacion/services_cierre.py`.
+- Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
+- Clasificacion automatica y override: `liquidacion/signals.py`.
 
-## Matriz funcional base (resumen)
+## Archivos criticos
 
-- Medicos: operan sobre registros propios en `ABIERTA/REVISION`.
-- Jefe/instructor: igual que medicos para visibilidad personal.
-- Vista global: `administrativo`, `jefe_servicio`, `superuser`.
-- Correcciones en `CERRADA/FACTURADA`: perfiles operativos con trazabilidad fuerte.
-- `PAGADA`: bloqueada.
+- `liquidacion/models.py`: `calcular_monto`, sesiones, reglas, snapshots, historial.
+- `liquidacion/views.py`: escrituras criticas, B2/B3, D1, sesiones.
+- `liquidacion/services.py`: reglas de residencia y servicios compartidos.
+- `liquidacion/services_rrhh.py`: snapshot auditable para RRHH; no recalcula.
+- `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
+- `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
+- `templates/liquidacion/*`: UX; no fuente de verdad economica.
+- `liquidacion/tests_auditoria_2026_05_11.py`: regresiones B2/B3/sesiones/gate.
 
-## Checklist tecnico obligatorio
+## Comandos por tipo de cambio
 
-- Permisos en backend (`dispatch`, `test_func`, queryset restringido).
-- Calculo centralizado en modelo/servicio (`calcular_monto`).
-- `transaction.atomic` en escrituras compuestas.
-- N+1 controlado en reportes.
-- Tests por rol + estado + calculo.
+### Reglas residencia C1
 
-## Riesgos frecuentes
+```bash
+python manage.py test liquidacion.tests_regla_descuento_residencia --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
 
-- Duplicar reglas de calculo entre vista y modelo.
-- Permisos solo en frontend (sin enforcement backend).
-- Ediciones sin `modificado_por`/`fecha_modificacion`/`motivo_modificacion`.
-- Cambios de comportamiento en cierres sin test por estado.
+### Calculo residencia C2
 
-## Flujo recomendado de implementacion
+```bash
+python manage.py test liquidacion.tests_regla_descuento_residencia_calculo --verbosity=1
+python manage.py test liquidacion.tests_regla_descuento_residencia --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
 
-1. Definir regla de negocio y rol afectado.
-2. Ajustar validacion backend.
-3. Ajustar vista/template.
-4. Escribir test de regresion.
-5. Verificar lista completa `python manage.py test liquidacion`.
+### Revision horaria B2/B3
 
-## Salida esperada del skill
+```bash
+python manage.py test liquidacion.tests_auditoria_2026_05_11 --verbosity=1 --failfast
+python manage.py makemigrations --check --dry-run
+```
 
-- Diagnostico corto del problema.
-- Cambios puntuales aplicados en backend/frontend/tests.
-- Riesgos mitigados y pendientes.
-- Pasos de validacion funcional para administrativo y medico.
+Preferir tests focales de la clase/metodo afectado si el usuario pide no correr suite larga.
+
+### RRHH D1
+
+```bash
+python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+### Checklist E1
+
+```bash
+python manage.py test liquidacion.tests_checklist_cierre --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+### Override Extra Residencia
+
+```bash
+python manage.py test liquidacion.tests.ClasificacionHorarioResidenciaProxyTest --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+### Cambio documental
+
+```bash
+git diff -- <archivos-documentales>
+git status --short
+```
+
+No correr tests Django para cambios puramente documentales salvo pedido explicito.
+
+## Senales de riesgo
+
+- El cambio toca `calcular_monto()`.
+- El cambio modifica `signals.py`.
+- El cambio permite operar en `CERRADA`, `FACTURADA` o `PAGADA`.
+- El cambio actualiza mas de un registro.
+- El cambio combina `select_for_update()` con `select_related()`.
+- El cambio crea o modifica snapshots/historial.
+- El cambio mueve reglas a template.
+- El cambio envia email real.
+
+## Salida esperada
+
+- Que se cambio o audito.
+- Que reglas sensibles se preservaron.
+- Que comandos se ejecutaron.
+- Estado final de `git status --short` cuando corresponda.
+- Riesgo residual y proximo paso si queda algo abierto.
