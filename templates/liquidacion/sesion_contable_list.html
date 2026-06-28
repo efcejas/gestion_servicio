@@ -3,7 +3,7 @@
 {% block title %}Sesiones Contables{% endblock %}
 
 {% block content %}
-<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+<div class="container mx-auto px-4 py-4 lg:py-6 w-full">
 
     <div class="mb-4">
         <a href="{% url 'liquidacion:portal_inicio' %}"
@@ -28,46 +28,20 @@
         </div>
     </div>
 
-    <!-- Tabla de sesiones -->
-    <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden mb-6">
-        <div class="overflow-x-auto w-full">
-            <table class="w-full min-w-full lg:min-w-[1024px] table-fixed divide-y divide-slate-200">
-                <colgroup>
-                    <col style="width: 28%;">
-                    <col style="width: 14%;">
-                    <col style="width: 12%;">
-                    <col style="width: 12%;">
-                    <col style="width: 16%;">
-                    <col style="width: 18%;">
-                </colgroup>
-                <thead class="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                        <th class="px-3 md:px-6 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Período</th>
-                        <th class="px-3 md:px-6 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Estado</th>
-                        <th class="px-3 md:px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Prácticas</th>
-                        <th class="px-3 md:px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Guardias</th>
-                        <th class="px-3 md:px-6 py-3 text-right text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Total general</th>
-                        <th class="px-3 md:px-6 py-3 text-center text-[11px] font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap">Acción</th>
-                    </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-slate-100">
-                    {% for dato in sesiones_data %}
-                    <tr class="hover:bg-slate-50 transition-colors">
-
-                        <!-- Período -->
-                        <td class="px-3 md:px-6 py-4 align-top">
-                            <div class="text-sm font-semibold text-gray-900">{{ dato.mes_nombre }} {{ dato.sesion.año }}</div>
-                            <div class="text-xs text-gray-400 mt-0.5">Apertura: {{ dato.sesion.fecha_apertura|date:"d/m/Y" }}</div>
-                            {% if dato.sesion.fecha_cierre %}
-                            <div class="text-xs text-gray-400">Cierre: {{ dato.sesion.fecha_cierre|date:"d/m/Y H:i" }}</div>
-                            {% endif %}
-                            {% if dato.sesion.cerrada_por %}
-                            <div class="text-xs text-gray-400">Por: {{ dato.sesion.cerrada_por.get_full_name }}</div>
-                            {% endif %}
-                        </td>
-
-                        <!-- Estado badge -->
-                        <td class="px-3 md:px-6 py-4 align-top">
+    <!-- Sesiones por card -->
+    <div class="space-y-5 mb-6">
+        {% for dato in sesiones_data %}
+        <section class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+            <div class="border-b px-4 md:px-6 py-4
+                {% if dato.sesion.estado == 'ABIERTA' %}bg-gradient-to-r from-green-50 to-white border-green-100
+                {% elif dato.sesion.estado == 'REVISION' %}bg-gradient-to-r from-amber-50 to-white border-amber-100
+                {% elif dato.sesion.estado == 'CERRADA' %}bg-gradient-to-r from-blue-50 to-white border-blue-100
+                {% elif dato.sesion.estado == 'FACTURADA' %}bg-gradient-to-r from-fuchsia-50 to-white border-fuchsia-100
+                {% else %}bg-gradient-to-r from-slate-100 to-white border-slate-200{% endif %}">
+                <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-3">
+                            <h2 class="text-xl md:text-2xl font-bold text-slate-900">{{ dato.mes_nombre }} {{ dato.sesion.año }}</h2>
                             {% if dato.sesion.estado == 'ABIERTA' %}
                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 whitespace-nowrap">
                                 <span class="w-1.5 h-1.5 mr-1.5 rounded-full bg-green-500"></span>
@@ -94,129 +68,189 @@
                                 Pagada
                             </span>
                             {% endif %}
-                            <div class="mt-2.5 space-y-1.5">
-                                {% if dato.gate_bloqueantes_count %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 whitespace-nowrap">
-                                    {{ dato.gate_bloqueantes_count }} bloqueante(s)
-                                </span>
-                                {% endif %}
-                                {% if dato.gate_advertencias_count %}
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap">
-                                    {{ dato.gate_advertencias_count }} advertencia(s)
-                                </span>
-                                {% endif %}
-                            </div>
-                        </td>
-
-                        <!-- Prácticas -->
-                        <td class="px-3 md:px-6 py-4 text-right align-top">
-                            <div class="text-sm font-semibold text-gray-900">{{ dato.count_practicas }}</div>
-                            <div class="text-xs text-gray-400">${{ dato.total_monto_practicas|floatformat:0 }}</div>
-                        </td>
-
-                        <!-- Guardias -->
-                        <td class="px-3 md:px-6 py-4 text-right align-top">
-                            <div class="text-sm font-semibold text-gray-900">{{ dato.count_guardias }}</div>
-                            <div class="text-xs text-gray-400">${{ dato.total_monto_guardias|floatformat:0 }}</div>
-                        </td>
-
-                        <!-- Total general -->
-                        <td class="px-3 md:px-6 py-4 text-right align-top">
-                            <div class="text-sm font-bold text-gray-900">${{ dato.total_general|floatformat:0 }}</div>
-                        </td>
-
-                        <!-- Acción de transición -->
-                        <td class="px-3 md:px-6 py-4 text-center align-top min-w-[180px]">
-                            {% if dato.puede_transicionar and dato.siguiente_estado %}
-                                {% if dato.sesion.estado == 'ABIERTA' %}
-                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
-                                      onsubmit="return confirm('¿Pasar {{ dato.sesion }} a REVISIÓN?\nLos médicos seguirán pudiendo registrar.')">
-                                    {% csrf_token %}
-                                    <button type="submit"
-                                            class="inline-flex items-center justify-center w-full sm:w-auto gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-yellow-500 hover:bg-yellow-600 rounded-lg transition-colors">
-                                        <i class="fas fa-search"></i> Pasar a Revisión
-                                    </button>
-                                </form>
-                                {% elif dato.sesion.estado == 'REVISION' %}
-                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
-                                      onsubmit="return confirm('¿Cerrar {{ dato.sesion }}?\nSolo admin podrá cargar registros faltantes.')">
-                                    {% csrf_token %}
-                                    <button type="submit"
-                                            class="inline-flex items-center justify-center w-full sm:w-auto gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
-                                        <i class="fas fa-lock"></i> Cerrar sesión
-                                    </button>
-                                </form>
-                                {% elif dato.sesion.estado == 'CERRADA' %}
-                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
-                                      onsubmit="return confirm('¿Marcar {{ dato.sesion }} como FACTURADA?\nLos montos quedan definitivos.')">
-                                    {% csrf_token %}
-                                    <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
-                                    <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
-                                              placeholder="Motivo obligatorio para FACTURAR"
-                                              class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
-                                    <button type="submit"
-                                            class="inline-flex items-center justify-center w-full sm:w-auto gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
-                                        <i class="fas fa-file-invoice-dollar"></i> Marcar Facturada
-                                    </button>
-                                </form>
-                                {% elif dato.sesion.estado == 'FACTURADA' %}
-                                <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
-                                      onsubmit="return confirm('¿Marcar {{ dato.sesion }} como PAGADA?\nEsta acción es irreversible.')">
-                                    {% csrf_token %}
-                                    <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
-                                    <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
-                                              placeholder="Motivo obligatorio para PAGAR"
-                                              class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500"></textarea>
-                                    <button type="submit"
-                                            class="inline-flex items-center justify-center w-full sm:w-auto gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
-                                        <i class="fas fa-check-double"></i> Marcar Pagada
-                                    </button>
-                                </form>
-                                {% endif %}
-                            {% elif dato.sesion.estado == 'PAGADA' %}
-                            <span class="text-xs text-gray-400 italic">Liquidada</span>
-                            {% else %}
-                            <span class="text-xs text-gray-400 italic">Sin permiso</span>
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center text-xs text-slate-500">
+                            <span>Apertura: {{ dato.sesion.fecha_apertura|date:"d/m/Y" }}</span>
+                            {% if dato.sesion.fecha_cierre %}
+                                <span class="mx-2 text-slate-400">|</span>
+                                <span>Cierre: {{ dato.sesion.fecha_cierre|date:"d/m/Y H:i" }}</span>
                             {% endif %}
-                        </td>
+                            {% if dato.sesion.cerrada_por %}
+                                <span class="mx-2 text-slate-400">|</span>
+                                <span>Por: {{ dato.sesion.cerrada_por.get_full_name }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            {% if dato.gate_bloqueantes_count %}
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 whitespace-nowrap">
+                                {{ dato.gate_bloqueantes_count }} bloqueante(s)
+                            </span>
+                            {% endif %}
+                            {% if dato.gate_advertencias_count %}
+                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap">
+                                {{ dato.gate_advertencias_count }} advertencia(s)
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
 
-                    </tr>
-                    <tr class="bg-slate-50/70">
-                        <td colspan="6" class="px-3 md:px-6 py-4">
-                            <div class="mb-4 rounded-lg border border-slate-200 bg-white p-3">
-                                <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Checklist de cierre</p>
-                                    {% if dato.checklist_cierre.proximo_paso %}
-                                    <p class="text-xs text-gray-500">
-                                        Próximo paso:
-                                        <span class="font-semibold text-gray-700">{{ dato.checklist_cierre.proximo_paso.label }}</span>
-                                    </p>
-                                    {% endif %}
-                                </div>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    {% for item in dato.checklist_cierre.items %}
-                                    <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold
-                                        {% if item.estado == 'ok' %}bg-emerald-100 text-emerald-800
-                                        {% elif item.estado == 'bloqueante' %}bg-red-100 text-red-800
-                                        {% elif item.estado == 'advertencia' %}bg-amber-100 text-amber-800
-                                        {% else %}bg-slate-100 text-slate-700{% endif %}">
-                                        {{ item.label }}:
-                                        <span class="uppercase">{{ item.estado }}</span>
-                                        {% if item.detalle %}
-                                        <span class="font-normal opacity-80">({{ item.detalle }})</span>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 xl:min-w-[460px] items-stretch">
+                        <div class="h-full min-h-[104px] rounded-xl border border-slate-200 bg-white px-4 py-3 flex flex-col justify-between">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Prácticas</p>
+                            <p class="mt-1 text-2xl font-bold text-slate-900">{{ dato.count_practicas }}</p>
+                            <p class="text-xs text-slate-400">${{ dato.total_monto_practicas|floatformat:0 }}</p>
+                        </div>
+                        <div class="h-full min-h-[104px] rounded-xl border border-slate-200 bg-white px-4 py-3 flex flex-col justify-between">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Guardias</p>
+                            <p class="mt-1 text-2xl font-bold text-slate-900">{{ dato.count_guardias }}</p>
+                            <p class="text-xs text-slate-400">${{ dato.total_monto_guardias|floatformat:0 }}</p>
+                        </div>
+                        <div class="h-full min-h-[104px] rounded-xl border border-slate-200 bg-white px-4 py-3 col-span-2 flex flex-col justify-between">
+                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total general</p>
+                            <p class="mt-1 text-2xl font-bold text-slate-900">${{ dato.total_general|floatformat:0 }}</p>
+                            <p class="text-xs text-slate-400">Siguiente estado: {{ dato.siguiente_estado|default:"Sin transición" }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-4 md:px-6 py-4 bg-white">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+                    <div class="h-full col-span-2 rounded-lg border px-3 py-2
+                        {% if dato.checklist_cierre.estado_global == 'bloqueante' %}border-red-200 bg-red-50
+                        {% elif dato.checklist_cierre.estado_global == 'advertencia' or dato.checklist_cierre.estado_global == 'pendiente' %}border-amber-200 bg-amber-50
+                        {% else %}border-emerald-200 bg-emerald-50{% endif %}">
+                        <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider
+                                    {% if dato.checklist_cierre.estado_global == 'bloqueante' %}text-red-800
+                                    {% elif dato.checklist_cierre.estado_global == 'advertencia' or dato.checklist_cierre.estado_global == 'pendiente' %}text-amber-800
+                                    {% else %}text-emerald-800{% endif %}">
+                                    Estado de cierre
+                                </p>
+                                <p class="mt-0.5 text-xs text-gray-700">
+                                    Próximo paso recomendado:
+                                    <span class="font-semibold">
+                                        {% if dato.checklist_cierre.proximo_paso %}
+                                            {{ dato.checklist_cierre.proximo_paso.label }}
+                                        {% else %}
+                                            Sin acciones pendientes
                                         {% endif %}
                                     </span>
-                                    {% endfor %}
-                                </div>
+                                </p>
                             </div>
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                <div class="lg:col-span-1">
-                                    <p class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Exportación</p>
+                            {% if dato.checklist_cierre.proximo_paso.url %}
+                            <a href="{{ dato.checklist_cierre.proximo_paso.url }}"
+                               class="inline-flex items-center justify-center rounded-md px-3 py-1 text-xs font-semibold text-white transition-colors
+                               {% if dato.checklist_cierre.estado_global == 'bloqueante' %}bg-red-700 hover:bg-red-800
+                               {% elif dato.checklist_cierre.estado_global == 'advertencia' or dato.checklist_cierre.estado_global == 'pendiente' %}bg-amber-700 hover:bg-amber-800
+                               {% else %}bg-emerald-700 hover:bg-emerald-800{% endif %}">
+                                Ir
+                            </a>
+                            {% endif %}
+                        </div>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            {% for item in dato.checklist_cierre.items %}
+                                {% if item.url %}
+                                <a href="{{ item.url }}"
+                                   class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors
+                                   {% if item.estado == 'ok' %}border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-200
+                                   {% elif item.estado == 'bloqueante' %}border-red-200 bg-red-100 text-red-800 hover:bg-red-200
+                                   {% elif item.estado == 'advertencia' %}border-amber-200 bg-amber-100 text-amber-800 hover:bg-amber-200
+                                   {% else %}border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200{% endif %}">
+                                    <span class="h-1.5 w-1.5 rounded-full
+                                        {% if item.estado == 'ok' %}bg-emerald-600
+                                        {% elif item.estado == 'bloqueante' %}bg-red-600
+                                        {% elif item.estado == 'advertencia' %}bg-amber-600
+                                        {% else %}bg-slate-400{% endif %}"></span>
+                                    <span>{{ item.label_corto }}</span>
+                                    {% if item.detalle_corto %}<span class="font-normal opacity-80">({{ item.detalle_corto }})</span>{% endif %}
+                                </a>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold
+                                    {% if item.estado == 'ok' %}border-emerald-200 bg-emerald-100 text-emerald-800
+                                    {% elif item.estado == 'bloqueante' %}border-red-200 bg-red-100 text-red-800
+                                    {% elif item.estado == 'advertencia' %}border-amber-200 bg-amber-100 text-amber-800
+                                    {% else %}border-slate-200 bg-slate-100 text-slate-700{% endif %}">
+                                    <span class="h-1.5 w-1.5 rounded-full
+                                        {% if item.estado == 'ok' %}bg-emerald-600
+                                        {% elif item.estado == 'bloqueante' %}bg-red-600
+                                        {% elif item.estado == 'advertencia' %}bg-amber-600
+                                        {% else %}bg-slate-400{% endif %}"></span>
+                                    <span>{{ item.label_corto }}</span>
+                                    {% if item.detalle_corto %}<span class="font-normal opacity-80">({{ item.detalle_corto }})</span>{% endif %}
+                                </span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div id="acciones-sesion-{{ dato.sesion.pk }}" class="h-full col-span-2 md:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-4 min-h-[120px]">
+                        <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Acción principal</p>
+                        {% if dato.puede_transicionar and dato.siguiente_estado %}
+                            {% if dato.sesion.estado == 'ABIERTA' %}
+                            <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                  onsubmit="return confirm('¿Pasar {{ dato.sesion }} a REVISIÓN?\nLos médicos seguirán pudiendo registrar.')">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center w-full gap-1 px-3 py-2 text-sm font-semibold text-white bg-yellow-500 hover:bg-yellow-600 rounded-lg transition-colors">
+                                    <i class="fas fa-search"></i> Pasar a Revisión
+                                </button>
+                            </form>
+                            {% elif dato.sesion.estado == 'REVISION' %}
+                            <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                  onsubmit="return confirm('¿Cerrar {{ dato.sesion }}?\nSolo admin podrá cargar registros faltantes.')">
+                                {% csrf_token %}
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center w-full gap-1 px-3 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                                    <i class="fas fa-lock"></i> Cerrar sesión
+                                </button>
+                            </form>
+                            {% elif dato.sesion.estado == 'CERRADA' %}
+                            <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                  onsubmit="return confirm('¿Marcar {{ dato.sesion }} como FACTURADA?\nLos montos quedan definitivos.')">
+                                {% csrf_token %}
+                                <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
+                                <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
+                                          placeholder="Motivo obligatorio para FACTURAR"
+                                          class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-purple-500"></textarea>
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center w-full gap-1 px-3 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors">
+                                    <i class="fas fa-file-invoice-dollar"></i> Marcar Facturada
+                                </button>
+                            </form>
+                            {% elif dato.sesion.estado == 'FACTURADA' %}
+                            <form method="post" action="{% url 'liquidacion:sesion_transicion' dato.sesion.pk %}"
+                                  onsubmit="return confirm('¿Marcar {{ dato.sesion }} como PAGADA?\nEsta acción es irreversible.')">
+                                {% csrf_token %}
+                                <label for="motivo_sesion_{{ dato.sesion.pk }}" class="sr-only">Motivo</label>
+                                <textarea id="motivo_sesion_{{ dato.sesion.pk }}" name="motivo" rows="2" required
+                                          placeholder="Motivo obligatorio para PAGAR"
+                                          class="w-full mb-2 px-2 py-1.5 text-xs border border-gray-300 rounded-md focus:ring-2 focus:ring-slate-500 focus:border-slate-500"></textarea>
+                                <button type="submit"
+                                        class="inline-flex items-center justify-center w-full gap-1 px-3 py-2 text-sm font-semibold text-white bg-gray-600 hover:bg-gray-700 rounded-lg transition-colors">
+                                    <i class="fas fa-check-double"></i> Marcar Pagada
+                                </button>
+                            </form>
+                            {% endif %}
+                        {% elif dato.sesion.estado == 'PAGADA' %}
+                        <span class="inline-flex items-center rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-500 italic">Liquidada</span>
+                        {% else %}
+                        <span class="inline-flex items-center rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm text-slate-500 italic">Sin permiso</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-4 max-w-max mx-auto grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Exportación</p>
                                     <div class="flex flex-wrap items-center gap-2">
+                                        {% if dato.sesion.estado != 'FACTURADA' and dato.sesion.estado != 'PAGADA' %}
                                         <a href="{% url 'liquidacion:exportar_excel_liquidacion' %}?mes={{ dato.sesion.mes }}&año={{ dato.sesion.año }}"
                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
                                             <i class="fas fa-file-export"></i> Exportar PRELIMINAR
                                         </a>
+                                        {% endif %}
                                         {% if dato.sesion.estado == 'FACTURADA' or dato.sesion.estado == 'PAGADA' %}
                                         <a href="{% url 'liquidacion:exportar_excel_liquidacion_definitiva' %}?mes={{ dato.sesion.mes }}&año={{ dato.sesion.año }}"
                                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition-colors">
@@ -227,17 +261,17 @@
                                               title="Disponible solo cuando la sesión está FACTURADA o PAGADA.">
                                             <i class="fas fa-lock"></i> Exportar DEFINITIVA
                                         </span>
-                                        <span class="text-[11px] text-gray-400">Definitiva habilitada solo en FACTURADA/PAGADA.</span>
+                                        <span class="text-[11px] text-slate-400">Definitiva habilitada solo en FACTURADA/PAGADA.</span>
                                         {% endif %}
                                     </div>
                                 </div>
 
-                                <div class="lg:col-span-1">
-                                    <details class="group">
-                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <details id="gate-sesion-{{ dato.sesion.pk }}" class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                             <span>Preview gate administrativo</span>
-                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
-                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                            <span class="text-slate-400 group-open:hidden">(ver)</span>
+                                            <span class="text-slate-400 hidden group-open:inline">(ocultar)</span>
                                         </summary>
                                         <div class="mt-2 space-y-1 text-xs">
                                             {% if dato.gate_bloqueantes_preview %}
@@ -251,21 +285,21 @@
                                                 {% endfor %}
                                             {% endif %}
                                             {% if not dato.gate_bloqueantes_preview and not dato.gate_advertencias_preview %}
-                                            <p class="text-gray-500">Sin hallazgos para la próxima transición.</p>
+                                            <p class="text-slate-500">Sin hallazgos para la próxima transición.</p>
                                             {% endif %}
                                         </div>
                                     </details>
                                 </div>
 
-                                <div class="lg:col-span-1">
-                                    <details class="group">
-                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <details id="auditoria-eco-sesion-{{ dato.sesion.pk }}" class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                             <span>Auditoría residentes ECO</span>
-                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
-                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                            <span class="text-slate-400 group-open:hidden">(ver)</span>
+                                            <span class="text-slate-400 hidden group-open:inline">(ocultar)</span>
                                         </summary>
                                         <div class="mt-2 space-y-2 text-xs">
-                                            <p class="text-gray-700">
+                                            <p class="text-slate-700">
                                                 Residentes con alertas: <span class="font-semibold">{{ dato.auditoria_residentes_eco.residentes_con_alertas }} / {{ dato.auditoria_residentes_eco.total_residentes }}</span>
                                             </p>
                                             <div class="flex flex-wrap items-center gap-2">
@@ -280,62 +314,57 @@
                                             {% if dato.auditoria_residentes_eco.top_alertas %}
                                                 <div class="space-y-1">
                                                     {% for item in dato.auditoria_residentes_eco.top_alertas %}
-                                                        <p class="text-gray-700 flex flex-wrap items-center gap-2">
+                                                        <p class="text-slate-700 flex flex-wrap items-center gap-2">
                                                             <span class="font-medium">{{ item.medico_nombre }}</span>
                                                             {% if item.severidad == 'roja' %}
                                                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-red-100 text-red-800">Roja</span>
                                                             {% else %}
                                                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800">Amarilla</span>
                                                             {% endif %}
-                                                            <span class="text-gray-500">({{ item.cantidad_alertas }} alerta{{ item.cantidad_alertas|pluralize:'s' }})</span>
+                                                            <span class="text-slate-500">({{ item.cantidad_alertas }} alerta{{ item.cantidad_alertas|pluralize:'s' }})</span>
                                                         </p>
                                                     {% endfor %}
                                                 </div>
-                                                <p class="text-gray-500">Detalle próximamente.</p>
+                                                <p class="text-slate-500">Detalle próximamente.</p>
                                             {% else %}
-                                                <p class="text-gray-500">Sin alertas de auditoría ECO en esta sesión.</p>
+                                                <p class="text-slate-500">Sin alertas de auditoría ECO en esta sesión.</p>
                                             {% endif %}
                                         </div>
                                     </details>
                                 </div>
 
-                                <div class="lg:col-span-1">
-                                    <details class="group">
-                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <details id="historial-sesion-{{ dato.sesion.pk }}" class="group">
+                                        <summary class="cursor-pointer list-none text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                                             <span>Historial ({{ dato.historial_count }})</span>
-                                            <span class="text-gray-400 group-open:hidden">(ver)</span>
-                                            <span class="text-gray-400 hidden group-open:inline">(ocultar)</span>
+                                            <span class="text-slate-400 group-open:hidden">(ver)</span>
+                                            <span class="text-slate-400 hidden group-open:inline">(ocultar)</span>
                                         </summary>
-                                        <div class="mt-2 space-y-2">
+                                        <div class="mt-2 space-y-2 max-h-56 overflow-y-auto pr-1">
                                             {% for mov in dato.historial_reciente %}
-                                            <div class="text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white">
-                                                <p class="text-gray-700 font-medium">{{ mov.estado_anterior }} → {{ mov.estado_nuevo }}</p>
-                                                <p class="text-gray-500">{{ mov.fecha|date:"d/m/Y H:i" }} · {{ mov.origen }} · {{ mov.usuario|default:"Sistema" }}</p>
+                                            <div class="text-xs border border-slate-200 rounded-md px-2 py-1.5 bg-white">
+                                                <p class="text-slate-700 font-medium">{{ mov.estado_anterior }} → {{ mov.estado_nuevo }}</p>
+                                                <p class="text-slate-500">{{ mov.fecha|date:"d/m/Y H:i" }} · {{ mov.origen }} · {{ mov.usuario|default:"Sistema" }}</p>
                                                 {% if mov.motivo %}
-                                                <p class="text-gray-600 mt-0.5">Motivo: {{ mov.motivo }}</p>
+                                                <p class="text-slate-600 mt-0.5">Motivo: {{ mov.motivo }}</p>
                                                 {% endif %}
                                             </div>
                                             {% empty %}
-                                            <p class="text-xs text-gray-500">Sin transiciones registradas.</p>
+                                            <p class="text-xs text-slate-500">Sin transiciones registradas.</p>
                                             {% endfor %}
                                         </div>
                                     </details>
                                 </div>
-                            </div>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="6" class="px-3 md:px-6 py-12 text-center">
+                </div>
+            </div>
+        </section>
+        {% empty %}
+        <div class="bg-white rounded-xl shadow-md border border-gray-200 px-3 md:px-6 py-12 text-center">
                             <i class="fas fa-calendar-times text-4xl text-gray-200 block mb-3"></i>
                             <p class="text-gray-500 text-sm">No hay sesiones contables registradas todavía.</p>
                             <p class="text-gray-400 text-xs mt-1">Se crean automáticamente al registrar la primera práctica del mes.</p>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
+        {% endfor %}
     </div>
 
     <!-- Ayuda operativa -->

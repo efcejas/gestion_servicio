@@ -86,6 +86,66 @@ def _puede_acceder_panel_administrativo(user):
     return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
 
 
+def _enriquecer_checklist_cierre_visual(checklist, sesion):
+    """Agrega datos de presentacion sin cambiar la logica del checklist."""
+    base_solicitudes_url = reverse('liquidacion:solicitudes_revision_horario_list')
+    sesion_pk = sesion.pk
+    sesion_rrhh_habilitada = sesion.estado in ['CERRADA', 'FACTURADA', 'PAGADA']
+
+    urls_por_item = {
+        'registros_validos': f'#gate-sesion-{sesion_pk}',
+        'solicitudes_pendientes': (
+            f'{base_solicitudes_url}?sesion={sesion_pk}'
+            f'&estado={SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE}'
+        ),
+        'aprobadas_sin_aplicar': (
+            f'{base_solicitudes_url}?sesion={sesion_pk}'
+            f'&estado={SolicitudRevisionHorarioRegistro.ESTADO_APROBADA}'
+        ),
+        'auditoria_residentes_eco': f'#auditoria-eco-sesion-{sesion_pk}',
+        'preparacion_rrhh': (
+            reverse('liquidacion:preparacion_rrhh_preview', kwargs={'pk': sesion_pk})
+            if sesion_rrhh_habilitada
+            else None
+        ),
+        'lista_para_facturar': f'#acciones-sesion-{sesion_pk}',
+        'sesion_pagada': f'#historial-sesion-{sesion_pk}',
+    }
+    labels_cortos = {
+        'registros_validos': 'Registros',
+        'solicitudes_pendientes': 'Solicitudes',
+        'aprobadas_sin_aplicar': 'Aplicaciones',
+        'auditoria_residentes_eco': 'Auditoría ECO',
+        'preparacion_rrhh': 'RRHH',
+        'lista_para_facturar': 'Facturación',
+        'sesion_pagada': 'Pago',
+    }
+
+    for item in checklist.get('items', []):
+        key = item.get('key')
+        item['url'] = urls_por_item.get(key)
+        item['label_corto'] = labels_cortos.get(key, item.get('label'))
+        item['detalle_corto'] = ''
+
+        if key == 'preparacion_rrhh':
+            if not sesion_rrhh_habilitada:
+                item['detalle_corto'] = 'No disponible'
+            elif item.get('estado') == 'ok':
+                item['detalle_corto'] = 'Preparado'
+            elif item.get('estado') == 'advertencia':
+                item['detalle_corto'] = 'Borrador'
+            else:
+                item['detalle_corto'] = 'Preparación pendiente'
+        elif item.get('count'):
+            item['detalle_corto'] = str(item['count'])
+
+    proximo_paso = checklist.get('proximo_paso')
+    if proximo_paso:
+        proximo_paso['url'] = urls_por_item.get(proximo_paso.get('key'))
+
+    return checklist
+
+
 def _build_diagnostico_recalculo_b3(solicitud):
     """Diagnostico solo lectura para explicar el recalculo B3."""
     if not solicitud.fecha_aplicacion:
@@ -2466,7 +2526,10 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
             auditoria_residentes_eco = auditar_residentes_eco_por_sesion(sesion)
-            checklist_cierre = construir_checklist_cierre_sesion(sesion, user=user)
+            checklist_cierre = _enriquecer_checklist_cierre_visual(
+                construir_checklist_cierre_sesion(sesion, user=user),
+                sesion,
+            )
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
