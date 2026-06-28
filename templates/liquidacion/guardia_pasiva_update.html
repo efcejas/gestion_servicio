@@ -24,7 +24,7 @@
                     </div>
                 </div>
 
-                <a href="{% url 'liquidacion:registrar_guardia_pasiva' %}"
+                <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:registrar_guardia_pasiva' %}{% endif %}"
                    class="inline-flex items-center px-5 py-2.5 bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-medium rounded-xl transition-all border border-white/30 shadow-lg hover:shadow-xl">
                     <i class="fas fa-arrow-left mr-2"></i>Volver
                 </a>

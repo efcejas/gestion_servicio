@@ -257,5 +257,17 @@ class ChecklistCierreSesionTest(TestCase):
             if issue.get('registro_id') == registro.pk
         ]
         self.assertTrue(acciones)
-        self.assertEqual(acciones[0]['label'], 'Ver registro')
-        self.assertIn(f'focus_registro={registro.pk}', acciones[0]['url'])
+        self.assertEqual(acciones[0]['label'], 'Inspeccionar registro')
+        self.assertIn(reverse('liquidacion:registroestudios_admin_detalle', args=[registro.pk]), acciones[0]['url'])
+
+    def test_admin_puede_inspeccionar_registro_desde_cierre(self):
+        registro = self._crear_registro(monto=Decimal('0.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_admin_detalle', args=[registro.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['registro'].pk, registro.pk)

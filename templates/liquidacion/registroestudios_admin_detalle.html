@@ -1,0 +1,156 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Inspeccion de registro{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="mb-4">
+        <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:sesiones_list' %}{% endif %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            {% if volver_sesion_url %}Volver a la sesion contable{% else %}Volver a sesiones{% endif %}
+        </a>
+    </div>
+
+    <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <h1 class="text-2xl font-bold mb-1">Inspeccion administrativa de registro</h1>
+        <p class="text-slate-300 text-sm">Vista solo lectura para entender bloqueantes de cierre. No modifica montos ni recalcula.</p>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
+        <div class="xl:col-span-2 rounded-xl border border-gray-200 bg-white shadow-md p-5">
+            <h2 class="text-sm font-bold text-gray-900 mb-4">Datos principales</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p class="text-gray-500">Registro</p>
+                    <p class="font-semibold text-gray-900">#{{ registro.pk }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Sesion contable</p>
+                    <p class="font-semibold text-gray-900">
+                        {% if registro.sesion_contable %}
+                            {{ registro.sesion_contable.mes }}/{{ registro.sesion_contable.año }} - {{ registro.sesion_contable.get_estado_display }}
+                        {% else %}
+                            Sin sesion
+                        {% endif %}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Medico</p>
+                    <p class="font-semibold text-gray-900">{{ registro.medico.get_full_name|default:registro.medico.username }}</p>
+                    <p class="text-xs text-gray-500">{{ registro.medico.rol }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Paciente</p>
+                    <p class="font-semibold text-gray-900">{{ registro.apellido_paciente }}, {{ registro.nombre_paciente }}</p>
+                    <p class="text-xs text-gray-500">DNI {{ registro.dni_paciente }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Fecha del informe</p>
+                    <p class="font-semibold text-gray-900">{{ registro.fecha_del_informe|date:"d/m/Y" }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Fecha de carga</p>
+                    <p class="font-semibold text-gray-900">{{ registro.fecha_registro|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white shadow-md p-5">
+            <h2 class="text-sm font-bold text-gray-900 mb-4">Liquidacion persistida</h2>
+            <div class="space-y-3 text-sm">
+                <div>
+                    <p class="text-gray-500">Horario</p>
+                    <p class="font-semibold text-gray-900">{{ registro.get_horario_display }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Obra social</p>
+                    <p class="font-semibold text-gray-900">{{ registro.get_tipo_obra_social_display }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500">Monto calculado</p>
+                    <p class="text-2xl font-bold {% if registro.monto_calculado <= 0 %}text-red-700{% else %}text-gray-900{% endif %}">
+                        ${{ registro.monto_calculado|floatformat:2 }}
+                    </p>
+                </div>
+                {% if registro.liquidar_como_extra_residencia %}
+                <div class="rounded-md bg-indigo-50 border border-indigo-100 px-3 py-2 text-xs text-indigo-800">
+                    Liquidado como Extra Residencia por actividad asistencial fuera de rol docente.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-gray-200 bg-white shadow-md overflow-hidden">
+            <div class="px-5 py-3 border-b border-gray-100">
+                <h2 class="text-sm font-bold text-gray-900">Estudios asociados</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full divide-y divide-gray-100">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Estudio</th>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Grupo</th>
+                            <th class="px-4 py-2 text-right text-xs font-semibold text-gray-500 uppercase">Cant.</th>
+                            <th class="px-4 py-2 text-left text-xs font-semibold text-gray-500 uppercase">Contexto</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for rel in registro.registroestudio_set.all %}
+                        <tr>
+                            <td class="px-4 py-2 text-sm text-gray-900">{{ rel.estudio.nombre }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-700">{{ rel.estudio.tipo }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-700">
+                                {% if rel.estudio.grupo_tarifario %}
+                                    {{ rel.estudio.grupo_tarifario.codigo }}
+                                {% else %}
+                                    <span class="text-amber-700 font-semibold">Sin grupo</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2 text-sm text-gray-900 text-right">{{ rel.cantidad }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-700">{{ rel.get_contexto_display }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center text-sm text-red-600">Sin estudios asociados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="rounded-xl border border-gray-200 bg-white shadow-md p-5">
+            <h2 class="text-sm font-bold text-gray-900 mb-4">Trazabilidad y revision horaria</h2>
+            <div class="mb-4 text-sm">
+                <p class="text-gray-500">Ultima modificacion</p>
+                <p class="font-semibold text-gray-900">{{ registro.fecha_modificacion|date:"d/m/Y H:i"|default:"-" }}</p>
+                <p class="text-xs text-gray-600">{{ registro.motivo_modificacion|default:"Sin motivo registrado." }}</p>
+            </div>
+
+            <div class="space-y-2">
+                {% for solicitud in solicitudes_revision %}
+                <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <p class="font-semibold text-gray-900">{{ solicitud.get_estado_display }}</p>
+                        <a href="{% url 'liquidacion:solicitudes_revision_horario_detalle' solicitud.pk %}"
+                           class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">
+                            Ver solicitud
+                        </a>
+                    </div>
+                    <p class="text-xs text-gray-600">Solicitado: {{ solicitud.fecha_solicitud|date:"d/m/Y H:i" }}</p>
+                    {% if solicitud.fecha_aplicacion %}
+                    <p class="text-xs text-gray-600">Aplicado: {{ solicitud.fecha_aplicacion|date:"d/m/Y H:i" }}</p>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <p class="text-sm text-gray-500">Sin solicitudes de revision horaria para este registro.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

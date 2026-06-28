@@ -4,10 +4,10 @@
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
     <div class="mb-4 flex flex-wrap items-center gap-3">
-        <a href="{% url 'liquidacion:grupos_tarifarios_list' %}"
+        <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:grupos_tarifarios_list' %}{% endif %}"
            class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
             <i class="fas fa-arrow-left"></i>
-            Volver a grupos tarifarios
+            {% if volver_sesion_url %}Volver a la sesión contable{% else %}Volver a grupos tarifarios{% endif %}
         </a>
     </div>
 
@@ -19,7 +19,7 @@
                 <p class="text-slate-300 text-sm">Auditoria administrativa de vigencias, historial de tarifas y estudios asociados.</p>
             </div>
             {% if user.is_superuser or user.rol == 'administrativo' or user.rol == 'jefe_servicio' %}
-            <a href="{% url 'liquidacion:grupo_tarifario_tarifa_nueva' grupo.pk %}"
+            <a href="{% url 'liquidacion:grupo_tarifario_tarifa_nueva' grupo.pk %}{% if volver_sesion_id %}?volver_sesion={{ volver_sesion_id }}{% endif %}"
                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors shrink-0">
                 <i class="fas fa-plus"></i>
                 Nueva tarifa

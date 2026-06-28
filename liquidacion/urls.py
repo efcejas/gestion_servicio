@@ -5,6 +5,7 @@ from .views import (
     EstudiosUpdateView,
     SolicitudRevisionHorarioRegistroCreateView,
     RegistroEstudiosPorMedicoCreateView,
+    RegistroEstudiosPorMedicoAdminDetailView,
     RegistroEstudiosPorMedicoListView,
     RegistroEstudiosPorMedicoUpdateView,
     RegistroEstudiosPorMedicoDeleteView,
@@ -93,6 +94,7 @@ urlpatterns = [
     # Rutas para Registro de Estudios por Medico
     path('registro_estudios_por_medico/nuevo/', RegistroEstudiosPorMedicoCreateView.as_view(), name='registroestudios_nuevo'),
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
+    path('registro_estudios_por_medico/<int:pk>/inspeccionar/', RegistroEstudiosPorMedicoAdminDetailView.as_view(), name='registroestudios_admin_detalle'),
     path(
         'registro_estudios_por_medico/<int:registro_pk>/solicitar-revision/',
         SolicitudRevisionHorarioRegistroCreateView.as_view(),

@@ -103,7 +103,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
             f'{base_solicitudes_url}?sesion={sesion_pk}'
             f'&estado={SolicitudRevisionHorarioRegistro.ESTADO_APROBADA}'
         ),
-        'auditoria_residentes_eco': f'#auditoria-eco-sesion-{sesion_pk}',
+        'auditoria_residentes_eco': None,
         'preparacion_rrhh': (
             reverse('liquidacion:preparacion_rrhh_preview', kwargs={'pk': sesion_pk})
             if sesion_rrhh_habilitada
@@ -149,16 +149,20 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
     return checklist
 
 
-def _registro_focus_url(registro_id, fecha=None):
-    params = {'focus_registro': registro_id}
-    if fecha:
-        if isinstance(fecha, str):
-            partes_fecha = fecha.split('-')
-            if len(partes_fecha) >= 2:
-                params.update({'mes': partes_fecha[1], 'año': partes_fecha[0]})
-        else:
-            params.update({'mes': fecha.month, 'año': fecha.year})
-    return f"{reverse('liquidacion:registroestudios_list')}?{urlencode(params)}#registro-{registro_id}"
+def _volver_sesion_id(request):
+    return (request.GET.get('volver_sesion') or request.POST.get('volver_sesion') or '').strip()
+
+
+def _volver_sesion_url(request):
+    sesion_id = _volver_sesion_id(request)
+    if not sesion_id:
+        return ''
+    return f"{reverse('liquidacion:sesiones_list')}#sesion-card-{sesion_id}"
+
+
+def _query_volver_sesion(sesion):
+    sesion_id = getattr(sesion, 'pk', None)
+    return {'volver_sesion': sesion_id} if sesion_id else {}
 
 
 def _accion_para_issue_cierre(issue, sesion=None):
@@ -177,44 +181,64 @@ def _accion_para_issue_cierre(issue, sesion=None):
         if issue.get('estado_solicitud'):
             params['estado'] = issue['estado_solicitud']
         return {
-            'label': 'Ver solicitudes',
+            'label': 'Resolver solicitudes' if issue.get('estado') == 'bloqueante' else 'Revisar solicitudes',
             'url': f"{reverse('liquidacion:solicitudes_revision_horario_list')}?{urlencode(params)}",
         }
 
     if tipo == 'recalculo_b3' and sesion_id:
         return {
-            'label': 'Ver solicitudes',
+            'label': 'Revisar solicitudes',
             'url': f"{reverse('liquidacion:solicitudes_revision_horario_list')}?{urlencode({'sesion': sesion_id})}",
         }
 
     if tipo in {'sin_tarifa_vigente_grupo', 'contextual_sin_tarifa'} and grupo_id:
+        params = _query_volver_sesion(sesion)
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo_id})
+        if params:
+            url = f'{url}?{urlencode(params)}'
         return {
             'label': 'Cargar tarifa',
-            'url': reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo_id}),
+            'url': url,
         }
 
     if tipo == 'contextual_sin_grupo':
+        params = _query_volver_sesion(sesion)
+        url = reverse('liquidacion:grupos_tarifarios_list')
+        if params:
+            url = f'{url}?{urlencode(params)}'
         return {
-            'label': 'Ver grupos',
-            'url': reverse('liquidacion:grupos_tarifarios_list'),
+            'label': 'Revisar grupos tarifarios',
+            'url': url,
         }
 
     if tipo in {'sin_precio_resoluble', 'sin_grupo_con_fallback'} and estudio_id:
+        params = _query_volver_sesion(sesion)
+        url = reverse('liquidacion:estudios_edit', kwargs={'pk': estudio_id})
+        if params:
+            url = f'{url}?{urlencode(params)}'
         return {
-            'label': 'Ver estudio',
-            'url': reverse('liquidacion:estudios_edit', kwargs={'pk': estudio_id}),
+            'label': 'Revisar estudio',
+            'url': url,
         }
 
     if guardia_id:
+        params = _query_volver_sesion(sesion)
+        url = reverse('liquidacion:editar_guardia_pasiva', kwargs={'pk': guardia_id})
+        if params:
+            url = f'{url}?{urlencode(params)}'
         return {
             'label': 'Editar guardia',
-            'url': reverse('liquidacion:editar_guardia_pasiva', kwargs={'pk': guardia_id}),
+            'url': url,
         }
 
     if registro_id:
+        params = _query_volver_sesion(sesion)
+        url = reverse('liquidacion:registroestudios_admin_detalle', kwargs={'pk': registro_id})
+        if params:
+            url = f'{url}?{urlencode(params)}'
         return {
-            'label': 'Ver registro',
-            'url': _registro_focus_url(registro_id, fecha),
+            'label': 'Inspeccionar registro',
+            'url': url,
         }
 
     return None
@@ -369,6 +393,8 @@ class GruposTarifariosListView(LoginRequiredMixin, UserPassesTestMixin, ListView
             })
 
         context['grupos_data'] = grupos_data
+        context['volver_sesion_id'] = _volver_sesion_id(self.request)
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
         return context
 
 
@@ -423,6 +449,8 @@ class GrupoTarifarioDetalleView(LoginRequiredMixin, UserPassesTestMixin, DetailV
         context['estudios_asociados'] = estudios_asociados
         context['cantidad_estudios_asociados'] = len(estudios_asociados)
         context['tiene_tarifa_vigente'] = tarifa_vigente is not None
+        context['volver_sesion_id'] = _volver_sesion_id(self.request)
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
         return context
 
 
@@ -459,11 +487,16 @@ class GrupoTarifarioTarifaNuevaView(LoginRequiredMixin, UserPassesTestMixin, Suc
         return super().form_valid(form)
 
     def get_success_url(self):
+        volver_sesion = _volver_sesion_url(self.request)
+        if volver_sesion:
+            return volver_sesion
         return reverse('liquidacion:grupo_tarifario_detalle', kwargs={'pk': self.grupo_tarifario.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['grupo'] = self.grupo_tarifario
+        context['volver_sesion_id'] = _volver_sesion_id(self.request)
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
         return context
 
 
@@ -588,6 +621,44 @@ class SolicitudRevisionHorarioAdminDetailView(LoginRequiredMixin, UserPassesTest
             and sesion.estado in ['ABIERTA', 'REVISION']
         )
         context['diagnostico_recalculo_b3'] = _build_diagnostico_recalculo_b3(self.object)
+        return context
+
+
+class RegistroEstudiosPorMedicoAdminDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+    """Inspeccion administrativa read-only de un registro que bloquea el cierre."""
+
+    model = RegistroEstudiosPorMedico
+    template_name = 'liquidacion/registroestudios_admin_detalle.html'
+    context_object_name = 'registro'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para inspeccionar registros de liquidacion.')
+        return redirect('home')
+
+    def get_queryset(self):
+        return (
+            RegistroEstudiosPorMedico.objects
+            .select_related('medico', 'sesion_contable')
+            .prefetch_related(
+                Prefetch(
+                    'registroestudio_set',
+                    queryset=RegistroEstudio.objects.select_related('estudio__grupo_tarifario').order_by('id'),
+                )
+            )
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
+        context['solicitudes_revision'] = (
+            SolicitudRevisionHorarioRegistro.objects
+            .filter(registro=self.object)
+            .select_related('solicitado_por', 'revisado_por', 'aplicado_por')
+            .order_by('-fecha_solicitud')
+        )
         return context
 
 
@@ -908,6 +979,17 @@ class EstudiosUpdateView(LoginRequiredMixin, UserPassesTestMixin, SuccessMessage
 
     def test_func(self):
         return _puede_acceder_panel_administrativo(self.request.user)
+
+    def get_success_url(self):
+        volver_sesion = _volver_sesion_url(self.request)
+        if volver_sesion:
+            return volver_sesion
+        return super().get_success_url()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
+        return context
 
 
 class EstudiosListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -1384,6 +1466,12 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         kwargs['user'] = self.request.user
         return kwargs
 
+    def get_success_url(self):
+        volver_sesion = _volver_sesion_url(self.request)
+        if volver_sesion:
+            return volver_sesion
+        return super().get_success_url()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         guardia = self.object
@@ -1392,7 +1480,8 @@ class GuardiaPasivaUpdateView(LoginRequiredMixin, SuccessMessageMixin, UpdateVie
         context['sesion_contable'] = guardia.sesion_contable
         context['puede_editar'] = guardia.sesion_contable.puede_registrar_practicas(self.request.user)
         context['monto_guardia_vigente'] = ConfiguracionGuardiaPasiva.get_config().monto_vigente
-        
+        context['volver_sesion_url'] = _volver_sesion_url(self.request)
+
         return context
 
     def form_valid(self, form):

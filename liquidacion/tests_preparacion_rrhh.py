@@ -263,8 +263,8 @@ class PreparacionLiquidacionRRHHTest(TestCase):
             if issue.get('registro_id') == registro.pk
         ]
         self.assertTrue(acciones)
-        self.assertEqual(acciones[0]['label'], 'Ver registro')
-        self.assertIn(f'focus_registro={registro.pk}', acciones[0]['url'])
+        self.assertEqual(acciones[0]['label'], 'Inspeccionar registro')
+        self.assertIn(reverse('liquidacion:registroestudios_admin_detalle', args=[registro.pk]), acciones[0]['url'])
 
     def test_bloquea_solicitud_pendiente(self):
         registro = self._crear_registro(self.residente)

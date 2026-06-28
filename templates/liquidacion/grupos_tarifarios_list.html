@@ -4,10 +4,10 @@
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
     <div class="mb-4">
-        <a href="{% url 'liquidacion:portal_inicio' %}"
+        <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:portal_inicio' %}{% endif %}"
            class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
             <i class="fas fa-arrow-left"></i>
-            Volver al portal de liquidación
+            {% if volver_sesion_url %}Volver a la sesión contable{% else %}Volver al portal de liquidación{% endif %}
         </a>
     </div>
 
@@ -72,7 +72,7 @@
                         </td>
                         {% endif %}
                         <td class="px-4 py-3 text-sm">
-                            <a href="{% url 'liquidacion:grupo_tarifario_detalle' dato.grupo.pk %}"
+                            <a href="{% url 'liquidacion:grupo_tarifario_detalle' dato.grupo.pk %}{% if volver_sesion_id %}?volver_sesion={{ volver_sesion_id }}{% endif %}"
                                class="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors">
                                 Ver detalle
                             </a>

@@ -31,7 +31,7 @@
     <!-- Sesiones por card -->
     <div class="space-y-5 mb-6">
         {% for dato in sesiones_data %}
-        <section class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
+        <section id="sesion-card-{{ dato.sesion.pk }}" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden">
             <div class="border-b px-4 md:px-6 py-4
                 {% if dato.sesion.estado == 'ABIERTA' %}bg-gradient-to-r from-green-50 to-white border-green-100
                 {% elif dato.sesion.estado == 'REVISION' %}bg-gradient-to-r from-amber-50 to-white border-amber-100

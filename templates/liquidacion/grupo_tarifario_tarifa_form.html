@@ -4,10 +4,10 @@
 {% block content %}
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
     <div class="mb-4">
-        <a href="{% url 'liquidacion:grupo_tarifario_detalle' grupo.pk %}"
+        <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:grupo_tarifario_detalle' grupo.pk %}{% endif %}"
            class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
             <i class="fas fa-arrow-left"></i>
-            Volver al detalle del grupo
+            {% if volver_sesion_url %}Volver a la sesión contable{% else %}Volver al detalle del grupo{% endif %}
         </a>
     </div>
 
@@ -66,7 +66,7 @@
                         class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
                     Guardar tarifa
                 </button>
-                <a href="{% url 'liquidacion:grupo_tarifario_detalle' grupo.pk %}"
+                <a href="{% if volver_sesion_url %}{{ volver_sesion_url }}{% else %}{% url 'liquidacion:grupo_tarifario_detalle' grupo.pk %}{% endif %}"
                    class="inline-flex items-center rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200 transition-colors">
                     Cancelar
                 </a>
