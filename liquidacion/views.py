@@ -2132,6 +2132,8 @@ def _get_registros_personales_filtrados(request):
 @login_required
 def exportar_excel_mis_registros(request):
     mes, año, registros, guardias = _get_registros_personales_filtrados(request)
+    registros = list(registros)
+    guardias = list(guardias)
 
     wb = Workbook()
     ws = wb.active
@@ -2178,6 +2180,25 @@ def exportar_excel_mis_registros(request):
             sesion.get_estado_display() if sesion else '',
         ])
 
+    primera_fila_practicas = 2
+    ultima_fila_practicas = ws.max_row
+    tiene_practicas = ultima_fila_practicas >= primera_fila_practicas
+    fila_total_practicas = ultima_fila_practicas + 1
+    ws.append([
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        'Totales',
+        f'=SUM(I{primera_fila_practicas}:I{ultima_fila_practicas})' if tiene_practicas else 0,
+        f'=SUM(J{primera_fila_practicas}:J{ultima_fila_practicas})' if tiene_practicas else 0,
+        '',
+        '',
+    ])
+
     ws_guardias = wb.create_sheet('Guardias')
     ws_guardias.append(['Fecha guardia', 'Tipo', 'Monto', 'Observaciones'])
     for guardia in guardias:
@@ -2188,16 +2209,37 @@ def exportar_excel_mis_registros(request):
             guardia.observaciones,
         ])
 
+    primera_fila_guardias = 2
+    ultima_fila_guardias = ws_guardias.max_row
+    tiene_guardias = ultima_fila_guardias >= primera_fila_guardias
+    fila_total_guardias = ultima_fila_guardias + 1
+    ws_guardias.append([
+        '',
+        'Totales',
+        f'=SUM(C{primera_fila_guardias}:C{ultima_fila_guardias})' if tiene_guardias else 0,
+        '',
+    ])
+
     ws_resumen = wb.create_sheet('Resumen')
     total_practicas = sum((registro.monto_calculado or Decimal('0.00')) for registro in registros)
     total_guardias = sum((guardia.monto or Decimal('0.00')) for guardia in guardias)
     ws_resumen.append(['Profesional', request.user.get_full_name() or request.user.username])
     ws_resumen.append(['Periodo', f'{mes}/{año}'])
-    ws_resumen.append(['Cantidad practicas', registros.count()])
-    ws_resumen.append(['Monto practicas', float(total_practicas)])
-    ws_resumen.append(['Cantidad guardias', guardias.count()])
-    ws_resumen.append(['Monto guardias', float(total_guardias)])
-    ws_resumen.append(['Total', float(total_practicas + total_guardias)])
+    ws_resumen.append([
+        'Cantidad practicas',
+        f'=COUNTA(Practicas!C{primera_fila_practicas}:C{ultima_fila_practicas})' if tiene_practicas else 0,
+    ])
+    ws_resumen.append(['Regiones practicas', f'=Practicas!I{fila_total_practicas}'])
+    ws_resumen.append(['Monto practicas', f'=Practicas!J{fila_total_practicas}'])
+    ws_resumen.append([
+        'Cantidad guardias',
+        f'=COUNTA(Guardias!A{primera_fila_guardias}:A{ultima_fila_guardias})' if tiene_guardias else 0,
+    ])
+    ws_resumen.append(['Monto guardias', f'=Guardias!C{fila_total_guardias}'])
+    ws_resumen.append(['Total', '=B5+B7'])
+    ws_resumen.append(['Monto practicas persistido', float(total_practicas)])
+    ws_resumen.append(['Monto guardias persistido', float(total_guardias)])
+    ws_resumen.append(['Total persistido', float(total_practicas + total_guardias)])
 
     for sheet in wb.worksheets:
         for row in sheet.iter_rows():
@@ -2211,6 +2253,25 @@ def exportar_excel_mis_registros(request):
             )
         for cell in sheet[1]:
             cell.font = Font(bold=True)
+        if sheet.title == 'Practicas':
+            for cell in sheet[fila_total_practicas]:
+                cell.font = Font(bold=True)
+            for row in sheet.iter_rows(min_row=2, min_col=9, max_col=10):
+                for cell in row:
+                    cell.number_format = '$#,##0.00' if cell.column == 10 else '#,##0'
+        elif sheet.title == 'Guardias':
+            for cell in sheet[fila_total_guardias]:
+                cell.font = Font(bold=True)
+            for row in sheet.iter_rows(min_row=2, min_col=3, max_col=3):
+                for cell in row:
+                    cell.number_format = '$#,##0.00'
+        elif sheet.title == 'Resumen':
+            for cell in sheet['A']:
+                cell.font = Font(bold=True)
+            for row_number in [5, 7, 8, 9, 10, 11]:
+                sheet[f'B{row_number}'].number_format = '$#,##0.00'
+            for row_number in [3, 4, 6]:
+                sheet[f'B{row_number}'].number_format = '#,##0'
 
     buffer = io.BytesIO()
     wb.save(buffer)
