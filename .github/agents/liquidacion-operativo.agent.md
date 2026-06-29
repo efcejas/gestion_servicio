@@ -21,6 +21,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - Cierre mensual: estados `ABIERTA`, `REVISION`, `CERRADA`, `FACTURADA`, `PAGADA`, gate administrativo e historial.
 - RRHH D1: `PreparacionLiquidacionRRHH`, snapshot auditable, preview sin envio real y requisito para facturar cuando hay practicas de residencia.
 - Checklist E1: resumen visual de cierre por sesion; orienta, no calcula.
+- Resolucion guiada E2: acciones de navegacion para bloqueantes, inspeccion read-only de registros y retorno contextual a sesiones.
 
 ## Como auditar antes de tocar codigo
 
@@ -45,6 +46,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - Si afecta RRHH, recordar que D1 no envia email, usa `monto_calculado` persistido y puede bloquear `CERRADA -> FACTURADA` cuando hay practicas de residencia sin preparacion `PREPARADO`.
 - Si afecta facturacion, verificar si la sesion tiene practicas de residencia: con residencia requiere RRHH `PREPARADO`; sin residencia RRHH queda como `No requerido`.
 - Si afecta checklist E1, mantenerlo como resumen visual; no mover reglas economicas al template.
+- Si afecta navegacion de bloqueantes E2, distinguir inspeccion de resolucion: los links deben guiar al administrativo sin crear correcciones silenciosas.
 - Si el usuario pide "solo disenar", no implementar.
 - Si el usuario pide "no modificar codigo", limitarse a auditoria/comandos de lectura.
 - Si el cambio es documental, no correr tests Django salvo pedido explicito.
@@ -59,6 +61,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - ¿Falta trazabilidad (`modificado_por`, fecha, motivo, historial o snapshot)?
 - ¿Hay reglas duplicadas entre modelo, servicio, vista y template?
 - ¿Existe test focal que describa la regla?
+- ¿El usuario puede volver a la sesion contable despues de inspeccionar un bloqueante?
 
 ## Forma de trabajo
 
@@ -86,4 +89,5 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - No bloquear facturacion por RRHH cuando no hay practicas de residencia; en ese caso debe figurar como `No requerido`.
 - No modificar migraciones aplicadas.
 - No convertir templates/checklists en fuente de reglas economicas.
+- No convertir la inspeccion administrativa de registros en una edicion economica encubierta.
 - No usar `select_for_update().select_related(...)` en flujos con relaciones nullable.

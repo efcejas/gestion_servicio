@@ -107,6 +107,9 @@ applyTo: "liquidacion/**/*.py"
 - El checklist E1 es orientacion visual y operativa; no es fuente de verdad economica.
 - No mover reglas economicas al checklist ni al template.
 - Los detalles siguen viviendo en gate administrativo, auditoria ECO, solicitudes, RRHH e historial.
+- El gate de registros puede mostrar acciones de navegacion para resolver bloqueantes, pero no debe ejecutar correcciones automaticas.
+- La inspeccion administrativa de registros bloqueantes es read-only; no debe recalcular ni modificar registros.
+- El gadget `Registros` debe dirigir y abrir el bloque de gate administrativo de esa sesion.
 
 ## Permisos y trazabilidad
 

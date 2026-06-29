@@ -13,6 +13,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Leer `.github/instructions/liquidacion.instructions.md` antes de tocar codigo del modulo.
 - Identificar si el cambio toca dinero persistido, historial, snapshot o estado de sesion.
 - Si el cambio toca facturacion, verificar requisito RRHH: con practicas de residencia requiere preparacion `PREPARADO`; sin residencia es `No requerido`.
+- Si el cambio toca bloqueantes de cierre, distinguir navegacion/inspeccion de correccion real.
 - Mantener la logica economica fuera de templates.
 - Usar servicios existentes antes de crear nuevas reglas.
 - Evitar recalculos masivos.
@@ -26,7 +27,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Modelos y calculo: `liquidacion/models.py`.
 - Servicio de reglas residencia: `liquidacion/services.py`.
 - Snapshot RRHH D1 y requisito para facturar: `liquidacion/services_rrhh.py`.
-- Checklist E1: `liquidacion/services_cierre.py`.
+- Checklist E1 y acciones E2: `liquidacion/services_cierre.py`, `liquidacion/services_auditoria.py`, `liquidacion/views.py`.
 - Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
 - Clasificacion automatica y override: `liquidacion/signals.py`.
 
@@ -37,6 +38,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - `liquidacion/services.py`: reglas de residencia y servicios compartidos.
 - `liquidacion/services_rrhh.py`: snapshot auditable para RRHH, deteccion de practicas de residencia y requisito para facturar; no recalcula.
 - `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
+- `liquidacion/services_auditoria.py`: gate administrativo y hallazgos accionables; no corrige datos.
 - `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
 - `templates/liquidacion/*`: UX; no fuente de verdad economica.
 - `liquidacion/tests_auditoria_2026_05_11.py`: regresiones B2/B3/sesiones/gate.
@@ -83,6 +85,8 @@ python manage.py test liquidacion.tests_checklist_cierre --verbosity=1
 python manage.py makemigrations --check --dry-run
 ```
 
+Incluye E2 si el cambio toca acciones de bloqueantes, inspeccion read-only de registros o apertura del gate desde el checklist.
+
 ### Override Extra Residencia
 
 ```bash
@@ -109,6 +113,7 @@ No correr tests Django para cambios puramente documentales salvo pedido explicit
 - El cambio combina `select_for_update()` con `select_related()`.
 - El cambio crea o modifica snapshots/historial.
 - El cambio mueve reglas a template.
+- El cambio convierte una vista read-only de inspeccion en una vista de edicion.
 - El cambio envia email real.
 
 ## Salida esperada

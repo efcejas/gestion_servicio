@@ -246,6 +246,29 @@ Resume el avance operativo de una sesion:
 
 El checklist es orientacion visual/operativa. No es fuente de verdad economica y no recalcula montos.
 
+### E2 - Resolucion guiada de bloqueantes
+
+La pantalla de sesiones transforma algunos hallazgos del gate administrativo y RRHH en acciones de navegacion:
+
+- solicitudes pendientes o aprobadas sin aplicar -> bandeja de solicitudes filtrada;
+- registros con problemas -> inspeccion administrativa read-only del registro;
+- estudios sin configuracion suficiente -> edicion administrativa del estudio;
+- grupos sin tarifa vigente -> carga de nueva tarifa;
+- guardias con monto invalido -> edicion de guardia, si la sesion lo permite.
+
+Estas acciones no corrigen automaticamente. Solo llevan al administrativo al punto de revision o configuracion correspondiente.
+
+El gadget **Registros** abre el bloque **Registros: bloqueantes y advertencias** de la misma sesion. Ese bloque debe:
+
+- desplegarse al navegar desde el checklist;
+- explicar que los hallazgos deben revisarse antes de avanzar;
+- mostrar acciones sugeridas cuando existan;
+- mantener el retorno contextual a la sesion contable.
+
+La inspeccion administrativa de registros es solo lectura: no recalcula, no guarda cambios y no reemplaza las solicitudes horarias B2/B3.
+
+La **Auditoria residentes ECO** es una advertencia operativa. En esta fase no queda marcada como revisada ni bloquea el cierre; requiere una fase posterior si se decide guardar estado de revision.
+
 ### Regla de facturacion con RRHH
 
 Para pasar una sesion de `CERRADA` a `FACTURADA`:
