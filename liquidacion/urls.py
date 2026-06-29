@@ -13,6 +13,7 @@ from .views import (
     LiquidacionPorMedicoPorMesListView,  # [NUEVO v3.0] Vista unificada
     exportar_excel_liquidacion,  # [NUEVO v3.0] Exportación unificada
     exportar_excel_liquidacion_definitiva,
+    exportar_excel_mis_registros,
     # RegistrarDiaSinPacientesView,  # [DEPRECADO] No se usa en Colegiales
     RegistrarGuardiaPasivaView,  # [NUEVO v2.0]
     GuardiaPasivaUpdateView,  # [NUEVO v3.2]
@@ -100,6 +101,7 @@ urlpatterns = [
     # Rutas para Registro de Estudios por Medico
     path('registro_estudios_por_medico/nuevo/', RegistroEstudiosPorMedicoCreateView.as_view(), name='registroestudios_nuevo'),
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
+    path('registro_estudios_por_medico/exportar-excel/', exportar_excel_mis_registros, name='exportar_excel_mis_registros'),
     path('registro_estudios_por_medico/<int:pk>/inspeccionar/', RegistroEstudiosPorMedicoAdminDetailView.as_view(), name='registroestudios_admin_detalle'),
     path(
         'registro_estudios_por_medico/<int:registro_pk>/solicitar-revision/',

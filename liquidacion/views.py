@@ -2042,8 +2042,188 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             'cardiologo',
         ]
         context['mostrar_info_bonus_urgencia'] = bool(self.request.user.trabaja_remoto)
+        export_params = self.request.GET.copy()
+        if not export_params.get('mes'):
+            export_params['mes'] = str(mes)
+        if not export_params.get('año'):
+            export_params['año'] = str(año)
+        context['exportar_mis_registros_url'] = (
+            f"{reverse('liquidacion:exportar_excel_mis_registros')}?{export_params.urlencode()}"
+        )
         
         return context
+
+
+def _get_periodo_registros_personales(request):
+    fecha_actual = datetime.now()
+    mes_actual = fecha_actual.month
+    año_actual = fecha_actual.year
+
+    params = request.GET.copy()
+    if not params.get('mes'):
+        params['mes'] = str(mes_actual)
+    if not params.get('año'):
+        params['año'] = str(año_actual)
+
+    form = FiltroEstudiosPorMedicoForm(params)
+    if form.is_valid():
+        mes = int(form.cleaned_data.get('mes') or mes_actual)
+        año = int(form.cleaned_data.get('año') or año_actual)
+    else:
+        mes, año = mes_actual, año_actual
+
+    return mes, año
+
+
+def _get_registros_personales_filtrados(request):
+    mes, año = _get_periodo_registros_personales(request)
+    registros = (
+        RegistroEstudiosPorMedico.objects
+        .filter(
+            medico=request.user,
+            fecha_del_informe__year=año,
+            fecha_del_informe__month=mes,
+        )
+        .select_related('sesion_contable')
+        .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
+    )
+
+    orden = request.GET.get('orden', 'fecha_desc')
+    filtro_rapido = request.GET.get('filtro_rapido', '')
+    busqueda = request.GET.get('busqueda', '').strip()
+    modalidades_validas = [valor for valor, _ in Estudios.TIPO_ESTUDIO_CHOICES]
+    modalidades_seleccionadas = [
+        modalidad
+        for modalidad in request.GET.getlist('modalidad')
+        if modalidad in modalidades_validas
+    ]
+
+    if busqueda:
+        registros = registros.filter(
+            Q(nombre_paciente__icontains=busqueda)
+            | Q(apellido_paciente__icontains=busqueda)
+            | Q(dni_paciente__icontains=busqueda)
+        )
+
+    if filtro_rapido == 'hoy':
+        registros = registros.filter(fecha_registro__date=date.today())
+
+    if modalidades_seleccionadas:
+        registros = registros.filter(estudio__tipo__in=modalidades_seleccionadas).distinct()
+
+    if orden == 'fecha_asc':
+        registros = registros.order_by('fecha_del_informe', 'fecha_registro')
+    elif orden == 'fecha_desc':
+        registros = registros.order_by('-fecha_del_informe', '-fecha_registro')
+    elif orden == 'paciente_asc':
+        registros = registros.order_by('apellido_paciente', 'nombre_paciente')
+    elif orden == 'paciente_desc':
+        registros = registros.order_by('-apellido_paciente', '-nombre_paciente')
+
+    guardias = GuardiaPasiva.objects.filter(
+        medico=request.user,
+        fecha_guardia__year=año,
+        fecha_guardia__month=mes,
+    ).order_by('-fecha_guardia')
+
+    return mes, año, registros.distinct(), guardias
+
+
+@login_required
+def exportar_excel_mis_registros(request):
+    mes, año, registros, guardias = _get_registros_personales_filtrados(request)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Practicas'
+    ws.append([
+        'Fecha informe',
+        'Fecha carga',
+        'Paciente',
+        'DNI',
+        'Obra social',
+        'Horario',
+        'Estudios',
+        'Modalidades',
+        'Cantidad regiones',
+        'Monto calculado',
+        'Sesion contable',
+        'Estado sesion',
+    ])
+
+    for registro in registros:
+        relaciones = list(registro.registroestudio_set.all())
+        estudios = []
+        modalidades = []
+        for rel in relaciones:
+            estudio = rel.estudio
+            cantidad = f' x{rel.cantidad}' if rel.cantidad and rel.cantidad > 1 else ''
+            contexto = f' ({rel.get_contexto_display()})' if rel.contexto else ''
+            estudios.append(f'{estudio.nombre}{contexto}{cantidad}')
+            modalidades.append(estudio.get_tipo_display())
+
+        sesion = registro.sesion_contable
+        ws.append([
+            registro.fecha_del_informe.strftime('%d/%m/%Y') if registro.fecha_del_informe else '',
+            registro.fecha_registro.strftime('%d/%m/%Y %H:%M') if registro.fecha_registro else '',
+            f'{registro.apellido_paciente}, {registro.nombre_paciente}',
+            registro.dni_paciente,
+            registro.get_tipo_obra_social_display(),
+            registro.get_horario_display(),
+            '; '.join(estudios),
+            '; '.join(dict.fromkeys(modalidades)),
+            registro.cantidad_regiones,
+            float(registro.monto_calculado or 0),
+            f'{sesion.mes}/{sesion.año}' if sesion else '',
+            sesion.get_estado_display() if sesion else '',
+        ])
+
+    ws_guardias = wb.create_sheet('Guardias')
+    ws_guardias.append(['Fecha guardia', 'Tipo', 'Monto', 'Observaciones'])
+    for guardia in guardias:
+        ws_guardias.append([
+            guardia.fecha_guardia.strftime('%d/%m/%Y') if guardia.fecha_guardia else '',
+            guardia.get_tipo_guardia_display(),
+            float(guardia.monto or 0),
+            guardia.observaciones,
+        ])
+
+    ws_resumen = wb.create_sheet('Resumen')
+    total_practicas = sum((registro.monto_calculado or Decimal('0.00')) for registro in registros)
+    total_guardias = sum((guardia.monto or Decimal('0.00')) for guardia in guardias)
+    ws_resumen.append(['Profesional', request.user.get_full_name() or request.user.username])
+    ws_resumen.append(['Periodo', f'{mes}/{año}'])
+    ws_resumen.append(['Cantidad practicas', registros.count()])
+    ws_resumen.append(['Monto practicas', float(total_practicas)])
+    ws_resumen.append(['Cantidad guardias', guardias.count()])
+    ws_resumen.append(['Monto guardias', float(total_guardias)])
+    ws_resumen.append(['Total', float(total_practicas + total_guardias)])
+
+    for sheet in wb.worksheets:
+        for row in sheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(vertical='top', wrap_text=True)
+        for column_cells in sheet.columns:
+            column_letter = get_column_letter(column_cells[0].column)
+            sheet.column_dimensions[column_letter].width = min(
+                max(len(str(cell.value or '')) for cell in column_cells) + 2,
+                45,
+            )
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    username = ''.join(char for char in request.user.username if char.isalnum() or char in ('-', '_'))
+    response = HttpResponse(
+        buffer.read(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    response['Content-Disposition'] = f'attachment; filename="mis_registros_{username}_{mes}_{año}.xlsx"'
+    return response
+
 
 class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
     model = RegistroEstudiosPorMedico

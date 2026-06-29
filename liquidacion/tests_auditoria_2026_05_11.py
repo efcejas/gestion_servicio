@@ -855,6 +855,65 @@ class PermisosYTrazabilidadViewTest(TestCase):
             reverse('liquidacion:solicitud_revision_horario_nueva', kwargs={'registro_pk': registro_facturada.pk}),
         )
 
+    def test_lista_personal_muestra_descarga_excel(self):
+        self.client.force_login(self.residente)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_list') + '?mes=6&año=2026',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Descargar Excel')
+        self.assertContains(response, reverse('liquidacion:exportar_excel_mis_registros'))
+
+    def test_exportar_excel_mis_registros_solo_incluye_usuario_logueado(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        estudio = Estudios.objects.create(
+            nombre='Eco test export personal',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1200.00'),
+            activo=True,
+        )
+        registro_propio = self._crear_registro_para_revision(self.residente)
+        registro_propio.apellido_paciente = 'PropioExcel'
+        registro_propio.nombre_paciente = 'Paciente'
+        registro_propio.save(update_fields=['apellido_paciente', 'nombre_paciente'])
+        RegistroEstudio.objects.create(registro=registro_propio, estudio=estudio, cantidad=1)
+
+        registro_ajeno = self._crear_registro_para_revision(self.medico)
+        registro_ajeno.apellido_paciente = 'AjenoExcel'
+        registro_ajeno.nombre_paciente = 'Paciente'
+        registro_ajeno.save(update_fields=['apellido_paciente', 'nombre_paciente'])
+        RegistroEstudio.objects.create(registro=registro_ajeno, estudio=estudio, cantidad=1)
+
+        self.client.force_login(self.residente)
+        response = self.client.get(
+            reverse('liquidacion:exportar_excel_mis_registros') + '?mes=6&año=2026',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response['Content-Type'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        workbook = load_workbook(BytesIO(response.content), read_only=True)
+        practicas = workbook['Practicas']
+        valores = [
+            str(cell.value)
+            for row in practicas.iter_rows()
+            for cell in row
+            if cell.value is not None
+        ]
+        contenido = ' '.join(valores)
+        self.assertIn('PropioExcel', contenido)
+        self.assertNotIn('AjenoExcel', contenido)
+
     def test_bandeja_revision_horario_permite_administrativo(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse('liquidacion:solicitudes_revision_horario_list'))
