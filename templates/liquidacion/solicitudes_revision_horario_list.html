@@ -54,6 +54,21 @@
                     Limpiar
                 </a>
             </div>
+            <div class="md:col-span-4 flex flex-wrap items-center gap-3 pt-1">
+                <label class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900">
+                    <input type="checkbox" name="pendiente_aplicacion" value="1"
+                           class="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
+                           {% if pendiente_aplicacion_actual %}checked{% endif %}>
+                    Mostrar solo aprobadas sin aplicar
+                </label>
+                <a href="{% url 'liquidacion:solicitudes_revision_horario_list' %}?estado=APROBADA&pendiente_aplicacion=1"
+                   class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
+                    Ir a aprobadas sin aplicar
+                </a>
+                {% if pendiente_aplicacion_actual %}
+                <span class="text-xs font-semibold text-emerald-700">Listo para seleccionar y usar "Aplicar aprobadas".</span>
+                {% endif %}
+            </div>
         </form>
     </div>
 
@@ -63,7 +78,7 @@
         <div class="border-b border-indigo-100 bg-indigo-50 px-4 py-3">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="text-sm font-bold text-indigo-950">Accion masiva superusuario</p>
+                    <p class="text-sm font-bold text-indigo-950">Accion masiva autorizada</p>
                     <p class="text-xs text-indigo-800">Selecciona solicitudes visibles. Aprobar no modifica montos; aplicar ejecuta B2 individualmente por solicitud.</p>
                 </div>
                 <div class="flex flex-col gap-2 md:flex-row md:items-end">
@@ -90,6 +105,40 @@
             </div>
         </div>
         {% endif %}
+        {% if resumen_aplicacion_b4.cantidad_aplicables %}
+        <div class="border-b border-emerald-100 bg-emerald-50 px-4 py-3">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                <div>
+                    <p class="text-sm font-bold text-emerald-950">Resumen de aplicacion pendiente</p>
+                    <p class="text-xs text-emerald-800">
+                        {{ resumen_aplicacion_b4.cantidad_aplicables }} solicitud(es) aprobada(s) sin aplicar visibles.
+                        Monto actual ${{ resumen_aplicacion_b4.monto_actual_total|floatformat:2 }},
+                        al aplicar ${{ resumen_aplicacion_b4.monto_simulado_total|floatformat:2 }},
+                        diferencia ${{ resumen_aplicacion_b4.diferencia_total|floatformat:2 }}.
+                    </p>
+                </div>
+                <div class="grid w-full gap-2 md:grid-cols-2 xl:max-w-4xl">
+                    {% for item in resumen_aplicacion_b4.items|slice:":6" %}
+                    <div class="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-gray-700">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="font-semibold text-gray-900">
+                                    {{ item.solicitud.registro.medico.get_full_name|default:item.solicitud.registro.medico.username }}
+                                </p>
+                                <p>{{ item.solicitud.registro.apellido_paciente }}, {{ item.solicitud.registro.nombre_paciente }}</p>
+                                <p class="text-gray-500">{{ item.solicitud.registro.get_horario_display }} -> {{ item.solicitud.get_horario_solicitado_display }}</p>
+                            </div>
+                            <div class="text-right font-semibold text-gray-900">
+                                <p>${{ item.monto_actual|floatformat:2 }}</p>
+                                <p class="text-emerald-700">-> ${{ item.monto_simulado|floatformat:2 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="overflow-x-auto w-full">
             <table class="w-full min-w-[1200px] divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -107,6 +156,7 @@
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estudios</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Horario actual</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Horario solicitado</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Impacto al aplicar</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Fecha/hora real declarada</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Sesion contable</th>
                         <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Accion</th>
@@ -148,6 +198,14 @@
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700">{{ solicitud.registro.get_horario_display }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700">{{ solicitud.get_horario_solicitado_display }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-700">
+                            {% if solicitud.impacto_aplicacion_b4.aplicable %}
+                            <div class="font-semibold text-gray-900">${{ solicitud.impacto_aplicacion_b4.monto_actual|floatformat:2 }} -> ${{ solicitud.impacto_aplicacion_b4.monto_simulado|floatformat:2 }}</div>
+                            <div class="text-xs text-gray-500">Diferencia ${{ solicitud.impacto_aplicacion_b4.diferencia|floatformat:2 }}</div>
+                            {% else %}
+                            <span class="text-xs text-gray-400">No aplicable ahora</span>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-700">{{ solicitud.fecha_hora_real_declarada|date:"d/m/Y H:i" }}</td>
                         <td class="px-4 py-3 text-sm text-gray-700">
                             {% if solicitud.registro.sesion_contable %}
@@ -167,7 +225,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if puede_accion_masiva_b4 %}11{% else %}10{% endif %}" class="px-4 py-8 text-center text-sm text-gray-500">
+                        <td colspan="{% if puede_accion_masiva_b4 %}12{% else %}11{% endif %}" class="px-4 py-8 text-center text-sm text-gray-500">
                             No hay solicitudes para los filtros seleccionados.
                         </td>
                     </tr>

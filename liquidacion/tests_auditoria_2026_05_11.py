@@ -954,6 +954,57 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertLess(html.index(registro_pendiente.apellido_paciente), html.index(registro_aprobada.apellido_paciente))
         self.assertEqual(solicitud_pendiente.estado, 'PENDIENTE')
 
+    def test_bandeja_revision_horario_filtra_aprobadas_sin_aplicar_y_muestra_resumen(self):
+        registro_aprobada = self._crear_registro_para_revision(self.residente)
+        registro_aprobada.apellido_paciente = 'Aplicar'
+        registro_aprobada.nombre_paciente = 'Pendiente'
+        registro_aprobada.dni_paciente = '90000003'
+        registro_aprobada.save(update_fields=['apellido_paciente', 'nombre_paciente', 'dni_paciente'])
+        self._crear_solicitud_revision(
+            registro=registro_aprobada,
+            solicitado_por=self.residente,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
+            motivo='Aprobada pendiente de aplicar.',
+        )
+
+        registro_aplicada = self._crear_registro_para_revision(self.residente)
+        registro_aplicada.apellido_paciente = 'YaAplicada'
+        registro_aplicada.nombre_paciente = 'Caso'
+        registro_aplicada.dni_paciente = '90000004'
+        registro_aplicada.save(update_fields=['apellido_paciente', 'nombre_paciente', 'dni_paciente'])
+        solicitud_aplicada = self._crear_solicitud_revision(
+            registro=registro_aplicada,
+            solicitado_por=self.residente,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
+            motivo='Aprobada ya aplicada.',
+        )
+        solicitud_aplicada.fecha_aplicacion = timezone.now()
+        solicitud_aplicada.horario_aplicado = solicitud_aplicada.horario_solicitado
+        solicitud_aplicada.save(update_fields=['fecha_aplicacion', 'horario_aplicado'])
+
+        registro_pendiente = self._crear_registro_para_revision(self.residente)
+        registro_pendiente.apellido_paciente = 'TodaviaPendiente'
+        registro_pendiente.nombre_paciente = 'Caso'
+        registro_pendiente.dni_paciente = '90000005'
+        registro_pendiente.save(update_fields=['apellido_paciente', 'nombre_paciente', 'dni_paciente'])
+        self._crear_solicitud_revision(
+            registro=registro_pendiente,
+            solicitado_por=self.residente,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE,
+        )
+
+        self.client.force_login(self.jefe_servicio)
+        response = self.client.get(
+            reverse('liquidacion:solicitudes_revision_horario_list') + '?estado=APROBADA&pendiente_aplicacion=1',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Resumen de aplicacion pendiente')
+        self.assertContains(response, 'Aplicar')
+        self.assertNotContains(response, 'YaAplicada')
+        self.assertNotContains(response, 'TodaviaPendiente')
+
     def test_resolucion_aprobar_pendiente_guarda_auditoria(self):
         registro = self._crear_registro_para_revision(self.residente)
         solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
@@ -1222,6 +1273,27 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(solicitud.revisado_por, self.superuser)
         self.assertEqual(registro.monto_calculado, monto_inicial)
         self.assertEqual(registro.horario, horario_inicial)
+
+    def test_b4a_jefe_servicio_aprueba_y_redirige_a_aprobadas_sin_aplicar(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.jefe_servicio)
+        response = self.client.post(
+            reverse('liquidacion:solicitudes_revision_horario_accion_masiva'),
+            {
+                'accion': 'APROBAR',
+                'solicitudes': [str(solicitud.pk)],
+                'observacion': 'Aprobacion masiva por jefatura',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('pendiente_aplicacion=1', response['Location'])
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, SolicitudRevisionHorarioRegistro.ESTADO_APROBADA)
+        self.assertEqual(solicitud.revisado_por, self.jefe_servicio)
 
     def test_b4b_superuser_aplica_aprobadas_seleccionadas_con_b2(self):
         registro = self._crear_registro_para_revision(self.residente)

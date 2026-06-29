@@ -11,6 +11,7 @@ from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
+from decimal import Decimal
 import io, json
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -86,6 +87,10 @@ from django.urls import reverse
 
 def _puede_acceder_panel_administrativo(user):
     return user.is_superuser or user.rol in ['administrativo', 'jefe_servicio']
+
+
+def _puede_accion_masiva_revision_horaria(user):
+    return user.is_superuser or user.rol == 'jefe_servicio'
 
 
 def _enriquecer_checklist_cierre_visual(checklist, sesion):
@@ -327,6 +332,58 @@ def _build_diagnostico_recalculo_b3(solicitud):
     }
 
 
+def _build_resumen_aplicacion_b4(solicitudes):
+    """Resumen solo lectura del impacto de aplicar las solicitudes visibles."""
+    resumen = {
+        'cantidad_aplicables': 0,
+        'monto_actual_total': Decimal('0.00'),
+        'monto_simulado_total': Decimal('0.00'),
+        'diferencia_total': Decimal('0.00'),
+        'items': [],
+    }
+
+    for solicitud in solicitudes:
+        registro = solicitud.registro
+        es_aplicable = (
+            solicitud.estado == SolicitudRevisionHorarioRegistro.ESTADO_APROBADA
+            and solicitud.fecha_aplicacion is None
+        )
+        impacto = {
+            'aplicable': es_aplicable,
+            'monto_actual': registro.monto_calculado,
+            'monto_simulado': None,
+            'diferencia': None,
+        }
+
+        if es_aplicable:
+            horario_original = registro.horario
+            registro.horario = solicitud.horario_solicitado
+            try:
+                monto_simulado = registro.calcular_monto()
+            finally:
+                registro.horario = horario_original
+
+            diferencia = monto_simulado - registro.monto_calculado
+            impacto.update({
+                'monto_simulado': monto_simulado,
+                'diferencia': diferencia,
+            })
+            resumen['cantidad_aplicables'] += 1
+            resumen['monto_actual_total'] += registro.monto_calculado
+            resumen['monto_simulado_total'] += monto_simulado
+            resumen['diferencia_total'] += diferencia
+            resumen['items'].append({
+                'solicitud': solicitud,
+                'monto_actual': registro.monto_calculado,
+                'monto_simulado': monto_simulado,
+                'diferencia': diferencia,
+            })
+
+        solicitud.impacto_aplicacion_b4 = impacto
+
+    return resumen
+
+
 class PortalLiquidacionInicioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """Vista de inicio del portal administrativo de liquidación"""
     template_name = 'liquidacion/portal_inicio.html'
@@ -538,8 +595,14 @@ class SolicitudRevisionHorarioAdminListView(LoginRequiredMixin, UserPassesTestMi
         estado = (self.request.GET.get('estado') or '').strip()
         medico_id = (self.request.GET.get('medico') or '').strip()
         sesion_id = (self.request.GET.get('sesion') or '').strip()
+        pendiente_aplicacion = (self.request.GET.get('pendiente_aplicacion') or '').strip() == '1'
 
-        if estado:
+        if pendiente_aplicacion:
+            queryset = queryset.filter(
+                estado=SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
+                fecha_aplicacion__isnull=True,
+            )
+        elif estado:
             queryset = queryset.filter(estado=estado)
         if medico_id:
             queryset = queryset.filter(registro__medico_id=medico_id)
@@ -571,7 +634,9 @@ class SolicitudRevisionHorarioAdminListView(LoginRequiredMixin, UserPassesTestMi
         context['estado_actual'] = (self.request.GET.get('estado') or '').strip()
         context['medico_actual'] = (self.request.GET.get('medico') or '').strip()
         context['sesion_actual'] = (self.request.GET.get('sesion') or '').strip()
-        context['puede_accion_masiva_b4'] = self.request.user.is_superuser
+        context['pendiente_aplicacion_actual'] = (self.request.GET.get('pendiente_aplicacion') or '').strip() == '1'
+        context['puede_accion_masiva_b4'] = _puede_accion_masiva_revision_horaria(self.request.user)
+        context['resumen_aplicacion_b4'] = _build_resumen_aplicacion_b4(context['solicitudes'])
         return context
 
 
@@ -840,13 +905,16 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
 
 
 class SolicitudRevisionHorarioBulkActionView(LoginRequiredMixin, UserPassesTestMixin, View):
-    """B4a/B4b: acciones masivas de superusuario sobre solicitudes seleccionadas."""
+    """B4a/B4b: acciones masivas autorizadas sobre solicitudes seleccionadas."""
 
     def test_func(self):
-        return self.request.user.is_superuser
+        return _puede_accion_masiva_revision_horaria(self.request.user)
 
     def handle_no_permission(self):
-        messages.error(self.request, 'Solo superusuarios pueden ejecutar acciones masivas de revision horaria.')
+        messages.error(
+            self.request,
+            'Solo superusuarios o jefatura de servicio pueden ejecutar acciones masivas de revision horaria.',
+        )
         return redirect('liquidacion:solicitudes_revision_horario_list')
 
     def post(self, request, *args, **kwargs):
@@ -901,7 +969,10 @@ class SolicitudRevisionHorarioBulkActionView(LoginRequiredMixin, UserPassesTestM
             messages.success(request, f'B4a: {aprobadas} solicitud(es) aprobada(s).')
             if omitidas:
                 messages.warning(request, f'Omitidas: {" | ".join(omitidas[:5])}')
-            return redirect('liquidacion:solicitudes_revision_horario_list')
+            return redirect(
+                f"{reverse('liquidacion:solicitudes_revision_horario_list')}"
+                f"?estado={SolicitudRevisionHorarioRegistro.ESTADO_APROBADA}&pendiente_aplicacion=1"
+            )
 
         aplicadas = 0
         omitidas = []
