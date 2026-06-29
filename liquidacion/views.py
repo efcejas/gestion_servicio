@@ -54,6 +54,7 @@ from .forms import (
     SolicitudRevisionHorarioResolucionForm,
     SolicitudRevisionHorarioAplicarForm,
     SolicitudRevisionHorarioRecalcularAplicacionForm,
+    SolicitudRevisionHorarioBulkActionForm,
     PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -570,6 +571,7 @@ class SolicitudRevisionHorarioAdminListView(LoginRequiredMixin, UserPassesTestMi
         context['estado_actual'] = (self.request.GET.get('estado') or '').strip()
         context['medico_actual'] = (self.request.GET.get('medico') or '').strip()
         context['sesion_actual'] = (self.request.GET.get('sesion') or '').strip()
+        context['puede_accion_masiva_b4'] = self.request.user.is_superuser
         return context
 
 
@@ -731,6 +733,80 @@ class SolicitudRevisionHorarioResolverView(LoginRequiredMixin, UserPassesTestMix
         return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
 
+def _aplicar_solicitud_revision_horario_b2(solicitud_pk, user, observacion_aplicacion=''):
+    """Aplica economicamente una solicitud aprobada. Retorna dict con ok/motivo."""
+    with transaction.atomic():
+        try:
+            solicitud = SolicitudRevisionHorarioRegistro.objects.select_for_update().get(pk=solicitud_pk)
+        except SolicitudRevisionHorarioRegistro.DoesNotExist:
+            return {'ok': False, 'solicitud_id': solicitud_pk, 'motivo': 'Solicitud inexistente.'}
+
+        try:
+            registro = RegistroEstudiosPorMedico.objects.select_for_update().get(pk=solicitud.registro_id)
+        except RegistroEstudiosPorMedico.DoesNotExist:
+            return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'Registro asociado inexistente.'}
+
+        if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
+            return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'No esta APROBADA.'}
+
+        if solicitud.fecha_aplicacion:
+            return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'Ya fue aplicada.'}
+
+        sesion = None
+        if registro.sesion_contable_id:
+            sesion = SesionContable.objects.get(pk=registro.sesion_contable_id)
+        if not sesion or sesion.estado not in ['ABIERTA', 'REVISION']:
+            return {
+                'ok': False,
+                'solicitud_id': solicitud.pk,
+                'motivo': 'La sesion no esta ABIERTA o REVISION.',
+            }
+
+        horario_anterior = registro.horario
+        monto_anterior = registro.monto_calculado
+        horario_aplicado = solicitud.horario_solicitado
+
+        registro.horario = horario_aplicado
+        monto_aplicado = registro.calcular_monto()
+        fecha_aplicacion = now()
+
+        motivo_modificacion = (
+            f"Correccion de horario por solicitud de revision #{solicitud.pk} aprobada administrativamente. "
+            f"Horario: {horario_anterior} -> {horario_aplicado}. "
+            f"Monto: ${monto_anterior} -> ${monto_aplicado}."
+        )
+
+        actualizados_registro = RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            horario=horario_aplicado,
+            monto_calculado=monto_aplicado,
+            modificado_por=user,
+            fecha_modificacion=fecha_aplicacion,
+            motivo_modificacion=motivo_modificacion,
+        )
+
+        if actualizados_registro == 0:
+            return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'No se pudo actualizar el registro.'}
+
+        solicitud.horario_anterior = horario_anterior
+        solicitud.horario_aplicado = horario_aplicado
+        solicitud.monto_anterior = monto_anterior
+        solicitud.monto_aplicado = monto_aplicado
+        solicitud.aplicado_por = user
+        solicitud.fecha_aplicacion = fecha_aplicacion
+        solicitud.observacion_aplicacion = observacion_aplicacion
+        solicitud.save(update_fields=[
+            'horario_anterior',
+            'horario_aplicado',
+            'monto_anterior',
+            'monto_aplicado',
+            'aplicado_por',
+            'fecha_aplicacion',
+            'observacion_aplicacion',
+        ])
+
+    return {'ok': True, 'solicitud_id': solicitud_pk, 'motivo': ''}
+
+
 class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Aplicación económica B2 sobre solicitud APROBADA."""
 
@@ -751,78 +827,99 @@ class SolicitudRevisionHorarioAplicarView(LoginRequiredMixin, UserPassesTestMixi
             messages.error(request, 'Datos invalidos para aplicar la solicitud.')
             return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud_pk)
 
-        with transaction.atomic():
-            solicitud = get_object_or_404(
-                SolicitudRevisionHorarioRegistro.objects.select_for_update(),
-                pk=solicitud_pk,
+        resultado = _aplicar_solicitud_revision_horario_b2(
+            solicitud_pk,
+            request.user,
+            form.cleaned_data['observacion_aplicacion'],
+        )
+        if not resultado['ok']:
+            messages.error(request, resultado['motivo'])
+        else:
+            messages.success(request, 'Aplicacion economica realizada correctamente.')
+        return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud_pk)
+
+
+class SolicitudRevisionHorarioBulkActionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """B4a/B4b: acciones masivas de superusuario sobre solicitudes seleccionadas."""
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo superusuarios pueden ejecutar acciones masivas de revision horaria.')
+        return redirect('liquidacion:solicitudes_revision_horario_list')
+
+    def post(self, request, *args, **kwargs):
+        form = SolicitudRevisionHorarioBulkActionForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Selecciona solicitudes y una accion masiva valida.')
+            return redirect('liquidacion:solicitudes_revision_horario_list')
+
+        solicitud_ids = [int(pk) for pk in form.cleaned_data['solicitudes']]
+        accion = form.cleaned_data['accion']
+        observacion = form.cleaned_data['observacion']
+
+        if accion == SolicitudRevisionHorarioBulkActionForm.ACCION_APROBAR:
+            aprobadas = 0
+            omitidas = []
+            for solicitud_id in solicitud_ids:
+                with transaction.atomic():
+                    try:
+                        solicitud = SolicitudRevisionHorarioRegistro.objects.select_for_update().get(pk=solicitud_id)
+                    except SolicitudRevisionHorarioRegistro.DoesNotExist:
+                        omitidas.append(f'#{solicitud_id}: inexistente')
+                        continue
+
+                    if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE:
+                        omitidas.append(f'#{solicitud.pk}: no esta PENDIENTE')
+                        continue
+
+                    registro = RegistroEstudiosPorMedico.objects.select_related('sesion_contable').get(
+                        pk=solicitud.registro_id,
+                    )
+                    sesion = registro.sesion_contable
+                    if sesion and sesion.estado in ['FACTURADA', 'PAGADA']:
+                        omitidas.append(f'#{solicitud.pk}: sesion {sesion.estado}')
+                        continue
+
+                    if solicitud.solicitado_por_id == request.user.id:
+                        omitidas.append(f'#{solicitud.pk}: auto-revision no permitida')
+                        continue
+
+                    solicitud.estado = SolicitudRevisionHorarioRegistro.ESTADO_APROBADA
+                    solicitud.revisado_por = request.user
+                    solicitud.fecha_revision = now()
+                    solicitud.observacion_revision = observacion
+                    solicitud.save(update_fields=[
+                        'estado',
+                        'revisado_por',
+                        'fecha_revision',
+                        'observacion_revision',
+                    ])
+                    aprobadas += 1
+
+            messages.success(request, f'B4a: {aprobadas} solicitud(es) aprobada(s).')
+            if omitidas:
+                messages.warning(request, f'Omitidas: {" | ".join(omitidas[:5])}')
+            return redirect('liquidacion:solicitudes_revision_horario_list')
+
+        aplicadas = 0
+        omitidas = []
+        for solicitud_id in solicitud_ids:
+            resultado = _aplicar_solicitud_revision_horario_b2(
+                solicitud_id,
+                request.user,
+                observacion,
             )
-            registro = RegistroEstudiosPorMedico.objects.select_for_update().get(
-                pk=solicitud.registro_id,
-            )
+            if resultado['ok']:
+                aplicadas += 1
+            else:
+                omitidas.append(f"#{solicitud_id}: {resultado['motivo']}")
 
-            if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
-                messages.error(request, 'Solo se puede aplicar una solicitud en estado APROBADA.')
-                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
-
-            if solicitud.fecha_aplicacion:
-                messages.error(request, 'La solicitud ya fue aplicada anteriormente.')
-                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
-
-            sesion = None
-            if registro.sesion_contable_id:
-                sesion = SesionContable.objects.get(pk=registro.sesion_contable_id)
-            if not sesion or sesion.estado not in ['ABIERTA', 'REVISION']:
-                messages.error(
-                    request,
-                    'Solo se puede aplicar en sesiones ABIERTA o REVISION. En CERRADA, FACTURADA o PAGADA esta bloqueado.',
-                )
-                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
-
-            horario_anterior = registro.horario
-            monto_anterior = registro.monto_calculado
-            horario_aplicado = solicitud.horario_solicitado
-
-            registro.horario = horario_aplicado
-            monto_aplicado = registro.calcular_monto()
-            fecha_aplicacion = now()
-
-            motivo_modificacion = (
-                f"Correccion de horario por solicitud de revision #{solicitud.pk} aprobada administrativamente. "
-                f"Horario: {horario_anterior} -> {horario_aplicado}. "
-                f"Monto: ${monto_anterior} -> ${monto_aplicado}."
-            )
-
-            actualizados_registro = RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
-                horario=horario_aplicado,
-                monto_calculado=monto_aplicado,
-                modificado_por=request.user,
-                fecha_modificacion=fecha_aplicacion,
-                motivo_modificacion=motivo_modificacion,
-            )
-
-            if actualizados_registro == 0:
-                messages.error(request, 'No se pudo actualizar el registro asociado.')
-                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
-
-            solicitud.horario_anterior = horario_anterior
-            solicitud.horario_aplicado = horario_aplicado
-            solicitud.monto_anterior = monto_anterior
-            solicitud.monto_aplicado = monto_aplicado
-            solicitud.aplicado_por = request.user
-            solicitud.fecha_aplicacion = fecha_aplicacion
-            solicitud.observacion_aplicacion = form.cleaned_data['observacion_aplicacion']
-            solicitud.save(update_fields=[
-                'horario_anterior',
-                'horario_aplicado',
-                'monto_anterior',
-                'monto_aplicado',
-                'aplicado_por',
-                'fecha_aplicacion',
-                'observacion_aplicacion',
-            ])
-
-        messages.success(request, 'Aplicacion economica realizada correctamente.')
-        return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
+        messages.success(request, f'B4b: {aplicadas} solicitud(es) aplicada(s) economicamente.')
+        if omitidas:
+            messages.warning(request, f'Omitidas: {" | ".join(omitidas[:5])}')
+        return redirect('liquidacion:solicitudes_revision_horario_list')
 
 
 class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserPassesTestMixin, View):

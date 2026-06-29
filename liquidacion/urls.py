@@ -22,6 +22,7 @@ from .views import (
     SolicitudRevisionHorarioAdminListView,
     SolicitudRevisionHorarioAdminDetailView,
     SolicitudRevisionHorarioResolverView,
+    SolicitudRevisionHorarioBulkActionView,
     SolicitudRevisionHorarioAplicarView,
     SolicitudRevisionHorarioRecalcularAplicacionView,
     GruposTarifariosListView,
@@ -60,6 +61,11 @@ urlpatterns = [
         'solicitudes-revision-horario/<int:pk>/resolver/',
         SolicitudRevisionHorarioResolverView.as_view(),
         name='solicitud_revision_horario_resolver',
+    ),
+    path(
+        'solicitudes-revision-horario/accion-masiva/',
+        SolicitudRevisionHorarioBulkActionView.as_view(),
+        name='solicitudes_revision_horario_accion_masiva',
     ),
     path(
         'solicitudes-revision-horario/<int:pk>/aplicar/',

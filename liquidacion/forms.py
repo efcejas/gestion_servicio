@@ -204,6 +204,35 @@ class SolicitudRevisionHorarioRecalcularAplicacionForm(forms.Form):
     )
 
 
+class SolicitudRevisionHorarioBulkActionForm(forms.Form):
+    """Acciones masivas B4 para superusuario sobre solicitudes seleccionadas."""
+
+    ACCION_APROBAR = 'APROBAR'
+    ACCION_APLICAR = 'APLICAR'
+    ACCION_CHOICES = [
+        (ACCION_APROBAR, 'Aprobar seleccionadas'),
+        (ACCION_APLICAR, 'Aplicar aprobadas seleccionadas'),
+    ]
+
+    solicitudes = forms.MultipleChoiceField(required=True)
+    accion = forms.ChoiceField(choices=ACCION_CHOICES)
+    observacion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': TAILWIND_INPUT_CLASSES,
+            'rows': 2,
+            'placeholder': 'Observacion para registrar en la accion masiva',
+        }),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['solicitudes'].choices = [
+            (str(pk), str(pk))
+            for pk in SolicitudRevisionHorarioRegistro.objects.values_list('pk', flat=True)
+        ]
+
+
 # ============================================================================
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================

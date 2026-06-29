@@ -1198,6 +1198,79 @@ class PermisosYTrazabilidadViewTest(TestCase):
         registro.refresh_from_db()
         self.assertNotEqual(registro.monto_calculado, monto_inicial)
 
+    def test_b4a_superuser_aprueba_pendientes_seleccionadas_sin_modificar_registro(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        monto_inicial = registro.monto_calculado
+        horario_inicial = registro.horario
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            reverse('liquidacion:solicitudes_revision_horario_accion_masiva'),
+            {
+                'accion': 'APROBAR',
+                'solicitudes': [str(solicitud.pk)],
+                'observacion': 'Aprobacion masiva B4a',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        registro.refresh_from_db()
+        self.assertEqual(solicitud.estado, SolicitudRevisionHorarioRegistro.ESTADO_APROBADA)
+        self.assertEqual(solicitud.revisado_por, self.superuser)
+        self.assertEqual(registro.monto_calculado, monto_inicial)
+        self.assertEqual(registro.horario, horario_inicial)
+
+    def test_b4b_superuser_aplica_aprobadas_seleccionadas_con_b2(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(
+            registro=registro,
+            solicitado_por=self.residente,
+            estado=SolicitudRevisionHorarioRegistro.ESTADO_APROBADA,
+        )
+
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            reverse('liquidacion:solicitudes_revision_horario_accion_masiva'),
+            {
+                'accion': 'APLICAR',
+                'solicitudes': [str(solicitud.pk)],
+                'observacion': 'Aplicacion masiva B4b',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(solicitud.horario_anterior, 'INTRA')
+        self.assertEqual(solicitud.horario_aplicado, 'EXTRA')
+        self.assertEqual(solicitud.aplicado_por, self.superuser)
+        self.assertIsNotNone(solicitud.fecha_aplicacion)
+        self.assertEqual(solicitud.observacion_aplicacion, 'Aplicacion masiva B4b')
+
+    def test_b4_accion_masiva_denegada_para_administrativo(self):
+        registro = self._crear_registro_para_revision(self.residente)
+        solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:solicitudes_revision_horario_accion_masiva'),
+            {
+                'accion': 'APROBAR',
+                'solicitudes': [str(solicitud.pk)],
+                'observacion': 'No permitido',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        solicitud.refresh_from_db()
+        self.assertEqual(solicitud.estado, SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE)
+
     def test_aplicar_guarda_snapshot_horario_anterior_y_aplicado(self):
         registro = self._crear_registro_para_revision(self.residente)
         solicitud = self._crear_solicitud_revision(registro=registro, solicitado_por=self.residente)
