@@ -210,6 +210,25 @@ def _flatten_registros_alerta_auditoria_eco(auditoria, medico_id='', motivo=''):
     return registros
 
 
+def _filtrar_registros_alerta_auditoria_eco(registros, estado_revision='', fecha_desde='', fecha_hasta=''):
+    """Filtra la bandeja ECO con datos ya enriquecidos de revision."""
+    filtrados = []
+    for registro in registros:
+        revision = registro.get('revision_auditoria_eco')
+        estado_actual = revision.estado if revision else 'SIN_REVISAR'
+        fecha_informe = registro.get('fecha_informe') or ''
+
+        if estado_revision and estado_actual != estado_revision:
+            continue
+        if fecha_desde and fecha_informe < fecha_desde:
+            continue
+        if fecha_hasta and fecha_informe > fecha_hasta:
+            continue
+
+        filtrados.append(registro)
+    return filtrados
+
+
 def _volver_sesion_id(request):
     return (request.GET.get('volver_sesion') or request.POST.get('volver_sesion') or '').strip()
 
@@ -808,6 +827,9 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
         )
         medico_actual = (self.request.GET.get('medico') or '').strip()
         motivo_actual = (self.request.GET.get('motivo') or '').strip()
+        estado_revision_actual = (self.request.GET.get('estado_revision') or '').strip()
+        fecha_desde_actual = (self.request.GET.get('fecha_desde') or '').strip()
+        fecha_hasta_actual = (self.request.GET.get('fecha_hasta') or '').strip()
         registros_alerta = _flatten_registros_alerta_auditoria_eco(
             auditoria,
             medico_id=medico_actual,
@@ -838,6 +860,13 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             registro['revision_auditoria_eco'] = revisiones_por_registro.get(registro['registro_id'])
             registro['correccion_pacs'] = correcciones_por_registro.get(registro['registro_id'])
 
+        registros_alerta = _filtrar_registros_alerta_auditoria_eco(
+            registros_alerta,
+            estado_revision=estado_revision_actual,
+            fecha_desde=fecha_desde_actual,
+            fecha_hasta=fecha_hasta_actual,
+        )
+
         motivos_disponibles = sorted({
             motivo
             for item in auditoria.get('items', [])
@@ -851,6 +880,15 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             'registros_alerta': registros_alerta,
             'medico_actual': medico_actual,
             'motivo_actual': motivo_actual,
+            'estado_revision_actual': estado_revision_actual,
+            'fecha_desde_actual': fecha_desde_actual,
+            'fecha_hasta_actual': fecha_hasta_actual,
+            'estado_revision_choices': [
+                ('SIN_REVISAR', 'Sin revisar'),
+                (RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO, 'Validado contra PACS'),
+                (RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION, 'Requiere correccion'),
+                (RevisionAuditoriaEcoRegistro.ESTADO_DESCARTADO, 'Descartado / no corresponde'),
+            ],
             'medicos_alerta': [
                 item for item in auditoria.get('items', [])
                 if item.get('registros_alerta')

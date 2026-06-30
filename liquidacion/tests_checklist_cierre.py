@@ -326,6 +326,42 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'No hay registros sospechosos para los filtros seleccionados.')
 
+    def test_vista_completa_auditoria_eco_filtra_solo_sin_revisar(self):
+        revisado = self._crear_registro(monto=Decimal('1000.00'))
+        RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=revisado,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Validado contra PACS.',
+            revisado_por=self.admin,
+        )
+        for _ in range(34):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]) + '?estado_revision=SIN_REVISAR',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sin revisar')
+        self.assertNotContains(response, 'Validado contra PACS.')
+
+    def test_vista_completa_auditoria_eco_filtra_por_fecha_informe(self):
+        for _ in range(35):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]) + '?fecha_desde=2026-06-11',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No hay registros sospechosos para los filtros seleccionados.')
+
     def test_vista_completa_auditoria_eco_deniega_residente(self):
         self.client.force_login(self.residente)
 
