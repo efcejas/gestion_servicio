@@ -1514,6 +1514,55 @@ class PreparacionLiquidacionRRHH(models.Model):
 
     def __str__(self):
         return f"{self.sesion_contable} - RRHH v{self.version} ({self.estado})"
+
+
+class RevisionAuditoriaEcoRegistro(models.Model):
+    """Resolucion administrativa read-only sobre alertas ECO de cierre."""
+
+    ESTADO_VALIDADO = 'VALIDADO'
+    ESTADO_REQUIERE_CORRECCION = 'REQUIERE_CORRECCION'
+    ESTADO_DESCARTADO = 'DESCARTADO'
+    ESTADO_CHOICES = [
+        (ESTADO_VALIDADO, 'Validado contra PACS'),
+        (ESTADO_REQUIERE_CORRECCION, 'Requiere correccion'),
+        (ESTADO_DESCARTADO, 'Descartado / no corresponde'),
+    ]
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='revisiones_auditoria_eco',
+        verbose_name='Sesion contable',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.PROTECT,
+        related_name='revisiones_auditoria_eco',
+        verbose_name='Registro',
+    )
+    estado = models.CharField(max_length=24, choices=ESTADO_CHOICES, verbose_name='Estado')
+    motivos_json = models.JSONField(default=list, blank=True, verbose_name='Motivos detectados')
+    observacion = models.TextField(verbose_name='Observacion')
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='revisiones_auditoria_eco_realizadas',
+        verbose_name='Revisado por',
+    )
+    fecha_revision = models.DateTimeField(auto_now_add=True, verbose_name='Fecha revision')
+
+    class Meta:
+        verbose_name = 'Revision auditoria ECO'
+        verbose_name_plural = 'Revisiones auditoria ECO'
+        ordering = ['-fecha_revision']
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha_revision']),
+            models.Index(fields=['registro', '-fecha_revision']),
+            models.Index(fields=['estado', '-fecha_revision']),
+        ]
+
+    def __str__(self):
+        return f"Revision ECO registro #{self.registro_id} - {self.estado}"
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================

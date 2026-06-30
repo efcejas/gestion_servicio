@@ -11,6 +11,7 @@ from .models import (
     PreparacionLiquidacionRRHH,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    RevisionAuditoriaEcoRegistro,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
     TarifaGrupoTarifario,
@@ -277,14 +278,118 @@ class ChecklistCierreSesionTest(TestCase):
         )
         self.assertEqual(auditoria_item['url'], f'#auditoria-eco-sesion-{self.sesion.pk}')
         self.assertContains(response, 'Cantidad de registros EXTRA mensual elevada')
-        self.assertContains(response, 'Revisar registros')
-        self.assertContains(response, reverse('liquidacion:liquidacion_mensual'))
+        self.assertContains(response, 'Ver todos')
         self.assertContains(response, 'Registros que explican la alerta')
         self.assertContains(response, 'Inspeccionar')
         self.assertContains(
             response,
             reverse('liquidacion:registroestudios_admin_detalle', args=[registros[-1].pk]),
         )
+        self.assertContains(response, reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]))
+
+    def test_vista_completa_auditoria_eco_lista_registros_sospechosos(self):
+        registros = []
+        for _ in range(35):
+            registros.append(self._crear_registro(monto=Decimal('1000.00')))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Auditoria residentes ECO')
+        self.assertContains(response, 'Registros sospechosos')
+        self.assertContains(response, 'EXTRA')
+        self.assertContains(response, 'Inspeccionar')
+        self.assertContains(
+            response,
+            reverse('liquidacion:registroestudios_admin_detalle', args=[registros[-1].pk]),
+        )
+
+    def test_vista_completa_auditoria_eco_filtra_por_motivo(self):
+        for _ in range(35):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]) + '?motivo=Nocturno',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No hay registros sospechosos para los filtros seleccionados.')
+
+    def test_vista_completa_auditoria_eco_deniega_residente(self):
+        self.client.force_login(self.residente)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertIn(response.status_code, [302, 403])
+
+    def test_resolver_alerta_eco_crea_revision_auditada(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_resolver', args=[self.sesion.pk, registro.pk]),
+            {
+                'estado': RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                'observacion': 'Validado contra PACS.',
+                'motivos': ['EXTRA'],
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        revision = RevisionAuditoriaEcoRegistro.objects.get(registro=registro)
+        self.assertEqual(revision.sesion_contable, self.sesion)
+        self.assertEqual(revision.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
+        self.assertEqual(revision.revisado_por, self.admin)
+        self.assertEqual(revision.motivos_json, ['EXTRA'])
+
+    def test_vista_completa_auditoria_eco_muestra_revision_existente(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['EXTRA'],
+            observacion='Difiere de PACS.',
+            revisado_por=self.admin,
+        )
+        for _ in range(34):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Requiere correccion')
+        self.assertContains(response, 'Difiere de PACS.')
+
+    def test_resolver_alerta_eco_deniega_residente(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.residente)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_resolver', args=[self.sesion.pk, registro.pk]),
+            {
+                'estado': RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                'observacion': 'Intento no permitido.',
+            },
+            secure=True,
+        )
+
+        self.assertIn(response.status_code, [302, 403])
+        self.assertFalse(RevisionAuditoriaEcoRegistro.objects.exists())
 
     def test_admin_puede_inspeccionar_registro_desde_cierre(self):
         registro = self._crear_registro(monto=Decimal('0.00'))

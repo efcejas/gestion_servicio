@@ -32,6 +32,7 @@ from .models import (
     SolicitudRevisionHorarioRegistro,
     HistorialRecalculoSolicitudRevisionHorario,
     PreparacionLiquidacionRRHH,
+    RevisionAuditoriaEcoRegistro,
     GuardiaPasiva,
     SesionContable,
     ConfiguracionGuardiaPasiva,
@@ -56,6 +57,7 @@ from .forms import (
     SolicitudRevisionHorarioAplicarForm,
     SolicitudRevisionHorarioRecalcularAplicacionForm,
     SolicitudRevisionHorarioBulkActionForm,
+    RevisionAuditoriaEcoRegistroForm,
     PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -181,6 +183,28 @@ def _enriquecer_auditoria_residentes_eco_visual(auditoria, sesion):
         item['url_liquidacion'] = f"{reverse('liquidacion:liquidacion_mensual')}?{urlencode(params)}"
 
     return auditoria
+
+
+def _flatten_registros_alerta_auditoria_eco(auditoria, medico_id='', motivo=''):
+    registros = []
+    for item in auditoria.get('items', []):
+        if medico_id and str(item.get('medico_id')) != str(medico_id):
+            continue
+        for registro_alerta in item.get('registros_alerta', []):
+            motivos = registro_alerta.get('motivos', [])
+            if motivo and motivo not in motivos:
+                continue
+            registro = {
+                **registro_alerta,
+                'medico_id': item.get('medico_id'),
+                'medico_nombre': item.get('medico_nombre'),
+                'rol': item.get('rol'),
+                'severidad': item.get('severidad'),
+            }
+            registros.append(registro)
+
+    registros.sort(key=lambda registro: registro.get('fecha_carga') or '', reverse=True)
+    return registros
 
 
 def _volver_sesion_id(request):
@@ -755,6 +779,109 @@ class RegistroEstudiosPorMedicoAdminDetailView(LoginRequiredMixin, UserPassesTes
             .order_by('-fecha_solicitud')
         )
         return context
+
+
+class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Vista completa read-only de registros ECO sospechosos por sesion."""
+
+    template_name = 'liquidacion/auditoria_eco_sesion.html'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para revisar la auditoria ECO.')
+        return redirect('home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        auditoria = _enriquecer_auditoria_residentes_eco_visual(
+            auditar_residentes_eco_por_sesion(self.sesion),
+            self.sesion,
+        )
+        medico_actual = (self.request.GET.get('medico') or '').strip()
+        motivo_actual = (self.request.GET.get('motivo') or '').strip()
+        registros_alerta = _flatten_registros_alerta_auditoria_eco(
+            auditoria,
+            medico_id=medico_actual,
+            motivo=motivo_actual,
+        )
+        registro_ids = [registro['registro_id'] for registro in registros_alerta]
+        revisiones_por_registro = {}
+        revisiones = (
+            RevisionAuditoriaEcoRegistro.objects
+            .filter(sesion_contable=self.sesion, registro_id__in=registro_ids)
+            .select_related('revisado_por')
+            .order_by('registro_id', '-fecha_revision')
+        )
+        for revision in revisiones:
+            if revision.registro_id not in revisiones_por_registro:
+                revisiones_por_registro[revision.registro_id] = revision
+        for registro in registros_alerta:
+            registro['revision_auditoria_eco'] = revisiones_por_registro.get(registro['registro_id'])
+
+        motivos_disponibles = sorted({
+            motivo
+            for item in auditoria.get('items', [])
+            for registro in item.get('registros_alerta', [])
+            for motivo in registro.get('motivos', [])
+        })
+
+        context.update({
+            'sesion': self.sesion,
+            'auditoria': auditoria,
+            'registros_alerta': registros_alerta,
+            'medico_actual': medico_actual,
+            'motivo_actual': motivo_actual,
+            'medicos_alerta': [
+                item for item in auditoria.get('items', [])
+                if item.get('registros_alerta')
+            ],
+            'motivos_disponibles': motivos_disponibles,
+            'current_path': self.request.get_full_path(),
+        })
+        return context
+
+
+class AuditoriaEcoRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Marca una alerta ECO como revisada sin modificar el registro."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para resolver alertas ECO.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        registro = get_object_or_404(
+            RegistroEstudiosPorMedico.objects.select_related('sesion_contable'),
+            pk=kwargs['registro_pk'],
+            sesion_contable=sesion,
+        )
+        form = RevisionAuditoriaEcoRegistroForm(request.POST)
+        redirect_url = request.POST.get('next') or reverse('liquidacion:auditoria_eco_sesion', kwargs={'pk': sesion.pk})
+
+        if not form.is_valid():
+            messages.error(request, 'Debes indicar estado y observacion para resolver la alerta ECO.')
+            return redirect(redirect_url)
+
+        motivos = request.POST.getlist('motivos')
+        RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=sesion,
+            registro=registro,
+            estado=form.cleaned_data['estado'],
+            motivos_json=motivos,
+            observacion=form.cleaned_data['observacion'],
+            revisado_por=request.user,
+        )
+        messages.success(request, f'Revision ECO registrada para el registro #{registro.pk}.')
+        return redirect(redirect_url)
 
 
 class SolicitudRevisionHorarioResolverView(LoginRequiredMixin, UserPassesTestMixin, View):

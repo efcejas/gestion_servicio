@@ -237,6 +237,29 @@ class SolicitudRevisionHorarioBulkActionForm(forms.Form):
 # FORMULARIO PRINCIPAL: REGISTRO DE PRÁCTICAS (v2.0)
 # ============================================================================
 
+class RevisionAuditoriaEcoRegistroForm(forms.Form):
+    """Resolucion administrativa de una alerta ECO sin modificar el registro."""
+
+    ESTADO_VALIDADO = 'VALIDADO'
+    ESTADO_REQUIERE_CORRECCION = 'REQUIERE_CORRECCION'
+    ESTADO_DESCARTADO = 'DESCARTADO'
+    ESTADO_CHOICES = [
+        (ESTADO_VALIDADO, 'Validado contra PACS'),
+        (ESTADO_REQUIERE_CORRECCION, 'Requiere correccion'),
+        (ESTADO_DESCARTADO, 'Descartado / no corresponde'),
+    ]
+
+    estado = forms.ChoiceField(choices=ESTADO_CHOICES)
+    observacion = forms.CharField(
+        max_length=1000,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 2,
+            'placeholder': 'Observacion de revision administrativa',
+        }),
+    )
+
+
 class PracticaForm(forms.ModelForm):
     """
     Formulario para registro de prácticas médicas - Liquidación v3.1

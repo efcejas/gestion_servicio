@@ -12,6 +12,7 @@ from .models import (
     PreparacionLiquidacionRRHH,
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
+    RevisionAuditoriaEcoRegistro,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
     TarifaGrupoTarifario,
@@ -778,6 +779,45 @@ class HistorialRecalculoSolicitudRevisionHorarioAdmin(admin.ModelAdmin):
         'motivo_sistema',
     )
     ordering = ('-fecha_recalculo',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RevisionAuditoriaEcoRegistro)
+class RevisionAuditoriaEcoRegistroAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'sesion_contable',
+        'registro',
+        'estado',
+        'revisado_por',
+        'fecha_revision',
+    )
+    list_filter = ('estado', 'sesion_contable__año', 'sesion_contable__mes', 'fecha_revision')
+    search_fields = (
+        'registro__id',
+        'registro__apellido_paciente',
+        'registro__nombre_paciente',
+        'registro__dni_paciente',
+        'observacion',
+    )
+    readonly_fields = (
+        'sesion_contable',
+        'registro',
+        'estado',
+        'motivos_json',
+        'observacion',
+        'revisado_por',
+        'fecha_revision',
+    )
+    ordering = ('-fecha_revision',)
 
     def has_add_permission(self, request):
         return False

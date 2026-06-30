@@ -1,0 +1,168 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Auditoria ECO - Sesion {{ sesion.mes }}/{{ sesion.año }}{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Auditoria residentes ECO</h1>
+            <p class="text-sm text-gray-600">Sesion {{ sesion.mes }}/{{ sesion.año }} · {{ sesion.get_estado_display }}</p>
+        </div>
+        <a href="{% url 'liquidacion:sesiones_list' %}#auditoria-eco-sesion-{{ sesion.pk }}"
+           class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+            <i class="fas fa-arrow-left"></i>
+            Volver a sesiones
+        </a>
+    </div>
+
+    <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div class="rounded-lg border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Residentes con alertas</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900">{{ auditoria.residentes_con_alertas }}</p>
+        </div>
+        <div class="rounded-lg border border-red-200 bg-red-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-red-700">Alertas rojas</p>
+            <p class="mt-1 text-2xl font-bold text-red-800">{{ auditoria.alertas_rojas }}</p>
+        </div>
+        <div class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Alertas amarillas</p>
+            <p class="mt-1 text-2xl font-bold text-amber-800">{{ auditoria.alertas_amarillas }}</p>
+        </div>
+        <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wider text-indigo-700">Registros sospechosos</p>
+            <p class="mt-1 text-2xl font-bold text-indigo-800">{{ registros_alerta|length }}</p>
+        </div>
+    </div>
+
+    <div class="mb-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+        <form method="get" class="grid grid-cols-1 gap-3 md:grid-cols-12 md:items-end">
+            <div class="md:col-span-5">
+                <label for="medico" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Profesional</label>
+                <select id="medico" name="medico" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                    <option value="">Todos</option>
+                    {% for item in medicos_alerta %}
+                    <option value="{{ item.medico_id }}" {% if medico_actual == item.medico_id|stringformat:"s" %}selected{% endif %}>{{ item.medico_nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="md:col-span-4">
+                <label for="motivo" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Motivo</label>
+                <select id="motivo" name="motivo" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm">
+                    <option value="">Todos</option>
+                    {% for motivo in motivos_disponibles %}
+                    <option value="{{ motivo }}" {% if motivo_actual == motivo %}selected{% endif %}>{{ motivo }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="flex gap-2 md:col-span-3 md:justify-end">
+                <button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                    <i class="fas fa-filter"></i>
+                    Filtrar
+                </button>
+                <a href="{% url 'liquidacion:auditoria_eco_sesion' sesion.pk %}"
+                   class="inline-flex items-center gap-1.5 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200">
+                    Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1100px] divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Profesional</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Fecha</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Paciente</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Horario</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Motivos</th>
+                        <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Monto</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Revision</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for registro in registros_alerta %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm">
+                            <div class="font-semibold text-gray-900">{{ registro.medico_nombre }}</div>
+                            <div class="text-xs text-gray-500">{{ registro.rol }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">
+                            <div>{{ registro.fecha_informe }}</div>
+                            <div class="text-xs text-gray-500">Carga {{ registro.fecha_carga|slice:":16" }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">
+                            <div class="font-medium text-gray-900">{{ registro.paciente }}</div>
+                            <div class="text-xs text-gray-500">DNI {{ registro.dni_paciente }}</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">{{ registro.horario }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <div class="flex flex-wrap gap-1">
+                                {% for motivo in registro.motivos %}
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{{ motivo }}</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-right text-sm font-semibold text-gray-900">${{ registro.monto_calculado|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            {% if registro.revision_auditoria_eco %}
+                            <div class="rounded-md border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
+                                <p class="font-semibold">{{ registro.revision_auditoria_eco.get_estado_display }}</p>
+                                <p>{{ registro.revision_auditoria_eco.fecha_revision|date:"d/m/Y H:i" }} · {{ registro.revision_auditoria_eco.revisado_por|default:"-" }}</p>
+                                <p class="mt-0.5 text-emerald-700">{{ registro.revision_auditoria_eco.observacion|truncatechars:80 }}</p>
+                            </div>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Sin revisar</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-sm">
+                            <div class="flex flex-wrap gap-2">
+                                {% if registro.url_registro %}
+                                <a href="{{ registro.url_registro }}"
+                                   class="inline-flex items-center gap-1 rounded bg-slate-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">
+                                    Inspeccionar
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'liquidacion:liquidacion_mensual' %}?mes={{ sesion.mes }}&año={{ sesion.año }}&medico={{ registro.medico_id }}"
+                                   class="inline-flex items-center gap-1 rounded bg-indigo-100 px-2.5 py-1.5 text-xs font-semibold text-indigo-800 hover:bg-indigo-200">
+                                    Liquidacion
+                                </a>
+                            </div>
+                            <form method="post"
+                                  action="{% url 'liquidacion:auditoria_eco_registro_resolver' sesion.pk registro.registro_id %}"
+                                  class="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ current_path }}">
+                                {% for motivo in registro.motivos %}
+                                <input type="hidden" name="motivos" value="{{ motivo }}">
+                                {% endfor %}
+                                <div class="grid grid-cols-1 gap-1">
+                                    <select name="estado" class="rounded border border-slate-300 px-2 py-1 text-xs">
+                                        <option value="VALIDADO">Validado contra PACS</option>
+                                        <option value="REQUIERE_CORRECCION">Requiere correccion</option>
+                                        <option value="DESCARTADO">Descartado / no corresponde</option>
+                                    </select>
+                                    <textarea name="observacion" rows="2" required
+                                              class="rounded border border-slate-300 px-2 py-1 text-xs"
+                                              placeholder="Observacion obligatoria"></textarea>
+                                    <button type="submit"
+                                            class="inline-flex items-center justify-center rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700">
+                                        Guardar revision
+                                    </button>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500">No hay registros sospechosos para los filtros seleccionados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
