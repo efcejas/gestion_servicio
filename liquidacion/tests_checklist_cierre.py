@@ -10,6 +10,7 @@ from .models import (
     GrupoTarifario,
     PreparacionLiquidacionRRHH,
     CorreccionPacsRegistro,
+    ReglaDescuentoResidencia,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
     RevisionAuditoriaEcoRegistro,
@@ -450,6 +451,50 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(correccion.monto_anterior, Decimal('1000.00'))
         self.assertEqual(correccion.monto_nuevo, Decimal('650.00'))
         self.assertEqual(correccion.corregido_por, self.admin)
+
+    def test_correccion_pacs_recalcula_monto_por_horario_corregido(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['EXTRA'],
+            observacion='PACS confirma horario previo a 17.',
+            revisado_por=self.admin,
+        )
+        ReglaDescuentoResidencia.objects.create(
+            estudio=self.estudio,
+            aplica_medico_residente=True,
+            vigencia_desde=timezone.datetime(2026, 1, 1).date(),
+            activo=True,
+            creado_por=self.admin,
+            actualizado_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_corregir', args=[self.sesion.pk, registro.pk]),
+            {
+                'tipo_correccion': CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+                'horario_corregido': 'INTRA',
+                'observacion': 'Horario real antes de las 17 segun PACS.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(registro.modificado_por, self.admin)
+        self.assertIn('Horario: EXTRA -> INTRA', registro.motivo_modificacion)
+        correccion = CorreccionPacsRegistro.objects.get(registro=registro)
+        self.assertEqual(correccion.revision_auditoria_eco, revision)
+        self.assertEqual(correccion.tipo_correccion, CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO)
+        self.assertEqual(correccion.horario_anterior, 'EXTRA')
+        self.assertEqual(correccion.horario_nuevo, 'INTRA')
+        self.assertEqual(correccion.monto_anterior, Decimal('1000.00'))
+        self.assertEqual(correccion.monto_nuevo, Decimal('500.00'))
 
     def test_correccion_pacs_bloquea_sesion_facturada(self):
         registro = self._crear_registro(monto=Decimal('1000.00'))

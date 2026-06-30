@@ -263,10 +263,27 @@ class RevisionAuditoriaEcoRegistroForm(forms.Form):
 class CorreccionPacsRegistroForm(forms.Form):
     """Correccion economica puntual posterior a control PACS."""
 
+    TIPO_HORARIO_RECALCULADO = 'HORARIO_RECALCULADO'
+    TIPO_MONTO_MANUAL = 'MONTO_MANUAL'
+    TIPO_CHOICES = [
+        (TIPO_HORARIO_RECALCULADO, 'Recalcular por horario corregido'),
+        (TIPO_MONTO_MANUAL, 'Cargar monto manual'),
+    ]
+
+    tipo_correccion = forms.ChoiceField(
+        choices=TIPO_CHOICES,
+        required=False,
+        initial=TIPO_MONTO_MANUAL,
+    )
+    horario_corregido = forms.ChoiceField(
+        choices=RegistroEstudiosPorMedico.HORARIO_CHOICES,
+        required=False,
+    )
     monto_nuevo = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
         min_value=Decimal('0.01'),
+        required=False,
         widget=forms.NumberInput(attrs={
             'step': '0.01',
             'placeholder': 'Monto corregido',
@@ -280,6 +297,18 @@ class CorreccionPacsRegistroForm(forms.Form):
             'placeholder': 'Motivo del ajuste segun control PACS',
         }),
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        tipo = cleaned.get('tipo_correccion') or self.TIPO_MONTO_MANUAL
+        cleaned['tipo_correccion'] = tipo
+
+        if tipo == self.TIPO_HORARIO_RECALCULADO and not cleaned.get('horario_corregido'):
+            self.add_error('horario_corregido', 'Debes indicar el horario corregido.')
+        if tipo == self.TIPO_MONTO_MANUAL and cleaned.get('monto_nuevo') is None:
+            self.add_error('monto_nuevo', 'Debes indicar el monto corregido.')
+
+        return cleaned
 
 
 class PracticaForm(forms.ModelForm):

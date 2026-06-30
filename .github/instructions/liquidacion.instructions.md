@@ -125,14 +125,16 @@ applyTo: "liquidacion/**/*.py"
   - requerir ultima revision ECO en `REQUIERE_CORRECCION`;
   - bloquear sesiones `FACTURADA` y `PAGADA`;
   - usar `transaction.atomic()` y lock simple si hay escritura concurrente;
+  - recalcular con `RegistroEstudiosPorMedico.calcular_monto()` cuando la correccion sea por horario corregido;
   - actualizar `monto_calculado`, `modificado_por`, `fecha_modificacion` y `motivo_modificacion`;
+  - actualizar `horario` solo en correcciones PACS de tipo `HORARIO_RECALCULADO`;
   - crear historial `CorreccionPacsRegistro`;
   - mostrarse al profesional en su lista de registros.
 - Correccion PACS no debe:
-  - llamar ni modificar `calcular_monto()`;
+  - modificar `calcular_monto()`;
   - tocar `signals.py`;
   - recalcular masivamente;
-  - cambiar estudios, horario, paciente, clasificacion automatica o reglas residencia;
+  - cambiar estudios, paciente, clasificacion automatica o reglas residencia;
   - aplicarse si el monto nuevo coincide con el actual.
 
 ## Permisos y trazabilidad

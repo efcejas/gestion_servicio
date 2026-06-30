@@ -1568,6 +1568,13 @@ class RevisionAuditoriaEcoRegistro(models.Model):
 class CorreccionPacsRegistro(models.Model):
     """Ajuste economico puntual aplicado luego de control contra PACS."""
 
+    TIPO_MONTO_MANUAL = 'MONTO_MANUAL'
+    TIPO_HORARIO_RECALCULADO = 'HORARIO_RECALCULADO'
+    TIPO_CHOICES = [
+        (TIPO_MONTO_MANUAL, 'Monto manual'),
+        (TIPO_HORARIO_RECALCULADO, 'Horario corregido y recalculado'),
+    ]
+
     sesion_contable = models.ForeignKey(
         'SesionContable',
         on_delete=models.PROTECT,
@@ -1587,6 +1594,26 @@ class CorreccionPacsRegistro(models.Model):
         null=True,
         blank=True,
         verbose_name='Revision auditoria ECO',
+    )
+    tipo_correccion = models.CharField(
+        max_length=24,
+        choices=TIPO_CHOICES,
+        default=TIPO_MONTO_MANUAL,
+        verbose_name='Tipo de correccion',
+    )
+    horario_anterior = models.CharField(
+        max_length=6,
+        choices=RegistroEstudiosPorMedico.HORARIO_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name='Horario anterior',
+    )
+    horario_nuevo = models.CharField(
+        max_length=6,
+        choices=RegistroEstudiosPorMedico.HORARIO_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name='Horario nuevo',
     )
     monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto anterior')
     monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto nuevo')

@@ -307,6 +307,10 @@ Guarda:
 - sesion contable;
 - registro corregido;
 - revision ECO que origino la correccion;
+- tipo de correccion:
+  - `HORARIO_RECALCULADO`;
+  - `MONTO_MANUAL`;
+- horario anterior y horario nuevo, si corresponde;
 - monto anterior;
 - monto nuevo;
 - observacion;
@@ -318,17 +322,20 @@ Reglas:
 - solo se corrige un registro puntual;
 - requiere que la ultima revision ECO del registro sea `REQUIERE_CORRECCION`;
 - bloquea sesiones `FACTURADA` y `PAGADA`;
-- no toca `calcular_monto()`;
+- si la correccion es por horario, setea el horario corregido y recalcula con `RegistroEstudiosPorMedico.calcular_monto()`;
+- si la correccion es manual, usa el monto ingresado por administracion;
+- no modifica `calcular_monto()`;
 - no toca `signals.py`;
 - no recalcula registros historicos;
-- no cambia estudios, horario, paciente ni clasificacion automatica;
+- no cambia estudios, paciente ni clasificacion automatica;
 - actualiza `RegistroEstudiosPorMedico.monto_calculado`;
+- actualiza `RegistroEstudiosPorMedico.horario` solo cuando el tipo de correccion es `HORARIO_RECALCULADO`;
 - actualiza auditoria del registro:
   - `modificado_por`;
   - `fecha_modificacion`;
   - `motivo_modificacion`.
 
-La correccion queda visible para el profesional en **Mis registros** como **Ajuste PACS aplicado**, con monto anterior, monto nuevo, fecha y observacion. Esto permite que el usuario sepa que el valor fue ajustado por control administrativo contra PACS.
+La correccion queda visible para el profesional en **Mis registros** como **Ajuste PACS aplicado**, con horario anterior/nuevo si existio recorreccion horaria, monto anterior, monto nuevo, fecha y observacion. Esto permite que el usuario sepa que el valor fue ajustado por control administrativo contra PACS.
 
 ### Regla de facturacion con RRHH
 

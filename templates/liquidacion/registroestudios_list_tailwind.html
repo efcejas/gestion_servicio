@@ -402,6 +402,9 @@
                             {% if registro.tiene_correccion_pacs %}
                             <div class="mt-1.5 inline-flex max-w-[180px] flex-col items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] leading-tight text-blue-800">
                                 <span class="font-semibold">Ajuste PACS aplicado</span>
+                                {% if registro.correccion_pacs_info.horario_nuevo %}
+                                <span>{{ registro.correccion_pacs_info.horario_anterior|default:"-" }} -> {{ registro.correccion_pacs_info.horario_nuevo }}</span>
+                                {% endif %}
                                 <span>${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}</span>
                             </div>
                             {% endif %}
@@ -489,6 +492,11 @@
                                 {% if registro.tiene_correccion_pacs %}
                                 <div class="bg-blue-50 rounded border border-blue-200 px-3 py-2 md:col-span-2 lg:col-span-3">
                                     <p class="text-blue-700 font-semibold">Ajuste por control PACS</p>
+                                    {% if registro.correccion_pacs_info.horario_nuevo %}
+                                    <p class="font-medium text-blue-900">
+                                        Horario {{ registro.correccion_pacs_info.horario_anterior|default:"-" }} -> {{ registro.correccion_pacs_info.horario_nuevo }}
+                                    </p>
+                                    {% endif %}
                                     <p class="font-medium text-blue-900">
                                         ${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}
                                         el {{ registro.correccion_pacs_info.fecha_correccion|date:"d/m/Y H:i" }}

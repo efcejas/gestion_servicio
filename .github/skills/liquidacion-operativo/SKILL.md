@@ -41,7 +41,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
 - `liquidacion/services_auditoria.py`: gate administrativo y hallazgos accionables; no corrige datos por si solo.
 - `RevisionAuditoriaEcoRegistro`: revision administrativa ECO/PACS; no modifica montos.
-- `CorreccionPacsRegistro`: historial de ajuste economico puntual por control PACS.
+- `CorreccionPacsRegistro`: historial de ajuste economico puntual por control PACS; puede guardar cambio de horario y monto recalculado.
 - `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
 - `templates/liquidacion/*`: UX; no fuente de verdad economica.
 - `liquidacion/tests_auditoria_2026_05_11.py`: regresiones B2/B3/sesiones/gate.
@@ -127,6 +127,7 @@ No correr tests Django para cambios puramente documentales salvo pedido explicit
 - El cambio mueve reglas a template.
 - El cambio convierte una vista read-only de inspeccion en una vista de edicion.
 - El cambio corrige montos por PACS sin revision previa `REQUIERE_CORRECCION`.
+- El cambio pide monto manual cuando podria recalcular por horario corregido.
 - El cambio oculta al profesional que hubo ajuste PACS.
 - El cambio envia email real.
 

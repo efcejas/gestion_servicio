@@ -941,31 +941,53 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 )
                 return redirect(redirect_url)
 
+            tipo_correccion = form.cleaned_data['tipo_correccion']
+            observacion = form.cleaned_data['observacion']
             monto_anterior = registro.monto_calculado
-            monto_nuevo = form.cleaned_data['monto_nuevo']
+            horario_anterior = registro.horario
+            horario_nuevo = None
 
-            if monto_nuevo == monto_anterior:
-                messages.warning(request, 'El monto corregido coincide con el monto actual. No se aplicaron cambios.')
+            if tipo_correccion == CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO:
+                horario_nuevo = form.cleaned_data['horario_corregido']
+                registro.horario = horario_nuevo
+                monto_nuevo = registro.calcular_monto()
+            else:
+                monto_nuevo = form.cleaned_data['monto_nuevo']
+
+            if monto_nuevo == monto_anterior and (not horario_nuevo or horario_nuevo == horario_anterior):
+                messages.warning(request, 'La correccion coincide con el registro actual. No se aplicaron cambios.')
                 return redirect(redirect_url)
 
-            observacion = form.cleaned_data['observacion']
             registro.monto_calculado = monto_nuevo
             registro.modificado_por = request.user
             registro.fecha_modificacion = now()
-            registro.motivo_modificacion = (
-                f'Ajuste por control PACS en auditoria ECO. '
-                f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
-            )
-            registro.save(update_fields=[
+            if horario_nuevo:
+                registro.motivo_modificacion = (
+                    f'Ajuste por control PACS en auditoria ECO. '
+                    f'Horario: {horario_anterior} -> {horario_nuevo}. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                )
+            else:
+                registro.motivo_modificacion = (
+                    f'Ajuste por control PACS en auditoria ECO. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                )
+            update_fields = [
                 'monto_calculado',
                 'modificado_por',
                 'fecha_modificacion',
                 'motivo_modificacion',
-            ])
+            ]
+            if horario_nuevo:
+                update_fields.append('horario')
+            registro.save(update_fields=update_fields)
             CorreccionPacsRegistro.objects.create(
                 sesion_contable=sesion,
                 registro=registro,
                 revision_auditoria_eco=revision,
+                tipo_correccion=tipo_correccion,
+                horario_anterior=horario_anterior if horario_nuevo else None,
+                horario_nuevo=horario_nuevo,
                 monto_anterior=monto_anterior,
                 monto_nuevo=monto_nuevo,
                 observacion=observacion,
