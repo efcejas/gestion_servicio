@@ -363,6 +363,7 @@ def auditar_residentes_eco_por_sesion(sesion):
                 'severidad': 'ok',
                 'alertas': [],
                 '_eco_por_dia': defaultdict(int),
+                '_registros_eco': [],
             },
         )
 
@@ -391,9 +392,30 @@ def auditar_residentes_eco_por_sesion(sesion):
         if es_finde or es_feriado:
             item['finde_feriado'] += 1
         elif hora_local >= AUDIT_HORA_POST_17:
-            item['post_17'] += 1
+                item['post_17'] += 1
 
         item['_eco_por_dia'][fecha_local] += 1
+        motivos_registro = []
+        if registro.horario == 'EXTRA':
+            motivos_registro.append('EXTRA')
+        if hora_local >= AUDIT_HORA_NOCTURNA_DESDE or hora_local < AUDIT_HORA_NOCTURNA_HASTA:
+            motivos_registro.append('Nocturno')
+        if es_finde or es_feriado:
+            motivos_registro.append('Finde/Feriado')
+        elif hora_local >= AUDIT_HORA_POST_17:
+            motivos_registro.append('Post 17')
+
+        item['_registros_eco'].append({
+            'registro_id': registro.pk,
+            'fecha_informe': registro.fecha_del_informe.isoformat() if registro.fecha_del_informe else '',
+            'fecha_carga': dt.isoformat(),
+            'fecha_local': fecha_local.isoformat(),
+            'paciente': f'{registro.apellido_paciente}, {registro.nombre_paciente}',
+            'dni_paciente': registro.dni_paciente,
+            'horario': registro.horario,
+            'monto_calculado': registro.monto_calculado,
+            'motivos': motivos_registro,
+        })
 
     items = []
     for item in acumulado.values():
@@ -404,6 +426,7 @@ def auditar_residentes_eco_por_sesion(sesion):
         item['proporcion_extra'] = item['extra'] / total_eco
 
         eco_por_dia = item.pop('_eco_por_dia')
+        registros_eco = item.pop('_registros_eco')
         item['max_eco_dia'] = max(eco_por_dia.values()) if eco_por_dia else 0
         item['dias_pico'] = sorted(
             [
@@ -460,6 +483,28 @@ def auditar_residentes_eco_por_sesion(sesion):
             item['severidad'] = 'amarilla'
         else:
             item['severidad'] = 'ok'
+
+        dias_pico = set(item['dias_pico'])
+        for registro_alerta in registros_eco:
+            if registro_alerta['fecha_local'] in dias_pico and 'Dia pico' not in registro_alerta['motivos']:
+                registro_alerta['motivos'].append('Dia pico')
+
+        tipos_alerta = {alerta['tipo'] for alerta in item['alertas']}
+        registros_alerta = []
+        for registro_alerta in registros_eco:
+            motivos = set(registro_alerta['motivos'])
+            aporta = (
+                ({'extra_mensual', 'proporcion_extra'} & tipos_alerta and 'EXTRA' in motivos)
+                or ('nocturnos' in tipos_alerta and 'Nocturno' in motivos)
+                or ('finde_feriado' in tipos_alerta and 'Finde/Feriado' in motivos)
+                or ('volumen_diario' in tipos_alerta and 'Dia pico' in motivos)
+            )
+            if aporta:
+                registros_alerta.append(registro_alerta)
+
+        registros_alerta.sort(key=lambda registro: registro['fecha_carga'], reverse=True)
+        item['registros_alerta'] = registros_alerta
+        item['registros_alerta_total'] = len(registros_alerta)
 
         items.append(item)
 

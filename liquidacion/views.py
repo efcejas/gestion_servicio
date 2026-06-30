@@ -109,7 +109,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
             f'{base_solicitudes_url}?sesion={sesion_pk}'
             f'&estado={SolicitudRevisionHorarioRegistro.ESTADO_APROBADA}'
         ),
-        'auditoria_residentes_eco': None,
+        'auditoria_residentes_eco': f'#auditoria-eco-sesion-{sesion_pk}',
         'preparacion_rrhh': (
             reverse('liquidacion:preparacion_rrhh_preview', kwargs={'pk': sesion_pk})
             if sesion_rrhh_habilitada
@@ -153,6 +153,34 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         proximo_paso['url'] = urls_por_item.get(proximo_paso.get('key'))
 
     return checklist
+
+
+def _enriquecer_auditoria_residentes_eco_visual(auditoria, sesion):
+    """Agrega enlaces de inspeccion administrativa sin alterar el resultado de auditoria."""
+    params_base = {'mes': sesion.mes, 'año': sesion.año}
+    for item in auditoria.get('items', []):
+        params = {**params_base, 'medico': item.get('medico_id')}
+        item['url_liquidacion'] = f"{reverse('liquidacion:liquidacion_mensual')}?{urlencode(params)}"
+        for registro_alerta in item.get('registros_alerta', []):
+            registro_id = registro_alerta.get('registro_id')
+            if registro_id:
+                volver_params = _query_volver_sesion(sesion)
+                url = reverse('liquidacion:registroestudios_admin_detalle', kwargs={'pk': registro_id})
+                if volver_params:
+                    url = f'{url}?{urlencode(volver_params)}'
+                registro_alerta['url_registro'] = url
+        for alerta in item.get('alertas', []):
+            alerta['valor_display'] = (
+                f"{alerta['valor']:.0%}"
+                if alerta.get('tipo') == 'proporcion_extra'
+                else alerta['valor']
+            )
+
+    for item in auditoria.get('top_alertas', []):
+        params = {**params_base, 'medico': item.get('medico_id')}
+        item['url_liquidacion'] = f"{reverse('liquidacion:liquidacion_mensual')}?{urlencode(params)}"
+
+    return auditoria
 
 
 def _volver_sesion_id(request):
@@ -3107,7 +3135,10 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             gate_preview = {'bloqueantes': [], 'advertencias': []}
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
-            auditoria_residentes_eco = auditar_residentes_eco_por_sesion(sesion)
+            auditoria_residentes_eco = _enriquecer_auditoria_residentes_eco_visual(
+                auditar_residentes_eco_por_sesion(sesion),
+                sesion,
+            )
             checklist_cierre = _enriquecer_checklist_cierre_visual(
                 construir_checklist_cierre_sesion(sesion, user=user),
                 sesion,

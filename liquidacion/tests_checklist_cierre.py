@@ -260,6 +260,32 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(acciones[0]['label'], 'Inspeccionar registro')
         self.assertIn(reverse('liquidacion:registroestudios_admin_detalle', args=[registro.pk]), acciones[0]['url'])
 
+    def test_vista_sesion_contable_auditoria_eco_muestra_detalle_accionable(self):
+        registros = []
+        for _ in range(35):
+            registros.append(self._crear_registro(monto=Decimal('1000.00')))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        sesiones_data = response.context['sesiones_data']
+        dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
+        auditoria_item = next(
+            item for item in dato['checklist_cierre']['items']
+            if item['key'] == 'auditoria_residentes_eco'
+        )
+        self.assertEqual(auditoria_item['url'], f'#auditoria-eco-sesion-{self.sesion.pk}')
+        self.assertContains(response, 'Cantidad de registros EXTRA mensual elevada')
+        self.assertContains(response, 'Revisar registros')
+        self.assertContains(response, reverse('liquidacion:liquidacion_mensual'))
+        self.assertContains(response, 'Registros que explican la alerta')
+        self.assertContains(response, 'Inspeccionar')
+        self.assertContains(
+            response,
+            reverse('liquidacion:registroestudios_admin_detalle', args=[registros[-1].pk]),
+        )
+
     def test_admin_puede_inspeccionar_registro_desde_cierre(self):
         registro = self._crear_registro(monto=Decimal('0.00'))
         self.client.force_login(self.admin)

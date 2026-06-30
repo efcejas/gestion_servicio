@@ -377,10 +377,78 @@
                                                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800">Amarilla</span>
                                                             {% endif %}
                                                             <span class="text-slate-500">({{ item.cantidad_alertas }} alerta{{ item.cantidad_alertas|pluralize:'s' }})</span>
+                                                            <a href="{{ item.url_liquidacion }}"
+                                                               class="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-50">
+                                                                Ver liquidacion
+                                                            </a>
                                                         </p>
                                                     {% endfor %}
                                                 </div>
-                                                <p class="text-slate-500">Detalle próximamente.</p>
+                                                <div class="space-y-2 pt-1">
+                                                    {% for item in dato.auditoria_residentes_eco.items %}
+                                                        {% if item.alertas %}
+                                                        <div class="rounded-md border {% if item.severidad == 'roja' %}border-red-100 bg-red-50{% else %}border-amber-100 bg-amber-50{% endif %} px-2 py-2">
+                                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                                <div>
+                                                                    <p class="font-semibold text-slate-800">{{ item.medico_nombre }}</p>
+                                                                    <p class="text-slate-500">
+                                                                        ECO: {{ item.total_eco }} · INTRA: {{ item.intra }} · EXTRA: {{ item.extra }} · Nocturnos: {{ item.nocturnos }}
+                                                                    </p>
+                                                                </div>
+                                                                <a href="{{ item.url_liquidacion }}"
+                                                                   class="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-50">
+                                                                    Revisar registros
+                                                                </a>
+                                                            </div>
+                                                            <div class="mt-1.5 space-y-1">
+                                                                {% for alerta in item.alertas %}
+                                                                <p class="{% if alerta.severidad == 'roja' %}text-red-700{% else %}text-amber-700{% endif %}">
+                                                                    • {{ alerta.mensaje }}: {{ alerta.valor_display }} (umbral {{ alerta.umbral }})
+                                                                </p>
+                                                                {% endfor %}
+                                                            </div>
+                                                            {% if item.dias_pico %}
+                                                            <p class="mt-1 text-slate-500">Dias pico: {{ item.dias_pico|join:", " }}</p>
+                                                            {% endif %}
+                                                            {% if item.registros_alerta %}
+                                                            <div class="mt-2 rounded-md border border-white/70 bg-white/70">
+                                                                <div class="border-b border-slate-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                                                    Registros que explican la alerta
+                                                                    {% if item.registros_alerta_total > 6 %}
+                                                                    <span class="font-normal normal-case text-slate-400">({{ item.registros_alerta_total }} en total, se muestran 6)</span>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="divide-y divide-slate-100">
+                                                                    {% for registro_alerta in item.registros_alerta|slice:":6" %}
+                                                                    <div class="flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between">
+                                                                        <div>
+                                                                            <p class="font-medium text-slate-800">{{ registro_alerta.fecha_informe }} · {{ registro_alerta.paciente }}</p>
+                                                                            <p class="text-slate-500">
+                                                                                Carga: {{ registro_alerta.fecha_carga|slice:":16" }} · Horario: {{ registro_alerta.horario }} · ${{ registro_alerta.monto_calculado|floatformat:2 }}
+                                                                            </p>
+                                                                            <div class="mt-1 flex flex-wrap gap-1">
+                                                                                {% for motivo in registro_alerta.motivos %}
+                                                                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+                                                                                    {{ motivo }}
+                                                                                </span>
+                                                                                {% endfor %}
+                                                                            </div>
+                                                                        </div>
+                                                                        {% if registro_alerta.url_registro %}
+                                                                        <a href="{{ registro_alerta.url_registro }}"
+                                                                           class="inline-flex items-center justify-center rounded bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 border border-slate-200 hover:bg-slate-50">
+                                                                            Inspeccionar
+                                                                        </a>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                    {% endfor %}
+                                                                </div>
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </div>
                                             {% else %}
                                                 <p class="text-slate-500">Sin alertas de auditoría ECO en esta sesión.</p>
                                             {% endif %}
@@ -456,35 +524,35 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    function abrirGateDesdeHash(hash) {
-        if (!hash || !hash.startsWith('#gate-sesion-')) {
+    function abrirDetalleDesdeHash(hash) {
+        if (!hash || (!hash.startsWith('#gate-sesion-') && !hash.startsWith('#auditoria-eco-sesion-') && !hash.startsWith('#historial-sesion-'))) {
             return;
         }
 
-        const gate = document.querySelector(hash);
-        if (!gate || !gate.matches('[data-gate-administrativo]')) {
+        const detalle = document.querySelector(hash);
+        if (!detalle || detalle.tagName.toLowerCase() !== 'details') {
             return;
         }
 
-        gate.open = true;
-        gate.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+        detalle.open = true;
+        detalle.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
         setTimeout(function () {
-            gate.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            detalle.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 80);
         setTimeout(function () {
-            gate.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+            detalle.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
         }, 2600);
     }
 
-    abrirGateDesdeHash(window.location.hash || '');
+    abrirDetalleDesdeHash(window.location.hash || '');
 
     window.addEventListener('hashchange', function () {
-        abrirGateDesdeHash(window.location.hash || '');
+        abrirDetalleDesdeHash(window.location.hash || '');
     });
 
-    document.querySelectorAll('a[href^="#gate-sesion-"]').forEach(function (link) {
+    document.querySelectorAll('a[href^="#gate-sesion-"], a[href^="#auditoria-eco-sesion-"], a[href^="#historial-sesion-"]').forEach(function (link) {
         link.addEventListener('click', function () {
-            abrirGateDesdeHash(link.getAttribute('href'));
+            abrirDetalleDesdeHash(link.getAttribute('href'));
         });
     });
 });
