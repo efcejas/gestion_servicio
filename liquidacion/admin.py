@@ -10,6 +10,7 @@ from .models import (
     HistorialRecalculoSolicitudRevisionHorario,
     HistorialSesionContable,
     PreparacionLiquidacionRRHH,
+    CorreccionPacsRegistro,
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
     RevisionAuditoriaEcoRegistro,
@@ -818,6 +819,47 @@ class RevisionAuditoriaEcoRegistroAdmin(admin.ModelAdmin):
         'fecha_revision',
     )
     ordering = ('-fecha_revision',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(CorreccionPacsRegistro)
+class CorreccionPacsRegistroAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'sesion_contable',
+        'registro',
+        'monto_anterior',
+        'monto_nuevo',
+        'corregido_por',
+        'fecha_correccion',
+    )
+    list_filter = ('sesion_contable', 'fecha_correccion')
+    search_fields = (
+        'registro__id',
+        'registro__apellido_paciente',
+        'registro__nombre_paciente',
+        'registro__dni_paciente',
+        'observacion',
+    )
+    readonly_fields = (
+        'sesion_contable',
+        'registro',
+        'revision_auditoria_eco',
+        'monto_anterior',
+        'monto_nuevo',
+        'observacion',
+        'corregido_por',
+        'fecha_correccion',
+    )
+    ordering = ('-fecha_correccion',)
 
     def has_add_permission(self, request):
         return False

@@ -399,6 +399,12 @@
                             {% else %}
                             <span class="text-[11px] text-gray-400">Sin revisión</span>
                             {% endif %}
+                            {% if registro.tiene_correccion_pacs %}
+                            <div class="mt-1.5 inline-flex max-w-[180px] flex-col items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] leading-tight text-blue-800">
+                                <span class="font-semibold">Ajuste PACS aplicado</span>
+                                <span>${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}</span>
+                            </div>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">${{ registro.monto_calculado|floatformat:2 }}</td>
@@ -480,6 +486,16 @@
                                     <p class="text-emerald-700">Monto final guardado</p>
                                     <p class="font-bold text-emerald-800">${{ registro.detalle_monto.monto_final|floatformat:2 }}</p>
                                 </div>
+                                {% if registro.tiene_correccion_pacs %}
+                                <div class="bg-blue-50 rounded border border-blue-200 px-3 py-2 md:col-span-2 lg:col-span-3">
+                                    <p class="text-blue-700 font-semibold">Ajuste por control PACS</p>
+                                    <p class="font-medium text-blue-900">
+                                        ${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}
+                                        el {{ registro.correccion_pacs_info.fecha_correccion|date:"d/m/Y H:i" }}
+                                    </p>
+                                    <p class="mt-1 text-blue-800 whitespace-pre-line">{{ registro.correccion_pacs_info.observacion }}</p>
+                                </div>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

@@ -113,6 +113,14 @@
                                 <p>{{ registro.revision_auditoria_eco.fecha_revision|date:"d/m/Y H:i" }} · {{ registro.revision_auditoria_eco.revisado_por|default:"-" }}</p>
                                 <p class="mt-0.5 text-emerald-700">{{ registro.revision_auditoria_eco.observacion|truncatechars:80 }}</p>
                             </div>
+                            {% if registro.correccion_pacs %}
+                            <div class="mt-2 rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs text-blue-800">
+                                <p class="font-semibold">Ajuste PACS aplicado</p>
+                                <p>${{ registro.correccion_pacs.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs.monto_nuevo|floatformat:2 }}</p>
+                                <p>{{ registro.correccion_pacs.fecha_correccion|date:"d/m/Y H:i" }} Â· {{ registro.correccion_pacs.corregido_por|default:"-" }}</p>
+                                <p class="mt-0.5 text-blue-700">{{ registro.correccion_pacs.observacion|truncatechars:80 }}</p>
+                            </div>
+                            {% endif %}
                             {% else %}
                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Sin revisar</span>
                             {% endif %}
@@ -153,6 +161,27 @@
                                     </button>
                                 </div>
                             </form>
+                            {% if registro.revision_auditoria_eco.estado == 'REQUIERE_CORRECCION' %}
+                            <form method="post"
+                                  action="{% url 'liquidacion:auditoria_eco_registro_corregir' sesion.pk registro.registro_id %}"
+                                  class="mt-2 rounded-md border border-blue-200 bg-blue-50 p-2">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ current_path }}">
+                                <p class="mb-1 text-xs font-semibold text-blue-900">Aplicar ajuste por control PACS</p>
+                                <div class="grid grid-cols-1 gap-1">
+                                    <input type="number" name="monto_nuevo" step="0.01" min="0.01" required
+                                           class="rounded border border-blue-200 px-2 py-1 text-xs"
+                                           placeholder="Monto corregido">
+                                    <textarea name="observacion" rows="2" required
+                                              class="rounded border border-blue-200 px-2 py-1 text-xs"
+                                              placeholder="Motivo del ajuste"></textarea>
+                                    <button type="submit"
+                                            class="inline-flex items-center justify-center rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700">
+                                        Aplicar ajuste PACS
+                                    </button>
+                                </div>
+                            </form>
+                            {% endif %}
                         </td>
                     </tr>
                     {% empty %}

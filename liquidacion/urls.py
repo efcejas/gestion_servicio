@@ -28,6 +28,7 @@ from .views import (
     SolicitudRevisionHorarioRecalcularAplicacionView,
     AuditoriaEcoSesionView,
     AuditoriaEcoRegistroResolverView,
+    AuditoriaEcoRegistroCorregirView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -89,6 +90,11 @@ urlpatterns = [
         'sesiones/<int:pk>/auditoria-eco/<int:registro_pk>/resolver/',
         AuditoriaEcoRegistroResolverView.as_view(),
         name='auditoria_eco_registro_resolver',
+    ),
+    path(
+        'sesiones/<int:pk>/auditoria-eco/<int:registro_pk>/corregir/',
+        AuditoriaEcoRegistroCorregirView.as_view(),
+        name='auditoria_eco_registro_corregir',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',

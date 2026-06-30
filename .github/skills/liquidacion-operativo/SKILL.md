@@ -28,6 +28,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Servicio de reglas residencia: `liquidacion/services.py`.
 - Snapshot RRHH D1 y requisito para facturar: `liquidacion/services_rrhh.py`.
 - Checklist E1 y acciones E2: `liquidacion/services_cierre.py`, `liquidacion/services_auditoria.py`, `liquidacion/views.py`.
+- Auditoria ECO/PACS E3/E4: `RevisionAuditoriaEcoRegistro`, `CorreccionPacsRegistro`, `AuditoriaEcoSesionView`, `AuditoriaEcoRegistroCorregirView`.
 - Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
 - Clasificacion automatica y override: `liquidacion/signals.py`.
 
@@ -38,7 +39,9 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - `liquidacion/services.py`: reglas de residencia y servicios compartidos.
 - `liquidacion/services_rrhh.py`: snapshot auditable para RRHH, deteccion de practicas de residencia y requisito para facturar; no recalcula.
 - `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
-- `liquidacion/services_auditoria.py`: gate administrativo y hallazgos accionables; no corrige datos.
+- `liquidacion/services_auditoria.py`: gate administrativo y hallazgos accionables; no corrige datos por si solo.
+- `RevisionAuditoriaEcoRegistro`: revision administrativa ECO/PACS; no modifica montos.
+- `CorreccionPacsRegistro`: historial de ajuste economico puntual por control PACS.
 - `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
 - `templates/liquidacion/*`: UX; no fuente de verdad economica.
 - `liquidacion/tests_auditoria_2026_05_11.py`: regresiones B2/B3/sesiones/gate.
@@ -87,6 +90,15 @@ python manage.py makemigrations --check --dry-run
 
 Incluye E2 si el cambio toca acciones de bloqueantes, inspeccion read-only de registros o apertura del gate desde el checklist.
 
+### Auditoria ECO/PACS E3/E4
+
+```bash
+python manage.py test liquidacion.tests_checklist_cierre --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+Usar cuando el cambio toque revision de alertas ECO, control PACS, `RevisionAuditoriaEcoRegistro`, `CorreccionPacsRegistro`, visibilidad del ajuste en la lista profesional o acciones desde `auditoria_eco_sesion`.
+
 ### Override Extra Residencia
 
 ```bash
@@ -114,6 +126,8 @@ No correr tests Django para cambios puramente documentales salvo pedido explicit
 - El cambio crea o modifica snapshots/historial.
 - El cambio mueve reglas a template.
 - El cambio convierte una vista read-only de inspeccion en una vista de edicion.
+- El cambio corrige montos por PACS sin revision previa `REQUIERE_CORRECCION`.
+- El cambio oculta al profesional que hubo ajuste PACS.
 - El cambio envia email real.
 
 ## Salida esperada

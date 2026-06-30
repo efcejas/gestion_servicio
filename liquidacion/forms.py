@@ -260,6 +260,28 @@ class RevisionAuditoriaEcoRegistroForm(forms.Form):
     )
 
 
+class CorreccionPacsRegistroForm(forms.Form):
+    """Correccion economica puntual posterior a control PACS."""
+
+    monto_nuevo = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.01'),
+        widget=forms.NumberInput(attrs={
+            'step': '0.01',
+            'placeholder': 'Monto corregido',
+        }),
+    )
+    observacion = forms.CharField(
+        max_length=1000,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 2,
+            'placeholder': 'Motivo del ajuste segun control PACS',
+        }),
+    )
+
+
 class PracticaForm(forms.ModelForm):
     """
     Formulario para registro de prácticas médicas - Liquidación v3.1

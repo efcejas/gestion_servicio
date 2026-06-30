@@ -1563,6 +1563,53 @@ class RevisionAuditoriaEcoRegistro(models.Model):
 
     def __str__(self):
         return f"Revision ECO registro #{self.registro_id} - {self.estado}"
+
+
+class CorreccionPacsRegistro(models.Model):
+    """Ajuste economico puntual aplicado luego de control contra PACS."""
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='correcciones_pacs',
+        verbose_name='Sesion contable',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.PROTECT,
+        related_name='correcciones_pacs',
+        verbose_name='Registro',
+    )
+    revision_auditoria_eco = models.ForeignKey(
+        'RevisionAuditoriaEcoRegistro',
+        on_delete=models.PROTECT,
+        related_name='correcciones_pacs',
+        null=True,
+        blank=True,
+        verbose_name='Revision auditoria ECO',
+    )
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto anterior')
+    monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto nuevo')
+    observacion = models.TextField(verbose_name='Observacion')
+    corregido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='correcciones_pacs_realizadas',
+        verbose_name='Corregido por',
+    )
+    fecha_correccion = models.DateTimeField(auto_now_add=True, verbose_name='Fecha correccion')
+
+    class Meta:
+        verbose_name = 'Correccion PACS de registro'
+        verbose_name_plural = 'Correcciones PACS de registros'
+        ordering = ['-fecha_correccion']
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha_correccion']),
+            models.Index(fields=['registro', '-fecha_correccion']),
+        ]
+
+    def __str__(self):
+        return f"Correccion PACS registro #{self.registro_id}: ${self.monto_anterior} -> ${self.monto_nuevo}"
     
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================

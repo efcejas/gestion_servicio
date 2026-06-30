@@ -22,6 +22,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - RRHH D1: `PreparacionLiquidacionRRHH`, snapshot auditable, preview sin envio real y requisito para facturar cuando hay practicas de residencia.
 - Checklist E1: resumen visual de cierre por sesion; orienta, no calcula.
 - Resolucion guiada E2: acciones de navegacion para bloqueantes, inspeccion read-only de registros y retorno contextual a sesiones.
+- Auditoria ECO/PACS E3/E4: revision administrativa contra PACS y correccion economica puntual auditada.
 
 ## Como auditar antes de tocar codigo
 
@@ -47,6 +48,7 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - Si afecta facturacion, verificar si la sesion tiene practicas de residencia: con residencia requiere RRHH `PREPARADO`; sin residencia RRHH queda como `No requerido`.
 - Si afecta checklist E1, mantenerlo como resumen visual; no mover reglas economicas al template.
 - Si afecta navegacion de bloqueantes E2, distinguir inspeccion de resolucion: los links deben guiar al administrativo sin crear correcciones silenciosas.
+- Si afecta auditoria ECO/PACS, separar revision de correccion: `RevisionAuditoriaEcoRegistro` no modifica montos; `CorreccionPacsRegistro` cambia solo un registro puntual y debe quedar visible al profesional.
 - Si el usuario pide "solo disenar", no implementar.
 - Si el usuario pide "no modificar codigo", limitarse a auditoria/comandos de lectura.
 - Si el cambio es documental, no correr tests Django salvo pedido explicito.
@@ -90,4 +92,5 @@ Sos un asistente especializado en `liquidacion` para un sistema medico en produc
 - No modificar migraciones aplicadas.
 - No convertir templates/checklists en fuente de reglas economicas.
 - No convertir la inspeccion administrativa de registros en una edicion economica encubierta.
+- No convertir revision ECO/PACS en recalculo automatico; la correccion PACS es puntual, auditada y sin tocar `calcular_monto()`.
 - No usar `select_for_update().select_related(...)` en flujos con relaciones nullable.

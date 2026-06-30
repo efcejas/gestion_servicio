@@ -267,7 +267,68 @@ El gadget **Registros** abre el bloque **Registros: bloqueantes y advertencias**
 
 La inspeccion administrativa de registros es solo lectura: no recalcula, no guarda cambios y no reemplaza las solicitudes horarias B2/B3.
 
-La **Auditoria residentes ECO** es una advertencia operativa. En esta fase no queda marcada como revisada ni bloquea el cierre; requiere una fase posterior si se decide guardar estado de revision.
+### E3 - Auditoria residentes ECO y control PACS
+
+La **Auditoria residentes ECO** es una advertencia operativa para revisar registros ECO sospechosos contra PACS. No recalcula automaticamente y no reemplaza el gate administrativo ni las solicitudes horarias.
+
+La vista completa de auditoria permite:
+
+- ver todos los registros sospechosos de la sesion;
+- filtrar por profesional y motivo;
+- inspeccionar el registro en modo administrativo;
+- ver la liquidacion del profesional;
+- registrar una revision administrativa:
+  - `VALIDADO`: el registro coincide con PACS o se acepta tal como esta;
+  - `REQUIERE_CORRECCION`: el control PACS detecto diferencia que requiere ajuste;
+  - `DESCARTADO`: la alerta no corresponde o no debe tratarse.
+
+`RevisionAuditoriaEcoRegistro` deja trazabilidad de:
+
+- sesion;
+- registro;
+- estado;
+- motivos detectados;
+- observacion obligatoria;
+- usuario revisor;
+- fecha de revision.
+
+La revision por si sola no modifica montos.
+
+### E4 - Correccion puntual por control PACS
+
+Cuando la ultima revision de un registro queda en `REQUIERE_CORRECCION`, administracion puede aplicar un ajuste puntual por control PACS.
+
+Modelo:
+
+`CorreccionPacsRegistro`
+
+Guarda:
+
+- sesion contable;
+- registro corregido;
+- revision ECO que origino la correccion;
+- monto anterior;
+- monto nuevo;
+- observacion;
+- usuario que corrige;
+- fecha de correccion.
+
+Reglas:
+
+- solo se corrige un registro puntual;
+- requiere que la ultima revision ECO del registro sea `REQUIERE_CORRECCION`;
+- bloquea sesiones `FACTURADA` y `PAGADA`;
+- no toca `calcular_monto()`;
+- no toca `signals.py`;
+- no recalcula registros historicos;
+- no cambia estudios, horario, paciente ni clasificacion automatica;
+- actualiza `RegistroEstudiosPorMedico.monto_calculado`;
+- actualiza auditoria del registro:
+  - `modificado_por`;
+  - `fecha_modificacion`;
+  - `motivo_modificacion`.
+
+La correccion queda visible para el profesional en **Mis registros** como **Ajuste PACS aplicado**, con monto anterior, monto nuevo, fecha y observacion. Esto permite que el usuario sepa que el valor fue ajustado por control administrativo contra PACS.
 
 ### Regla de facturacion con RRHH
 

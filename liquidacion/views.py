@@ -33,6 +33,7 @@ from .models import (
     HistorialRecalculoSolicitudRevisionHorario,
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
+    CorreccionPacsRegistro,
     GuardiaPasiva,
     SesionContable,
     ConfiguracionGuardiaPasiva,
@@ -58,6 +59,7 @@ from .forms import (
     SolicitudRevisionHorarioRecalcularAplicacionForm,
     SolicitudRevisionHorarioBulkActionForm,
     RevisionAuditoriaEcoRegistroForm,
+    CorreccionPacsRegistroForm,
     PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -821,8 +823,19 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
         for revision in revisiones:
             if revision.registro_id not in revisiones_por_registro:
                 revisiones_por_registro[revision.registro_id] = revision
+        correcciones_por_registro = {}
+        correcciones = (
+            CorreccionPacsRegistro.objects
+            .filter(sesion_contable=self.sesion, registro_id__in=registro_ids)
+            .select_related('corregido_por')
+            .order_by('registro_id', '-fecha_correccion')
+        )
+        for correccion in correcciones:
+            if correccion.registro_id not in correcciones_por_registro:
+                correcciones_por_registro[correccion.registro_id] = correccion
         for registro in registros_alerta:
             registro['revision_auditoria_eco'] = revisiones_por_registro.get(registro['registro_id'])
+            registro['correccion_pacs'] = correcciones_por_registro.get(registro['registro_id'])
 
         motivos_disponibles = sorted({
             motivo
@@ -881,6 +894,85 @@ class AuditoriaEcoRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, 
             revisado_por=request.user,
         )
         messages.success(request, f'Revision ECO registrada para el registro #{registro.pk}.')
+        return redirect(redirect_url)
+
+
+class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Aplica un ajuste economico puntual luego de una revision PACS."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para corregir registros por control PACS.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        form = CorreccionPacsRegistroForm(request.POST)
+        redirect_url = request.POST.get('next') or reverse('liquidacion:auditoria_eco_sesion', kwargs={'pk': sesion.pk})
+
+        if sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(request, 'No se puede aplicar un ajuste PACS en sesiones FACTURADAS o PAGADAS.')
+            return redirect(redirect_url)
+
+        if not form.is_valid():
+            messages.error(request, 'Debes indicar monto corregido y observacion para aplicar el ajuste PACS.')
+            return redirect(redirect_url)
+
+        with transaction.atomic():
+            registro = get_object_or_404(
+                RegistroEstudiosPorMedico.objects.select_for_update(),
+                pk=kwargs['registro_pk'],
+                sesion_contable=sesion,
+            )
+            revision = (
+                RevisionAuditoriaEcoRegistro.objects
+                .filter(sesion_contable=sesion, registro=registro)
+                .select_related('revisado_por')
+                .order_by('-fecha_revision')
+                .first()
+            )
+
+            if not revision or revision.estado != RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION:
+                messages.error(
+                    request,
+                    'Debe marcarse el registro como "Requiere correccion" antes de aplicar un ajuste PACS.',
+                )
+                return redirect(redirect_url)
+
+            monto_anterior = registro.monto_calculado
+            monto_nuevo = form.cleaned_data['monto_nuevo']
+
+            if monto_nuevo == monto_anterior:
+                messages.warning(request, 'El monto corregido coincide con el monto actual. No se aplicaron cambios.')
+                return redirect(redirect_url)
+
+            observacion = form.cleaned_data['observacion']
+            registro.monto_calculado = monto_nuevo
+            registro.modificado_por = request.user
+            registro.fecha_modificacion = now()
+            registro.motivo_modificacion = (
+                f'Ajuste por control PACS en auditoria ECO. '
+                f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+            )
+            registro.save(update_fields=[
+                'monto_calculado',
+                'modificado_por',
+                'fecha_modificacion',
+                'motivo_modificacion',
+            ])
+            CorreccionPacsRegistro.objects.create(
+                sesion_contable=sesion,
+                registro=registro,
+                revision_auditoria_eco=revision,
+                monto_anterior=monto_anterior,
+                monto_nuevo=monto_nuevo,
+                observacion=observacion,
+                corregido_por=request.user,
+            )
+
+        messages.success(request, f'Ajuste PACS aplicado al registro #{registro.pk}.')
         return redirect(redirect_url)
 
 
@@ -2110,6 +2202,17 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             if revision.registro_id not in ultima_revision_por_registro:
                 ultima_revision_por_registro[revision.registro_id] = revision
 
+        correcciones_pacs_por_registro = {}
+        correcciones_pacs_qs = (
+            CorreccionPacsRegistro.objects
+            .filter(registro_id__in=registros_ids)
+            .select_related('corregido_por')
+            .order_by('registro_id', '-fecha_correccion')
+        )
+        for correccion in correcciones_pacs_qs:
+            if correccion.registro_id not in correcciones_pacs_por_registro:
+                correcciones_pacs_por_registro[correccion.registro_id] = correccion
+
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
@@ -2131,6 +2234,8 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             registro.tiene_revision = revision is not None
             registro.revision_badge_label = ''
             registro.revision_badge_classes = ''
+            registro.correccion_pacs_info = correcciones_pacs_por_registro.get(registro.id)
+            registro.tiene_correccion_pacs = registro.correccion_pacs_info is not None
 
             if revision:
                 if revision.fecha_aplicacion:

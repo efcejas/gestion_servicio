@@ -111,6 +111,30 @@ applyTo: "liquidacion/**/*.py"
 - La inspeccion administrativa de registros bloqueantes es read-only; no debe recalcular ni modificar registros.
 - El gadget `Registros` debe dirigir y abrir el bloque de gate administrativo de esa sesion.
 
+## Auditoria ECO/PACS E3/E4
+
+- `RevisionAuditoriaEcoRegistro` registra revision administrativa de alertas ECO contra PACS.
+- La revision ECO no modifica montos por si sola.
+- Estados de revision ECO:
+  - `VALIDADO`;
+  - `REQUIERE_CORRECCION`;
+  - `DESCARTADO`.
+- `CorreccionPacsRegistro` registra un ajuste economico puntual originado en control PACS.
+- Correccion PACS debe:
+  - operar sobre un solo `RegistroEstudiosPorMedico`;
+  - requerir ultima revision ECO en `REQUIERE_CORRECCION`;
+  - bloquear sesiones `FACTURADA` y `PAGADA`;
+  - usar `transaction.atomic()` y lock simple si hay escritura concurrente;
+  - actualizar `monto_calculado`, `modificado_por`, `fecha_modificacion` y `motivo_modificacion`;
+  - crear historial `CorreccionPacsRegistro`;
+  - mostrarse al profesional en su lista de registros.
+- Correccion PACS no debe:
+  - llamar ni modificar `calcular_monto()`;
+  - tocar `signals.py`;
+  - recalcular masivamente;
+  - cambiar estudios, horario, paciente, clasificacion automatica o reglas residencia;
+  - aplicarse si el monto nuevo coincide con el actual.
+
 ## Permisos y trazabilidad
 
 - Validar permisos en backend (`dispatch`, `test_func`, queryset restringido), no solo en template.
