@@ -530,3 +530,107 @@ def auditar_residentes_eco_por_sesion(sesion):
     ]
 
     return resultado
+
+
+def resumir_pendientes_auditoria_eco(auditoria):
+    """
+    Agrega una lectura operativa de pendientes sin alterar la auditoria bruta.
+
+    La deteccion de patrones ECO conserva todos los hallazgos. Para paneles de
+    cierre, en cambio, solo debe quedar pendiente lo que todavia requiere accion:
+    registros sin revision o con revision "requiere correccion" sin ajuste PACS.
+    """
+    from .models import CorreccionPacsRegistro, RevisionAuditoriaEcoRegistro
+
+    registro_ids = [
+        registro_alerta.get('registro_id')
+        for item in auditoria.get('items', [])
+        for registro_alerta in item.get('registros_alerta', [])
+        if registro_alerta.get('registro_id')
+    ]
+    registro_ids = list(dict.fromkeys(registro_ids))
+
+    revisiones_por_registro = {}
+    if registro_ids:
+        revisiones = (
+            RevisionAuditoriaEcoRegistro.objects
+            .filter(registro_id__in=registro_ids)
+            .order_by('registro_id', '-fecha_revision')
+        )
+        for revision in revisiones:
+            revisiones_por_registro.setdefault(revision.registro_id, revision)
+
+    registros_con_correccion = set()
+    if registro_ids:
+        registros_con_correccion = set(
+            CorreccionPacsRegistro.objects
+            .filter(registro_id__in=registro_ids)
+            .values_list('registro_id', flat=True)
+        )
+
+    items_pendientes = []
+    alertas_rojas_pendientes = 0
+    alertas_amarillas_pendientes = 0
+    registros_pendientes_total = 0
+
+    for item in auditoria.get('items', []):
+        registros_pendientes = []
+        for registro_alerta in item.get('registros_alerta', []):
+            registro_id = registro_alerta.get('registro_id')
+            revision = revisiones_por_registro.get(registro_id)
+            tiene_correccion = registro_id in registros_con_correccion
+
+            pendiente = (
+                revision is None
+                or (
+                    revision.estado == RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION
+                    and not tiene_correccion
+                )
+            )
+            registro_alerta['auditoria_eco_pendiente'] = pendiente
+            if pendiente:
+                registros_pendientes.append(registro_alerta)
+
+        item['registros_alerta_pendientes'] = registros_pendientes
+        item['registros_alerta_pendientes_total'] = len(registros_pendientes)
+        item['auditoria_eco_pendiente'] = bool(registros_pendientes)
+
+        if registros_pendientes:
+            items_pendientes.append(item)
+            registros_pendientes_total += len(registros_pendientes)
+            alertas_rojas_pendientes += sum(
+                1 for alerta in item.get('alertas', [])
+                if alerta.get('severidad') == 'roja'
+            )
+            alertas_amarillas_pendientes += sum(
+                1 for alerta in item.get('alertas', [])
+                if alerta.get('severidad') == 'amarilla'
+            )
+
+    orden_severidad = {'roja': 0, 'amarilla': 1, 'ok': 2}
+    top_pendientes = sorted(
+        items_pendientes,
+        key=lambda item: (
+            orden_severidad.get(item.get('severidad'), 9),
+            -item.get('registros_alerta_pendientes_total', 0),
+            item.get('medico_nombre') or '',
+        ),
+    )
+
+    auditoria['items_pendientes'] = items_pendientes
+    auditoria['residentes_con_alertas_pendientes'] = len(items_pendientes)
+    auditoria['registros_alerta_pendientes_total'] = registros_pendientes_total
+    auditoria['alertas_rojas_pendientes'] = alertas_rojas_pendientes
+    auditoria['alertas_amarillas_pendientes'] = alertas_amarillas_pendientes
+    auditoria['top_alertas_pendientes'] = [
+        {
+            'medico_id': item.get('medico_id'),
+            'medico_nombre': item.get('medico_nombre'),
+            'severidad': item.get('severidad'),
+            'cantidad_alertas': len(item.get('alertas', [])),
+            'registros_pendientes': item.get('registros_alerta_pendientes_total', 0),
+        }
+        for item in top_pendientes[:3]
+    ]
+
+    return auditoria

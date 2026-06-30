@@ -283,14 +283,112 @@ class ChecklistCierreSesionTest(TestCase):
         )
         self.assertEqual(auditoria_item['url'], f'#auditoria-eco-sesion-{self.sesion.pk}')
         self.assertContains(response, 'Cantidad de registros EXTRA mensual elevada')
-        self.assertContains(response, 'Ver todos')
-        self.assertContains(response, 'Registros que explican la alerta')
+        self.assertContains(response, 'Resolver pendientes')
+        self.assertContains(response, 'Registros pendientes de revisión')
         self.assertContains(response, 'Inspeccionar')
         self.assertContains(
             response,
             reverse('liquidacion:registroestudios_admin_detalle', args=[registros[-1].pk]),
         )
         self.assertContains(response, reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]))
+
+    def test_vista_sesion_contable_auditoria_eco_no_muestra_residentes_ya_validados(self):
+        registros = []
+        for _ in range(35):
+            registro = self._crear_registro(monto=Decimal('1000.00'))
+            registros.append(registro)
+            RevisionAuditoriaEcoRegistro.objects.create(
+                sesion_contable=self.sesion,
+                registro=registro,
+                estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                motivos_json=['EXTRA'],
+                observacion='Validado contra PACS.',
+                revisado_por=self.admin,
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        sesiones_data = response.context['sesiones_data']
+        dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
+        auditoria = dato['auditoria_residentes_eco']
+        auditoria_item = next(
+            item for item in dato['checklist_cierre']['items']
+            if item['key'] == 'auditoria_residentes_eco'
+        )
+        self.assertEqual(auditoria['residentes_con_alertas_pendientes'], 0)
+        self.assertEqual(auditoria['registros_alerta_pendientes_total'], 0)
+        self.assertEqual(auditoria_item['estado'], 'ok')
+        self.assertContains(response, 'Sin pendientes de auditoría ECO en esta sesión.')
+
+    def test_vista_sesion_contable_auditoria_eco_mantiene_pendiente_correccion_sin_ajuste(self):
+        registros = []
+        for index in range(35):
+            registro = self._crear_registro(monto=Decimal('1000.00'))
+            registros.append(registro)
+            RevisionAuditoriaEcoRegistro.objects.create(
+                sesion_contable=self.sesion,
+                registro=registro,
+                estado=(
+                    RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION
+                    if index == 0
+                    else RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO
+                ),
+                motivos_json=['EXTRA'],
+                observacion='Revision auditoria ECO.',
+                revisado_por=self.admin,
+            )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        sesiones_data = response.context['sesiones_data']
+        dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
+        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 1)
+        self.assertEqual(dato['auditoria_residentes_eco']['registros_alerta_pendientes_total'], 1)
+        self.assertContains(response, 'Resolver pendientes')
+
+    def test_vista_sesion_contable_auditoria_eco_no_muestra_pendiente_con_ajuste_pacs(self):
+        registros = []
+        revision_corregida = None
+        for index in range(35):
+            registro = self._crear_registro(monto=Decimal('1000.00'))
+            registros.append(registro)
+            revision = RevisionAuditoriaEcoRegistro.objects.create(
+                sesion_contable=self.sesion,
+                registro=registro,
+                estado=(
+                    RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION
+                    if index == 0
+                    else RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO
+                ),
+                motivos_json=['EXTRA'],
+                observacion='Revision auditoria ECO.',
+                revisado_por=self.admin,
+            )
+            if index == 0:
+                revision_corregida = revision
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registros[0],
+            revision_auditoria_eco=revision_corregida,
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('750.00'),
+            observacion='Ajuste aplicado contra PACS.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        sesiones_data = response.context['sesiones_data']
+        dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
+        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 0)
+        self.assertEqual(dato['auditoria_residentes_eco']['registros_alerta_pendientes_total'], 0)
+        self.assertContains(response, 'Sin pendientes de auditoría ECO en esta sesión.')
 
     def test_vista_completa_auditoria_eco_lista_registros_sospechosos(self):
         registros = []

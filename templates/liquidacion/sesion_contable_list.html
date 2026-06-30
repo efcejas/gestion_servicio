@@ -355,26 +355,26 @@
                                         </summary>
                                         <div class="mt-2 space-y-2 text-xs">
                                             <p class="text-slate-700">
-                                                Residentes con alertas: <span class="font-semibold">{{ dato.auditoria_residentes_eco.residentes_con_alertas }} / {{ dato.auditoria_residentes_eco.total_residentes }}</span>
+                                                Pendientes de revisión: <span class="font-semibold">{{ dato.auditoria_residentes_eco.residentes_con_alertas_pendientes }} / {{ dato.auditoria_residentes_eco.total_residentes }}</span>
                                             </p>
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 whitespace-nowrap">
-                                                    Rojas: {{ dato.auditoria_residentes_eco.alertas_rojas }}
+                                                    Rojas: {{ dato.auditoria_residentes_eco.alertas_rojas_pendientes }}
                                                 </span>
                                                 <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 whitespace-nowrap">
-                                                    Amarillas: {{ dato.auditoria_residentes_eco.alertas_amarillas }}
+                                                    Amarillas: {{ dato.auditoria_residentes_eco.alertas_amarillas_pendientes }}
                                                 </span>
-                                                {% if dato.auditoria_residentes_eco.residentes_con_alertas %}
+                                                {% if dato.auditoria_residentes_eco.residentes_con_alertas_pendientes %}
                                                 <a href="{% url 'liquidacion:auditoria_eco_sesion' dato.sesion.pk %}"
                                                    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-indigo-100 text-indigo-800 hover:bg-indigo-200 whitespace-nowrap">
-                                                    Ver todos
+                                                    Resolver pendientes
                                                 </a>
                                                 {% endif %}
                                             </div>
 
-                                            {% if dato.auditoria_residentes_eco.top_alertas %}
+                                            {% if dato.auditoria_residentes_eco.top_alertas_pendientes %}
                                                 <div class="space-y-1">
-                                                    {% for item in dato.auditoria_residentes_eco.top_alertas %}
+                                                    {% for item in dato.auditoria_residentes_eco.top_alertas_pendientes %}
                                                         <p class="text-slate-700 flex flex-wrap items-center gap-2">
                                                             <span class="font-medium">{{ item.medico_nombre }}</span>
                                                             {% if item.severidad == 'roja' %}
@@ -382,13 +382,13 @@
                                                             {% else %}
                                                             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800">Amarilla</span>
                                                             {% endif %}
-                                                            <span class="text-slate-500">({{ item.cantidad_alertas }} alerta{{ item.cantidad_alertas|pluralize:'s' }})</span>
+                                                            <span class="text-slate-500">({{ item.registros_pendientes }} pendiente{{ item.registros_pendientes|pluralize:'s' }})</span>
                                                         </p>
                                                     {% endfor %}
                                                 </div>
                                                 <div class="space-y-2 pt-1">
-                                                    {% for item in dato.auditoria_residentes_eco.items %}
-                                                        {% if item.alertas %}
+                                                    {% for item in dato.auditoria_residentes_eco.items_pendientes %}
+                                                        {% if item.auditoria_eco_pendiente %}
                                                         <div class="rounded-md border {% if item.severidad == 'roja' %}border-red-100 bg-red-50{% else %}border-amber-100 bg-amber-50{% endif %} px-2 py-2">
                                                             <div class="flex flex-wrap items-center justify-between gap-2">
                                                                 <div>
@@ -408,16 +408,16 @@
                                                             {% if item.dias_pico %}
                                                             <p class="mt-1 text-slate-500">Dias pico: {{ item.dias_pico|join:", " }}</p>
                                                             {% endif %}
-                                                            {% if item.registros_alerta %}
+                                                            {% if item.registros_alerta_pendientes %}
                                                             <div class="mt-2 rounded-md border border-white/70 bg-white/70">
                                                                 <div class="border-b border-slate-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                                                                    Registros que explican la alerta
-                                                                    {% if item.registros_alerta_total > 6 %}
-                                                                    <span class="font-normal normal-case text-slate-400">({{ item.registros_alerta_total }} en total, se muestran 6)</span>
+                                                                    Registros pendientes de revisión
+                                                                    {% if item.registros_alerta_pendientes_total > 6 %}
+                                                                    <span class="font-normal normal-case text-slate-400">({{ item.registros_alerta_pendientes_total }} en total, se muestran 6)</span>
                                                                     {% endif %}
                                                                 </div>
                                                                 <div class="divide-y divide-slate-100">
-                                                                    {% for registro_alerta in item.registros_alerta|slice:":6" %}
+                                                                    {% for registro_alerta in item.registros_alerta_pendientes|slice:":6" %}
                                                                     <div class="flex flex-col gap-1 px-2 py-1.5 sm:flex-row sm:items-center sm:justify-between">
                                                                         <div>
                                                                             <p class="font-medium text-slate-800">{{ registro_alerta.fecha_informe }} · {{ registro_alerta.paciente }}</p>
@@ -448,7 +448,7 @@
                                                     {% endfor %}
                                                 </div>
                                             {% else %}
-                                                <p class="text-slate-500">Sin alertas de auditoría ECO en esta sesión.</p>
+                                                <p class="text-slate-500">Sin pendientes de auditoría ECO en esta sesión.</p>
                                             {% endif %}
                                         </div>
                                     </details>

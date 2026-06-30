@@ -45,7 +45,11 @@ from .grupo_tarifario_mapping import (
     es_eco_general_real_estudio,
 )
 from .permisos import puede_ver_desglose_administrativo
-from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
+from .services_auditoria import (
+    evaluar_gate_consistencia_sesion,
+    auditar_residentes_eco_por_sesion,
+    resumir_pendientes_auditoria_eco,
+)
 from .services import (
     ROLES_RESIDENCIA,
     adjuntar_ultima_correccion_pacs,
@@ -3457,7 +3461,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
             auditoria_residentes_eco = _enriquecer_auditoria_residentes_eco_visual(
-                auditar_residentes_eco_por_sesion(sesion),
+                resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion)),
                 sesion,
             )
             checklist_cierre = _enriquecer_checklist_cierre_visual(

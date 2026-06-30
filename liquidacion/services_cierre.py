@@ -1,5 +1,9 @@
 from .models import PreparacionLiquidacionRRHH, SolicitudRevisionHorarioRegistro
-from .services_auditoria import auditar_residentes_eco_por_sesion, evaluar_gate_consistencia_sesion
+from .services_auditoria import (
+    auditar_residentes_eco_por_sesion,
+    evaluar_gate_consistencia_sesion,
+    resumir_pendientes_auditoria_eco,
+)
 from .services_rrhh import evaluar_requisito_rrhh_para_facturar
 
 
@@ -74,17 +78,17 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         fecha_aplicacion__isnull=True,
     ).count()
 
-    auditoria = auditar_residentes_eco_por_sesion(sesion)
-    auditoria_alertas = auditoria.get('alertas_rojas', 0) + auditoria.get('alertas_amarillas', 0)
+    auditoria = resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion))
+    auditoria_alertas = auditoria.get('alertas_rojas_pendientes', 0) + auditoria.get('alertas_amarillas_pendientes', 0)
     if auditoria_alertas:
         estado_auditoria = 'advertencia'
         detalle_auditoria = (
-            f"{auditoria.get('alertas_rojas', 0)} roja(s), "
-            f"{auditoria.get('alertas_amarillas', 0)} amarilla(s)"
+            f"{auditoria.get('alertas_rojas_pendientes', 0)} roja(s), "
+            f"{auditoria.get('alertas_amarillas_pendientes', 0)} amarilla(s)"
         )
     else:
         estado_auditoria = 'ok'
-        detalle_auditoria = 'Sin alertas'
+        detalle_auditoria = 'Sin pendientes'
 
     requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
     ultima_preparacion = requisito_rrhh['ultima_preparacion']
