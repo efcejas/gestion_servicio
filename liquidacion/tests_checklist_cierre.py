@@ -1,5 +1,8 @@
+import io
+from datetime import time
 from decimal import Decimal
 
+import openpyxl
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -451,6 +454,9 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(correccion.monto_anterior, Decimal('1000.00'))
         self.assertEqual(correccion.monto_nuevo, Decimal('650.00'))
         self.assertEqual(correccion.corregido_por, self.admin)
+        ultima_revision = RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).order_by('-fecha_revision').first()
+        self.assertEqual(ultima_revision.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
+        self.assertIn('Correccion PACS aplicada', ultima_revision.observacion)
 
     def test_correccion_pacs_recalcula_monto_por_horario_corregido(self):
         registro = self._crear_registro(monto=Decimal('1000.00'))
@@ -477,6 +483,7 @@ class ChecklistCierreSesionTest(TestCase):
             {
                 'tipo_correccion': CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
                 'horario_corregido': 'INTRA',
+                'hora_pacs': '16:30',
                 'observacion': 'Horario real antes de las 17 segun PACS.',
             },
             secure=True,
@@ -493,8 +500,45 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(correccion.tipo_correccion, CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO)
         self.assertEqual(correccion.horario_anterior, 'EXTRA')
         self.assertEqual(correccion.horario_nuevo, 'INTRA')
+        self.assertEqual(correccion.hora_pacs, time(16, 30))
         self.assertEqual(correccion.monto_anterior, Decimal('1000.00'))
         self.assertEqual(correccion.monto_nuevo, Decimal('500.00'))
+        ultima_revision = RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).order_by('-fecha_revision').first()
+        self.assertEqual(ultima_revision.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
+
+    def test_vista_auditoria_no_muestra_formulario_de_ajuste_si_ya_hay_correccion_pacs(self):
+        registro = self._crear_registro(monto=Decimal('650.00'))
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['EXTRA'],
+            observacion='Difiere de PACS.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+            horario_anterior='EXTRA',
+            horario_nuevo='INTRA',
+            hora_pacs=time(16, 30),
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('650.00'),
+            observacion='PACS confirma horario real.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ajuste PACS aplicado')
+        self.assertNotContains(response, 'Aplicar ajuste por control PACS')
 
     def test_correccion_pacs_bloquea_sesion_facturada(self):
         registro = self._crear_registro(monto=Decimal('1000.00'))
@@ -553,6 +597,89 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Ajuste PACS aplicado')
         self.assertContains(response, 'PACS confirma menor valor.')
+
+    def test_liquidacion_mensual_muestra_resumen_y_detalle_de_ajustes_pacs(self):
+        registro = self._crear_registro(monto=Decimal('650.00'))
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Correccion PACS aplicada.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+            horario_anterior='EXTRA',
+            horario_nuevo='INTRA',
+            hora_pacs=time(16, 30),
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('650.00'),
+            observacion='PACS confirma horario real.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:liquidacion_mensual'),
+            {'mes': 6, 'año': 2026},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ajustes PACS: 1')
+        self.assertContains(response, 'Impacto total: $-350,00')
+        self.assertContains(response, 'Horario EXTRA -> INTRA')
+        self.assertContains(response, 'Hora PACS 16:30')
+        self.assertContains(response, 'PACS confirma horario real.')
+
+    def test_export_liquidacion_incluye_columnas_de_ajuste_pacs(self):
+        registro = self._crear_registro(monto=Decimal('650.00'))
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Correccion PACS aplicada.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+            horario_anterior='EXTRA',
+            horario_nuevo='INTRA',
+            hora_pacs=time(16, 30),
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('650.00'),
+            observacion='PACS confirma horario real.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:exportar_excel_liquidacion'),
+            {'mes': 6, 'año': 2026},
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        workbook = openpyxl.load_workbook(io.BytesIO(response.content))
+        sheet = workbook.active
+        headers = [cell.value for cell in sheet[1]]
+        self.assertIn('Ajuste PACS', headers)
+        self.assertIn('Monto anterior PACS', headers)
+        self.assertIn('Hora PACS', headers)
+        self.assertIn('Observacion ajuste PACS', headers)
+        rows = list(sheet.iter_rows(values_only=True))
+        self.assertTrue(any(row[10] == 'SI' for row in rows[1:]))
+        self.assertTrue(any(row[12] == 'EXTRA' and row[13] == 'INTRA' for row in rows[1:]))
+        self.assertTrue(any(row[16] == '16:30' for row in rows[1:]))
+        self.assertTrue(any(row[17] == 'PACS confirma horario real.' for row in rows[1:]))
 
     def test_admin_puede_inspeccionar_registro_desde_cierre(self):
         registro = self._crear_registro(monto=Decimal('0.00'))

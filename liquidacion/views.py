@@ -48,6 +48,7 @@ from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import evaluar_gate_consistencia_sesion, auditar_residentes_eco_por_sesion
 from .services import (
     ROLES_RESIDENCIA,
+    adjuntar_ultima_correccion_pacs,
     clasificar_horario_residencia_por_proxy,
     estudio_aplica_descuento_residencia,
 )
@@ -917,7 +918,7 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
             return redirect(redirect_url)
 
         if not form.is_valid():
-            messages.error(request, 'Debes indicar monto corregido y observacion para aplicar el ajuste PACS.')
+            messages.error(request, 'Debes indicar horario corregido o monto manual, y una observacion para aplicar el ajuste PACS.')
             return redirect(redirect_url)
 
         with transaction.atomic():
@@ -946,9 +947,11 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
             monto_anterior = registro.monto_calculado
             horario_anterior = registro.horario
             horario_nuevo = None
+            hora_pacs = None
 
             if tipo_correccion == CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO:
                 horario_nuevo = form.cleaned_data['horario_corregido']
+                hora_pacs = form.cleaned_data['hora_pacs']
                 registro.horario = horario_nuevo
                 monto_nuevo = registro.calcular_monto()
             else:
@@ -965,6 +968,7 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 registro.motivo_modificacion = (
                     f'Ajuste por control PACS en auditoria ECO. '
                     f'Horario: {horario_anterior} -> {horario_nuevo}. '
+                    f'Hora PACS: {hora_pacs.strftime("%H:%M")}. '
                     f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
                 )
             else:
@@ -988,13 +992,25 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 tipo_correccion=tipo_correccion,
                 horario_anterior=horario_anterior if horario_nuevo else None,
                 horario_nuevo=horario_nuevo,
+                hora_pacs=hora_pacs,
                 monto_anterior=monto_anterior,
                 monto_nuevo=monto_nuevo,
                 observacion=observacion,
                 corregido_por=request.user,
             )
+            RevisionAuditoriaEcoRegistro.objects.create(
+                sesion_contable=sesion,
+                registro=registro,
+                estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                motivos_json=revision.motivos_json,
+                observacion=(
+                    f'Correccion PACS aplicada. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                ),
+                revisado_por=request.user,
+            )
 
-        messages.success(request, f'Ajuste PACS aplicado al registro #{registro.pk}.')
+        messages.success(request, f'Ajuste PACS aplicado al registro #{registro.pk}. Monto: ${monto_anterior} -> ${monto_nuevo}.')
         return redirect(redirect_url)
 
 
@@ -3039,7 +3055,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
         todos_medicos = set(registros_por_medico.keys()) | set(guardias_por_medico.keys())
         
         for medico in todos_medicos:
-            registros = registros_por_medico.get(medico, [])
+            registros = adjuntar_ultima_correccion_pacs(registros_por_medico.get(medico, []))
             guardias = guardias_por_medico.get(medico, [])
             
             # v3.1 - Marzo 2026: Enriquecer cada registro con cantidades de estudios
@@ -3071,6 +3087,16 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
             
             total_regiones = sum(registro.cantidad_regiones for registro in registros)
             total_monto = sum(registro.monto_calculado for registro in registros)
+            correcciones_pacs = [
+                registro.correccion_pacs_info
+                for registro in registros
+                if registro.tiene_correccion_pacs
+            ]
+            total_impacto_pacs = sum(
+                registro.impacto_correccion_pacs
+                for registro in registros
+                if registro.tiene_correccion_pacs
+            )
             total_guardias = len(guardias)
             total_monto_guardias = sum(guardia.monto for guardia in guardias)
             
@@ -3081,6 +3107,9 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                 'guardias': guardias,
                 'total_regiones': total_regiones,
                 'total_monto': total_monto,
+                'correcciones_pacs': correcciones_pacs,
+                'correcciones_pacs_count': len(correcciones_pacs),
+                'total_impacto_pacs': total_impacto_pacs,
                 'total_guardias': total_guardias,
                 'total_monto_guardias': total_monto_guardias,
                 'total_general': total_monto + total_monto_guardias,

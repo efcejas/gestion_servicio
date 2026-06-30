@@ -279,6 +279,12 @@ class CorreccionPacsRegistroForm(forms.Form):
         choices=RegistroEstudiosPorMedico.HORARIO_CHOICES,
         required=False,
     )
+    hora_pacs = forms.TimeField(
+        required=False,
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+        }),
+    )
     monto_nuevo = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -305,6 +311,8 @@ class CorreccionPacsRegistroForm(forms.Form):
 
         if tipo == self.TIPO_HORARIO_RECALCULADO and not cleaned.get('horario_corregido'):
             self.add_error('horario_corregido', 'Debes indicar el horario corregido.')
+        if tipo == self.TIPO_HORARIO_RECALCULADO and not cleaned.get('hora_pacs'):
+            self.add_error('hora_pacs', 'Debes indicar la hora vista en PACS.')
         if tipo == self.TIPO_MONTO_MANUAL and cleaned.get('monto_nuevo') is None:
             self.add_error('monto_nuevo', 'Debes indicar el monto corregido.')
 

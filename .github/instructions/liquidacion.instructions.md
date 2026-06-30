@@ -126,6 +126,7 @@ applyTo: "liquidacion/**/*.py"
   - bloquear sesiones `FACTURADA` y `PAGADA`;
   - usar `transaction.atomic()` y lock simple si hay escritura concurrente;
   - recalcular con `RegistroEstudiosPorMedico.calcular_monto()` cuando la correccion sea por horario corregido;
+  - guardar `hora_pacs` cuando la correccion sea por horario corregido;
   - actualizar `monto_calculado`, `modificado_por`, `fecha_modificacion` y `motivo_modificacion`;
   - actualizar `horario` solo en correcciones PACS de tipo `HORARIO_RECALCULADO`;
   - crear historial `CorreccionPacsRegistro`;
@@ -136,6 +137,7 @@ applyTo: "liquidacion/**/*.py"
   - recalcular masivamente;
   - cambiar estudios, paciente, clasificacion automatica o reglas residencia;
   - aplicarse si el monto nuevo coincide con el actual.
+- En pantallas operativas, mostrar como dato principal la hora PACS asociada a la fecha del registro; la fecha administrativa de aplicacion queda como trazabilidad secundaria.
 
 ## Permisos y trazabilidad
 

@@ -11,7 +11,13 @@ from django.utils import timezone
 from django.db.models import Prefetch, Q
 
 from .grupo_tarifario_mapping import es_eco_general_real_estudio
-from .models import Estudios, GuardiaPasiva, ReglaDescuentoResidencia, RegistroEstudiosPorMedico
+from .models import (
+    CorreccionPacsRegistro,
+    Estudios,
+    GuardiaPasiva,
+    ReglaDescuentoResidencia,
+    RegistroEstudiosPorMedico,
+)
 
 
 ROLES_RESIDENCIA = {
@@ -25,6 +31,36 @@ CAMPO_REGLA_DESCUENTO_POR_ROL = {
     'jefe_residentes': 'aplica_jefe_residentes',
     'instructor_residentes': 'aplica_instructor_residentes',
 }
+
+
+def adjuntar_ultima_correccion_pacs(registros):
+    """Adjunta la ultima correccion PACS a cada registro, sin recalcular montos."""
+    registros = list(registros)
+    registro_ids = [registro.pk for registro in registros]
+    correcciones_por_registro = {}
+
+    if registro_ids:
+        correcciones = (
+            CorreccionPacsRegistro.objects
+            .filter(registro_id__in=registro_ids)
+            .select_related('corregido_por')
+            .order_by('registro_id', '-fecha_correccion')
+        )
+        for correccion in correcciones:
+            if correccion.registro_id not in correcciones_por_registro:
+                correcciones_por_registro[correccion.registro_id] = correccion
+
+    for registro in registros:
+        correccion = correcciones_por_registro.get(registro.pk)
+        registro.correccion_pacs_info = correccion
+        registro.tiene_correccion_pacs = correccion is not None
+        registro.impacto_correccion_pacs = (
+            correccion.monto_nuevo - correccion.monto_anterior
+            if correccion
+            else 0
+        )
+
+    return registros
 
 
 def _resultado_descuento_residencia(aplica, fuente, regla_id=None, motivo=''):
@@ -318,9 +354,13 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     ws = wb.active
     ws.title = "Liquidación Completa"
 
+    registros = adjuntar_ultima_correccion_pacs(registros.order_by('-fecha_del_informe'))
+
     headers_practicas = [
         "Fecha", "Paciente", "DNI", "Estudios",
-        "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus"
+        "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus",
+        "Ajuste PACS", "Tipo ajuste PACS", "Horario anterior", "Horario nuevo",
+        "Monto anterior PACS", "Monto nuevo PACS", "Hora PACS", "Observacion ajuste PACS",
     ]
     ws.append(headers_practicas)
 
@@ -332,11 +372,12 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     total_regiones = 0
     total_monto_practicas = 0
 
-    for registro in registros.order_by('-fecha_del_informe'):
+    for registro in registros:
         estudios_lista = registro.estudio.all()
         estudios_nombres = ", ".join(e.nombre for e in estudios_lista) if estudios_lista.exists() else "N/A"
         tipos_estudios = ", ".join(e.get_tipo_display() for e in estudios_lista) if estudios_lista.exists() else "N/A"
         bonus_icon = "⚡ SÍ" if registro.paciente_internado else ""
+        correccion = getattr(registro, 'correccion_pacs_info', None)
 
         ws.append([
             registro.fecha_del_informe.strftime("%d/%m/%Y"),
@@ -348,7 +389,15 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
             registro.get_tipo_obra_social_display(),
             registro.get_horario_display(),
             float(registro.monto_calculado),
-            bonus_icon
+            bonus_icon,
+            "SI" if correccion else "NO",
+            correccion.get_tipo_correccion_display() if correccion else "",
+            correccion.horario_anterior if correccion and correccion.horario_anterior else "",
+            correccion.horario_nuevo if correccion and correccion.horario_nuevo else "",
+            float(correccion.monto_anterior) if correccion else "",
+            float(correccion.monto_nuevo) if correccion else "",
+            correccion.hora_pacs.strftime("%H:%M") if correccion and correccion.hora_pacs else "",
+            correccion.observacion if correccion else "",
         ])
 
         total_regiones += registro.cantidad_regiones
@@ -356,7 +405,7 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
 
     ws.append([])
     totales_practicas_row = ws.max_row + 1
-    ws.append(["", "", "", "", "SUBTOTAL PRÁCTICAS", total_regiones, "", "", float(total_monto_practicas), ""])
+    ws.append(["", "", "", "", "SUBTOTAL PRÁCTICAS", total_regiones, "", "", float(total_monto_practicas), "", "", "", "", "", "", "", "", ""])
 
     for cell in ws[totales_practicas_row]:
         cell.font = Font(bold=True)
@@ -403,7 +452,7 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     ws.append([])
     ws.append([])
     total_general_row = ws.max_row + 1
-    ws.append(["", "", "", "", "TOTAL GENERAL", "", "", "", float(total_monto_practicas + total_monto_guardias), ""])
+    ws.append(["", "", "", "", "TOTAL GENERAL", "", "", "", float(total_monto_practicas + total_monto_guardias), "", "", "", "", "", "", "", "", ""])
 
     for cell in ws[total_general_row]:
         cell.font = Font(bold=True, size=12)
@@ -413,6 +462,8 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
 
     for row in range(2, totales_practicas_row):
         ws.cell(row=row, column=9).number_format = '$#,##0.00'
+        ws.cell(row=row, column=15).number_format = '$#,##0.00'
+        ws.cell(row=row, column=16).number_format = '$#,##0.00'
 
     if guardias.exists() and header_row and totales_guardias_row:
         guardias_start = header_row + 1

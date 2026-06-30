@@ -1615,6 +1615,7 @@ class CorreccionPacsRegistro(models.Model):
         blank=True,
         verbose_name='Horario nuevo',
     )
+    hora_pacs = models.TimeField(null=True, blank=True, verbose_name='Hora vista en PACS')
     monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto anterior')
     monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto nuevo')
     observacion = models.TextField(verbose_name='Observacion')

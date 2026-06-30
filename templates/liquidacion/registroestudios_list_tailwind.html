@@ -405,6 +405,9 @@
                                 {% if registro.correccion_pacs_info.horario_nuevo %}
                                 <span>{{ registro.correccion_pacs_info.horario_anterior|default:"-" }} -> {{ registro.correccion_pacs_info.horario_nuevo }}</span>
                                 {% endif %}
+                                {% if registro.correccion_pacs_info.hora_pacs %}
+                                <span>Hora PACS {{ registro.correccion_pacs_info.hora_pacs|time:"H:i" }}</span>
+                                {% endif %}
                                 <span>${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}</span>
                             </div>
                             {% endif %}
@@ -497,9 +500,13 @@
                                         Horario {{ registro.correccion_pacs_info.horario_anterior|default:"-" }} -> {{ registro.correccion_pacs_info.horario_nuevo }}
                                     </p>
                                     {% endif %}
+                                    {% if registro.correccion_pacs_info.hora_pacs %}
+                                    <p class="font-medium text-blue-900">
+                                        Hora PACS {{ registro.correccion_pacs_info.hora_pacs|time:"H:i" }} para fecha {{ registro.fecha_del_informe|date:"d/m/Y" }}
+                                    </p>
+                                    {% endif %}
                                     <p class="font-medium text-blue-900">
                                         ${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}
-                                        el {{ registro.correccion_pacs_info.fecha_correccion|date:"d/m/Y H:i" }}
                                     </p>
                                     <p class="mt-1 text-blue-800 whitespace-pre-line">{{ registro.correccion_pacs_info.observacion }}</p>
                                 </div>
