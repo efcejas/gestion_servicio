@@ -308,8 +308,12 @@
             </div>
         </div>
 
+        <div class="border-b border-gray-200 bg-gray-50 px-4 py-2 text-xs font-medium text-gray-500">
+            <i class="fas fa-arrows-left-right mr-1 text-gray-400"></i>
+            La columna de acciones queda visible a la derecha. Si no ves todos los datos, desplazá la tabla horizontalmente.
+        </div>
         <div class="overflow-x-auto">
-            <table class="w-full">
+            <table class="w-full min-w-[1180px]">
                 <thead class="bg-gray-700 border-b border-gray-800 text-white">
                     <tr>
                         <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
@@ -347,7 +351,7 @@
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Revisión</th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Regiones</th>
                         <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Monto</th>
-                        <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Acciones</th>
+                        <th scope="col" class="sticky right-0 z-20 bg-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.8)]">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200">
@@ -383,7 +387,7 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="sticky right-0 z-10 bg-white px-4 py-3 text-center shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                             {% if registro.tiene_revision %}
                             <div class="flex flex-col items-center gap-1.5">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap {{ registro.revision_badge_classes }}">
