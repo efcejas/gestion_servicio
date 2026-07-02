@@ -51,14 +51,17 @@
                         <i class="fas fa-user-md text-2xl text-white"></i>
                     </div>
                     <div>
-                        <h1 class="text-3xl font-bold text-white">Revisión de Preinforme</h1>
+                        <h1 class="text-3xl font-bold text-white">
+                            {% if es_edicion_finalizada %}Editar Revisión{% else %}Revisión de Preinforme{% endif %}
+                        </h1>
                         <p class="text-purple-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
                     </div>
                 </div>
                 <div>
                     <span class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold shadow-sm
                         {% if preinforme.estado == 'en_revision' %}bg-gradient-to-r from-orange-500 to-red-500 text-white
-                        {% elif preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white{% endif %}">
+                        {% elif preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white
+                        {% elif preinforme.estado == 'finalizado' %}bg-gradient-to-r from-green-500 to-emerald-600 text-white{% endif %}">
                         <i class="fas fa-circle text-xs mr-1.5"></i>
                         {{ preinforme.get_estado_display }}
                     </span>
@@ -328,7 +331,7 @@
                         </button>
                         
                         <div class="flex flex-wrap gap-3">
-                            <a href="{% url 'preinformes:lista_revision' %}" 
+                            <a href="{% url 'preinformes:lista_revision' %}{% if es_edicion_finalizada %}?mostrar=finalizados{% endif %}" 
                                class="inline-flex items-center px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-all shadow-lg">
                                 <i class="fas fa-arrow-left mr-2"></i>
                                 Cancelar
@@ -342,9 +345,9 @@
                             
                             <button type="submit" name="finalizar_revision"
                                     class="inline-flex items-center px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium rounded-xl transition-all shadow-lg"
-                                    onclick="return confirm('¿Está seguro de finalizar la revisión? Esta acción no se puede deshacer.')">
+                                    onclick="return confirm('{% if es_edicion_finalizada %}¿Guardar los cambios en esta revisión finalizada?{% else %}¿Está seguro de finalizar la revisión? Esta acción no se puede deshacer.{% endif %}')">
                                 <i class="fas fa-check-circle mr-2"></i>
-                                Finalizar Revisión
+                                {% if es_edicion_finalizada %}Guardar y Mantener Finalizado{% else %}Finalizar Revisión{% endif %}
                             </button>
                         </div>
                     </div>

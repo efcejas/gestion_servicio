@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -7,6 +7,15 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios, AdjuntoPreinforme
 
 User = get_user_model()
+
+TEST_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 
 class PreinformeModelTest(TestCase):
@@ -622,6 +631,89 @@ class AdjuntoPreinformeTest(TestCase):
 # Smoke tests: autosave residente + revisor, copiar_informe_final, cargar_plantillas
 # ---------------------------------------------------------------------------
 
+@override_settings(SECURE_SSL_REDIRECT=False, STORAGES=TEST_STORAGES)
+class RevisionFinalizadaEditTest(TestCase):
+    """Permite corregir una revision ya finalizada solo al revisor asignado."""
+
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='res_final_edit',
+            email='res_final_edit@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.revisor = User.objects.create_user(
+            username='rev_final_edit',
+            email='rev_final_edit@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.otro_revisor = User.objects.create_user(
+            username='otro_final_edit',
+            email='otro_final_edit@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo_estudio = TipoEstudio.objects.create(nombre='RM Rodilla')
+        self.region = Region.objects.create(nombre='Rodilla')
+        self.preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-FIN001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Final',
+            nombre_paciente='Editar',
+            informe_html='<p>Original residente</p>',
+        )
+        self.preinforme.iniciar_revision(self.revisor)
+        self.revision = RevisionPreinforme.objects.create(
+            preinforme=self.preinforme,
+            revisor=self.revisor,
+            informe_residente_snapshot='<p>Original residente</p>',
+            informe_final_html='<p>Informe final inicial</p>',
+        )
+        self.preinforme.finalizar_revision()
+
+    def _url(self):
+        return reverse('preinformes:revisar_preinforme', kwargs={'pk': self.preinforme.pk})
+
+    def test_revisor_asignado_puede_abrir_finalizado_para_editar(self):
+        self.client.login(username='rev_final_edit', password='pass123')
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Editar Revisi')
+
+    def test_revisor_asignado_puede_guardar_finalizado(self):
+        self.client.login(username='rev_final_edit', password='pass123')
+        response = self.client.post(
+            self._url(),
+            {
+                'informe_final_html': '<p>Informe corregido luego de finalizado</p>',
+                'comentarios_generales': 'Agrego comentario tardio.',
+                'puntuacion': '8',
+                'finalizar_revision': '1',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('mostrar=finalizados', response['Location'])
+
+        self.revision.refresh_from_db()
+        self.preinforme.refresh_from_db()
+        self.assertEqual(self.preinforme.estado, 'finalizado')
+        self.assertEqual(self.revision.informe_final_html, '<p>Informe corregido luego de finalizado</p>')
+        self.assertEqual(self.revision.comentarios_generales, 'Agrego comentario tardio.')
+
+    def test_otro_revisor_no_puede_editar_finalizado(self):
+        self.client.login(username='otro_final_edit', password='pass123')
+        response = self.client.get(self._url())
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('preinformes:lista_revision'))
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, STORAGES=TEST_STORAGES)
 class AutosaveRevisionSmokeTest(TestCase):
     """Tests del endpoint autosave_revision (POST /preinformes/revision/<pk>/autosave/)."""
 
@@ -693,6 +785,23 @@ class AutosaveRevisionSmokeTest(TestCase):
         from .models import RevisionPreinforme
         revision = RevisionPreinforme.objects.get(preinforme=self.preinforme)
         self.assertEqual(revision.informe_final_html, payload)
+
+    def test_autosave_revision_finalizado_revisor_correcto_ok(self):
+        """El revisor asignado puede usar autosave aunque el preinforme ya este finalizado."""
+        import json
+        self.preinforme.finalizar_revision()
+        self.client.login(username='rev_autosave', password='pass123')
+        payload = '<p>Contenido finalizado guardado por autosave</p>'
+        response = self.client.post(
+            self._url(),
+            data=json.dumps({'informe_final_html': payload}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json().get('success'))
+
+        self.revision.refresh_from_db()
+        self.assertEqual(self.revision.informe_final_html, payload)
 
     def test_autosave_revision_contenido_vacio_devuelve_400(self):
         """Contenido vacío debe devolver HTTP 400."""

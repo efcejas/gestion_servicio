@@ -651,7 +651,7 @@ def lista_revision(request):
             # Si no tiene el rol adecuado, mostrar lista vacía
             preinformes = Preinforme.objects.none()
     elif mostrar == 'finalizados':
-        # Preinformes que ya revisé y están finalizados (solo lectura)
+        # Preinformes que ya revisé y están finalizados
         preinformes = Preinforme.objects.filter(
             revisor=request.user,
             estado='finalizado',
@@ -812,8 +812,9 @@ def revisar_preinforme(request, pk):
     preinforme = get_object_or_404(
         Preinforme, 
         pk=pk,
-        estado__in=['pendiente_revision', 'en_revision']
+        estado__in=['pendiente_revision', 'en_revision', 'finalizado']
     )
+    es_edicion_finalizada = preinforme.estado == 'finalizado'
     
     # Lógica de asignación automática
     if preinforme.estado == 'pendiente_revision':
@@ -831,6 +832,10 @@ def revisar_preinforme(request, pk):
                 request, 
                 f'Este preinforme está siendo revisado por {preinforme.revisor.get_full_name()}.'
             )
+            return redirect('preinformes:lista_revision')
+    elif preinforme.estado == 'finalizado':
+        if preinforme.revisor != request.user:
+            messages.error(request, 'Solo el revisor asignado puede editar un preinforme finalizado.')
             return redirect('preinformes:lista_revision')
     
     # Obtener o crear revisión
@@ -877,6 +882,9 @@ def revisar_preinforme(request, pk):
                 # Actualizar historial del residente
                 historial, _ = HistorialEstudios.objects.get_or_create(residente=preinforme.residente)
                 historial.actualizar_estadisticas()
+                if es_edicion_finalizada:
+                    messages.success(request, 'Revision actualizada exitosamente.')
+                    return redirect(f"{reverse('preinformes:lista_revision')}?mostrar=finalizados")
                 messages.success(request, 'Revisión finalizada exitosamente.')
                 return redirect('preinformes:lista_revision')
             else:
@@ -893,7 +901,8 @@ def revisar_preinforme(request, pk):
         'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
-        'title': f'Revisar Preinforme {preinforme.numero_estudio}'
+        'es_edicion_finalizada': es_edicion_finalizada,
+        'title': f'Editar Revision {preinforme.numero_estudio}' if es_edicion_finalizada else f'Revisar Preinforme {preinforme.numero_estudio}'
     }
     
     return render(request, 'preinformes/revisar_preinforme.html', context)
@@ -911,7 +920,7 @@ def autosave_revision(request, pk):
         preinforme = get_object_or_404(
             Preinforme,
             pk=pk,
-            estado__in=['pendiente_revision', 'en_revision']
+            estado__in=['pendiente_revision', 'en_revision', 'finalizado']
         )
         
         # Obtener la revisión asociada
