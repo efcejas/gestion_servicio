@@ -746,6 +746,12 @@ def asignar_revisor(request, pk):
         if action == 'asignarme':
             # Asignarse a sí mismo
             revisor_anterior = preinforme.revisor
+            if revisor_anterior and revisor_anterior != request.user and preinforme.estado == 'en_revision':
+                messages.error(
+                    request,
+                    'No se puede tomar un preinforme que ya esta en revision por otro staff.'
+                )
+                return redirect(redirect_url)
             preinforme.revisor = request.user
             preinforme.save()
             if revisor_anterior and revisor_anterior != request.user:

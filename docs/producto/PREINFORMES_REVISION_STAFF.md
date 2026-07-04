@@ -86,13 +86,14 @@ Flujo:
 
 1. El staff entra en `Asignados a otros`.
 2. Busca por paciente, numero de estudio, residente, tipo o fechas.
-3. Si confirma que corresponde tomarlo, usa `Tomar para mi`.
+3. Si confirma que corresponde tomarlo y sigue pendiente, usa `Tomar para mi`.
 4. El sistema reasigna el preinforme al staff actual y lo mantiene activo.
 5. El estudio queda disponible en `Mis asignados` para revisar o continuar.
 
 Reglas:
 
-- solo aplica a preinformes activos (`pendiente_revision` o `en_revision`);
+- se puede tomar solo si esta `pendiente_revision`;
+- si esta `en_revision` por otro staff, se puede ver en la bandeja pero no tomar;
 - no incluye finalizados de otros revisores;
 - la accion pide confirmacion para evitar tomar estudios por error;
 - no borra historial ni cambia el residente ni el contenido del preinforme.
@@ -105,7 +106,7 @@ Norma vigente:
 - `Continuar`: el estudio ya esta en revision por el usuario.
 - `Tomar y revisar`: el estudio no tiene revisor y se va a abrir inmediatamente.
 - `Asignarme para despues`: reservar un estudio sin abrir el editor.
-- `Tomar para mi`: reasignar a mi usuario un estudio que estaba con otro revisor.
+- `Tomar para mi`: reasignar a mi usuario un estudio pendiente que estaba con otro revisor.
 - `Editar`: corregir una revision ya finalizada.
 - `Ver comparacion`: contrastar snapshot del residente contra informe final.
 

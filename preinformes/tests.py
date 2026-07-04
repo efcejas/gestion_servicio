@@ -273,6 +273,19 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         preinforme.refresh_from_db()
         self.assertEqual(preinforme.revisor, self.staff)
 
+    def test_staff_no_puede_tomar_preinforme_en_revision_de_otro(self):
+        preinforme = self._preinforme('FLOW-008', estado='en_revision', revisor=self.otro_staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.post(
+            reverse('preinformes:asignar_revisor', kwargs={'pk': preinforme.pk}) + '?mostrar=asignados_otros',
+            {'action': 'asignarme'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        preinforme.refresh_from_db()
+        self.assertEqual(preinforme.revisor, self.otro_staff)
+
 
 class PreinformeViewTest(TestCase):
     def setUp(self):

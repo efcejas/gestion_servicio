@@ -241,7 +241,7 @@
                                                 Asignarme para despues
                                             </button>
                                         </form>
-                                    {% elif preinforme.revisor != user and mostrar == 'asignados_otros' %}
+                                    {% elif preinforme.revisor != user and mostrar == 'asignados_otros' and preinforme.estado == 'pendiente_revision' %}
                                         <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="asignarme">
@@ -252,6 +252,11 @@
                                                 Tomar para mi
                                             </button>
                                         </form>
+                                    {% elif preinforme.revisor != user and mostrar == 'asignados_otros' and preinforme.estado == 'en_revision' %}
+                                        <span class="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm">
+                                            <i class="fas fa-lock mr-1"></i>
+                                            En revision por otro staff
+                                        </span>
                                     {% elif preinforme.revisor == user %}
                                         <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
                                             {% csrf_token %}

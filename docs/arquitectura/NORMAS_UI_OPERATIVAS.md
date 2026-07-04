@@ -19,7 +19,7 @@ Usar verbos concretos:
 
 - `Tomar y revisar`: asigna al usuario y abre el editor.
 - `Asignarme para despues`: asigna al usuario sin abrir el editor.
-- `Tomar para mi`: reasigna un item activo que estaba con otro usuario.
+- `Tomar para mi`: reasigna un item pendiente que estaba con otro usuario.
 - `Continuar`: vuelve a una tarea ya iniciada.
 - `Finalizar`: cierra un flujo activo.
 - `Guardar cambios`: persiste sin cambiar de estado.
@@ -62,7 +62,8 @@ Cuando un estado aparece en una card o fila, el boton debe complementar el estad
 
 - `pendiente_revision` sin revisor -> `Tomar y revisar`.
 - `pendiente_revision` con revisor actual -> `Revisar`.
-- `pendiente_revision` o `en_revision` con otro revisor -> `Tomar para mi` con confirmacion.
+- `pendiente_revision` con otro revisor -> `Tomar para mi` con confirmacion.
+- `en_revision` con otro revisor -> mostrar responsable/bloqueo, sin accion de toma.
 - `en_revision` con revisor actual -> `Continuar`.
 - `finalizado` propio -> `Editar` / `Ver comparacion`.
 
