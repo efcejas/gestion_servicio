@@ -40,8 +40,16 @@ MAX_ADJUNTOS_POR_ORIGEN = 3
 MAX_ADJUNTO_SIZE_MB = 5
 ALLOWED_ADJUNTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
 
-from .services import evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar
-from .selectors import get_asignados_de, get_pendientes_sin_revisor
+from .services import (
+    evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar,
+    obtener_o_preparar_revision,
+)
+from .selectors import (
+    get_asignados_de,
+    get_asignados_a_otros,
+    get_pendientes_sin_revisor,
+    get_revision_queryset,
+)
 
 
 def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
@@ -587,6 +595,7 @@ def dashboard_staff(request):
     
     # Preinformes sin asignar (pendientes de revisión sin revisor)
     pendientes_revision = get_pendientes_sin_revisor().count()
+    asignados_otros = get_asignados_a_otros(request.user).count()
     
     # Preinformes en revisión por este usuario
     en_revision = Preinforme.objects.filter(
@@ -609,6 +618,7 @@ def dashboard_staff(request):
     context = {
         'mis_asignados': mis_asignados,
         'pendientes_revision': pendientes_revision,
+        'asignados_otros': asignados_otros,
         'en_revision': en_revision,
         'total_preinformes_mes': total_preinformes_mes,
         'mis_ultimos_asignados': mis_ultimos_asignados,
@@ -673,6 +683,9 @@ def lista_revision(request):
             )
         
         preinformes = Preinforme.objects.filter(base_filter)
+
+    # Fuente efectiva de las bandejas: mantener centralizada la regla en selectors.py.
+    preinformes = get_revision_queryset(request.user, mostrar)
     
     # Aplicar filtros
     if form.is_valid():
@@ -732,9 +745,16 @@ def asignar_revisor(request, pk):
         
         if action == 'asignarme':
             # Asignarse a sí mismo
+            revisor_anterior = preinforme.revisor
             preinforme.revisor = request.user
             preinforme.save()
-            messages.success(request, f'Te asignaste el preinforme #{preinforme.numero_estudio}.')
+            if revisor_anterior and revisor_anterior != request.user:
+                messages.success(
+                    request,
+                    f'Tomaste el preinforme #{preinforme.numero_estudio}, antes asignado a {revisor_anterior.get_full_name()}.'
+                )
+            else:
+                messages.success(request, f'Te asignaste el preinforme #{preinforme.numero_estudio}.')
         elif action == 'desasignar':
             # Desasignar el preinforme
             preinforme.revisor = None
@@ -838,21 +858,7 @@ def revisar_preinforme(request, pk):
             messages.error(request, 'Solo el revisor asignado puede editar un preinforme finalizado.')
             return redirect('preinformes:lista_revision')
     
-    # Obtener o crear revisión
-    revision, created = RevisionPreinforme.objects.get_or_create(
-        preinforme=preinforme,
-        defaults={'revisor': request.user}
-    )
-    
-    # 1) Snapshot: congelar lo que envió el residente (una vez)
-    if not revision.informe_residente_snapshot:
-        revision.informe_residente_snapshot = preinforme.get_informe_html_or_legacy() or ""
-        revision.save(update_fields=['informe_residente_snapshot'])
-    
-    # 2) Precarga del editor del staff (solo si todavía no editó)
-    if not revision.informe_final_html:
-        revision.informe_final_html = revision.informe_residente_snapshot
-        revision.save(update_fields=['informe_final_html'])
+    revision, created = obtener_o_preparar_revision(preinforme, request.user)
     
     if request.method == 'POST':
         # Guardar y finalizar revisión

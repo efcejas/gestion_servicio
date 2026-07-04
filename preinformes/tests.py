@@ -165,6 +165,115 @@ class PreinformeModelTest(TestCase):
         self.assertEqual(historial.promedio_puntuacion, 8.5)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
+class RevisionStaffWorkflowRefactorTest(TestCase):
+    """Tests de reglas reutilizables del circuito staff."""
+
+    def setUp(self):
+        self.residente = User.objects.create_user(
+            username='res_staff_flow',
+            email='res_staff_flow@test.com',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.staff = User.objects.create_user(
+            username='staff_flow',
+            email='staff_flow@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.jefe = User.objects.create_user(
+            username='jefe_flow',
+            email='jefe_flow@test.com',
+            password='pass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.otro_staff = User.objects.create_user(
+            username='otro_staff_flow',
+            email='otro_staff_flow@test.com',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo_estudio = TipoEstudio.objects.create(nombre='TC Staff Flow')
+        self.region = Region.objects.create(nombre='Abdomen Staff Flow')
+
+    def _preinforme(self, numero, estado='pendiente_revision', revisor=None, compartido=False):
+        return Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio=numero,
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente=numero,
+            informe_html=f'<p>Original {numero}</p>',
+            estado=estado,
+            revisor=revisor,
+            asignacion_compartida=compartido,
+            fecha_envio_revision=timezone.now(),
+        )
+
+    def test_revision_queryset_staff_no_ve_pool_compartido_en_sin_asignar(self):
+        from .selectors import get_revision_queryset
+
+        normal = self._preinforme('FLOW-001')
+        compartido = self._preinforme('FLOW-002', compartido=True)
+
+        qs = get_revision_queryset(self.staff, 'sin_asignar')
+
+        self.assertIn(normal, qs)
+        self.assertNotIn(compartido, qs)
+
+    def test_revision_queryset_jefe_ve_pool_compartido(self):
+        from .selectors import get_revision_queryset
+
+        compartido = self._preinforme('FLOW-003', compartido=True)
+
+        qs = get_revision_queryset(self.jefe, 'compartidos')
+
+        self.assertIn(compartido, qs)
+
+    def test_revision_queryset_muestra_asignados_a_otros(self):
+        from .selectors import get_revision_queryset
+
+        propio = self._preinforme('FLOW-004', revisor=self.staff)
+        ajeno = self._preinforme('FLOW-005', revisor=self.otro_staff)
+
+        qs = get_revision_queryset(self.staff, 'asignados_otros')
+
+        self.assertIn(ajeno, qs)
+        self.assertNotIn(propio, qs)
+
+    def test_obtener_o_preparar_revision_crea_snapshot_y_precarga_editor(self):
+        from .services import obtener_o_preparar_revision
+
+        preinforme = self._preinforme('FLOW-006')
+
+        revision, created = obtener_o_preparar_revision(preinforme, self.staff)
+
+        self.assertTrue(created)
+        self.assertEqual(revision.revisor, self.staff)
+        self.assertEqual(revision.informe_residente_snapshot, '<p>Original FLOW-006</p>')
+        self.assertEqual(revision.informe_final_html, '<p>Original FLOW-006</p>')
+
+    def test_staff_puede_tomar_preinforme_asignado_a_otro(self):
+        preinforme = self._preinforme('FLOW-007', revisor=self.otro_staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.post(
+            reverse('preinformes:asignar_revisor', kwargs={'pk': preinforme.pk}) + '?mostrar=asignados_otros',
+            {'action': 'asignarme'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('mostrar=asignados_otros', response['Location'])
+        preinforme.refresh_from_db()
+        self.assertEqual(preinforme.revisor, self.staff)
+
+
 class PreinformeViewTest(TestCase):
     def setUp(self):
         self.residente = User.objects.create_user(

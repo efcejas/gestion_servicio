@@ -1,28 +1,36 @@
 """
-selectors.py — Queries reutilizables del módulo preinformes.
+selectors.py - Queries reutilizables del modulo preinformes.
 
-Cada función encapsula un patrón de filtrado frecuente. Retornan QuerySets
+Cada funcion encapsula un patron de filtrado frecuente. Retornan QuerySets
 (no listas), por lo que el caller puede seguir encadenando .filter(), .count(),
-.order_by(), etc., sin reescribir la lógica base.
-
-Convenio de nombres:
-    get_*()  → retorna un QuerySet (puede estar vacío, nunca None)
+.order_by(), etc., sin reescribir la logica base.
 """
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 
 from .models import Preinforme, PlantillaPreinforme
 
 User = get_user_model()
 
-# Estados que indican que un preinforme está activo en el flujo de revisión
+# Estados que indican que un preinforme esta activo en el flujo de revision.
 ESTADOS_ACTIVOS = ['pendiente_revision', 'en_revision']
+ROLES_POOL_COMPARTIDO = ['jefe_residentes', 'instructor_residentes']
+ROLES_REVISORES = ['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+MODOS_LISTA_REVISION = [
+    'asignados',
+    'sin_asignar',
+    'asignados_otros',
+    'compartidos',
+    'todos',
+    'finalizados',
+]
 
 
 def get_asignados_de(revisor):
     """
-    Preinformes activos (pendiente_revision o en_revision) asignados a un revisor.
+    Preinformes activos asignados a un revisor.
 
-    Uso típico:
+    Uso tipico:
         get_asignados_de(request.user).count()
         get_asignados_de(request.user).order_by('-fecha_envio_revision')[:5]
     """
@@ -34,13 +42,10 @@ def get_asignados_de(revisor):
 
 def get_pendientes_sin_revisor():
     """
-    Preinformes en estado pendiente_revision que aún no tienen revisor asignado.
+    Preinformes en pendiente_revision que aun no tienen revisor asignado.
 
-    No incluye los en estado en_revision (esos ya fueron tomados por alguien).
-
-    Uso típico:
-        get_pendientes_sin_revisor().count()
-        get_pendientes_sin_revisor().order_by('-fecha_envio_revision')[:10]
+    Se conserva para contadores historicos del dashboard. Para la bandeja
+    operativa de revision usar get_sin_asignar_para_revision().
     """
     return Preinforme.objects.filter(
         estado='pendiente_revision',
@@ -48,11 +53,109 @@ def get_pendientes_sin_revisor():
     )
 
 
+def get_sin_asignar_para_revision():
+    """
+    Bandeja operativa de estudios sin revisor.
+
+    Excluye el pool compartido, que se maneja con reglas propias para jefes e
+    instructores. Incluye en_revision sin revisor por compatibilidad con datos
+    previos o estados intermedios.
+    """
+    return Preinforme.objects.filter(
+        estado__in=ESTADOS_ACTIVOS,
+        revisor__isnull=True,
+        asignacion_compartida=False,
+    )
+
+
+def get_pool_compartido_para(usuario):
+    """
+    Estudios del pool compartido visibles para jefes/instructores.
+    Otros roles reciben QuerySet vacio para que la vista no replique permisos.
+    """
+    if getattr(usuario, 'rol', None) not in ROLES_POOL_COMPARTIDO:
+        return Preinforme.objects.none()
+
+    return Preinforme.objects.filter(
+        asignacion_compartida=True,
+        revisor__isnull=True,
+        estado__in=ESTADOS_ACTIVOS,
+    )
+
+
+def get_finalizados_de(revisor):
+    """Preinformes finalizados por un revisor."""
+    return Preinforme.objects.filter(
+        revisor=revisor,
+        estado='finalizado',
+    )
+
+
+def get_asignados_a_otros(usuario):
+    """
+    Estudios activos asignados a otro revisor.
+
+    Permite ubicar errores de asignacion y tomar el estudio cuando corresponde.
+    No incluye finalizados para evitar reabrir historiales ajenos.
+    """
+    return Preinforme.objects.filter(
+        estado__in=ESTADOS_ACTIVOS,
+        revisor__isnull=False,
+    ).exclude(revisor=usuario)
+
+
+def get_revision_todos_para(usuario):
+    """
+    Bandeja "todos" del staff: mis activos + disponibles para tomar.
+
+    Jefes e instructores ven tambien el pool compartido. Staff y jefe_servicio
+    ven solo sin asignar no compartidos.
+    """
+    base_filter = Q(estado__in=ESTADOS_ACTIVOS, revisor=usuario)
+
+    if getattr(usuario, 'rol', None) in ROLES_POOL_COMPARTIDO:
+        base_filter |= Q(estado__in=ESTADOS_ACTIVOS, revisor__isnull=True)
+    else:
+        base_filter |= Q(
+            estado__in=ESTADOS_ACTIVOS,
+            revisor__isnull=True,
+            asignacion_compartida=False,
+        )
+
+    return Preinforme.objects.filter(base_filter)
+
+
+def get_revision_queryset(usuario, mostrar):
+    """
+    Retorna el QuerySet base para cada pestana de revision staff.
+
+    `mostrar` puede ser asignados, sin_asignar, compartidos, todos o
+    finalizados. Valores desconocidos caen en "todos" para conservar el
+    comportamiento previo.
+    """
+    if mostrar == 'asignados':
+        return get_asignados_de(usuario)
+    if mostrar == 'sin_asignar':
+        return get_sin_asignar_para_revision()
+    if mostrar == 'asignados_otros':
+        return get_asignados_a_otros(usuario)
+    if mostrar == 'compartidos':
+        return get_pool_compartido_para(usuario)
+    if mostrar == 'finalizados':
+        return get_finalizados_de(usuario).select_related(
+            'revision',
+            'residente',
+            'tipo_estudio',
+            'region',
+        )
+    return get_revision_todos_para(usuario)
+
+
 def get_plantillas_activas(tipo_estudio=None, region=None):
     """
     Plantillas de preinformes visibles para los residentes.
 
-    Parámetros opcionales para filtrar por tipo_estudio y/o region:
+    Parametros opcionales para filtrar por tipo_estudio y/o region:
         get_plantillas_activas(tipo_estudio=tipo, region=region)
     """
     qs = PlantillaPreinforme.objects.filter(activa=True)
@@ -67,9 +170,7 @@ def get_revisores_disponibles():
     """
     Usuarios con rol habilitado para revisar preinformes.
 
-    Retorna un QuerySet de User, útil para poblar desplegables de
-    asignación manual o para validar un revisor_id recibido del frontend.
+    Retorna un QuerySet de User, util para poblar desplegables de asignacion
+    manual o para validar un revisor_id recibido del frontend.
     """
-    return User.objects.filter(
-        rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'],
-    )
+    return User.objects.filter(rol__in=ROLES_REVISORES)

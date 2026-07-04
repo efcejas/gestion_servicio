@@ -157,6 +157,30 @@
                     {% endif %}
                 </a>
 
+                <a href="{% url 'preinformes:lista_revision' %}?mostrar=asignados_otros" 
+                   class="flex items-center p-4 bg-sky-50 hover:bg-sky-100 rounded-lg transition-colors group">
+                    <div class="p-2 bg-sky-500 text-white rounded-lg mr-4">
+                        <i class="fas fa-user-tag"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-medium text-gray-900">Asignados a Otros</h3>
+                        <p class="text-sm text-gray-600">
+                            {% if asignados_otros > 0 %}
+                                {{ asignados_otros }} preinforme(s) activo(s) con otro revisor
+                            {% else %}
+                                No hay preinformes asignados a otros revisores
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% if asignados_otros > 0 %}
+                    <div class="ml-4">
+                        <span class="bg-sky-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                            {{ asignados_otros }}
+                        </span>
+                    </div>
+                    {% endif %}
+                </a>
+
                 <a href="{% url 'preinformes:lista_revision' %}?mostrar=finalizados" 
                    class="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors group">
                     <div class="p-2 bg-green-500 text-white rounded-lg mr-4">
@@ -281,7 +305,7 @@
                             </span>
                             <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}" 
                                class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                                Revisar →
+                                Tomar y revisar →
                             </a>
                         </div>
                     </div>

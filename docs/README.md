@@ -29,6 +29,7 @@
 - **[producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md](producto/RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md)** - Resumen funcional/técnico del registro de estudios.
 - **[producto/NOTIFICACIONES_TOKEN_README.md](producto/NOTIFICACIONES_TOKEN_README.md)** - Acceso por token y notificaciones para médicos.
 - **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
+- **[producto/PREINFORMES_REVISION_STAFF.md](producto/PREINFORMES_REVISION_STAFF.md)** - Circuito vigente de revision staff de preinformes.
 
 - **[liquidacion/reglas-descuento-residencia.md](liquidacion/reglas-descuento-residencia.md)** - Reglas vigentes de descuento residencia, B2/B3, diagnostico de recalculo, preparacion RRHH y checklist de cierre.
 
@@ -42,6 +43,7 @@
 - **[arquitectura/REFACTOR_REVISION_STAFF.md](arquitectura/REFACTOR_REVISION_STAFF.md)** - Refactor de la revisión de staff en preinformes.
 - **[arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md](arquitectura/SISTEMA_CARGA_ARCHIVOS_HIBRIDO.md)** - Arquitectura de carga híbrida para clases de residentes.
 - **[arquitectura/SISTEMA_DISENO_DARK_MODE.md](arquitectura/SISTEMA_DISENO_DARK_MODE.md)** - Sistema visual unificado para dark mode en dictado IA.
+- **[arquitectura/NORMAS_UI_OPERATIVAS.md](arquitectura/NORMAS_UI_OPERATIVAS.md)** - Normas UI para bandejas, estados y acciones operativas.
 
 ### Calidad y seguridad
 

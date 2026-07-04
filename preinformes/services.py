@@ -84,3 +84,38 @@ def evaluar_sesion_mentor(preinforme, conversacion_id=None):
         )
 
     return resultado
+
+
+def obtener_o_preparar_revision(preinforme, revisor):
+    """
+    Devuelve la RevisionPreinforme lista para editar.
+
+    Responsabilidades:
+    - crear la revision si todavia no existe;
+    - congelar una vez el informe enviado por el residente;
+    - precargar el editor del staff si aun no tiene contenido.
+
+    Mantener esta regla fuera de la vista evita divergencias entre revision
+    inicial, continuacion y edicion posterior de finalizados.
+    """
+    from .models import RevisionPreinforme
+
+    revision, created = RevisionPreinforme.objects.get_or_create(
+        preinforme=preinforme,
+        defaults={'revisor': revisor},
+    )
+
+    campos_actualizados = []
+
+    if not revision.informe_residente_snapshot:
+        revision.informe_residente_snapshot = preinforme.get_informe_html_or_legacy() or ""
+        campos_actualizados.append('informe_residente_snapshot')
+
+    if not revision.informe_final_html:
+        revision.informe_final_html = revision.informe_residente_snapshot
+        campos_actualizados.append('informe_final_html')
+
+    if campos_actualizados:
+        revision.save(update_fields=campos_actualizados)
+
+    return revision, created
