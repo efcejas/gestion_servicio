@@ -100,6 +100,36 @@ def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
     return len(creados), None
 
 
+def _asegurar_resumen_ia_revision(revision):
+    """Genera el resumen IA pre-revision sin bloquear el flujo si falla."""
+    if revision.resumen_ia_revision:
+        return
+    if revision.resumen_ia_revision_error:
+        return
+    if not getattr(settings, 'PREINFORMES_RESUMEN_IA_REVISION_AUTO_GENERAR', True):
+        return
+
+    try:
+        from django.utils import timezone as _timezone
+        from .asistente_service import AsistenteRadiologicoBot
+
+        resultado = AsistenteRadiologicoBot().generar_resumen_pre_revision(revision.preinforme)
+        if resultado.get('success'):
+            revision.resumen_ia_revision = resultado.get('resumen') or {}
+            revision.resumen_ia_revision_generado_en = _timezone.now()
+            revision.resumen_ia_revision_error = ''
+            revision.save(update_fields=[
+                'resumen_ia_revision',
+                'resumen_ia_revision_generado_en',
+                'resumen_ia_revision_error',
+            ])
+        elif resultado.get('error') != 'Bot no disponible.':
+            revision.resumen_ia_revision_error = resultado.get('error') or 'No se pudo generar el resumen IA.'
+            revision.save(update_fields=['resumen_ia_revision_error'])
+    except Exception as exc:
+        logger.warning("No se pudo generar resumen IA pre-revision para revision %s: %s", revision.pk, exc)
+
+
 def _normalizar_html_editor(content):
     """Aplica una normalización HTML suave para usar una base consistente en editor/exportación."""
     return prepare_editor_html_content(content)
@@ -904,12 +934,14 @@ def revisar_preinforme(request, pk):
                 return redirect('preinformes:lista_revision')
     else:
         # GET: El form se crea con la instancia que ya tiene informe_final_html cargado
+        _asegurar_resumen_ia_revision(revision)
         form = RevisionPreinformeForm(instance=revision, preinforme=preinforme)
     
     context = {
         'form': form,
         'preinforme': preinforme,
         'revision': revision,
+        'resumen_ia_revision': revision.resumen_ia_revision or {},
         'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),

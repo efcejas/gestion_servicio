@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import patch
 
 from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios, AdjuntoPreinforme
 
@@ -165,7 +166,11 @@ class PreinformeModelTest(TestCase):
         self.assertEqual(historial.promedio_puntuacion, 8.5)
 
 
-@override_settings(SECURE_SSL_REDIRECT=False)
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    STORAGES=TEST_STORAGES,
+    PREINFORMES_RESUMEN_IA_REVISION_AUTO_GENERAR=False,
+)
 class RevisionStaffWorkflowRefactorTest(TestCase):
     """Tests de reglas reutilizables del circuito staff."""
 
@@ -258,6 +263,32 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertEqual(revision.revisor, self.staff)
         self.assertEqual(revision.informe_residente_snapshot, '<p>Original FLOW-006</p>')
         self.assertEqual(revision.informe_final_html, '<p>Original FLOW-006</p>')
+
+    @override_settings(PREINFORMES_RESUMEN_IA_REVISION_AUTO_GENERAR=True)
+    def test_revisar_preinforme_genera_y_muestra_resumen_ia(self):
+        preinforme = self._preinforme('FLOW-IA-001', estado='en_revision', revisor=self.staff)
+
+        with patch('preinformes.asistente_service.AsistenteRadiologicoBot') as bot_mock:
+            bot_mock.return_value.generar_resumen_pre_revision.return_value = {
+                'success': True,
+                'resumen': {
+                    'resumen': 'Preinforme con hallazgos principales presentes.',
+                    'puntos_clave': ['Revisar que el cierre diagnóstico priorice los hallazgos relevantes.'],
+                    'posibles_fricciones': ['El cierre del informe podría quedar poco específico.'],
+                    'prioridad': 'media',
+                },
+                'error': None,
+            }
+
+            self.client.login(username='staff_flow', password='pass123')
+            response = self.client.get(reverse('preinformes:revisar_preinforme', kwargs={'pk': preinforme.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Resumen IA para revisar')
+        self.assertContains(response, 'cierre diagnóstico')
+
+        revision = RevisionPreinforme.objects.get(preinforme=preinforme)
+        self.assertEqual(revision.resumen_ia_revision['prioridad'], 'media')
 
     def test_staff_puede_tomar_preinforme_asignado_a_otro(self):
         preinforme = self._preinforme('FLOW-007', revisor=self.otro_staff)
@@ -753,7 +784,11 @@ class AdjuntoPreinformeTest(TestCase):
 # Smoke tests: autosave residente + revisor, copiar_informe_final, cargar_plantillas
 # ---------------------------------------------------------------------------
 
-@override_settings(SECURE_SSL_REDIRECT=False, STORAGES=TEST_STORAGES)
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    STORAGES=TEST_STORAGES,
+    PREINFORMES_RESUMEN_IA_REVISION_AUTO_GENERAR=False,
+)
 class RevisionFinalizadaEditTest(TestCase):
     """Permite corregir una revision ya finalizada solo al revisor asignado."""
 

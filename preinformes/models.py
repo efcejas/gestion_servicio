@@ -712,7 +712,22 @@ class RevisionPreinforme(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(10)],
         help_text="Puntuación del 1 al 10 (opcional)"
     )
-    
+
+    resumen_ia_revision = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Resumen IA orientativo para el staff antes de revisar"
+    )
+    resumen_ia_revision_generado_en = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha de generacion del resumen IA pre-revision"
+    )
+    resumen_ia_revision_error = models.TextField(
+        blank=True,
+        default='',
+        help_text="Ultimo error al generar el resumen IA pre-revision"
+    )
 
     
     # Timestamps
@@ -749,6 +764,9 @@ class RevisionPreinforme(models.Model):
             if save:
                 self.save()
     
+    def tiene_resumen_ia_revision(self):
+        return bool(self.resumen_ia_revision)
+
     def inicializar_revision(self, save=True):
         """Inicializa la revisión creando snapshot y preparando informe final"""
         self.crear_snapshot_residente()

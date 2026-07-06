@@ -398,6 +398,109 @@ CONVERSACIÓN:
             logger.error(f"Error en evaluar_conversacion({conversacion_id}): {e}")
             return {'success': False, 'error': str(e)}
 
+    def generar_resumen_pre_revision(self, preinforme):
+        """
+        Genera una guía breve para el staff antes de corregir un preinforme.
+
+        Returns:
+            dict: {success, resumen, error}
+        """
+        if not self.client:
+            return {'success': False, 'resumen': {}, 'error': 'Bot no disponible.'}
+
+        try:
+            import json as _json
+
+            texto_informe = _strip_html(preinforme.get_informe_html_or_legacy())
+            if len(texto_informe) > 3500:
+                texto_informe = texto_informe[:3500] + '...'
+
+            sexo = ''
+            if preinforme.sexo_paciente:
+                sexo = {'M': 'masculino', 'F': 'femenino', 'O': 'otro'}.get(preinforme.sexo_paciente, '')
+
+            prompt = f"""Sos un médico staff de Diagnóstico por Imágenes ayudando a otro staff antes de revisar un preinforme de un residente.
+
+Tu tarea NO es corregir el informe completo ni reemplazar al revisor. Tenés que dar una orientación breve sobre con qué se va a encontrar y qué conviene mirar primero.
+
+Norma del servicio: muchos staff no usan una sección formal titulada "Conclusión". No consideres la ausencia de esa sección como un defecto por sí misma. Evaluá si el informe comunica adecuadamente el cierre diagnóstico, la impresión o la priorización de hallazgos relevantes, aunque estén integrados en el texto. Solo señalá este punto si el informe queda ambiguo, incompleto o clínicamente poco claro.
+
+DATOS DEL ESTUDIO:
+- Tipo: {preinforme.tipo_estudio.nombre}
+- Región: {preinforme.region.nombre}
+- Edad: {preinforme.edad_paciente or 'no informada'}
+- Sexo: {sexo or 'no informado'}
+
+PREINFORME DEL RESIDENTE:
+\"{texto_informe}\"
+
+Respondé ÚNICAMENTE con JSON válido con esta estructura exacta:
+{{
+  "resumen": "<1 o 2 frases sobre el contenido general>",
+  "puntos_clave": ["<máximo 4 puntos concretos para revisar>"],
+  "posibles_fricciones": ["<máximo 3 inconsistencias, omisiones o dudas; si no hay, lista vacía>"],
+  "prioridad": "baja|media|alta"
+}}
+
+Usá español rioplatense natural, sobrio, clínico y útil para un revisor.
+Usá tildes y signos de apertura cuando correspondan. No escribas texto sin acentos.
+Evitá datos identificatorios del paciente."""
+
+            messages = [
+                {"role": "system", "content": "Sos un asistente clínico para revisión docente. Respondés siempre JSON válido, en español natural y con tildes."},
+                {"role": "user", "content": prompt},
+            ]
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=500,
+                )
+                texto_respuesta = response.choices[0].message.content
+            except Exception as api_error:
+                logger.error(f"Error API resumen pre-revision: {api_error}")
+                if self.fallback_client:
+                    response = self.fallback_client.chat.completions.create(
+                        model=self.fallback_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=500,
+                    )
+                    texto_respuesta = response.choices[0].message.content
+                else:
+                    raise api_error
+
+            match = re.search(r'\{.*\}', texto_respuesta, re.DOTALL)
+            if not match:
+                raise ValueError(f"Respuesta no contiene JSON válido: {texto_respuesta[:200]}")
+
+            resumen = _json.loads(match.group())
+            resumen_normalizado = {
+                'resumen': str(resumen.get('resumen') or '').strip()[:700],
+                'puntos_clave': [
+                    str(item).strip()[:220]
+                    for item in (resumen.get('puntos_clave') or [])[:4]
+                    if str(item).strip()
+                ],
+                'posibles_fricciones': [
+                    str(item).strip()[:220]
+                    for item in (resumen.get('posibles_fricciones') or [])[:3]
+                    if str(item).strip()
+                ],
+                'prioridad': resumen.get('prioridad') if resumen.get('prioridad') in ['baja', 'media', 'alta'] else 'media',
+            }
+
+            if not resumen_normalizado['resumen'] and not resumen_normalizado['puntos_clave']:
+                raise ValueError('La IA devolvió un resumen vacío.')
+
+            return {'success': True, 'resumen': resumen_normalizado, 'error': None}
+
+        except Exception as e:
+            logger.error(f"Error en generar_resumen_pre_revision({preinforme.pk}): {e}")
+            return {'success': False, 'resumen': {}, 'error': str(e)}
+
     def analizar_borrador(self, contenido_html, tipo_estudio='', region=''):
         """
         Analiza proactivamente el borrador del informe para detectar problemas
