@@ -1225,6 +1225,16 @@ document.addEventListener('DOMContentLoaded', function() {
             try { localStorage.removeItem(LOCAL_KEY); } catch(e) {}
         }
 
+        function clearAllPreinformeDrafts() {
+            clearDraftLocal();
+            try {
+                localStorage.removeItem('preinforme_draft_nuevo');
+                if (PREINFORME_PK) {
+                    localStorage.removeItem('preinforme_draft_' + PREINFORME_PK);
+                }
+            } catch(e) {}
+        }
+
         function getDraftLocal() {
             try {
                 return parseDraftPayload(localStorage.getItem(LOCAL_KEY));
@@ -1424,11 +1434,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- Limpiar al enviar el formulario ---
         const form = document.querySelector('form');
         if (form) {
-            form.addEventListener('submit', function() {
+            form.addEventListener('submit', function(e) {
                 isSubmitting = true;
                 clearTimeout(debounceTimer);
                 clearInterval(serverTimer);
-                clearDraftLocal();
+                const submitterName = e.submitter ? e.submitter.name : '';
+                if (submitterName === 'guardar_y_enviar') {
+                    clearAllPreinformeDrafts();
+                } else {
+                    clearDraftLocal();
+                }
             });
         }
 
@@ -1605,6 +1620,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function mostrarModalDuplicados(duplicados) {
+        if (duplicadoVerificadoSesion) {
+            return;
+        }
+
         const modal = document.getElementById('modal-duplicados');
         const contenido = document.getElementById('contenido-duplicados');
         
@@ -1770,6 +1789,8 @@ document.addEventListener('DOMContentLoaded', function() {
         if (checkbox && checkbox.checked) {
             console.log('Usuario confirmó que no es duplicado');
             duplicadoVerificadoSesion = true; // No volver a mostrar en esta sesión
+            verificacionEnProceso = false;
+            clearTimeout(timeoutVerificacion);
             cerrarModalDuplicados();
         } else {
             alert('Por favor, marca la casilla para confirmar que has verificado el preinforme existente.');

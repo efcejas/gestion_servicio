@@ -472,6 +472,31 @@ def editar_preinforme(request, pk):
 
 @login_required
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+@require_http_methods(["POST"])
+def eliminar_preinforme(request, pk):
+    """Permite al preinformante eliminar sus preinformes no tomados por staff."""
+    preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
+
+    if preinforme.estado not in ['borrador', 'pendiente_revision']:
+        messages.error(request, 'Solo podés eliminar preinformes en borrador o pendientes de revisión.')
+        return redirect('preinformes:mis_preinformes')
+
+    numero_estudio = preinforme.numero_estudio
+    for adjunto in preinforme.adjuntos.all():
+        if adjunto.imagen:
+            adjunto.imagen.delete(save=False)
+
+    preinforme.delete()
+
+    historial, _ = HistorialEstudios.objects.get_or_create(residente=request.user)
+    historial.actualizar_estadisticas()
+
+    messages.success(request, f'Preinforme #{numero_estudio} eliminado.')
+    return redirect('preinformes:mis_preinformes')
+
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def mis_preinformes(request):
     """Lista de preinformes del residente"""
     form = FiltroPreinformesForm(request.GET)
@@ -895,7 +920,18 @@ def revisar_preinforme(request, pk):
             return redirect('preinformes:lista_revision')
     
     revision, created = obtener_o_preparar_revision(preinforme, request.user)
-    
+
+    if request.method == 'POST' and 'liberar_revision' in request.POST:
+        if preinforme.estado == 'en_revision' and preinforme.revisor == request.user:
+            preinforme.revisor = None
+            preinforme.estado = 'pendiente_revision'
+            preinforme.save(update_fields=['revisor', 'estado', 'fecha_modificacion'])
+            messages.success(request, 'Liberaste la revisión. El residente podrá editar y el estudio queda disponible nuevamente.')
+            return redirect('preinformes:lista_revision')
+
+        messages.error(request, 'Solo podés liberar una revisión activa asignada a vos.')
+        return redirect('preinformes:lista_revision')
+
     if request.method == 'POST':
         # Guardar y finalizar revisión
         form = RevisionPreinformeForm(request.POST, instance=revision, preinforme=preinforme)

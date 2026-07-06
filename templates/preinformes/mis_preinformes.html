@@ -200,6 +200,15 @@
                                    class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-sm">
                                     <i class="fas fa-edit mr-1"></i>Editar
                                 </a>
+
+                                <form method="post" action="{% url 'preinformes:eliminar_preinforme' preinforme.pk %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="inline-flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors shadow-sm text-sm"
+                                            onclick="return confirm('¿Eliminar este preinforme? Esta acción no se puede deshacer.')">
+                                        <i class="fas fa-trash-alt mr-1"></i>Eliminar
+                                    </button>
+                                </form>
                             {% endif %}
 
                             {% if preinforme.estado == 'finalizado' and preinforme.revision %}

@@ -317,6 +317,20 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         preinforme.refresh_from_db()
         self.assertEqual(preinforme.revisor, self.otro_staff)
 
+    def test_staff_puede_liberar_revision_accidental(self):
+        preinforme = self._preinforme('FLOW-009', estado='en_revision', revisor=self.staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.post(
+            reverse('preinformes:revisar_preinforme', kwargs={'pk': preinforme.pk}),
+            {'liberar_revision': '1'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        preinforme.refresh_from_db()
+        self.assertEqual(preinforme.estado, 'pendiente_revision')
+        self.assertIsNone(preinforme.revisor)
+
 
 class PreinformeViewTest(TestCase):
     def setUp(self):
@@ -625,6 +639,7 @@ class NormalizeHTMLContentSoftTest(TestCase):
                             "Soft no debe crear muchos <p> adicionales")
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, STORAGES=TEST_STORAGES)
 class AdjuntoPreinformeTest(TestCase):
     def setUp(self):
         self.residente = User.objects.create_user(
@@ -778,6 +793,24 @@ class AdjuntoPreinformeTest(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertFalse(AdjuntoPreinforme.objects.filter(id=adjunto.id).exists())
+
+    def test_residente_puede_eliminar_preinforme_propio_pendiente(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-9005',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente='Cinco',
+            informe_html='<p>Texto inicial</p>',
+        )
+        preinforme.enviar_a_revision()
+
+        self.client.login(username='residente_adjuntos', password='testpass123')
+        response = self.client.post(reverse('preinformes:eliminar_preinforme', kwargs={'pk': preinforme.pk}))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Preinforme.objects.filter(pk=preinforme.pk).exists())
 
 
 # ---------------------------------------------------------------------------

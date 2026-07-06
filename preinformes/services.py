@@ -107,6 +107,10 @@ def obtener_o_preparar_revision(preinforme, revisor):
 
     campos_actualizados = []
 
+    if revision.revisor_id != revisor.id:
+        revision.revisor = revisor
+        campos_actualizados.append('revisor')
+
     if not revision.informe_residente_snapshot:
         revision.informe_residente_snapshot = preinforme.get_informe_html_or_legacy() or ""
         campos_actualizados.append('informe_residente_snapshot')
