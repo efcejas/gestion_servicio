@@ -138,6 +138,9 @@
                                         {% endif %}
                                     </span>
                                 </p>
+                                {% if dato.checklist_cierre.proximo_paso.resolver_texto %}
+                                <p class="mt-0.5 text-[11px] text-gray-600">{{ dato.checklist_cierre.proximo_paso.resolver_texto }}</p>
+                                {% endif %}
                             </div>
                             {% if dato.checklist_cierre.proximo_paso.url %}
                             <a href="{{ dato.checklist_cierre.proximo_paso.url }}"
@@ -153,6 +156,7 @@
                             {% for item in dato.checklist_cierre.items %}
                                 {% if item.url %}
                                 <a href="{{ item.url }}"
+                                   title="{{ item.ayuda }}"
                                    class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors
                                    {% if item.estado == 'ok' %}border-emerald-200 bg-emerald-100 text-emerald-800 hover:bg-emerald-200
                                    {% elif item.estado == 'bloqueante' %}border-red-200 bg-red-100 text-red-800 hover:bg-red-200
@@ -167,7 +171,8 @@
                                     {% if item.detalle_corto %}<span class="font-normal opacity-80">({{ item.detalle_corto }})</span>{% endif %}
                                 </a>
                                 {% else %}
-                                <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold
+                                <span title="{{ item.ayuda }}"
+                                    class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold
                                     {% if item.estado == 'ok' %}border-emerald-200 bg-emerald-100 text-emerald-800
                                     {% elif item.estado == 'bloqueante' %}border-red-200 bg-red-100 text-red-800
                                     {% elif item.estado == 'advertencia' %}border-amber-200 bg-amber-100 text-amber-800
@@ -183,6 +188,22 @@
                                 {% endif %}
                             {% endfor %}
                         </div>
+                        {% if dato.checklist_cierre.estado_global != 'ok' %}
+                        <div class="mt-2 space-y-1">
+                            {% for item in dato.checklist_cierre.items %}
+                                {% if item.estado != 'ok' and item.resolver_texto %}
+                                <div class="flex flex-col gap-1 rounded-md border border-white/70 bg-white/70 px-2 py-1.5 text-[11px] text-gray-700 sm:flex-row sm:items-center sm:justify-between">
+                                    <span><strong>{{ item.label_corto }}:</strong> {{ item.resolver_texto }}</span>
+                                    {% if item.url %}
+                                    <a href="{{ item.url }}" class="inline-flex items-center justify-center rounded bg-gray-800 px-2 py-0.5 font-semibold text-white hover:bg-gray-900">
+                                        Ir
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div id="acciones-sesion-{{ dato.sesion.pk }}" class="h-full col-span-2 md:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-4 min-h-[120px]">

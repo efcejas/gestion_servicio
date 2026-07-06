@@ -51,6 +51,14 @@ class ChecklistCierreSesionTest(TestCase):
             last_name='Checklist',
             perfil_completo=True,
         )
+        self.jefe_servicio = User.objects.create_user(
+            username='jefe_servicio_checklist',
+            password='x',
+            rol='jefe_servicio',
+            first_name='Jefa',
+            last_name='Servicio',
+            perfil_completo=True,
+        )
         self.sesion = SesionContable.objects.create(mes=6, año=2026, estado='CERRADA')
         self.grupo = GrupoTarifario.objects.create(
             codigo='ECO_CHECKLIST',
@@ -247,6 +255,38 @@ class ChecklistCierreSesionTest(TestCase):
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
         self.assertIn('checklist_cierre', dato)
         self.assertEqual(dato['checklist_cierre']['sesion_id'], self.sesion.pk)
+
+    def test_vista_sesion_contable_checklist_muestra_pasos_de_resolucion(self):
+        registro = self._crear_registro()
+        SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro,
+            solicitado_por=self.residente,
+            horario_solicitado='INTRA',
+            fecha_hora_real_declarada=timezone.now(),
+            motivo_solicitud='Test',
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Pendientes')
+        self.assertContains(response, 'Revisar y aprobar/rechazar solicitudes pendientes.')
+        self.assertContains(
+            response,
+            reverse('liquidacion:solicitudes_revision_horario_list')
+            + f'?sesion={self.sesion.pk}&amp;estado={SolicitudRevisionHorarioRegistro.ESTADO_PENDIENTE}',
+        )
+
+    def test_vista_sesion_contable_checklist_explica_rrhh_pendiente(self):
+        self._crear_registro()
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Guardar la preparacion RRHH en estado PREPARADO.')
+        self.assertContains(response, reverse('liquidacion:preparacion_rrhh_preview', args=[self.sesion.pk]))
 
     def test_vista_sesion_contable_incluye_accion_para_bloqueante_de_registro(self):
         registro = self._crear_registro(monto=Decimal('0.00'))
@@ -673,6 +713,132 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Ajuste PACS aplicado')
         self.assertNotContains(response, 'Aplicar ajuste por control PACS')
+
+    def test_vista_auditoria_filtra_registros_con_ajuste_pacs(self):
+        corregido = self._crear_registro(monto=Decimal('650.00'))
+        corregido.apellido_paciente = 'ConAjuste'
+        corregido.save(update_fields=['apellido_paciente'])
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=corregido,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Correccion previa.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=corregido,
+            revision_auditoria_eco=revision,
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('650.00'),
+            observacion='PACS confirma menor valor.',
+            corregido_por=self.admin,
+        )
+        sin_ajuste = self._crear_registro(monto=Decimal('1000.00'))
+        sin_ajuste.apellido_paciente = 'SinAjuste'
+        sin_ajuste.save(update_fields=['apellido_paciente'])
+        for _ in range(33):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.jefe_servicio)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]) + '?ajuste_pacs=CON_AJUSTE',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ConAjuste')
+        self.assertNotContains(response, 'SinAjuste')
+
+    def test_correccion_masiva_pacs_recalcula_ajuste_previo_a_extra(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            horario='INTRA',
+            monto_calculado=Decimal('500.00'),
+        )
+        registro.refresh_from_db()
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Ajuste previo aplicado.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+            horario_anterior='EXTRA',
+            horario_nuevo='INTRA',
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('500.00'),
+            observacion='PACS informaba horario previo a 17.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.jefe_servicio)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_correccion_pacs_masiva', args=[self.sesion.pk]),
+            {
+                'registros': [str(registro.pk)],
+                'horario_corregido': 'EXTRA',
+                'observacion': 'Se corrige porque la fecha correspondia a feriado.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertIn('Nueva correccion sobre ajuste PACS aplicado', registro.motivo_modificacion)
+        correcciones = CorreccionPacsRegistro.objects.filter(registro=registro).order_by('fecha_correccion')
+        self.assertEqual(correcciones.count(), 2)
+        nueva = correcciones.last()
+        self.assertEqual(nueva.horario_anterior, 'INTRA')
+        self.assertEqual(nueva.horario_nuevo, 'EXTRA')
+        self.assertEqual(nueva.monto_anterior, Decimal('500.00'))
+        self.assertEqual(nueva.monto_nuevo, Decimal('1000.00'))
+        self.assertEqual(nueva.corregido_por, self.jefe_servicio)
+
+    def test_correccion_masiva_pacs_deniega_administrativo_comun(self):
+        registro = self._crear_registro(monto=Decimal('500.00'))
+        revision = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['EXTRA'],
+            observacion='Ajuste previo aplicado.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('500.00'),
+            observacion='PACS confirma menor valor.',
+            corregido_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_correccion_pacs_masiva', args=[self.sesion.pk]),
+            {
+                'registros': [str(registro.pk)],
+                'horario_corregido': 'EXTRA',
+                'observacion': 'Intento administrativo comun.',
+            },
+            secure=True,
+        )
+
+        self.assertIn(response.status_code, [302, 403])
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(CorreccionPacsRegistro.objects.filter(registro=registro).count(), 1)
 
     def test_correccion_pacs_bloquea_sesion_facturada(self):
         registro = self._crear_registro(monto=Decimal('1000.00'))

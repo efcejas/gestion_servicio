@@ -319,6 +319,28 @@ class CorreccionPacsRegistroForm(forms.Form):
         return cleaned
 
 
+class CorreccionPacsAplicadaBulkForm(forms.Form):
+    """Nueva correccion auditada sobre ajustes PACS ya aplicados."""
+
+    registros = forms.MultipleChoiceField(required=True)
+    horario_corregido = forms.ChoiceField(
+        choices=RegistroEstudiosPorMedico.HORARIO_CHOICES,
+        required=True,
+    )
+    observacion = forms.CharField(
+        max_length=1000,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 2,
+            'placeholder': 'Motivo de la nueva correccion sobre ajustes PACS aplicados',
+        }),
+    )
+
+    def __init__(self, *args, registro_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['registros'].choices = registro_choices or []
+
+
 class PracticaForm(forms.ModelForm):
     """
     Formulario para registro de prácticas médicas - Liquidación v3.1

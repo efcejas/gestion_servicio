@@ -65,6 +65,7 @@ from .forms import (
     SolicitudRevisionHorarioBulkActionForm,
     RevisionAuditoriaEcoRegistroForm,
     CorreccionPacsRegistroForm,
+    CorreccionPacsAplicadaBulkForm,
     PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -137,11 +138,32 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         'sesion_pagada': 'Pago',
     }
 
+    ayuda_por_item = {
+        'registros_validos': 'Abrir el Gate Administrativo para ver bloqueantes, advertencias y acciones sugeridas.',
+        'solicitudes_pendientes': 'Ir a la bandeja de revision horaria filtrada por solicitudes pendientes.',
+        'aprobadas_sin_aplicar': 'Ir a solicitudes aprobadas que aun deben aplicarse economicamente.',
+        'auditoria_residentes_eco': 'Abrir el resumen ECO; desde ahi podes resolver pendientes contra PACS.',
+        'preparacion_rrhh': 'Preparar o completar el snapshot RRHH de residencia.',
+        'lista_para_facturar': 'Volver a la accion principal cuando los pasos previos esten listos.',
+        'sesion_pagada': 'Revisar historial y estado final de pago.',
+    }
+    resolver_por_item = {
+        'registros_validos': 'Resolver hallazgos del Gate Administrativo.',
+        'solicitudes_pendientes': 'Revisar y aprobar/rechazar solicitudes pendientes.',
+        'aprobadas_sin_aplicar': 'Aplicar solicitudes aprobadas para actualizar horario y monto.',
+        'auditoria_residentes_eco': 'Revisar contra PACS los registros ECO pendientes.',
+        'preparacion_rrhh': 'Guardar la preparacion RRHH en estado PREPARADO.',
+        'lista_para_facturar': 'Completar pasos previos y ejecutar la transicion correspondiente.',
+        'sesion_pagada': 'Confirmar pago cuando la sesion este FACTURADA.',
+    }
+
     for item in checklist.get('items', []):
         key = item.get('key')
         item['url'] = urls_por_item.get(key)
         item['label_corto'] = labels_cortos.get(key, item.get('label'))
         item['detalle_corto'] = ''
+        item['ayuda'] = ayuda_por_item.get(key, '')
+        item['resolver_texto'] = resolver_por_item.get(key, '')
 
         if key == 'preparacion_rrhh':
             if item.get('detalle') == 'No requerido':
@@ -160,6 +182,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
     proximo_paso = checklist.get('proximo_paso')
     if proximo_paso:
         proximo_paso['url'] = urls_por_item.get(proximo_paso.get('key'))
+        proximo_paso['resolver_texto'] = resolver_por_item.get(proximo_paso.get('key'), '')
 
     return checklist
 
@@ -214,7 +237,13 @@ def _flatten_registros_alerta_auditoria_eco(auditoria, medico_id='', motivo=''):
     return registros
 
 
-def _filtrar_registros_alerta_auditoria_eco(registros, estado_revision='', fecha_desde='', fecha_hasta=''):
+def _filtrar_registros_alerta_auditoria_eco(
+    registros,
+    estado_revision='',
+    fecha_desde='',
+    fecha_hasta='',
+    ajuste_pacs='',
+):
     """Filtra la bandeja ECO con datos ya enriquecidos de revision."""
     filtrados = []
     for registro in registros:
@@ -227,6 +256,10 @@ def _filtrar_registros_alerta_auditoria_eco(registros, estado_revision='', fecha
         if fecha_desde and fecha_informe < fecha_desde:
             continue
         if fecha_hasta and fecha_informe > fecha_hasta:
+            continue
+        if ajuste_pacs == 'CON_AJUSTE' and not registro.get('correccion_pacs'):
+            continue
+        if ajuste_pacs == 'SIN_AJUSTE' and registro.get('correccion_pacs'):
             continue
 
         filtrados.append(registro)
@@ -834,6 +867,7 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
         estado_revision_actual = (self.request.GET.get('estado_revision') or '').strip()
         fecha_desde_actual = (self.request.GET.get('fecha_desde') or '').strip()
         fecha_hasta_actual = (self.request.GET.get('fecha_hasta') or '').strip()
+        ajuste_pacs_actual = (self.request.GET.get('ajuste_pacs') or '').strip()
         registros_alerta = _flatten_registros_alerta_auditoria_eco(
             auditoria,
             medico_id=medico_actual,
@@ -869,6 +903,7 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             estado_revision=estado_revision_actual,
             fecha_desde=fecha_desde_actual,
             fecha_hasta=fecha_hasta_actual,
+            ajuste_pacs=ajuste_pacs_actual,
         )
 
         motivos_disponibles = sorted({
@@ -887,6 +922,12 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             'estado_revision_actual': estado_revision_actual,
             'fecha_desde_actual': fecha_desde_actual,
             'fecha_hasta_actual': fecha_hasta_actual,
+            'ajuste_pacs_actual': ajuste_pacs_actual,
+            'ajuste_pacs_choices': [
+                ('CON_AJUSTE', 'Con ajuste PACS'),
+                ('SIN_AJUSTE', 'Sin ajuste PACS'),
+            ],
+            'puede_correccion_masiva_pacs': _puede_accion_masiva_revision_horaria(self.request.user),
             'estado_revision_choices': [
                 ('SIN_REVISAR', 'Sin revisar'),
                 (RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO, 'Validado contra PACS'),
@@ -1053,6 +1094,132 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
             )
 
         messages.success(request, f'Ajuste PACS aplicado al registro #{registro.pk}. Monto: ${monto_anterior} -> ${monto_nuevo}.')
+        return redirect(redirect_url)
+
+
+class AuditoriaEcoCorreccionPacsBulkView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Aplica una nueva correccion auditada sobre ajustes PACS ya existentes."""
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            'Solo superusuarios o jefatura de servicio pueden corregir ajustes PACS en forma masiva.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        redirect_url = request.POST.get('next') or reverse('liquidacion:auditoria_eco_sesion', kwargs={'pk': sesion.pk})
+
+        if sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(request, 'No se pueden corregir ajustes PACS en sesiones FACTURADAS o PAGADAS.')
+            return redirect(redirect_url)
+
+        registro_ids = request.POST.getlist('registros')
+        registro_choices = [(str(pk), str(pk)) for pk in registro_ids]
+        form = CorreccionPacsAplicadaBulkForm(request.POST, registro_choices=registro_choices)
+        if not form.is_valid():
+            messages.error(request, 'Selecciona registros, horario corregido y observacion para aplicar la correccion masiva.')
+            return redirect(redirect_url)
+
+        horario_nuevo = form.cleaned_data['horario_corregido']
+        observacion = form.cleaned_data['observacion']
+        seleccionados = [int(pk) for pk in form.cleaned_data['registros']]
+        aplicados = 0
+        omitidos = 0
+
+        with transaction.atomic():
+            registros = list(
+                RegistroEstudiosPorMedico.objects
+                .select_for_update()
+                .filter(pk__in=seleccionados, sesion_contable=sesion)
+                .order_by('pk')
+            )
+            registros_por_id = {registro.pk: registro for registro in registros}
+            correcciones_previas = (
+                CorreccionPacsRegistro.objects
+                .filter(sesion_contable=sesion, registro_id__in=registros_por_id)
+                .order_by('registro_id', '-fecha_correccion')
+            )
+            correcciones_por_registro = {}
+            for correccion in correcciones_previas:
+                correcciones_por_registro.setdefault(correccion.registro_id, correccion)
+
+            revisiones = (
+                RevisionAuditoriaEcoRegistro.objects
+                .filter(sesion_contable=sesion, registro_id__in=registros_por_id)
+                .order_by('registro_id', '-fecha_revision')
+            )
+            revisiones_por_registro = {}
+            for revision in revisiones:
+                revisiones_por_registro.setdefault(revision.registro_id, revision)
+
+            for registro_id in seleccionados:
+                registro = registros_por_id.get(registro_id)
+                correccion_previa = correcciones_por_registro.get(registro_id)
+                if not registro or not correccion_previa:
+                    omitidos += 1
+                    continue
+
+                monto_anterior = registro.monto_calculado
+                horario_anterior = registro.horario
+                registro.horario = horario_nuevo
+                monto_nuevo = registro.calcular_monto()
+
+                if monto_nuevo == monto_anterior and horario_nuevo == horario_anterior:
+                    omitidos += 1
+                    continue
+
+                registro.monto_calculado = monto_nuevo
+                registro.modificado_por = request.user
+                registro.fecha_modificacion = now()
+                registro.motivo_modificacion = (
+                    f'Nueva correccion sobre ajuste PACS aplicado. '
+                    f'Horario: {horario_anterior} -> {horario_nuevo}. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                )
+                registro.save(update_fields=[
+                    'horario',
+                    'monto_calculado',
+                    'modificado_por',
+                    'fecha_modificacion',
+                    'motivo_modificacion',
+                ])
+
+                revision = revisiones_por_registro.get(registro_id)
+                nueva_correccion = CorreccionPacsRegistro.objects.create(
+                    sesion_contable=sesion,
+                    registro=registro,
+                    revision_auditoria_eco=revision,
+                    tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+                    horario_anterior=horario_anterior,
+                    horario_nuevo=horario_nuevo,
+                    monto_anterior=monto_anterior,
+                    monto_nuevo=monto_nuevo,
+                    observacion=observacion,
+                    corregido_por=request.user,
+                )
+                RevisionAuditoriaEcoRegistro.objects.create(
+                    sesion_contable=sesion,
+                    registro=registro,
+                    estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                    motivos_json=revision.motivos_json if revision else [],
+                    observacion=(
+                        f'Nueva correccion sobre ajuste PACS #{nueva_correccion.pk}. '
+                        f'Horario: {horario_anterior} -> {horario_nuevo}. '
+                        f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                    ),
+                    revisado_por=request.user,
+                )
+                aplicados += 1
+
+        if aplicados:
+            messages.success(request, f'Se aplicaron {aplicados} nueva(s) correccion(es) PACS. Omitidos: {omitidos}.')
+        else:
+            messages.warning(request, f'No se aplicaron correcciones. Omitidos: {omitidos}.')
         return redirect(redirect_url)
 
 

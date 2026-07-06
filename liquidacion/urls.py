@@ -29,6 +29,7 @@ from .views import (
     AuditoriaEcoSesionView,
     AuditoriaEcoRegistroResolverView,
     AuditoriaEcoRegistroCorregirView,
+    AuditoriaEcoCorreccionPacsBulkView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -95,6 +96,11 @@ urlpatterns = [
         'sesiones/<int:pk>/auditoria-eco/<int:registro_pk>/corregir/',
         AuditoriaEcoRegistroCorregirView.as_view(),
         name='auditoria_eco_registro_corregir',
+    ),
+    path(
+        'sesiones/<int:pk>/auditoria-eco/corregir-ajustes-masivo/',
+        AuditoriaEcoCorreccionPacsBulkView.as_view(),
+        name='auditoria_eco_correccion_pacs_masiva',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',
