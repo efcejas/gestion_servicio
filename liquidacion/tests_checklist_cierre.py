@@ -570,6 +570,80 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertIn(response.status_code, [302, 403])
         self.assertFalse(RevisionAuditoriaEcoRegistro.objects.exists())
 
+    def test_revision_masiva_eco_valida_sin_modificar_monto_ni_crear_correccion(self):
+        registros = [self._crear_registro(monto=Decimal('1000.00')) for _ in range(35)]
+        self.client.force_login(self.jefe_servicio)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_resolver_masivo', args=[self.sesion.pk]),
+            {
+                'registros': [str(registro.pk) for registro in registros],
+                'estado': RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                'observacion': 'Validado masivamente contra PACS.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            RevisionAuditoriaEcoRegistro.objects.filter(
+                registro__in=registros,
+                estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            ).count(),
+            35,
+        )
+        self.assertFalse(CorreccionPacsRegistro.objects.filter(registro__in=registros).exists())
+        self.assertFalse(
+            RegistroEstudiosPorMedico.objects
+            .filter(pk__in=[registro.pk for registro in registros])
+            .exclude(monto_calculado=Decimal('1000.00'))
+            .exists()
+        )
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+        dato = next(item for item in response.context['sesiones_data'] if item['sesion'].pk == self.sesion.pk)
+        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 0)
+
+    def test_revision_masiva_eco_descarta_sin_correccion(self):
+        registros = [self._crear_registro(monto=Decimal('1000.00')) for _ in range(2)]
+        self.client.force_login(self.jefe_servicio)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_resolver_masivo', args=[self.sesion.pk]),
+            {
+                'registros': [str(registro.pk) for registro in registros],
+                'estado': RevisionAuditoriaEcoRegistro.ESTADO_DESCARTADO,
+                'observacion': 'Descartado por patron conocido.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            RevisionAuditoriaEcoRegistro.objects.filter(
+                registro__in=registros,
+                estado=RevisionAuditoriaEcoRegistro.ESTADO_DESCARTADO,
+            ).count(),
+            2,
+        )
+
+    def test_revision_masiva_eco_deniega_administrativo_comun(self):
+        registro = self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_resolver_masivo', args=[self.sesion.pk]),
+            {
+                'registros': [str(registro.pk)],
+                'estado': RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                'observacion': 'Intento no permitido.',
+            },
+            secure=True,
+        )
+
+        self.assertIn(response.status_code, [302, 403])
+        self.assertFalse(RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).exists())
+
     def test_correccion_pacs_requiere_revision_en_requiere_correccion(self):
         registro = self._crear_registro(monto=Decimal('1000.00'))
         RevisionAuditoriaEcoRegistro.objects.create(

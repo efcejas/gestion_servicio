@@ -64,6 +64,7 @@ from .forms import (
     SolicitudRevisionHorarioRecalcularAplicacionForm,
     SolicitudRevisionHorarioBulkActionForm,
     RevisionAuditoriaEcoRegistroForm,
+    RevisionAuditoriaEcoBulkForm,
     CorreccionPacsRegistroForm,
     CorreccionPacsAplicadaBulkForm,
     PreparacionLiquidacionRRHHForm,
@@ -928,6 +929,7 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                 ('SIN_AJUSTE', 'Sin ajuste PACS'),
             ],
             'puede_correccion_masiva_pacs': _puede_accion_masiva_revision_horaria(self.request.user),
+            'puede_revision_masiva_eco': _puede_accion_masiva_revision_horaria(self.request.user),
             'estado_revision_choices': [
                 ('SIN_REVISAR', 'Sin revisar'),
                 (RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO, 'Validado contra PACS'),
@@ -978,6 +980,83 @@ class AuditoriaEcoRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, 
             revisado_por=request.user,
         )
         messages.success(request, f'Revision ECO registrada para el registro #{registro.pk}.')
+        return redirect(redirect_url)
+
+
+class AuditoriaEcoBulkResolverView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Valida o descarta en forma masiva alertas ECO sin impacto economico."""
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            'Solo superusuarios o jefatura de servicio pueden resolver alertas ECO en forma masiva.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        redirect_url = request.POST.get('next') or reverse('liquidacion:auditoria_eco_sesion', kwargs={'pk': sesion.pk})
+        registro_ids = request.POST.getlist('registros')
+        registro_choices = [(str(pk), str(pk)) for pk in registro_ids]
+        form = RevisionAuditoriaEcoBulkForm(request.POST, registro_choices=registro_choices)
+
+        if not form.is_valid():
+            messages.error(request, 'Selecciona registros, accion y observacion para resolver alertas ECO.')
+            return redirect(redirect_url)
+
+        seleccionados = [int(pk) for pk in form.cleaned_data['registros']]
+        estado = form.cleaned_data['estado']
+        observacion = form.cleaned_data['observacion']
+
+        auditoria = auditar_residentes_eco_por_sesion(sesion)
+        motivos_por_registro = {}
+        for item in auditoria.get('items', []):
+            for registro_alerta in item.get('registros_alerta', []):
+                registro_id = registro_alerta.get('registro_id')
+                if registro_id:
+                    motivos_por_registro[registro_id] = registro_alerta.get('motivos', [])
+
+        revisados = set(
+            RevisionAuditoriaEcoRegistro.objects
+            .filter(sesion_contable=sesion, registro_id__in=seleccionados)
+            .values_list('registro_id', flat=True)
+        )
+        con_correccion = set(
+            CorreccionPacsRegistro.objects
+            .filter(sesion_contable=sesion, registro_id__in=seleccionados)
+            .values_list('registro_id', flat=True)
+        )
+        registros_validos = list(
+            RegistroEstudiosPorMedico.objects
+            .filter(pk__in=seleccionados, sesion_contable=sesion)
+            .exclude(pk__in=revisados)
+            .exclude(pk__in=con_correccion)
+            .order_by('pk')
+        )
+
+        creadas = [
+            RevisionAuditoriaEcoRegistro(
+                sesion_contable=sesion,
+                registro=registro,
+                estado=estado,
+                motivos_json=motivos_por_registro.get(registro.pk, []),
+                observacion=observacion,
+                revisado_por=request.user,
+            )
+            for registro in registros_validos
+        ]
+        if creadas:
+            RevisionAuditoriaEcoRegistro.objects.bulk_create(creadas)
+
+        omitidos = len(seleccionados) - len(creadas)
+        if creadas:
+            accion = 'validada(s)' if estado == RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO else 'descartada(s)'
+            messages.success(request, f'{len(creadas)} alerta(s) ECO {accion} en forma masiva. Omitidas: {omitidos}.')
+        else:
+            messages.warning(request, f'No se resolvieron alertas ECO. Omitidas: {omitidos}.')
         return redirect(redirect_url)
 
 

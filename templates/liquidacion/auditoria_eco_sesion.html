@@ -111,6 +111,45 @@
         </form>
     </div>
 
+    {% if puede_revision_masiva_eco %}
+    <form id="bulk-revision-eco-form" method="post" action="{% url 'liquidacion:auditoria_eco_resolver_masivo' sesion.pk %}"
+          class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ current_path }}">
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
+            <div class="lg:col-span-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-900">Resolver alertas seleccionadas</p>
+                <p class="mt-1 text-xs text-emerald-800">
+                    Validar o descartar alertas sin aplicar correcciones economicas. Solo toma registros sin revision previa.
+                </p>
+            </div>
+            <div class="lg:col-span-2">
+                <label for="bulk_estado_revision" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-emerald-900">Accion</label>
+                <select id="bulk_estado_revision" name="estado" required class="h-9 w-full rounded-md border border-emerald-200 px-3 text-sm">
+                    <option value="VALIDADO">Validar seleccionados</option>
+                    <option value="DESCARTADO">Descartar seleccionados</option>
+                </select>
+            </div>
+            <div class="lg:col-span-4">
+                <label for="bulk_revision_observacion" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-emerald-900">Observacion</label>
+                <textarea id="bulk_revision_observacion" name="observacion" rows="2" required
+                          class="w-full rounded-md border border-emerald-200 px-3 py-1.5 text-sm"
+                          placeholder="Ej.: Revisado contra PACS. Se valida por patron global del dia."></textarea>
+            </div>
+            <div class="flex flex-col gap-2 lg:col-span-2">
+                <button type="button" id="seleccionar-revision-eco"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-white px-3 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100">
+                    Seleccionar sin revisar
+                </button>
+                <button type="submit"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white hover:bg-emerald-800">
+                    Guardar revision
+                </button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+
     {% if puede_correccion_masiva_pacs %}
     <form id="bulk-correccion-pacs-form" method="post" action="{% url 'liquidacion:auditoria_eco_correccion_pacs_masiva' sesion.pk %}"
           class="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
@@ -175,7 +214,13 @@
                     <tr class="hover:bg-gray-50">
                         {% if puede_correccion_masiva_pacs %}
                         <td class="px-4 py-3 text-sm">
-                            {% if registro.correccion_pacs %}
+                            {% if puede_revision_masiva_eco and not registro.revision_auditoria_eco and not registro.correccion_pacs %}
+                            <label class="inline-flex items-center gap-1 text-xs text-emerald-800">
+                                <input type="checkbox" name="registros" value="{{ registro.registro_id }}" form="bulk-revision-eco-form"
+                                       class="bulk-revision-eco rounded border-gray-300 text-emerald-700 focus:ring-emerald-500">
+                                Revisar
+                            </label>
+                            {% elif registro.correccion_pacs %}
                             <input type="checkbox" name="registros" value="{{ registro.registro_id }}" form="bulk-correccion-pacs-form"
                                    class="bulk-ajuste-pacs rounded border-gray-300 text-blue-700 focus:ring-blue-500">
                             {% else %}
@@ -317,6 +362,17 @@
 </div>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const seleccionarRevision = document.getElementById('seleccionar-revision-eco');
+    if (seleccionarRevision) {
+        seleccionarRevision.addEventListener('click', function () {
+            const checks = document.querySelectorAll('.bulk-revision-eco');
+            const algunoSinMarcar = Array.from(checks).some(function (check) { return !check.checked; });
+            checks.forEach(function (check) {
+                check.checked = algunoSinMarcar;
+            });
+        });
+    }
+
     const seleccionar = document.getElementById('seleccionar-ajustes-pacs');
     if (!seleccionar) {
         return;

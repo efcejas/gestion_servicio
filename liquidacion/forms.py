@@ -260,6 +260,23 @@ class RevisionAuditoriaEcoRegistroForm(forms.Form):
     )
 
 
+class RevisionAuditoriaEcoBulkForm(forms.Form):
+    """Resolucion masiva de alertas ECO sin impacto economico."""
+
+    ESTADO_CHOICES = [
+        (RevisionAuditoriaEcoRegistroForm.ESTADO_VALIDADO, 'Validar seleccionados'),
+        (RevisionAuditoriaEcoRegistroForm.ESTADO_DESCARTADO, 'Descartar seleccionados'),
+    ]
+
+    registros = forms.MultipleChoiceField(required=True)
+    estado = forms.ChoiceField(choices=ESTADO_CHOICES)
+    observacion = forms.CharField(max_length=1000, required=True)
+
+    def __init__(self, *args, registro_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['registros'].choices = registro_choices or []
+
+
 class CorreccionPacsRegistroForm(forms.Form):
     """Correccion economica puntual posterior a control PACS."""
 
