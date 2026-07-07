@@ -111,32 +111,34 @@
         </form>
     </div>
 
+    {% if puede_revision_masiva_eco or puede_correccion_masiva_pacs %}
+    <div class="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    {% endif %}
+
     {% if puede_revision_masiva_eco %}
     <form id="bulk-revision-eco-form" method="post" action="{% url 'liquidacion:auditoria_eco_resolver_masivo' sesion.pk %}"
-          class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+          class="rounded-xl border border-emerald-200 bg-emerald-50 p-3 shadow-sm">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ current_path }}">
-        <div class="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
-            <div class="lg:col-span-4">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-6 md:items-end">
+            <div class="md:col-span-6">
                 <p class="text-xs font-semibold uppercase tracking-wider text-emerald-900">Resolver alertas seleccionadas</p>
-                <p class="mt-1 text-xs text-emerald-800">
-                    Validar o descartar alertas sin aplicar correcciones economicas. Solo toma registros sin revision previa.
-                </p>
+                <p class="mt-0.5 text-xs text-emerald-800">Sin impacto economico. Solo registros sin revision previa.</p>
             </div>
-            <div class="lg:col-span-2">
+            <div class="md:col-span-2">
                 <label for="bulk_estado_revision" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-emerald-900">Accion</label>
                 <select id="bulk_estado_revision" name="estado" required class="h-9 w-full rounded-md border border-emerald-200 px-3 text-sm">
                     <option value="VALIDADO">Validar seleccionados</option>
                     <option value="DESCARTADO">Descartar seleccionados</option>
                 </select>
             </div>
-            <div class="lg:col-span-4">
+            <div class="md:col-span-4">
                 <label for="bulk_revision_observacion" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-emerald-900">Observacion</label>
-                <textarea id="bulk_revision_observacion" name="observacion" rows="2" required
+                <textarea id="bulk_revision_observacion" name="observacion" rows="1" required
                           class="w-full rounded-md border border-emerald-200 px-3 py-1.5 text-sm"
                           placeholder="Ej.: Revisado contra PACS. Se valida por patron global del dia."></textarea>
             </div>
-            <div class="flex flex-col gap-2 lg:col-span-2">
+            <div class="grid grid-cols-2 gap-2 md:col-span-6">
                 <button type="button" id="seleccionar-revision-eco"
                         class="inline-flex h-9 items-center justify-center rounded-md bg-white px-3 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100">
                     Seleccionar sin revisar
@@ -152,17 +154,15 @@
 
     {% if puede_correccion_masiva_pacs %}
     <form id="bulk-correccion-pacs-form" method="post" action="{% url 'liquidacion:auditoria_eco_correccion_pacs_masiva' sesion.pk %}"
-          class="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+          class="rounded-xl border border-blue-200 bg-blue-50 p-3 shadow-sm">
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ current_path }}">
-        <div class="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
-            <div class="lg:col-span-4">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-6 md:items-end">
+            <div class="md:col-span-6">
                 <p class="text-xs font-semibold uppercase tracking-wider text-blue-900">Corregir ajustes PACS seleccionados</p>
-                <p class="mt-1 text-xs text-blue-800">
-                    Usar para casos como feriado informado luego: filtra por fecha, marca registros con ajuste PACS y recalcula todos al horario correcto.
-                </p>
+                <p class="mt-0.5 text-xs text-blue-800">Recalcula ajustes ya aplicados, por ejemplo feriado informado luego.</p>
             </div>
-            <div class="lg:col-span-2">
+            <div class="md:col-span-2">
                 <label for="bulk_horario_corregido" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-blue-900">Horario correcto</label>
                 <select id="bulk_horario_corregido" name="horario_corregido" required class="h-9 w-full rounded-md border border-blue-200 px-3 text-sm">
                     <option value="">Elegir</option>
@@ -171,13 +171,13 @@
                     <option value="NA">No Aplica</option>
                 </select>
             </div>
-            <div class="lg:col-span-4">
+            <div class="md:col-span-4">
                 <label for="bulk_observacion" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-blue-900">Motivo</label>
-                <textarea id="bulk_observacion" name="observacion" rows="2" required
+                <textarea id="bulk_observacion" name="observacion" rows="1" required
                           class="w-full rounded-md border border-blue-200 px-3 py-1.5 text-sm"
                           placeholder="Ej.: Se corrige ajuste previo porque la fecha correspondia a feriado."></textarea>
             </div>
-            <div class="flex flex-col gap-2 lg:col-span-2">
+            <div class="grid grid-cols-2 gap-2 md:col-span-6">
                 <button type="button" id="seleccionar-ajustes-pacs"
                         class="inline-flex h-9 items-center justify-center rounded-md bg-white px-3 text-xs font-semibold text-blue-800 ring-1 ring-blue-200 hover:bg-blue-100">
                     Seleccionar visibles
@@ -189,6 +189,10 @@
             </div>
         </div>
     </form>
+    {% endif %}
+
+    {% if puede_revision_masiva_eco or puede_correccion_masiva_pacs %}
+    </div>
     {% endif %}
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
