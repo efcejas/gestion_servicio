@@ -108,47 +108,40 @@
                     Filtrar
                 </button>
             </div>
-        </form>
-    </div>
-
-    {% if medico_actual or motivo_actual or estado_revision_actual or fecha_desde_actual or fecha_hasta_actual or ajuste_pacs_actual %}
-    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <p class="font-semibold uppercase tracking-wider">Filtros activos</p>
-                <div class="mt-2 flex flex-wrap gap-1.5">
+            {% if medico_actual or motivo_actual or estado_revision_actual or fecha_desde_actual or fecha_hasta_actual or ajuste_pacs_actual %}
+            <div class="flex flex-col gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-900 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="font-semibold uppercase tracking-wider">Filtros activos</span>
                     {% if medico_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Profesional</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Profesional</span>
                     {% endif %}
                     {% if motivo_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Motivo: {{ motivo_actual }}</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Motivo: {{ motivo_actual }}</span>
                     {% endif %}
                     {% if estado_revision_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Revision: {{ estado_revision_actual }}</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Revision: {{ estado_revision_actual }}</span>
                     {% endif %}
                     {% if fecha_desde_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Desde: {{ fecha_desde_actual }}</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Desde: {{ fecha_desde_actual }}</span>
                     {% endif %}
                     {% if fecha_hasta_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Hasta: {{ fecha_hasta_actual }}</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Hasta: {{ fecha_hasta_actual }}</span>
                     {% endif %}
                     {% if ajuste_pacs_actual %}
-                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Ajuste PACS: {{ ajuste_pacs_actual }}</span>
+                    <span class="rounded-full bg-white px-2 py-0.5 font-semibold ring-1 ring-amber-200">Ajuste PACS: {{ ajuste_pacs_actual }}</span>
+                    {% endif %}
+                    {% if estado_revision_actual or ajuste_pacs_actual %}
+                    <span class="text-amber-800">Los registros resueltos pueden dejar de aparecer.</span>
                     {% endif %}
                 </div>
-                {% if estado_revision_actual or ajuste_pacs_actual %}
-                <p class="mt-2 text-amber-800">
-                    Si aplicaste una revision o correccion, el registro puede cambiar de estado y dejar de aparecer con estos filtros.
-                </p>
-                {% endif %}
+                <a href="{% url 'liquidacion:auditoria_eco_sesion' sesion.pk %}"
+                   class="inline-flex h-7 items-center justify-center rounded-md bg-white px-2.5 font-semibold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100">
+                    Ver todos
+                </a>
             </div>
-            <a href="{% url 'liquidacion:auditoria_eco_sesion' sesion.pk %}"
-               class="inline-flex h-9 items-center justify-center rounded-md bg-amber-100 px-3 text-xs font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200">
-                Ver todos
-            </a>
-        </div>
+            {% endif %}
+        </form>
     </div>
-    {% endif %}
 
     {% if puede_revision_masiva_eco or puede_correccion_masiva_pacs %}
     <div class="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
