@@ -6,6 +6,7 @@ from django.db import models, IntegrityError, transaction
 from django.http import JsonResponse, HttpResponse
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.paginator import Paginator
 from django.core.files.uploadedfile import UploadedFile
 from django.core.cache import cache
@@ -476,10 +477,13 @@ def editar_preinforme(request, pk):
 def eliminar_preinforme(request, pk):
     """Permite al preinformante eliminar sus preinformes no tomados por staff."""
     preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
+    next_url = request.POST.get('next') or reverse('preinformes:mis_preinformes')
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = reverse('preinformes:mis_preinformes')
 
     if preinforme.estado not in ['borrador', 'pendiente_revision']:
         messages.error(request, 'Solo podés eliminar preinformes en borrador o pendientes de revisión.')
-        return redirect('preinformes:mis_preinformes')
+        return redirect(next_url)
 
     numero_estudio = preinforme.numero_estudio
     for adjunto in preinforme.adjuntos.all():
@@ -492,7 +496,7 @@ def eliminar_preinforme(request, pk):
     historial.actualizar_estadisticas()
 
     messages.success(request, f'Preinforme #{numero_estudio} eliminado.')
-    return redirect('preinformes:mis_preinformes')
+    return redirect(next_url)
 
 
 @login_required

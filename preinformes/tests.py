@@ -812,6 +812,29 @@ class AdjuntoPreinformeTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Preinforme.objects.filter(pk=preinforme.pk).exists())
 
+    def test_eliminar_preinforme_preserva_filtros_de_retorno(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-9006',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Paciente',
+            nombre_paciente='Seis',
+            informe_html='<p>Texto inicial</p>',
+        )
+        preinforme.enviar_a_revision()
+        next_url = f"{reverse('preinformes:mis_preinformes')}?estado=pendiente_revision&page=2"
+
+        self.client.login(username='residente_adjuntos', password='testpass123')
+        response = self.client.post(
+            reverse('preinformes:eliminar_preinforme', kwargs={'pk': preinforme.pk}),
+            {'next': next_url},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], next_url)
+        self.assertFalse(Preinforme.objects.filter(pk=preinforme.pk).exists())
+
 
 # ---------------------------------------------------------------------------
 # Smoke tests: autosave residente + revisor, copiar_informe_final, cargar_plantillas
