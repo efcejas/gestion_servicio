@@ -111,6 +111,45 @@
         </form>
     </div>
 
+    {% if medico_actual or motivo_actual or estado_revision_actual or fecha_desde_actual or fecha_hasta_actual or ajuste_pacs_actual %}
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <p class="font-semibold uppercase tracking-wider">Filtros activos</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    {% if medico_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Profesional</span>
+                    {% endif %}
+                    {% if motivo_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Motivo: {{ motivo_actual }}</span>
+                    {% endif %}
+                    {% if estado_revision_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Revision: {{ estado_revision_actual }}</span>
+                    {% endif %}
+                    {% if fecha_desde_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Desde: {{ fecha_desde_actual }}</span>
+                    {% endif %}
+                    {% if fecha_hasta_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Hasta: {{ fecha_hasta_actual }}</span>
+                    {% endif %}
+                    {% if ajuste_pacs_actual %}
+                    <span class="rounded-full bg-white px-2.5 py-1 font-semibold text-amber-900 ring-1 ring-amber-200">Ajuste PACS: {{ ajuste_pacs_actual }}</span>
+                    {% endif %}
+                </div>
+                {% if estado_revision_actual or ajuste_pacs_actual %}
+                <p class="mt-2 text-amber-800">
+                    Si aplicaste una revision o correccion, el registro puede cambiar de estado y dejar de aparecer con estos filtros.
+                </p>
+                {% endif %}
+            </div>
+            <a href="{% url 'liquidacion:auditoria_eco_sesion' sesion.pk %}"
+               class="inline-flex h-9 items-center justify-center rounded-md bg-amber-100 px-3 text-xs font-semibold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-200">
+                Ver todos
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
     {% if puede_revision_masiva_eco or puede_correccion_masiva_pacs %}
     <div class="mb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
     {% endif %}
@@ -356,7 +395,18 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if puede_correccion_masiva_pacs %}9{% else %}8{% endif %}" class="px-4 py-8 text-center text-sm text-gray-500">No hay registros sospechosos para los filtros seleccionados.</td>
+                        <td colspan="{% if puede_correccion_masiva_pacs %}9{% else %}8{% endif %}" class="px-4 py-8 text-center text-sm text-gray-500">
+                            <p>No hay registros sospechosos para los filtros seleccionados.</p>
+                            {% if medico_actual or motivo_actual or estado_revision_actual or fecha_desde_actual or fecha_hasta_actual or ajuste_pacs_actual %}
+                            <p class="mt-1 text-xs text-gray-400">
+                                Si acabas de validar, descartar o corregir registros, es posible que ya no coincidan con el filtro actual.
+                            </p>
+                            <a href="{% url 'liquidacion:auditoria_eco_sesion' sesion.pk %}"
+                               class="mt-3 inline-flex h-8 items-center justify-center rounded-md bg-gray-100 px-3 text-xs font-semibold text-gray-700 hover:bg-gray-200">
+                                Limpiar filtros
+                            </a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
