@@ -4,6 +4,8 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from control_guardias.models import Feriado
+
 from .models import (
     Estudios,
     GrupoTarifario,
@@ -104,6 +106,13 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
 
         self.assertEqual(registro.calcular_monto(), Decimal('50.000'))
 
+    def test_eco_general_real_residente_intra_en_feriado_no_descuenta(self):
+        Feriado.objects.create(fecha=self.fecha_informe, descripcion='Feriado test')
+        registro = self._registro()
+        self._agregar_estudio(registro, self.estudio_eco)
+
+        self.assertEqual(registro.calcular_monto(), Decimal('100.00'))
+
     def test_dop_residente_intra_sin_regla_no_descuenta(self):
         registro = self._registro()
         self._agregar_estudio(registro, self.estudio_dop)
@@ -120,6 +129,18 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
         self._agregar_estudio(registro, self.estudio_dop)
 
         self.assertEqual(registro.calcular_monto(), Decimal('100.000'))
+
+    def test_dop_residente_intra_con_regla_activa_en_feriado_no_descuenta(self):
+        Feriado.objects.create(fecha=self.fecha_informe, descripcion='Feriado test')
+        ReglaDescuentoResidencia.objects.create(
+            estudio=self.estudio_dop,
+            aplica_medico_residente=True,
+            vigencia_desde=date(2026, 1, 1),
+        )
+        registro = self._registro()
+        self._agregar_estudio(registro, self.estudio_dop)
+
+        self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
 
     def test_dop_residente_extra_con_regla_activa_no_descuenta(self):
         ReglaDescuentoResidencia.objects.create(

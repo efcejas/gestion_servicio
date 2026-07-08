@@ -970,7 +970,11 @@ class RegistroEstudiosPorMedico(models.Model):
             Doppler (DOP), ECOCAR y otros no.
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
-        from .services import ROLES_RESIDENCIA, estudio_aplica_descuento_residencia
+        from .services import (
+            ROLES_RESIDENCIA,
+            es_fecha_feriado_liquidacion,
+            estudio_aplica_descuento_residencia,
+        )
 
         # Si no hay estudios asignados, retornar 0
         relaciones = self.registroestudio_set.select_related('estudio__grupo_tarifario').all()
@@ -978,7 +982,12 @@ class RegistroEstudiosPorMedico(models.Model):
             return Decimal('0.00')
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
-        rol_residencia_intra = self.horario == 'INTRA' and self.medico.rol in ROLES_RESIDENCIA
+        es_feriado = es_fecha_feriado_liquidacion(fecha_referencia)
+        rol_residencia_intra = (
+            self.horario == 'INTRA'
+            and self.medico.rol in ROLES_RESIDENCIA
+            and not es_feriado
+        )
         
         # 1. Sumar (precio × cantidad) separando elegibles para descuento residencia.
         precio_total = Decimal('0.00')
@@ -1089,7 +1098,15 @@ class RegistroEstudiosPorMedico(models.Model):
             estudios_nombres.append(label)
         
         # Porcentaje según horario
-        porcentaje = 0.5 if self.horario == 'INTRA' else 1.0
+        from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
+
+        fecha_referencia = self.fecha_del_informe or timezone.now().date()
+        es_feriado = es_fecha_feriado_liquidacion(fecha_referencia)
+        porcentaje = (
+            Decimal('0.5')
+            if self.horario == 'INTRA' and self.medico.rol in ROLES_RESIDENCIA and not es_feriado
+            else Decimal('1.0')
+        )
         subtotal = precio_total * Decimal(str(porcentaje))
         bonus_urgencia = self.calcular_bonus_urgencia()
         
@@ -1103,6 +1120,8 @@ class RegistroEstudiosPorMedico(models.Model):
             'porcentaje': f"{int(porcentaje * 100)}%",
             'monto_final': self.monto_calculado,
         }
+        if es_feriado:
+            desglose['feriado'] = True
 
         # Exponer ecuacion base desde backend para UI (ej: 6500 x 2 = 13000)
         regiones = self.cantidad_regiones or 0
@@ -1253,12 +1272,15 @@ class RegistroEstudiosPorMedico(models.Model):
                 self.horario = 'NA'
             else:
                 # Sin M2M aún no inferimos ECO/no ECO; usamos proxy por fecha_registro.
+                from .services import es_fecha_feriado_liquidacion
                 from django.utils import timezone
                 referencia = self.fecha_registro or timezone.now()
                 hora_actual = timezone.localtime(referencia).hour
                 
                 # 8:00 a 16:59 → INTRA (17:00 ya es EXTRA)
-                if 8 <= hora_actual < 17:
+                if es_fecha_feriado_liquidacion(self.fecha_del_informe):
+                    self.horario = 'EXTRA'
+                elif 8 <= hora_actual < 17:
                     self.horario = 'INTRA'
                 else:
                     self.horario = 'EXTRA'

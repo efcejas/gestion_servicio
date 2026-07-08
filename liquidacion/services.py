@@ -143,7 +143,24 @@ def estudio_aplica_descuento_residencia(estudio, rol, fecha=None):
     )
 
 
-def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco_general):
+def es_fecha_feriado_liquidacion(fecha):
+    """Retorna True si la fecha esta configurada como feriado institucional."""
+    if not fecha:
+        return False
+    if hasattr(fecha, 'date'):
+        fecha = timezone.localtime(fecha).date() if timezone.is_aware(fecha) else fecha.date()
+
+    from control_guardias.models import Feriado
+
+    return Feriado.objects.filter(fecha=fecha).exists()
+
+
+def clasificar_horario_residencia_por_proxy(
+    rol,
+    fecha_registro,
+    tiene_eco_general,
+    fecha_practica=None,
+):
     """
     Clasifica horario INTRA/EXTRA para residencia usando fecha_registro como proxy.
 
@@ -158,13 +175,14 @@ def clasificar_horario_residencia_por_proxy(rol, fecha_registro, tiene_eco_gener
         return None
 
     fecha_local = timezone.localtime(fecha_registro)
+    fecha_calendario = fecha_practica or fecha_local.date()
+    if hasattr(fecha_calendario, 'date'):
+        fecha_calendario = fecha_calendario.date()
 
     # Feriados institucionales centralizados en control_guardias.
-    from control_guardias.models import Feriado
-
-    if fecha_local.weekday() >= 5:
+    if fecha_calendario.weekday() >= 5:
         return 'EXTRA'
-    if Feriado.objects.filter(fecha=fecha_local.date()).exists():
+    if es_fecha_feriado_liquidacion(fecha_calendario):
         return 'EXTRA'
 
     return 'INTRA' if 8 <= fecha_local.hour < 17 else 'EXTRA'

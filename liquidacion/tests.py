@@ -1322,6 +1322,19 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         )
         self.assertEqual(resultado, 'EXTRA')
 
+    def test_feriado_por_fecha_practica_extra_aunque_carga_sea_habil(self):
+        fecha_carga = self._aware(2026, 5, 27, 10, 0)
+        fecha_practica = date(2026, 5, 29)
+        Feriado.objects.create(fecha=fecha_practica, descripcion='Feriado test')
+
+        resultado = clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=fecha_carga,
+            tiene_eco_general=True,
+            fecha_practica=fecha_practica,
+        )
+        self.assertEqual(resultado, 'EXTRA')
+
     def test_no_aplica_si_no_hay_eco(self):
         resultado = clasificar_horario_residencia_por_proxy(
             rol='medico_residente',

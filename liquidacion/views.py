@@ -2001,6 +2001,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                     rol=user.rol,
                     fecha_registro=self.object.fecha_registro,
                     tiene_eco_general=True,
+                    fecha_practica=self.object.fecha_del_informe,
                 )
                 self.object.horario = nuevo_horario or 'NA'
             else:
@@ -3068,6 +3069,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
                     rol=user.rol,
                     fecha_registro=self.object.fecha_registro,
                     tiene_eco_general=True,
+                    fecha_practica=self.object.fecha_del_informe,
                 )
                 self.object.horario = nuevo_horario or 'NA'
             else:
@@ -3626,6 +3628,7 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                                     rol=medico.rol,
                                     fecha_registro=registro.fecha_registro,
                                     tiene_eco_general=True,
+                                    fecha_practica=registro.fecha_del_informe,
                                 )
                                 registro.horario = nuevo_horario or 'NA'
                             else:

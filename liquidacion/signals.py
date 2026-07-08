@@ -82,6 +82,7 @@ def recalcular_cantidad_regiones_cuando_estudio_cambia(sender, instance, created
                     rol=registro.medico.rol,
                     fecha_registro=registro.fecha_registro,
                     tiene_eco_general=True,
+                    fecha_practica=registro.fecha_del_informe,
                 )
                 horario_objetivo = nuevo_horario or 'NA'
             else:
