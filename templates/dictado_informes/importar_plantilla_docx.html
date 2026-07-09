@@ -1,0 +1,327 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+
+{% block title %}Importar Plantilla - Dictado{% endblock %}
+
+{% block content %}
+<div class="min-h-screen">
+    <div class="flex items-center justify-between mb-6">
+        <div class="flex items-center space-x-3">
+            <div class="p-2 bg-green-900/50 rounded-lg">
+                <i class="fas fa-file-word text-xl text-green-400"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-white">Importar Plantilla</h1>
+                <p class="text-sm text-gray-400">Sube un archivo .docx, .doc, .txt, .md, .rtf o .html, revisa la estructura detectada y guarda cuando encaje.</p>
+            </div>
+        </div>
+        <a href="{% url 'dictado_informes:plantilla_estructurada_list' %}"
+           class="inline-flex items-center px-4 py-2 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-600 transition-colors">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Volver
+        </a>
+    </div>
+
+    <div class="bg-gray-800 border border-gray-700 rounded-lg p-6 mb-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="preview">
+            <div>
+                <label for="{{ upload_form.archivo_docx.id_for_label }}" class="block text-sm font-bold text-white mb-2">
+                    {{ upload_form.archivo_docx.label }}
+                </label>
+                <div id="template-dropzone"
+                     class="group relative overflow-hidden rounded-2xl border-2 border-dashed border-green-500/40 bg-gray-900/60 p-6 transition-all duration-200 hover:border-green-400 hover:bg-gray-900">
+                    <div class="pointer-events-none flex flex-col items-center justify-center text-center">
+                        <div class="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-green-500/10 text-green-400">
+                            <i class="fas fa-file-upload text-xl"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-white">
+                            Arrastra y suelta tu archivo de plantilla aqui
+                        </p>
+                        <p class="mt-1 text-xs text-gray-400">
+                            o haz click para seleccionarlo desde tu equipo
+                        </p>
+                        <p id="template-selected-name" aria-live="polite" class="mt-3 text-xs font-medium text-gray-400">
+                            Ningun archivo seleccionado
+                        </p>
+                    </div>
+                    <div class="absolute inset-0 cursor-pointer">
+                        {{ upload_form.archivo_docx }}
+                    </div>
+                </div>
+                {% if upload_form.archivo_docx.help_text %}
+                <p class="text-xs text-gray-400 mt-2">{{ upload_form.archivo_docx.help_text }}</p>
+                {% endif %}
+                {% if upload_form.archivo_docx.errors %}
+                <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                    {{ upload_form.archivo_docx.errors }}
+                </div>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="h-px flex-1 bg-gray-700"></div>
+                <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">o</span>
+                <div class="h-px flex-1 bg-gray-700"></div>
+            </div>
+            <div>
+                <div class="mb-2 flex items-center justify-between gap-3">
+                    <label for="{{ upload_form.texto_plantilla.id_for_label }}" class="block text-sm font-bold text-white">
+                        {{ upload_form.texto_plantilla.label }}
+                    </label>
+                    <button type="button"
+                            id="btn-paste-template"
+                            class="inline-flex items-center px-3 py-1.5 bg-gray-700 text-xs font-semibold text-white rounded-lg hover:bg-gray-600 transition-colors">
+                        <i class="fas fa-clipboard mr-2"></i>
+                        Pegar desde portapapeles
+                    </button>
+                </div>
+                {{ upload_form.texto_plantilla }}
+                {% if upload_form.texto_plantilla.help_text %}
+                <p class="text-xs text-gray-400 mt-2">{{ upload_form.texto_plantilla.help_text }}</p>
+                {% endif %}
+                <p id="paste-template-status" aria-live="polite" class="hidden text-xs mt-2"></p>
+                {% if upload_form.texto_plantilla.errors %}
+                <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                    {{ upload_form.texto_plantilla.errors }}
+                </div>
+                {% endif %}
+            </div>
+            {% if upload_form.non_field_errors %}
+            <div class="text-red-400 text-sm bg-red-900/30 p-3 rounded border border-red-700">
+                {{ upload_form.non_field_errors }}
+            </div>
+            {% endif %}
+            <button type="submit"
+                    class="inline-flex items-center px-5 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors">
+                <i class="fas fa-magic mr-2"></i>
+                Generar Vista Previa
+            </button>
+        </form>
+    </div>
+
+    {% if preview_generado and plantilla_form %}
+    <form method="post" class="bg-gray-800 border border-green-700 rounded-lg p-6 space-y-5">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="guardar">
+
+        <div class="border-b border-gray-700 pb-4">
+            <h2 class="text-lg font-bold text-white">Vista previa editable</h2>
+            <p class="text-sm text-gray-400 mt-1">Ajusta nombre, contenido o estructura antes de guardar. El codigo interno se genera automaticamente.</p>
+        </div>
+
+        {{ plantilla_form.codigo }}
+        {% if plantilla_form.codigo.errors %}<div class="text-red-400 text-sm mt-2">{{ plantilla_form.codigo.errors }}</div>{% endif %}
+
+        <div class="rounded-lg border border-gray-700 bg-gray-900/50 p-3 text-sm text-gray-300">
+            Codigo interno automatico: se asignara al guardar y no necesitas modificarlo.
+        </div>
+
+        <div class="grid grid-cols-1 gap-4">
+            <div>
+                <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.nombre.label }}</label>
+                {{ plantilla_form.nombre }}
+                {% if plantilla_form.nombre.errors %}<div class="text-red-400 text-sm mt-2">{{ plantilla_form.nombre.errors }}</div>{% endif %}
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.titulo.label }}</label>
+            {{ plantilla_form.titulo }}
+            {% if plantilla_form.titulo.errors %}<div class="text-red-400 text-sm mt-2">{{ plantilla_form.titulo.errors }}</div>{% endif %}
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.seccion_tecnica.label }}</label>
+            {{ plantilla_form.seccion_tecnica }}
+            {% if plantilla_form.seccion_tecnica.errors %}<div class="text-red-400 text-sm mt-2">{{ plantilla_form.seccion_tecnica.errors }}</div>{% endif %}
+        </div>
+
+        <div>
+            <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.comentarios_base_texto.label }}</label>
+            {{ plantilla_form.comentarios_base_texto }}
+            {% if plantilla_form.comentarios_base_texto.errors %}<div class="text-red-400 text-sm mt-2">{{ plantilla_form.comentarios_base_texto.errors }}</div>{% endif %}
+        </div>
+
+        <details open class="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
+            <summary class="cursor-pointer text-sm font-bold text-white">
+                Estructura detectada
+            </summary>
+            <div class="mt-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.modo_estructura.label }}</label>
+                        {{ plantilla_form.modo_estructura }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.permitir_secciones_nuevas.label }}</label>
+                        <div class="flex items-center gap-3 text-gray-300">
+                            {{ plantilla_form.permitir_secciones_nuevas }}
+                            <span class="text-sm">Permitir que la IA agregue secciones no presentes</span>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-white mb-2">{{ plantilla_form.estructura_documento_texto.label }}</label>
+                    {{ plantilla_form.estructura_documento_texto }}
+                    {% if plantilla_form.estructura_documento_texto.errors %}
+                    <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                        {{ plantilla_form.estructura_documento_texto.errors }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </details>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label class="flex items-center gap-3 text-sm text-gray-300">
+                {{ plantilla_form.activa }}
+                Activa
+            </label>
+            <label class="flex items-center gap-3 text-sm text-gray-300">
+                {{ plantilla_form.compartida }}
+                Compartida con otros usuarios de Dictado IA
+            </label>
+        </div>
+
+        {{ plantilla_form.guia_estilo.as_hidden }}
+
+        {% if plantilla_form.non_field_errors %}
+        <div class="text-red-400 text-sm bg-red-900/30 p-3 rounded border border-red-700">
+            {{ plantilla_form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <div class="flex items-center gap-3 pt-4 border-t border-gray-700">
+            <button type="submit"
+                    class="inline-flex items-center px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors">
+                <i class="fas fa-save mr-2"></i>
+                Guardar Plantilla
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('{{ upload_form.archivo_docx.id_for_label }}');
+    const dropzone = document.getElementById('template-dropzone');
+    const fileName = document.getElementById('template-selected-name');
+    const pasteButton = document.getElementById('btn-paste-template');
+    const pasteText = document.getElementById('{{ upload_form.texto_plantilla.id_for_label }}');
+    const pasteStatus = document.getElementById('paste-template-status');
+
+    if (!input || !dropzone || !fileName) {
+        return;
+    }
+
+    function setIdleState() {
+        fileName.textContent = 'Ningun archivo seleccionado';
+        fileName.classList.remove('text-green-300', 'text-red-400');
+        fileName.classList.add('text-gray-400');
+    }
+
+    function setFileState(name) {
+        fileName.textContent = name;
+        fileName.classList.remove('text-gray-400', 'text-red-400');
+        fileName.classList.add('text-green-300');
+    }
+
+    function setErrorState(message) {
+        fileName.textContent = message;
+        fileName.classList.remove('text-gray-400', 'text-green-300');
+        fileName.classList.add('text-red-400');
+    }
+
+    function clearDragState() {
+        dropzone.classList.remove('border-green-400', 'bg-green-500/5', 'ring-2', 'ring-green-500/30');
+    }
+
+    function updateFileName(files) {
+        if (files && files.length > 0) {
+            setFileState(files[0].name);
+        } else {
+            setIdleState();
+        }
+    }
+
+    input.addEventListener('change', function () {
+        updateFileName(input.files);
+    });
+
+    ['dragenter', 'dragover'].forEach(function (eventName) {
+        dropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            dropzone.classList.add('border-green-400', 'bg-green-500/5', 'ring-2', 'ring-green-500/30');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(function (eventName) {
+        dropzone.addEventListener(eventName, function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            clearDragState();
+        });
+    });
+
+    dropzone.addEventListener('drop', function (event) {
+        const files = event.dataTransfer.files;
+        if (!files || files.length === 0) {
+            return;
+        }
+
+        const droppedFile = files[0];
+        const formatosPermitidos = ['.doc', '.docx', '.txt', '.md', '.markdown', '.rtf', '.html', '.htm'];
+        const nombre = droppedFile.name.toLowerCase();
+        if (!formatosPermitidos.some(ext => nombre.endsWith(ext))) {
+            input.value = '';
+            setErrorState('Archivo invalido. Usa .docx, .doc, .txt, .md, .rtf o .html');
+            return;
+        }
+
+        input.files = files;
+        updateFileName(files);
+    });
+
+    if (input.files && input.files.length > 0) {
+        updateFileName(input.files);
+    } else {
+        setIdleState();
+    }
+
+    function setPasteStatus(message, isError) {
+        if (!pasteStatus) {
+            return;
+        }
+        pasteStatus.textContent = message;
+        pasteStatus.classList.remove('hidden', 'text-green-300', 'text-red-400', 'text-gray-400');
+        pasteStatus.classList.add(isError ? 'text-red-400' : 'text-green-300');
+    }
+
+    pasteButton?.addEventListener('click', async function () {
+        if (!pasteText) {
+            return;
+        }
+        if (!navigator.clipboard || !navigator.clipboard.readText) {
+            pasteText.focus();
+            setPasteStatus('Tu navegador no permite leer el portapapeles. Pega manualmente con Ctrl+V.', true);
+            return;
+        }
+        try {
+            const texto = await navigator.clipboard.readText();
+            if (!texto || !texto.trim()) {
+                setPasteStatus('El portapapeles no contiene texto para importar.', true);
+                return;
+            }
+            pasteText.value = texto;
+            pasteText.focus();
+            setPasteStatus('Texto pegado desde el portapapeles. Ya puedes generar la vista previa.', false);
+        } catch (error) {
+            pasteText.focus();
+            setPasteStatus('No se pudo acceder al portapapeles. Pega manualmente con Ctrl+V.', true);
+        }
+    });
+});
+</script>
+{% endblock %}

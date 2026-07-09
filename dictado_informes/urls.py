@@ -31,6 +31,7 @@ urlpatterns = [
     # Plantillas Estructuradas (Guardrails de IA)
     path('plantillas-estructuradas/', views.PlantillaEstructuradaListView.as_view(), name='plantilla_estructurada_list'),
     path('plantillas-estructuradas/nueva/', views.PlantillaEstructuradaCreateView.as_view(), name='plantilla_estructurada_create'),
+    path('plantillas-estructuradas/importar-docx/', views.importar_plantilla_docx_view, name='plantilla_estructurada_import_docx'),
     path('plantillas-estructuradas/<int:pk>/editar/', views.PlantillaEstructuradaUpdateView.as_view(), name='plantilla_estructurada_update'),
     path('plantillas-estructuradas/<int:pk>/eliminar/', views.PlantillaEstructuradaDeleteView.as_view(), name='plantilla_estructurada_delete'),
     

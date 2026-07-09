@@ -92,6 +92,16 @@
                             <p class="text-xs text-gray-400">Solo corrige ortografía y términos médicos</p>
                         </div>
                     </label>
+                    {% if dictado_agente_habilitado %}
+                    <label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
+                        <input type="radio" name="modoIA" value="AGENTE"
+                               class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
+                        <div class="ml-3">
+                            <p class="text-sm font-bold text-white"><i class="fas fa-wand-magic-sparkles text-purple-400 mr-2"></i>Agente de informe</p>
+                            <p class="text-xs text-gray-400">Elige la plantilla mas probable y ordena el dictado</p>
+                        </div>
+                    </label>
+                    {% endif %}
                     <label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
                         <input type="radio" name="modoIA" value="ESTRUCTURADO" 
                                class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
@@ -1063,7 +1073,10 @@ async function procesarAudio() {
                 throw new Error(dataTranscripcion.error || 'Error en transcripción');
             }
             
-            const textoTranscrito = dataTranscripcion.texto_transcrito;
+            const textoTranscrito = (dataTranscripcion.texto_transcrito || dataTranscripcion.texto_original || '').trim();
+            if (!textoTranscrito) {
+                throw new Error('No se detectó texto útil en el audio. Intenta grabar nuevamente hablando más cerca del micrófono.');
+            }
             const fromCache = dataTranscripcion.from_cache;
             
             // 🔍 LOGGING DETALLADO: Mostrar texto procesado y correcciones
@@ -1138,18 +1151,25 @@ async function procesarAudio() {
             motivoConfirmacionIA = dataMejora.motivo_confianza || '';
             terminosSospechososIA = dataMejora.terminos_sospechosos || [];
 
-            // Mostrar resumen de guardrails si aplica
+            // Mostrar resumen de guardrails / agente si aplica
             const guardrails = dataMejora.guardrails_aplicados || [];
             const guardrailsResumen = document.getElementById('guardrailsResumen');
             const guardrailsTexto = document.getElementById('guardrailsTexto');
-            if (guardrails.length > 0 && guardrailsResumen && guardrailsTexto) {
-                guardrailsTexto.textContent = `Guardrails: se restauraron ${guardrails.length} líneas de plantilla no mencionadas.`;
+            const plantillaSugerida = dataMejora.plantilla_sugerida;
+            if ((guardrails.length > 0 || plantillaSugerida) && guardrailsResumen && guardrailsTexto) {
+                const partesResumen = [];
+                if (plantillaSugerida) {
+                    partesResumen.push(`Agente: plantilla seleccionada "${plantillaSugerida.nombre}".`);
+                }
+                if (guardrails.length > 0) {
+                    partesResumen.push(`Guardrails: se restauraron ${guardrails.length} lineas de plantilla no mencionadas.`);
+                }
+                guardrailsTexto.textContent = partesResumen.join(' ');
                 guardrailsResumen.classList.remove('hidden');
             } else if (guardrailsResumen) {
                 guardrailsResumen.classList.add('hidden');
             }
-            
-            setTextoMejoradoContenido(dataMejora.texto_mejorado);
+                        setTextoMejoradoContenido(dataMejora.texto_mejorado);
             
             // Guardar texto IA para aprendizaje
             textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(dataMejora.texto_mejorado));

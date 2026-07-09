@@ -39,6 +39,17 @@ class PlantillaEstructurada(models.Model):
     
     Campo 'codigo' vinculado a tipo de estudio (ej. RODILLA, CADERA, ABDOMEN C/G).
     """
+    MODO_ESTRUCTURA_LEGACY = 'legacy'
+    MODO_ESTRUCTURA_ESTRICTA = 'estricta'
+    MODO_ESTRUCTURA_FLEXIBLE = 'flexible'
+    MODO_ESTRUCTURA_AGENTE = 'agente'
+    MODO_ESTRUCTURA_CHOICES = [
+        (MODO_ESTRUCTURA_LEGACY, 'Legacy compatible'),
+        (MODO_ESTRUCTURA_ESTRICTA, 'Estructura estricta'),
+        (MODO_ESTRUCTURA_FLEXIBLE, 'Estructura flexible'),
+        (MODO_ESTRUCTURA_AGENTE, 'Agente con confirmacion'),
+    ]
+
     # Código único identificador (ej. RODILLA, CADERA, TORAX S/G, etc.)
     codigo = models.CharField(
         max_length=50,
@@ -87,6 +98,36 @@ class PlantillaEstructurada(models.Model):
             "Instrucciones en lenguaje natural que la IA recibe para esta plantilla. "
             "Ejemplo: 'Para meniscos usar \"de configuración habitual\" (no \"normales\"). "
             "En desgarros indicar siempre grado Stoller y cuerno afectado.'"
+        )
+    )
+
+    modo_estructura = models.CharField(
+        max_length=20,
+        choices=MODO_ESTRUCTURA_CHOICES,
+        default=MODO_ESTRUCTURA_LEGACY,
+        verbose_name="Modo de Estructura",
+        help_text=(
+            "Define cuanto debe respetarse la estructura original. "
+            "Legacy mantiene el comportamiento actual."
+        )
+    )
+
+    estructura_documento = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Estructura del Documento",
+        help_text=(
+            "Representacion flexible de secciones importadas desde documentos. "
+            "Si queda vacia, se deriva desde titulo, tecnica y comentarios base."
+        )
+    )
+
+    permitir_secciones_nuevas = models.BooleanField(
+        default=False,
+        verbose_name="Permitir Secciones Nuevas",
+        help_text=(
+            "Si esta desactivado, la IA no debe agregar secciones que no existan "
+            "en la plantilla original."
         )
     )
 
@@ -169,6 +210,110 @@ class PlantillaEstructurada(models.Model):
         if not usuario or not getattr(usuario, 'is_authenticated', False):
             return False
         return usuario.is_superuser or self.creada_por_id == usuario.id
+
+    def obtener_estructura_documento(self):
+        """
+        Devuelve una estructura normalizada de secciones sin cambiar el modelo legacy.
+
+        Las plantillas actuales no tienen estructura_documento cargada; para ellas
+        se deriva un contrato equivalente al comportamiento historico, incluyendo
+        CONCLUSION. Las plantillas importadas pueden omitir secciones y el agente
+        debe respetar esa omision salvo instruccion explicita.
+        """
+        estructura = self.estructura_documento or {}
+        secciones = estructura.get('secciones') if isinstance(estructura, dict) else None
+
+        if isinstance(secciones, list) and secciones:
+            return {
+                'modo': estructura.get('modo') or self.modo_estructura,
+                'permitir_secciones_nuevas': bool(
+                    estructura.get('permitir_secciones_nuevas', self.permitir_secciones_nuevas)
+                ),
+                'secciones': [self._normalizar_seccion_estructura(s) for s in secciones],
+            }
+
+        secciones_legacy = []
+        if self.titulo:
+            secciones_legacy.append({
+                'nombre': 'TITULO',
+                'tipo': 'titulo',
+                'contenido': self.titulo,
+                'editable_por_ia': True,
+            })
+        if self.seccion_tecnica:
+            secciones_legacy.append({
+                'nombre': 'TECNICA',
+                'tipo': 'tecnica',
+                'contenido': self.seccion_tecnica,
+                'editable_por_ia': False,
+            })
+        if self.comentarios_base:
+            secciones_legacy.append({
+                'nombre': 'COMENTARIO',
+                'tipo': 'hallazgos',
+                'lineas_base': list(self.comentarios_base or []),
+                'editable_por_ia': True,
+            })
+
+        # Compatibilidad: el modo estructurado actual siempre genera conclusion.
+        secciones_legacy.append({
+            'nombre': 'CONCLUSION',
+            'tipo': 'conclusion',
+            'contenido': '',
+            'editable_por_ia': True,
+        })
+
+        return {
+            'modo': self.modo_estructura,
+            'permitir_secciones_nuevas': self.permitir_secciones_nuevas,
+            'secciones': secciones_legacy,
+        }
+
+    def tiene_seccion(self, nombre):
+        nombre_normalizado = self._normalizar_nombre_seccion(nombre)
+        estructura = self.obtener_estructura_documento()
+        return any(
+            self._normalizar_nombre_seccion(s.get('nombre')) == nombre_normalizado
+            for s in estructura.get('secciones', [])
+        )
+
+    def puede_agregar_seccion(self, nombre):
+        if self.tiene_seccion(nombre):
+            return True
+
+        estructura = self.obtener_estructura_documento()
+        return bool(estructura.get('permitir_secciones_nuevas'))
+
+    @staticmethod
+    def _normalizar_seccion_estructura(seccion):
+        if not isinstance(seccion, dict):
+            return {
+                'nombre': 'SECCION',
+                'tipo': 'texto',
+                'contenido': str(seccion),
+                'editable_por_ia': True,
+            }
+
+        nombre = (seccion.get('nombre') or seccion.get('titulo') or 'SECCION').strip()
+        tipo = (seccion.get('tipo') or 'texto').strip().lower()
+        normalizada = {
+            'nombre': nombre,
+            'tipo': tipo,
+            'contenido': seccion.get('contenido') or '',
+            'editable_por_ia': bool(seccion.get('editable_por_ia', True)),
+        }
+
+        lineas_base = seccion.get('lineas_base')
+        if isinstance(lineas_base, list):
+            normalizada['lineas_base'] = [str(linea).strip() for linea in lineas_base if str(linea).strip()]
+
+        return normalizada
+
+    @staticmethod
+    def _normalizar_nombre_seccion(nombre):
+        texto = (nombre or '').strip().upper()
+        reemplazos = str.maketrans('ÁÉÍÓÚÜÑ', 'AEIOUUN')
+        return texto.translate(reemplazos).rstrip(':')
 
 
 class PlantillaInforme(models.Model):

@@ -57,6 +57,8 @@
                         </div>
                         {% endif %}
                     </div>
+                {% elif field.name == 'modo_estructura' or field.name == 'permitir_secciones_nuevas' or field.name == 'estructura_documento_texto' %}
+                    {# Se renderizan juntos en Opciones Avanzadas #}
                 {% elif field.type == 'HiddenInput' %}
                     {# Saltar campos hidden #}
                     {{ field }}
@@ -117,6 +119,64 @@
                     </div>
                 {% endif %}
             {% endfor %}
+
+            <!-- Opciones avanzadas de estructura flexible -->
+            <details class="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
+                <summary class="cursor-pointer text-sm font-bold text-white">
+                    <i class="fas fa-sliders-h text-cyan-400 mr-1"></i>
+                    Opciones avanzadas de estructura
+                </summary>
+                <div class="mt-4 space-y-5">
+                    <div>
+                        <label for="{{ form.modo_estructura.id_for_label }}" class="block text-sm font-bold text-white mb-2">
+                            {{ form.modo_estructura.label }}
+                        </label>
+                        {{ form.modo_estructura }}
+                        <p class="text-xs text-gray-400 mt-2">
+                            Legacy mantiene el comportamiento actual. Estricta/flexible/agente usan la estructura JSON como contrato.
+                        </p>
+                        {% if form.modo_estructura.errors %}
+                        <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                            {{ form.modo_estructura.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.permitir_secciones_nuevas.id_for_label }}" class="block text-sm font-bold text-white mb-2">
+                            {{ form.permitir_secciones_nuevas.label }}
+                        </label>
+                        <div class="flex items-center">
+                            {{ form.permitir_secciones_nuevas }}
+                            <span class="ml-3 text-sm text-gray-400">
+                                Si queda desactivado, la IA no debe agregar secciones que no existan en la plantilla.
+                            </span>
+                        </div>
+                        {% if form.permitir_secciones_nuevas.errors %}
+                        <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                            {{ form.permitir_secciones_nuevas.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.estructura_documento_texto.id_for_label }}" class="block text-sm font-bold text-white mb-2">
+                            {{ form.estructura_documento_texto.label }}
+                        </label>
+                        {{ form.estructura_documento_texto }}
+                        {% if form.estructura_documento_texto.help_text %}
+                        <p class="text-xs text-gray-400 mt-2 bg-gray-950/60 p-2 rounded border border-gray-700">
+                            {{ form.estructura_documento_texto.help_text }}
+                        </p>
+                        {% endif %}
+                        {% if form.estructura_documento_texto.errors %}
+                        <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                            {{ form.estructura_documento_texto.errors }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </details>
 
             <!-- Errores no-field -->
             {% if form.non_field_errors %}

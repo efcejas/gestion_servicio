@@ -14,8 +14,8 @@ from .models import (
 
 @admin.register(PlantillaEstructurada)
 class PlantillaEstructuradaAdmin(admin.ModelAdmin):
-    list_display = ['__str__', 'codigo', 'origen', 'activa', 'fecha_creacion']
-    list_filter = ['origen', 'activa', 'fecha_creacion']
+    list_display = ['__str__', 'codigo', 'origen', 'modo_estructura', 'activa', 'fecha_creacion']
+    list_filter = ['origen', 'modo_estructura', 'activa', 'fecha_creacion']
     search_fields = ['codigo', 'nombre', 'titulo']
     readonly_fields = ['fecha_creacion', 'fecha_modificacion', 'origen', 'comentarios_base_preview']
     
@@ -32,6 +32,14 @@ class PlantillaEstructuradaAdmin(admin.ModelAdmin):
                 'Instrucciones en lenguaje natural que la IA recibe al generar informes con esta plantilla. '
                 'Ejemplo: "Para meniscos usar \'de configuración habitual\'. '
                 'En desgarros indicar siempre grado Stoller y cuerno afectado."'
+            ),
+        }),
+        ('Estructura flexible', {
+            'fields': ('modo_estructura', 'permitir_secciones_nuevas', 'estructura_documento'),
+            'classes': ('collapse',),
+            'description': (
+                'Contrato avanzado para plantillas importadas o personalizadas. '
+                'Si estructura_documento queda vacio, se deriva desde los campos clasicos.'
             ),
         }),
         ('Metadatos', {

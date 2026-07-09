@@ -7,15 +7,19 @@ Fecha: 2026-03-08
 Cobertura esperada: ~70% de las APIs
 """
 
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from unittest.mock import patch, MagicMock
 import json
 import base64
 
+from dictado_informes.models import PlantillaEstructurada
+from dictado_informes.views import extraer_contexto_clinico_dictado, sugerir_plantilla_para_dictado
+
 User = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
 class TestAPIsTranscripcion(TestCase):
     """Tests para API de transcripción"""
     
@@ -79,6 +83,26 @@ class TestAPIsTranscripcion(TestCase):
         # Debe tener puntos y saltos de línea procesados
         self.assertIn('.', texto)
         self.assertIn('\n', texto)
+
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcribir_whisper_rechaza_texto_vacio(self, mock_transcribe):
+        mock_transcribe.return_value = {
+            'text': '',
+            'confidence': 0.95
+        }
+
+        audio_fake = base64.b64encode(b'fake audio' * 100).decode()
+
+        response = self.client.post(
+            '/dictado_informes/api/transcribir-whisper/',
+            data=json.dumps({'audio': f'data:audio/webm;base64,{audio_fake}'}),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('No se detecto texto', data['error'])
     
     def test_transcribir_audio_muy_corto(self):
         """Prueba que rechaza audios muy cortos"""
@@ -118,10 +142,11 @@ class TestAPIsTranscripcion(TestCase):
             content_type='application/json'
         )
         
-        # Debe rechazar por falta de permisos
-        self.assertEqual(response.status_code, 403)
+        # LoginRequired redirige al login cuando no hay sesion.
+        self.assertIn(response.status_code, [302, 403])
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
 class TestAPIsMejora(TestCase):
     """Tests para API de mejora de texto"""
     
@@ -157,6 +182,43 @@ class TestAPIsMejora(TestCase):
         
         self.assertTrue(data['success'])
         self.assertEqual(data['texto_mejorado'], 'Texto mejorado por IA')
+
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_mejorar_texto_acepta_texto_transcrito(self, mock_improve):
+        mock_improve.return_value = {
+            'texto_mejorado': 'Texto mejorado por IA',
+            'confianza': 0.90,
+            'sugerencias': []
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_transcrito': 'texto desde transcripcion',
+                'modo': 'AGENTE',
+                'tipo_estudio': 'RES'
+            }),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_improve.call_args.args[0], 'texto desde transcripcion')
+
+    @override_settings(DICTADO_AGENTE_HABILITADO=False)
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_mejorar_texto_rechaza_agente_si_flag_apagado(self, mock_improve):
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'gonalgia derecha',
+                'modo': 'AGENTE',
+                'tipo_estudio': 'RES'
+            }),
+            content_type='application/json'
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(mock_improve.called)
     
     @patch('dictado_informes.models.TerminoMedico.aplicar_correcciones')
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')
@@ -175,7 +237,8 @@ class TestAPIsMejora(TestCase):
             '/dictado_informes/api/mejorar-texto/',
             data=json.dumps({
                 'texto_original': 'gonartrosis',
-                'modo': 'FIEL'
+                'modo': 'FIEL',
+                'from_manual_edit': True,
             }),
             content_type='application/json'
         )
@@ -210,7 +273,84 @@ class TestAPIsMejora(TestCase):
         
         self.assertEqual(response.status_code, 403)
 
+    def test_selector_agente_sugiere_plantilla_por_dictado(self):
+        PlantillaEstructurada.objects.create(
+            codigo='100000',
+            nombre='RM de Rodilla',
+            titulo='RESONANCIA MAGNETICA DE RODILLA',
+            seccion_tecnica='Se exploro la rodilla con secuencias habituales.',
+            comentarios_base=[
+                'Meniscos de altura y senal normales.',
+                'No se observa aumento del liquido articular.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+        PlantillaEstructurada.objects.create(
+            codigo='100001',
+            nombre='RM de Cerebro',
+            titulo='RESONANCIA MAGNETICA DE CEREBRO',
+            seccion_tecnica='Se exploro el encefalo con secuencias habituales.',
+            comentarios_base=['Sistema ventricular conservado.'],
+            creada_por=self.user,
+            origen='user',
+        )
 
+        sugerida = sugerir_plantilla_para_dictado(
+            'rodilla derecha con desgarro de menisco y derrame articular',
+            self.user,
+        )
+
+        self.assertEqual(sugerida['codigo'], '100000')
+
+    def test_extrae_contexto_clinico_gonalgia_derecha(self):
+        contexto = extraer_contexto_clinico_dictado('Paciente con gonalgia derecha.')
+
+        self.assertEqual(contexto['region'], 'RODILLA')
+        self.assertEqual(contexto['lateralidad'], 'DERECHA')
+        self.assertEqual(contexto['lado_tecnica'], 'derecha')
+        self.assertEqual(contexto['indicacion_clinica'], 'Gonalgia derecha.')
+
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_modo_agente_usa_plantilla_sugerida(self, mock_improve):
+        PlantillaEstructurada.objects.create(
+            codigo='100000',
+            nombre='RM de Rodilla',
+            titulo='RESONANCIA MAGNETICA DE RODILLA',
+            seccion_tecnica='Se exploro la rodilla con secuencias habituales.',
+            comentarios_base=['Meniscos de altura y senal normales.'],
+            creada_por=self.user,
+            origen='user',
+        )
+        mock_improve.return_value = {
+            'texto_mejorado': 'Informe estructurado',
+            'confianza': 0.9,
+            'sugerencias': [],
+            'modo': 'ESTRUCTURADO',
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'gonalgia derecha con desgarro meniscal',
+                'modo': 'AGENTE',
+                'tipo_plantilla': 'FALLBACK',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['plantilla_sugerida']['codigo'], '100000')
+        self.assertEqual(data['tipo_plantilla_usada'], '100000')
+        contexto = mock_improve.call_args.args[2]
+        self.assertEqual(contexto['modo'], 'ESTRUCTURADO')
+        self.assertEqual(contexto['tipo_plantilla'], '100000')
+        self.assertEqual(contexto['contexto_clinico']['lateralidad'], 'DERECHA')
+        self.assertEqual(contexto['contexto_clinico']['indicacion_clinica'], 'Gonalgia derecha.')
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
 class TestAPIsAprendizaje(TestCase):
     """Tests para API de aprendizaje"""
     
@@ -262,12 +402,14 @@ class TestAPIsAprendizaje(TestCase):
         from dictado_informes.models import CorreccionAprendizaje
         
         # Crear corrección
-        CorreccionAprendizaje.objects.create(
-            texto_original='a',
-            texto_ia='b',
-            texto_final='c',
+        correccion = CorreccionAprendizaje.objects.create(
+            texto_original='rodilla con lesion',
+            texto_ia='Se observa lesion meniscal.',
+            texto_final='Desgarro meniscal.',
             usuario=self.user
         )
+        correccion.cambios_detectados = correccion.calcular_diferencias()
+        correccion.save(update_fields=['cambios_detectados'])
         
         response = self.client.get('/dictado_informes/api/info-aprendizaje/')
         

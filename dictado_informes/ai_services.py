@@ -93,6 +93,7 @@ class AIService:
                 'seccion_tecnica': plantilla_obj.seccion_tecnica,
                 'comentarios': plantilla_obj.comentarios_base or [],
                 'guia_estilo': plantilla_obj.guia_estilo or '',
+                'estructura_documento': plantilla_obj.obtener_estructura_documento(),
             }
         except PlantillaEstructurada.DoesNotExist:
             logger.warning(f"⚠️ Plantilla '{tipo_plantilla}' no encontrada en BD, usando hardcode")
@@ -634,6 +635,8 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                 
                 # 🔄 LEER PLANTILLA DESDE BD (con fallback a hardcode)
                 plantilla_actual = self._get_plantilla_estructurada(tipo_plantilla, usuario=usuario)
+                contexto_clinico = contexto.get('contexto_clinico') or {}
+                contexto_clinico_bloque = self._construir_bloque_contexto_clinico(contexto_clinico)
                 guia_estilo = plantilla_actual.get('guia_estilo', '')
                 guia_estilo_bloque = f"""
 🖊️ GUÍA DE ESTILO DEL RADIÓLOGO (PRIORIDAD MÁXIMA):
@@ -647,9 +650,31 @@ Devuelve ÚNICAMENTE el texto corregido, tal como está, solo con ortografía me
                     for i, linea in enumerate(plantilla_actual['comentarios'])
                 )
 
+                contrato_estructura = self._construir_contrato_estructura_flexible(plantilla_actual)
+                if contrato_estructura:
+                    reglas_estructura = contrato_estructura['reglas']
+                    formato_salida = contrato_estructura['formato_salida']
+                    logger.info("Usando contrato de estructura flexible para plantilla")
+                else:
+                    reglas_estructura = "Genera el informe final con esta estructura exacta (titulos en MAYUSCULAS, sin asteriscos ni markdown):"
+                    formato_salida = f"""{plantilla_actual['titulo']}
+
+INFORMACION CLINICA
+[Sintomas o antecedentes del dictado]
+
+TECNICA
+{plantilla_actual['seccion_tecnica']}
+
+COMENTARIO
+[Una linea por estructura. Cada oracion termina con punto y salto de linea. NO todo en un parrafo.]
+
+CONCLUSION
+[Texto corrido narrativo, 2-4 lineas. Sin vinetas. Sin "se observa / se evidencia". Jerarquizar: hallazgo principal -> asociados -> secundarios.]"""
+
                 # 🧠 PROMPT CON RAZONAMIENTO SEMÁNTICO DE LÍNEAS
                 prompt = f"""Sos un radiólogo experto generando un informe de {tipo_nombre}.
 {guia_estilo_bloque}
+{contexto_clinico_bloque}
 ━━━ DICTADO DEL MÉDICO ━━━
 {texto_original}
 
@@ -679,6 +704,9 @@ Si el hallazgo nuevo no existe en la plantilla base, ubicarlo así:
 
 PASO 3 — REGLAS DE ORO:
   ✅ Nunca eliminar una línea sin reemplazarla o justificarlo
+  - La GUIA DE ESTILO DEL RADIOLOGO tiene prioridad sobre las lineas normales de la plantilla cuando indica como resolver una contradiccion.
+  - La numeracion [1], [2], [3] es solo para razonar internamente: NO debe aparecer en el informe final.
+  - Si una subestructura esta patologica y la plantilla tiene una linea normal del conjunto que la incluye, NO repitas ambas. Reemplaza la linea normal por una frase residual: "Resto de...", "No se visualizan otras..." o "El resto de ... sin alteraciones".
   ✅ Si una línea habla de dos estructuras (ej: "bursas y tendón") y solo una fue mencionada, reescribir la línea dejando normal la no menciona
   ✅ Si una línea de la plantilla niega varios hallazgos en conjunto (ej: "No se identifican X ni Y") y el dictado confirma UNO de ellos, reescribir la línea conservando solo la negación del hallazgo NO confirmado. Si el dictado confirma TODOS los hallazgos negados en esa línea, eliminarla por completo y reemplazarla por el hallazgo positivo. Ej: dictado dice 'imagen nodular' → plantilla dice 'No se identifican nódulos ni áreas de consolidación' → reescribir como 'No se identifican áreas de consolidación parenquimatosa.'
   ✅ Si aparece una estructura patológica nueva no contemplada en plantilla, crear su línea e insertarla cerca de su estructura relacionada
@@ -688,21 +716,9 @@ PASO 3 — REGLAS DE ORO:
   ✅ Si hay contradicción (patología + "sin alteraciones" de la misma estructura) → eliminar la parte normal
 
 ━━━ FORMATO DE SALIDA ━━━
-Generá el informe final con esta estructura exacta (títulos en MAYÚSCULAS, sin asteriscos ni markdown):
+{reglas_estructura}
 
-{plantilla_actual['titulo']}
-
-INFORMACIÓN CLÍNICA
-[Síntomas o antecedentes del dictado]
-
-TÉCNICA
-{plantilla_actual['seccion_tecnica']}
-
-COMENTARIO
-[Una línea por estructura. Cada oración termina con punto y salto de línea. NO todo en un párrafo.]
-
-CONCLUSIÓN
-[Texto corrido narrativo, 2-4 líneas. Sin viñetas. Sin "se observa / se evidencia". Jerarquizar: hallazgo principal → asociados → secundarios.]
+{formato_salida}
 
 💡 EJEMPLO COMPLETO:
 Dictado: "rodilla derecha, trauma, desgarro LCA, derrame articular"
@@ -1075,6 +1091,136 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         
         return sugerencias
 
+    def _construir_contrato_estructura_flexible(self, plantilla_actual):
+        """
+        Construye instrucciones de salida desde estructura_documento.
+
+        Retorna None para plantillas legacy, de modo que el prompt historico siga
+        intacto. Para plantillas importadas o estrictas, la salida queda limitada
+        a las secciones declaradas por el usuario.
+        """
+        estructura = (plantilla_actual or {}).get('estructura_documento') or {}
+        if not isinstance(estructura, dict):
+            return None
+
+        modo = estructura.get('modo') or 'legacy'
+        secciones = estructura.get('secciones') or []
+        if modo == 'legacy' or not secciones:
+            return None
+
+        permitir_secciones_nuevas = bool(estructura.get('permitir_secciones_nuevas', False))
+        nombres = [self._normalizar_header_salida(s.get('nombre')) for s in secciones if s.get('nombre')]
+        tiene_conclusion = 'CONCLUSION' in nombres
+        tiene_info_clinica = 'INFORMACION CLINICA' in nombres
+
+        lineas_formato = []
+        for seccion in secciones:
+            nombre = self._normalizar_header_salida(seccion.get('nombre') or 'SECCION')
+            tipo = (seccion.get('tipo') or 'texto').lower()
+            contenido = (seccion.get('contenido') or '').strip()
+            lineas_base = seccion.get('lineas_base') or []
+
+            if tipo == 'titulo':
+                lineas_formato.append(contenido or nombre)
+                continue
+
+            lineas_formato.append(nombre)
+            if tipo == 'tecnica':
+                lineas_formato.append(contenido or '[Mantener tecnica de la plantilla si existe.]')
+            elif tipo == 'hallazgos':
+                if lineas_base:
+                    lineas_formato.append('[Una linea por estructura. Conservar o reemplazar las lineas base segun el dictado. No incluir numeros, indices ni corchetes.]')
+                    lineas_formato.extend(lineas_base)
+                else:
+                    lineas_formato.append('[Completar con hallazgos dictados, una linea por estructura.]')
+            elif tipo == 'conclusion':
+                lineas_formato.append(contenido or '[Sintesis de hallazgos patologicos, solo si la plantilla incluye esta seccion.]')
+            else:
+                lineas_formato.append(contenido or '[Completar solo si el dictado aporta informacion para esta seccion.]')
+
+            lineas_formato.append('')
+
+        restricciones = [
+            "Respetar exactamente las secciones declaradas en la plantilla del usuario.",
+            "No agregar, renombrar ni eliminar secciones.",
+            "Mantener los titulos de seccion tal como aparecen en el FORMATO DE SALIDA.",
+            "Modificar solo contenido permitido por el dictado; no inventar hallazgos.",
+            "No incluir numeracion de lineas en la salida final: nada de [1], [2], 1), bullets ni vinetas.",
+            "Si una linea normal contradice un hallazgo patologico dictado, reemplazarla por una variante compatible en vez de conservar ambas.",
+            "Reemplazar placeholders de lateralidad o lado ([<DERECHA/IZQUIERDA>], [<lado>]) usando el contexto clinico detectado.",
+        ]
+        if not permitir_secciones_nuevas:
+            restricciones.append("La plantilla NO permite secciones nuevas.")
+        if not tiene_conclusion:
+            restricciones.append("La plantilla NO contiene CONCLUSION: no crear CONCLUSION ni IMPRESION.")
+        if not tiene_info_clinica:
+            restricciones.append("La plantilla NO contiene INFORMACION CLINICA: no crear esa seccion.")
+
+        reglas = (
+            "Genera el informe final respetando el contrato estructural del usuario.\n"
+            + "\n".join(f"- {r}" for r in restricciones)
+        )
+
+        return {
+            'reglas': reglas,
+            'formato_salida': "\n".join(lineas_formato).strip(),
+            'tiene_conclusion': tiene_conclusion,
+            'permitir_secciones_nuevas': permitir_secciones_nuevas,
+        }
+
+    def _construir_bloque_contexto_clinico(self, contexto_clinico):
+        if not contexto_clinico:
+            return ''
+
+        lineas = []
+        lateralidad = contexto_clinico.get('lateralidad')
+        lado_tecnica = contexto_clinico.get('lado_tecnica')
+        region = contexto_clinico.get('region')
+        indicacion = contexto_clinico.get('indicacion_clinica')
+
+        if lateralidad:
+            lineas.append(f"- Lateralidad detectada: {lateralidad}.")
+        if lado_tecnica:
+            lineas.append(f"- Para placeholders de tecnica tipo [<lado>] usar: {lado_tecnica}.")
+        if region:
+            lineas.append(f"- Region/estudio probable: {region}.")
+        if indicacion:
+            lineas.append(f"- Informacion clinica a completar si la plantilla incluye esa seccion: {indicacion}")
+
+        if not lineas:
+            return ''
+
+        return (
+            "CONTEXTO CLINICO EXTRAIDO DEL DICTADO:\n"
+            + "\n".join(lineas)
+            + "\nREGLAS: usar este contexto para completar lateralidad en TITULO/TECNICA y la INFORMACION CLINICA si existe. "
+            "No agregar INFORMACION CLINICA si la plantilla no la contiene.\n"
+        )
+
+    def _headers_hallazgos_plantilla(self, plantilla_actual):
+        headers = {'COMENTARIO'}
+        estructura = (plantilla_actual or {}).get('estructura_documento') or {}
+        if isinstance(estructura, dict):
+            for seccion in estructura.get('secciones') or []:
+                if (seccion.get('tipo') or '').lower() == 'hallazgos':
+                    headers.add(self._normalizar_header_salida(seccion.get('nombre') or 'HALLAZGOS'))
+        return headers
+
+    def _headers_fin_hallazgos_plantilla(self, plantilla_actual):
+        headers = {'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'}
+        estructura = (plantilla_actual or {}).get('estructura_documento') or {}
+        if isinstance(estructura, dict):
+            for seccion in estructura.get('secciones') or []:
+                nombre = self._normalizar_header_salida(seccion.get('nombre') or '')
+                if nombre and nombre not in self._headers_hallazgos_plantilla(plantilla_actual):
+                    headers.add(nombre)
+        return headers
+
+    def _normalizar_header_salida(self, texto):
+        tabla = str.maketrans('ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNaeiouun')
+        normalizado = (texto or '').strip().translate(tabla).upper().rstrip(':')
+        return re.sub(r'\s+', ' ', normalizado)
+
     def _aplicar_guardrails_estructurado(self, texto_original, texto_mejorado, plantilla_actual):
         """
         Guardrail MVP para estructurado:
@@ -1086,20 +1232,27 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
             return texto_mejorado, []
 
         lineas = (texto_mejorado or '').splitlines()
-        idx_comentario = self._buscar_indice_header(lineas, {'COMENTARIO'})
+        headers_hallazgos = self._headers_hallazgos_plantilla(plantilla_actual)
+        idx_comentario = self._buscar_indice_header(lineas, headers_hallazgos)
         if idx_comentario is None:
             return texto_mejorado, []
 
         idx_fin = self._buscar_siguiente_header(
             lineas,
             idx_comentario + 1,
-            {'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'}
+            self._headers_fin_hallazgos_plantilla(plantilla_actual)
         )
         if idx_fin is None:
             idx_fin = len(lineas)
 
         bloque_comentario = lineas[idx_comentario + 1:idx_fin]
-        comentario_lineas = [l.strip() for l in bloque_comentario if l.strip()]
+        comentario_lineas_originales = [l.strip() for l in bloque_comentario if l.strip()]
+        comentario_lineas = [
+            self._limpiar_numeracion_salida(l)
+            for l in comentario_lineas_originales
+            if self._limpiar_numeracion_salida(l)
+        ]
+        numeracion_limpiada = comentario_lineas != comentario_lineas_originales
         dictado_lower = (texto_original or '').lower()
 
         # Consolidar fragmentación excesiva de una misma patología en líneas separadas.
@@ -1110,7 +1263,18 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
 
         restauradas = []
         for linea_base in comentarios_base:
+            linea_residual = self._linea_residual_por_hallazgo(linea_base, texto_original, comentario_lineas)
+            if linea_residual:
+                if not self._linea_equivalente_en_lista(linea_residual, comentario_lineas):
+                    indice = self._indice_insercion_residual(linea_base, comentario_lineas, texto_original)
+                    comentario_lineas.insert(indice, linea_residual)
+                    restauradas.append(linea_residual)
+                continue
+
             if self._linea_mencionada_en_dictado(linea_base, dictado_lower):
+                continue
+
+            if self._linea_base_contradicha_por_hallazgos(linea_base, texto_original, comentario_lineas):
                 continue
 
             if self._linea_equivalente_en_lista(linea_base, comentario_lineas):
@@ -1119,7 +1283,7 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
             comentario_lineas.append(linea_base)
             restauradas.append(linea_base)
 
-        if not restauradas and not consolidado:
+        if not restauradas and not consolidado and not numeracion_limpiada:
             return texto_mejorado, []
 
         nuevas_lineas = []
@@ -1128,6 +1292,143 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         nuevas_lineas.extend(lineas[idx_fin:])
 
         return '\n'.join(nuevas_lineas).strip(), restauradas
+
+    def _limpiar_numeracion_salida(self, linea):
+        """Quita indices que el modelo puede copiar desde la plantilla razonada."""
+        return re.sub(r'^\s*\[\d+\]\s*', '', linea or '').strip()
+
+    def _linea_base_contradicha_por_hallazgos(self, linea_base, texto_original, comentario_lineas):
+        """
+        Evita restaurar una linea normal si el dictado/salida ya describen
+        patologia de la misma region. Caso clave: lesion del parenquima cerebral.
+        """
+        base_norm = self._normalizar_texto_simple(linea_base)
+        contexto_norm = self._normalizar_texto_simple(
+            ' '.join([texto_original or '', ' '.join(comentario_lineas or [])])
+        )
+
+        es_normal = any(p in base_norm for p in [
+            'no se observan', 'sin alteraciones', 'sin lesion', 'sin lesiones',
+            'conservad', 'normal',
+        ])
+        if not es_normal:
+            return False
+
+        patologias = [
+            'lesion', 'nodular', 'nodulo', 'focal', 'tumor', 'masa', 'expansiv',
+            'edema', 'isquemi', 'infarto', 'hemorrag', 'coleccion',
+        ]
+        hay_patologia = any(p in contexto_norm for p in patologias)
+        if not hay_patologia:
+            return False
+
+        linea_parenquima_cerebral = any(p in base_norm for p in [
+            'sustancia gris', 'sustancia blanca', 'parenquima', 'encefal',
+            'cerebral', 'cerebro',
+        ])
+        contexto_cerebral = any(p in contexto_norm for p in [
+            'cerebral', 'cerebro', 'encefal', 'parenquima', 'frontal',
+            'parietal', 'temporal', 'occipital', 'cerebel',
+        ])
+        if linea_parenquima_cerebral and contexto_cerebral:
+            return True
+
+        return False
+
+    def _linea_residual_por_hallazgo(self, linea_base, texto_original, comentario_lineas):
+        """
+        Reemplaza lineas normales de conjunto por una frase residual cuando una
+        subestructura incluida ya fue informada como patologica.
+        """
+        base_norm = self._normalizar_texto_simple(linea_base)
+        contexto_norm = self._normalizar_texto_simple(
+            ' '.join([texto_original or '', ' '.join(comentario_lineas or [])])
+        )
+
+        def contiene(*tokens):
+            return any(t in contexto_norm for t in tokens)
+
+        def base_contiene(*tokens):
+            return any(t in base_norm for t in tokens)
+
+        if base_contiene('ligamentos cruzados', 'ligamento cruzado'):
+            anterior = contiene('ligamento cruzado anterior', 'lca', 'cruzado anterior')
+            posterior = contiene('ligamento cruzado posterior', 'lcp', 'cruzado posterior')
+            if anterior and not posterior:
+                return 'Ligamento cruzado posterior conservado.'
+            if posterior and not anterior:
+                return 'Ligamento cruzado anterior conservado.'
+            if anterior and posterior:
+                return None
+
+        if base_contiene('meniscos', 'menisco'):
+            menisco_interno = contiene('menisco interno', 'menisco medial')
+            menisco_externo = contiene('menisco externo', 'menisco lateral')
+            if menisco_interno and not menisco_externo:
+                return 'Menisco externo de altura y señal conservadas.'
+            if menisco_externo and not menisco_interno:
+                return 'Menisco interno de altura y señal conservadas.'
+            if menisco_interno and menisco_externo:
+                return None
+
+        if base_contiene('manguito rotador', 'supraespinoso', 'infraespinoso', 'subescapular'):
+            componentes = [
+                ('supraespinoso', 'supraespinoso'),
+                ('infraespinoso', 'infraespinoso'),
+                ('subescapular', 'subescapular'),
+                ('redondo menor', 'redondo menor'),
+            ]
+            afectados = [nombre for nombre, token in componentes if token in contexto_norm]
+            if afectados and len(afectados) < len(componentes):
+                return 'Resto de tendones del manguito rotador sin alteraciones.'
+            if len(afectados) == len(componentes):
+                return None
+
+        if base_contiene('sustancia gris', 'sustancia blanca', 'parenquima', 'encefal'):
+            if contiene('lesion', 'nodular', 'nodulo', 'masa', 'frontal', 'parietal', 'temporal', 'occipital'):
+                return 'No se observan otras alteraciones en el resto del parénquima cerebral.'
+
+        return None
+
+    def _indice_insercion_residual(self, linea_base, comentario_lineas, texto_original):
+        base_norm = self._normalizar_texto_simple(linea_base)
+
+        grupos = []
+        if any(t in base_norm for t in ['meniscos', 'menisco']):
+            grupos.append(['menisco', 'meniscal'])
+        if any(t in base_norm for t in ['ligamentos cruzados', 'ligamento cruzado']):
+            grupos.append(['ligamento cruzado', 'cruzado anterior', 'cruzado posterior', 'lca', 'lcp'])
+        if any(t in base_norm for t in ['manguito rotador', 'supraespinoso', 'infraespinoso', 'subescapular']):
+            grupos.append(['manguito', 'supraespinoso', 'infraespinoso', 'subescapular', 'redondo menor'])
+        if any(t in base_norm for t in ['sustancia gris', 'sustancia blanca', 'parenquima', 'encefal']):
+            grupos.append(['parenquima', 'cerebral', 'encefal', 'frontal', 'parietal', 'temporal', 'occipital'])
+
+        if not grupos:
+            return len(comentario_lineas)
+
+        patologias = [
+            'desgarro', 'rotura', 'ruptura', 'lesion', 'lesión', 'edema', 'derrame',
+            'tendinopatia', 'tendinopatía', 'nodular', 'nodulo', 'masa', 'focal',
+        ]
+
+        mejor_indice = None
+        mejor_score = 0
+        for i, linea in enumerate(comentario_lineas):
+            linea_norm = self._normalizar_texto_simple(linea)
+            score = 0
+            for grupo in grupos:
+                if any(token in linea_norm for token in grupo):
+                    score += 3
+            if any(p in linea_norm for p in patologias):
+                score += 2
+            if score > mejor_score:
+                mejor_score = score
+                mejor_indice = i
+
+        if mejor_indice is not None and mejor_score >= 3:
+            return mejor_indice + 1
+
+        return len(comentario_lineas)
 
     def _consolidar_hallazgos_relacionados(self, comentario_lineas, texto_original):
         """
@@ -1328,7 +1629,10 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
             }
 
         lineas = (texto_mejorado or '').splitlines()
-        idx_comentario = self._buscar_indice_header(lineas, {'COMENTARIO'})
+        idx_comentario = self._buscar_indice_header(
+            lineas,
+            self._headers_hallazgos_plantilla(plantilla_actual)
+        )
         if idx_comentario is None:
             return {
                 'detectada': False,
@@ -1338,7 +1642,7 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         idx_fin = self._buscar_siguiente_header(
             lineas,
             idx_comentario + 1,
-            {'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'}
+            self._headers_fin_hallazgos_plantilla(plantilla_actual)
         )
         if idx_fin is None:
             idx_fin = len(lineas)

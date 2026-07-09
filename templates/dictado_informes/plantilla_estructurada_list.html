@@ -16,11 +16,18 @@
                 <p class="text-sm text-gray-400">Guardrails y estructura para modo IA ESTRUCTURADO</p>
             </div>
         </div>
-        <a href="{% url 'dictado_informes:plantilla_estructurada_create' %}" 
-           class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
-            <i class="fas fa-plus-circle mr-2"></i>
-            Nueva Plantilla
-        </a>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'dictado_informes:plantilla_estructurada_import_docx' %}"
+               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+                <i class="fas fa-file-upload mr-2"></i>
+                Importar Archivo
+            </a>
+            <a href="{% url 'dictado_informes:plantilla_estructurada_create' %}" 
+               class="inline-flex items-center px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors">
+                <i class="fas fa-plus-circle mr-2"></i>
+                Nueva Plantilla
+            </a>
+        </div>
     </div>
 
     <!-- Filtros -->

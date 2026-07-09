@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from dictado_informes.models import PlantillaEstructurada
@@ -8,6 +8,7 @@ from dictado_informes.models import PlantillaEstructurada
 User = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
 class DictadoPilotoAccessTests(TestCase):
     def setUp(self):
         self.piloto = User.objects.create_user(
@@ -67,6 +68,16 @@ class DictadoPilotoAccessTests(TestCase):
         response = self.client.get(reverse('dictado_informes:dictado_rapido'))
 
         self.assertEqual(response.status_code, 200)
+
+    @override_settings(DICTADO_AGENTE_HABILITADO=False)
+    def test_dictado_rapido_oculta_agente_si_flag_apagado(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Agente de informe')
+        self.assertContains(response, 'Plantilla Estructurada')
 
     def test_piloto_accede_a_plantillas_estructuradas(self):
         self.client.force_login(self.piloto)

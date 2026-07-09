@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django import forms
 from django.conf import settings
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -16,13 +17,16 @@ from .models import (
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
     PlantillaEstructurada, FeedbackCalidadDictado
 )
-from .forms import TerminoMedicoForm, PlantillaEstructuradaForm
+from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
 from .ai_services import ai_service
+from .template_importer import DocxTemplateImportError, importar_plantilla_archivo, importar_plantilla_texto
 import json
 import base64
 import logging
 import time  # 🚀 FASE 4: Para medir tiempos
 import difflib
+import re
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,166 @@ def user_can_access_transcripcion_preinformes(user):
 
 def get_plantillas_estructuradas_visibles(user, solo_activas=False):
     return PlantillaEstructurada.visibles_para_usuario(user, solo_activas=solo_activas)
+
+
+def _generar_codigo_interno_plantilla():
+    codigos = PlantillaEstructurada.objects.values_list('codigo', flat=True)
+    max_codigo = 99999
+    for codigo in codigos:
+        if not str(codigo).isdigit():
+            continue
+        try:
+            max_codigo = max(max_codigo, int(codigo))
+        except (TypeError, ValueError):
+            continue
+
+    while True:
+        max_codigo += 1
+        candidato = str(max_codigo)
+        if not PlantillaEstructurada.objects.filter(codigo=candidato).exists():
+            return candidato
+
+
+def _normalizar_texto_selector(texto):
+    texto = unicodedata.normalize('NFKD', texto or '')
+    texto = ''.join(c for c in texto if not unicodedata.combining(c))
+    texto = re.sub(r'[^a-zA-Z0-9]+', ' ', texto.lower())
+    return re.sub(r'\s+', ' ', texto).strip()
+
+
+def _tokens_selector(texto):
+    stopwords = {
+        'de', 'del', 'la', 'las', 'el', 'los', 'con', 'sin', 'para', 'por',
+        'una', 'uno', 'un', 'y', 'o', 'en', 'se', 'al', 'rm', 'resonancia',
+        'magnetica', 'tomografia', 'tc', 'estudio', 'informe',
+    }
+    return {
+        token for token in _normalizar_texto_selector(texto).split()
+        if len(token) >= 3 and token not in stopwords
+    }
+
+
+def extraer_contexto_clinico_dictado(texto):
+    texto_norm = _normalizar_texto_selector(texto)
+    tokens = set(texto_norm.split())
+
+    lateralidad = None
+    lado_tecnica = None
+    if {'derecha', 'derecho'} & tokens:
+        lateralidad = 'DERECHA'
+        lado_tecnica = 'derecha'
+    elif {'izquierda', 'izquierdo'} & tokens:
+        lateralidad = 'IZQUIERDA'
+        lado_tecnica = 'izquierda'
+    elif 'bilateral' in tokens or 'ambas' in tokens or 'ambos' in tokens:
+        lateralidad = 'BILATERAL'
+        lado_tecnica = 'bilateral'
+
+    regiones = [
+        ('RODILLA', {'rodilla', 'gonalgia', 'menisco', 'meniscal', 'rotula', 'patelar'}),
+        ('HOMBRO', {'hombro', 'manguito', 'supraespinoso', 'infraespinoso', 'subescapular'}),
+        ('CODO', {'codo', 'epicondilo', 'epitroclea'}),
+        ('TOBILLO', {'tobillo', 'aquiles', 'peroneos', 'retromaleolar'}),
+        ('CADERA', {'cadera', 'coxofemoral', 'coxalgia'}),
+        ('CEREBRO', {'cerebro', 'encefalo', 'cefalea', 'convulsion', 'frontal', 'parietal', 'temporal'}),
+    ]
+    region = None
+    for nombre, claves in regiones:
+        if tokens & claves:
+            region = nombre
+            break
+
+    indicaciones = []
+    if 'gonalgia' in tokens:
+        indicaciones.append('Gonalgia')
+    if 'coxalgia' in tokens:
+        indicaciones.append('Coxalgia')
+    if 'trauma' in tokens or 'traumatismo' in tokens:
+        indicaciones.append('Antecedente traumatico')
+    if 'dolor' in tokens and not indicaciones:
+        indicaciones.append('Dolor')
+    if 'cefalea' in tokens:
+        indicaciones.append('Cefalea')
+    if 'convulsion' in tokens or 'convulsiones' in tokens:
+        indicaciones.append('Convulsiones')
+
+    if indicaciones and lateralidad in {'DERECHA', 'IZQUIERDA'} and region in {'RODILLA', 'HOMBRO', 'CODO', 'TOBILLO', 'CADERA'}:
+        indicacion_clinica = f"{indicaciones[0]} {lateralidad.lower()}."
+    elif indicaciones:
+        indicacion_clinica = f"{indicaciones[0]}."
+    else:
+        indicacion_clinica = ''
+
+    return {
+        'lateralidad': lateralidad,
+        'lado_tecnica': lado_tecnica,
+        'region': region,
+        'indicacion_clinica': indicacion_clinica,
+    }
+
+
+def sugerir_plantilla_para_dictado(texto, usuario=None):
+    """
+    Selector deterministico para el primer paso del modo agente.
+    Devuelve la plantilla visible mas compatible con el dictado.
+    """
+    texto_norm = _normalizar_texto_selector(texto)
+    if not texto_norm:
+        return None
+
+    texto_tokens = _tokens_selector(texto)
+    contexto_clinico = extraer_contexto_clinico_dictado(texto)
+    queryset = PlantillaEstructurada.visibles_para_usuario(usuario, solo_activas=True)
+    mejor = None
+    mejor_score = 0
+
+    for plantilla in queryset:
+        corpus = ' '.join([
+            plantilla.codigo,
+            plantilla.nombre,
+            plantilla.titulo,
+            plantilla.seccion_tecnica,
+            ' '.join(plantilla.comentarios_base or []),
+        ])
+        plantilla_norm = _normalizar_texto_selector(corpus)
+        plantilla_tokens = _tokens_selector(corpus)
+        coincidencias = texto_tokens & plantilla_tokens
+        score = len(coincidencias) * 3
+
+        nombre_tokens = _tokens_selector(f'{plantilla.nombre} {plantilla.titulo}')
+        score += len(texto_tokens & nombre_tokens) * 4
+
+        for token in nombre_tokens:
+            if token and token in texto_norm:
+                score += 3
+
+        if plantilla.codigo and _normalizar_texto_selector(plantilla.codigo) in texto_norm:
+            score += 8
+
+        region = contexto_clinico.get('region')
+        if region and region.lower() in plantilla_norm:
+            score += 25
+        if region and region.lower() in _normalizar_texto_selector(plantilla.nombre):
+            score += 20
+
+        if usuario and plantilla.creada_por_id == getattr(usuario, 'id', None):
+            score += 40
+
+        if any(token in plantilla_norm for token in texto_tokens):
+            score += 1
+
+        if score > mejor_score:
+            mejor = plantilla
+            mejor_score = score
+
+    if mejor and mejor_score >= 5:
+        return {
+            'codigo': mejor.codigo,
+            'nombre': mejor.nombre,
+            'score': mejor_score,
+            'contexto_clinico': contexto_clinico,
+        }
+    return None
 
 
 def _calcular_metricas_edicion(texto_ia, texto_final):
@@ -179,6 +343,7 @@ class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateVi
         context['plantillas_biblioteca'] = plantillas_biblioteca
         context['plantillas_default_codigo'] = default_codigo
         context['plantillas_total_visibles'] = len(plantillas_visibles)
+        context['dictado_agente_habilitado'] = getattr(settings, 'DICTADO_AGENTE_HABILITADO', True)
         return context
 
 
@@ -493,6 +658,72 @@ class PlantillaEstructuradaCreateView(LoginRequiredMixin, DictadoModuleAccessMix
         return context
 
 
+@login_required
+def importar_plantilla_docx_view(request):
+    """Importa una plantilla desde archivo con preview editable antes de guardar."""
+    if not user_can_access_dictado_module(request.user):
+        messages.warning(request, "⚠️ No tienes permiso para acceder a Dictado IA.")
+        return redirect('home')
+
+    upload_form = ImportarPlantillaDocxForm()
+    plantilla_form = None
+    preview_generado = False
+
+    if request.method == 'POST' and request.POST.get('accion') == 'preview':
+        upload_form = ImportarPlantillaDocxForm(request.POST, request.FILES)
+        if upload_form.is_valid():
+            archivo = upload_form.cleaned_data['archivo_docx']
+            texto_plantilla = upload_form.cleaned_data.get('texto_plantilla') or ''
+            try:
+                if archivo:
+                    data = importar_plantilla_archivo(archivo)
+                else:
+                    data = importar_plantilla_texto(texto_plantilla)
+                codigo = _generar_codigo_interno_plantilla()
+                initial = {
+                    'codigo': codigo,
+                    'nombre': data.get('titulo') or codigo,
+                    'titulo': data.get('titulo') or '',
+                    'seccion_tecnica': data.get('seccion_tecnica') or '',
+                    'comentarios_base_texto': '\n'.join(data.get('comentarios_base') or []),
+                    'modo_estructura': PlantillaEstructurada.MODO_ESTRUCTURA_ESTRICTA,
+                    'permitir_secciones_nuevas': False,
+                    'estructura_documento_texto': json.dumps(
+                        data.get('estructura_documento') or {},
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    'activa': True,
+                    'compartida': getattr(request.user, 'rol', None) != 'piloto_dictado',
+                }
+                plantilla_form = PlantillaEstructuradaForm(initial=initial, user=request.user)
+                plantilla_form.fields['codigo'].widget = forms.HiddenInput()
+                plantilla_form.fields['seccion_tecnica'].widget.attrs['placeholder'] = ''
+                plantilla_form.fields['comentarios_base_texto'].widget.attrs['placeholder'] = ''
+                preview_generado = True
+                messages.info(request, "Revisa la vista previa antes de guardar la plantilla.")
+            except DocxTemplateImportError as exc:
+                upload_form.add_error('archivo_docx', str(exc))
+
+    elif request.method == 'POST' and request.POST.get('accion') == 'guardar':
+        plantilla_form = PlantillaEstructuradaForm(request.POST, user=request.user)
+        plantilla_form.fields['codigo'].widget = forms.HiddenInput()
+        if plantilla_form.is_valid():
+            plantilla = plantilla_form.save(commit=False)
+            plantilla.creada_por = request.user
+            plantilla.origen = 'user'
+            plantilla.save()
+            messages.success(request, f"✅ Plantilla '{plantilla.nombre}' importada desde Word.")
+            return redirect('dictado_informes:plantilla_estructurada_update', pk=plantilla.pk)
+        preview_generado = True
+
+    return render(request, 'dictado_informes/importar_plantilla_docx.html', {
+        'upload_form': upload_form,
+        'plantilla_form': plantilla_form,
+        'preview_generado': preview_generado,
+    })
+
+
 class PlantillaEstructuradaUpdateView(LoginRequiredMixin, DictadoModuleAccessMixin, UpdateView):
     """Editar una plantilla estructurada existente"""
     model = PlantillaEstructurada
@@ -654,6 +885,15 @@ def transcribir_audio_whisper(request):
         
         # 🎯 PROCESAMIENTO UNIFICADO: Comandos de voz + diccionario médico en orden correcto
         texto_procesado, correcciones = TerminoMedico.procesar_texto_completo(texto_transcrito)
+
+        if not (texto_procesado or '').strip():
+            tuvo_error = True
+            error_detalle = 'Whisper no devolvio texto util'
+            logger.warning("Transcripcion vacia: Whisper no devolvio texto util")
+            return JsonResponse({
+                'success': False,
+                'error': 'No se detecto texto en el audio. Intenta grabar nuevamente hablando mas cerca del microfono.'
+            }, status=400)
         
         if correcciones:
             logger.info(f"✅ Texto procesado: {len(correcciones)} correcciones aplicadas")
@@ -735,16 +975,20 @@ def mejorar_texto_ia(request):
     try:
         data = json.loads(request.body)
         # Aceptar tanto 'texto' como 'texto_original' para compatibilidad
-        texto = data.get('texto_original') or data.get('texto', '')
+        texto = data.get('texto_original') or data.get('texto') or data.get('texto_transcrito', '')
         tipo_estudio = data.get('tipo_estudio', 'OTR')
         modo = data.get('modo', 'LIBRE')
         tipo_plantilla = data.get('tipo_plantilla', 'RODILLA')  # Nuevo campo
         plantilla = data.get('plantilla', None)
-        field_name = data.get('field_name', None)  # Campo específico para contexto
+        field_name = data.get('field_name', None)
+        plantilla_sugerida = None
         
         if not texto or texto.strip() == '':
             logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
             return JsonResponse({'error': 'No se recibió texto para mejorar'}, status=400)
+        if modo == 'AGENTE' and not getattr(settings, 'DICTADO_AGENTE_HABILITADO', True):
+            logger.warning("Modo AGENTE solicitado pero deshabilitado por settings")
+            return JsonResponse({'error': 'Modo agente deshabilitado'}, status=403)
         
         logger.info(f"📝 Mejorando texto ({len(texto)} caracteres) en modo {modo} para campo '{field_name}'")
         
@@ -761,28 +1005,50 @@ def mejorar_texto_ia(request):
             # Ya viene procesado de transcripción
             texto_procesado = texto
         
-        # Construir contexto con modo y campo específico
+        if modo == 'AGENTE':
+            plantilla_sugerida = sugerir_plantilla_para_dictado(texto_procesado, request.user)
+            if plantilla_sugerida:
+                tipo_plantilla = plantilla_sugerida['codigo']
+                logger.info(
+                    "Modo AGENTE: plantilla sugerida %s (score %s)",
+                    plantilla_sugerida['codigo'],
+                    plantilla_sugerida['score'],
+                )
+            else:
+                logger.info(
+                    "Modo AGENTE: no hubo match claro; se usa plantilla fallback %s",
+                    tipo_plantilla,
+                )
+
+        modo_procesamiento = 'ESTRUCTURADO' if modo == 'AGENTE' else modo
+        contexto_clinico = (
+            (plantilla_sugerida or {}).get('contexto_clinico')
+            if modo == 'AGENTE'
+            else extraer_contexto_clinico_dictado(texto_procesado)
+        )
+
+        # Construir contexto con modo y campo especifico
         contexto = {
-            'modo': modo,  # 'FIEL' = solo corregir, 'AUTO' = detectar, 'ESTRUCTURADO' = crear secciones
-            'field_name': field_name  # Para mejor contexto del campo específico
+            'modo': modo_procesamiento,
+            'field_name': field_name,
+            'contexto_clinico': contexto_clinico,
         }
-        
+
         # Solo agregar tipo_plantilla si NO es modo FIEL
-        if modo != 'FIEL':
+        if modo_procesamiento != 'FIEL':
             contexto['tipo_plantilla'] = tipo_plantilla
-            logger.info(f"📋 Tipo de plantilla: {tipo_plantilla}")
+            logger.info(f"Tipo de plantilla: {tipo_plantilla}")
         else:
-            logger.info(f"✏️ Modo FIEL - sin plantilla, solo corrección")
-        
+            logger.info("Modo FIEL - sin plantilla, solo correccion")
+
         # Solo agregar plantilla si NO es modo FIEL
-        if plantilla and modo != 'FIEL':
+        if plantilla and modo_procesamiento != 'FIEL':
             contexto['plantilla'] = plantilla
-            logger.info(f"🎯 Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
-        
-        # 📊 FASE 4: Medir tiempo de mejora con IA
+            logger.info(f"Usando plantilla: {plantilla.get('nombre', 'sin nombre')}")
+
+        # FASE 4: Medir tiempo de mejora con IA
         tiempo_mejora_inicio = time.time()
-        
-        # 3. MEJORAR CON IA
+                # 3. MEJORAR CON IA
         result = ai_service.improve_medical_text(
             texto_procesado, 
             tipo_estudio, 
@@ -828,7 +1094,10 @@ def mejorar_texto_ia(request):
             'motivo_confianza': result.get('motivo_confianza', ''),
             'guardrails_aplicados': result.get('guardrails_aplicados', []),
             'posible_invencion': result.get('posible_invencion', False),
-            'terminos_sospechosos': result.get('terminos_sospechosos', [])
+            'terminos_sospechosos': result.get('terminos_sospechosos', []),
+            'plantilla_sugerida': plantilla_sugerida,
+            'tipo_plantilla_usada': tipo_plantilla,
+            'contexto_clinico': contexto_clinico,
         })
     
     except json.JSONDecodeError as e:

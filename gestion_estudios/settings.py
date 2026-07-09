@@ -566,6 +566,9 @@ SECURE_REFERRER_POLICY = 'same-origin'
 # Valor por defecto: 5 horas. Ajustar con SESSION_INACTIVITY_TIMEOUT en .env
 SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=5 * 60 * 60))
 
+# Dictado IA: permite apagar el modo agente sin rollback de codigo.
+DICTADO_AGENTE_HABILITADO = config('DICTADO_AGENTE_HABILITADO', default=True, cast=bool)
+
 SESSION_COOKIE_HTTPONLY = True
 
 # CSRF Cookie: False para permitir peticiones AJAX
