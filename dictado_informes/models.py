@@ -916,6 +916,7 @@ class CorreccionAprendizaje(models.Model):
         # 🔍 Detectar líneas de plantilla "normal" que fueron eliminadas
         lineas_eliminadas_normales = self._detectar_conflictos_plantilla_patologia(lineas_ia, lineas_final)
         cambios.extend(lineas_eliminadas_normales)
+        cambios.extend(self._detectar_reordenamiento_lineas(lineas_ia, lineas_final))
         
         for tag, i1, i2, j1, j2 in matcher.get_opcodes():
             if tag == 'replace':
@@ -958,6 +959,87 @@ class CorreccionAprendizaje(models.Model):
         logger.info(f"📊 Análisis semántico: {len(cambios)} cambios detectados")
         return cambios
     
+    def _detectar_reordenamiento_lineas(self, lineas_ia, lineas_final):
+        """
+        Detecta cuando el usuario conserva una linea generada pero la mueve de lugar.
+        Esto ensenia preferencias de ubicacion dentro del bloque COMENTARIO/HALLAZGOS.
+        """
+        cambios = []
+        bloque_ia = self._extraer_bloque_hallazgos(lineas_ia)
+        bloque_final = self._extraer_bloque_hallazgos(lineas_final)
+        if len(bloque_ia) < 2 or len(bloque_final) < 2:
+            return cambios
+
+        usados_final = set()
+        pares = []
+        for idx_ia, linea_ia in enumerate(bloque_ia):
+            mejor_idx = None
+            mejor_ratio = 0
+            for idx_final, linea_final in enumerate(bloque_final):
+                if idx_final in usados_final:
+                    continue
+                ratio = difflib.SequenceMatcher(
+                    None,
+                    self._normalizar_para_control(linea_ia),
+                    self._normalizar_para_control(linea_final),
+                ).ratio()
+                if ratio > mejor_ratio:
+                    mejor_ratio = ratio
+                    mejor_idx = idx_final
+
+            if mejor_idx is not None and mejor_ratio >= 0.88:
+                usados_final.add(mejor_idx)
+                pares.append((idx_ia, mejor_idx, bloque_final[mejor_idx]))
+
+        for idx_ia, idx_final, linea in pares:
+            if idx_ia == idx_final:
+                continue
+            previa = bloque_final[idx_final - 1] if idx_final > 0 else ''
+            siguiente = bloque_final[idx_final + 1] if idx_final + 1 < len(bloque_final) else ''
+            cambios.append({
+                'tipo': 'reordenamiento_linea',
+                'texto': linea,
+                'posicion_ia': idx_ia + 1,
+                'posicion_final': idx_final + 1,
+                'despues_de': previa,
+                'antes_de': siguiente,
+                'categoria': 'estructural_orden',
+                'score': 88,
+                'regla': self._formatear_regla_orden(linea, previa, siguiente),
+            })
+
+        return cambios[:5]
+
+    @classmethod
+    def _extraer_bloque_hallazgos(cls, lineas):
+        headers_inicio = {'COMENTARIO', 'HALLAZGOS', 'INFORME', 'DESCRIPCION', 'DESCRIPCIÓN'}
+        headers_fin = {'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN', 'TECNICA', 'TÉCNICA'}
+        dentro = False
+        bloque = []
+
+        for linea in lineas:
+            limpia = (linea or '').strip()
+            if not limpia:
+                continue
+            header = cls._normalizar_para_control(limpia).upper().rstrip(':')
+            if header in headers_inicio:
+                dentro = True
+                continue
+            if dentro and header in headers_fin:
+                break
+            if dentro:
+                bloque.append(limpia)
+
+        return bloque
+
+    @staticmethod
+    def _formatear_regla_orden(linea, previa, siguiente):
+        if previa:
+            return f'Ubicar "{linea}" inmediatamente despues de "{previa}".'
+        if siguiente:
+            return f'Ubicar "{linea}" inmediatamente antes de "{siguiente}".'
+        return f'Ubicar "{linea}" segun el orden corregido por el usuario.'
+
     def _detectar_conflictos_plantilla_patologia(self, lineas_ia, lineas_final):
         """
         🎯 NUEVO: Detecta cuando el usuario elimina líneas "normales" porque mencionó patología
@@ -1375,6 +1457,63 @@ class CorreccionAprendizaje(models.Model):
         
         return resultado
     
+    @staticmethod
+    def obtener_preferencias_aprendidas(usuario=None, limite=8):
+        """
+        Extrae reglas compactas desde correcciones previas:
+        - ubicacion de lineas movidas por el usuario
+        - reemplazos terminologicos frecuentes
+        """
+        from django.core.cache import cache
+
+        cache_key = f'preferencias_aprendidas_v1_{usuario.id if usuario else "global"}_{limite}'
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        query = CorreccionAprendizaje.objects.all()
+        if usuario:
+            query = query.filter(usuario=usuario)
+
+        correcciones = query.only(
+            'cambios_detectados', 'texto_ia', 'texto_final'
+        ).order_by('-fecha_creacion')[:limite * 5]
+
+        reglas_orden = []
+        reemplazos = []
+        vistos = set()
+        for corr in correcciones:
+            if not CorreccionAprendizaje.es_apta_para_prompt(corr):
+                continue
+            for cambio in corr.cambios_detectados or []:
+                tipo = cambio.get('tipo')
+                if tipo == 'reordenamiento_linea':
+                    regla = cambio.get('regla')
+                    if regla and regla not in vistos:
+                        vistos.add(regla)
+                        reglas_orden.append(regla)
+                elif tipo == 'reemplazo' and cambio.get('score', 0) >= 70:
+                    de = (cambio.get('de') or '').strip()
+                    a = (cambio.get('a') or '').strip()
+                    if de and a:
+                        regla = f'Preferir "{a}" en lugar de "{de}".'
+                        if regla not in vistos:
+                            vistos.add(regla)
+                            reemplazos.append(regla)
+
+        lineas = []
+        if reglas_orden:
+            lineas.append('ORDEN Y UBICACION APRENDIDOS:')
+            lineas.extend(f'- {r}' for r in reglas_orden[:limite])
+        if reemplazos:
+            lineas.append('TERMINOLOGIA APRENDIDA:')
+            lineas.extend(f'- {r}' for r in reemplazos[:limite])
+
+        resultado = '\n'.join(lineas)
+        if resultado:
+            cache.set(cache_key, resultado, timeout=600)
+        return resultado
+
     @staticmethod
     def obtener_ejemplos_estilo_completo(usuario=None, limite=3):
         """

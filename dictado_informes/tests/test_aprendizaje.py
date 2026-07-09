@@ -255,6 +255,45 @@ class TestCorreccionAprendizaje(TestCase):
         self.assertNotIn('random random', ejemplos.lower())
 
 
+    def test_aprende_reordenamiento_de_lineas_en_comentario(self):
+        cache.clear()
+
+        correccion = CorreccionAprendizaje.objects.create(
+            texto_original="Rodilla con desgarro del LCA.",
+            texto_ia=(
+                "COMENTARIO\n"
+                "Meniscos normales.\n"
+                "Ligamento cruzado posterior conservado.\n"
+                "Desgarro del ligamento cruzado anterior.\n"
+                "CONCLUSION\n"
+                "Desgarro del LCA."
+            ),
+            texto_final=(
+                "COMENTARIO\n"
+                "Desgarro del ligamento cruzado anterior.\n"
+                "Ligamento cruzado posterior conservado.\n"
+                "Meniscos normales.\n"
+                "CONCLUSION\n"
+                "Desgarro del LCA."
+            ),
+            usuario=self.user
+        )
+
+        cambios_orden = [
+            c for c in correccion.cambios_detectados
+            if c.get('tipo') == 'reordenamiento_linea'
+        ]
+        self.assertTrue(cambios_orden)
+
+        preferencias = CorreccionAprendizaje.obtener_preferencias_aprendidas(
+            usuario=self.user,
+            limite=5,
+        )
+
+        self.assertIn('ORDEN Y UBICACION APRENDIDOS', preferencias)
+        self.assertIn('Desgarro del ligamento cruzado anterior', preferencias)
+
+
 class TestCorreccionAprendizajeAdmin(TestCase):
     """Tests para funciones del admin"""
     

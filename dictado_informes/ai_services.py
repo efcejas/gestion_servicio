@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 import difflib
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -738,6 +739,7 @@ Hallazgo 1. Hallazgo 2. Hallazgo 3."""
             # 🧠 Obtener ejemplos de aprendizaje del usuario (SIEMPRE)
             ejemplos_aprendizaje = self._get_ejemplos_aprendizaje_cached(usuario)
             ejemplos_estilo = self._get_ejemplos_estilo_cached(usuario) if modo != 'FIEL' else None
+            preferencias_aprendidas = self._get_preferencias_aprendidas_cached(usuario) if modo != 'FIEL' else None
             
             if modo == 'FIEL':
                 logger.info("✏️ Modo FIEL AL DICTADO - solo corrección ortográfica")
@@ -865,6 +867,7 @@ PASO 3 — REGLAS DE ORO:
   ✅ Si dicta "el resto normal" → conservar todas las líneas no modificadas
   ✅ Lenguaje coloquial del dictado → terminología radiológica precisa en el informe
   ✅ NO inventar hallazgos no dictados
+  - Solo desarrollar una descripcion hipotetica si el dictado lo pide explicitamente con frases como "describi como seria" o "redacta una descripcion de".
   ✅ Si hay contradicción (patología + "sin alteraciones" de la misma estructura) → eliminar la parte normal
 
 ━━━ FORMATO DE SALIDA ━━━
@@ -961,6 +964,14 @@ Estos ejemplos tienen prioridad sobre cualquier otra consideración ortográfica
 
 Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo habitual del usuario."""
                 
+                if preferencias_aprendidas:
+                    prompt += f"""
+
+MEMORIA FUERTE DEL USUARIO:
+{preferencias_aprendidas}
+
+Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dictado aporte el hallazgo correspondiente. No inventar hallazgos para satisfacer una preferencia."""
+
                 prompt += "\n\nGenera el informe profesional en texto plano:"
 
         try:
@@ -1009,6 +1020,12 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
                     texto_mejorado=texto_mejorado,
                     plantilla_actual=plantilla_actual
                 )
+                texto_mejorado, lateralidad_aplicada = self._aplicar_guardrail_lateralidad_contexto(
+                    texto_mejorado,
+                    contexto_clinico,
+                )
+                if lateralidad_aplicada:
+                    guardrails_aplicados.append('TITULO: lateralidad contextual aplicada')
                 texto_mejorado, conclusion_limpiada = self._aplicar_guardrail_conclusion_patologica(
                     texto_mejorado
                 )
@@ -1092,6 +1109,12 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
                             texto_mejorado=texto_mejorado,
                             plantilla_actual=plantilla_actual
                         )
+                        texto_mejorado, lateralidad_aplicada = self._aplicar_guardrail_lateralidad_contexto(
+                            texto_mejorado,
+                            contexto_clinico,
+                        )
+                        if lateralidad_aplicada:
+                            guardrails_aplicados.append('TITULO: lateralidad contextual aplicada')
                         texto_mejorado, conclusion_limpiada = self._aplicar_guardrail_conclusion_patologica(
                             texto_mejorado
                         )
@@ -1194,6 +1217,28 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         
         return ejemplos
     
+    def _get_preferencias_aprendidas_cached(self, usuario):
+        """Obtiene memoria compacta de terminologia y orden corregidos por el usuario."""
+        if not usuario:
+            return None
+
+        cache_key = f'preferencias_aprendidas_{usuario.id if hasattr(usuario, "id") else usuario}'
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        from .models import CorreccionAprendizaje
+        preferencias = CorreccionAprendizaje.obtener_preferencias_aprendidas(
+            usuario=usuario,
+            limite=8,
+        )
+
+        if preferencias:
+            cache.set(cache_key, preferencias, timeout=600)
+            logger.info("Memoria fuerte de usuario cargada para prompt")
+
+        return preferencias
+
     @staticmethod
     def invalidar_cache_usuario(usuario):
         """
@@ -1210,7 +1255,9 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         # Invalidar ejemplos de aprendizaje y estilo
         cache_keys = [
             f'ejemplos_aprendizaje_{usuario_id}',
-            f'ejemplos_estilo_{usuario_id}'
+            f'ejemplos_estilo_{usuario_id}',
+            f'preferencias_aprendidas_{usuario_id}',
+            f'preferencias_aprendidas_v1_{usuario_id}_8',
         ]
         
         for key in cache_keys:
@@ -1339,6 +1386,8 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         lineas = []
         lateralidad = contexto_clinico.get('lateralidad')
         lado_tecnica = contexto_clinico.get('lado_tecnica')
+        titulo_lateralidad = contexto_clinico.get('titulo_lateralidad')
+        frase_lateralidad = contexto_clinico.get('frase_lateralidad')
         region = contexto_clinico.get('region')
         indicacion = contexto_clinico.get('indicacion_clinica')
 
@@ -1346,6 +1395,10 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
             lineas.append(f"- Lateralidad detectada: {lateralidad}.")
         if lado_tecnica:
             lineas.append(f"- Para placeholders de tecnica tipo [<lado>] usar: {lado_tecnica}.")
+        if titulo_lateralidad:
+            lineas.append(f"- Para TITULO usar formulacion: {titulo_lateralidad}.")
+        if frase_lateralidad:
+            lineas.append(f"- Para tecnica y comentario usar formulacion natural: {frase_lateralidad}.")
         if region:
             lineas.append(f"- Region/estudio probable: {region}.")
         if indicacion:
@@ -1536,6 +1589,43 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         if depurada and not depurada.endswith('.'):
             depurada += '.'
         return depurada
+
+    def _aplicar_guardrail_lateralidad_contexto(self, texto_mejorado, contexto_clinico):
+        if not contexto_clinico:
+            return texto_mejorado, False
+
+        if contexto_clinico.get('region') != 'CADERA':
+            return texto_mejorado, False
+        if contexto_clinico.get('lateralidad') != 'BILATERAL':
+            return texto_mejorado, False
+
+        lineas = (texto_mejorado or '').splitlines()
+        cambio = False
+        for idx, linea in enumerate(lineas):
+            if not linea.strip():
+                continue
+
+            normalizada = self._normalizar_texto_simple(linea)
+            if 'rm de cadera' in normalizada or 'resonancia magnetica de cadera' in normalizada:
+                nueva = re.sub(
+                    r'\bRM\s+DE\s+CADERAS?\b.*',
+                    'RM DE AMBAS CADERAS',
+                    linea,
+                    flags=re.I,
+                )
+                nueva = re.sub(
+                    r'\bRESONANCIA\s+MAGNETICA\s+DE\s+CADERAS?\b.*',
+                    'RESONANCIA MAGNETICA DE AMBAS CADERAS',
+                    nueva,
+                    flags=re.I,
+                )
+                nueva = re.sub(r'\s*\[<DERECHA/IZQUIERDA>\]\s*', ' ', nueva, flags=re.I).strip()
+                if nueva != linea:
+                    lineas[idx] = nueva
+                    cambio = True
+            break
+
+        return '\n'.join(lineas).strip(), cambio
 
     def _linea_base_contradicha_por_hallazgos(self, linea_base, texto_original, comentario_lineas):
         """
@@ -1765,8 +1855,9 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         return nuevas, consolidado
 
     def _normalizar_texto_simple(self, texto):
-        tabla = str.maketrans('áéíóúüñÁÉÍÓÚÜÑ', 'aeiouunAEIOUUN')
-        return (texto or '').translate(tabla).lower()
+        texto = unicodedata.normalize('NFKD', texto or '')
+        texto = ''.join(c for c in texto if not unicodedata.combining(c))
+        return texto.lower()
 
     def _formatear_lista_es(self, elementos):
         if not elementos:
@@ -1845,15 +1936,46 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
         return False
 
     def _linea_equivalente_en_lista(self, linea_base, lineas_generadas):
-        base = (linea_base or '').strip().lower()
+        base = self._normalizar_texto_simple(linea_base).strip()
         if not base:
             return False
 
+        base_tokens = self._tokens_equivalencia_linea(base)
+        base_normal = self._es_linea_normalidad(base)
+
         for linea in lineas_generadas:
-            ratio = difflib.SequenceMatcher(None, base, (linea or '').strip().lower()).ratio()
+            linea_norm = self._normalizar_texto_simple(linea).strip()
+            ratio = difflib.SequenceMatcher(None, base, linea_norm).ratio()
             if ratio >= 0.72:
                 return True
+            linea_tokens = self._tokens_equivalencia_linea(linea_norm)
+            if base_normal and self._es_linea_normalidad(linea_norm):
+                if base_tokens and len(base_tokens & linea_tokens) >= 2:
+                    return True
         return False
+
+    def _tokens_equivalencia_linea(self, texto):
+        stopwords = {
+            'altura', 'senal', 'forma', 'tamano', 'posicion', 'trayecto',
+            'morfologia', 'correcta', 'adecuada', 'conservado', 'conservada',
+            'conservados', 'conservadas', 'normal', 'normales', 'sin',
+            'alteraciones', 'lesion', 'lesiones', 'observan', 'visualizan',
+            'aumento', 'significativas', 'resto',
+        }
+        return {
+            token
+            for token in re.findall(r'[a-z0-9]+', self._normalizar_texto_simple(texto))
+            if len(token) >= 4 and token not in stopwords
+        }
+
+    def _es_linea_normalidad(self, texto):
+        texto_norm = self._normalizar_texto_simple(texto)
+        patrones = [
+            'conservad', 'normal', 'sin alteraciones', 'sin lesion',
+            'sin lesiones', 'no se observa', 'no se observan',
+            'no se visualiza', 'no se visualizan', 'correcta alineacion',
+        ]
+        return any(p in texto_norm for p in patrones)
 
     def _detectar_posible_invencion_estructurada(self, texto_original, texto_mejorado, plantilla_actual, modo):
         """

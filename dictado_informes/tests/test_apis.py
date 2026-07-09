@@ -303,6 +303,39 @@ class TestAPIsMejora(TestCase):
 
         self.assertEqual(sugerida['codigo'], '100000')
 
+    def test_selector_agente_no_mezcla_cadera_con_columna(self):
+        PlantillaEstructurada.objects.create(
+            codigo='100010',
+            nombre='RM de columna lumbosacra',
+            titulo='RM DE COLUMNA LUMBOSACRA',
+            seccion_tecnica='Se exploro la columna lumbosacra.',
+            comentarios_base=[
+                'Correcta alineacion en el plano sagital.',
+                'Cuerpos vertebrales y espacios discales de altura conservada.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+        PlantillaEstructurada.objects.create(
+            codigo='100011',
+            nombre='RM de caderas',
+            titulo='RM DE CADERAS',
+            seccion_tecnica='Se exploraron ambas caderas.',
+            comentarios_base=[
+                'Articulaciones coxofemorales conservadas.',
+                'Tendones gluteos conservados.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+
+        sugerida = sugerir_plantilla_para_dictado(
+            'Resonancia de ambas caderas con tendinopatia glutea derecha.',
+            self.user,
+        )
+
+        self.assertEqual(sugerida['codigo'], '100011')
+
     def test_extrae_contexto_clinico_gonalgia_derecha(self):
         contexto = extraer_contexto_clinico_dictado('Paciente con gonalgia derecha.')
 
@@ -310,6 +343,15 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['lateralidad'], 'DERECHA')
         self.assertEqual(contexto['lado_tecnica'], 'derecha')
         self.assertEqual(contexto['indicacion_clinica'], 'Gonalgia derecha.')
+
+    def test_extrae_contexto_clinico_ambas_caderas(self):
+        contexto = extraer_contexto_clinico_dictado('Paciente con coxalgia de ambas caderas.')
+
+        self.assertEqual(contexto['region'], 'CADERA')
+        self.assertEqual(contexto['lateralidad'], 'BILATERAL')
+        self.assertEqual(contexto['titulo_lateralidad'], 'AMBAS CADERAS')
+        self.assertEqual(contexto['frase_lateralidad'], 'ambas caderas')
+        self.assertEqual(contexto['indicacion_clinica'], 'Coxalgia bilateral.')
 
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')
     def test_modo_agente_usa_plantilla_sugerida(self, mock_improve):

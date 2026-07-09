@@ -175,6 +175,24 @@ Desgarro meniscal.
         self.assertIn('Gonalgia derecha.', bloque)
         self.assertIn('No agregar INFORMACION CLINICA si la plantilla no la contiene', bloque)
 
+    def test_guardrail_lateralidad_ambas_caderas_normaliza_titulo(self):
+        texto_final, aplicado = self.ai._aplicar_guardrail_lateralidad_contexto(
+            """RM DE CADERA BILATERAL
+
+TECNICA
+Se exploraron ambas caderas.
+""",
+            {
+                'lateralidad': 'BILATERAL',
+                'region': 'CADERA',
+                'titulo_lateralidad': 'AMBAS CADERAS',
+                'frase_lateralidad': 'ambas caderas',
+            }
+        )
+
+        self.assertTrue(aplicado)
+        self.assertIn('RM DE AMBAS CADERAS', texto_final)
+
     def test_guardrail_restaura_linea_en_seccion_hallazgos_flexible(self):
         texto_original = "Rodilla con derrame articular."
         texto_mejorado = """RM DE RODILLA
@@ -243,6 +261,38 @@ HALLAZGOS
         self.assertNotIn('[1]', texto_final)
         self.assertNotIn('[2]', texto_final)
         self.assertIn('Meniscos de configuracion habitual.', texto_final)
+
+    def test_guardrail_no_duplica_linea_normal_equivalente(self):
+        texto_original = "Columna lumbosacra sin hallazgos patologicos."
+        texto_mejorado = """RM DE COLUMNA LUMBOSACRA
+
+COMENTARIO
+Alineacion sagital conservada.
+Cuerpos vertebrales y espacios discales de altura conservada.
+"""
+        plantilla = {
+            'comentarios': [
+                'Correcta alineacion en el plano sagital.',
+                'Cuerpos vertebrales y espacios discales de altura conservada.',
+            ],
+            'estructura_documento': {
+                'modo': 'estricta',
+                'secciones': [
+                    {'nombre': 'TITULO', 'tipo': 'titulo', 'contenido': 'RM DE COLUMNA LUMBOSACRA'},
+                    {'nombre': 'COMENTARIO', 'tipo': 'hallazgos', 'lineas_base': []},
+                ],
+            },
+        }
+
+        texto_final, restauradas = self.ai._aplicar_guardrails_estructurado(
+            texto_original=texto_original,
+            texto_mejorado=texto_mejorado,
+            plantilla_actual=plantilla,
+        )
+
+        self.assertIn('Alineacion sagital conservada.', texto_final)
+        self.assertNotIn('Correcta alineacion en el plano sagital.', texto_final)
+        self.assertEqual(restauradas, [])
 
     def test_guardrail_conclusion_quita_normalidad_si_hay_patologia(self):
         texto_mejorado = """RM DE RODILLA DERECHA

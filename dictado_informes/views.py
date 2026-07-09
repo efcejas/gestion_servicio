@@ -101,6 +101,43 @@ def _tokens_selector(texto):
     }
 
 
+REGION_SELECTOR_KEYWORDS = {
+    'RODILLA': {
+        'rodilla', 'gonalgia', 'menisco', 'meniscal', 'rotula', 'patelar',
+        'cruzado', 'lca', 'lcp',
+    },
+    'HOMBRO': {
+        'hombro', 'manguito', 'supraespinoso', 'infraespinoso', 'subescapular',
+        'glenohumeral', 'acromioclavicular',
+    },
+    'CODO': {'codo', 'epicondilo', 'epitroclea'},
+    'TOBILLO': {'tobillo', 'aquiles', 'peroneos', 'retromaleolar'},
+    'CADERA': {
+        'cadera', 'caderas', 'coxofemoral', 'coxalgia', 'gluteo', 'gluteos',
+        'trocanter', 'trocanterica', 'acetabulo', 'acetabular', 'femoral',
+        'iliopsoas',
+    },
+    'CEREBRO': {
+        'cerebro', 'encefalo', 'encefalico', 'cefalea', 'convulsion',
+        'convulsiones', 'frontal', 'parietal', 'temporal', 'occipital',
+    },
+    'COLUMNA': {
+        'columna', 'lumbar', 'lumbosacra', 'lumbosacro', 'dorsal', 'cervical',
+        'vertebral', 'vertebrales', 'discal', 'discales', 'disco', 'protrusion',
+        'protrusiones', 'hernia', 'cono', 'medular', 'radicular',
+    },
+}
+
+
+def _regiones_en_texto_selector(texto):
+    tokens = set(_normalizar_texto_selector(texto).split())
+    return {
+        region
+        for region, claves in REGION_SELECTOR_KEYWORDS.items()
+        if tokens & claves
+    }
+
+
 def extraer_contexto_clinico_dictado(texto):
     texto_norm = _normalizar_texto_selector(texto)
     tokens = set(texto_norm.split())
@@ -117,16 +154,8 @@ def extraer_contexto_clinico_dictado(texto):
         lateralidad = 'BILATERAL'
         lado_tecnica = 'bilateral'
 
-    regiones = [
-        ('RODILLA', {'rodilla', 'gonalgia', 'menisco', 'meniscal', 'rotula', 'patelar'}),
-        ('HOMBRO', {'hombro', 'manguito', 'supraespinoso', 'infraespinoso', 'subescapular'}),
-        ('CODO', {'codo', 'epicondilo', 'epitroclea'}),
-        ('TOBILLO', {'tobillo', 'aquiles', 'peroneos', 'retromaleolar'}),
-        ('CADERA', {'cadera', 'coxofemoral', 'coxalgia'}),
-        ('CEREBRO', {'cerebro', 'encefalo', 'cefalea', 'convulsion', 'frontal', 'parietal', 'temporal'}),
-    ]
     region = None
-    for nombre, claves in regiones:
+    for nombre, claves in REGION_SELECTOR_KEYWORDS.items():
         if tokens & claves:
             region = nombre
             break
@@ -147,14 +176,27 @@ def extraer_contexto_clinico_dictado(texto):
 
     if indicaciones and lateralidad in {'DERECHA', 'IZQUIERDA'} and region in {'RODILLA', 'HOMBRO', 'CODO', 'TOBILLO', 'CADERA'}:
         indicacion_clinica = f"{indicaciones[0]} {lateralidad.lower()}."
+    elif indicaciones and lateralidad == 'BILATERAL' and region == 'CADERA':
+        indicacion_clinica = f"{indicaciones[0]} bilateral."
     elif indicaciones:
         indicacion_clinica = f"{indicaciones[0]}."
     else:
         indicacion_clinica = ''
 
+    titulo_lateralidad = ''
+    frase_lateralidad = ''
+    if lateralidad == 'BILATERAL' and region == 'CADERA':
+        titulo_lateralidad = 'AMBAS CADERAS'
+        frase_lateralidad = 'ambas caderas'
+    elif lateralidad in {'DERECHA', 'IZQUIERDA'}:
+        titulo_lateralidad = lateralidad
+        frase_lateralidad = lateralidad.lower()
+
     return {
         'lateralidad': lateralidad,
         'lado_tecnica': lado_tecnica,
+        'titulo_lateralidad': titulo_lateralidad,
+        'frase_lateralidad': frase_lateralidad,
         'region': region,
         'indicacion_clinica': indicacion_clinica,
     }
@@ -185,6 +227,11 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
         ])
         plantilla_norm = _normalizar_texto_selector(corpus)
         plantilla_tokens = _tokens_selector(corpus)
+        region = contexto_clinico.get('region')
+        regiones_plantilla = _regiones_en_texto_selector(corpus)
+        if region and regiones_plantilla and region not in regiones_plantilla:
+            continue
+
         coincidencias = texto_tokens & plantilla_tokens
         score = len(coincidencias) * 3
 
@@ -198,11 +245,12 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
         if plantilla.codigo and _normalizar_texto_selector(plantilla.codigo) in texto_norm:
             score += 8
 
-        region = contexto_clinico.get('region')
         if region and region.lower() in plantilla_norm:
             score += 25
         if region and region.lower() in _normalizar_texto_selector(plantilla.nombre):
             score += 20
+        if region and region in regiones_plantilla:
+            score += 30
 
         if usuario and plantilla.creada_por_id == getattr(usuario, 'id', None):
             score += 40
