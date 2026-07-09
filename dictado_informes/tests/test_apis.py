@@ -336,6 +336,48 @@ class TestAPIsMejora(TestCase):
 
         self.assertEqual(sugerida['codigo'], '100011')
 
+    def test_selector_agente_no_mezcla_mano_con_columna(self):
+        PlantillaEstructurada.objects.create(
+            codigo='100020',
+            nombre='RM de columna lumbosacra',
+            titulo='RM DE COLUMNA LUMBOSACRA',
+            seccion_tecnica='Se exploro la columna lumbosacra.',
+            comentarios_base=[
+                'Correcta alineacion en el plano sagital.',
+                'Cuerpos vertebrales y espacios discales de altura conservada.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+        PlantillaEstructurada.objects.create(
+            codigo='100021',
+            nombre='RM de mano',
+            titulo='RM DE MANO [<DERECHA/IZQUIERDA>]',
+            seccion_tecnica='Se exploro la mano [<lado>] con protocolo habitual.',
+            comentarios_base=[
+                'Alineacion carpometacarpiana conservada.',
+                'Tendones flexores y extensores sin alteraciones.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+
+        sugerida = sugerir_plantilla_para_dictado(
+            'resonancia magnetica de mano izquierda con trauma, risartrosis y tenosinovitis del tendon flexor del pulgar',
+            self.user,
+        )
+
+        self.assertEqual(sugerida['codigo'], '100021')
+
+    def test_extrae_contexto_clinico_mano_izquierda(self):
+        contexto = extraer_contexto_clinico_dictado(
+            'Resonancia magnetica de mano izquierda con antecedente traumatico y risartrosis.'
+        )
+
+        self.assertEqual(contexto['region'], 'MANO')
+        self.assertEqual(contexto['lateralidad'], 'IZQUIERDA')
+        self.assertEqual(contexto['lado_tecnica'], 'izquierda')
+
     def test_extrae_contexto_clinico_gonalgia_derecha(self):
         contexto = extraer_contexto_clinico_dictado('Paciente con gonalgia derecha.')
 

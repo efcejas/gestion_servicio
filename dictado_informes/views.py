@@ -111,6 +111,15 @@ REGION_SELECTOR_KEYWORDS = {
         'glenohumeral', 'acromioclavicular',
     },
     'CODO': {'codo', 'epicondilo', 'epitroclea'},
+    'MANO': {
+        'mano', 'manos', 'dedo', 'dedos', 'pulgar', 'metacarpiano',
+        'metacarpianos', 'metacarpofalangica', 'interfalangica', 'falange',
+        'falanges', 'risartrosis', 'trapeciometacarpiana',
+    },
+    'MUNECA': {
+        'muneca', 'carpo', 'carpiano', 'carpianos', 'escafoides',
+        'semilunar', 'radiocubital', 'radiocarpiana', 'tunel carpiano',
+    },
     'TOBILLO': {'tobillo', 'aquiles', 'peroneos', 'retromaleolar'},
     'CADERA': {
         'cadera', 'caderas', 'coxofemoral', 'coxalgia', 'gluteo', 'gluteos',

@@ -193,6 +193,23 @@ Se exploraron ambas caderas.
         self.assertTrue(aplicado)
         self.assertIn('RM DE AMBAS CADERAS', texto_final)
 
+    def test_plantilla_columna_incompatible_con_contexto_mano(self):
+        plantilla = {
+            'titulo': 'RM DE COLUMNA LUMBOSACRA',
+            'seccion_tecnica': 'Se exploro la columna lumbosacra.',
+            'comentarios': [
+                'Correcta alineacion en el plano sagital.',
+                'Cuerpos vertebrales y espacios discales de altura conservada.',
+            ],
+        }
+
+        compatible = self.ai._plantilla_compatible_con_contexto(
+            plantilla,
+            {'region': 'MANO'}
+        )
+
+        self.assertFalse(compatible)
+
     def test_guardrail_restaura_linea_en_seccion_hallazgos_flexible(self):
         texto_original = "Rodilla con derrame articular."
         texto_mejorado = """RM DE RODILLA

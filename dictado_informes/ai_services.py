@@ -1015,11 +1015,14 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             texto_mejorado = response.choices[0].message.content.strip()
             guardrails_aplicados = []
             if modo != 'FIEL' and not custom_prompt and plantilla_actual:
-                texto_mejorado, guardrails_aplicados = self._aplicar_guardrails_estructurado(
-                    texto_original=texto_original,
-                    texto_mejorado=texto_mejorado,
-                    plantilla_actual=plantilla_actual
-                )
+                if self._plantilla_compatible_con_contexto(plantilla_actual, contexto_clinico):
+                    texto_mejorado, guardrails_aplicados = self._aplicar_guardrails_estructurado(
+                        texto_original=texto_original,
+                        texto_mejorado=texto_mejorado,
+                        plantilla_actual=plantilla_actual
+                    )
+                else:
+                    guardrails_aplicados = ['Guardrails de plantilla omitidos por region incompatible']
                 texto_mejorado, lateralidad_aplicada = self._aplicar_guardrail_lateralidad_contexto(
                     texto_mejorado,
                     contexto_clinico,
@@ -1104,11 +1107,14 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                     texto_mejorado = response.choices[0].message.content.strip()
                     guardrails_aplicados = []
                     if modo != 'FIEL' and not custom_prompt and plantilla_actual:
-                        texto_mejorado, guardrails_aplicados = self._aplicar_guardrails_estructurado(
-                            texto_original=texto_original,
-                            texto_mejorado=texto_mejorado,
-                            plantilla_actual=plantilla_actual
-                        )
+                        if self._plantilla_compatible_con_contexto(plantilla_actual, contexto_clinico):
+                            texto_mejorado, guardrails_aplicados = self._aplicar_guardrails_estructurado(
+                                texto_original=texto_original,
+                                texto_mejorado=texto_mejorado,
+                                plantilla_actual=plantilla_actual
+                            )
+                        else:
+                            guardrails_aplicados = ['Guardrails de plantilla omitidos por region incompatible']
                         texto_mejorado, lateralidad_aplicada = self._aplicar_guardrail_lateralidad_contexto(
                             texto_mejorado,
                             contexto_clinico,
@@ -1432,6 +1438,54 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 if nombre and nombre not in self._headers_hallazgos_plantilla(plantilla_actual):
                     headers.add(nombre)
         return headers
+
+    def _plantilla_compatible_con_contexto(self, plantilla_actual, contexto_clinico):
+        region = (contexto_clinico or {}).get('region')
+        if not region:
+            return True
+
+        corpus = ' '.join([
+            str((plantilla_actual or {}).get('titulo') or ''),
+            str((plantilla_actual or {}).get('seccion_tecnica') or ''),
+            ' '.join((plantilla_actual or {}).get('comentarios') or []),
+        ])
+        regiones_plantilla = self._regiones_en_texto(corpus)
+        if not regiones_plantilla:
+            return True
+        return region in regiones_plantilla
+
+    def _regiones_en_texto(self, texto):
+        texto_norm = self._normalizar_texto_simple(texto)
+        tokens = set(re.findall(r'[a-z0-9]+', texto_norm))
+        mapa = {
+            'COLUMNA': {
+                'columna', 'lumbar', 'lumbosacra', 'lumbosacro', 'cervical',
+                'dorsal', 'vertebral', 'vertebrales', 'discal', 'discales',
+                'protrusion', 'protrusiones', 'cono', 'medular',
+            },
+            'MANO': {
+                'mano', 'manos', 'dedo', 'dedos', 'pulgar', 'metacarpiano',
+                'metacarpianos', 'falange', 'falanges', 'risartrosis',
+                'trapeciometacarpiana',
+            },
+            'MUNECA': {
+                'muneca', 'carpo', 'carpiano', 'carpianos', 'escafoides',
+                'semilunar', 'radiocarpiana', 'radiocubital',
+            },
+            'CADERA': {
+                'cadera', 'caderas', 'coxofemoral', 'coxalgia', 'gluteo',
+                'gluteos', 'trocanter', 'acetabulo',
+            },
+            'RODILLA': {
+                'rodilla', 'gonalgia', 'menisco', 'meniscal', 'rotula',
+                'patelar', 'cruzado',
+            },
+            'HOMBRO': {
+                'hombro', 'manguito', 'supraespinoso', 'infraespinoso',
+                'subescapular', 'glenohumeral',
+            },
+        }
+        return {region for region, claves in mapa.items() if tokens & claves}
 
     def _normalizar_header_salida(self, texto):
         tabla = str.maketrans('ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNaeiouun')
