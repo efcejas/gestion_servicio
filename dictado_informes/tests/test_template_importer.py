@@ -5,11 +5,13 @@ from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from unittest.mock import patch
 
 from dictado_informes.template_importer import (
     DocxTemplateImportError,
     extraer_parrafos_docx,
     extraer_parrafos_texto,
+    extraer_texto_plantilla_archivo,
     importar_plantilla_archivo,
     importar_plantilla_docx,
     importar_plantilla_texto,
@@ -152,6 +154,19 @@ class TemplateImporterTests(SimpleTestCase):
         self.assertEqual(data['titulo'], 'RM DE RODILLA')
         self.assertEqual(data['seccion_tecnica'], 'Tecnica base')
         self.assertEqual(data['comentarios_base'], ['Meniscos normales.'])
+
+    def test_extraer_texto_plantilla_archivo(self):
+        archivo = BytesIO(
+            b'RM DE RODILLA\nTECNICA\nTecnica base\nHALLAZGOS\nMeniscos normales.'
+        )
+        archivo.name = 'rodilla.txt'
+
+        texto = extraer_texto_plantilla_archivo(archivo)
+
+        self.assertEqual(
+            texto,
+            'RM DE RODILLA\nTECNICA\nTecnica base\nHALLAZGOS\nMeniscos normales.'
+        )
 
     def test_importar_plantilla_desde_texto_pegado(self):
         data = importar_plantilla_texto(
@@ -313,6 +328,42 @@ class ImportarPlantillaDocxViewTests(TestCase):
         self.assertContains(response, 'Vista previa editable')
         self.assertContains(response, 'RM CEREBRO')
         self.assertContains(response, 'Sistema ventricular conservado.')
+
+    @patch('dictado_informes.views.ai_service.estructurar_plantilla_importada')
+    def test_importador_puede_estructurar_con_ia(self, mock_estructurar):
+        mock_estructurar.return_value = {
+            'titulo': 'RM DE RODILLA',
+            'seccion_tecnica': 'Tecnica IA',
+            'comentarios_base': ['Meniscos normales.'],
+            'estructura_documento': {
+                'modo': 'estricta',
+                'permitir_secciones_nuevas': False,
+                'secciones': [
+                    {'nombre': 'TITULO', 'tipo': 'titulo', 'contenido': 'RM DE RODILLA'},
+                    {'nombre': 'TECNICA', 'tipo': 'tecnica', 'contenido': 'Tecnica IA'},
+                    {'nombre': 'COMENTARIO', 'tipo': 'hallazgos', 'lineas_base': ['Meniscos normales.']},
+                    {'nombre': 'CONCLUSION', 'tipo': 'conclusion', 'contenido': ''},
+                ],
+            },
+        }
+
+        response = self.client.post(
+            reverse('dictado_informes:plantilla_estructurada_import_docx'),
+            data={
+                'accion': 'preview',
+                'estructurar_con_ia': 'on',
+                'texto_plantilla': (
+                    'RM DE RODILLA\n'
+                    'Se exploro con protocolo habitual.\n'
+                    'Meniscos normales.'
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_estructurar.assert_called_once()
+        self.assertContains(response, 'Tecnica IA')
+        self.assertContains(response, 'COMENTARIO')
 
     def test_importador_requiere_archivo_o_texto(self):
         response = self.client.post(

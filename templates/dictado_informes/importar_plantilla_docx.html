@@ -91,6 +91,18 @@
                 {{ upload_form.non_field_errors }}
             </div>
             {% endif %}
+            <label class="flex items-start gap-3 rounded-lg border border-green-700/40 bg-green-900/20 p-3 text-sm text-gray-200">
+                <span class="mt-0.5">{{ upload_form.estructurar_con_ia }}</span>
+                <span>
+                    <span class="block font-bold text-white">{{ upload_form.estructurar_con_ia.label }}</span>
+                    <span class="block text-xs text-gray-400">{{ upload_form.estructurar_con_ia.help_text }}</span>
+                </span>
+            </label>
+            {% if upload_form.estructurar_con_ia.errors %}
+            <div class="text-red-400 text-sm mt-2 bg-red-900/30 p-2 rounded border border-red-700">
+                {{ upload_form.estructurar_con_ia.errors }}
+            </div>
+            {% endif %}
             <button type="submit"
                     class="inline-flex items-center px-5 py-2.5 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors">
                 <i class="fas fa-magic mr-2"></i>

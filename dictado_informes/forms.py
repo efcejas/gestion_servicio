@@ -211,6 +211,20 @@ class PlantillaEstructuradaForm(forms.ModelForm):
 
 
 class ImportarPlantillaDocxForm(forms.Form):
+    estructurar_con_ia = forms.BooleanField(
+        label='Estructurar con IA',
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'rounded border-gray-300 text-green-600 shadow-sm focus:border-green-500 focus:ring-green-500'
+        }),
+        help_text=(
+            'Si esta activo, la IA intenta separar titulo, informacion clinica, '
+            'tecnica, comentario/hallazgos y conclusion. Si falla, se usa el '
+            'analisis local como respaldo.'
+        )
+    )
+
     archivo_docx = forms.FileField(
         label='Archivo de plantilla',
         required=False,

@@ -280,6 +280,17 @@ def importar_plantilla_archivo(file_obj):
     return construir_estructura_desde_parrafos(parrafos)
 
 
+def extraer_texto_plantilla_archivo(file_obj):
+    nombre = (getattr(file_obj, 'name', '') or '').lower()
+    if nombre.endswith('.docx'):
+        parrafos = extraer_parrafos_docx(file_obj)
+    elif nombre.endswith(('.txt', '.md', '.markdown', '.rtf', '.html', '.htm', '.doc')):
+        parrafos = extraer_parrafos_texto(file_obj)
+    else:
+        raise DocxTemplateImportError('Formato no soportado. Usa .docx, .doc, .txt, .md, .rtf o .html.')
+    return '\n'.join(parrafos)
+
+
 def importar_plantilla_texto(texto):
     parrafos = texto_a_parrafos(texto)
     if not parrafos:

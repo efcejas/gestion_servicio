@@ -244,6 +244,25 @@ HALLAZGOS
         self.assertNotIn('[2]', texto_final)
         self.assertIn('Meniscos de configuracion habitual.', texto_final)
 
+    def test_guardrail_conclusion_quita_normalidad_si_hay_patologia(self):
+        texto_mejorado = """RM DE RODILLA DERECHA
+
+COMENTARIO
+Desgarro del ligamento cruzado anterior.
+Ligamento cruzado posterior conservado.
+Meniscos de altura y senal normales.
+
+CONCLUSION
+Desgarro del ligamento cruzado anterior en rodilla derecha con meniscos y resto de estructuras ligamentarias sin alteraciones.
+"""
+
+        texto_final, aplicado = self.ai._aplicar_guardrail_conclusion_patologica(texto_mejorado)
+
+        self.assertTrue(aplicado)
+        self.assertIn('CONCLUSION', texto_final)
+        self.assertIn('Desgarro del ligamento cruzado anterior en rodilla derecha.', texto_final)
+        self.assertNotIn('meniscos y resto de estructuras ligamentarias sin alteraciones', texto_final)
+
     def test_guardrail_no_restaura_linea_normal_de_parenquima_con_lesion_cerebral(self):
         texto_original = "Lesion nodular focal en region frontal izquierda."
         texto_mejorado = """RESONANCIA MAGNETICA DE CEREBRO

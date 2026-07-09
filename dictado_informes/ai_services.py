@@ -7,6 +7,7 @@ from django.core.cache import cache
 from decouple import config
 import logging
 import hashlib
+import json
 import re
 import difflib
 
@@ -434,6 +435,157 @@ class AIService:
                 'error': error_msg
             }
     
+    def estructurar_plantilla_importada(self, texto_plantilla):
+        """
+        Usa IA para clasificar una plantilla libre en secciones editables.
+
+        Devuelve el mismo contrato que template_importer.construir_estructura_desde_parrafos:
+        titulo, seccion_tecnica, comentarios_base y estructura_documento.
+        """
+        if not self.llm_enabled:
+            raise ValueError('IA no configurada para estructurar plantillas.')
+
+        texto_plantilla = (texto_plantilla or '').strip()
+        if not texto_plantilla:
+            raise ValueError('No se recibio texto de plantilla para estructurar.')
+
+        prompt = f"""Analiza esta plantilla medica de radiologia y separala en secciones.
+
+TEXTO ORIGINAL:
+{texto_plantilla}
+
+Devuelve UNICAMENTE JSON valido, sin markdown, con esta forma exacta:
+{{
+  "titulo": "titulo del estudio o primera linea util",
+  "informacion_clinica": "texto clinico si existe, si no vacio",
+  "seccion_tecnica": "parrafo tecnico si existe, si no vacio",
+  "comentarios_base": ["una linea por hallazgo normal o descripcion base"],
+  "conclusion": "conclusion si existe en la plantilla original, si no vacio",
+  "tiene_conclusion": true,
+  "nombres_secciones": {{
+    "informacion_clinica": "INFORMACION CLINICA",
+    "tecnica": "TECNICA",
+    "hallazgos": "COMENTARIO",
+    "conclusion": "CONCLUSION"
+  }}
+}}
+
+Reglas:
+- Respeta la estructura real de la plantilla original.
+- No inventes CONCLUSION si la plantilla original no la trae.
+- No inventes INFORMACION CLINICA si la plantilla original no la trae.
+- Si hay encabezados como INFORME, COMENTARIO, HALLAZGOS o DESCRIPCION, usalos como bloque de comentarios_base.
+- La tecnica suele mencionar secuencias, T1, T2, STIR, FLAIR, difusion, contraste o planos.
+- comentarios_base debe contener una linea por estructura anatomica o hallazgo normal.
+- No corrijas el contenido salvo errores menores de espaciado."""
+
+        response = self.llm_client.chat.completions.create(
+            model=self.llm_model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Eres un asistente experto en plantillas de informes radiologicos. "
+                        "Tu unica tarea es clasificar texto en JSON valido sin inventar secciones."
+                    )
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.05,
+            max_tokens=1800,
+        )
+        contenido = response.choices[0].message.content.strip()
+        data = self._extraer_json_respuesta(contenido)
+        return self._normalizar_estructura_plantilla_ia(data)
+
+    def _extraer_json_respuesta(self, contenido):
+        try:
+            return json.loads(contenido)
+        except json.JSONDecodeError:
+            match = re.search(r'\{.*\}', contenido or '', flags=re.S)
+            if not match:
+                raise ValueError('La IA no devolvio JSON valido.')
+            return json.loads(match.group(0))
+
+    def _normalizar_estructura_plantilla_ia(self, data):
+        from .template_importer import construir_estructura_desde_parrafos
+
+        if not isinstance(data, dict):
+            raise ValueError('La estructura IA debe ser un objeto JSON.')
+
+        titulo = str(data.get('titulo') or 'PLANTILLA IMPORTADA').strip()
+        informacion_clinica = str(data.get('informacion_clinica') or '').strip()
+        tecnica = str(data.get('seccion_tecnica') or '').strip()
+        conclusion = str(data.get('conclusion') or '').strip()
+        comentarios_base = data.get('comentarios_base') or []
+        if not isinstance(comentarios_base, list):
+            raise ValueError('comentarios_base debe ser una lista.')
+
+        comentarios_base = [
+            str(linea).strip()
+            for linea in comentarios_base
+            if str(linea).strip()
+        ]
+        tiene_conclusion = self._json_bool(data.get('tiene_conclusion')) or bool(conclusion)
+        nombres = data.get('nombres_secciones') if isinstance(data.get('nombres_secciones'), dict) else {}
+
+        secciones = [
+            {
+                'nombre': 'TITULO',
+                'tipo': 'titulo',
+                'contenido': titulo,
+                'editable_por_ia': True,
+            }
+        ]
+        if informacion_clinica:
+            secciones.append({
+                'nombre': nombres.get('informacion_clinica') or 'INFORMACION CLINICA',
+                'tipo': 'texto',
+                'contenido': informacion_clinica,
+                'editable_por_ia': True,
+            })
+        if tecnica:
+            secciones.append({
+                'nombre': nombres.get('tecnica') or 'TECNICA',
+                'tipo': 'tecnica',
+                'contenido': tecnica,
+                'editable_por_ia': False,
+            })
+        secciones.append({
+            'nombre': nombres.get('hallazgos') or 'HALLAZGOS',
+            'tipo': 'hallazgos',
+            'lineas_base': comentarios_base,
+            'editable_por_ia': True,
+        })
+        if tiene_conclusion:
+            secciones.append({
+                'nombre': nombres.get('conclusion') or 'CONCLUSION',
+                'tipo': 'conclusion',
+                'contenido': conclusion,
+                'editable_por_ia': True,
+            })
+
+        if not comentarios_base and not tecnica and not informacion_clinica and not conclusion:
+            return construir_estructura_desde_parrafos([titulo])
+
+        return {
+            'titulo': titulo,
+            'seccion_tecnica': tecnica,
+            'comentarios_base': comentarios_base,
+            'estructura_documento': {
+                'modo': 'estricta',
+                'permitir_secciones_nuevas': False,
+                'secciones': secciones,
+            },
+        }
+
+    def _json_bool(self, valor):
+        if isinstance(valor, bool):
+            return valor
+        if isinstance(valor, str):
+            return valor.strip().lower() in {'true', '1', 'si', 'sí', 'yes'}
+        return bool(valor)
+
     def improve_medical_text(self, texto_original, tipo_estudio, contexto=None, usuario=None, custom_prompt=None):
         """
         Mejora el texto dictado usando GPT-4 para darle formato médico profesional
@@ -669,7 +821,7 @@ COMENTARIO
 [Una linea por estructura. Cada oracion termina con punto y salto de linea. NO todo en un parrafo.]
 
 CONCLUSION
-[Texto corrido narrativo, 2-4 lineas. Sin vinetas. Sin "se observa / se evidencia". Jerarquizar: hallazgo principal -> asociados -> secundarios.]"""
+[Solo hallazgos patologicos dictados. Texto corrido narrativo, breve. No mencionar estructuras normales ni "resto sin alteraciones".]"""
 
                 # 🧠 PROMPT CON RAZONAMIENTO SEMÁNTICO DE LÍNEAS
                 prompt = f"""Sos un radiólogo experto generando un informe de {tipo_nombre}.
@@ -750,7 +902,7 @@ PRINCIPIOS FUNDAMENTALES:
    • Primero: Lesión principal o diagnóstico clave (desgarro, fractura, masa)
    • Segundo: Hallazgos directamente relacionados (edema óseo asociado, extrusión meniscal)
    • Tercero: Hallazgos secundarios/inflamatorios (derrame, sinovitis, edema de partes blandas)
-   • Cierre (si aplica): "Resto de estructuras sin particularidades" o frase equivalente
+   • No usar cierre de normalidad si existe al menos un hallazgo patologico
 
 2. TERMINOLOGÍA RADIOLÓGICA ESTÁNDAR - Usar lenguaje profesional preciso:
    ✅ USAR: meniscopatía degenerativa, desgarro complejo, gonartrosis tricompartimental
@@ -778,11 +930,13 @@ PRINCIPIOS FUNDAMENTALES:
    ✅ Especificar localización anatómica cuando sea relevante
    ✅ Mencionar lateralidad si es pertinente (medial/lateral, interno/externo)
    ❌ NO describir estructuras normales (salvo relevancia clínica específica)
+   ❌ NO mencionar "resto de estructuras", meniscos normales, ligamentos conservados ni otras normalidades
    ❌ NO agregar recomendaciones clínicas ni correlación clínica
    ❌ NO omitir patología descrita en el COMENTARIO
 
 6. CASOS ESPECIALES:
    • Estudio NORMAL → "Estudio dentro de los parámetros normales."
+   • Estudio con patologia → CONCLUSION solo con patologia. La normalidad queda en COMENTARIO.
    • Estudio comparativo → primera línea del COMENTARIO: "Comparativo con [fecha]"
    • "El resto normal" en el dictado → conservar todas las líneas no modificadas"""
                 
@@ -855,6 +1009,11 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
                     texto_mejorado=texto_mejorado,
                     plantilla_actual=plantilla_actual
                 )
+                texto_mejorado, conclusion_limpiada = self._aplicar_guardrail_conclusion_patologica(
+                    texto_mejorado
+                )
+                if conclusion_limpiada:
+                    guardrails_aplicados.append('CONCLUSION: normalidad removida')
             modo_usado = "PLANTILLA" if plantilla else modo
             analisis_invencion = self._detectar_posible_invencion_estructurada(
                 texto_original=texto_original,
@@ -933,6 +1092,11 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
                             texto_mejorado=texto_mejorado,
                             plantilla_actual=plantilla_actual
                         )
+                        texto_mejorado, conclusion_limpiada = self._aplicar_guardrail_conclusion_patologica(
+                            texto_mejorado
+                        )
+                        if conclusion_limpiada:
+                            guardrails_aplicados.append('CONCLUSION: normalidad removida')
                     modo_usado = "PLANTILLA" if plantilla else modo
                     analisis_invencion = self._detectar_posible_invencion_estructurada(
                         texto_original=texto_original,
@@ -1296,6 +1460,82 @@ Usa esta guía únicamente para ordenar y redactar el COMENTARIO con el estilo h
     def _limpiar_numeracion_salida(self, linea):
         """Quita indices que el modelo puede copiar desde la plantilla razonada."""
         return re.sub(r'^\s*\[\d+\]\s*', '', linea or '').strip()
+
+    def _aplicar_guardrail_conclusion_patologica(self, texto_mejorado):
+        lineas = (texto_mejorado or '').splitlines()
+        idx_conclusion = self._buscar_indice_header(
+            lineas,
+            {'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'}
+        )
+        if idx_conclusion is None:
+            return texto_mejorado, False
+
+        idx_fin = self._buscar_siguiente_header(
+            lineas,
+            idx_conclusion + 1,
+            {'TECNICA', 'TÉCNICA', 'COMENTARIO', 'HALLAZGOS', 'INFORMACION CLINICA', 'INFORMACIÓN CLÍNICA'}
+        )
+        if idx_fin is None:
+            idx_fin = len(lineas)
+
+        bloque = lineas[idx_conclusion + 1:idx_fin]
+        nuevas = []
+        cambio = False
+        for linea in bloque:
+            limpia = linea.strip()
+            if not limpia:
+                continue
+            depurada = self._depurar_linea_conclusion(limpia)
+            if depurada != limpia:
+                cambio = True
+            if depurada:
+                nuevas.append(depurada)
+
+        if not cambio:
+            return texto_mejorado, False
+
+        nuevas_lineas = []
+        nuevas_lineas.extend(lineas[:idx_conclusion + 1])
+        nuevas_lineas.extend(nuevas)
+        nuevas_lineas.extend(lineas[idx_fin:])
+        return '\n'.join(nuevas_lineas).strip(), True
+
+    def _depurar_linea_conclusion(self, linea):
+        normalizada = self._normalizar_texto_simple(linea)
+        normalidad = [
+            'sin alteraciones', 'sin particularidades', 'conservad', 'normales',
+            'normal', 'sin lesion', 'sin lesiones', 'no se observa', 'no se visualiza',
+            'resto de estructuras', 'resto de tendones', 'resto ligament'
+        ]
+        patologia = [
+            'desgarro', 'rotura', 'ruptura', 'lesion', 'edema', 'derrame',
+            'fractura', 'tendinopatia', 'condromalacia', 'meniscopatia',
+            'gonartrosis', 'sinovitis', 'bursitis', 'quiste', 'nodulo', 'masa'
+        ]
+
+        tiene_normalidad = any(p in normalizada for p in normalidad)
+        tiene_patologia = any(p in normalizada for p in patologia)
+        if not tiene_normalidad:
+            return linea
+        if not tiene_patologia:
+            return ''
+
+        depurada = re.sub(
+            r'\s+(con|y)\s+[^.]*?(sin alteraciones|sin particularidades|conservad\w*|normales?|resto de estructuras|resto de tendones|resto ligament\w*)[^.]*',
+            '',
+            linea,
+            flags=re.I,
+        )
+        depurada = re.sub(
+            r'\b(Meniscos|Ligamentos|Resto de estructuras|Resto de tendones)[^.]*?(sin alteraciones|conservad\w*|normales?)[^.]*\.?',
+            '',
+            depurada,
+            flags=re.I,
+        )
+        depurada = re.sub(r'\s+', ' ', depurada).strip(' ,;')
+        if depurada and not depurada.endswith('.'):
+            depurada += '.'
+        return depurada
 
     def _linea_base_contradicha_por_hallazgos(self, linea_base, texto_original, comentario_lineas):
         """

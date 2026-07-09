@@ -19,7 +19,12 @@ from .models import (
 )
 from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
 from .ai_services import ai_service
-from .template_importer import DocxTemplateImportError, importar_plantilla_archivo, importar_plantilla_texto
+from .template_importer import (
+    DocxTemplateImportError,
+    extraer_texto_plantilla_archivo,
+    importar_plantilla_archivo,
+    importar_plantilla_texto,
+)
 import json
 import base64
 import logging
@@ -674,11 +679,27 @@ def importar_plantilla_docx_view(request):
         if upload_form.is_valid():
             archivo = upload_form.cleaned_data['archivo_docx']
             texto_plantilla = upload_form.cleaned_data.get('texto_plantilla') or ''
+            estructurar_con_ia = upload_form.cleaned_data.get('estructurar_con_ia')
             try:
                 if archivo:
+                    texto_fuente = extraer_texto_plantilla_archivo(archivo)
                     data = importar_plantilla_archivo(archivo)
                 else:
+                    texto_fuente = texto_plantilla
                     data = importar_plantilla_texto(texto_plantilla)
+                if estructurar_con_ia:
+                    try:
+                        data = ai_service.estructurar_plantilla_importada(texto_fuente)
+                        messages.success(
+                            request,
+                            "La IA estructuro la plantilla. Revisa la vista previa antes de guardar."
+                        )
+                    except Exception as exc:
+                        logger.warning("No se pudo estructurar plantilla con IA: %s", exc)
+                        messages.warning(
+                            request,
+                            "No se pudo estructurar con IA; se uso el analisis local como respaldo."
+                        )
                 codigo = _generar_codigo_interno_plantilla()
                 initial = {
                     'codigo': codigo,
