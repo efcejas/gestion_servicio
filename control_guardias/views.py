@@ -79,6 +79,14 @@ class JefeInstructorMixin(LoginRequiredMixin, UserPassesTestMixin):
         return user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
 
 
+class ResidenteMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Acceso exclusivo para residentes."""
+    login_url = 'login'
+
+    def test_func(self):
+        return self.request.user.rol == 'medico_residente'
+
+
 def _safe_return_url(request, fallback, focus=''):
     return_to = (
         request.POST.get('return_to')
@@ -858,7 +866,7 @@ class AusenciasView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class ReportarAusenciaView(LoginRequiredMixin, TemplateView):
+class ReportarAusenciaView(ResidenteMixin, TemplateView):
     """
     GET: muestra el formulario para reportar une ausencia.
     POST: crea la ausencia y vincula guardias afectadas.

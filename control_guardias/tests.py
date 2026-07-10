@@ -2,7 +2,7 @@ import datetime
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
@@ -1385,6 +1385,7 @@ class CancelarCambioTest(TestCase):
             self.cancelar(solicitud1, self.residente1)
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class AusenciasViewTest(TestCase):
     """Tests de permisos y datos en las vistas de ausencias."""
 
@@ -1425,6 +1426,22 @@ class AusenciasViewTest(TestCase):
         })
         self.assertRedirects(response, reverse('control_guardias:ausencias'))
         self.assertTrue(AusenciaResidente.objects.filter(residente=self.residente).exists())
+
+    def test_jefe_no_puede_acceder_a_reportar_ausencia(self):
+        self.client.login(username='jefe1', password='testpass123')
+        response = self.client.get(reverse('control_guardias:ausencia_reportar'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_jefe_no_puede_reportar_ausencia_via_post(self):
+        self.client.login(username='jefe1', password='testpass123')
+        response = self.client.post(reverse('control_guardias:ausencia_reportar'), {
+            'fecha_inicio': self.hoy.isoformat(),
+            'fecha_fin': self.hoy.isoformat(),
+            'motivo': 'OTRO',
+            'descripcion': '',
+        })
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(AusenciaResidente.objects.filter(residente=self.jefe).exists())
 
     def test_residente_reporta_ausencia_via_post_con_documento(self):
         self.client.login(username='residente1', password='testpass123')
