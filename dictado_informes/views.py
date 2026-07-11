@@ -300,13 +300,105 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
     return None
 
 
+SELECTOR_HIBRIDO_STOPWORDS = {
+    'a', 'al', 'con', 'de', 'del', 'el', 'en', 'es', 'la', 'las', 'lo',
+    'los', 'magnetica', 'paciente', 'presenta', 'que', 'resonancia', 'se',
+    'sin', 'un', 'una', 'y',
+}
+
+
+def sugerir_plantilla_hibrida_en_sombra(texto, usuario=None):
+    """Rank templates semantically without affecting the active selection."""
+    texto_norm = _normalizar_texto_selector(texto)
+    if not texto_norm:
+        return None
+
+    contexto = extraer_contexto_clinico_dictado(texto)
+    region = contexto.get('region')
+    texto_tokens = _tokens_selector(texto) - SELECTOR_HIBRIDO_STOPWORDS
+    candidatos = []
+
+    for plantilla in PlantillaEstructurada.visibles_para_usuario(usuario, solo_activas=True):
+        nombre_titulo = f'{plantilla.nombre} {plantilla.titulo}'
+        corpus = ' '.join([
+            plantilla.codigo,
+            nombre_titulo,
+            plantilla.seccion_tecnica,
+            ' '.join(plantilla.comentarios_base or []),
+            plantilla.guia_estilo or '',
+        ])
+        regiones_plantilla = _regiones_en_texto_selector(corpus)
+        if region and regiones_plantilla and region not in regiones_plantilla:
+            continue
+
+        nombre_tokens = _tokens_selector(nombre_titulo) - SELECTOR_HIBRIDO_STOPWORDS
+        corpus_tokens = _tokens_selector(corpus) - SELECTOR_HIBRIDO_STOPWORDS
+        union_nombre = texto_tokens | nombre_tokens
+        union_corpus = texto_tokens | corpus_tokens
+        similitud_nombre = (
+            len(texto_tokens & nombre_tokens) / len(union_nombre)
+            if union_nombre else 0.0
+        )
+        similitud_corpus = (
+            len(texto_tokens & corpus_tokens) / len(union_corpus)
+            if union_corpus else 0.0
+        )
+        secuencia = difflib.SequenceMatcher(
+            None,
+            texto_norm,
+            _normalizar_texto_selector(nombre_titulo),
+        ).ratio()
+
+        score = similitud_nombre * 25
+        score += similitud_corpus * 20
+        score += secuencia * 10
+        if region and region in regiones_plantilla:
+            score += 40
+        elif region and not regiones_plantilla:
+            score += 5
+        if usuario and plantilla.creada_por_id == getattr(usuario, 'id', None):
+            score += 5
+
+        candidatos.append((round(score, 2), plantilla))
+
+    candidatos.sort(key=lambda item: (-item[0], item[1].pk))
+    if not candidatos or candidatos[0][0] < 10:
+        return None
+
+    mejor_score, mejor = candidatos[0]
+    segundo_score = candidatos[1][0] if len(candidatos) > 1 else 0.0
+    margen = round(mejor_score - segundo_score, 2)
+    if margen >= 15:
+        confianza = 'alta'
+    elif margen >= 5:
+        confianza = 'media'
+    else:
+        confianza = 'baja'
+
+    return {
+        'version': 'hibrido_v1',
+        'codigo': mejor.codigo,
+        'nombre': mejor.nombre,
+        'score': mejor_score,
+        'margen': margen,
+        'confianza_selector': confianza,
+        'candidatos': [
+            {'codigo': plantilla.codigo, 'nombre': plantilla.nombre, 'score': score}
+            for score, plantilla in candidatos[:5]
+        ],
+        'contexto_clinico': contexto,
+    }
+
+
 def _registrar_traza_agente(
     request, texto, plantilla_sugerida, contexto_clinico, result=None,
+    plantilla_sombra=None,
     duracion_ms=0, error_detalle='',
 ):
     """Persist agent decisions while avoiding storage of raw clinical text."""
     result = result or {}
     sugerida = plantilla_sugerida or {}
+    sombra = plantilla_sombra or {}
     plantilla_obj = None
     codigo = sugerida.get('codigo', '')
     if codigo:
@@ -328,6 +420,14 @@ def _registrar_traza_agente(
             margen_selector=sugerida.get('margen', 0),
             confianza_selector=sugerida.get('confianza_selector', ''),
             candidatos=sugerida.get('candidatos', []),
+            codigo_plantilla_sombra=sombra.get('codigo', ''),
+            score_selector_sombra=sombra.get('score', 0.0),
+            margen_selector_sombra=sombra.get('margen', 0.0),
+            confianza_selector_sombra=sombra.get('confianza_selector', ''),
+            candidatos_sombra=sombra.get('candidatos', []),
+            selector_sombra_coincide=bool(
+                codigo and codigo == sombra.get('codigo')
+            ),
             guardrails_aplicados=result.get('guardrails_aplicados', []),
             confianza_ia=result.get('confianza', 0.0) or 0.0,
             requiere_confirmacion=result.get('requiere_confirmacion', False),
@@ -1119,6 +1219,7 @@ def mejorar_texto_ia(request):
         plantilla = data.get('plantilla', None)
         field_name = data.get('field_name', None)
         plantilla_sugerida = None
+        plantilla_sombra = None
         
         if not texto or texto.strip() == '':
             logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
@@ -1144,6 +1245,11 @@ def mejorar_texto_ia(request):
         
         if modo == 'AGENTE':
             plantilla_sugerida = sugerir_plantilla_para_dictado(texto_procesado, request.user)
+            if getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_SOMBRA', True):
+                plantilla_sombra = sugerir_plantilla_hibrida_en_sombra(
+                    texto_procesado,
+                    request.user,
+                )
             if plantilla_sugerida:
                 tipo_plantilla = plantilla_sugerida['codigo']
                 logger.info(
@@ -1226,6 +1332,7 @@ def mejorar_texto_ia(request):
                 plantilla_sugerida=plantilla_sugerida,
                 contexto_clinico=contexto_clinico,
                 result=result,
+                plantilla_sombra=plantilla_sombra,
                 duracion_ms=tiempo_total_ms,
             )
 
@@ -1278,6 +1385,7 @@ def mejorar_texto_ia(request):
                 texto=locals().get('texto_procesado', locals().get('texto', '')),
                 plantilla_sugerida=locals().get('plantilla_sugerida'),
                 contexto_clinico=locals().get('contexto_clinico', {}),
+                plantilla_sombra=locals().get('plantilla_sombra'),
                 duracion_ms=int((time.time() - tiempo_inicio) * 1000),
                 error_detalle=error_detalle,
             )

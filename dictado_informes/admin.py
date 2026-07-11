@@ -18,10 +18,12 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
     list_display = [
         'id', 'usuario', 'region_detectada', 'lateralidad_detectada',
         'codigo_plantilla', 'score_selector', 'margen_selector',
-        'confianza_selector', 'exitosa', 'fecha_creacion',
+        'confianza_selector', 'codigo_plantilla_sombra',
+        'selector_sombra_coincide', 'exitosa', 'fecha_creacion',
     ]
     list_filter = [
-        'exitosa', 'confianza_selector', 'region_detectada',
+        'exitosa', 'confianza_selector', 'confianza_selector_sombra',
+        'selector_sombra_coincide', 'region_detectada',
         'lateralidad_detectada', 'fecha_creacion',
     ]
     search_fields = ['codigo_plantilla', 'huella_entrada', 'usuario__username']
@@ -30,6 +32,9 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         'region_detectada', 'lateralidad_detectada', 'plantilla_seleccionada',
         'codigo_plantilla', 'score_selector', 'margen_selector',
         'confianza_selector', 'candidatos', 'guardrails_aplicados',
+        'codigo_plantilla_sombra', 'score_selector_sombra',
+        'margen_selector_sombra', 'confianza_selector_sombra',
+        'candidatos_sombra', 'selector_sombra_coincide',
         'confianza_ia', 'requiere_confirmacion', 'posible_invencion',
         'duracion_ms', 'exitosa', 'error_detalle',
     ]

@@ -14,7 +14,11 @@ import json
 import base64
 
 from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
-from dictado_informes.views import extraer_contexto_clinico_dictado, sugerir_plantilla_para_dictado
+from dictado_informes.views import (
+    extraer_contexto_clinico_dictado,
+    sugerir_plantilla_hibrida_en_sombra,
+    sugerir_plantilla_para_dictado,
+)
 
 User = get_user_model()
 
@@ -372,6 +376,38 @@ class TestAPIsMejora(TestCase):
 
         self.assertEqual(sugerida['codigo'], '100021')
 
+    def test_selector_hibrido_distingue_plantillas_de_la_misma_region(self):
+        PlantillaEstructurada.objects.create(
+            codigo='100030',
+            nombre='RM de rodilla general',
+            titulo='RM DE RODILLA',
+            seccion_tecnica='Se exploro la rodilla con protocolo habitual.',
+            comentarios_base=['Ligamentos cruzados conservados.'],
+            creada_por=self.user,
+            origen='user',
+        )
+        PlantillaEstructurada.objects.create(
+            codigo='100031',
+            nombre='RM de rodilla meniscal',
+            titulo='RM DE RODILLA',
+            seccion_tecnica='Se exploro la rodilla con protocolo habitual.',
+            comentarios_base=[
+                'Menisco interno de altura y senal conservadas.',
+                'Menisco externo de altura y senal conservadas.',
+            ],
+            creada_por=self.user,
+            origen='user',
+        )
+
+        sugerida = sugerir_plantilla_hibrida_en_sombra(
+            'Rodilla derecha con desgarro del menisco interno.',
+            self.user,
+        )
+
+        self.assertEqual(sugerida['codigo'], '100031')
+        self.assertEqual(sugerida['version'], 'hibrido_v1')
+        self.assertEqual(sugerida['candidatos'][0]['codigo'], '100031')
+
     def test_extrae_contexto_clinico_mano_izquierda(self):
         contexto = extraer_contexto_clinico_dictado(
             'Resonancia magnetica de mano izquierda con antecedente traumatico y risartrosis.'
@@ -444,6 +480,38 @@ class TestAPIsMejora(TestCase):
         self.assertTrue(traza.huella_entrada)
         self.assertNotIn('gonalgia', str(traza.candidatos).lower())
         self.assertTrue(traza.exitosa)
+        self.assertEqual(traza.codigo_plantilla_sombra, '100000')
+        self.assertTrue(traza.selector_sombra_coincide)
+
+    @override_settings(DICTADO_SELECTOR_HIBRIDO_SOMBRA=False)
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_selector_sombra_puede_desactivarse_sin_afectar_agente(self, mock_improve):
+        PlantillaEstructurada.objects.create(
+            codigo='100040',
+            nombre='RM de Rodilla',
+            titulo='RM DE RODILLA',
+            seccion_tecnica='Se exploro la rodilla.',
+            comentarios_base=['Meniscos conservados.'],
+            creada_por=self.user,
+            origen='user',
+        )
+        mock_improve.return_value = {
+            'texto_mejorado': 'Informe estructurado',
+            'confianza': 0.9,
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'gonalgia derecha',
+                'modo': 'AGENTE',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['tipo_plantilla_usada'], '100040')
+        self.assertEqual(TrazaAgenteDictado.objects.get().codigo_plantilla_sombra, '')
 
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')
     def test_modo_fiel_no_registra_traza_agente(self, mock_improve):

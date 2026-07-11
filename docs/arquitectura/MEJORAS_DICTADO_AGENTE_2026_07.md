@@ -410,6 +410,24 @@ la longitud de entrada y una huella SHA-256 irreversible para correlacion tecnic
 Las trazas son de solo lectura en Django Admin y se generan exclusivamente en
 modo `AGENTE`.
 
+### Selector hibrido en sombra
+
+El selector `hibrido_v1` calcula una segunda recomendacion sin modificar la
+plantilla utilizada por el agente. Combina:
+
+- filtro obligatorio de compatibilidad anatomica;
+- similitud de tokens con nombre, titulo, tecnica, comentarios y guia de estilo;
+- similitud textual con nombre y titulo;
+- prioridad moderada para plantillas propias del usuario.
+
+La traza conserva la recomendacion, cinco candidatas, puntaje, margen, confianza
+y si coincide con el selector activo. Esto permite calibrarlo con casos reales
+antes de darle control. Puede apagarse sin rollback con:
+
+```env
+DICTADO_SELECTOR_HIBRIDO_SOMBRA=False
+```
+
 ## Frontend
 
 Archivo principal:
@@ -512,7 +530,7 @@ No changes detected in app 'dictado_informes'
 
 ## Pendientes recomendados
 
-1. Implementar selector hibrido y confirmacion cuando el margen sea bajo.
+1. Evaluar el selector hibrido en sombra y definir umbrales de activacion.
 2. Crear UI para ver "memoria fuerte" activa por usuario.
 3. Permitir desactivar una regla aprendida desde el admin o panel del usuario.
 4. Registrar explicitamente `tipo_plantilla` y `modo_dictado` en `CorreccionAprendizaje`.
