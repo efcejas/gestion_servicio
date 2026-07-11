@@ -1,6 +1,8 @@
 # Mejoras Dictado IA: plantillas flexibles, modo agente y aprendizaje
 
-Fecha: 2026-07-09
+Fecha inicial: 2026-07-09
+
+Ultima actualizacion: 2026-07-11
 
 Este documento resume el bloque de mejoras implementadas para evolucionar el dictado inteligente desde un generador con plantillas hacia un agente asistido por voz, manteniendo fallback seguro al flujo de plantilla estructurada.
 
@@ -300,6 +302,25 @@ El prompt ahora diferencia entre:
 
 Solo en el segundo caso puede desarrollar una descripcion no literal.
 
+### Acentuacion obligatoria de encabezados
+
+La salida final normaliza de forma deterministica los encabezados completos,
+incluso cuando el modelo los devuelve en mayusculas sin tilde:
+
+```text
+INFORMACION CLINICA -> INFORMACIÓN CLÍNICA
+DATOS CLINICOS      -> DATOS CLÍNICOS
+TECNICA             -> TÉCNICA
+CONCLUSION          -> CONCLUSIÓN
+IMPRESION           -> IMPRESIÓN
+DESCRIPCION         -> DESCRIPCIÓN
+```
+
+El guardrail solo modifica lineas que son encabezados completos; no reemplaza
+palabras dentro del contenido clinico. Se aplica al proveedor principal y al
+fallback. La clave de cache de mejora fue versionada para evitar reutilizar
+resultados anteriores sin acentuacion.
+
 ## Aprendizaje del usuario
 
 Modelo:
@@ -427,6 +448,26 @@ antes de darle control. Puede apagarse sin rollback con:
 ```env
 DICTADO_SELECTOR_HIBRIDO_SOMBRA=False
 ```
+
+### Etapa de calibracion en produccion
+
+Durante esta etapa el usuario puede utilizar el agente normalmente. Se recomienda
+reunir inicialmente entre 30 y 50 informes variados, incluyendo regiones con
+plantillas similares. El selector hibrido no modifica la plantilla utilizada ni
+la salida visible.
+
+Para el analisis posterior se necesitan solamente datos agregados de
+`TrazaAgenteDictado`:
+
+- porcentaje de coincidencia entre selector activo y selector en sombra;
+- desacuerdos por region;
+- distribucion de margenes y niveles de confianza;
+- pares de plantillas que compiten con frecuencia;
+- casos marcados con error, posible invencion o confirmacion requerida.
+
+El asistente de desarrollo no tiene acceso automatico a produccion. Estos datos
+deben compartirse mediante una exportacion anonimizada, una consulta de resumen
+o un panel administrativo. La traza no almacena el dictado ni el informe.
 
 ## Frontend
 
