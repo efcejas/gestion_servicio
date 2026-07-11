@@ -393,6 +393,23 @@ Efectos:
 - si alguien llama la API manualmente con `modo: AGENTE`, responde `403`;
 - mantiene activos `FIEL` y `ESTRUCTURADO`.
 
+## Trazabilidad de decisiones del agente
+
+Se agrego `TrazaAgenteDictado` para poder auditar por que el agente eligio una
+plantilla y que controles se aplicaron. La traza registra:
+
+- usuario, fecha y duracion;
+- region y lateralidad detectadas;
+- cinco mejores plantillas candidatas y sus puntajes;
+- puntaje ganador, margen y confianza del selector;
+- guardrails aplicados, necesidad de confirmacion y posible invencion;
+- resultado exitoso o error.
+
+Por privacidad no almacena el dictado ni el informe completo. Conserva solamente
+la longitud de entrada y una huella SHA-256 irreversible para correlacion tecnica.
+Las trazas son de solo lectura en Django Admin y se generan exclusivamente en
+modo `AGENTE`.
+
 ## Frontend
 
 Archivo principal:
@@ -495,12 +512,13 @@ No changes detected in app 'dictado_informes'
 
 ## Pendientes recomendados
 
-1. Crear UI para ver "memoria fuerte" activa por usuario.
-2. Permitir desactivar una regla aprendida desde el admin o panel del usuario.
-3. Registrar explicitamente `tipo_plantilla` y `modo_dictado` en `CorreccionAprendizaje`.
-4. Agregar una tabla dedicada para reglas aprendidas versionadas si el aprendizaje crece.
-5. Sumar regiones adicionales segun casuistica real: pelvis, abdomen, torax, cuello, pie.
-6. Convertir `agente con confirmacion` en flujo real: propuesta, diferencias, aceptar/rechazar.
+1. Implementar selector hibrido y confirmacion cuando el margen sea bajo.
+2. Crear UI para ver "memoria fuerte" activa por usuario.
+3. Permitir desactivar una regla aprendida desde el admin o panel del usuario.
+4. Registrar explicitamente `tipo_plantilla` y `modo_dictado` en `CorreccionAprendizaje`.
+5. Agregar una tabla dedicada para reglas aprendidas versionadas si el aprendizaje crece.
+6. Sumar regiones adicionales segun casuistica real: pelvis, abdomen, torax, cuello, pie.
+7. Convertir `agente con confirmacion` en flujo real: propuesta, diferencias, aceptar/rechazar.
 
 ## Guia rapida de debug
 
@@ -542,4 +560,3 @@ print(CorreccionAprendizaje.obtener_ejemplos_aprendizaje(usuario=request.user))
 ```env
 DICTADO_AGENTE_HABILITADO=False
 ```
-

@@ -15,7 +15,7 @@ from django.core.files.base import ContentFile
 from .models import (
     Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
-    PlantillaEstructurada, FeedbackCalidadDictado
+    PlantillaEstructurada, FeedbackCalidadDictado, TrazaAgenteDictado
 )
 from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
 from .ai_services import ai_service
@@ -32,6 +32,7 @@ import time  # 🚀 FASE 4: Para medir tiempos
 import difflib
 import re
 import unicodedata
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +224,7 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
     texto_tokens = _tokens_selector(texto)
     contexto_clinico = extraer_contexto_clinico_dictado(texto)
     queryset = PlantillaEstructurada.visibles_para_usuario(usuario, solo_activas=True)
-    mejor = None
-    mejor_score = 0
+    candidatos = []
 
     for plantilla in queryset:
         corpus = ' '.join([
@@ -267,18 +267,77 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
         if any(token in plantilla_norm for token in texto_tokens):
             score += 1
 
-        if score > mejor_score:
-            mejor = plantilla
-            mejor_score = score
+        if score > 0:
+            candidatos.append((score, plantilla))
 
-    if mejor and mejor_score >= 5:
+    candidatos.sort(key=lambda item: (-item[0], item[1].pk))
+    if candidatos and candidatos[0][0] >= 5:
+        mejor_score, mejor = candidatos[0]
+        segundo_score = candidatos[1][0] if len(candidatos) > 1 else 0
+        margen = mejor_score - segundo_score
+        if margen >= 20:
+            confianza_selector = 'alta'
+        elif margen >= 8:
+            confianza_selector = 'media'
+        else:
+            confianza_selector = 'baja'
         return {
             'codigo': mejor.codigo,
             'nombre': mejor.nombre,
             'score': mejor_score,
+            'margen': margen,
+            'confianza_selector': confianza_selector,
+            'candidatos': [
+                {
+                    'codigo': plantilla.codigo,
+                    'nombre': plantilla.nombre,
+                    'score': score,
+                }
+                for score, plantilla in candidatos[:5]
+            ],
             'contexto_clinico': contexto_clinico,
         }
     return None
+
+
+def _registrar_traza_agente(
+    request, texto, plantilla_sugerida, contexto_clinico, result=None,
+    duracion_ms=0, error_detalle='',
+):
+    """Persist agent decisions while avoiding storage of raw clinical text."""
+    result = result or {}
+    sugerida = plantilla_sugerida or {}
+    plantilla_obj = None
+    codigo = sugerida.get('codigo', '')
+    if codigo:
+        plantilla_obj = PlantillaEstructurada.visibles_para_usuario(
+            request.user,
+            solo_activas=True,
+        ).filter(codigo=codigo).first()
+
+    try:
+        TrazaAgenteDictado.objects.create(
+            usuario=request.user if request.user.is_authenticated else None,
+            huella_entrada=hashlib.sha256((texto or '').encode('utf-8')).hexdigest(),
+            longitud_entrada=len(texto or ''),
+            region_detectada=(contexto_clinico or {}).get('region') or '',
+            lateralidad_detectada=(contexto_clinico or {}).get('lateralidad') or '',
+            plantilla_seleccionada=plantilla_obj,
+            codigo_plantilla=codigo,
+            score_selector=sugerida.get('score', 0),
+            margen_selector=sugerida.get('margen', 0),
+            confianza_selector=sugerida.get('confianza_selector', ''),
+            candidatos=sugerida.get('candidatos', []),
+            guardrails_aplicados=result.get('guardrails_aplicados', []),
+            confianza_ia=result.get('confianza', 0.0) or 0.0,
+            requiere_confirmacion=result.get('requiere_confirmacion', False),
+            posible_invencion=result.get('posible_invencion', False),
+            duracion_ms=max(0, duracion_ms),
+            exitosa=not bool(error_detalle),
+            error_detalle=(error_detalle or '')[:500],
+        )
+    except Exception:
+        logger.exception('No se pudo registrar la traza del agente')
 
 
 def _calcular_metricas_edicion(texto_ia, texto_final):
@@ -1160,6 +1219,16 @@ def mejorar_texto_ia(request):
         except Exception as metric_error:
             logger.error(f"Error registrando métrica: {metric_error}")
         
+        if modo == 'AGENTE':
+            _registrar_traza_agente(
+                request=request,
+                texto=texto_procesado,
+                plantilla_sugerida=plantilla_sugerida,
+                contexto_clinico=contexto_clinico,
+                result=result,
+                duracion_ms=tiempo_total_ms,
+            )
+
         return JsonResponse({
             'success': True,
             'texto_mejorado': texto_mejorado,
@@ -1203,6 +1272,16 @@ def mejorar_texto_ia(request):
         except Exception as metric_error:
             logger.error(f"Error registrando métrica: {metric_error}")
         
+        if 'data' in locals() and data.get('modo') == 'AGENTE':
+            _registrar_traza_agente(
+                request=request,
+                texto=locals().get('texto_procesado', locals().get('texto', '')),
+                plantilla_sugerida=locals().get('plantilla_sugerida'),
+                contexto_clinico=locals().get('contexto_clinico', {}),
+                duracion_ms=int((time.time() - tiempo_inicio) * 1000),
+                error_detalle=error_detalle,
+            )
+
         return JsonResponse({
             'success': False,
             'error': str(e)

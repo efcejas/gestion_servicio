@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 import json
 import base64
 
-from dictado_informes.models import PlantillaEstructurada
+from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
 from dictado_informes.views import extraer_contexto_clinico_dictado, sugerir_plantilla_para_dictado
 
 User = get_user_model()
@@ -302,6 +302,9 @@ class TestAPIsMejora(TestCase):
         )
 
         self.assertEqual(sugerida['codigo'], '100000')
+        self.assertEqual(sugerida['candidatos'][0]['codigo'], '100000')
+        self.assertIn(sugerida['confianza_selector'], {'alta', 'media', 'baja'})
+        self.assertGreaterEqual(sugerida['margen'], 0)
 
     def test_selector_agente_no_mezcla_cadera_con_columna(self):
         PlantillaEstructurada.objects.create(
@@ -432,6 +435,34 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['tipo_plantilla'], '100000')
         self.assertEqual(contexto['contexto_clinico']['lateralidad'], 'DERECHA')
         self.assertEqual(contexto['contexto_clinico']['indicacion_clinica'], 'Gonalgia derecha.')
+
+        traza = TrazaAgenteDictado.objects.get()
+        self.assertEqual(traza.usuario, self.user)
+        self.assertEqual(traza.codigo_plantilla, '100000')
+        self.assertEqual(traza.region_detectada, 'RODILLA')
+        self.assertEqual(traza.lateralidad_detectada, 'DERECHA')
+        self.assertTrue(traza.huella_entrada)
+        self.assertNotIn('gonalgia', str(traza.candidatos).lower())
+        self.assertTrue(traza.exitosa)
+
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_modo_fiel_no_registra_traza_agente(self, mock_improve):
+        mock_improve.return_value = {
+            'texto_mejorado': 'Texto corregido',
+            'confianza': 0.9,
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'texto de prueba',
+                'modo': 'FIEL',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(TrazaAgenteDictado.objects.exists())
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])

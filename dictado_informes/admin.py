@@ -9,7 +9,37 @@ from .models import (
     TerminoMedico,
     CorreccionAprendizaje,
     FeedbackCalidadDictado,
+    TrazaAgenteDictado,
 )
+
+
+@admin.register(TrazaAgenteDictado)
+class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
+    list_display = [
+        'id', 'usuario', 'region_detectada', 'lateralidad_detectada',
+        'codigo_plantilla', 'score_selector', 'margen_selector',
+        'confianza_selector', 'exitosa', 'fecha_creacion',
+    ]
+    list_filter = [
+        'exitosa', 'confianza_selector', 'region_detectada',
+        'lateralidad_detectada', 'fecha_creacion',
+    ]
+    search_fields = ['codigo_plantilla', 'huella_entrada', 'usuario__username']
+    readonly_fields = [
+        'usuario', 'fecha_creacion', 'huella_entrada', 'longitud_entrada',
+        'region_detectada', 'lateralidad_detectada', 'plantilla_seleccionada',
+        'codigo_plantilla', 'score_selector', 'margen_selector',
+        'confianza_selector', 'candidatos', 'guardrails_aplicados',
+        'confianza_ia', 'requiere_confirmacion', 'posible_invencion',
+        'duracion_ms', 'exitosa', 'error_detalle',
+    ]
+    date_hierarchy = 'fecha_creacion'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PlantillaEstructurada)

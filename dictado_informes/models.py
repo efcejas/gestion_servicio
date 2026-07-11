@@ -813,6 +813,55 @@ class TerminoMedico(models.Model):
         return texto_procesado.strip()
 
 
+class TrazaAgenteDictado(models.Model):
+    """Decision audit trail for agent mode without storing clinical text."""
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='trazas_agente_dictado',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    huella_entrada = models.CharField(max_length=64, blank=True)
+    longitud_entrada = models.PositiveIntegerField(default=0)
+    region_detectada = models.CharField(max_length=30, blank=True)
+    lateralidad_detectada = models.CharField(max_length=20, blank=True)
+    plantilla_seleccionada = models.ForeignKey(
+        'PlantillaEstructurada',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='trazas_seleccion',
+    )
+    codigo_plantilla = models.CharField(max_length=50, blank=True)
+    score_selector = models.IntegerField(default=0)
+    margen_selector = models.IntegerField(default=0)
+    confianza_selector = models.CharField(max_length=10, blank=True)
+    candidatos = models.JSONField(default=list, blank=True)
+    guardrails_aplicados = models.JSONField(default=list, blank=True)
+    confianza_ia = models.FloatField(default=0.0)
+    requiere_confirmacion = models.BooleanField(default=False)
+    posible_invencion = models.BooleanField(default=False)
+    duracion_ms = models.PositiveIntegerField(default=0)
+    exitosa = models.BooleanField(default=True)
+    error_detalle = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['usuario', '-fecha_creacion']),
+            models.Index(fields=['region_detectada', '-fecha_creacion']),
+            models.Index(fields=['exitosa', '-fecha_creacion']),
+        ]
+        verbose_name = 'Traza del agente de dictado'
+        verbose_name_plural = 'Trazas del agente de dictado'
+
+    def __str__(self):
+        plantilla = self.codigo_plantilla or 'sin plantilla'
+        return f'Traza {self.pk} - {plantilla}'
+
+
 class CorreccionAprendizaje(models.Model):
     """
     Modelo para guardar correcciones manuales del usuario y entrenar la IA.
