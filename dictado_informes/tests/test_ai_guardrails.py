@@ -10,6 +10,27 @@ class AIGuardrailsTests(TestCase):
     def setUp(self):
         self.ai = AIService()
 
+    def test_normaliza_acentos_solo_en_encabezados_completos(self):
+        texto = """RM DE RODILLA DERECHA
+INFORMACION CLINICA
+Evaluacion clinica por dolor.
+TECNICA:
+Se realizo tecnica habitual.
+COMENTARIO
+Sin informacion adicional.
+CONCLUSION
+Desgarro meniscal.
+"""
+
+        texto_final, aplicado = self.ai._normalizar_acentos_encabezados(texto)
+
+        self.assertTrue(aplicado)
+        self.assertIn('INFORMACIÓN CLÍNICA\n', texto_final)
+        self.assertIn('TÉCNICA:\n', texto_final)
+        self.assertIn('CONCLUSIÓN\n', texto_final)
+        self.assertIn('Se realizo tecnica habitual.', texto_final)
+        self.assertIn('Sin informacion adicional.', texto_final)
+
     def test_guardrail_restaurar_linea_no_mencionada(self):
         texto_original = "Rodilla derecha con desgarro del ligamento cruzado anterior y derrame articular."
         texto_mejorado = """RM DE RODILLA DERECHA

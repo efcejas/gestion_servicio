@@ -623,6 +623,7 @@ Reglas:
             logger.info("🤖 Modo conversacional activo - caché deshabilitado")
         else:
             cache_key_parts = [
+                'encabezados_v2',
                 texto_original,
                 tipo_estudio,
                 modo,
@@ -1034,6 +1035,11 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 )
                 if conclusion_limpiada:
                     guardrails_aplicados.append('CONCLUSION: normalidad removida')
+            texto_mejorado, encabezados_corregidos = self._normalizar_acentos_encabezados(
+                texto_mejorado
+            )
+            if encabezados_corregidos:
+                guardrails_aplicados.append('ENCABEZADOS: acentuacion normalizada')
             modo_usado = "PLANTILLA" if plantilla else modo
             analisis_invencion = self._detectar_posible_invencion_estructurada(
                 texto_original=texto_original,
@@ -1126,6 +1132,11 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                         )
                         if conclusion_limpiada:
                             guardrails_aplicados.append('CONCLUSION: normalidad removida')
+                    texto_mejorado, encabezados_corregidos = self._normalizar_acentos_encabezados(
+                        texto_mejorado
+                    )
+                    if encabezados_corregidos:
+                        guardrails_aplicados.append('ENCABEZADOS: acentuacion normalizada')
                     modo_usado = "PLANTILLA" if plantilla else modo
                     analisis_invencion = self._detectar_posible_invencion_estructurada(
                         texto_original=texto_original,
@@ -1307,6 +1318,33 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             sugerencias.append("Se estructuró con Conclusión clara")
         
         return sugerencias
+
+    def _normalizar_acentos_encabezados(self, texto):
+        """Correct section headings while leaving report prose untouched."""
+        encabezados = {
+            'INFORMACION CLINICA': 'INFORMACIÓN CLÍNICA',
+            'DATOS CLINICOS': 'DATOS CLÍNICOS',
+            'TECNICA': 'TÉCNICA',
+            'CONCLUSION': 'CONCLUSIÓN',
+            'IMPRESION': 'IMPRESIÓN',
+            'DESCRIPCION': 'DESCRIPCIÓN',
+        }
+        lineas = []
+        cambio = False
+        for linea in (texto or '').splitlines():
+            match = re.match(r'^(\s*)([^:]+?)(\s*:)?(\s*)$', linea)
+            if not match:
+                lineas.append(linea)
+                continue
+            clave = self._normalizar_header_salida(match.group(2))
+            reemplazo = encabezados.get(clave)
+            if not reemplazo:
+                lineas.append(linea)
+                continue
+            nueva = f'{match.group(1)}{reemplazo}{match.group(3) or ""}{match.group(4)}'
+            lineas.append(nueva)
+            cambio = cambio or nueva != linea
+        return '\n'.join(lineas), cambio
 
     def _construir_contrato_estructura_flexible(self, plantilla_actual):
         """
