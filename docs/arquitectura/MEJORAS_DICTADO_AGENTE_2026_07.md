@@ -414,6 +414,34 @@ Efectos:
 - si alguien llama la API manualmente con `modo: AGENTE`, responde `403`;
 - mantiene activos `FIEL` y `ESTRUCTURADO`.
 
+## Motor de redaccion GPT-5.6 Terra
+
+El motor OpenAI predeterminado para redactar informes es `gpt-5.6-terra`, con
+esfuerzo de razonamiento `low` para equilibrar coherencia y latencia. La
+transcripcion de audio continua separada y no cambia con esta configuracion.
+
+Variables de entorno:
+
+```env
+OPENAI_LLM_MODEL=gpt-5.6-terra
+OPENAI_LLM_FALLBACK_MODEL=gpt-4.1-mini
+OPENAI_LLM_REASONING_EFFORT=low
+```
+
+Si Terra no esta habilitado para la cuenta o una llamada falla, el sistema
+reintenta el mismo pedido con `gpt-4.1-mini`. Si tambien falla y Groq esta
+configurado, utiliza `llama-3.3-70b-versatile` como tercer nivel.
+
+Rollback inmediato sin codigo:
+
+```env
+OPENAI_LLM_MODEL=gpt-4.1-mini
+```
+
+La cache incluye modelo y esfuerzo de razonamiento en su clave. Cada
+`TrazaAgenteDictado` registra `modelo_ia` para comparar calidad, latencia y
+correcciones manuales por modelo.
+
 ## Trazabilidad de decisiones del agente
 
 Se agrego `TrazaAgenteDictado` para poder auditar por que el agente eligio una

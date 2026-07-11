@@ -36,9 +36,23 @@ class AIService:
         if openai_key:
             self.llm_client = OpenAI(api_key=openai_key)
             self.llm_enabled = True
-            self.llm_model = 'gpt-4.1-mini'
+            self.llm_model = getattr(settings, 'OPENAI_LLM_MODEL', 'gpt-5.6-terra')
+            self.llm_fallback_model = getattr(
+                settings,
+                'OPENAI_LLM_FALLBACK_MODEL',
+                'gpt-4.1-mini',
+            )
+            self.llm_reasoning_effort = getattr(
+                settings,
+                'OPENAI_LLM_REASONING_EFFORT',
+                'low',
+            )
             self.llm_provider = 'openai'
-            logger.info("✅ OpenAI GPT-4.1-mini configurado para mejora de texto (PRIORITARIO)")
+            logger.info(
+                "OpenAI %s configurado para mejora de texto (fallback: %s)",
+                self.llm_model,
+                self.llm_fallback_model,
+            )
             
             # Groq como fallback gratuito si OpenAI falla
             if groq_key:
@@ -58,6 +72,8 @@ class AIService:
             )
             self.llm_enabled = True
             self.llm_model = 'llama-3.3-70b-versatile'
+            self.llm_fallback_model = None
+            self.llm_reasoning_effort = None
             self.llm_provider = 'groq'
             self.groq_fallback = None
             logger.info("✅ Groq LLM configurado (solo Groq disponible)")
@@ -65,6 +81,8 @@ class AIService:
             self.llm_client = None
             self.llm_enabled = False
             self.llm_model = None
+            self.llm_fallback_model = None
+            self.llm_reasoning_effort = None
             self.llm_provider = None
             self.groq_fallback = None
         
@@ -73,6 +91,45 @@ class AIService:
         if not self.enabled:
             logger.warning("⚠️ Ninguna API de IA configurada. Servicios deshabilitados.")
     
+    @staticmethod
+    def _es_modelo_razonamiento_openai(modelo):
+        return (modelo or '').startswith(('gpt-5', 'o1', 'o3', 'o4'))
+
+    def _crear_chat_completion_openai(
+        self,
+        messages,
+        temperature,
+        max_tokens,
+        response_format=None,
+    ):
+        """Call the configured model and retry with the stable OpenAI fallback."""
+        modelos = [self.llm_model]
+        if self.llm_fallback_model and self.llm_fallback_model not in modelos:
+            modelos.append(self.llm_fallback_model)
+
+        ultimo_error = None
+        for modelo in modelos:
+            kwargs = {'model': modelo, 'messages': messages}
+            if response_format:
+                kwargs['response_format'] = response_format
+            if self._es_modelo_razonamiento_openai(modelo):
+                kwargs['max_completion_tokens'] = max_tokens
+                if self.llm_reasoning_effort:
+                    kwargs['extra_body'] = {
+                        'reasoning_effort': self.llm_reasoning_effort,
+                    }
+            else:
+                kwargs['temperature'] = temperature
+                kwargs['max_tokens'] = max_tokens
+
+            try:
+                return self.llm_client.chat.completions.create(**kwargs), modelo
+            except Exception as error:
+                ultimo_error = error
+                logger.warning("Fallo modelo OpenAI %s: %s", modelo, error)
+
+        raise ultimo_error
+
     def _get_plantilla_estructurada(self, tipo_plantilla, usuario=None):
         """
         Obtiene plantilla estructurada desde BD con fallback a hardcode.
@@ -480,8 +537,7 @@ Reglas:
 - comentarios_base debe contener una linea por estructura anatomica o hallazgo normal.
 - No corrijas el contenido salvo errores menores de espaciado."""
 
-        response = self.llm_client.chat.completions.create(
-            model=self.llm_model,
+        response, _ = self._crear_chat_completion_openai(
             messages=[
                 {
                     "role": "system",
@@ -624,6 +680,8 @@ Reglas:
         else:
             cache_key_parts = [
                 'encabezados_v2',
+                self.llm_model or '',
+                self.llm_reasoning_effort or '',
                 texto_original,
                 tipo_estudio,
                 modo,
@@ -997,8 +1055,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             else:
                 temperature = 0.3  # Modo estructurado - permite creatividad en redacción
             
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
+            response, modelo_usado = self._crear_chat_completion_openai(
                 messages=[
                     {
                         "role": "system",
@@ -1010,7 +1067,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                     }
                 ],
                 temperature=temperature,
-                max_tokens=1500
+                max_tokens=1500,
             )
             
             texto_mejorado = response.choices[0].message.content.strip()
@@ -1054,7 +1111,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 analisis_invencion=analisis_invencion,
             )
             
-            logger.info(f"✅ Texto mejorado con {self.llm_provider.upper()} ({self.llm_model})")
+            logger.info(f"✅ Texto mejorado con {self.llm_provider.upper()} ({modelo_usado})")
             
             # Calcular "confianza" basada en la longitud y coherencia
             confianza = min(0.95, len(texto_mejorado) / max(len(texto_original), 1))
@@ -1072,6 +1129,8 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 'guardrails_aplicados': guardrails_aplicados,
                 'posible_invencion': analisis_invencion['detectada'],
                 'terminos_sospechosos': analisis_invencion['terminos_sospechosos'],
+                'model_used': modelo_usado,
+                'api_used': 'gpt',
             }
             
             # 🚀 GUARDAR EN CACHÉ (30 minutos) - SOLO si NO es modo conversacional
@@ -1168,6 +1227,8 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                         'guardrails_aplicados': guardrails_aplicados,
                         'posible_invencion': analisis_invencion['detectada'],
                         'terminos_sospechosos': analisis_invencion['terminos_sospechosos'],
+                        'model_used': 'llama-3.3-70b-versatile',
+                        'api_used': 'groq',
                     }
                     
                     # 🚀 GUARDAR EN CACHÉ (30 minutos)
@@ -2329,15 +2390,14 @@ Generá un análisis estructurado en formato JSON con las siguientes claves exac
 Respondé ÚNICAMENTE con el JSON válido, sin texto adicional."""
 
         try:
-            response = self.llm_client.chat.completions.create(
-                model=self.llm_model,
+            response, _ = self._crear_chat_completion_openai(
                 messages=[
                     {"role": "system", "content": "Sos un metodólogo médico experto. Respondés siempre en JSON válido, en español argentino."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
                 max_tokens=1500,
-                response_format={"type": "json_object"}
+                response_format={"type": "json_object"},
             )
             resultado = response.choices[0].message.content
             import json as _json

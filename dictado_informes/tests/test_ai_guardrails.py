@@ -2,6 +2,7 @@
 Tests para guardrails de modo estructurado en AIService.
 """
 from django.test import TestCase
+from unittest.mock import MagicMock
 
 from dictado_informes.ai_services import AIService
 
@@ -9,6 +10,53 @@ from dictado_informes.ai_services import AIService
 class AIGuardrailsTests(TestCase):
     def setUp(self):
         self.ai = AIService()
+
+    def test_terra_usa_parametros_de_modelo_de_razonamiento(self):
+        respuesta = MagicMock()
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-5.6-terra'
+        self.ai.llm_fallback_model = 'gpt-4.1-mini'
+        self.ai.llm_reasoning_effort = 'low'
+
+        resultado, modelo = self.ai._crear_chat_completion_openai(
+            messages=[{'role': 'user', 'content': 'Informe'}],
+            temperature=0.3,
+            max_tokens=1500,
+        )
+
+        self.assertIs(resultado, respuesta)
+        self.assertEqual(modelo, 'gpt-5.6-terra')
+        kwargs = self.ai.llm_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs['max_completion_tokens'], 1500)
+        self.assertEqual(kwargs['extra_body'], {'reasoning_effort': 'low'})
+        self.assertNotIn('temperature', kwargs)
+        self.assertNotIn('max_tokens', kwargs)
+
+    def test_terra_reintenta_con_gpt_4_1_mini(self):
+        respuesta = MagicMock()
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.side_effect = [
+            RuntimeError('modelo no habilitado'),
+            respuesta,
+        ]
+        self.ai.llm_model = 'gpt-5.6-terra'
+        self.ai.llm_fallback_model = 'gpt-4.1-mini'
+        self.ai.llm_reasoning_effort = 'low'
+
+        resultado, modelo = self.ai._crear_chat_completion_openai(
+            messages=[{'role': 'user', 'content': 'Informe'}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+
+        self.assertIs(resultado, respuesta)
+        self.assertEqual(modelo, 'gpt-4.1-mini')
+        self.assertEqual(self.ai.llm_client.chat.completions.create.call_count, 2)
+        kwargs = self.ai.llm_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs['model'], 'gpt-4.1-mini')
+        self.assertEqual(kwargs['temperature'], 0.2)
+        self.assertEqual(kwargs['max_tokens'], 1200)
 
     def test_normaliza_acentos_solo_en_encabezados_completos(self):
         texto = """RM DE RODILLA DERECHA

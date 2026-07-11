@@ -847,6 +847,7 @@ class TrazaAgenteDictado(models.Model):
     selector_sombra_coincide = models.BooleanField(default=False)
     guardrails_aplicados = models.JSONField(default=list, blank=True)
     confianza_ia = models.FloatField(default=0.0)
+    modelo_ia = models.CharField(max_length=50, blank=True)
     requiere_confirmacion = models.BooleanField(default=False)
     posible_invencion = models.BooleanField(default=False)
     duracion_ms = models.PositiveIntegerField(default=0)

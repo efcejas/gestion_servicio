@@ -450,6 +450,7 @@ class TestAPIsMejora(TestCase):
             'confianza': 0.9,
             'sugerencias': [],
             'modo': 'ESTRUCTURADO',
+            'model_used': 'gpt-5.6-terra',
         }
 
         response = self.client.post(
@@ -480,6 +481,7 @@ class TestAPIsMejora(TestCase):
         self.assertTrue(traza.huella_entrada)
         self.assertNotIn('gonalgia', str(traza.candidatos).lower())
         self.assertTrue(traza.exitosa)
+        self.assertEqual(traza.modelo_ia, 'gpt-5.6-terra')
         self.assertEqual(traza.codigo_plantilla_sombra, '100000')
         self.assertTrue(traza.selector_sombra_coincide)
 

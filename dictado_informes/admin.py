@@ -19,12 +19,12 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         'id', 'usuario', 'region_detectada', 'lateralidad_detectada',
         'codigo_plantilla', 'score_selector', 'margen_selector',
         'confianza_selector', 'codigo_plantilla_sombra',
-        'selector_sombra_coincide', 'exitosa', 'fecha_creacion',
+        'selector_sombra_coincide', 'modelo_ia', 'exitosa', 'fecha_creacion',
     ]
     list_filter = [
         'exitosa', 'confianza_selector', 'confianza_selector_sombra',
         'selector_sombra_coincide', 'region_detectada',
-        'lateralidad_detectada', 'fecha_creacion',
+        'lateralidad_detectada', 'modelo_ia', 'fecha_creacion',
     ]
     search_fields = ['codigo_plantilla', 'huella_entrada', 'usuario__username']
     readonly_fields = [
@@ -36,6 +36,7 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         'margen_selector_sombra', 'confianza_selector_sombra',
         'candidatos_sombra', 'selector_sombra_coincide',
         'confianza_ia', 'requiere_confirmacion', 'posible_invencion',
+        'modelo_ia',
         'duracion_ms', 'exitosa', 'error_detalle',
     ]
     date_hierarchy = 'fecha_creacion'

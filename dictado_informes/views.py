@@ -430,6 +430,7 @@ def _registrar_traza_agente(
             ),
             guardrails_aplicados=result.get('guardrails_aplicados', []),
             confianza_ia=result.get('confianza', 0.0) or 0.0,
+            modelo_ia=result.get('model_used', ''),
             requiere_confirmacion=result.get('requiere_confirmacion', False),
             posible_invencion=result.get('posible_invencion', False),
             duracion_ms=max(0, duracion_ms),

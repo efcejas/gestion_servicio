@@ -575,6 +575,17 @@ DICTADO_SELECTOR_HIBRIDO_SOMBRA = config(
     cast=bool,
 )
 
+# Modelo de redaccion de informes. Volver a gpt-4.1-mini permite rollback sin codigo.
+OPENAI_LLM_MODEL = config('OPENAI_LLM_MODEL', default='gpt-5.6-terra')
+OPENAI_LLM_FALLBACK_MODEL = config(
+    'OPENAI_LLM_FALLBACK_MODEL',
+    default='gpt-4.1-mini',
+)
+OPENAI_LLM_REASONING_EFFORT = config(
+    'OPENAI_LLM_REASONING_EFFORT',
+    default='low',
+)
+
 SESSION_COOKIE_HTTPONLY = True
 
 # CSRF Cookie: False para permitir peticiones AJAX
