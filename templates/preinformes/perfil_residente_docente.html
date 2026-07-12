@@ -167,12 +167,95 @@
                         <td class="px-5 py-3 text-center text-gray-700">{{ revision.puntuacion|default:"-" }}{% if revision.puntuacion %}/10{% endif %}</td>
                         <td class="px-5 py-3 text-center">
                             {% with puntaje=revision.evaluacion_ia_final.puntaje_global %}
-                            <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-bold
+                            <button type="button"
+                                class="js-toggle-evaluacion inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-violet-500
                                 {% if puntaje >= 8 %}bg-green-100 text-green-700
                                 {% elif puntaje >= 6 %}bg-amber-100 text-amber-700
                                 {% else %}bg-red-100 text-red-700{% endif %}">
                                 {{ puntaje }}/10
-                            </span>
+                                <i class="fas fa-chevron-down text-[10px] transition-transform" aria-hidden="true"></i>
+                            </button>
+                            {% endwith %}
+                        </td>
+                    </tr>
+                    <tr class="js-evaluacion-detalle hidden bg-violet-50/40">
+                        <td colspan="4" class="px-5 py-5">
+                            {% with ev=revision.evaluacion_ia_final dims=revision.evaluacion_ia_final.dimensiones %}
+                            <div class="space-y-5">
+                                <div class="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <h3 class="font-semibold text-gray-900">Fundamento de la evaluaci&oacute;n</h3>
+                                        <p class="text-xs text-gray-500 mt-1">Basado en el contraste entre el preinforme y la correcci&oacute;n del staff. La IA no accede a las im&aacute;genes.</p>
+                                    </div>
+                                    <a href="{% url 'preinformes:comparacion_revision' revision.preinforme.pk %}"
+                                       class="inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-violet-700 border border-violet-200 bg-white rounded-lg hover:bg-violet-50 transition">
+                                        <i class="fas fa-columns" aria-hidden="true"></i>
+                                        Ver comparaci&oacute;n
+                                    </a>
+                                </div>
+
+                                {% if ev.devolucion_docente %}
+                                <p class="text-sm leading-relaxed text-gray-800 bg-white border border-violet-100 rounded-lg px-4 py-3">{{ ev.devolucion_docente }}</p>
+                                {% endif %}
+
+                                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Interpretaci&oacute;n</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.interpretacion_diagnostica.puntaje }}/10</div>
+                                        {% if dims.interpretacion_diagnostica.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.interpretacion_diagnostica.comentario }}</p>{% endif %}
+                                    </div>
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Priorizaci&oacute;n</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.priorizacion_clinica.puntaje }}/10</div>
+                                        {% if dims.priorizacion_clinica.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.priorizacion_clinica.comentario }}</p>{% endif %}
+                                    </div>
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Redacci&oacute;n</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.redaccion_radiologica.puntaje }}/10</div>
+                                        {% if dims.redaccion_radiologica.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.redaccion_radiologica.comentario }}</p>{% endif %}
+                                    </div>
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Estructura</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.estructura_informe.puntaje }}/10</div>
+                                        {% if dims.estructura_informe.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.estructura_informe.comentario }}</p>{% endif %}
+                                    </div>
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Terminolog&iacute;a</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.precision_terminologica.puntaje }}/10</div>
+                                        {% if dims.precision_terminologica.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.precision_terminologica.comentario }}</p>{% endif %}
+                                    </div>
+                                    <div class="bg-white border border-gray-100 rounded-lg p-3">
+                                        <div class="text-xs text-gray-500">Autonom&iacute;a</div>
+                                        <div class="font-bold text-gray-900 mt-1">{{ dims.autonomia.puntaje }}/10</div>
+                                        {% if dims.autonomia.comentario %}<p class="text-xs text-gray-600 mt-2">{{ dims.autonomia.comentario }}</p>{% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="grid md:grid-cols-2 gap-4">
+                                    {% if ev.fortalezas %}
+                                    <div class="bg-white border border-green-100 rounded-lg p-4">
+                                        <h4 class="text-xs font-semibold uppercase text-green-700 mb-2">Fortalezas</h4>
+                                        <ul class="space-y-1.5 text-sm text-gray-700">
+                                            {% for item in ev.fortalezas %}<li class="flex gap-2"><i class="fas fa-check text-green-500 mt-1 text-xs" aria-hidden="true"></i><span>{{ item }}</span></li>{% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                    {% if ev.aspectos_a_mejorar %}
+                                    <div class="bg-white border border-amber-100 rounded-lg p-4">
+                                        <h4 class="text-xs font-semibold uppercase text-amber-700 mb-2">Aspectos a trabajar</h4>
+                                        <ul class="space-y-1.5 text-sm text-gray-700">
+                                            {% for item in ev.aspectos_a_mejorar %}<li class="flex gap-2"><i class="fas fa-angle-right text-amber-500 mt-1 text-xs" aria-hidden="true"></i><span>{{ item }}</span></li>{% endfor %}
+                                        </ul>
+                                    </div>
+                                    {% endif %}
+                                </div>
+
+                                {% if ev.impacto_correccion_staff %}
+                                <div class="text-sm text-gray-700 border-t border-violet-100 pt-3">
+                                    <span class="font-semibold">Impacto de la correcci&oacute;n del staff:</span> {{ ev.impacto_correccion_staff }}
+                                </div>
+                                {% endif %}
+                            </div>
                             {% endwith %}
                         </td>
                     </tr>
@@ -274,4 +357,20 @@
     </div>
 
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.js-toggle-evaluacion').forEach(function (button) {
+        var detailRow = button.closest('tr').nextElementSibling;
+        var icon = button.querySelector('.fa-chevron-down');
+        button.setAttribute('aria-expanded', 'false');
+
+        button.addEventListener('click', function () {
+            var willOpen = detailRow.classList.contains('hidden');
+            detailRow.classList.toggle('hidden', !willOpen);
+            button.setAttribute('aria-expanded', String(willOpen));
+            if (icon) icon.classList.toggle('rotate-180', willOpen);
+        });
+    });
+});
+</script>
 {% endblock %}
