@@ -264,6 +264,26 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertEqual(revision.informe_residente_snapshot, '<p>Original FLOW-006</p>')
         self.assertEqual(revision.informe_final_html, '<p>Original FLOW-006</p>')
 
+    def test_preinforme_form_guarda_contexto_clinico_opcional(self):
+        from .forms import PreinformeForm
+
+        form = PreinformeForm(data={
+            'numero_estudio': 'FLOW-CONTEXTO-001',
+            'tipo_estudio': self.tipo_estudio.pk,
+            'region': self.region.pk,
+            'sistema_destino': 'eges',
+            'apellido_paciente': 'Paciente',
+            'nombre_paciente': 'Contexto',
+            'contexto_clinico': 'Dolor toracico y control evolutivo.',
+            'informe_html': '<p>Informe de prueba.</p>',
+        }, user=self.residente)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        preinforme = form.save(commit=False)
+        preinforme.residente = self.residente
+        preinforme.save()
+        self.assertEqual(preinforme.contexto_clinico, 'Dolor toracico y control evolutivo.')
+
     @override_settings(PREINFORMES_RESUMEN_IA_REVISION_AUTO_GENERAR=True)
     def test_revisar_preinforme_genera_y_muestra_resumen_ia(self):
         preinforme = self._preinforme('FLOW-IA-001', estado='en_revision', revisor=self.staff)
@@ -289,6 +309,70 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
 
         revision = RevisionPreinforme.objects.get(preinforme=preinforme)
         self.assertEqual(revision.resumen_ia_revision['prioridad'], 'media')
+
+    def test_resumen_ia_pre_revision_filtra_recomendaciones_demograficas(self):
+        from .asistente_service import limpiar_resumen_pre_revision
+
+        resumen = limpiar_resumen_pre_revision({
+            'resumen': 'El preinforme describe los hallazgos principales.',
+            'puntos_clave': ['Verificar que el cierre diagnostico priorice los hallazgos relevantes.'],
+            'posibles_fricciones': [
+                'No se menciona la edad y el sexo del paciente, lo que podria ser relevante.',
+                'La descripcion podria ordenar mejor la prioridad de los hallazgos.',
+            ],
+            'prioridad': 'media',
+        })
+
+        fricciones = ' '.join(resumen['posibles_fricciones']).lower()
+        self.assertNotIn('edad', fricciones)
+        self.assertNotIn('sexo', fricciones)
+        self.assertIn('La descripcion podria ordenar mejor la prioridad de los hallazgos.', resumen['posibles_fricciones'])
+
+    def test_finalizar_revision_genera_evaluacion_ia_formativa(self):
+        preinforme = self._preinforme('FLOW-IA-FINAL-001', estado='en_revision', revisor=self.staff)
+
+        evaluacion = {
+            'puntaje_global': 8,
+            'dimensiones': {
+                'interpretacion_diagnostica': {'puntaje': 8, 'comentario': 'Reconoce el hallazgo principal.'},
+                'priorizacion_clinica': {'puntaje': 7, 'comentario': 'Puede jerarquizar mejor.'},
+                'redaccion_radiologica': {'puntaje': 8, 'comentario': 'Redaccion clara.'},
+                'estructura_informe': {'puntaje': 8, 'comentario': 'Orden adecuado.'},
+                'precision_terminologica': {'puntaje': 7, 'comentario': 'Terminologia aceptable.'},
+                'autonomia': {'puntaje': 7, 'comentario': 'Requirio correccion moderada.'},
+            },
+            'fortalezas': ['Describe el hallazgo principal.'],
+            'aspectos_a_mejorar': ['Mejorar la priorizacion.'],
+            'tipo_correccion_predominante': 'jerarquizacion',
+            'impacto_correccion_staff': 'La correccion fue moderada.',
+            'uso_mentor': 'Sin uso registrado.',
+            'devolucion_docente': 'Buen avance, con foco pendiente en jerarquizacion.',
+        }
+
+        with patch('preinformes.asistente_service.AsistenteRadiologicoBot') as bot_mock:
+            bot_mock.return_value.generar_evaluacion_final_revision.return_value = {
+                'success': True,
+                'evaluacion': evaluacion,
+                'error': None,
+            }
+
+            self.client.login(username='staff_flow', password='pass123')
+            response = self.client.post(
+                reverse('preinformes:revisar_preinforme', kwargs={'pk': preinforme.pk}),
+                {
+                    'informe_final_html': '<p>Informe final corregido.</p>',
+                    'comentarios_generales': 'Revisar jerarquizacion de hallazgos.',
+                    'puntuacion': '8',
+                    'finalizar_revision': '1',
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        preinforme.refresh_from_db()
+        revision = RevisionPreinforme.objects.get(preinforme=preinforme)
+        self.assertEqual(preinforme.estado, 'finalizado')
+        self.assertEqual(revision.evaluacion_ia_final['puntaje_global'], 8)
+        self.assertEqual(revision.evaluacion_ia_final['tipo_correccion_predominante'], 'jerarquizacion')
 
     def test_staff_puede_tomar_preinforme_asignado_a_otro(self):
         preinforme = self._preinforme('FLOW-007', revisor=self.otro_staff)

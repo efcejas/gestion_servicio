@@ -85,6 +85,9 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                             Mentor IA
                         </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider" title="Promedio de la evaluacion IA generada despues de la correccion del staff">
+                            Evaluaci&oacute;n final IA
+                        </th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
@@ -159,6 +162,18 @@
                             {% else %}
                                 <a href="{% url 'preinformes:perfil_residente_docente' residente.pk %}"
                                    class="text-xs text-gray-400 hover:text-teal-600">Ver perfil →</a>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            {% if residente.promedio_evaluacion_final_ia %}
+                                <span class="inline-flex px-3 py-1.5 text-xs font-bold rounded-lg shadow-sm text-white
+                                    {% if residente.promedio_evaluacion_final_ia >= 8 %}bg-green-500
+                                    {% elif residente.promedio_evaluacion_final_ia >= 6 %}bg-yellow-500
+                                    {% else %}bg-red-500{% endif %}">
+                                    {{ residente.promedio_evaluacion_final_ia|floatformat:1 }}/10
+                                </span>
+                            {% else %}
+                                <span class="text-sm text-gray-400">Sin evaluaciones</span>
                             {% endif %}
                         </td>
                     </tr>

@@ -155,6 +155,15 @@
     </div>
 
     <!-- Layout 2 Columnas: Original vs Revisión -->
+    {% if preinforme.contexto_clinico %}
+    <div class="bg-blue-50 rounded-xl border border-blue-100 px-4 py-3 mb-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-1">
+            <i class="fas fa-notes-medical mr-1"></i>Contexto aportado
+        </p>
+        <p class="text-sm text-blue-950 leading-relaxed whitespace-pre-line">{{ preinforme.contexto_clinico }}</p>
+    </div>
+    {% endif %}
+
     {% if preinforme.revision %}
 
     <!-- Barra de metadatos de revisión (encima del grid para no desalinear columnas) -->
@@ -194,6 +203,74 @@
     </div>
 
     <!-- Grid de comparación: ambas columnas arrancan a la misma altura -->
+    {% if preinforme.revision.evaluacion_ia_final %}
+    {% with ev=preinforme.revision.evaluacion_ia_final dims=preinforme.revision.evaluacion_ia_final.dimensiones %}
+    <div class="bg-white shadow-md rounded-xl border border-purple-100 mb-4 overflow-hidden">
+        <div class="px-5 py-3 bg-purple-50 border-b border-purple-100 flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h3 class="text-sm font-semibold text-purple-950 flex items-center">
+                    <i class="fas fa-magic text-purple-600 mr-2"></i>Evaluacion IA formativa
+                </h3>
+                <p class="text-xs text-purple-700">Orientativa. La decision docente final corresponde al staff.</p>
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-white text-purple-700 border border-purple-200">
+                {{ ev.puntaje_global }}/10
+            </span>
+        </div>
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div class="lg:col-span-2">
+                {% if ev.devolucion_docente %}
+                <p class="text-sm text-gray-800 leading-relaxed mb-4">{{ ev.devolucion_docente }}</p>
+                {% endif %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                    <div class="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                        <p class="text-xs font-semibold text-gray-500">Interpretacion</p>
+                        <p class="font-semibold text-gray-900">{{ dims.interpretacion_diagnostica.puntaje }}/10</p>
+                        <p class="text-xs text-gray-600">{{ dims.interpretacion_diagnostica.comentario }}</p>
+                    </div>
+                    <div class="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                        <p class="text-xs font-semibold text-gray-500">Priorizacion clinica</p>
+                        <p class="font-semibold text-gray-900">{{ dims.priorizacion_clinica.puntaje }}/10</p>
+                        <p class="text-xs text-gray-600">{{ dims.priorizacion_clinica.comentario }}</p>
+                    </div>
+                    <div class="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                        <p class="text-xs font-semibold text-gray-500">Redaccion</p>
+                        <p class="font-semibold text-gray-900">{{ dims.redaccion_radiologica.puntaje }}/10</p>
+                        <p class="text-xs text-gray-600">{{ dims.redaccion_radiologica.comentario }}</p>
+                    </div>
+                    <div class="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                        <p class="text-xs font-semibold text-gray-500">Autonomia</p>
+                        <p class="font-semibold text-gray-900">{{ dims.autonomia.puntaje }}/10</p>
+                        <p class="text-xs text-gray-600">{{ dims.autonomia.comentario }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-3">
+                {% if ev.fortalezas %}
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-green-700 mb-1">Fortalezas</p>
+                    <ul class="space-y-1 text-sm text-gray-700">
+                        {% for item in ev.fortalezas %}<li class="flex gap-2"><i class="fas fa-check text-green-500 mt-1 text-xs"></i><span>{{ item }}</span></li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if ev.aspectos_a_mejorar %}
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">A mejorar</p>
+                    <ul class="space-y-1 text-sm text-gray-700">
+                        {% for item in ev.aspectos_a_mejorar %}<li class="flex gap-2"><i class="fas fa-angle-right text-amber-500 mt-1 text-xs"></i><span>{{ item }}</span></li>{% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% if ev.impacto_correccion_staff %}
+                <p class="text-xs text-gray-500 border-t border-gray-100 pt-2">{{ ev.impacto_correccion_staff }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    {% endif %}
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Columna Izquierda: Preinforme Original -->
         <div class="bg-white shadow-md rounded-lg p-6">

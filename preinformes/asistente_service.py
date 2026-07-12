@@ -11,6 +11,7 @@ from decouple import config
 import re
 import logging
 import hashlib
+import unicodedata
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,122 @@ def _strip_html(html_content: str) -> str:
     text = text.replace('&nbsp;', ' ').replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&')
     text = re.sub(r'\s+', ' ', text).strip()
     return text
+
+
+def _normalizar_para_busqueda(texto: str) -> str:
+    texto = str(texto or '').lower()
+    return ''.join(
+        char
+        for char in unicodedata.normalize('NFD', texto)
+        if unicodedata.category(char) != 'Mn'
+    )
+
+
+def _es_recomendacion_demografica(texto: str) -> bool:
+    texto_normalizado = _normalizar_para_busqueda(texto)
+    return any(
+        termino in texto_normalizado
+        for termino in ['edad', 'sexo', 'genero', 'demografic']
+    )
+
+
+def limpiar_resumen_pre_revision(resumen):
+    """
+    Normaliza el resumen IA y quita sugerencias que pidan incluir datos
+    demograficos en el cuerpo del informe.
+    """
+    if not isinstance(resumen, dict):
+        return {}
+
+    def _limpiar_lista(items, limite):
+        elementos = []
+        for item in items or []:
+            texto = str(item).strip()
+            if not texto or _es_recomendacion_demografica(texto):
+                continue
+            elementos.append(texto[:220])
+            if len(elementos) >= limite:
+                break
+        return elementos
+
+    prioridad = resumen.get('prioridad')
+    return {
+        'resumen': str(resumen.get('resumen') or '').strip()[:700],
+        'puntos_clave': _limpiar_lista(resumen.get('puntos_clave'), 4),
+        'posibles_fricciones': _limpiar_lista(resumen.get('posibles_fricciones'), 3),
+        'prioridad': prioridad if prioridad in ['baja', 'media', 'alta'] else 'media',
+    }
+
+
+def normalizar_evaluacion_ia_final(evaluacion):
+    if not isinstance(evaluacion, dict):
+        return {}
+
+    dimensiones_validas = [
+        'interpretacion_diagnostica',
+        'priorizacion_clinica',
+        'redaccion_radiologica',
+        'estructura_informe',
+        'precision_terminologica',
+        'autonomia',
+    ]
+    tipos_correccion = [
+        'redaccion',
+        'interpretacion',
+        'omision',
+        'jerarquizacion',
+        'estructura',
+        'terminologia',
+        'minima',
+    ]
+
+    def _puntaje(valor, default=6):
+        try:
+            numero = int(round(float(valor)))
+        except (TypeError, ValueError):
+            numero = default
+        return max(1, min(10, numero))
+
+    def _texto(valor, limite):
+        return str(valor or '').strip()[:limite]
+
+    def _lista(valor, limite, largo_item=220):
+        salida = []
+        for item in valor or []:
+            texto = _texto(item, largo_item)
+            if texto:
+                salida.append(texto)
+            if len(salida) >= limite:
+                break
+        return salida
+
+    dimensiones = evaluacion.get('dimensiones') or {}
+    dimensiones_normalizadas = {}
+    for clave in dimensiones_validas:
+        dato = dimensiones.get(clave) if isinstance(dimensiones, dict) else {}
+        if isinstance(dato, dict):
+            dimensiones_normalizadas[clave] = {
+                'puntaje': _puntaje(dato.get('puntaje')),
+                'comentario': _texto(dato.get('comentario'), 260),
+            }
+        else:
+            dimensiones_normalizadas[clave] = {
+                'puntaje': _puntaje(dato),
+                'comentario': '',
+            }
+
+    tipo = evaluacion.get('tipo_correccion_predominante')
+    return {
+        'puntaje_global': _puntaje(evaluacion.get('puntaje_global')),
+        'dimensiones': dimensiones_normalizadas,
+        'fortalezas': _lista(evaluacion.get('fortalezas'), 3),
+        'aspectos_a_mejorar': _lista(evaluacion.get('aspectos_a_mejorar'), 4),
+        'tipo_correccion_predominante': tipo if tipo in tipos_correccion else 'redaccion',
+        'impacto_correccion_staff': _texto(evaluacion.get('impacto_correccion_staff'), 360),
+        'uso_mentor': _texto(evaluacion.get('uso_mentor'), 280),
+        'devolucion_docente': _texto(evaluacion.get('devolucion_docente'), 520),
+        'advertencia': 'Evaluacion orientativa generada por IA. La decision docente final corresponde al staff.',
+    }
 
 
 class AsistenteRadiologicoBot:
@@ -74,6 +191,7 @@ class AsistenteRadiologicoBot:
         region = contexto_estudio.get('region', '')
         edad = contexto_estudio.get('edad', '')
         sexo = contexto_estudio.get('sexo', '')
+        contexto_clinico = contexto_estudio.get('contexto_clinico', '')
         contenido_editor = contexto_estudio.get('contenido_editor', '')
 
         nombre_usuario = ''
@@ -94,6 +212,11 @@ class AsistenteRadiologicoBot:
                 sexo_str = {'M': 'masculino', 'F': 'femenino', 'O': 'otro'}.get(sexo, '')
                 partes.append(f"paciente de {edad} años{' (' + sexo_str + ')' if sexo_str else ''}")
             desc_estudio = f"\n\n**ESTUDIO ACTUAL QUE ESTÁ INFORMANDO:**\n{', '.join(partes)}."
+            if contexto_clinico and contexto_clinico.strip():
+                contexto_limpio = _strip_html(contexto_clinico)
+                if len(contexto_limpio) > 1000:
+                    contexto_limpio = contexto_limpio[:1000] + '...'
+                desc_estudio += f"\nContexto clinico aportado por el residente: \"{contexto_limpio}\". Usalo solo para orientar el razonamiento; no lo trates como texto obligatorio del informe."
 
         # Incluir contenido del editor (anonimizado)
         desc_contenido = ''
@@ -430,6 +553,11 @@ DATOS DEL ESTUDIO:
 - Región: {preinforme.region.nombre}
 - Edad: {preinforme.edad_paciente or 'no informada'}
 - Sexo: {sexo or 'no informado'}
+- Sistema destino: {preinforme.get_sistema_destino_display()}
+- Contexto clinico aportado por el residente: {preinforme.contexto_clinico or 'no informado'}
+
+Edad y sexo son solo contexto clinico para tu analisis. No sugieras que edad, sexo, genero ni otros datos demograficos deban mencionarse en el cuerpo del informe. En este servicio esos datos no se escriben alli; tampoco los marques como omision, friccion o punto de atencion.
+Si el sistema destino es NetTerm/NETTER, no marques como error la falta de acentos, signos de apertura ni caracteres especiales: puede ser una adaptacion tecnica deliberada.
 
 PREINFORME DEL RESIDENTE:
 \"{texto_informe}\"
@@ -477,20 +605,7 @@ Evitá datos identificatorios del paciente."""
                 raise ValueError(f"Respuesta no contiene JSON válido: {texto_respuesta[:200]}")
 
             resumen = _json.loads(match.group())
-            resumen_normalizado = {
-                'resumen': str(resumen.get('resumen') or '').strip()[:700],
-                'puntos_clave': [
-                    str(item).strip()[:220]
-                    for item in (resumen.get('puntos_clave') or [])[:4]
-                    if str(item).strip()
-                ],
-                'posibles_fricciones': [
-                    str(item).strip()[:220]
-                    for item in (resumen.get('posibles_fricciones') or [])[:3]
-                    if str(item).strip()
-                ],
-                'prioridad': resumen.get('prioridad') if resumen.get('prioridad') in ['baja', 'media', 'alta'] else 'media',
-            }
+            resumen_normalizado = limpiar_resumen_pre_revision(resumen)
 
             if not resumen_normalizado['resumen'] and not resumen_normalizado['puntos_clave']:
                 raise ValueError('La IA devolvió un resumen vacío.')
@@ -500,6 +615,168 @@ Evitá datos identificatorios del paciente."""
         except Exception as e:
             logger.error(f"Error en generar_resumen_pre_revision({preinforme.pk}): {e}")
             return {'success': False, 'resumen': {}, 'error': str(e)}
+
+    def generar_evaluacion_final_revision(self, revision):
+        """
+        Genera una evaluacion formativa del trabajo escrito del residente,
+        tomando la correccion del staff como referencia docente.
+
+        Returns:
+            dict: {success, evaluacion, error}
+        """
+        if not self.client:
+            return {'success': False, 'evaluacion': {}, 'error': 'Bot no disponible.'}
+
+        try:
+            import json as _json
+            from .models import ConversacionAsistentePreinforme
+
+            preinforme = revision.preinforme
+            informe_residente = _strip_html(revision.informe_residente_snapshot or preinforme.get_informe_html_or_legacy())
+            informe_final = _strip_html(revision.informe_final_html or '')
+            comentarios_staff = _strip_html(revision.comentarios_generales or '')
+            contexto_clinico = _strip_html(preinforme.contexto_clinico or '')
+
+            for nombre, valor in [
+                ('informe_residente', informe_residente),
+                ('informe_final', informe_final),
+                ('comentarios_staff', comentarios_staff),
+                ('contexto_clinico', contexto_clinico),
+            ]:
+                if len(valor) > 3500:
+                    if nombre == 'informe_residente':
+                        informe_residente = valor[:3500] + '...'
+                    elif nombre == 'informe_final':
+                        informe_final = valor[:3500] + '...'
+                    elif nombre == 'comentarios_staff':
+                        comentarios_staff = valor[:1800] + '...'
+                    elif nombre == 'contexto_clinico':
+                        contexto_clinico = valor[:1000] + '...'
+
+            conversaciones = ConversacionAsistentePreinforme.objects.filter(
+                preinforme=preinforme,
+                usuario=preinforme.residente,
+            ).prefetch_related('mensajes_asistente').order_by('-fecha_actualizacion')[:3]
+
+            resumen_mentor = []
+            for conversacion in conversaciones:
+                evaluacion = conversacion.evaluacion_ia or {}
+                partes = []
+                if conversacion.puntuacion_global is not None:
+                    partes.append(f"puntaje mentor {conversacion.puntuacion_global}/10")
+                if evaluacion:
+                    partes.append(f"evaluacion mentor: {evaluacion}")
+                mensajes = list(conversacion.mensajes_asistente.order_by('timestamp')[:8])
+                if mensajes:
+                    texto_mensajes = ' | '.join(
+                        f"{m.rol}: {_strip_html(m.contenido)[:180]}"
+                        for m in mensajes
+                    )
+                    partes.append(f"fragmentos: {texto_mensajes}")
+                if partes:
+                    resumen_mentor.append(' ; '.join(partes)[:1200])
+
+            sexo = ''
+            if preinforme.sexo_paciente:
+                sexo = {'M': 'masculino', 'F': 'femenino', 'O': 'otro'}.get(preinforme.sexo_paciente, '')
+
+            prompt = f"""Sos un especialista docente senior en Diagnostico por Imagenes. Tenes que generar una evaluacion formativa del preinforme de un residente luego de la correccion final del staff.
+
+La evaluacion debe estimar el avance del residente en el informe escrito: interpretacion, jerarquizacion clinica, lenguaje radiologico, estructura, precision y autonomia. No reemplaza al docente ni debe ser punitiva.
+
+LIMITACION CENTRAL: no ves las imagenes del estudio y no podes juzgar por cuenta propia si los hallazgos son verdaderos, adecuados, completos o correctamente interpretados. La unica referencia diagnostica disponible es la intervencion del staff: diferencias entre el preinforme original y el informe final, comentarios y puntaje manual.
+
+Reglas importantes:
+- Fundamenta cada valoracion en cambios concretos realizados por el staff o en comentarios del staff. Usa expresiones como "el staff conservo", "el staff agrego", "el staff modifico" o "el staff senalo".
+- Nunca afirmes "hallazgos adecuados/correctos", "interpretacion correcta", "estudio normal" ni equivalentes como una conclusion propia. Tampoco inventes omisiones que el staff no haya corregido o mencionado.
+- Si original y final son iguales y no hay comentarios, describi que no se registraron correcciones sustanciales; no lo conviertas en validacion diagnostica. En ese caso, se prudente con interpretacion y priorizacion porque no hay evidencia suficiente para evaluarlas.
+- El puntaje mide concordancia con la revision y grado de correccion requerido. No mide capacidad para detectar hallazgos en las imagenes.
+- Si el sistema destino es NetTerm/NETTER, NO penalices ausencia de acentos, signos de apertura ni caracteres especiales. Puede ser una adaptacion tecnica deliberada.
+- Muchos staff no usan seccion formal de Conclusion. No penalices esa ausencia si el cierre diagnostico o la impresion quedan claros en el texto.
+- Edad y sexo son contexto clinico, no texto obligatorio del informe. No los marques como omision.
+- El contexto clinico aportado por el residente orienta la lectura, pero no necesariamente debe copiarse en el informe.
+- Considera las correcciones del staff: si el informe final cambia mucho respecto del original, eso debe reflejarse como necesidad de mayor supervision o correccion.
+- Si hubo Mentor IA, usalo como contexto secundario: no premies ni castigues por usarlo mucho, evalua si ayudo al razonamiento.
+
+DATOS:
+- Tipo: {preinforme.tipo_estudio.nombre}
+- Region: {preinforme.region.nombre}
+- Sistema destino: {preinforme.get_sistema_destino_display()}
+- Edad: {preinforme.edad_paciente or 'no informada'}
+- Sexo: {sexo or 'no informado'}
+- Contexto clinico: {contexto_clinico or 'no informado'}
+- Puntaje manual del staff: {revision.puntuacion or 'no informado'}
+
+PREINFORME ORIGINAL DEL RESIDENTE:
+\"{informe_residente}\"
+
+INFORME FINAL CORREGIDO POR STAFF:
+\"{informe_final}\"
+
+COMENTARIOS DEL STAFF:
+\"{comentarios_staff or 'sin comentarios'}\"
+
+INTERACCION CON MENTOR IA:
+\"{chr(10).join(resumen_mentor) if resumen_mentor else 'sin uso registrado'}\"
+
+Responde UNICAMENTE con JSON valido con esta estructura exacta:
+{{
+  "puntaje_global": <int 1-10>,
+  "dimensiones": {{
+    "interpretacion_diagnostica": {{"puntaje": <int 1-10>, "comentario": "<breve>"}},
+    "priorizacion_clinica": {{"puntaje": <int 1-10>, "comentario": "<breve>"}},
+    "redaccion_radiologica": {{"puntaje": <int 1-10>, "comentario": "<breve>"}},
+    "estructura_informe": {{"puntaje": <int 1-10>, "comentario": "<breve>"}},
+    "precision_terminologica": {{"puntaje": <int 1-10>, "comentario": "<breve>"}},
+    "autonomia": {{"puntaje": <int 1-10>, "comentario": "<breve>"}}
+  }},
+  "fortalezas": ["<maximo 3>"],
+  "aspectos_a_mejorar": ["<maximo 4>"],
+  "tipo_correccion_predominante": "redaccion|interpretacion|omision|jerarquizacion|estructura|terminologia|minima",
+  "impacto_correccion_staff": "<1 o 2 frases sobre cuanto cambio necesito>",
+  "uso_mentor": "<si no hubo uso, indicarlo sin penalizar>",
+  "devolucion_docente": "<mensaje breve, especifico y formativo para el residente>"
+}}"""
+
+            messages = [
+                {"role": "system", "content": "Sos un evaluador docente de textos radiologicos. No ves imagenes: toda inferencia diagnostica debe apoyarse exclusivamente en la correccion del staff. Respondes siempre JSON valido, sobrio y formativo."},
+                {"role": "user", "content": prompt},
+            ]
+
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.2,
+                    max_tokens=1100,
+                )
+                texto_respuesta = response.choices[0].message.content
+            except Exception as api_error:
+                logger.error(f"Error API evaluacion final revision: {api_error}")
+                if self.fallback_client:
+                    response = self.fallback_client.chat.completions.create(
+                        model=self.fallback_model,
+                        messages=messages,
+                        temperature=0.2,
+                        max_tokens=1100,
+                    )
+                    texto_respuesta = response.choices[0].message.content
+                else:
+                    raise api_error
+
+            match = re.search(r'\{.*\}', texto_respuesta, re.DOTALL)
+            if not match:
+                raise ValueError(f"Respuesta no contiene JSON valido: {texto_respuesta[:200]}")
+
+            evaluacion = normalizar_evaluacion_ia_final(_json.loads(match.group()))
+            if not evaluacion:
+                raise ValueError('La IA devolvio una evaluacion vacia.')
+
+            return {'success': True, 'evaluacion': evaluacion, 'error': None}
+
+        except Exception as e:
+            logger.error(f"Error en generar_evaluacion_final_revision({revision.pk}): {e}")
+            return {'success': False, 'evaluacion': {}, 'error': str(e)}
 
     def analizar_borrador(self, contenido_html, tipo_estudio='', region=''):
         """

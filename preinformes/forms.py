@@ -56,6 +56,7 @@ class PreinformeForm(forms.ModelForm):
             'dni_paciente',
             'edad_paciente',
             'sexo_paciente',
+            'contexto_clinico',
             'informe_html'  # Campo único simplificado
         ]
         widgets = {
@@ -73,7 +74,7 @@ class PreinformeForm(forms.ModelForm):
             }),
             'dni_paciente': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
-                'placeholder': 'DNI del paciente (opcional)',
+                'placeholder': 'DNI (opcional)',
             }),
             'edad_paciente': forms.NumberInput(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',
@@ -82,6 +83,12 @@ class PreinformeForm(forms.ModelForm):
             }),
             'sexo_paciente': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors'
+            }),
+            'contexto_clinico': forms.Textarea(attrs={
+                'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-y min-h-[72px]',
+                'rows': 2,
+                'maxlength': 1000,
+                'placeholder': 'Ej: dolor en FID, control postoperatorio, sospecha clinica o pregunta concreta.'
             }),
             'tipo_estudio': forms.Select(attrs={
                 'class': 'w-full px-4 py-3 border border-gray-300 bg-white text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors',

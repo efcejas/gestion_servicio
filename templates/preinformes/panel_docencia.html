@@ -43,6 +43,7 @@
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap" title="Preinformes en borrador o pendientes de revisión">En curso</th>
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap" title="Promedio de las notas otorgadas por el revisor (0–10)">Nota Revisor</th>
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap" title="Promedio de puntuación del Asistente IA Radiólogo Mentor (0–10)">Promedio IA</th>
+                        <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap" title="Promedio de la evaluacion IA generada despues de la correccion del staff">Evaluaci&oacute;n final IA</th>
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap">Clases</th>
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap">Última actividad</th>
                         <th class="px-4 py-3 text-center font-semibold text-gray-600 uppercase tracking-wider text-xs whitespace-nowrap"></th>
@@ -124,6 +125,20 @@
                                 </span>
                             {% else %}
                                 <span class="text-gray-400 text-xs">—</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Evaluacion IA posterior a la revision -->
+                        <td class="px-4 py-4 text-center">
+                            {% if r.promedio_evaluacion_final_ia %}
+                                <span class="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold
+                                    {% if r.promedio_evaluacion_final_ia >= 8 %}bg-green-100 text-green-700
+                                    {% elif r.promedio_evaluacion_final_ia >= 6 %}bg-amber-100 text-amber-700
+                                    {% else %}bg-red-100 text-red-700{% endif %}">
+                                    {{ r.promedio_evaluacion_final_ia }}/10
+                                </span>
+                            {% else %}
+                                <span class="text-gray-400 text-xs">-</span>
                             {% endif %}
                         </td>
 

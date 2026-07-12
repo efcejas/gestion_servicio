@@ -104,6 +104,12 @@ def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
 def _asegurar_resumen_ia_revision(revision):
     """Genera el resumen IA pre-revision sin bloquear el flujo si falla."""
     if revision.resumen_ia_revision:
+        from .asistente_service import limpiar_resumen_pre_revision
+
+        resumen_limpio = limpiar_resumen_pre_revision(revision.resumen_ia_revision)
+        if resumen_limpio != revision.resumen_ia_revision:
+            revision.resumen_ia_revision = resumen_limpio
+            revision.save(update_fields=['resumen_ia_revision'])
         return
     if revision.resumen_ia_revision_error:
         return
@@ -129,6 +135,29 @@ def _asegurar_resumen_ia_revision(revision):
             revision.save(update_fields=['resumen_ia_revision_error'])
     except Exception as exc:
         logger.warning("No se pudo generar resumen IA pre-revision para revision %s: %s", revision.pk, exc)
+
+
+def _generar_evaluacion_ia_final_revision(revision):
+    """Genera evaluacion IA final sin bloquear el cierre de la revision."""
+    try:
+        from django.utils import timezone as _timezone
+        from .asistente_service import AsistenteRadiologicoBot
+
+        resultado = AsistenteRadiologicoBot().generar_evaluacion_final_revision(revision)
+        if resultado.get('success'):
+            revision.evaluacion_ia_final = resultado.get('evaluacion') or {}
+            revision.evaluacion_ia_final_generada_en = _timezone.now()
+            revision.evaluacion_ia_final_error = ''
+            revision.save(update_fields=[
+                'evaluacion_ia_final',
+                'evaluacion_ia_final_generada_en',
+                'evaluacion_ia_final_error',
+            ])
+        elif resultado.get('error') != 'Bot no disponible.':
+            revision.evaluacion_ia_final_error = resultado.get('error') or 'No se pudo generar la evaluacion IA final.'
+            revision.save(update_fields=['evaluacion_ia_final_error'])
+    except Exception as exc:
+        logger.warning("No se pudo generar evaluacion IA final para revision %s: %s", revision.pk, exc)
 
 
 def _normalizar_html_editor(content):
@@ -961,6 +990,7 @@ def revisar_preinforme(request, pk):
                 return redirect('preinformes:revisar_preinforme', pk=pk)
             elif 'finalizar_revision' in request.POST:
                 preinforme.finalizar_revision()
+                _generar_evaluacion_ia_final_revision(revision)
                 # Actualizar historial del residente
                 historial, _ = HistorialEstudios.objects.get_or_create(residente=preinforme.residente)
                 historial.actualizar_estadisticas()
@@ -1340,6 +1370,31 @@ def copiar_informe_final(request, pk):
 
 # === VISTAS DE ESTADÍSTICAS ===
 
+def _agregar_promedio_evaluacion_final_ia(residentes):
+    """Agrega el promedio de la evaluacion IA posterior a la revision."""
+    residentes = list(residentes)
+    acumulados = {}
+    revisiones = RevisionPreinforme.objects.filter(
+        preinforme__residente_id__in=[residente.pk for residente in residentes],
+    ).exclude(evaluacion_ia_final={}).values_list(
+        'preinforme__residente_id', 'evaluacion_ia_final'
+    )
+
+    for residente_id, evaluacion in revisiones:
+        if not isinstance(evaluacion, dict):
+            continue
+        puntaje = evaluacion.get('puntaje_global')
+        if isinstance(puntaje, (int, float)):
+            acumulados.setdefault(residente_id, []).append(float(puntaje))
+
+    for residente in residentes:
+        puntajes = acumulados.get(residente.pk, [])
+        residente.promedio_evaluacion_final_ia = (
+            round(sum(puntajes) / len(puntajes), 1) if puntajes else None
+        )
+    return residentes
+
+
 @login_required
 @role_required('jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def estadisticas(request):
@@ -1359,6 +1414,7 @@ def estadisticas(request):
             filter=Q(conversaciones_asistente_preinforme__evaluada=True)
         ),
     ).order_by('-total_preinformes')
+    residentes_stats = _agregar_promedio_evaluacion_final_ia(residentes_stats)
     
     # Estadísticas por tipo de estudio
     estudios_stats = TipoEstudio.objects.annotate(
@@ -1423,6 +1479,7 @@ def panel_docencia(request):
         if p.residente_id not in ultima_actividad:
             ultima_actividad[p.residente_id] = p.fecha_modificacion
 
+    residentes = _agregar_promedio_evaluacion_final_ia(residentes)
     residentes_data = []
     for r in residentes:
         r.ultima_actividad = ultima_actividad.get(r.pk)
@@ -1657,6 +1714,7 @@ def asistente_preinforme_chat(request):
         'region': contexto_raw.get('region', ''),
         'edad': contexto_raw.get('edad', ''),
         'sexo': contexto_raw.get('sexo', ''),
+        'contexto_clinico': contexto_raw.get('contexto_clinico', ''),
         'contenido_editor': contexto_raw.get('contenido_editor', ''),
     }
 
@@ -1821,6 +1879,21 @@ def perfil_residente_docente(request, pk):
     if promedio_scoring is not None:
         promedio_scoring = round(promedio_scoring, 1)
 
+    revisiones_evaluadas = RevisionPreinforme.objects.filter(
+        preinforme__residente=residente,
+    ).exclude(evaluacion_ia_final={}).select_related(
+        'preinforme__tipo_estudio', 'preinforme__region', 'revisor'
+    ).order_by('-evaluacion_ia_final_generada_en', '-fecha_modificacion')
+    puntajes_finales = [
+        revision.evaluacion_ia_final.get('puntaje_global')
+        for revision in revisiones_evaluadas
+        if isinstance(revision.evaluacion_ia_final.get('puntaje_global'), (int, float))
+    ]
+    promedio_evaluacion_final = (
+        round(sum(puntajes_finales) / len(puntajes_finales), 1)
+        if puntajes_finales else None
+    )
+
     # Promedios por dimensión (calculados en Python desde el JSONField)
     dims_acum = {'razonamiento_clinico': [], 'terminologia': [], 'autonomia': [], 'receptividad': []}
     for conv in conversaciones_evaluadas:
@@ -1841,6 +1914,8 @@ def perfil_residente_docente(request, pk):
         'residente': residente,
         'conversaciones_evaluadas': conversaciones_evaluadas,
         'promedio_scoring': promedio_scoring,
+        'revisiones_evaluadas': revisiones_evaluadas,
+        'promedio_evaluacion_final': promedio_evaluacion_final,
         'promedios_dims': promedios_dims,
         'historial': historial,
     }

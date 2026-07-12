@@ -492,6 +492,13 @@ class Preinforme(models.Model):
     )
     
     # Contenido del preinforme - Campo único simplificado
+    contexto_clinico = models.TextField(
+        blank=True,
+        default='',
+        verbose_name="Contexto clinico",
+        help_text="Dato clinico, motivo del estudio o pregunta a responder. Opcional."
+    )
+
     informe_html = CKEditor5Field(
         config_name='default',
         verbose_name="Contenido del Preinforme",
@@ -727,6 +734,21 @@ class RevisionPreinforme(models.Model):
         blank=True,
         default='',
         help_text="Ultimo error al generar el resumen IA pre-revision"
+    )
+    evaluacion_ia_final = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Evaluacion IA formativa generada al finalizar la revision"
+    )
+    evaluacion_ia_final_generada_en = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Fecha de generacion de la evaluacion IA final"
+    )
+    evaluacion_ia_final_error = models.TextField(
+        blank=True,
+        default='',
+        help_text="Ultimo error al generar la evaluacion IA final"
     )
 
     

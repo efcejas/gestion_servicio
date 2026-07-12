@@ -25,7 +25,7 @@
         {% csrf_token %}
         <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
 
-        <!-- Información del Estudio y Paciente - Ultra Compacto -->
+        <!-- Información del Estudio y Paciente -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
             <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2 border-b border-gray-200">
                 <h2 class="text-sm font-semibold text-gray-800 flex items-center">
@@ -33,11 +33,10 @@
                     Datos del Estudio y Paciente
                 </h2>
             </div>
-            <div class="p-3">
-                <!-- Grid ultra-compacto: 12 columnas en desktop -->
-                <div class="grid grid-cols-2 md:grid-cols-12 gap-2">
+            <div class="p-4 sm:p-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3">
                     <!-- Fila 1: Datos del Estudio -->
-                    <div class="col-span-2 md:col-span-2">
+                    <div class="sm:col-span-2 md:col-span-3">
                         <label for="{{ form.numero_estudio.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             N° Estudio *
                         </label>
@@ -47,7 +46,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-2 md:col-span-3">
+                    <div class="sm:col-span-2 md:col-span-3">
                         <label for="{{ form.tipo_estudio.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Tipo *
                         </label>
@@ -57,7 +56,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-1 md:col-span-2">
+                    <div class="sm:col-span-1 md:col-span-3">
                         <label for="{{ form.region.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Región *
                         </label>
@@ -67,7 +66,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-1 md:col-span-2">
+                    <div class="sm:col-span-1 md:col-span-3">
                         <label for="{{ form.sistema_destino.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Sistema *
                         </label>
@@ -77,7 +76,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-2 md:col-span-3">
+                    <div class="sm:col-span-2 md:col-span-4">
                         <label for="{{ form.plantilla_utilizada.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Plantilla {% if preinforme.pk %}<span class="text-gray-500">(no modificable)</span>{% endif %}
                         </label>
@@ -127,7 +126,7 @@
                     </div>
 
                     <!-- Fila 2: Datos del Paciente -->
-                    <div class="col-span-2 md:col-span-3">
+                    <div class="sm:col-span-1 md:col-span-3">
                         <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Apellido *
                         </label>
@@ -137,7 +136,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-2 md:col-span-3">
+                    <div class="sm:col-span-1 md:col-span-3">
                         <label for="{{ form.nombre_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Nombre *
                         </label>
@@ -147,7 +146,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-1 md:col-span-2">
+                    <div class="sm:col-span-1 md:col-span-2">
                         <label for="{{ form.dni_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             DNI
                         </label>
@@ -157,7 +156,7 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-1 md:col-span-2">
+                    <div class="sm:col-span-1 md:col-span-2">
                         <label for="{{ form.edad_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Edad
                         </label>
@@ -167,13 +166,26 @@
                         {% endif %}
                     </div>
 
-                    <div class="col-span-2 md:col-span-2">
+                    <div class="sm:col-span-1 md:col-span-2">
                         <label for="{{ form.sexo_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
                             Sexo
                         </label>
                         {{ form.sexo_paciente }}
                         {% if form.sexo_paciente.errors %}
                             <div class="text-red-600 text-xs mt-0.5">{{ form.sexo_paciente.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="sm:col-span-2 md:col-span-8">
+                        <label for="{{ form.contexto_clinico.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
+                            Contexto clinico <span class="text-gray-400 font-normal">(opcional)</span>
+                        </label>
+                        {{ form.contexto_clinico }}
+                        <p class="mt-1 text-xs text-gray-500 leading-snug">
+                            Dato clinico, antecedente o pregunta para orientar al staff. Evitar nombre, DNI, edad o sexo.
+                        </p>
+                        {% if form.contexto_clinico.errors %}
+                            <div class="text-red-600 text-xs mt-0.5">{{ form.contexto_clinico.errors.0 }}</div>
                         {% endif %}
                     </div>
                 </div>
@@ -189,7 +201,8 @@
                 </h2>
             </div>
             <div class="p-4 space-y-4">
-                <div class="max-w-md">
+                <div class="flex flex-col lg:flex-row lg:items-start gap-4">
+                <div class="w-full lg:flex-1 lg:max-w-md">
                     <label for="{{ form.revisor.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
                         Asignar a revisor específico (opcional)
                     </label>
@@ -204,8 +217,8 @@
                 </div>
                 
                 <!-- Campo de Asignación Compartida -->
-                <div class="max-w-md border-t border-gray-200 pt-4">
-                    <div class="flex items-start">
+                <div class="w-full lg:flex-1 md:border-l md:border-gray-200 md:pl-4 border-t border-gray-200 pt-4 md:pt-0 md:border-t-0">
+                    <div class="flex items-start rounded-lg border border-gray-100 bg-gray-50 px-3 py-3">
                         <div class="flex items-center h-5">
                             {{ form.asignacion_compartida }}
                         </div>
@@ -222,6 +235,7 @@
                     {% if form.asignacion_compartida.errors %}
                         <div class="text-red-600 text-sm mt-2">{{ form.asignacion_compartida.errors.0 }}</div>
                     {% endif %}
+                </div>
                 </div>
                 
                 {% if form.non_field_errors %}
@@ -922,13 +936,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         plantillaSelect.value = plantillaActual;
                     }
                 }
-    
-    // Si no hay plantilla seleccionada, limpiar el editor
-    if (!plantillaId) {
-        console.log('🧹 Limpiando contenido del editor');
-        setEditorContent('');
-        return;
-    }
                 
                 // Ocultar spinner
                 if (spinner) {
@@ -1144,7 +1151,11 @@ document.addEventListener('DOMContentLoaded', function() {
     (function() {
         const PREINFORME_PK = {{ preinforme.pk|default:'null' }};
         const PREINFORME_ESTADO = '{{ preinforme.estado|default:"" }}';
-        const LOCAL_KEY = 'preinforme_draft_' + (PREINFORME_PK || 'nuevo');
+        const CURRENT_USER_ID = '{{ request.user.pk|default:"anon" }}';
+        const IS_NEW_PREINFORME = !PREINFORME_PK;
+        const LOCAL_KEY = 'preinforme_draft_' + CURRENT_USER_ID + '_' + (PREINFORME_PK || 'nuevo');
+        const LEGACY_LOCAL_KEY = 'preinforme_draft_' + (PREINFORME_PK || 'nuevo');
+        const MAX_NEW_DRAFT_AGE_MS = 6 * 60 * 60 * 1000;
         const AUTOSAVE_DELAY = 2000;   // 2 s tras dejar de escribir
         const SERVER_INTERVAL = 30000; // 30 s guardado servidor
         const SERVER_STATES = ['borrador', 'pendiente_revision'];
@@ -1186,6 +1197,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // --- localStorage helpers ---
+        function fieldValue(id) {
+            const el = document.getElementById(id);
+            return el ? (el.value || '') : '';
+        }
+
+        function currentDraftMeta() {
+            return {
+                userId: CURRENT_USER_ID,
+                preinformePk: PREINFORME_PK || null,
+                numeroEstudio: fieldValue('id_numero_estudio').trim(),
+                tipoEstudio: fieldValue('id_tipo_estudio'),
+                region: fieldValue('id_region'),
+                sistemaDestino: fieldValue('id_sistema_destino'),
+                plantilla: fieldValue('id_plantilla'),
+            };
+        }
+
         function parseDraftPayload(rawValue) {
             if (!rawValue) return null;
 
@@ -1195,13 +1223,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     return {
                         content: parsed.content,
                         savedAt: parsed.savedAt || null,
+                        meta: parsed.meta || null,
+                        version: parsed.version || 1,
                     };
                 }
             } catch (e) {
                 // Compatibilidad con formato anterior (string plano)
             }
 
-            return { content: rawValue, savedAt: null };
+            return { content: rawValue, savedAt: null, meta: null, version: 0 };
         }
 
         function getEditorContent() {
@@ -1214,8 +1244,10 @@ document.addEventListener('DOMContentLoaded', function() {
         function saveDraftLocal() {
             try {
                 const payload = {
+                    version: 2,
                     content: getEditorContent(),
                     savedAt: new Date().toISOString(),
+                    meta: currentDraftMeta(),
                 };
                 localStorage.setItem(LOCAL_KEY, JSON.stringify(payload));
             } catch(e) { /* cuota llena, ignorar */ }
@@ -1228,9 +1260,12 @@ document.addEventListener('DOMContentLoaded', function() {
         function clearAllPreinformeDrafts() {
             clearDraftLocal();
             try {
+                localStorage.removeItem(LEGACY_LOCAL_KEY);
                 localStorage.removeItem('preinforme_draft_nuevo');
+                localStorage.removeItem('preinforme_draft_' + CURRENT_USER_ID + '_nuevo');
                 if (PREINFORME_PK) {
                     localStorage.removeItem('preinforme_draft_' + PREINFORME_PK);
+                    localStorage.removeItem('preinforme_draft_' + CURRENT_USER_ID + '_' + PREINFORME_PK);
                 }
             } catch(e) {}
         }
@@ -1241,6 +1276,32 @@ document.addEventListener('DOMContentLoaded', function() {
             } catch(e) {
                 return null;
             }
+        }
+
+        function clearLegacyNewDraftIfNeeded() {
+            if (!IS_NEW_PREINFORME) return;
+            try { localStorage.removeItem(LEGACY_LOCAL_KEY); } catch(e) {}
+        }
+
+        function isDraftFresh(draft) {
+            if (!draft.savedAt) return false;
+            const savedAt = new Date(draft.savedAt).getTime();
+            if (Number.isNaN(savedAt)) return false;
+            return (Date.now() - savedAt) <= MAX_NEW_DRAFT_AGE_MS;
+        }
+
+        function isCompatibleNewDraft(draft) {
+            if (!draft || draft.version < 2 || !draft.meta) return false;
+            if (draft.meta.userId !== CURRENT_USER_ID) return false;
+            if (!isDraftFresh(draft)) return false;
+
+            const currentMeta = currentDraftMeta();
+            if (draft.meta.numeroEstudio && currentMeta.numeroEstudio && draft.meta.numeroEstudio !== currentMeta.numeroEstudio) {
+                return false;
+            }
+            return ['tipoEstudio', 'region', 'sistemaDestino', 'plantilla'].every(function(key) {
+                return !draft.meta[key] || !currentMeta[key] || draft.meta[key] === currentMeta[key];
+            });
         }
 
         // --- Restaurar borrador local al cargar ---
@@ -1260,10 +1321,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const currentTrim = (current || '').trim();
             const draftTrim = draft.content.trim();
 
+            if (IS_NEW_PREINFORME) {
+                if (!isCompatibleNewDraft(draft)) {
+                    clearDraftLocal();
+                    try { localStorage.removeItem(LEGACY_LOCAL_KEY); } catch(e) {}
+                    return;
+                }
+                if (currentTrim && currentTrim !== draftTrim) {
+                    setIndicator('ready', 'Listo');
+                    return;
+                }
+            }
+
             let shouldRestore = false;
             if (!currentTrim) {
                 shouldRestore = true;
             } else if (currentTrim !== draftTrim) {
+                if (IS_NEW_PREINFORME) return;
                 const whenText = draft.savedAt
                     ? `\n\nÚltimo guardado local: ${new Date(draft.savedAt).toLocaleString()}`
                     : '';
@@ -1448,6 +1522,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // --- Arrancar ---
+        clearLegacyNewDraftIfNeeded();
         tryConnectEditor(15);
         startServerCycle();
     })();
@@ -2245,6 +2320,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const regionEl = document.getElementById('id_region');
         const edadEl = document.getElementById('id_edad_paciente');
         const sexoEl = document.getElementById('id_sexo_paciente');
+        const contextoClinicoEl = document.getElementById('id_contexto_clinico');
 
         const tipo_estudio = tipoEl
             ? (tipoEl.options[tipoEl.selectedIndex]?.text || '')
@@ -2254,6 +2330,7 @@ document.addEventListener('DOMContentLoaded', function() {
             : '';
         const edad = edadEl ? (edadEl.value || '') : '';
         const sexo = sexoEl ? (sexoEl.value || '') : '';
+        const contexto_clinico = contextoClinicoEl ? (contextoClinicoEl.value || '') : '';
 
         // Contenido del editor CKEditor5 (ya tiene strip HTML en el servidor)
         let contenido_editor = '';
@@ -2271,6 +2348,7 @@ document.addEventListener('DOMContentLoaded', function() {
             region,
             edad,
             sexo,
+            contexto_clinico,
             contenido_editor,
             preinforme_id: '{% if preinforme.pk %}{{ preinforme.pk }}{% endif %}',
         };
