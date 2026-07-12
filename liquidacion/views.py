@@ -11,7 +11,7 @@ from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import io, json
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -566,6 +566,217 @@ class GruposTarifariosListView(LoginRequiredMixin, UserPassesTestMixin, ListView
         context['volver_sesion_id'] = _volver_sesion_id(self.request)
         context['volver_sesion_url'] = _volver_sesion_url(self.request)
         return context
+
+
+class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Actualizacion masiva de tarifas por vigencia para grupos tarifarios."""
+
+    template_name = 'liquidacion/grupos_tarifarios_tarifas_bulk_update.html'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            '❌ No tienes permisos para actualizar tarifas de grupos tarifarios.'
+        )
+        return redirect('home')
+
+    def _grupos_queryset(self):
+        return (
+            GrupoTarifario.objects
+            .filter(activo=True)
+            .annotate(cantidad_estudios=Count('estudios', distinct=True))
+            .prefetch_related(
+                Prefetch(
+                    'tarifas',
+                    queryset=TarifaGrupoTarifario.objects.order_by('-vigencia_desde'),
+                    to_attr='tarifas_ordenadas',
+                )
+            )
+            .order_by('modalidad', 'codigo')
+        )
+
+    def _tarifa_vigente(self, grupo, fecha_ref):
+        for tarifa in getattr(grupo, 'tarifas_ordenadas', []):
+            if tarifa.vigencia_desde <= fecha_ref and (
+                tarifa.vigencia_hasta is None or tarifa.vigencia_hasta >= fecha_ref
+            ):
+                return tarifa
+        return None
+
+    def _parse_decimal(self, value):
+        value = (value or '').strip().replace(',', '.')
+        if not value:
+            return None
+        try:
+            parsed = Decimal(value)
+        except (InvalidOperation, ValueError):
+            return None
+        return parsed.quantize(Decimal('0.01'))
+
+    def _build_rows(self, vigencia_desde=None, post_data=None):
+        fecha_ref = vigencia_desde or date.today()
+        rows = []
+        for grupo in self._grupos_queryset():
+            tarifa_vigente = self._tarifa_vigente(grupo, fecha_ref)
+            precio_cober_default = tarifa_vigente.precio_cober if tarifa_vigente else ''
+            precio_otras_default = tarifa_vigente.precio_otras_os if tarifa_vigente else ''
+            incluir_default = True
+
+            if post_data is not None:
+                incluir_default = post_data.get(f'incluir_{grupo.pk}') == 'on'
+                precio_cober_default = post_data.get(f'precio_cober_{grupo.pk}', '')
+                precio_otras_default = post_data.get(f'precio_otras_os_{grupo.pk}', '')
+
+            rows.append({
+                'grupo': grupo,
+                'tarifa_vigente': tarifa_vigente,
+                'incluir': incluir_default,
+                'precio_cober': precio_cober_default,
+                'precio_otras_os': precio_otras_default,
+            })
+        return rows
+
+    def _validar_preview(self, request):
+        errors = []
+        warnings = []
+        preview = []
+        vigencia_raw = request.POST.get('vigencia_desde') or ''
+        motivo = (request.POST.get('motivo_actualizacion') or '').strip()
+
+        try:
+            vigencia_desde = datetime.strptime(vigencia_raw, '%Y-%m-%d').date()
+        except ValueError:
+            vigencia_desde = None
+            errors.append('Indica una vigencia desde válida.')
+
+        rows = self._build_rows(vigencia_desde=vigencia_desde, post_data=request.POST)
+        if not vigencia_desde:
+            return None, motivo, rows, preview, errors, warnings
+
+        seleccionados = [row for row in rows if row['incluir']]
+        if not seleccionados:
+            errors.append('Selecciona al menos un grupo tarifario para actualizar.')
+
+        dia_anterior = vigencia_desde - timedelta(days=1)
+        for row in seleccionados:
+            grupo = row['grupo']
+            precio_cober = self._parse_decimal(row['precio_cober'])
+            precio_otras_os = self._parse_decimal(row['precio_otras_os'])
+
+            if precio_cober is None or precio_cober <= 0:
+                errors.append(f'{grupo.codigo}: el precio COBER debe ser mayor a 0.')
+                continue
+            if precio_otras_os is None or precio_otras_os <= 0:
+                errors.append(f'{grupo.codigo}: el precio OTRAS OS debe ser mayor a 0.')
+                continue
+
+            if TarifaGrupoTarifario.objects.filter(
+                grupo_tarifario=grupo,
+                vigencia_desde=vigencia_desde,
+            ).exists():
+                errors.append(f'{grupo.codigo}: ya existe una tarifa con vigencia {vigencia_desde:%d/%m/%Y}.')
+                continue
+
+            futuras_solapadas = TarifaGrupoTarifario.objects.filter(
+                grupo_tarifario=grupo,
+                vigencia_desde__gt=vigencia_desde,
+            ).filter(
+                Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=vigencia_desde)
+            )
+            if futuras_solapadas.exists():
+                errors.append(f'{grupo.codigo}: existe una tarifa futura que se solaparía. Revisar detalle del grupo.')
+                continue
+
+            tarifa_anterior = (
+                TarifaGrupoTarifario.objects
+                .filter(grupo_tarifario=grupo, vigencia_desde__lt=vigencia_desde)
+                .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=vigencia_desde))
+                .order_by('-vigencia_desde', '-id')
+                .first()
+            )
+            if not tarifa_anterior:
+                warnings.append(f'{grupo.codigo}: no se encontró tarifa anterior vigente para cerrar.')
+
+            sin_cambios = (
+                tarifa_anterior
+                and tarifa_anterior.precio_cober == precio_cober
+                and tarifa_anterior.precio_otras_os == precio_otras_os
+            )
+
+            preview.append({
+                'grupo': grupo,
+                'tarifa_anterior': tarifa_anterior,
+                'precio_cober_nuevo': precio_cober,
+                'precio_otras_os_nuevo': precio_otras_os,
+                'vigencia_desde': vigencia_desde,
+                'vigencia_hasta_anterior': dia_anterior if tarifa_anterior else None,
+                'sin_cambios': sin_cambios,
+            })
+
+        return vigencia_desde, motivo, rows, preview, errors, warnings
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        vigencia_desde = date.today().replace(day=1)
+        context.update({
+            'vigencia_desde': vigencia_desde,
+            'motivo_actualizacion': f'Actualización valores {vigencia_desde:%m/%Y}',
+            'rows': self._build_rows(vigencia_desde=vigencia_desde),
+            'preview': None,
+            'errors_preview': [],
+            'warnings_preview': [],
+        })
+        return context
+
+    def post(self, request, *args, **kwargs):
+        vigencia_desde, motivo, rows, preview, errors, warnings = self._validar_preview(request)
+        confirmar = request.POST.get('confirmar') == '1'
+
+        if errors or not confirmar:
+            return self.render_to_response({
+                **self.get_context_data(),
+                'vigencia_desde': vigencia_desde,
+                'motivo_actualizacion': motivo,
+                'rows': rows,
+                'preview': preview if not errors else None,
+                'errors_preview': errors,
+                'warnings_preview': warnings,
+            })
+
+        with transaction.atomic():
+            creadas = 0
+            cerradas = 0
+            dia_anterior = vigencia_desde - timedelta(days=1)
+
+            for item in preview:
+                tarifa_anterior = item['tarifa_anterior']
+                if tarifa_anterior and (
+                    tarifa_anterior.vigencia_hasta is None
+                    or tarifa_anterior.vigencia_hasta >= vigencia_desde
+                ):
+                    tarifa_anterior.vigencia_hasta = dia_anterior
+                    tarifa_anterior.save(update_fields=['vigencia_hasta'])
+                    cerradas += 1
+
+                TarifaGrupoTarifario.objects.create(
+                    grupo_tarifario=item['grupo'],
+                    vigencia_desde=vigencia_desde,
+                    vigencia_hasta=None,
+                    precio_cober=item['precio_cober_nuevo'],
+                    precio_otras_os=item['precio_otras_os_nuevo'],
+                    motivo_actualizacion=motivo or f'Actualización masiva desde {vigencia_desde:%d/%m/%Y}',
+                    actualizado_por=request.user,
+                )
+                creadas += 1
+
+        messages.success(
+            request,
+            f'Actualización aplicada: {creadas} tarifa(s) nueva(s), {cerradas} vigencia(s) anterior(es) cerrada(s).'
+        )
+        return redirect('liquidacion:grupos_tarifarios_list')
 
 
 class GrupoTarifarioDetalleView(LoginRequiredMixin, UserPassesTestMixin, DetailView):

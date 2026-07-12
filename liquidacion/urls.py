@@ -34,6 +34,7 @@ from .views import (
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
+    TarifasGrupoBulkUpdateView,
     SesionContableListView,       # [NUEVO Fase B] Gestión del ciclo contable
     PreparacionLiquidacionRRHHPreviewView,
     sesion_contable_transicion,   # [NUEVO Fase B] Transición de estado
@@ -52,6 +53,11 @@ urlpatterns = [
     # ===== PORTAL ADMINISTRATIVO (Sin Login) =====
     path('portal/', PortalLiquidacionInicioView.as_view(), name='portal_inicio'),
     path('grupos-tarifarios/', GruposTarifariosListView.as_view(), name='grupos_tarifarios_list'),
+    path(
+        'grupos-tarifarios/tarifas/actualizacion-masiva/',
+        TarifasGrupoBulkUpdateView.as_view(),
+        name='grupo_tarifario_tarifa_bulk_update',
+    ),
     path('grupos-tarifarios/<int:pk>/', GrupoTarifarioDetalleView.as_view(), name='grupo_tarifario_detalle'),
     path(
         'solicitudes-revision-horario/',

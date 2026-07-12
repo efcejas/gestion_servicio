@@ -1,0 +1,197 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% load l10n %}
+{% block title %}Actualizacion masiva de tarifas{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <a href="{% url 'liquidacion:grupos_tarifarios_list' %}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver a grupos tarifarios
+        </a>
+    </div>
+
+    <div class="mb-5 rounded-xl bg-slate-800 p-6 text-white shadow-lg"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <h1 class="text-2xl font-bold">Actualizacion masiva de tarifas</h1>
+        <p class="mt-1 text-sm text-slate-300">
+            Crea una nueva vigencia por grupo y cierra automaticamente la tarifa anterior el dia previo.
+        </p>
+    </div>
+
+    {% if errors_preview %}
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p class="font-semibold">Revisar antes de continuar</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+            {% for error in errors_preview %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if warnings_preview %}
+    <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p class="font-semibold">Advertencias</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+            {% for warning in warnings_preview %}
+            <li>{{ warning }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div>
+                    <label for="vigencia_desde" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Vigencia desde</label>
+                    <input id="vigencia_desde" name="vigencia_desde" type="date" required
+                           value="{{ vigencia_desde|date:'Y-m-d' }}"
+                           class="h-10 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="motivo_actualizacion" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Motivo</label>
+                    <input id="motivo_actualizacion" name="motivo_actualizacion" type="text"
+                           value="{{ motivo_actualizacion }}"
+                           placeholder="Ej.: Actualizacion valores julio 2026"
+                           class="h-10 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-100 px-4 py-3">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-700">Valores por grupo</h2>
+                <p class="mt-1 text-xs text-gray-500">
+                    Deja marcado solo lo que quieras actualizar. Los valores se precompletan con la tarifa vigente para facilitar la carga.
+                </p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Actualizar</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Grupo</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Modalidad</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">COBER vigente</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Otras vigente</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Nuevo COBER</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Nuevo Otras OS</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        {% for row in rows %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2">
+                                <input type="checkbox" name="incluir_{{ row.grupo.pk }}"
+                                       {% if row.incluir %}checked{% endif %}
+                                       class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            </td>
+                            <td class="px-3 py-2">
+                                <p class="text-sm font-semibold text-gray-900">{{ row.grupo.codigo }}</p>
+                                <p class="text-xs text-gray-500">{{ row.grupo.nombre }}</p>
+                            </td>
+                            <td class="px-3 py-2 text-sm text-gray-700">{{ row.grupo.get_modalidad_display }}</td>
+                            <td class="px-3 py-2 text-right text-sm text-gray-700">
+                                {% if row.tarifa_vigente %}${{ row.tarifa_vigente.precio_cober|floatformat:2 }}{% else %}-{% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-right text-sm text-gray-700">
+                                {% if row.tarifa_vigente %}${{ row.tarifa_vigente.precio_otras_os|floatformat:2 }}{% else %}-{% endif %}
+                            </td>
+                            <td class="px-3 py-2">
+                                <input name="precio_cober_{{ row.grupo.pk }}" type="number" min="0.01" step="0.01"
+                                       value="{{ row.precio_cober|unlocalize }}"
+                                       class="h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                            </td>
+                            <td class="px-3 py-2">
+                                <input name="precio_otras_os_{{ row.grupo.pk }}" type="number" min="0.01" step="0.01"
+                                       value="{{ row.precio_otras_os|unlocalize }}"
+                                       class="h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">No hay grupos tarifarios activos.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if preview %}
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+            <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-indigo-900">Previsualizacion</h2>
+                    <p class="text-xs text-indigo-800">
+                        Se cerraran vigencias anteriores y se crearan tarifas desde {{ vigencia_desde|date:"d/m/Y" }}.
+                    </p>
+                </div>
+                <button type="submit" name="confirmar" value="1"
+                        class="inline-flex h-9 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700">
+                    Confirmar actualizacion
+                </button>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-indigo-100 bg-white">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead class="bg-indigo-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-indigo-900">Grupo</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-indigo-900">Cierre anterior</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-indigo-900">COBER nuevo</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-indigo-900">Otras nuevo</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-indigo-900">Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for item in preview %}
+                        <tr>
+                            <td class="px-3 py-2 text-sm font-semibold text-gray-900">{{ item.grupo.codigo }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-700">
+                                {% if item.tarifa_anterior %}
+                                {{ item.tarifa_anterior.vigencia_desde|date:"d/m/Y" }} a {{ item.vigencia_hasta_anterior|date:"d/m/Y" }}
+                                {% else %}
+                                Sin tarifa anterior
+                                {% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">${{ item.precio_cober_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">${{ item.precio_otras_os_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-600">
+                                {% if item.sin_cambios %}
+                                Mismo valor que tarifa anterior
+                                {% else %}
+                                Nueva vigencia
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <a href="{% url 'liquidacion:grupos_tarifarios_list' %}"
+               class="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-200">
+                Cancelar
+            </a>
+            <button type="submit"
+                    class="inline-flex h-10 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-900">
+                Previsualizar cambios
+            </button>
+        </div>
+    </form>
+
+    <div class="mt-5 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4 text-sm text-amber-900">
+        <p class="font-semibold">Importante</p>
+        <p class="mt-1">
+            Esta accion no recalcula registros historicos. Los nuevos valores aplican cuando el calculo use una fecha de informe dentro de la nueva vigencia.
+        </p>
+    </div>
+</div>
+{% endblock %}

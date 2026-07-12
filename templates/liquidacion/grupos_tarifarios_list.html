@@ -13,8 +13,17 @@
 
     <div class="bg-slate-800 rounded-xl shadow-lg p-6 mb-6 text-white"
          style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
-        <h1 class="text-2xl font-bold mb-1">Configuracion Economica / Grupos Tarifarios</h1>
-        <p class="text-slate-300 text-sm">Estado global de vigencias para control administrativo.</p>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">Configuracion Economica / Grupos Tarifarios</h1>
+                <p class="text-slate-300 text-sm">Estado global de vigencias para control administrativo.</p>
+            </div>
+            <a href="{% url 'liquidacion:grupo_tarifario_tarifa_bulk_update' %}"
+               class="inline-flex h-10 items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-100">
+                <i class="fas fa-table-list mr-2"></i>
+                Actualizacion masiva
+            </a>
+        </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
