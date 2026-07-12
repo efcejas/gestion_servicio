@@ -1324,3 +1324,62 @@ class CargarPlantillasSmokeTest(TestCase):
         plantilla_con_fondo = next((x for x in datos if x['nombre'] == 'Con fondo'), None)
         self.assertIsNotNone(plantilla_con_fondo)
         self.assertNotIn('background-color', plantilla_con_fondo['contenido'])
+
+
+class PerfilResidenteDocentePaginacionTest(TestCase):
+    def setUp(self):
+        self.superuser = User.objects.create_superuser(
+            username='admin_evaluaciones',
+            email='admin@test.com',
+            password='pass123',
+        )
+        self.residente = User.objects.create_user(
+            username='residente_evaluaciones',
+            password='pass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        self.revisor = User.objects.create_user(
+            username='staff_evaluaciones',
+            password='pass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+        self.tipo = TipoEstudio.objects.create(nombre='TC evaluaciones')
+        self.region = Region.objects.create(nombre='Region evaluaciones')
+
+        for indice in range(11):
+            preinforme = Preinforme.objects.create(
+                residente=self.residente,
+                numero_estudio=f'EVAL-{indice:03d}',
+                tipo_estudio=self.tipo,
+                region=self.region,
+                apellido_paciente='Paciente',
+                nombre_paciente=str(indice),
+            )
+            RevisionPreinforme.objects.create(
+                preinforme=preinforme,
+                revisor=self.revisor,
+                evaluacion_ia_final={'puntaje_global': indice + 1},
+            )
+
+    def test_evaluaciones_finales_se_paginan_sin_alterar_promedio(self):
+        self.client.force_login(self.superuser)
+
+        response = self.client.get(reverse(
+            'preinformes:perfil_residente_docente',
+            args=[self.residente.pk],
+        ), follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        pagina = response.context['revisiones_evaluadas']
+        self.assertEqual(len(pagina), 10)
+        self.assertEqual(pagina.paginator.count, 11)
+        self.assertEqual(response.context['promedio_evaluacion_final'], 6.0)
+
+        segunda_pagina = self.client.get(
+            reverse('preinformes:perfil_residente_docente', args=[self.residente.pk]),
+            {'evaluaciones_page': 2},
+            follow=True,
+        ).context['revisiones_evaluadas']
+        self.assertEqual(len(segunda_pagina), 1)

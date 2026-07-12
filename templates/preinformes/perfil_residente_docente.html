@@ -129,7 +129,7 @@
     </div>
 
     <!-- Evolucion basada en la correccion final del staff -->
-    <div class="bg-white rounded-xl shadow border border-violet-100 overflow-hidden mb-8">
+    <div id="evaluaciones-finales" class="bg-white rounded-xl shadow border border-violet-100 overflow-hidden mb-8 scroll-mt-4">
         <div class="px-6 py-4 border-b border-violet-100 flex items-center justify-between gap-4 flex-wrap">
             <div>
                 <h2 class="text-lg font-semibold text-gray-800">Evaluaci&oacute;n final por preinforme</h2>
@@ -263,6 +263,39 @@
                 </tbody>
             </table>
         </div>
+        {% if revisiones_evaluadas.has_other_pages %}
+        <nav class="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-3" aria-label="Paginacion de evaluaciones finales">
+            <p class="text-xs text-gray-500 hidden sm:block">
+                P&aacute;gina {{ revisiones_evaluadas.number }} de {{ revisiones_evaluadas.paginator.num_pages }}
+            </p>
+            <div class="flex items-center gap-1 ml-auto">
+                {% if revisiones_evaluadas.has_previous %}
+                <a href="?evaluaciones_page={{ revisiones_evaluadas.previous_page_number }}#evaluaciones-finales"
+                   class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                   aria-label="Pagina anterior" title="P&aacute;gina anterior">
+                    <i class="fas fa-chevron-left text-xs" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+
+                {% for numero in revisiones_evaluadas.paginator.page_range %}
+                    {% if numero == revisiones_evaluadas.number %}
+                    <span class="inline-flex items-center justify-center min-w-9 h-9 px-2 rounded-lg bg-violet-600 text-white text-sm font-semibold" aria-current="page">{{ numero }}</span>
+                    {% elif numero >= revisiones_evaluadas.number|add:"-2" and numero <= revisiones_evaluadas.number|add:"2" %}
+                    <a href="?evaluaciones_page={{ numero }}#evaluaciones-finales"
+                       class="inline-flex items-center justify-center min-w-9 h-9 px-2 border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition">{{ numero }}</a>
+                    {% endif %}
+                {% endfor %}
+
+                {% if revisiones_evaluadas.has_next %}
+                <a href="?evaluaciones_page={{ revisiones_evaluadas.next_page_number }}#evaluaciones-finales"
+                   class="inline-flex items-center justify-center w-9 h-9 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                   aria-label="Pagina siguiente" title="P&aacute;gina siguiente">
+                    <i class="fas fa-chevron-right text-xs" aria-hidden="true"></i>
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
         {% else %}
         <p class="px-6 py-6 text-sm text-gray-500">Todav&iacute;a no hay preinformes con evaluaci&oacute;n final IA.</p>
         {% endif %}

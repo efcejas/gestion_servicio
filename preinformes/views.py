@@ -1879,19 +1879,23 @@ def perfil_residente_docente(request, pk):
     if promedio_scoring is not None:
         promedio_scoring = round(promedio_scoring, 1)
 
-    revisiones_evaluadas = RevisionPreinforme.objects.filter(
+    revisiones_evaluadas_qs = RevisionPreinforme.objects.filter(
         preinforme__residente=residente,
     ).exclude(evaluacion_ia_final={}).select_related(
         'preinforme__tipo_estudio', 'preinforme__region', 'revisor'
     ).order_by('-evaluacion_ia_final_generada_en', '-fecha_modificacion')
     puntajes_finales = [
         revision.evaluacion_ia_final.get('puntaje_global')
-        for revision in revisiones_evaluadas
+        for revision in revisiones_evaluadas_qs
         if isinstance(revision.evaluacion_ia_final.get('puntaje_global'), (int, float))
     ]
     promedio_evaluacion_final = (
         round(sum(puntajes_finales) / len(puntajes_finales), 1)
         if puntajes_finales else None
+    )
+    revisiones_paginator = Paginator(revisiones_evaluadas_qs, 10)
+    revisiones_evaluadas = revisiones_paginator.get_page(
+        request.GET.get('evaluaciones_page')
     )
 
     # Promedios por dimensión (calculados en Python desde el JSONField)
