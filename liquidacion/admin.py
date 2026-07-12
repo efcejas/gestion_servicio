@@ -8,6 +8,7 @@ from .models import (
     HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
     HistorialRecalculoSolicitudRevisionHorario,
+    HistorialRecalculoTarifaRegistro,
     HistorialSesionContable,
     PreparacionLiquidacionRRHH,
     CorreccionPacsRegistro,
@@ -779,6 +780,51 @@ class HistorialRecalculoSolicitudRevisionHorarioAdmin(admin.ModelAdmin):
         'observacion',
         'motivo_sistema',
     )
+    ordering = ('-fecha_recalculo',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistorialRecalculoTarifaRegistro)
+class HistorialRecalculoTarifaRegistroAdmin(admin.ModelAdmin):
+    list_display = (
+        'registro',
+        'sesion_contable',
+        'fecha_desde',
+        'fecha_hasta',
+        'monto_anterior',
+        'monto_nuevo',
+        'diferencia',
+        'recalculado_por',
+        'fecha_recalculo',
+    )
+    list_filter = ('sesion_contable', 'fecha_desde', 'fecha_recalculo')
+    search_fields = (
+        'registro__nombre_paciente',
+        'registro__apellido_paciente',
+        'registro__dni_paciente',
+        'motivo',
+    )
+    readonly_fields = (
+        'sesion_contable',
+        'registro',
+        'fecha_desde',
+        'fecha_hasta',
+        'monto_anterior',
+        'monto_nuevo',
+        'diferencia',
+        'motivo',
+        'recalculado_por',
+        'fecha_recalculo',
+    )
+    date_hierarchy = 'fecha_recalculo'
     ordering = ('-fecha_recalculo',)
 
     def has_add_permission(self, request):

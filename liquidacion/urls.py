@@ -35,6 +35,7 @@ from .views import (
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
     TarifasGrupoBulkUpdateView,
+    SesionContableRecalculoTarifasView,
     SesionContableListView,       # [NUEVO Fase B] Gestión del ciclo contable
     PreparacionLiquidacionRRHHPreviewView,
     sesion_contable_transicion,   # [NUEVO Fase B] Transición de estado
@@ -122,6 +123,11 @@ urlpatterns = [
     
     # [NUEVO v3.0 - VISTA UNIFICADA RECOMENDADA]
     path('liquidacion-mensual/', LiquidacionPorMedicoPorMesListView.as_view(), name='liquidacion_mensual'),
+    path(
+        'sesiones/<int:pk>/recalcular-tarifas/',
+        SesionContableRecalculoTarifasView.as_view(),
+        name='sesion_recalculo_tarifas',
+    ),
     path('exportar_excel_liquidacion/', exportar_excel_liquidacion, name='exportar_excel_liquidacion'),
     path(
         'exportar_excel_liquidacion_definitiva/',

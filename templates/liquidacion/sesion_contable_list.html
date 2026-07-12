@@ -288,6 +288,23 @@
                                 </div>
 
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Ajuste por tarifas</p>
+                                    <div class="space-y-2 text-xs text-slate-600">
+                                        <p>Recalculo controlado para registros ya cargados luego de actualizar vigencias.</p>
+                                        {% if dato.sesion.estado == 'FACTURADA' or dato.sesion.estado == 'PAGADA' %}
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-gray-100 text-gray-400">
+                                            <i class="fas fa-lock"></i> Bloqueado en {{ dato.sesion.estado }}
+                                        </span>
+                                        {% else %}
+                                        <a href="{% url 'liquidacion:sesion_recalculo_tarifas' dato.sesion.pk %}"
+                                           class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors">
+                                            <i class="fas fa-calculator"></i> Recalcular tarifas
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                     <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">RRHH residencia</p>
                                     <div class="space-y-2 text-xs">
                                         <p class="{% if dato.requisito_rrhh.ok %}text-emerald-700{% else %}text-amber-700{% endif %}">

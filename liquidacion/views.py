@@ -31,6 +31,7 @@ from .models import (
     ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
     SolicitudRevisionHorarioRegistro,
     HistorialRecalculoSolicitudRevisionHorario,
+    HistorialRecalculoTarifaRegistro,
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
     CorreccionPacsRegistro,
@@ -863,9 +864,25 @@ class GrupoTarifarioTarifaNuevaView(LoginRequiredMixin, UserPassesTestMixin, Suc
         return kwargs
 
     def form_valid(self, form):
-        form.instance.grupo_tarifario = self.grupo_tarifario
-        form.instance.actualizado_por = self.request.user
-        return super().form_valid(form)
+        with transaction.atomic():
+            vigencia_desde = form.instance.vigencia_desde
+            dia_anterior = vigencia_desde - timedelta(days=1)
+            tarifas_cerradas = (
+                TarifaGrupoTarifario.objects
+                .filter(grupo_tarifario=self.grupo_tarifario, vigencia_desde__lt=vigencia_desde)
+                .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=vigencia_desde))
+                .update(vigencia_hasta=dia_anterior)
+            )
+            form.instance.grupo_tarifario = self.grupo_tarifario
+            form.instance.actualizado_por = self.request.user
+            response = super().form_valid(form)
+
+        if tarifas_cerradas:
+            messages.info(
+                self.request,
+                f'Se cerró automáticamente {tarifas_cerradas} tarifa anterior al {dia_anterior:%d/%m/%Y}.',
+            )
+        return response
 
     def get_success_url(self):
         volver_sesion = _volver_sesion_url(self.request)
@@ -3976,6 +3993,193 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
 
         context['sesiones_data'] = sesiones_data
         return context
+
+
+class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Preview y aplicacion controlada de recalculo por tarifas vigentes."""
+
+    template_name = 'liquidacion/sesion_recalculo_tarifas.html'
+
+    def test_func(self):
+        return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para recalcular registros por tarifa.')
+        return redirect('home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        if self.sesion.estado in ['FACTURADA', 'PAGADA']:
+            messages.error(
+                request,
+                'No se puede recalcular por tarifas en sesiones FACTURADAS o PAGADAS.',
+            )
+            return redirect('liquidacion:sesiones_list')
+        return super().dispatch(request, *args, **kwargs)
+
+    def _rango_default(self):
+        fecha_desde = date(self.sesion.año, self.sesion.mes, 1)
+        if self.sesion.mes == 12:
+            fecha_hasta = date(self.sesion.año, 12, 31)
+        else:
+            fecha_hasta = date(self.sesion.año, self.sesion.mes + 1, 1) - timedelta(days=1)
+        return fecha_desde, fecha_hasta
+
+    def _parse_date(self, value):
+        try:
+            return datetime.strptime(value, '%Y-%m-%d').date()
+        except (TypeError, ValueError):
+            return None
+
+    def _build_preview(self, fecha_desde, fecha_hasta):
+        registros = (
+            RegistroEstudiosPorMedico.objects
+            .filter(
+                sesion_contable=self.sesion,
+                fecha_del_informe__gte=fecha_desde,
+                fecha_del_informe__lte=fecha_hasta,
+            )
+            .select_related('medico')
+            .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
+            .order_by('fecha_del_informe', 'apellido_paciente', 'nombre_paciente', 'id')
+        )
+
+        preview = []
+        total_actual = Decimal('0.00')
+        total_nuevo = Decimal('0.00')
+        for registro in registros:
+            monto_actual = registro.monto_calculado or Decimal('0.00')
+            monto_nuevo = registro.calcular_monto()
+            diferencia = monto_nuevo - monto_actual
+            total_actual += monto_actual
+            total_nuevo += monto_nuevo
+            estudios = ', '.join(
+                rel.estudio.nombre
+                for rel in registro.registroestudio_set.all()
+            )
+            preview.append({
+                'registro': registro,
+                'estudios': estudios,
+                'monto_actual': monto_actual,
+                'monto_nuevo': monto_nuevo,
+                'diferencia': diferencia,
+                'cambia': diferencia != Decimal('0.00'),
+            })
+
+        return {
+            'items': preview,
+            'total_registros': len(preview),
+            'total_cambian': sum(1 for item in preview if item['cambia']),
+            'total_actual': total_actual,
+            'total_nuevo': total_nuevo,
+            'diferencia_total': total_nuevo - total_actual,
+        }
+
+    def _contexto(self, request, errors=None, preview=None, fecha_desde=None, fecha_hasta=None, motivo=''):
+        default_desde, default_hasta = self._rango_default()
+        return {
+            'sesion': self.sesion,
+            'fecha_desde': fecha_desde or default_desde,
+            'fecha_hasta': fecha_hasta or default_hasta,
+            'motivo': motivo or f'Recalculo por actualizacion de tarifas vigentes - {self.sesion.mes}/{self.sesion.año}',
+            'preview': preview,
+            'errors_preview': errors or [],
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(self._contexto(self.request))
+        return context
+
+    def post(self, request, *args, **kwargs):
+        fecha_desde = self._parse_date(request.POST.get('fecha_desde'))
+        fecha_hasta = self._parse_date(request.POST.get('fecha_hasta'))
+        motivo = (request.POST.get('motivo') or '').strip()
+        confirmar = request.POST.get('confirmar') == '1'
+        errors = []
+
+        if not fecha_desde:
+            errors.append('Indica una fecha desde valida.')
+        if not fecha_hasta:
+            errors.append('Indica una fecha hasta valida.')
+        if fecha_desde and fecha_hasta and fecha_hasta < fecha_desde:
+            errors.append('La fecha hasta no puede ser anterior a fecha desde.')
+        if not motivo:
+            errors.append('Indica un motivo para auditar el recalculo.')
+
+        preview = None
+        if not errors:
+            preview = self._build_preview(fecha_desde, fecha_hasta)
+            if preview['total_registros'] == 0:
+                errors.append('No hay registros en el rango seleccionado.')
+
+        if errors or not confirmar:
+            return self.render_to_response(
+                self._contexto(
+                    request,
+                    errors=errors,
+                    preview=None if errors else preview,
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta,
+                    motivo=motivo,
+                )
+            )
+
+        aplicados = 0
+        sin_cambios = 0
+        with transaction.atomic():
+            registros = (
+                RegistroEstudiosPorMedico.objects
+                .select_for_update()
+                .filter(
+                    sesion_contable=self.sesion,
+                    fecha_del_informe__gte=fecha_desde,
+                    fecha_del_informe__lte=fecha_hasta,
+                )
+                .select_related('medico')
+                .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
+                .order_by('id')
+            )
+            for registro in registros:
+                monto_anterior = registro.monto_calculado or Decimal('0.00')
+                monto_nuevo = registro.calcular_monto()
+                if monto_nuevo == monto_anterior:
+                    sin_cambios += 1
+                    continue
+
+                motivo_sistema = (
+                    f'Recalculo por tarifas vigentes. '
+                    f'Rango: {fecha_desde:%d/%m/%Y} - {fecha_hasta:%d/%m/%Y}. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {motivo}'
+                )
+                registro.monto_calculado = monto_nuevo
+                registro.modificado_por = request.user
+                registro.fecha_modificacion = now()
+                registro.motivo_modificacion = motivo_sistema
+                registro.save(update_fields=[
+                    'monto_calculado',
+                    'modificado_por',
+                    'fecha_modificacion',
+                    'motivo_modificacion',
+                ])
+                HistorialRecalculoTarifaRegistro.objects.create(
+                    sesion_contable=self.sesion,
+                    registro=registro,
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta,
+                    monto_anterior=monto_anterior,
+                    monto_nuevo=monto_nuevo,
+                    diferencia=monto_nuevo - monto_anterior,
+                    motivo=motivo_sistema,
+                    recalculado_por=request.user,
+                )
+                aplicados += 1
+
+        messages.success(
+            request,
+            f'Recalculo por tarifas aplicado: {aplicados} registro(s) actualizado(s), {sin_cambios} sin cambios.',
+        )
+        return redirect('liquidacion:sesiones_list')
 
 
 class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMixin, FormView):

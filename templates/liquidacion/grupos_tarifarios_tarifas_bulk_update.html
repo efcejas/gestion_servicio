@@ -64,13 +64,17 @@
 
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-100 px-4 py-3">
-                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-700">Valores por grupo</h2>
-                <p class="mt-1 text-xs text-gray-500">
-                    Deja marcado solo lo que quieras actualizar. Los valores se precompletan con la tarifa vigente para facilitar la carga.
-                </p>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-700">Valores por grupo</h2>
+                        <p class="mt-1 text-xs text-gray-500">
+                            Deja marcado solo lo que quieras actualizar. Los valores se precompletan con la tarifa vigente para facilitar la carga.
+                        </p>
+                    </div>
+                </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+            <div class="w-full overflow-x-auto">
+                <table class="w-full table-fixed divide-y divide-gray-200" style="width: 100%; table-layout: fixed;">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Actualizar</th>
@@ -101,15 +105,15 @@
                             <td class="px-3 py-2 text-right text-sm text-gray-700">
                                 {% if row.tarifa_vigente %}${{ row.tarifa_vigente.precio_otras_os|floatformat:2 }}{% else %}-{% endif %}
                             </td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2 text-right">
                                 <input name="precio_cober_{{ row.grupo.pk }}" type="number" min="0.01" step="0.01"
                                        value="{{ row.precio_cober|unlocalize }}"
-                                       class="h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                                       class="ml-auto block h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
                             </td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2 text-right">
                                 <input name="precio_otras_os_{{ row.grupo.pk }}" type="number" min="0.01" step="0.01"
                                        value="{{ row.precio_otras_os|unlocalize }}"
-                                       class="h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                                       class="ml-auto block h-9 w-32 rounded-md border border-gray-300 px-2 text-right text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
                             </td>
                         </tr>
                         {% empty %}
@@ -119,6 +123,17 @@
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <div class="border-t border-gray-100 bg-gray-50 px-4 py-3">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p class="text-xs font-medium text-gray-600">
+                        Siguiente paso: cuando termines de marcar y editar, presiona <strong>Previsualizar cambios</strong>.
+                    </p>
+                    <button type="submit"
+                            class="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700">
+                        Previsualizar cambios
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -137,7 +152,7 @@
                 </button>
             </div>
             <div class="overflow-x-auto rounded-lg border border-indigo-100 bg-white">
-                <table class="min-w-full divide-y divide-gray-100">
+                <table class="w-full table-fixed divide-y divide-gray-100" style="width: 100%; table-layout: fixed;">
                     <thead class="bg-indigo-50">
                         <tr>
                             <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-indigo-900">Grupo</th>
@@ -180,10 +195,6 @@
                class="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-200">
                 Cancelar
             </a>
-            <button type="submit"
-                    class="inline-flex h-10 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-900">
-                Previsualizar cambios
-            </button>
         </div>
     </form>
 

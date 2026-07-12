@@ -1,0 +1,143 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Recalculo por tarifas vigentes{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 w-full">
+    <div class="mb-4">
+        <a href="{% url 'liquidacion:sesiones_list' %}#sesion-card-{{ sesion.pk }}"
+           class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+            <i class="fas fa-arrow-left"></i>
+            Volver a sesiones
+        </a>
+    </div>
+
+    <div class="mb-5 rounded-xl bg-slate-800 p-6 text-white shadow-lg"
+         style="background: linear-gradient(90deg, #334155 0%, #0f172a 100%);">
+        <h1 class="text-2xl font-bold">Recalculo por tarifas vigentes</h1>
+        <p class="mt-1 text-sm text-slate-300">
+            Sesion {{ sesion.mes }}/{{ sesion.año }} · compara monto guardado contra el calculo actual por fecha de informe.
+        </p>
+    </div>
+
+    {% if errors_preview %}
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p class="font-semibold">Revisar antes de continuar</p>
+        <ul class="mt-2 list-disc space-y-1 pl-5">
+            {% for error in errors_preview %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" class="space-y-5">
+        {% csrf_token %}
+        <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <div>
+                    <label for="fecha_desde" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Desde</label>
+                    <input id="fecha_desde" name="fecha_desde" type="date" required
+                           value="{{ fecha_desde|date:'Y-m-d' }}"
+                           class="h-10 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="fecha_hasta" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Hasta</label>
+                    <input id="fecha_hasta" name="fecha_hasta" type="date" required
+                           value="{{ fecha_hasta|date:'Y-m-d' }}"
+                           class="h-10 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label for="motivo" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Motivo</label>
+                    <input id="motivo" name="motivo" type="text" required
+                           value="{{ motivo }}"
+                           class="h-10 w-full rounded-md border border-gray-300 px-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+        </div>
+
+        {% if preview %}
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Registros evaluados</p>
+                <p class="mt-1 text-2xl font-bold text-slate-900">{{ preview.total_registros }}</p>
+            </div>
+            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-indigo-700">Con cambio</p>
+                <p class="mt-1 text-2xl font-bold text-indigo-800">{{ preview.total_cambian }}</p>
+            </div>
+            <div class="rounded-lg border border-slate-200 bg-white p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total actual</p>
+                <p class="mt-1 text-2xl font-bold text-slate-900">${{ preview.total_actual|floatformat:2 }}</p>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Diferencia</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-800">${{ preview.diferencia_total|floatformat:2 }}</p>
+            </div>
+        </div>
+
+        <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-100 px-4 py-3">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-gray-700">Previsualizacion</h2>
+                <p class="mt-1 text-xs text-gray-500">Solo se actualizaran registros cuyo monto recalculado sea distinto al monto guardado.</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Fecha</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Profesional</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Paciente</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Estudios</th>
+                            <th class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Horario</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actual</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Recalculado</th>
+                            <th class="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Dif.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        {% for item in preview.items %}
+                        <tr class="{% if item.cambia %}bg-indigo-50/40{% endif %}">
+                            <td class="px-3 py-2 text-sm text-gray-700">{{ item.registro.fecha_del_informe|date:"d/m/Y" }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-700">{{ item.registro.medico.get_full_name|default:item.registro.medico.username }}</td>
+                            <td class="px-3 py-2 text-sm font-semibold text-gray-900">{{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-600">{{ item.estudios }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-700">{{ item.registro.horario }}</td>
+                            <td class="px-3 py-2 text-right text-sm text-gray-700">${{ item.monto_actual|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">${{ item.monto_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold {% if item.cambia %}text-indigo-800{% else %}text-gray-400{% endif %}">${{ item.diferencia|floatformat:2 }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="px-4 py-8 text-center text-sm text-gray-500">No hay registros para el rango seleccionado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <a href="{% url 'liquidacion:sesiones_list' %}#sesion-card-{{ sesion.pk }}"
+               class="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-200">
+                Cancelar
+            </a>
+            <button type="submit"
+                    class="inline-flex h-10 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-900">
+                Previsualizar
+            </button>
+            {% if preview and preview.total_cambian %}
+            <button type="submit" name="confirmar" value="1"
+                    class="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700">
+                Confirmar recalculo
+            </button>
+            {% endif %}
+        </div>
+    </form>
+
+    <div class="mt-5 rounded-lg border-l-4 border-amber-500 bg-amber-50 p-4 text-sm text-amber-900">
+        <p class="font-semibold">Importante</p>
+        <p class="mt-1">No modifica horarios ni estudios. No recalcula otros meses. No esta disponible en sesiones FACTURADAS o PAGADAS.</p>
+    </div>
+</div>
+{% endblock %}

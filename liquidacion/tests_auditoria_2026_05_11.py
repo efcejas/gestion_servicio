@@ -7,7 +7,7 @@ Validar que los 4 fixes implementados funcionan:
   FIX #4: Post_save signals para recálculo automático
 """
 
-from django.test import TestCase, TransactionTestCase, RequestFactory
+from django.test import TestCase, TransactionTestCase, RequestFactory, override_settings
 from django.contrib.admin.sites import AdminSite
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -359,6 +359,7 @@ class SesionContableConstraintTest(TestCase):
             "❌ FALLA: Admin debe poder registrar en sesión CERRADA")
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class PermisosYTrazabilidadViewTest(TestCase):
     """Tests de regresión para permisos de vistas y operaciones sensibles."""
 
@@ -405,6 +406,9 @@ class PermisosYTrazabilidadViewTest(TestCase):
             rol='medico_residente',
             perfil_completo=True,
         )
+        self.client.defaults['wsgi.url_scheme'] = 'https'
+        self.client.defaults['SERVER_PORT'] = '443'
+        self.client.defaults['HTTP_X_FORWARDED_PROTO'] = 'https'
 
     def test_liquidacion_mensual_permite_admin_y_jefe_servicio(self):
         self.client.login(username='admin_liq', password='testpass123')
@@ -2335,16 +2339,56 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'La vigencia hasta no puede ser anterior a vigencia desde.')
 
-    def test_grupo_tarifario_tarifa_nueva_rechaza_solapamiento_vigencias(self):
+    def test_grupo_tarifario_tarifa_nueva_cierra_tarifa_anterior_solapada(self):
         grupo = GrupoTarifario.objects.create(
             codigo='TAR_VAL_SOLAP',
             nombre='Grupo valida solap',
             modalidad='DOP',
             activo=True,
         )
-        TarifaGrupoTarifario.objects.create(
+        tarifa_anterior = TarifaGrupoTarifario.objects.create(
             grupo_tarifario=grupo,
             vigencia_desde=date(2029, 1, 1),
+            vigencia_hasta=None,
+            precio_cober=Decimal('2500.00'),
+            precio_otras_os=Decimal('2700.00'),
+        )
+        url = reverse('liquidacion:grupo_tarifario_tarifa_nueva', kwargs={'grupo_pk': grupo.pk})
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            url,
+            data={
+                'vigencia_desde': '2029-06-01',
+                'vigencia_hasta': '',
+                'precio_cober': '2800.00',
+                'precio_otras_os': '3000.00',
+                'motivo_actualizacion': 'Intento solapado',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        tarifa_anterior.refresh_from_db()
+        self.assertEqual(tarifa_anterior.vigencia_hasta, date(2029, 5, 31))
+        self.assertTrue(
+            TarifaGrupoTarifario.objects.filter(
+                grupo_tarifario=grupo,
+                vigencia_desde=date(2029, 6, 1),
+                precio_cober=Decimal('2800.00'),
+                precio_otras_os=Decimal('3000.00'),
+            ).exists()
+        )
+
+    def test_grupo_tarifario_tarifa_nueva_rechaza_tarifa_futura_solapada(self):
+        grupo = GrupoTarifario.objects.create(
+            codigo='TAR_VAL_FUT_SOL',
+            nombre='Grupo valida futura solapada',
+            modalidad='DOP',
+            activo=True,
+        )
+        TarifaGrupoTarifario.objects.create(
+            grupo_tarifario=grupo,
+            vigencia_desde=date(2029, 7, 1),
             vigencia_hasta=None,
             precio_cober=Decimal('2500.00'),
             precio_otras_os=Decimal('2700.00'),

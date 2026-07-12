@@ -724,7 +724,9 @@ class TarifaGrupoTarifarioAdminForm(forms.ModelForm):
         if not self.grupo_tarifario or not vigencia_desde:
             return cleaned_data
 
-        # Solapamiento de vigencias para el mismo grupo (null = rango abierto)
+        # Solapamiento de vigencias para el mismo grupo (null = rango abierto).
+        # Las tarifas anteriores que llegan hasta la nueva vigencia se cierran
+        # automaticamente en la vista; se bloquean duplicadas o futuras.
         tarifas_qs = (
             self._meta.model.objects
             .filter(grupo_tarifario=self.grupo_tarifario)
@@ -733,7 +735,7 @@ class TarifaGrupoTarifarioAdminForm(forms.ModelForm):
         if vigencia_hasta:
             tarifas_qs = tarifas_qs.filter(vigencia_desde__lte=vigencia_hasta)
 
-        if tarifas_qs.exists():
+        if tarifas_qs.filter(vigencia_desde__gte=vigencia_desde).exists():
             raise forms.ValidationError(
                 'Ya existe una tarifa con vigencia que se solapa para este grupo tarifario.'
             )
