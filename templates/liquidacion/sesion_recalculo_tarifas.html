@@ -122,10 +122,17 @@
                class="inline-flex h-10 items-center justify-center rounded-md bg-gray-100 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-200">
                 Cancelar
             </a>
+            {% if preview %}
             <button type="submit"
-                    class="inline-flex h-10 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white hover:bg-slate-900">
+                    class="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">
+                Actualizar previsualizacion
+            </button>
+            {% else %}
+            <button type="submit"
+                    class="inline-flex h-10 items-center justify-center rounded-md bg-slate-800 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-900">
                 Previsualizar
             </button>
+            {% endif %}
             {% if preview and preview.total_cambian %}
             <button type="submit" name="confirmar" value="1"
                     class="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700">
