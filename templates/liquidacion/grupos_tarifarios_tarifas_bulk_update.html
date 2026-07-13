@@ -137,6 +137,38 @@
             </div>
         </div>
 
+        <div class="rounded-xl border border-blue-100 bg-blue-50 p-4 shadow-sm">
+            <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                <div class="flex items-start gap-3">
+                    <input id="incluir_guardia_pasiva" type="checkbox" name="incluir_guardia_pasiva"
+                           {% if guardia_pasiva_row.incluir %}checked{% endif %}
+                           class="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <div>
+                        <label for="incluir_guardia_pasiva" class="text-sm font-bold uppercase tracking-wider text-blue-900">
+                            Actualizar guardia pasiva
+                        </label>
+                        <p class="mt-1 text-xs text-blue-800">
+                            Crea una nueva vigencia y cierra la anterior el dia previo. No modifica guardias ya registradas.
+                        </p>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 md:w-96">
+                    <div>
+                        <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-blue-700">Monto vigente</p>
+                        <p class="h-10 rounded-md border border-blue-100 bg-white px-3 py-2 text-right text-sm text-gray-700">
+                            {% if guardia_pasiva_row.tarifa_vigente %}${{ guardia_pasiva_row.tarifa_vigente.monto_vigente|floatformat:2 }}{% else %}-{% endif %}
+                        </p>
+                    </div>
+                    <div>
+                        <label for="monto_guardia_pasiva" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-blue-700">Nuevo monto</label>
+                        <input id="monto_guardia_pasiva" name="monto_guardia_pasiva" type="number" min="0.01" step="0.01"
+                               value="{{ guardia_pasiva_row.monto|unlocalize }}"
+                               class="h-10 w-full rounded-md border border-blue-200 bg-white px-3 text-right text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {% if preview %}
         <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -165,16 +197,26 @@
                     <tbody class="divide-y divide-gray-100">
                         {% for item in preview %}
                         <tr>
-                            <td class="px-3 py-2 text-sm font-semibold text-gray-900">{{ item.grupo.codigo }}</td>
+                            <td class="px-3 py-2 text-sm font-semibold text-gray-900">
+                                {% if item.tipo == 'guardia_pasiva' %}GUARDIA PASIVA{% else %}{{ item.grupo.codigo }}{% endif %}
+                            </td>
                             <td class="px-3 py-2 text-sm text-gray-700">
                                 {% if item.tarifa_anterior %}
+                                {% if item.tipo == 'guardia_pasiva' %}
+                                {{ item.tarifa_anterior.vigente_desde|date:"d/m/Y" }} a {{ item.vigencia_hasta_anterior|date:"d/m/Y" }}
+                                {% else %}
                                 {{ item.tarifa_anterior.vigencia_desde|date:"d/m/Y" }} a {{ item.vigencia_hasta_anterior|date:"d/m/Y" }}
+                                {% endif %}
                                 {% else %}
                                 Sin tarifa anterior
                                 {% endif %}
                             </td>
-                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">${{ item.precio_cober_nuevo|floatformat:2 }}</td>
-                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">${{ item.precio_otras_os_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">
+                                {% if item.tipo == 'guardia_pasiva' %}${{ item.monto_nuevo|floatformat:2 }}{% else %}${{ item.precio_cober_nuevo|floatformat:2 }}{% endif %}
+                            </td>
+                            <td class="px-3 py-2 text-right text-sm font-semibold text-gray-900">
+                                {% if item.tipo == 'guardia_pasiva' %}-{% else %}${{ item.precio_otras_os_nuevo|floatformat:2 }}{% endif %}
+                            </td>
                             <td class="px-3 py-2 text-sm text-gray-600">
                                 {% if item.sin_cambios %}
                                 Mismo valor que tarifa anterior

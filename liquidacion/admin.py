@@ -504,13 +504,11 @@ class HistorialConfiguracionGuardiaPasivaInline(admin.TabularInline):
 
 @admin.register(ConfiguracionGuardiaPasiva)
 class ConfiguracionGuardiaPasivaAdmin(admin.ModelAdmin):
-    list_display = ('monto_vigente', 'vigente_desde', 'actualizado_por', 'fecha_actualizacion')
+    list_display = ('monto_vigente', 'vigente_desde', 'vigente_hasta', 'actualizado_por', 'fecha_actualizacion')
+    list_filter = ('vigente_desde', 'vigente_hasta')
     search_fields = ('motivo_actualizacion',)
     readonly_fields = ('fecha_actualizacion',)
     inlines = [HistorialConfiguracionGuardiaPasivaInline]
-
-    def has_add_permission(self, request):
-        return not ConfiguracionGuardiaPasiva.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

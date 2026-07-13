@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import GrupoTarifario, TarifaGrupoTarifario
+from .models import ConfiguracionGuardiaPasiva, GrupoTarifario, GuardiaPasiva, TarifaGrupoTarifario
 
 
 User = get_user_model()
@@ -79,3 +79,47 @@ class TarifasGrupoBulkUpdateTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'ya existe una tarifa con vigencia')
+
+    def test_confirmar_crea_nueva_tarifa_guardia_pasiva_y_cierra_anterior(self):
+        tarifa_guardia = ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('36500.00'),
+            vigente_desde=date(2026, 1, 1),
+            motivo_actualizacion='Inicial guardia',
+            actualizado_por=self.user,
+        )
+        data = self._post_data()
+        data.pop(f'incluir_{self.grupo.pk}')
+        data['incluir_guardia_pasiva'] = 'on'
+        data['monto_guardia_pasiva'] = '42000.00'
+
+        response = self.client.post(self.url, data, secure=True, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        tarifa_guardia.refresh_from_db()
+        self.assertEqual(tarifa_guardia.vigente_hasta, date(2026, 6, 30))
+        nueva = ConfiguracionGuardiaPasiva.objects.get(vigente_desde=date(2026, 7, 1))
+        self.assertEqual(nueva.monto_vigente, Decimal('42000.00'))
+        self.assertIsNone(nueva.vigente_hasta)
+
+    def test_guardia_pasiva_toma_tarifa_por_fecha_guardia(self):
+        ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('36500.00'),
+            vigente_desde=date(2026, 1, 1),
+            vigente_hasta=date(2026, 6, 30),
+        )
+        ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('42000.00'),
+            vigente_desde=date(2026, 7, 1),
+        )
+
+        guardia_junio = GuardiaPasiva.objects.create(
+            medico=self.user,
+            fecha_guardia=date(2026, 6, 30),
+        )
+        guardia_julio = GuardiaPasiva.objects.create(
+            medico=self.user,
+            fecha_guardia=date(2026, 7, 1),
+        )
+
+        self.assertEqual(guardia_junio.monto, Decimal('36500.00'))
+        self.assertEqual(guardia_julio.monto, Decimal('42000.00'))

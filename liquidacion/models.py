@@ -603,6 +603,12 @@ class ConfiguracionGuardiaPasiva(models.Model):
         verbose_name='Vigente desde',
         help_text='Fecha desde la cual rige este valor.',
     )
+    vigente_hasta = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name='Vigente hasta',
+        help_text='Fecha hasta la cual rige este valor. Vacio significa vigencia abierta.',
+    )
     motivo_actualizacion = models.TextField(
         blank=True,
         verbose_name='Motivo de actualización',
@@ -624,11 +630,14 @@ class ConfiguracionGuardiaPasiva(models.Model):
         ordering = ['-fecha_actualizacion']
 
     def __str__(self):
-        return f'Guardia pasiva: {self.monto_vigente} desde {self.vigente_desde}'
+        hasta = self.vigente_hasta.strftime('%d/%m/%Y') if self.vigente_hasta else 'vigente'
+        return f'Guardia pasiva: {self.monto_vigente} desde {self.vigente_desde} hasta {hasta}'
 
     def clean(self):
         if self.monto_vigente is not None and self.monto_vigente < 0:
             raise ValidationError('El monto vigente no puede ser negativo.')
+        if self.vigente_hasta and self.vigente_hasta < self.vigente_desde:
+            raise ValidationError('La fecha vigente hasta no puede ser anterior a vigente desde.')
 
     def save(self, *args, **kwargs):
         if self.pk:
@@ -650,15 +659,22 @@ class ConfiguracionGuardiaPasiva(models.Model):
         super().save(*args, **kwargs)
 
     @classmethod
-    def get_config(cls):
+    def get_config(cls, fecha=None):
         """Retorna la configuración vigente, creando una por defecto si no existe."""
-        config = cls.objects.first()
+        fecha = fecha or timezone.now().date()
+        config = (
+            cls.objects
+            .filter(vigente_desde__lte=fecha)
+            .filter(models.Q(vigente_hasta__isnull=True) | models.Q(vigente_hasta__gte=fecha))
+            .order_by('-vigente_desde', '-id')
+            .first()
+        )
         if config:
             return config
 
         return cls.objects.create(
             monto_vigente=Decimal('36500.00'),
-            vigente_desde=timezone.now().date(),
+            vigente_desde=fecha,
             motivo_actualizacion='Valor inicial por defecto',
         )
 
@@ -764,7 +780,7 @@ class GuardiaPasiva(models.Model):
             self.sesion_contable = sesion
 
         if not self.pk:
-            self.monto = ConfiguracionGuardiaPasiva.get_config().monto_vigente
+            self.monto = ConfiguracionGuardiaPasiva.get_config(self.fecha_guardia).monto_vigente
         
         super().save(*args, **kwargs)
 

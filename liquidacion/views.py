@@ -607,6 +607,15 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
                 return tarifa
         return None
 
+    def _guardia_pasiva_vigente(self, fecha_ref):
+        return (
+            ConfiguracionGuardiaPasiva.objects
+            .filter(vigente_desde__lte=fecha_ref)
+            .filter(Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=fecha_ref))
+            .order_by('-vigente_desde', '-id')
+            .first()
+        )
+
     def _parse_decimal(self, value):
         value = (value or '').strip().replace(',', '.')
         if not value:
@@ -640,6 +649,22 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
             })
         return rows
 
+    def _build_guardia_pasiva_row(self, vigencia_desde=None, post_data=None):
+        fecha_ref = vigencia_desde or date.today()
+        tarifa_vigente = self._guardia_pasiva_vigente(fecha_ref)
+        incluir_default = False
+        monto_default = tarifa_vigente.monto_vigente if tarifa_vigente else ''
+
+        if post_data is not None:
+            incluir_default = post_data.get('incluir_guardia_pasiva') == 'on'
+            monto_default = post_data.get('monto_guardia_pasiva', '')
+
+        return {
+            'tarifa_vigente': tarifa_vigente,
+            'incluir': incluir_default,
+            'monto': monto_default,
+        }
+
     def _validar_preview(self, request):
         errors = []
         warnings = []
@@ -654,12 +679,14 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
             errors.append('Indica una vigencia desde válida.')
 
         rows = self._build_rows(vigencia_desde=vigencia_desde, post_data=request.POST)
+        guardia_pasiva_row = self._build_guardia_pasiva_row(vigencia_desde=vigencia_desde, post_data=request.POST)
         if not vigencia_desde:
-            return None, motivo, rows, preview, errors, warnings
+            return None, motivo, rows, guardia_pasiva_row, preview, errors, warnings
 
         seleccionados = [row for row in rows if row['incluir']]
-        if not seleccionados:
-            errors.append('Selecciona al menos un grupo tarifario para actualizar.')
+        incluir_guardia_pasiva = guardia_pasiva_row['incluir']
+        if not seleccionados and not incluir_guardia_pasiva:
+            errors.append('Selecciona al menos un grupo tarifario o la guardia pasiva para actualizar.')
 
         dia_anterior = vigencia_desde - timedelta(days=1)
         for row in seleccionados:
@@ -708,6 +735,7 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
             )
 
             preview.append({
+                'tipo': 'grupo',
                 'grupo': grupo,
                 'tarifa_anterior': tarifa_anterior,
                 'precio_cober_nuevo': precio_cober,
@@ -717,7 +745,41 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
                 'sin_cambios': sin_cambios,
             })
 
-        return vigencia_desde, motivo, rows, preview, errors, warnings
+        if incluir_guardia_pasiva:
+            monto_guardia = self._parse_decimal(guardia_pasiva_row['monto'])
+            if monto_guardia is None or monto_guardia <= 0:
+                errors.append('Guardia pasiva: el monto debe ser mayor a 0.')
+            elif ConfiguracionGuardiaPasiva.objects.filter(vigente_desde=vigencia_desde).exists():
+                errors.append(f'Guardia pasiva: ya existe una tarifa con vigencia {vigencia_desde:%d/%m/%Y}.')
+            else:
+                futuras_solapadas = (
+                    ConfiguracionGuardiaPasiva.objects
+                    .filter(vigente_desde__gt=vigencia_desde)
+                    .filter(Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=vigencia_desde))
+                )
+                if futuras_solapadas.exists():
+                    errors.append('Guardia pasiva: existe una tarifa futura que se solaparia.')
+                else:
+                    tarifa_anterior = (
+                        ConfiguracionGuardiaPasiva.objects
+                        .filter(vigente_desde__lt=vigencia_desde)
+                        .filter(Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=vigencia_desde))
+                        .order_by('-vigente_desde', '-id')
+                        .first()
+                    )
+                    if not tarifa_anterior:
+                        warnings.append('Guardia pasiva: no se encontro tarifa anterior vigente para cerrar.')
+
+                    preview.append({
+                        'tipo': 'guardia_pasiva',
+                        'tarifa_anterior': tarifa_anterior,
+                        'monto_nuevo': monto_guardia,
+                        'vigencia_desde': vigencia_desde,
+                        'vigencia_hasta_anterior': dia_anterior if tarifa_anterior else None,
+                        'sin_cambios': tarifa_anterior and tarifa_anterior.monto_vigente == monto_guardia,
+                    })
+
+        return vigencia_desde, motivo, rows, guardia_pasiva_row, preview, errors, warnings
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -726,6 +788,7 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
             'vigencia_desde': vigencia_desde,
             'motivo_actualizacion': f'Actualización valores {vigencia_desde:%m/%Y}',
             'rows': self._build_rows(vigencia_desde=vigencia_desde),
+            'guardia_pasiva_row': self._build_guardia_pasiva_row(vigencia_desde=vigencia_desde),
             'preview': None,
             'errors_preview': [],
             'warnings_preview': [],
@@ -733,7 +796,7 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
         return context
 
     def post(self, request, *args, **kwargs):
-        vigencia_desde, motivo, rows, preview, errors, warnings = self._validar_preview(request)
+        vigencia_desde, motivo, rows, guardia_pasiva_row, preview, errors, warnings = self._validar_preview(request)
         confirmar = request.POST.get('confirmar') == '1'
 
         if errors or not confirmar:
@@ -742,6 +805,7 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
                 'vigencia_desde': vigencia_desde,
                 'motivo_actualizacion': motivo,
                 'rows': rows,
+                'guardia_pasiva_row': guardia_pasiva_row,
                 'preview': preview if not errors else None,
                 'errors_preview': errors,
                 'warnings_preview': warnings,
@@ -749,11 +813,31 @@ class TarifasGrupoBulkUpdateView(LoginRequiredMixin, UserPassesTestMixin, Templa
 
         with transaction.atomic():
             creadas = 0
+            guardias_creadas = 0
             cerradas = 0
             dia_anterior = vigencia_desde - timedelta(days=1)
 
             for item in preview:
                 tarifa_anterior = item['tarifa_anterior']
+                if item['tipo'] == 'guardia_pasiva':
+                    if tarifa_anterior and (
+                        tarifa_anterior.vigente_hasta is None
+                        or tarifa_anterior.vigente_hasta >= vigencia_desde
+                    ):
+                        tarifa_anterior.vigente_hasta = dia_anterior
+                        tarifa_anterior.save(update_fields=['vigente_hasta'])
+                        cerradas += 1
+
+                    ConfiguracionGuardiaPasiva.objects.create(
+                        monto_vigente=item['monto_nuevo'],
+                        vigente_desde=vigencia_desde,
+                        vigente_hasta=None,
+                        motivo_actualizacion=motivo or f'Actualizacion masiva desde {vigencia_desde:%d/%m/%Y}',
+                        actualizado_por=request.user,
+                    )
+                    guardias_creadas += 1
+                    continue
+
                 if tarifa_anterior and (
                     tarifa_anterior.vigencia_hasta is None
                     or tarifa_anterior.vigencia_hasta >= vigencia_desde
