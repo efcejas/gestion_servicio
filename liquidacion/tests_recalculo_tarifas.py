@@ -165,6 +165,22 @@ class RecalculoTarifasSesionTest(TestCase):
         self.assertContains(response, 'Previsualizacion de guardias pasivas')
         self.assertContains(response, '42000')
 
+    def test_lista_sesion_muestra_boton_recalculo_si_hay_ajustes_pendientes(self):
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Recalcular tarifas')
+        self.assertContains(response, '2 ajuste(s) pendiente(s)')
+
+    def test_lista_sesion_oculta_boton_recalculo_si_no_hay_ajustes_pendientes(self):
+        self.client.post(self.url, self._post_data(confirmar='1'), secure=True, follow=True)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Recalcular tarifas')
+        self.assertContains(response, 'Sin ajustes pendientes')
+
     def test_bloquea_sesion_facturada(self):
         self.sesion.estado = 'FACTURADA'
         self.sesion.save(update_fields=['estado'])

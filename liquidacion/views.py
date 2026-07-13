@@ -3962,6 +3962,63 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 # GESTIÓN DE SESIONES CONTABLES — Fase B (Mayo 2026)
 # ============================================================================
 
+def _resumen_recalculo_tarifas_pendiente_sesion(sesion):
+    if sesion.estado in ['FACTURADA', 'PAGADA']:
+        return {
+            'disponible': False,
+            'total_cambios': 0,
+            'registros_cambian': 0,
+            'guardias_cambian': 0,
+            'mensaje': f'Bloqueado en {sesion.estado}',
+        }
+
+    fecha_desde = date(sesion.año, sesion.mes, 1)
+    if sesion.mes == 12:
+        fecha_hasta = date(sesion.año, 12, 31)
+    else:
+        fecha_hasta = date(sesion.año, sesion.mes + 1, 1) - timedelta(days=1)
+
+    registros_cambian = 0
+    registros = (
+        RegistroEstudiosPorMedico.objects
+        .filter(
+            sesion_contable=sesion,
+            fecha_del_informe__gte=fecha_desde,
+            fecha_del_informe__lte=fecha_hasta,
+        )
+        .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
+    )
+    for registro in registros:
+        monto_actual = registro.monto_calculado or Decimal('0.00')
+        if registro.calcular_monto() != monto_actual:
+            registros_cambian += 1
+
+    guardias_cambian = 0
+    guardias = GuardiaPasiva.objects.filter(
+        sesion_contable=sesion,
+        fecha_guardia__gte=fecha_desde,
+        fecha_guardia__lte=fecha_hasta,
+    )
+    for guardia in guardias:
+        monto_actual = guardia.monto or Decimal('0.00')
+        monto_nuevo = ConfiguracionGuardiaPasiva.get_config(guardia.fecha_guardia).monto_vigente
+        if monto_nuevo != monto_actual:
+            guardias_cambian += 1
+
+    total_cambios = registros_cambian + guardias_cambian
+    return {
+        'disponible': total_cambios > 0,
+        'total_cambios': total_cambios,
+        'registros_cambian': registros_cambian,
+        'guardias_cambian': guardias_cambian,
+        'mensaje': (
+            f'{total_cambios} ajuste(s) pendiente(s)'
+            if total_cambios
+            else 'Sin ajustes pendientes'
+        ),
+    }
+
+
 class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     """
     Vista administrativa para gestionar el ciclo de vida de SesionContable.
@@ -4031,6 +4088,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 sesion,
             )
             requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
+            recalculo_tarifas = _resumen_recalculo_tarifas_pendiente_sesion(sesion)
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])
 
@@ -4071,6 +4129,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'auditoria_residentes_eco': auditoria_residentes_eco,
                 'checklist_cierre': checklist_cierre,
                 'requisito_rrhh': requisito_rrhh,
+                'recalculo_tarifas': recalculo_tarifas,
                 'ultima_preparacion_rrhh': requisito_rrhh['ultima_preparacion'],
                 'historial_reciente': historial_ordenado[:5],
                 'historial_count': len(historial_ordenado),
