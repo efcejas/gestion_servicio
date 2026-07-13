@@ -3978,32 +3978,66 @@ def _resumen_recalculo_tarifas_pendiente_sesion(sesion):
     else:
         fecha_hasta = date(sesion.año, sesion.mes + 1, 1) - timedelta(days=1)
 
-    registros_cambian = 0
-    registros = (
-        RegistroEstudiosPorMedico.objects
-        .filter(
-            sesion_contable=sesion,
-            fecha_del_informe__gte=fecha_desde,
-            fecha_del_informe__lte=fecha_hasta,
-        )
-        .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
+    registros_base = RegistroEstudio.objects.filter(
+        registro__sesion_contable=sesion,
+        registro__fecha_del_informe__gte=fecha_desde,
+        registro__fecha_del_informe__lte=fecha_hasta,
+        estudio__grupo_tarifario__isnull=False,
     )
-    for registro in registros:
-        monto_actual = registro.monto_calculado or Decimal('0.00')
-        if registro.calcular_monto() != monto_actual:
-            registros_cambian += 1
 
-    guardias_cambian = 0
-    guardias = GuardiaPasiva.objects.filter(
+    grupo_ids = list(
+        registros_base
+        .values_list('estudio__grupo_tarifario_id', flat=True)
+        .distinct()
+    )
+    ultima_recalculo_practicas = (
+        HistorialRecalculoTarifaRegistro.objects
+        .filter(sesion_contable=sesion)
+        .order_by('-fecha_recalculo')
+        .values_list('fecha_recalculo', flat=True)
+        .first()
+    )
+    tarifas_practicas = TarifaGrupoTarifario.objects.none()
+    if grupo_ids:
+        tarifas_practicas = (
+            TarifaGrupoTarifario.objects
+            .filter(grupo_tarifario_id__in=grupo_ids, vigencia_desde__lte=fecha_hasta)
+            .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=fecha_desde))
+        )
+        if ultima_recalculo_practicas:
+            tarifas_practicas = tarifas_practicas.filter(fecha_creacion__gt=ultima_recalculo_practicas)
+
+    registros_cambian = 0
+    if tarifas_practicas.exists():
+        registros_cambian = (
+            registros_base
+            .filter(estudio__grupo_tarifario_id__in=tarifas_practicas.values('grupo_tarifario_id'))
+            .values('registro_id')
+            .distinct()
+            .count()
+        )
+
+    guardias_base = GuardiaPasiva.objects.filter(
         sesion_contable=sesion,
         fecha_guardia__gte=fecha_desde,
         fecha_guardia__lte=fecha_hasta,
     )
-    for guardia in guardias:
-        monto_actual = guardia.monto or Decimal('0.00')
-        monto_nuevo = ConfiguracionGuardiaPasiva.get_config(guardia.fecha_guardia).monto_vigente
-        if monto_nuevo != monto_actual:
-            guardias_cambian += 1
+    ultima_recalculo_guardias = (
+        HistorialRecalculoTarifaGuardiaPasiva.objects
+        .filter(sesion_contable=sesion)
+        .order_by('-fecha_recalculo')
+        .values_list('fecha_recalculo', flat=True)
+        .first()
+    )
+    tarifas_guardias = (
+        ConfiguracionGuardiaPasiva.objects
+        .filter(vigente_desde__lte=fecha_hasta)
+        .filter(Q(vigente_hasta__isnull=True) | Q(vigente_hasta__gte=fecha_desde))
+    )
+    if ultima_recalculo_guardias:
+        tarifas_guardias = tarifas_guardias.filter(fecha_actualizacion__gt=ultima_recalculo_guardias)
+
+    guardias_cambian = guardias_base.count() if tarifas_guardias.exists() else 0
 
     total_cambios = registros_cambian + guardias_cambian
     return {
