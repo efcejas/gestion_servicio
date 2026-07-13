@@ -6,8 +6,11 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import (
+    ConfiguracionGuardiaPasiva,
     Estudios,
     GrupoTarifario,
+    GuardiaPasiva,
+    HistorialRecalculoTarifaGuardiaPasiva,
     HistorialRecalculoTarifaRegistro,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
@@ -91,6 +94,24 @@ class RecalculoTarifasSesionTest(TestCase):
         self.registro.refresh_from_db()
         self.url = reverse('liquidacion:sesion_recalculo_tarifas', kwargs={'pk': self.sesion.pk})
 
+        ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('36500.00'),
+            vigente_desde=date(2026, 1, 1),
+            vigente_hasta=date(2026, 6, 30),
+        )
+        ConfiguracionGuardiaPasiva.objects.create(
+            monto_vigente=Decimal('42000.00'),
+            vigente_desde=date(2026, 7, 1),
+        )
+        self.guardia = GuardiaPasiva.objects.create(
+            medico=self.medico,
+            sesion_contable=self.sesion,
+            fecha_guardia=date(2026, 7, 5),
+            monto=Decimal('36500.00'),
+        )
+        GuardiaPasiva.objects.filter(pk=self.guardia.pk).update(monto=Decimal('36500.00'))
+        self.guardia.refresh_from_db()
+
     def _post_data(self, confirmar='0'):
         return {
             'fecha_desde': '2026-07-01',
@@ -107,6 +128,7 @@ class RecalculoTarifasSesionTest(TestCase):
         self.registro.refresh_from_db()
         self.assertEqual(self.registro.monto_calculado, Decimal('5000.00'))
         self.assertEqual(HistorialRecalculoTarifaRegistro.objects.count(), 0)
+        self.assertEqual(HistorialRecalculoTarifaGuardiaPasiva.objects.count(), 0)
 
     def test_confirmar_actualiza_monto_y_crea_historial(self):
         response = self.client.post(self.url, self._post_data(confirmar='1'), secure=True, follow=True)
@@ -120,6 +142,28 @@ class RecalculoTarifasSesionTest(TestCase):
         self.assertEqual(historial.monto_anterior, Decimal('5000.00'))
         self.assertEqual(historial.monto_nuevo, Decimal('6500.00'))
         self.assertEqual(historial.diferencia, Decimal('1500.00'))
+
+    def test_confirmar_actualiza_guardia_pasiva_y_crea_historial(self):
+        response = self.client.post(self.url, self._post_data(confirmar='1'), secure=True, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.guardia.refresh_from_db()
+        self.assertEqual(self.guardia.monto, Decimal('42000.00'))
+        self.assertIn('Recalculo por tarifas vigentes de guardia pasiva', self.guardia.observaciones)
+        historial = HistorialRecalculoTarifaGuardiaPasiva.objects.get(guardia=self.guardia)
+        self.assertEqual(historial.monto_anterior, Decimal('36500.00'))
+        self.assertEqual(historial.monto_nuevo, Decimal('42000.00'))
+        self.assertEqual(historial.diferencia, Decimal('5500.00'))
+
+    def test_preview_permite_rango_solo_con_guardias_pasivas(self):
+        self.registro.fecha_del_informe = date(2026, 6, 30)
+        self.registro.save(update_fields=['fecha_del_informe'])
+
+        response = self.client.post(self.url, self._post_data(confirmar='0'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Previsualizacion de guardias pasivas')
+        self.assertContains(response, '42000')
 
     def test_bloquea_sesion_facturada(self):
         self.sesion.estado = 'FACTURADA'

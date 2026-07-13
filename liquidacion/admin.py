@@ -7,6 +7,7 @@ from .models import (
     ConfiguracionGuardiaPasiva,
     HistorialConfiguracionGuardiaPasiva,
     HistorialPrecioEstudio,
+    HistorialRecalculoTarifaGuardiaPasiva,
     HistorialRecalculoSolicitudRevisionHorario,
     HistorialRecalculoTarifaRegistro,
     HistorialSesionContable,
@@ -829,6 +830,39 @@ class HistorialRecalculoTarifaRegistroAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(HistorialRecalculoTarifaGuardiaPasiva)
+class HistorialRecalculoTarifaGuardiaPasivaAdmin(admin.ModelAdmin):
+    list_display = (
+        'fecha_recalculo',
+        'sesion_contable',
+        'guardia',
+        'monto_anterior',
+        'monto_nuevo',
+        'diferencia',
+        'recalculado_por',
+    )
+    list_filter = ('sesion_contable', 'fecha_recalculo', 'recalculado_por')
+    readonly_fields = (
+        'sesion_contable',
+        'guardia',
+        'fecha_desde',
+        'fecha_hasta',
+        'monto_anterior',
+        'monto_nuevo',
+        'diferencia',
+        'motivo',
+        'recalculado_por',
+        'fecha_recalculo',
+    )
+    date_hierarchy = 'fecha_recalculo'
+
+    def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):

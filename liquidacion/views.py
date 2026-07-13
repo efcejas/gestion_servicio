@@ -31,6 +31,7 @@ from .models import (
     ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
     SolicitudRevisionHorarioRegistro,
     HistorialRecalculoSolicitudRevisionHorario,
+    HistorialRecalculoTarifaGuardiaPasiva,
     HistorialRecalculoTarifaRegistro,
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
@@ -4129,8 +4130,11 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
         )
 
         preview = []
+        guardias_preview = []
         total_actual = Decimal('0.00')
         total_nuevo = Decimal('0.00')
+        total_guardias_actual = Decimal('0.00')
+        total_guardias_nuevo = Decimal('0.00')
         for registro in registros:
             monto_actual = registro.monto_calculado or Decimal('0.00')
             monto_nuevo = registro.calcular_monto()
@@ -4150,13 +4154,51 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
                 'cambia': diferencia != Decimal('0.00'),
             })
 
+        guardias = (
+            GuardiaPasiva.objects
+            .filter(
+                sesion_contable=self.sesion,
+                fecha_guardia__gte=fecha_desde,
+                fecha_guardia__lte=fecha_hasta,
+            )
+            .select_related('medico')
+            .order_by('fecha_guardia', 'medico__last_name', 'medico__first_name', 'id')
+        )
+        for guardia in guardias:
+            monto_actual = guardia.monto or Decimal('0.00')
+            monto_nuevo = ConfiguracionGuardiaPasiva.get_config(guardia.fecha_guardia).monto_vigente
+            diferencia = monto_nuevo - monto_actual
+            total_guardias_actual += monto_actual
+            total_guardias_nuevo += monto_nuevo
+            guardias_preview.append({
+                'guardia': guardia,
+                'monto_actual': monto_actual,
+                'monto_nuevo': monto_nuevo,
+                'diferencia': diferencia,
+                'cambia': diferencia != Decimal('0.00'),
+            })
+
+        total_actual_general = total_actual + total_guardias_actual
+        total_nuevo_general = total_nuevo + total_guardias_nuevo
+
         return {
             'items': preview,
+            'guardias': guardias_preview,
             'total_registros': len(preview),
-            'total_cambian': sum(1 for item in preview if item['cambia']),
-            'total_actual': total_actual,
-            'total_nuevo': total_nuevo,
-            'diferencia_total': total_nuevo - total_actual,
+            'total_guardias': len(guardias_preview),
+            'total_cambian_registros': sum(1 for item in preview if item['cambia']),
+            'total_cambian_guardias': sum(1 for item in guardias_preview if item['cambia']),
+            'total_cambian': (
+                sum(1 for item in preview if item['cambia'])
+                + sum(1 for item in guardias_preview if item['cambia'])
+            ),
+            'total_actual': total_actual_general,
+            'total_nuevo': total_nuevo_general,
+            'total_practicas_actual': total_actual,
+            'total_practicas_nuevo': total_nuevo,
+            'total_guardias_actual': total_guardias_actual,
+            'total_guardias_nuevo': total_guardias_nuevo,
+            'diferencia_total': total_nuevo_general - total_actual_general,
         }
 
     def _contexto(self, request, errors=None, preview=None, fecha_desde=None, fecha_hasta=None, motivo=''):
@@ -4194,8 +4236,8 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
         preview = None
         if not errors:
             preview = self._build_preview(fecha_desde, fecha_hasta)
-            if preview['total_registros'] == 0:
-                errors.append('No hay registros en el rango seleccionado.')
+            if preview['total_registros'] == 0 and preview['total_guardias'] == 0:
+                errors.append('No hay registros ni guardias pasivas en el rango seleccionado.')
 
         if errors or not confirmar:
             return self.render_to_response(
@@ -4210,7 +4252,9 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
             )
 
         aplicados = 0
+        guardias_aplicadas = 0
         sin_cambios = 0
+        guardias_sin_cambios = 0
         with transaction.atomic():
             registros = (
                 RegistroEstudiosPorMedico.objects
@@ -4259,9 +4303,54 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
                 )
                 aplicados += 1
 
+            guardias = (
+                GuardiaPasiva.objects
+                .select_for_update()
+                .filter(
+                    sesion_contable=self.sesion,
+                    fecha_guardia__gte=fecha_desde,
+                    fecha_guardia__lte=fecha_hasta,
+                )
+                .order_by('id')
+            )
+            for guardia in guardias:
+                monto_anterior = guardia.monto or Decimal('0.00')
+                monto_nuevo = ConfiguracionGuardiaPasiva.get_config(guardia.fecha_guardia).monto_vigente
+                if monto_nuevo == monto_anterior:
+                    guardias_sin_cambios += 1
+                    continue
+
+                motivo_sistema = (
+                    f'Recalculo por tarifas vigentes de guardia pasiva. '
+                    f'Rango: {fecha_desde:%d/%m/%Y} - {fecha_hasta:%d/%m/%Y}. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {motivo}'
+                )
+                guardia.monto = monto_nuevo
+                guardia.observaciones = (
+                    f"{guardia.observaciones}\n{motivo_sistema}".strip()
+                    if guardia.observaciones else motivo_sistema
+                )
+                guardia.save(update_fields=['monto', 'observaciones'])
+                HistorialRecalculoTarifaGuardiaPasiva.objects.create(
+                    sesion_contable=self.sesion,
+                    guardia=guardia,
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta,
+                    monto_anterior=monto_anterior,
+                    monto_nuevo=monto_nuevo,
+                    diferencia=monto_nuevo - monto_anterior,
+                    motivo=motivo_sistema,
+                    recalculado_por=request.user,
+                )
+                guardias_aplicadas += 1
+
         messages.success(
             request,
-            f'Recalculo por tarifas aplicado: {aplicados} registro(s) actualizado(s), {sin_cambios} sin cambios.',
+            (
+                f'Recalculo por tarifas aplicado: {aplicados} registro(s) y '
+                f'{guardias_aplicadas} guardia(s) actualizada(s). '
+                f'Sin cambios: {sin_cambios} registro(s), {guardias_sin_cambios} guardia(s).'
+            ),
         )
         return redirect('liquidacion:sesiones_list')
 

@@ -1721,6 +1721,49 @@ class HistorialRecalculoTarifaRegistro(models.Model):
         return f"Recalculo tarifa registro #{self.registro_id}: ${self.monto_anterior} -> ${self.monto_nuevo}"
 
 
+class HistorialRecalculoTarifaGuardiaPasiva(models.Model):
+    """Historial de recalculos controlados de guardias pasivas por cambio de tarifa vigente."""
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='historial_recalculos_tarifa_guardias',
+        verbose_name='Sesion contable',
+    )
+    guardia = models.ForeignKey(
+        'GuardiaPasiva',
+        on_delete=models.PROTECT,
+        related_name='historial_recalculos_tarifa',
+        verbose_name='Guardia pasiva',
+    )
+    fecha_desde = models.DateField(verbose_name='Fecha desde')
+    fecha_hasta = models.DateField(verbose_name='Fecha hasta')
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto anterior')
+    monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Monto nuevo')
+    diferencia = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Diferencia')
+    motivo = models.TextField(verbose_name='Motivo')
+    recalculado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='recalculos_tarifa_guardias_realizados',
+        verbose_name='Recalculado por',
+    )
+    fecha_recalculo = models.DateTimeField(auto_now_add=True, verbose_name='Fecha recalculo')
+
+    class Meta:
+        verbose_name = 'Historial de recalculo por tarifa de guardia pasiva'
+        verbose_name_plural = 'Historiales de recalculo por tarifa de guardia pasiva'
+        ordering = ['-fecha_recalculo']
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha_recalculo']),
+            models.Index(fields=['guardia', '-fecha_recalculo']),
+            models.Index(fields=['fecha_desde', 'fecha_hasta']),
+        ]
+
+    def __str__(self):
+        return f"Recalculo tarifa guardia #{self.guardia_id}: ${self.monto_anterior} -> ${self.monto_nuevo}"
+
+
 # Modelo para registrar que fue a la lista pero no tubo pacientes
 # ============================================================================
 # [DEPRECADO - 16 de febrero 2026 - Sanatorio Colegiales]
