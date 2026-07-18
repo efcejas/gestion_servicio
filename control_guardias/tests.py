@@ -614,6 +614,16 @@ class CalendarioViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['calendario_initial_date'], '2026-05-01')
 
+    def test_calendario_fija_hoy_con_fecha_local_de_argentina(self):
+        self.client.force_login(self.jefe)
+
+        response = self.client.get(reverse('control_guardias:calendario'), secure=True)
+
+        hoy_local = timezone.localdate().isoformat()
+        self.assertEqual(response.context['calendario_hoy'], hoy_local)
+        self.assertContains(response, f'const CALENDAR_TODAY = "{hoy_local}";')
+        self.assertContains(response, 'now: CALENDAR_TODAY')
+
     def test_calendario_query_invalida_no_define_fecha_inicial(self):
         self.client.force_login(self.jefe)
         response = self.client.get(reverse('control_guardias:calendario'), {'mes': '99', 'anio': 'abcd'})
@@ -1950,6 +1960,23 @@ class SolicitarSlotVacanteServiceTest(TestCase):
         )
         response = self.client.get(response.url, secure=True)
         self.assertContains(response, f'Solicitud #{solicitud.pk}')
+
+    def test_panel_gestor_calcula_solicitudes_demoradas(self):
+        from .services import solicitar_slot_vacante
+
+        solicitud = solicitar_slot_vacante(
+            self.residente, self.guardia, datetime.date(2026, 5, 14), self.tipo,
+        )
+        SolicitudSlotVacante.objects.filter(pk=solicitud.pk).update(
+            fecha_solicitud=timezone.now() - datetime.timedelta(hours=25)
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.get(reverse('control_guardias:index'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['slots_pendientes'], 1)
+        self.assertEqual(response.context['slots_demorados'], 1)
 
 
 class AprobarSlotVacanteServiceTest(TestCase):

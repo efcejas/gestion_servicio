@@ -226,6 +226,7 @@
   const apiUrl       = "{% url 'control_guardias:guardias_api' %}";
   const FERIADOS     = new Set({{ feriados_json|safe }});
   const INITIAL_DATE = "{{ calendario_initial_date|default:'' }}";
+  const CALENDAR_TODAY = "{{ calendario_hoy }}";
 
   let calendar = null;
 
@@ -331,6 +332,7 @@
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       initialDate: INITIAL_DATE || undefined,
+      now: CALENDAR_TODAY,
       locale: 'es',
       allDaySlot: false,
       displayEventTime: false,

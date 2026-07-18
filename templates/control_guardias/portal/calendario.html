@@ -375,6 +375,7 @@
   const eliminarExcepcionBaseUrl = "{% url 'control_guardias:guardia_eliminar_excepcion' guardia_pk=999999 %}";
   const FERIADOS    = new Set({{ feriados_json|safe }});
   const INITIAL_DATE = "{{ calendario_initial_date|default:'' }}";
+  const CALENDAR_TODAY = "{{ calendario_hoy }}";
   const ES_GESTOR = {{ es_gestor|yesno:'true,false' }};
   const formEliminarExcepcionEl = document.getElementById('formEliminarExcepcionCalendario');
   const eliminarExcepcionReturnToEl = document.getElementById('eliminarExcepcionReturnTo');
@@ -703,6 +704,7 @@
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       initialDate: INITIAL_DATE || undefined,
+      now: CALENDAR_TODAY,
       locale: 'es',
       allDaySlot: false,
       displayEventTime: false,

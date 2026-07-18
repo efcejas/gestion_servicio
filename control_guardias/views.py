@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import models
@@ -131,7 +133,7 @@ class GuardiasIndexView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        hoy = timezone.now().date()
+        hoy = timezone.localdate()
 
         # Notificaciones no leídas (todos los roles)
         context['notificaciones_no_leidas'] = (
@@ -169,7 +171,7 @@ class GuardiasIndexView(LoginRequiredMixin, TemplateView):
             slots_pendientes = SolicitudSlotVacante.objects.filter(estado='PENDIENTE')
             context['slots_pendientes'] = slots_pendientes.count()
             context['slots_demorados'] = slots_pendientes.filter(
-                fecha_solicitud__lte=timezone.now() - datetime.timedelta(hours=24)
+                fecha_solicitud__lte=timezone.now() - timedelta(hours=24)
             ).count()
             context['guardias_borrador'] = AsignacionGuardia.objects.filter(estado='BORRADOR').count()
             context['guardias_publicadas_mes'] = (
@@ -207,7 +209,7 @@ class MisGuardiasView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        hoy = timezone.now().date()
+        hoy = timezone.localdate()
         qs = self.get_queryset()
         context['proximas_guardias'] = qs.filter(fecha__gte=hoy, estado='PUBLICADA')
         context['guardias_pasadas'] = qs.filter(fecha__lt=hoy).order_by('-fecha')
@@ -419,6 +421,7 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
             context['calendario_back_label'] = 'Ir al inicio'
         # Permite abrir el calendario directamente en un mes/año objetivo (ej. desde borrador)
         context['calendario_initial_date'] = ''
+        context['calendario_hoy'] = timezone.localdate().isoformat()
         mes_q = self.request.GET.get('mes')
         anio_q = self.request.GET.get('anio')
         if mes_q and anio_q:
@@ -431,8 +434,8 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
                 pass
         # Feriados del rango visible (±6 meses) para colorear casilleros en el JS
         import json as _json
-        from datetime import date as _date, timedelta as _td
-        hoy = _date.today()
+        from datetime import timedelta as _td
+        hoy = timezone.localdate()
         feriados = list(
             Feriado.objects
             .filter(fecha__gte=hoy - _td(days=180), fecha__lte=hoy + _td(days=365))
@@ -457,7 +460,7 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
                 .filter(
                     residente=user,
                     estado='PUBLICADA',
-                    fecha__gte=timezone.now().date(),
+                    fecha__gte=timezone.localdate(),
                 )
                 .select_related('tipo_guardia')
                 .order_by('fecha', 'tipo_guardia__nombre')
