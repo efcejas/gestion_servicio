@@ -67,6 +67,53 @@ La regla base de cada bandeja vive en `preinformes/selectors.py`, funcion `get_r
 9. Puede guardar cambios y continuar.
 10. Al finalizar, el preinforme pasa a `finalizado` y se actualiza el historial del residente.
 
+## Evaluacion IA final
+
+La evaluacion IA final analiza la calidad y coherencia del informe escrito y su
+concordancia con la revision docente. No accede a las imagenes ni confirma la
+exactitud del diagnostico.
+
+Rubrica vigente (version 2):
+
+- coherencia radiologico-diagnostica interna: 30%;
+- calidad descriptiva: 25%;
+- jerarquizacion y sintesis: 20%;
+- adecuacion al metodo: 15%;
+- claridad profesional: 10%.
+
+Reglas de justicia:
+
+- si el staff finaliza sin nota y sin cambiar el texto, se considera aceptacion
+  docente: referencia 9/10 y piso 8/10;
+- si el staff informa una nota, el puntaje IA queda limitado a mas/menos un
+  punto respecto de esa nota;
+- si hubo correcciones sin nota, el puntaje considera su magnitud y naturaleza;
+- formato, acentos, adaptaciones NETTER y ausencia de una seccion formal de
+  conclusion no deben penalizar por si solos;
+- la falta de acceso a las imagenes se expresa como limitacion o confianza, no
+  como una reduccion automatica del puntaje.
+
+### Reevaluacion de puntajes historicos bajos
+
+Las evaluaciones antiguas con puntaje 5 o menor pueden revisarse con la rubrica
+actual. La operacion no se ejecuta en migraciones y conserva la evaluacion
+anterior dentro de `auditoria_reevaluacion`.
+
+Vista previa, sin llamadas de IA ni cambios:
+
+```bash
+python manage.py reevaluar_evaluaciones_ia_bajas --umbral 5
+```
+
+Aplicacion controlada:
+
+```bash
+python manage.py reevaluar_evaluaciones_ia_bajas --umbral 5 --apply
+```
+
+Se puede ensayar un lote pequeno con `--limit N`. Por defecto no vuelve a
+procesar evaluaciones que ya tengan la rubrica vigente.
+
 ## Edicion posterior
 
 Desde `Corregidos por mi`, el revisor asignado puede volver a editar un preinforme finalizado. Esto cubre olvidos o comentarios tardios.

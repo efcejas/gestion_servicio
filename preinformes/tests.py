@@ -3,7 +3,9 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from unittest.mock import patch
+from io import StringIO
 
 from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios, AdjuntoPreinforme
 
@@ -373,6 +375,113 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertEqual(preinforme.estado, 'finalizado')
         self.assertEqual(revision.evaluacion_ia_final['puntaje_global'], 8)
         self.assertEqual(revision.evaluacion_ia_final['tipo_correccion_predominante'], 'jerarquizacion')
+
+    def test_evaluacion_ia_aceptada_sin_cambios_tiene_piso_justo(self):
+        from .asistente_service import normalizar_evaluacion_ia_final
+
+        evaluacion = normalizar_evaluacion_ia_final({
+            'puntaje_global': 4,
+            'dimensiones': {
+                'interpretacion_diagnostica': {
+                    'puntaje': 3,
+                    'comentario': 'La redaccion es clara. Falta contexto clinico.',
+                },
+                'priorizacion_clinica': {'puntaje': 5},
+            },
+            'aspectos_a_mejorar': [
+                'Incluir contexto clinico.',
+                'Mejorar la jerarquizacion del hallazgo principal.',
+            ],
+            'devolucion_docente': (
+                'Buen trabajo en la redaccion. '
+                'Considera incluir mas datos clinicos en futuros informes.'
+            ),
+        }, aceptado_sin_cambios=True)
+
+        self.assertEqual(evaluacion['puntaje_global'], 8)
+        self.assertEqual(
+            evaluacion['dimensiones']['interpretacion_diagnostica']['puntaje'],
+            8,
+        )
+        self.assertEqual(evaluacion['criterio_puntaje'], 'aceptado_sin_cambios')
+        self.assertEqual(evaluacion['version_rubrica'], 2)
+        self.assertNotIn('Incluir contexto clinico.', evaluacion['aspectos_a_mejorar'])
+        self.assertIn(
+            'Mejorar la jerarquizacion del hallazgo principal.',
+            evaluacion['aspectos_a_mejorar'],
+        )
+        self.assertEqual(
+            evaluacion['dimensiones']['interpretacion_diagnostica']['comentario'],
+            'La redaccion es clara.',
+        )
+        self.assertEqual(evaluacion['devolucion_docente'], 'Buen trabajo en la redaccion.')
+
+    def test_evaluacion_ia_respeta_margen_de_nota_staff(self):
+        from .asistente_service import normalizar_evaluacion_ia_final
+
+        evaluacion_baja = normalizar_evaluacion_ia_final(
+            {'puntaje_global': 3},
+            puntuacion_staff=8,
+        )
+        evaluacion_alta = normalizar_evaluacion_ia_final(
+            {'puntaje_global': 10},
+            puntuacion_staff=6,
+        )
+
+        self.assertEqual(evaluacion_baja['puntaje_global'], 7)
+        self.assertEqual(evaluacion_alta['puntaje_global'], 7)
+        self.assertEqual(evaluacion_baja['criterio_puntaje'], 'anclado_nota_staff')
+        self.assertEqual(evaluacion_baja['confianza_evaluacion'], 'alta')
+
+    def test_comando_reevalua_solo_puntajes_historicos_bajos(self):
+        preinforme_bajo = self._preinforme('FLOW-IA-BAJA-001', estado='finalizado', revisor=self.staff)
+        revision_baja = RevisionPreinforme.objects.create(
+            preinforme=preinforme_bajo,
+            revisor=self.staff,
+            informe_residente_snapshot='<p>Informe aceptado.</p>',
+            informe_final_html='<p>Informe aceptado.</p>',
+            evaluacion_ia_final={'puntaje_global': 4, 'devolucion_docente': 'Evaluacion anterior.'},
+        )
+        preinforme_alto = self._preinforme('FLOW-IA-ALTA-001', estado='finalizado', revisor=self.staff)
+        revision_alta = RevisionPreinforme.objects.create(
+            preinforme=preinforme_alto,
+            revisor=self.staff,
+            evaluacion_ia_final={'puntaje_global': 7},
+        )
+        evaluacion_nueva = {
+            'puntaje_global': 9,
+            'dimensiones': {},
+            'version_rubrica': 2,
+            'devolucion_docente': 'Aceptado sin cambios por el staff.',
+        }
+
+        with patch(
+            'preinformes.management.commands.reevaluar_evaluaciones_ia_bajas.AsistenteRadiologicoBot'
+        ) as bot_mock:
+            bot_mock.return_value.client = object()
+            bot_mock.return_value.generar_evaluacion_final_revision.return_value = {
+                'success': True,
+                'evaluacion': evaluacion_nueva,
+                'error': None,
+            }
+            salida = StringIO()
+            call_command(
+                'reevaluar_evaluaciones_ia_bajas',
+                '--apply',
+                stdout=salida,
+            )
+
+        revision_baja.refresh_from_db()
+        revision_alta.refresh_from_db()
+        self.assertEqual(revision_baja.evaluacion_ia_final['puntaje_global'], 9)
+        self.assertEqual(
+            revision_baja.evaluacion_ia_final['auditoria_reevaluacion']['puntaje_anterior'],
+            4,
+        )
+        self.assertEqual(revision_alta.evaluacion_ia_final['puntaje_global'], 7)
+        bot_mock.return_value.generar_evaluacion_final_revision.assert_called_once_with(
+            revision_baja
+        )
 
     def test_staff_puede_tomar_preinforme_asignado_a_otro(self):
         preinforme = self._preinforme('FLOW-007', revisor=self.otro_staff)

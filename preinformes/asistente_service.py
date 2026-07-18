@@ -43,6 +43,19 @@ def _es_recomendacion_demografica(texto: str) -> bool:
     )
 
 
+def _es_observacion_clinica_no_evaluable(texto: str) -> bool:
+    texto_normalizado = _normalizar_para_busqueda(texto)
+    return any(
+        termino in texto_normalizado
+        for termino in [
+            'contexto clinico',
+            'datos clinicos',
+            'informacion clinica',
+            'antecedentes clinicos',
+        ]
+    )
+
+
 def limpiar_resumen_pre_revision(resumen):
     """
     Normaliza el resumen IA y quita sugerencias que pidan incluir datos
@@ -71,7 +84,15 @@ def limpiar_resumen_pre_revision(resumen):
     }
 
 
-def normalizar_evaluacion_ia_final(evaluacion):
+VERSION_RUBRICA_EVALUACION_FINAL = 2
+
+
+def normalizar_evaluacion_ia_final(
+    evaluacion,
+    *,
+    puntuacion_staff=None,
+    aceptado_sin_cambios=False,
+):
     if not isinstance(evaluacion, dict):
         return {}
 
@@ -103,11 +124,24 @@ def normalizar_evaluacion_ia_final(evaluacion):
     def _texto(valor, limite):
         return str(valor or '').strip()[:limite]
 
-    def _lista(valor, limite, largo_item=220):
+    def _texto_evaluable(valor, limite):
+        texto = str(valor or '').strip()
+        fragmentos = re.split(r'(?<=[.!?])\s+', texto)
+        texto_limpio = ' '.join(
+            fragmento
+            for fragmento in fragmentos
+            if fragmento and not _es_observacion_clinica_no_evaluable(fragmento)
+        )
+        return texto_limpio[:limite]
+
+    def _lista(valor, limite, largo_item=220, filtrar_no_evaluable=False):
         salida = []
         for item in valor or []:
             texto = _texto(item, largo_item)
-            if texto:
+            if texto and not (
+                filtrar_no_evaluable
+                and _es_observacion_clinica_no_evaluable(texto)
+            ):
                 salida.append(texto)
             if len(salida) >= limite:
                 break
@@ -120,7 +154,7 @@ def normalizar_evaluacion_ia_final(evaluacion):
         if isinstance(dato, dict):
             dimensiones_normalizadas[clave] = {
                 'puntaje': _puntaje(dato.get('puntaje')),
-                'comentario': _texto(dato.get('comentario'), 260),
+                'comentario': _texto_evaluable(dato.get('comentario'), 260),
             }
         else:
             dimensiones_normalizadas[clave] = {
@@ -128,17 +162,52 @@ def normalizar_evaluacion_ia_final(evaluacion):
                 'comentario': '',
             }
 
+    puntaje_global = _puntaje(evaluacion.get('puntaje_global'))
+    if puntuacion_staff is not None:
+        puntaje_staff = _puntaje(puntuacion_staff)
+        puntaje_global = max(puntaje_staff - 1, min(puntaje_staff + 1, puntaje_global))
+        criterio_puntaje = 'anclado_nota_staff'
+    elif aceptado_sin_cambios:
+        puntaje_global = max(8, puntaje_global)
+        for dimension in dimensiones_normalizadas.values():
+            dimension['puntaje'] = max(8, dimension['puntaje'])
+        criterio_puntaje = 'aceptado_sin_cambios'
+    else:
+        criterio_puntaje = 'magnitud_correcciones_staff'
+
+    confianza = evaluacion.get('confianza_evaluacion')
+    if puntuacion_staff is not None:
+        confianza = 'alta'
+    elif confianza not in ['limitada', 'media', 'alta']:
+        confianza = 'media'
+
     tipo = evaluacion.get('tipo_correccion_predominante')
     return {
-        'puntaje_global': _puntaje(evaluacion.get('puntaje_global')),
+        'puntaje_global': puntaje_global,
         'dimensiones': dimensiones_normalizadas,
         'fortalezas': _lista(evaluacion.get('fortalezas'), 3),
-        'aspectos_a_mejorar': _lista(evaluacion.get('aspectos_a_mejorar'), 4),
+        'aspectos_a_mejorar': _lista(
+            evaluacion.get('aspectos_a_mejorar'),
+            4,
+            filtrar_no_evaluable=True,
+        ),
         'tipo_correccion_predominante': tipo if tipo in tipos_correccion else 'redaccion',
-        'impacto_correccion_staff': _texto(evaluacion.get('impacto_correccion_staff'), 360),
+        'impacto_correccion_staff': _texto_evaluable(
+            evaluacion.get('impacto_correccion_staff'),
+            360,
+        ),
         'uso_mentor': _texto(evaluacion.get('uso_mentor'), 280),
-        'devolucion_docente': _texto(evaluacion.get('devolucion_docente'), 520),
-        'advertencia': 'Evaluacion orientativa generada por IA. La decision docente final corresponde al staff.',
+        'devolucion_docente': _texto_evaluable(
+            evaluacion.get('devolucion_docente'),
+            520,
+        ),
+        'version_rubrica': VERSION_RUBRICA_EVALUACION_FINAL,
+        'criterio_puntaje': criterio_puntaje,
+        'confianza_evaluacion': confianza,
+        'advertencia': (
+            'Evalua la calidad y coherencia del informe escrito y su concordancia '
+            'con la revision docente. No evalua las imagenes ni confirma el diagnostico.'
+        ),
     }
 
 
@@ -636,6 +705,12 @@ Evitá datos identificatorios del paciente."""
             informe_final = _strip_html(revision.informe_final_html or '')
             comentarios_staff = _strip_html(revision.comentarios_generales or '')
             contexto_clinico = _strip_html(preinforme.contexto_clinico or '')
+            aceptado_sin_cambios = bool(
+                informe_residente
+                and informe_final
+                and _normalizar_para_busqueda(informe_residente)
+                == _normalizar_para_busqueda(informe_final)
+            )
 
             for nombre, valor in [
                 ('informe_residente', informe_residente),
@@ -682,19 +757,25 @@ Evitá datos identificatorios del paciente."""
 
             prompt = f"""Sos un especialista docente senior en Diagnostico por Imagenes. Tenes que generar una evaluacion formativa del preinforme de un residente luego de la correccion final del staff.
 
-La evaluacion debe estimar el avance del residente en el informe escrito: interpretacion, jerarquizacion clinica, lenguaje radiologico, estructura, precision y autonomia. No reemplaza al docente ni debe ser punitiva.
+La evaluacion debe estimar la calidad profesional del informe escrito: coherencia radiologico-diagnostica interna, calidad descriptiva, jerarquizacion y sintesis, adecuacion al metodo, claridad y autonomia. No reemplaza al docente ni debe ser punitiva.
 
 LIMITACION CENTRAL: no ves las imagenes del estudio y no podes juzgar por cuenta propia si los hallazgos son verdaderos, adecuados, completos o correctamente interpretados. La unica referencia diagnostica disponible es la intervencion del staff: diferencias entre el preinforme original y el informe final, comentarios y puntaje manual.
 
 Reglas importantes:
 - Fundamenta cada valoracion en cambios concretos realizados por el staff o en comentarios del staff. Usa expresiones como "el staff conservo", "el staff agrego", "el staff modifico" o "el staff senalo".
 - Nunca afirmes "hallazgos adecuados/correctos", "interpretacion correcta", "estudio normal" ni equivalentes como una conclusion propia. Tampoco inventes omisiones que el staff no haya corregido o mencionado.
-- Si original y final son iguales y no hay comentarios, describi que no se registraron correcciones sustanciales; no lo conviertas en validacion diagnostica. En ese caso, se prudente con interpretacion y priorizacion porque no hay evidencia suficiente para evaluarlas.
-- El puntaje mide concordancia con la revision y grado de correccion requerido. No mide capacidad para detectar hallazgos en las imagenes.
+- Si el staff finalizo sin cambiar el texto y no puso nota, interpretalo como aceptacion docente del preinforme. La referencia es 9/10 y el rango justo es 8 a 10. No bajes dimensiones por falta de acceso a las imagenes: esa limitacion debe expresarse en la confianza, no transformarse en castigo.
+- Si el staff puso nota, esa nota es el ancla docente. Tu puntaje global debe quedar como maximo a un punto de distancia, hacia arriba o hacia abajo.
+- Si hubo cambios y no hay nota, evalua la magnitud y naturaleza de las correcciones. Los cambios de formato o estilo pesan poco; los cambios descriptivos, de jerarquizacion o de impresion pesan progresivamente mas.
+- Evalua si la descripcion permite que otro especialista comprenda que entidad o proceso se esta comunicando y si los descriptores son internamente coherentes con la impresion expresada. Esto es coherencia del texto, no confirmacion de la imagen.
+- El puntaje mide calidad del informe escrito, concordancia con la revision y grado de correccion requerido. No mide capacidad para detectar hallazgos en las imagenes.
+- Pondera orientativamente: coherencia radiologico-diagnostica 30%, calidad descriptiva 25%, jerarquizacion y sintesis 20%, adecuacion al metodo 15%, claridad profesional 10%.
 - Si el sistema destino es NetTerm/NETTER, NO penalices ausencia de acentos, signos de apertura ni caracteres especiales. Puede ser una adaptacion tecnica deliberada.
 - Muchos staff no usan seccion formal de Conclusion. No penalices esa ausencia si el cierre diagnostico o la impresion quedan claros en el texto.
 - Edad y sexo son contexto clinico, no texto obligatorio del informe. No los marques como omision.
-- El contexto clinico aportado por el residente orienta la lectura, pero no necesariamente debe copiarse en el informe.
+- El contexto clinico es opcional y externo al cuerpo del informe. No penalices que no haya sido aportado, no pidas incluirlo y no reduzcas interpretacion, priorizacion ni autonomia por su ausencia.
+- Una conclusion puede sintetizar o reiterar el hallazgo principal. No exijas que agregue informacion nueva si comunica con claridad la impresion diagnostica.
+- No propongas agregar descriptores o datos que no esten respaldados por el texto, la correccion del staff o el contexto disponible.
 - Considera las correcciones del staff: si el informe final cambia mucho respecto del original, eso debe reflejarse como necesidad de mayor supervision o correccion.
 - Si hubo Mentor IA, usalo como contexto secundario: no premies ni castigues por usarlo mucho, evalua si ayudo al razonamiento.
 
@@ -706,6 +787,7 @@ DATOS:
 - Sexo: {sexo or 'no informado'}
 - Contexto clinico: {contexto_clinico or 'no informado'}
 - Puntaje manual del staff: {revision.puntuacion or 'no informado'}
+- Aceptado sin cambios por el staff: {'si' if aceptado_sin_cambios else 'no'}
 
 PREINFORME ORIGINAL DEL RESIDENTE:
 \"{informe_residente}\"
@@ -735,7 +817,8 @@ Responde UNICAMENTE con JSON valido con esta estructura exacta:
   "tipo_correccion_predominante": "redaccion|interpretacion|omision|jerarquizacion|estructura|terminologia|minima",
   "impacto_correccion_staff": "<1 o 2 frases sobre cuanto cambio necesito>",
   "uso_mentor": "<si no hubo uso, indicarlo sin penalizar>",
-  "devolucion_docente": "<mensaje breve, especifico y formativo para el residente>"
+  "devolucion_docente": "<mensaje breve, especifico y formativo para el residente>",
+  "confianza_evaluacion": "limitada|media|alta"
 }}"""
 
             messages = [
@@ -768,7 +851,11 @@ Responde UNICAMENTE con JSON valido con esta estructura exacta:
             if not match:
                 raise ValueError(f"Respuesta no contiene JSON valido: {texto_respuesta[:200]}")
 
-            evaluacion = normalizar_evaluacion_ia_final(_json.loads(match.group()))
+            evaluacion = normalizar_evaluacion_ia_final(
+                _json.loads(match.group()),
+                puntuacion_staff=revision.puntuacion,
+                aceptado_sin_cambios=aceptado_sin_cambios,
+            )
             if not evaluacion:
                 raise ValueError('La IA devolvio una evaluacion vacia.')
 
