@@ -79,6 +79,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     residentes = list(
         User.objects.filter(
             rol='medico_residente',
+            estado_residencia='ACTIVO',
             perfil_completo=True,
             is_active=True,
         ).order_by('last_name', 'first_name')
@@ -745,7 +746,10 @@ def sugerir_reemplazo(guardia):
     ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
 
     residentes = list(
-        User.objects.filter(rol='medico_residente', perfil_completo=True, is_active=True)
+        User.objects.filter(
+            rol='medico_residente', estado_residencia='ACTIVO',
+            perfil_completo=True, is_active=True,
+        )
         .exclude(pk=guardia.residente_id)
         .order_by('last_name', 'first_name')
     )

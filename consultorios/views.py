@@ -878,7 +878,9 @@ def asignacion_rapida_bloques(request):
     )
 
     residentes = list(
-        User.objects.filter(is_active=True, rol='medico_residente')
+        User.objects.filter(
+            is_active=True, rol='medico_residente', estado_residencia='ACTIVO'
+        )
         .order_by('last_name', 'first_name', 'username')
     )
     jefes = list(
@@ -1133,7 +1135,7 @@ def confirmar_cobertura(request, ausencia_pk, residente_pk):
     ausencia = get_object_or_404(AusenciaCobertura, pk=ausencia_pk)
     residente = get_object_or_404(User, pk=residente_pk, is_active=True)
 
-    if getattr(residente, 'rol', None) != 'medico_residente':
+    if not residente.es_residente_activo():
         raise PermissionDenied
 
     ausencia.residente_asignado = residente

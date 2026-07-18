@@ -1,28 +1,39 @@
 from django.core.management.base import BaseCommand
-from accounts.models import CustomUser
+
+from accounts.services import procesar_cierre_residencia
+
 
 class Command(BaseCommand):
-    help = 'Actualiza el año de residencia para todos los residentes activos'
+    help = 'Procesa el cierre anual: promoción, repetición o egreso de residentes'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--cierre', type=int, help='Año del cierre del 31 de julio a procesar.')
+        parser.add_argument('--dry-run', action='store_true', help='Muestra los cambios sin guardarlos.')
 
     def handle(self, *args, **options):
-        residentes = CustomUser.objects.filter(rol='medico_residente', fecha_ingreso_residencia__isnull=False)
-        
-        actualizados = 0
-        for residente in residentes:
-            anio_anterior = residente.anio_residencia
-            residente.actualizar_anio_residencia()
-            
-            if anio_anterior != residente.anio_residencia:
-                actualizados += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f'✓ {residente.get_full_name()} ({residente.username}): {anio_anterior or "Sin asignar"} → {residente.anio_residencia}'
-                    )
-                )
-        
-        if actualizados == 0:
-            self.stdout.write(self.style.WARNING('No se encontraron residentes que requieran actualización'))
-        else:
-            self.stdout.write(
-                self.style.SUCCESS(f'\n✓ Se actualizaron {actualizados} residentes de {residentes.count()} total')
-            )
+        resultado = procesar_cierre_residencia(
+            cierre_anio=options['cierre'],
+            dry_run=options['dry_run'],
+        )
+        prefijo = '[SIMULACIÓN] ' if options['dry_run'] else ''
+        self.stdout.write(f"{prefijo}Cierre académico {resultado['cierre']}")
+
+        for residente, anterior, nuevo in resultado['promovidos']:
+            self.stdout.write(self.style.SUCCESS(
+                f'  {residente.get_full_name() or residente.username}: {anterior} → {nuevo}'
+            ))
+        for residente, anio in resultado['repetidores']:
+            self.stdout.write(self.style.WARNING(
+                f'  {residente.get_full_name() or residente.username}: repite {anio}'
+            ))
+        for residente in resultado['egresados']:
+            self.stdout.write(self.style.SUCCESS(
+                f'  {residente.get_full_name() or residente.username}: R4 → EGRESADO'
+            ))
+
+        self.stdout.write(
+            f"Promovidos: {len(resultado['promovidos'])} | "
+            f"Repiten: {len(resultado['repetidores'])} | "
+            f"Egresados: {len(resultado['egresados'])} | "
+            f"Sin cambios: {len(resultado['omitidos'])}"
+        )

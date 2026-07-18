@@ -3,21 +3,42 @@ from django.contrib.auth.admin import UserAdmin
 from .models import CustomUser
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
+
+class CustomUserAdminChangeForm(CustomUserChangeForm):
+    class Meta(CustomUserChangeForm.Meta):
+        fields = CustomUserChangeForm.Meta.fields + [
+            'estado_residencia', 'repite_anio_residencia',
+            'fecha_egreso_residencia', 'ultimo_cierre_residencia',
+        ]
+
 class CustomUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
-    form = CustomUserChangeForm
+    form = CustomUserAdminChangeForm
     model = CustomUser
-    list_display = ['username', 'first_name', 'last_name', 'email', 'rol', 'trabaja_remoto', 'perfil_completo', 'is_staff']
-    list_filter = ['rol', 'trabaja_remoto', 'perfil_completo', 'date_joined', 'is_staff']
+    list_display = [
+        'username', 'first_name', 'last_name', 'email', 'rol', 'anio_residencia',
+        'estado_residencia', 'repite_anio_residencia', 'trabaja_remoto', 'perfil_completo', 'is_staff',
+    ]
+    list_filter = [
+        'rol', 'estado_residencia', 'repite_anio_residencia', 'trabaja_remoto',
+        'perfil_completo', 'date_joined', 'is_staff',
+    ]
     
     # Campos de solo lectura (calculados automáticamente)
-    readonly_fields = ['anio_residencia', 'fecha_perfil_completado', 'last_login', 'date_joined']
+    readonly_fields = [
+        'anio_residencia', 'fecha_egreso_residencia', 'ultimo_cierre_residencia',
+        'fecha_perfil_completado', 'last_login', 'date_joined',
+    ]
 
     # Configuración de los campos en la vista de cambio de usuario
     fieldsets = (
         (None, {'fields': ('username',)}),
         ('Información personal', {'fields': ('first_name', 'last_name', 'email', 'cargo', 'telefono')}),
-        ('Perfil y rol', {'fields': ('rol', 'trabaja_remoto', 'fecha_ingreso_residencia', 'anio_residencia', 'perfil_completo', 'recibir_notificaciones')}),
+        ('Perfil y rol', {'fields': ('rol', 'trabaja_remoto', 'perfil_completo', 'recibir_notificaciones')}),
+        ('Residencia', {'fields': (
+            'fecha_ingreso_residencia', 'anio_residencia', 'estado_residencia',
+            'repite_anio_residencia', 'fecha_egreso_residencia', 'ultimo_cierre_residencia',
+        )}),
         ('Permisos', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Fechas importantes', {'fields': ('last_login', 'date_joined', 'fecha_perfil_completado')}),
     )

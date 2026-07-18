@@ -179,8 +179,15 @@ class CustomUserChangeForm(UserChangeForm):
         roles_con_residencia = ['medico_residente', 'jefe_residentes', 'instructor_residentes']
         
         # Actualizar año de residencia si cambió la fecha o el rol
-        if user.rol == 'medico_residente' and user.fecha_ingreso_residencia:
+        if (
+            user.rol == 'medico_residente'
+            and user.estado_residencia == 'ACTIVO'
+            and user.fecha_ingreso_residencia
+            and not user.anio_residencia
+        ):
             user.anio_residencia = user.calcular_anio_residencia()
+            if user.ultimo_cierre_residencia is None:
+                user.ultimo_cierre_residencia = user.cierre_residencia_vigente()
         elif user.rol not in roles_con_residencia:
             # Solo limpiar campos de residencia para roles que NO son relacionados con residencia
             user.anio_residencia = None

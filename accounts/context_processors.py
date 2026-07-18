@@ -228,7 +228,7 @@ def navbar_links(request):
                  groups.append(grupo_operativo)
 
     # ── MÉDICO RESIDENTE ───────────────────────────────────────────────────────
-    elif user.rol == 'medico_residente':
+    elif user.rol == 'medico_residente' and user.es_residente_activo():
         groups = [g for g in [
             group('Recursos', 'fa-toolbox',
                 i_protocolos(),
@@ -251,6 +251,16 @@ def navbar_links(request):
         ] if g]
 
     # ── JEFE DE RESIDENTES / INSTRUCTOR ───────────────────────────────────────
+    # Egresados: conservan la cuenta y recursos generales, sin tareas de residencia.
+    elif user.rol == 'medico_residente':
+        groups = [g for g in [
+            group('Recursos', 'fa-toolbox',
+                i_protocolos(),
+                i_stock(),
+                i_novedades(),
+            ),
+        ] if g]
+
     elif user.rol in ('jefe_residentes', 'instructor_residentes'):
         groups = [g for g in [
             group('Recursos', 'fa-toolbox',

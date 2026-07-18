@@ -102,6 +102,7 @@ def sugerir_cobertura(bloque: BloqueHorario, fecha=None) -> dict:
     residentes_qs = User.objects.filter(
         is_active=True,
         rol='medico_residente',
+        estado_residencia='ACTIVO',
     )
 
     # 2. Filtro por competencia (heurístico — Fase 2 ampliar con modelo Competencia)

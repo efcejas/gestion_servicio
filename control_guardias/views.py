@@ -84,7 +84,7 @@ class ResidenteMixin(LoginRequiredMixin, UserPassesTestMixin):
     login_url = 'login'
 
     def test_func(self):
-        return self.request.user.rol == 'medico_residente'
+        return self.request.user.es_residente_activo()
 
 
 def _safe_return_url(request, fallback, focus=''):
@@ -160,7 +160,9 @@ class GuardiasIndexView(LoginRequiredMixin, TemplateView):
         elif user.rol in ('jefe_residentes', 'instructor_residentes') or user.is_superuser:
             from django.contrib.auth import get_user_model
             User = get_user_model()
-            context['total_residentes'] = User.objects.filter(rol='medico_residente', is_active=True).count()
+            context['total_residentes'] = User.objects.filter(
+                rol='medico_residente', estado_residencia='ACTIVO', is_active=True
+            ).count()
             context['ausencias_pendientes'] = AusenciaResidente.objects.filter(estado='PENDIENTE').count()
             context['cambios_pendiente_jefe'] = SolicitudCambioGuardia.objects.filter(estado='PENDIENTE_JEFE').count()
             context['guardias_borrador'] = AsignacionGuardia.objects.filter(estado='BORRADOR').count()
@@ -428,7 +430,7 @@ class CalendarioView(LoginRequiredMixin, TemplateView):
         if es_gestor:
             residentes_qs = (
                 User.objects
-                .filter(rol='medico_residente', is_active=True)
+                .filter(rol='medico_residente', estado_residencia='ACTIVO', is_active=True)
                 .order_by('last_name', 'first_name')
             )
             context['residentes'] = residentes_qs

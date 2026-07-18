@@ -95,6 +95,7 @@ class AjustePenalizacionForm(forms.ModelForm):
         User = get_user_model()
         self.fields['residente'].queryset = User.objects.filter(
             rol='medico_residente',
+            estado_residencia='ACTIVO',
             perfil_completo=True,
             is_active=True,
         ).order_by('last_name', 'first_name')

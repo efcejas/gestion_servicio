@@ -89,18 +89,48 @@ email@example.com
 🩺 Médico Residente
 ```
 
-### 7. Comando de Actualización Masiva
+### 7. Cierre anual de la residencia
 
-Para actualizar el año de todos los residentes existentes:
+El ciclo termina el 31 de julio. Antes de esa fecha, en el admin de usuarios,
+marcar **Repite año de residencia** solamente en quienes deban conservar su año.
+
+El 1 de agosto (o en una tarea diaria/mensual) ejecutar:
 
 ```bash
 python manage.py actualizar_anios_residencia
 ```
 
-Este comando:
-- Busca todos los usuarios con rol `medico_residente`
-- Recalcula el año según su fecha de ingreso
-- Muestra un resumen de los cambios realizados
+#### Ejecución automática en Heroku
+
+Configurar un job en **Heroku Scheduler** con estos valores:
+
+- Frecuencia: `Daily`
+- Hora: `03:05 UTC` (equivale a `00:05` de Argentina)
+- Comando: `python manage.py actualizar_anios_residencia`
+
+Heroku Scheduler expresa los horarios diarios en UTC. El comando evalúa el cierre
+con la zona `America/Argentina/Buenos_Aires`, por lo que no promociona antes de la
+medianoche argentina. Ejecutarlo diariamente es seguro: cada cierre se registra y
+no puede aplicarse dos veces. Si una ejecución se demora o se omite, la siguiente
+ejecución diaria procesa el cierre pendiente.
+
+Para crear o abrir el Scheduler:
+
+```bash
+heroku addons:create scheduler:standard
+heroku addons:open scheduler
+```
+
+El comando es idempotente y realiza R1→R2, R2→R3, R3→R4 y R4→Egresado.
+Los repetidores conservan el año y la marca de excepción se limpia. Los egresados
+conservan su cuenta e historial, pero dejan de aparecer en guardias, coberturas y
+funciones propias de residentes.
+
+Para revisar anticipadamente el cierre 2026 sin guardar cambios:
+
+```bash
+python manage.py actualizar_anios_residencia --cierre 2026 --dry-run
+```
 
 ### 8. Validaciones
 
@@ -114,10 +144,8 @@ Este comando:
 
 ### 9. Actualización Automática
 
-El año de residencia se actualiza automáticamente en:
-- Registro inicial (al completar perfil)
-- Edición de perfil (al cambiar fecha de ingreso)
-- Comando manual: `actualizar_anios_residencia`
+El año inicial se calcula al completar el perfil. Los cambios posteriores se
+procesan por ciclo académico con `actualizar_anios_residencia`.
 
 ### 10. Permisos y Accesos
 
@@ -128,7 +156,7 @@ Todos los médicos (staff, residentes, jefes, instructores) tienen acceso a:
 
 ### 11. Próximos Pasos Sugeridos
 
-1. **Tarea Programada**: Crear un cronjob que ejecute `actualizar_anios_residencia` mensualmente
+1. **Tarea Programada**: ejecutar `actualizar_anios_residencia` diariamente o el 1 de agosto
 2. **Notificaciones**: Alertar cuando un residente cambia de año (R1→R2)
 3. **Estadísticas**: Dashboard mostrando distribución de residentes por año
 4. **Rotaciones**: Sistema para registrar rotaciones por servicio/modalidad

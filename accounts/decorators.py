@@ -68,6 +68,16 @@ def role_required(*allowed_roles):
                     f'Acceso denegado. Esta sección está disponible solo para: {", ".join(allowed_roles)}'
                 )
                 return redirect('home')
+
+            if (
+                request.user.rol == 'medico_residente'
+                and not request.user.es_residente_activo()
+            ):
+                messages.error(
+                    request,
+                    'Tu ciclo de residencia finalizó; esta función es exclusiva para residentes activos.'
+                )
+                return redirect('home')
             
             return view_func(request, *args, **kwargs)
         

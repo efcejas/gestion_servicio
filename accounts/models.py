@@ -58,6 +58,33 @@ class CustomUser(AbstractUser):
         null=True,
         help_text='Año de residencia calculado automáticamente (R1, R2, R3, R4, R5)'
     )
+    ESTADO_RESIDENCIA_CHOICES = [
+        ('ACTIVO', 'En curso'),
+        ('EGRESADO', 'Egresado'),
+    ]
+    estado_residencia = models.CharField(
+        max_length=10,
+        choices=ESTADO_RESIDENCIA_CHOICES,
+        default='ACTIVO',
+        help_text='Situación académica actual dentro de la residencia.',
+    )
+    repite_anio_residencia = models.BooleanField(
+        default=False,
+        help_text=(
+            'Marcar antes del cierre del 31 de julio para que conserve su año. '
+            'La marca se limpia al procesar el cierre.'
+        ),
+    )
+    fecha_egreso_residencia = models.DateField(
+        blank=True,
+        null=True,
+        help_text='Fecha en la que finalizó la residencia.',
+    )
+    ultimo_cierre_residencia = models.PositiveSmallIntegerField(
+        blank=True,
+        null=True,
+        help_text='Año del último cierre académico procesado para este residente.',
+    )
     
     # Control de perfil
     perfil_completo = models.BooleanField(
@@ -123,6 +150,18 @@ class CustomUser(AbstractUser):
             if anio_calculado and self.anio_residencia != anio_calculado:
                 self.anio_residencia = anio_calculado
                 self.save(update_fields=['anio_residencia'])
+
+    @staticmethod
+    def cierre_residencia_vigente(fecha=None):
+        referencia = fecha or timezone.localdate()
+        return referencia.year if (referencia.month, referencia.day) >= (8, 1) else referencia.year - 1
+
+    def es_residente_activo(self):
+        """Indica si conserva funciones y puede recibir asignaciones de residente."""
+        return (
+            self.rol == 'medico_residente'
+            and self.estado_residencia == 'ACTIVO'
+        )
     
     def marcar_perfil_completo(self):
         """Marca el perfil como completo y registra la fecha."""
@@ -132,7 +171,12 @@ class CustomUser(AbstractUser):
             # Si es residente, calcular año de residencia
             if self.rol == 'medico_residente' and self.fecha_ingreso_residencia:
                 self.anio_residencia = self.calcular_anio_residencia()
-            self.save(update_fields=['perfil_completo', 'fecha_perfil_completado', 'anio_residencia'])
+                if self.ultimo_cierre_residencia is None:
+                    self.ultimo_cierre_residencia = self.cierre_residencia_vigente()
+            self.save(update_fields=[
+                'perfil_completo', 'fecha_perfil_completado',
+                'anio_residencia', 'ultimo_cierre_residencia',
+            ])
     
     def puede_acceder_protocolos(self):
         """Verifica si el usuario puede acceder a protocolos radiológicos."""
@@ -145,7 +189,7 @@ class CustomUser(AbstractUser):
     
     def es_residente(self):
         """Verifica si el usuario es residente."""
-        return self.rol == 'medico_residente'
+        return self.es_residente_activo()
 
     def puede_acceder_dictado_ia(self):
         """Permite acceso al piloto de dictado y a superusuarios."""
