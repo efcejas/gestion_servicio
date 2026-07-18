@@ -1879,6 +1879,79 @@ class EliminarGuardiaExcepcionViewTest(TestCase):
 # Fase 6: SolicitudSlotVacante — aprobar, rechazar, cancelar
 # ---------------------------------------------------------------------------
 
+class SolicitarSlotVacanteServiceTest(TestCase):
+    def setUp(self):
+        self.jefe = crear_jefe('jefe_slots')
+        self.residente = crear_residente('res_solicita_slot', 'R2')
+        self.tipo = crear_tipo_guardia(creado_por=self.jefe)
+        self.guardia = AsignacionGuardia.objects.create(
+            residente=self.residente, tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 6), estado='PUBLICADA', creada_por=self.jefe,
+        )
+
+    def test_crea_comprobante_y_notifica_al_gestor(self):
+        from .services import solicitar_slot_vacante
+        solicitud = solicitar_slot_vacante(
+            self.residente, self.guardia, datetime.date(2026, 5, 14), self.tipo,
+        )
+        self.assertEqual(solicitud.estado, 'PENDIENTE')
+        self.assertTrue(NotificacionGuardia.objects.filter(
+            destinatario=self.jefe, mensaje__contains=f'#{solicitud.pk}',
+        ).exists())
+
+    def test_impide_doble_pedido_para_la_misma_guardia(self):
+        from .services import CambioGuardiaError, solicitar_slot_vacante
+        solicitar_slot_vacante(
+            self.residente, self.guardia, datetime.date(2026, 5, 14), self.tipo,
+        )
+        with self.assertRaisesMessage(CambioGuardiaError, 'Ya existe una solicitud pendiente'):
+            solicitar_slot_vacante(
+                self.residente, self.guardia, datetime.date(2026, 5, 15), self.tipo,
+            )
+        self.assertEqual(SolicitudSlotVacante.objects.count(), 1)
+
+    def test_reserva_el_slot_frente_a_otro_pedido(self):
+        from .services import CambioGuardiaError, solicitar_slot_vacante
+        solicitar_slot_vacante(
+            self.residente, self.guardia, datetime.date(2026, 5, 14), self.tipo,
+        )
+        otro = crear_residente('otro_slot', 'R1')
+        otra_guardia = AsignacionGuardia.objects.create(
+            residente=otro, tipo_guardia=self.tipo, fecha=datetime.date(2026, 5, 7),
+            estado='PUBLICADA', creada_por=self.jefe,
+        )
+        with self.assertRaisesMessage(CambioGuardiaError, 'ya fue solicitado'):
+            solicitar_slot_vacante(otro, otra_guardia, datetime.date(2026, 5, 14), self.tipo)
+
+    def test_rechaza_fecha_fuera_del_mes(self):
+        from .services import CambioGuardiaError, solicitar_slot_vacante
+        with self.assertRaisesMessage(CambioGuardiaError, 'mismo mes'):
+            solicitar_slot_vacante(
+                self.residente, self.guardia, datetime.date(2026, 6, 14), self.tipo,
+            )
+
+    def test_vista_devuelve_comprobante_visible(self):
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse('control_guardias:solicitar_slot_vacante', args=[self.guardia.pk]),
+            {
+                'slot_fecha': '2026-05-14',
+                'slot_tipo_guardia': str(self.tipo.pk),
+                'notas_solicitante': 'Necesito moverla',
+            },
+            secure=True,
+        )
+        self.assertIn('focus_slot=', response.url)
+        solicitud = SolicitudSlotVacante.objects.get()
+        self.assertRedirects(
+            response,
+            f"{reverse('control_guardias:mis_guardias')}?focus_slot={solicitud.pk}",
+            fetch_redirect_response=False,
+        )
+        response = self.client.get(response.url, secure=True)
+        self.assertContains(response, f'Solicitud #{solicitud.pk}')
+
+
 class AprobarSlotVacanteServiceTest(TestCase):
     """Tests del flujo completo de solicitud de slot vacante."""
 

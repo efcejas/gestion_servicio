@@ -12,7 +12,7 @@ from datetime import date, timedelta
 
 from django.conf import settings
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
 
@@ -656,6 +656,55 @@ def _notificar_gestores(tipo, mensaje, solicitud=None):
         crear_notificacion(g, tipo, mensaje, solicitud=solicitud)
 
 
+def solicitar_slot_vacante(residente, guardia, slot_fecha, tipo_guardia, notas=''):
+    """Crea un pedido de slot vacante validado, único y visible para los gestores."""
+    if guardia.residente_id != residente.pk or guardia.estado != 'PUBLICADA':
+        raise CambioGuardiaError('Solo podés solicitar un slot vacante desde una guardia propia publicada.')
+    if tipo_guardia.pk != guardia.tipo_guardia_id:
+        raise CambioGuardiaError('El slot debe ser del mismo tipo que la guardia original.')
+    if (slot_fecha.year, slot_fecha.month) != (guardia.fecha.year, guardia.fecha.month):
+        raise CambioGuardiaError('El slot debe pertenecer al mismo mes que la guardia original.')
+    if slot_fecha == guardia.fecha:
+        raise CambioGuardiaError('El slot destino debe ser una fecha diferente.')
+
+    with transaction.atomic():
+        guardia = AsignacionGuardia.objects.select_for_update().get(pk=guardia.pk)
+        if guardia.residente_id != residente.pk or guardia.estado != 'PUBLICADA':
+            raise CambioGuardiaError('La guardia original ya no está disponible para este pedido.')
+        if AsignacionGuardia.objects.filter(
+            fecha=slot_fecha, tipo_guardia=tipo_guardia,
+            estado__in=['BORRADOR', 'PUBLICADA'],
+        ).exists():
+            raise CambioGuardiaError('Ese slot ya no está disponible.')
+        if SolicitudSlotVacante.objects.filter(
+            guardia_ceder=guardia, estado='PENDIENTE'
+        ).exists():
+            raise CambioGuardiaError('Ya existe una solicitud pendiente para esta guardia.')
+        if SolicitudSlotVacante.objects.filter(
+            slot_fecha=slot_fecha, slot_tipo_guardia=tipo_guardia, estado='PENDIENTE'
+        ).exists():
+            raise CambioGuardiaError('Ese slot ya fue solicitado y está pendiente de revisión.')
+        try:
+            solicitud = SolicitudSlotVacante.objects.create(
+                solicitante=residente, guardia_ceder=guardia,
+                slot_fecha=slot_fecha, slot_tipo_guardia=tipo_guardia,
+                notas_solicitante=notas,
+            )
+        except IntegrityError as exc:
+            raise CambioGuardiaError(
+                'La solicitud ya fue registrada o el slot acaba de ser solicitado.'
+            ) from exc
+
+    nombre = residente.get_full_name() or residente.username
+    _notificar_gestores(
+        'CAMBIO_SOLICITADO',
+        f"Nueva solicitud de slot vacante #{solicitud.pk}: {nombre} solicita mover "
+        f"su guardia del {guardia.fecha.strftime('%d/%m/%Y')} al "
+        f"{slot_fecha.strftime('%d/%m/%Y')}. Requiere validación.",
+    )
+    return solicitud
+
+
 # --------------------------------------------------------------------------
 # Ausencias
 # --------------------------------------------------------------------------
@@ -1241,6 +1290,7 @@ def cancelar_slot_vacante(solicitud, solicitante):
         )
 
     solicitud.estado = 'CANCELADA'
-    solicitud.save(update_fields=['estado'])
+    solicitud.fecha_resolucion = timezone.now()
+    solicitud.save(update_fields=['estado', 'fecha_resolucion'])
 
     return solicitud

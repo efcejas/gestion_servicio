@@ -539,6 +539,26 @@ class SolicitudSlotVacante(models.Model):
         verbose_name = 'Solicitud de slot vacante'
         verbose_name_plural = 'Solicitudes de slot vacante'
         ordering = ['-fecha_solicitud']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['guardia_ceder'],
+                condition=models.Q(estado='PENDIENTE'),
+                name='uniq_slot_pendiente_por_guardia',
+            ),
+            models.UniqueConstraint(
+                fields=['slot_fecha', 'slot_tipo_guardia'],
+                condition=models.Q(estado='PENDIENTE'),
+                name='uniq_slot_destino_pendiente',
+            ),
+        ]
+
+    @property
+    def demorada(self):
+        """Indica que una solicitud pendiente lleva al menos 24 horas sin resolver."""
+        return (
+            self.estado == 'PENDIENTE'
+            and self.fecha_solicitud <= timezone.now() - timezone.timedelta(hours=24)
+        )
 
     def __str__(self):
         return (

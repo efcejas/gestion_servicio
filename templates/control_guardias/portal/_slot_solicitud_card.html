@@ -1,0 +1,28 @@
+<div id="slot-solicitud-{{ sol.pk }}" class="rounded-xl border {% if sol.demorada %}border-red-300 bg-red-50{% else %}border-gray-200 bg-white{% endif %} p-4 shadow-sm">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0 flex-1">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
+                <span class="font-semibold text-gray-900">Solicitud #{{ sol.pk }}</span>
+                {% if gestor %}<span class="text-sm text-gray-700">{{ sol.solicitante.get_full_name }}</span>{% endif %}
+                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {% if sol.estado == 'PENDIENTE' %}bg-yellow-100 text-yellow-800{% elif sol.estado == 'APROBADA' %}bg-green-100 text-green-800{% elif sol.estado == 'RECHAZADA' %}bg-red-100 text-red-800{% else %}bg-gray-100 text-gray-700{% endif %}">{{ sol.get_estado_display }}</span>
+                {% if sol.demorada %}<span class="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white"><i class="fas fa-clock"></i>Más de 24 h</span>{% endif %}
+            </div>
+            <p class="text-sm text-gray-700"><span class="font-medium">{{ sol.guardia_ceder.fecha|date:"d/m/Y" }}</span><i class="fas fa-arrow-right mx-2 text-gray-400"></i><span class="font-medium">{{ sol.slot_fecha|date:"d/m/Y" }}</span><span class="text-gray-500"> · {{ sol.slot_tipo_guardia.nombre }}</span></p>
+            <p class="mt-1 text-xs text-gray-400">Registrada el {{ sol.fecha_solicitud|date:"d/m/Y \a \l\a\s H:i" }}</p>
+            {% if sol.notas_solicitante %}<p class="mt-2 text-sm italic text-gray-500">“{{ sol.notas_solicitante }}”</p>{% endif %}
+            {% if sol.notas_jefe %}<p class="mt-2 text-sm text-gray-600"><span class="font-medium">Respuesta:</span> {{ sol.notas_jefe }}</p>{% endif %}
+        </div>
+        {% if gestor and sol.estado == 'PENDIENTE' %}
+        <form method="post" action="{% url 'control_guardias:slot_vacante_revisar' sol.pk %}" class="w-full shrink-0 sm:w-72">
+            {% csrf_token %}<input type="hidden" name="return_to" value="{{ request.get_full_path }}">
+            <textarea name="notas_jefe" rows="2" placeholder="Notas (opcional)..." class="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+            <div class="flex gap-2">
+                <button type="submit" name="accion" value="aprobar" class="flex-1 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"><i class="fas fa-check mr-1"></i>Aprobar</button>
+                <button type="submit" name="accion" value="rechazar" class="flex-1 rounded-lg bg-red-100 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-200" onclick="return confirm('¿Rechazar esta solicitud?')"><i class="fas fa-times mr-1"></i>Rechazar</button>
+            </div>
+        </form>
+        {% elif not gestor and sol.estado == 'PENDIENTE' %}
+        <form method="post" action="{% url 'control_guardias:slot_vacante_cancelar' sol.pk %}">{% csrf_token %}<button type="submit" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50" onclick="return confirm('¿Cancelar esta solicitud?')">Cancelar pedido</button></form>
+        {% endif %}
+    </div>
+</div>

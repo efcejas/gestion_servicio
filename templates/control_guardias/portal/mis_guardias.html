@@ -38,6 +38,19 @@
         {% endfor %}
     {% endif %}
 
+    {% if solicitudes_slot %}
+    <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 shadow-sm">
+        <div class="mb-3 flex items-center gap-2">
+            <i class="fas fa-route text-emerald-600"></i>
+            <h2 class="text-lg font-semibold text-gray-900">Mis pedidos de slot vacante</h2>
+            <span class="ml-auto text-xs text-gray-500">Comprobante y estado</span>
+        </div>
+        <div class="space-y-3">
+            {% for sol in solicitudes_slot %}{% include "control_guardias/portal/_slot_solicitud_card.html" with sol=sol gestor=False %}{% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Próximas Guardias -->
     <div class="mb-6 rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center gap-2 bg-gray-50">
@@ -114,6 +127,14 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const params = new URLSearchParams(window.location.search);
+    const focusSlot = params.get('focus_slot');
+    if (focusSlot) {
+        const slotCard = document.getElementById(`slot-solicitud-${focusSlot}`);
+        if (slotCard) {
+            slotCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            slotCard.classList.add('ring-2', 'ring-emerald-300', 'ring-offset-2');
+        }
+    }
     const focus = params.get('focus');
     if (!focus) {
         return;

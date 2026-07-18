@@ -187,6 +187,11 @@
                 {{ cambios_pendiente_jefe }}
             </p>
         </div>
+        <a href="{% url 'control_guardias:cambios' %}" class="bg-white border {% if slots_demorados %}border-red-300{% else %}border-gray-200{% endif %} rounded-xl p-4 shadow-sm">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Slots a validar</p>
+            <p class="text-2xl font-bold {% if slots_pendientes %}text-emerald-600{% else %}text-gray-900{% endif %}">{{ slots_pendientes }}</p>
+            {% if slots_demorados %}<p class="mt-1 text-xs font-medium text-red-600">{{ slots_demorados }} con más de 24 h</p>{% endif %}
+        </a>
     </div>
 
     <!-- Acciones rápidas del gestor -->

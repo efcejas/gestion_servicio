@@ -117,6 +117,17 @@ class SolicitudSlotVacanteAdmin(admin.ModelAdmin):
     list_filter = ('estado',)
     search_fields = ('solicitante__first_name', 'solicitante__last_name')
     raw_id_fields = ('solicitante', 'guardia_ceder', 'revisado_por', 'guardia_creada')
+    readonly_fields = (
+        'solicitante', 'guardia_ceder', 'slot_fecha', 'slot_tipo_guardia',
+        'estado', 'notas_solicitante', 'notas_jefe', 'revisado_por',
+        'guardia_creada', 'fecha_solicitud', 'fecha_resolucion',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def get_solicitante(self, obj):
         return obj.solicitante.get_full_name()

@@ -36,6 +36,17 @@
 
     <div class="space-y-6">
 
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-route text-emerald-600"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Pedidos de slot vacante</h2>
+                {% if slots_pendientes %}<span class="rounded-full bg-emerald-600 px-2 py-0.5 text-xs text-white">{{ slots_pendientes|length }}</span>{% endif %}
+            </div>
+            {% if slots_pendientes %}
+            <div class="p-4 space-y-3">{% for sol in slots_pendientes %}{% include "control_guardias/portal/_slot_solicitud_card.html" with sol=sol gestor=True %}{% endfor %}</div>
+            {% else %}<p class="px-5 py-6 text-sm text-gray-400">No hay pedidos de slot pendientes.</p>{% endif %}
+        </div>
+
         <!-- Pendientes de validación -->
         <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
             <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
@@ -88,6 +99,16 @@
     {% else %}
 
     <div class="space-y-6">
+
+        {% if slots_propios %}
+        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+            <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                <i class="fas fa-route text-emerald-600"></i>
+                <h2 class="text-sm font-semibold text-gray-700">Pedidos de slot vacante</h2>
+            </div>
+            <div class="p-4 space-y-3">{% for sol in slots_propios %}{% include "control_guardias/portal/_slot_solicitud_card.html" with sol=sol gestor=False %}{% endfor %}</div>
+        </div>
+        {% endif %}
 
         {% if recibidas %}
         <!-- Solicitudes recibidas -->

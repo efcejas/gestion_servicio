@@ -66,6 +66,7 @@ from .services import (
     reportar_ausencia,
     resolver_ausencia,
     solicitar_cambio,
+    solicitar_slot_vacante,
     sugerir_reemplazo,
 )
 
@@ -165,6 +166,11 @@ class GuardiasIndexView(LoginRequiredMixin, TemplateView):
             ).count()
             context['ausencias_pendientes'] = AusenciaResidente.objects.filter(estado='PENDIENTE').count()
             context['cambios_pendiente_jefe'] = SolicitudCambioGuardia.objects.filter(estado='PENDIENTE_JEFE').count()
+            slots_pendientes = SolicitudSlotVacante.objects.filter(estado='PENDIENTE')
+            context['slots_pendientes'] = slots_pendientes.count()
+            context['slots_demorados'] = slots_pendientes.filter(
+                fecha_solicitud__lte=timezone.now() - datetime.timedelta(hours=24)
+            ).count()
             context['guardias_borrador'] = AsignacionGuardia.objects.filter(estado='BORRADOR').count()
             context['guardias_publicadas_mes'] = (
                 AsignacionGuardia.objects
@@ -205,6 +211,12 @@ class MisGuardiasView(LoginRequiredMixin, ListView):
         qs = self.get_queryset()
         context['proximas_guardias'] = qs.filter(fecha__gte=hoy, estado='PUBLICADA')
         context['guardias_pasadas'] = qs.filter(fecha__lt=hoy).order_by('-fecha')
+        context['solicitudes_slot'] = (
+            SolicitudSlotVacante.objects
+            .filter(solicitante=self.request.user)
+            .select_related('guardia_ceder__tipo_guardia', 'slot_tipo_guardia', 'revisado_por')
+            .order_by('-fecha_solicitud')[:20]
+        )
         return context
 
 
@@ -1024,9 +1036,19 @@ class CambiosGuardiaView(LoginRequiredMixin, TemplateView):
         if es_gestor:
             context['pendientes_jefe'] = base_qs.filter(estado='PENDIENTE_JEFE').order_by('-fecha_solicitud')
             context['historial'] = base_qs.exclude(estado__in=['PENDIENTE_RECEPTOR', 'PENDIENTE_JEFE']).order_by('-fecha_resolucion')
+            context['slots_pendientes'] = (
+                SolicitudSlotVacante.objects.filter(estado='PENDIENTE')
+                .select_related('solicitante', 'guardia_ceder__tipo_guardia', 'slot_tipo_guardia')
+                .order_by('fecha_solicitud')
+            )
         else:
             context['enviadas'] = base_qs.filter(solicitante=user).order_by('-fecha_solicitud')
             context['recibidas'] = base_qs.filter(receptor=user, estado='PENDIENTE_RECEPTOR').order_by('-fecha_solicitud')
+            context['slots_propios'] = (
+                SolicitudSlotVacante.objects.filter(solicitante=user)
+                .select_related('guardia_ceder__tipo_guardia', 'slot_tipo_guardia')
+                .order_by('-fecha_solicitud')
+            )
         return context
 
 
@@ -1396,15 +1418,25 @@ class SolicitarSlotVacanteView(LoginRequiredMixin, TemplateView):
             return redirect(reverse('control_guardias:solicitar_slot_vacante', kwargs={'guardia_pk': guardia_pk}))
 
         tipo = get_object_or_404(ConfiguracionTipoGuardia, pk=tipo_id)
-        SolicitudSlotVacante.objects.create(
-            solicitante=request.user,
-            guardia_ceder=guardia,
-            slot_fecha=slot_fecha,
-            slot_tipo_guardia=tipo,
-            notas_solicitante=form.cleaned_data.get('notas_solicitante', ''),
+        try:
+            solicitud = solicitar_slot_vacante(
+                request.user,
+                guardia,
+                slot_fecha,
+                tipo,
+                notas=form.cleaned_data.get('notas_solicitante', ''),
+            )
+        except CambioGuardiaError as exc:
+            messages.error(request, str(exc))
+            return redirect(reverse(
+                'control_guardias:solicitar_slot_vacante',
+                kwargs={'guardia_pk': guardia_pk},
+            ))
+        messages.success(
+            request,
+            f'Solicitud #{solicitud.pk} enviada y registrada. Podés seguir su estado aquí.',
         )
-        messages.success(request, 'Solicitud enviada. El jefe la revisará a la brevedad.')
-        return redirect(_safe_return_url(request, reverse('control_guardias:mis_guardias')))
+        return redirect(f"{reverse('control_guardias:mis_guardias')}?focus_slot={solicitud.pk}")
 
 
 class CancelarSlotVacanteView(LoginRequiredMixin, TemplateView):
