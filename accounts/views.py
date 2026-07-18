@@ -4,11 +4,14 @@ from django.urls import reverse_lazy
 from django.core.mail import send_mail
 from django.conf import settings as django_settings
 from .forms import CustomUserCreationForm, CompletarPerfilForm, CustomUserChangeForm, UsernameRecoveryForm
-from .models import CustomUser
+from .models import CustomUser, NotificacionCicloResidencia
 from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.decorators.http import require_POST
+from django.http import Http404
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 
 
 class UserRegisterView(SuccessMessageMixin, CreateView):
@@ -127,3 +130,28 @@ def eliminar_avatar(request):
         request.user.avatar.delete(save=True)
         messages.success(request, 'Foto de perfil eliminada correctamente.')
     return redirect('accounts:editar_perfil')
+
+
+@login_required
+@require_POST
+def confirmar_notificacion_ciclo(request, pk):
+    """Marca como vista una notificación académica perteneciente al usuario actual."""
+    try:
+        notificacion = request.user.notificaciones_ciclo_residencia.get(pk=pk)
+    except NotificacionCicloResidencia.DoesNotExist as exc:
+        raise Http404 from exc
+
+    if notificacion.vista_en:
+        destino = request.POST.get('next') or '/'
+    else:
+        notificacion.vista_en = timezone.now()
+        notificacion.save(update_fields=['vista_en'])
+        destino = request.POST.get('next') or '/'
+
+    if not url_has_allowed_host_and_scheme(
+        destino,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        destino = '/'
+    return redirect(destino)

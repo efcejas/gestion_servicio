@@ -55,6 +55,19 @@ def _is_active(request, ns=None, url_names=None, exclude_url_names=None):
     return False
 
 
+def notificacion_ciclo_residencia(request):
+    """Expone la primera novedad académica aún no confirmada por el usuario."""
+    if not request.user.is_authenticated:
+        return {'notificacion_ciclo_residencia': None}
+    notificacion = (
+        request.user.notificaciones_ciclo_residencia
+        .filter(vista_en__isnull=True)
+        .order_by('creada_en')
+        .first()
+    )
+    return {'notificacion_ciclo_residencia': notificacion}
+
+
 def navbar_links(request):
     """
     Retorna {'nav_groups': [...]} con la estructura de navegación para el usuario actual.

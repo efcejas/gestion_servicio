@@ -196,3 +196,56 @@ class CustomUser(AbstractUser):
         return self.is_superuser or self.rol == 'piloto_dictado'
 
 
+class NotificacionCicloResidencia(models.Model):
+    TIPO_PROMOCION = 'PROMOCION'
+    TIPO_EGRESO = 'EGRESO'
+    TIPO_CHOICES = [
+        (TIPO_PROMOCION, 'Promoción'),
+        (TIPO_EGRESO, 'Egreso'),
+    ]
+
+    usuario = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='notificaciones_ciclo_residencia',
+    )
+    cierre_anio = models.PositiveSmallIntegerField()
+    tipo = models.CharField(max_length=12, choices=TIPO_CHOICES)
+    anio_anterior = models.CharField(max_length=2)
+    anio_nuevo = models.CharField(max_length=2, blank=True, null=True)
+    creada_en = models.DateTimeField(auto_now_add=True)
+    vista_en = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['creada_en']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['usuario', 'cierre_anio'],
+                name='unique_notificacion_ciclo_usuario_cierre',
+            ),
+        ]
+        verbose_name = 'Notificación de ciclo de residencia'
+        verbose_name_plural = 'Notificaciones de ciclo de residencia'
+
+    def __str__(self):
+        return f'{self.usuario} - {self.get_tipo_display()} {self.cierre_anio}'
+
+    @property
+    def anio_anterior_en_palabras(self):
+        return {
+            'R1': 'primer año',
+            'R2': 'segundo año',
+            'R3': 'tercer año',
+            'R4': 'cuarto año',
+        }.get(self.anio_anterior, self.anio_anterior)
+
+    @property
+    def anio_nuevo_en_palabras(self):
+        return {
+            'R1': 'primer año',
+            'R2': 'segundo año',
+            'R3': 'tercer año',
+            'R4': 'cuarto año',
+        }.get(self.anio_nuevo, self.anio_nuevo)
+
+

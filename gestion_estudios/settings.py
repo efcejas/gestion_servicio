@@ -158,6 +158,7 @@ TEMPLATES = [
                 'dictado_informes.context_processors.terminos_activos',
                 'gestion_estudios.context_processors.sanatorio_config',
                 'accounts.context_processors.navbar_links',
+                'accounts.context_processors.notificacion_ciclo_residencia',
                 'accounts.context_processors.consultorios_badges',
                 'consultorios.context_processors.consultorios_context',
             ],

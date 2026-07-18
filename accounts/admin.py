@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser
+from .models import CustomUser, NotificacionCicloResidencia
 from .forms import CustomUserCreationForm, CustomUserChangeForm
 
 
@@ -52,3 +52,22 @@ class CustomUserAdmin(UserAdmin):
     )
 
 admin.site.register(CustomUser, CustomUserAdmin)
+
+
+@admin.register(NotificacionCicloResidencia)
+class NotificacionCicloResidenciaAdmin(admin.ModelAdmin):
+    list_display = [
+        'usuario', 'tipo', 'anio_anterior', 'anio_nuevo',
+        'cierre_anio', 'creada_en', 'vista_en',
+    ]
+    list_filter = ['tipo', 'cierre_anio', 'vista_en']
+    search_fields = [
+        'usuario__username', 'usuario__first_name', 'usuario__last_name',
+    ]
+    readonly_fields = [
+        'usuario', 'tipo', 'anio_anterior', 'anio_nuevo',
+        'cierre_anio', 'creada_en', 'vista_en',
+    ]
+
+    def has_add_permission(self, request):
+        return False

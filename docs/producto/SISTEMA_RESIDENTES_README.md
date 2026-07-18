@@ -105,7 +105,7 @@ python manage.py actualizar_anios_residencia
 Configurar un job en **Heroku Scheduler** con estos valores:
 
 - Frecuencia: `Daily`
-- Hora: `03:05 UTC` (equivale a `00:05` de Argentina)
+- Hora: `03:00 UTC` (equivale a `00:00` de Argentina)
 - Comando: `python manage.py actualizar_anios_residencia`
 
 Heroku Scheduler expresa los horarios diarios en UTC. El comando evalúa el cierre
@@ -113,6 +113,14 @@ con la zona `America/Argentina/Buenos_Aires`, por lo que no promociona antes de 
 medianoche argentina. Ejecutarlo diariamente es seguro: cada cierre se registra y
 no puede aplicarse dos veces. Si una ejecución se demora o se omite, la siguiente
 ejecución diaria procesa el cierre pendiente.
+
+#### Felicitación al ingresar
+
+El cierre crea una notificación persistente para cada residente promovido y para
+cada egresado. En su primer ingreso posterior se muestra un modal personalizado
+con el cambio de año o el mensaje de finalización. Al pulsar **Continuar**, la
+lectura queda registrada en el servidor y el modal no vuelve a aparecer. Quienes
+repiten conservan su año, pero no reciben un mensaje de promoción.
 
 Para crear o abrir el Scheduler:
 

@@ -183,6 +183,92 @@
     <!-- Toast container (global) -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col items-end space-y-2 pointer-events-none"></div>
 
+    {% if notificacion_ciclo_residencia %}
+    <style>
+        .residencia-modal-button {
+            display: inline-flex;
+            width: 100%;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            padding: 0.95rem 1.6rem;
+            border: 0;
+            border-radius: 0.85rem;
+            background: linear-gradient(90deg, #2563eb, #4338ca);
+            color: #ffffff !important;
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1.25rem;
+            box-shadow: 0 10px 20px rgba(67, 56, 202, 0.22);
+            cursor: pointer;
+            transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        }
+        .residencia-modal-button:hover {
+            background: linear-gradient(90deg, #1d4ed8, #3730a3);
+            color: #ffffff !important;
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(67, 56, 202, 0.3);
+        }
+        .residencia-modal-button:focus-visible {
+            outline: 3px solid rgba(99, 102, 241, 0.35);
+            outline-offset: 3px;
+        }
+    </style>
+    <div class="fixed inset-0 flex items-center justify-center" style="z-index: 100; padding: 1.5rem;" role="dialog" aria-modal="true" aria-labelledby="titulo-ciclo-residencia">
+        <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"></div>
+        <div class="relative w-full max-w-lg overflow-hidden bg-white shadow-2xl" style="border-radius: 1.5rem;">
+            <div class="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600"></div>
+            <div class="text-center" style="padding: 2.75rem 2.5rem 2.25rem;">
+                <div class="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 to-yellow-200 shadow-inner">
+                    {% if notificacion_ciclo_residencia.tipo == 'EGRESO' %}
+                    <i class="fas fa-graduation-cap text-4xl text-indigo-700" aria-hidden="true"></i>
+                    {% else %}
+                    <i class="fas fa-trophy text-4xl text-amber-600" aria-hidden="true"></i>
+                    {% endif %}
+                </div>
+
+                <p class="mb-2 text-sm font-bold uppercase tracking-[0.22em] text-indigo-600">
+                    Ciclo académico {{ notificacion_ciclo_residencia.cierre_anio }}
+                </p>
+                <h2 id="titulo-ciclo-residencia" class="text-3xl font-extrabold text-slate-900">
+                    ¡Felicitaciones{% if user.first_name %}, {{ user.first_name }}{% endif %}!
+                </h2>
+
+                {% if notificacion_ciclo_residencia.tipo == 'EGRESO' %}
+                <p class="mt-4 text-lg leading-relaxed text-slate-600">
+                    Finalizaste tu residencia. Celebramos este logro y todo el camino recorrido para alcanzarlo.
+                </p>
+                <div class="mt-5 inline-flex items-center rounded-full bg-indigo-50 font-semibold text-indigo-700" style="gap: 1rem; padding: 0.65rem 1.4rem;">
+                    <span>{{ notificacion_ciclo_residencia.anio_anterior }}</span>
+                    <i class="fas fa-arrow-right text-sm" aria-hidden="true"></i>
+                    <span>Egresado/a</span>
+                </div>
+                {% else %}
+                <p class="mt-4 text-lg leading-relaxed text-slate-600">
+                    Completaste tu {{ notificacion_ciclo_residencia.anio_anterior_en_palabras }} e iniciás un
+                    <strong class="font-bold text-slate-800">{{ notificacion_ciclo_residencia.anio_nuevo_en_palabras }}</strong>
+                    lleno de nuevos aprendizajes, desafíos y crecimiento profesional.
+                </p>
+                <div class="mt-5 inline-flex items-center rounded-full bg-emerald-50 font-semibold text-emerald-700" style="gap: 1rem; padding: 0.65rem 1.4rem;">
+                    <span>{{ notificacion_ciclo_residencia.anio_anterior }}</span>
+                    <i class="fas fa-arrow-right text-sm" aria-hidden="true"></i>
+                    <span>{{ notificacion_ciclo_residencia.anio_nuevo }}</span>
+                </div>
+                {% endif %}
+
+                <form method="post" action="{% url 'accounts:confirmar_notificacion_ciclo' notificacion_ciclo_residencia.pk %}" style="margin-top: 2rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="residencia-modal-button">
+                        <i class="fas fa-star mr-2" aria-hidden="true"></i>
+                        Continuar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Main Content -->
     <main class="flex-1">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

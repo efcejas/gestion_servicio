@@ -3,7 +3,7 @@ from datetime import date
 from django.db import transaction
 from django.utils import timezone
 
-from .models import CustomUser
+from .models import CustomUser, NotificacionCicloResidencia
 
 
 ANIOS_RESIDENCIA = ('R1', 'R2', 'R3', 'R4')
@@ -57,6 +57,16 @@ def procesar_cierre_residencia(fecha_referencia=None, cierre_anio=None, dry_run=
                     'estado_residencia', 'fecha_egreso_residencia',
                     'anio_residencia', 'ultimo_cierre_residencia',
                 ])
+                NotificacionCicloResidencia.objects.update_or_create(
+                    usuario=residente,
+                    cierre_anio=cierre,
+                    defaults={
+                        'tipo': NotificacionCicloResidencia.TIPO_EGRESO,
+                        'anio_anterior': anio_actual,
+                        'anio_nuevo': None,
+                        'vista_en': None,
+                    },
+                )
             continue
 
         anio_nuevo = ANIOS_RESIDENCIA[ANIOS_RESIDENCIA.index(anio_actual) + 1]
@@ -65,6 +75,16 @@ def procesar_cierre_residencia(fecha_referencia=None, cierre_anio=None, dry_run=
             residente.anio_residencia = anio_nuevo
             residente.ultimo_cierre_residencia = cierre
             residente.save(update_fields=['anio_residencia', 'ultimo_cierre_residencia'])
+            NotificacionCicloResidencia.objects.update_or_create(
+                usuario=residente,
+                cierre_anio=cierre,
+                defaults={
+                    'tipo': NotificacionCicloResidencia.TIPO_PROMOCION,
+                    'anio_anterior': anio_actual,
+                    'anio_nuevo': anio_nuevo,
+                    'vista_en': None,
+                },
+            )
 
     if dry_run:
         transaction.set_rollback(True)
