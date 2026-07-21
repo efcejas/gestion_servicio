@@ -19,11 +19,13 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         'id', 'usuario', 'region_detectada', 'lateralidad_detectada',
         'codigo_plantilla', 'score_selector', 'margen_selector',
         'confianza_selector', 'codigo_plantilla_sombra',
-        'selector_sombra_coincide', 'modelo_ia', 'exitosa', 'fecha_creacion',
+        'selector_sombra_coincide', 'origen_seleccion', 'modelo_ia',
+        'exitosa', 'fecha_creacion',
     ]
     list_filter = [
         'exitosa', 'confianza_selector', 'confianza_selector_sombra',
-        'selector_sombra_coincide', 'region_detectada',
+        'selector_sombra_coincide', 'origen_seleccion', 'conflicto_contexto',
+        'region_detectada',
         'lateralidad_detectada', 'modelo_ia', 'fecha_creacion',
     ]
     search_fields = ['codigo_plantilla', 'huella_entrada', 'usuario__username']
@@ -31,6 +33,7 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         'usuario', 'fecha_creacion', 'huella_entrada', 'longitud_entrada',
         'region_detectada', 'lateralidad_detectada', 'plantilla_seleccionada',
         'codigo_plantilla', 'score_selector', 'margen_selector',
+        'codigo_plantilla_legacy', 'origen_seleccion', 'conflicto_contexto',
         'confianza_selector', 'candidatos', 'guardrails_aplicados',
         'codigo_plantilla_sombra', 'score_selector_sombra',
         'margen_selector_sombra', 'confianza_selector_sombra',

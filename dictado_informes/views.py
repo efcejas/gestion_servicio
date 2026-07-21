@@ -138,6 +138,27 @@ REGION_SELECTOR_KEYWORDS = {
     },
 }
 
+REGION_EXPLICIT_KEYWORDS = {
+    'RODILLA': {'rodilla', 'rodillas'},
+    'HOMBRO': {'hombro', 'hombros'},
+    'CODO': {'codo', 'codos'},
+    'MANO': {'mano', 'manos'},
+    'MUNECA': {'muneca', 'munecas'},
+    'TOBILLO': {'tobillo', 'tobillos'},
+    'CADERA': {'cadera', 'caderas'},
+    'CEREBRO': {'cerebro', 'encefalo', 'craneo'},
+    'COLUMNA': {
+        'columna', 'lumbar', 'lumbosacra', 'lumbosacro', 'cervical', 'dorsal',
+    },
+}
+
+MODALIDAD_SELECTOR_KEYWORDS = {
+    'RES': {'resonancia', 'rm'},
+    'TOM': {'tomografia', 'tomografica', 'tc'},
+    'RAD': {'radiografia', 'radiografica', 'rx'},
+    'ECO': {'ecografia', 'ecografica', 'eco'},
+}
+
 
 def _regiones_en_texto_selector(texto):
     tokens = set(_normalizar_texto_selector(texto).split())
@@ -148,27 +169,61 @@ def _regiones_en_texto_selector(texto):
     }
 
 
+def _regiones_explicitas_en_texto(texto):
+    tokens = set(_normalizar_texto_selector(texto).split())
+    return {
+        region
+        for region, claves in REGION_EXPLICIT_KEYWORDS.items()
+        if tokens & claves
+    }
+
+
+def _modalidades_en_texto_selector(texto):
+    tokens = set(_normalizar_texto_selector(texto).split())
+    return {
+        modalidad
+        for modalidad, claves in MODALIDAD_SELECTOR_KEYWORDS.items()
+        if tokens & claves
+    }
+
+
 def extraer_contexto_clinico_dictado(texto):
     texto_norm = _normalizar_texto_selector(texto)
     tokens = set(texto_norm.split())
 
     lateralidad = None
     lado_tecnica = None
-    if {'derecha', 'derecho'} & tokens:
+    if 'bilateral' in tokens or 'ambas' in tokens or 'ambos' in tokens:
+        lateralidad = 'BILATERAL'
+        lado_tecnica = 'bilateral'
+    elif {'derecha', 'derecho'} & tokens:
         lateralidad = 'DERECHA'
         lado_tecnica = 'derecha'
     elif {'izquierda', 'izquierdo'} & tokens:
         lateralidad = 'IZQUIERDA'
         lado_tecnica = 'izquierda'
-    elif 'bilateral' in tokens or 'ambas' in tokens or 'ambos' in tokens:
-        lateralidad = 'BILATERAL'
-        lado_tecnica = 'bilateral'
 
+    regiones_explicitas = _regiones_explicitas_en_texto(texto_norm)
+    regiones_detectadas = _regiones_en_texto_selector(texto_norm)
     region = None
-    for nombre, claves in REGION_SELECTOR_KEYWORDS.items():
-        if tokens & claves:
+    region_fuente = ''
+    for nombre in REGION_SELECTOR_KEYWORDS:
+        if nombre in regiones_explicitas:
             region = nombre
+            region_fuente = 'explicita'
             break
+    if not region:
+        for nombre in REGION_SELECTOR_KEYWORDS:
+            if nombre in regiones_detectadas:
+                region = nombre
+                region_fuente = 'inferida'
+                break
+
+    modalidades = _modalidades_en_texto_selector(texto_norm)
+    modalidad = next(
+        (nombre for nombre in MODALIDAD_SELECTOR_KEYWORDS if nombre in modalidades),
+        None,
+    )
 
     indicaciones = []
     if 'gonalgia' in tokens:
@@ -184,10 +239,30 @@ def extraer_contexto_clinico_dictado(texto):
     if 'convulsion' in tokens or 'convulsiones' in tokens:
         indicaciones.append('Convulsiones')
 
-    if indicaciones and lateralidad in {'DERECHA', 'IZQUIERDA'} and region in {'RODILLA', 'HOMBRO', 'CODO', 'TOBILLO', 'CADERA'}:
-        indicacion_clinica = f"{indicaciones[0]} {lateralidad.lower()}."
-    elif indicaciones and lateralidad == 'BILATERAL' and region == 'CADERA':
-        indicacion_clinica = f"{indicaciones[0]} bilateral."
+    lateralidad_indicacion = None
+    for termino in ('gonalgia', 'coxalgia'):
+        match = re.search(
+            rf'\b{termino}\b(?:\s+de)?\s+(derecha|derecho|izquierda|izquierdo|bilateral)',
+            texto_norm,
+        )
+        if match:
+            valor = match.group(1)
+            if valor.startswith('derech'):
+                lateralidad_indicacion = 'DERECHA'
+            elif valor.startswith('izquierd'):
+                lateralidad_indicacion = 'IZQUIERDA'
+            else:
+                lateralidad_indicacion = 'BILATERAL'
+            break
+
+    lateralidad_para_indicacion = lateralidad_indicacion or lateralidad
+    if indicaciones and indicaciones[0] in {'Gonalgia', 'Coxalgia'} and lateralidad_para_indicacion:
+        sufijo = (
+            'bilateral'
+            if lateralidad_para_indicacion == 'BILATERAL'
+            else lateralidad_para_indicacion.lower()
+        )
+        indicacion_clinica = f"{indicaciones[0]} {sufijo}."
     elif indicaciones:
         indicacion_clinica = f"{indicaciones[0]}."
     else:
@@ -208,6 +283,13 @@ def extraer_contexto_clinico_dictado(texto):
         'titulo_lateralidad': titulo_lateralidad,
         'frase_lateralidad': frase_lateralidad,
         'region': region,
+        'region_fuente': region_fuente,
+        'regiones_detectadas': sorted(regiones_detectadas),
+        'regiones_explicitas': sorted(regiones_explicitas),
+        'conflicto_region': len(regiones_explicitas) > 1,
+        'modalidad': modalidad,
+        'conflicto_modalidad': len(modalidades) > 1,
+        'lateralidad_indicacion': lateralidad_indicacion,
         'indicacion_clinica': indicacion_clinica,
     }
 
@@ -239,6 +321,10 @@ def sugerir_plantilla_para_dictado(texto, usuario=None):
         region = contexto_clinico.get('region')
         regiones_plantilla = _regiones_en_texto_selector(corpus)
         if region and regiones_plantilla and region not in regiones_plantilla:
+            continue
+        modalidad = contexto_clinico.get('modalidad')
+        modalidades_plantilla = _modalidades_en_texto_selector(corpus)
+        if modalidad and modalidades_plantilla and modalidad not in modalidades_plantilla:
             continue
 
         coincidencias = texto_tokens & plantilla_tokens
@@ -315,6 +401,7 @@ def sugerir_plantilla_hibrida_en_sombra(texto, usuario=None):
 
     contexto = extraer_contexto_clinico_dictado(texto)
     region = contexto.get('region')
+    modalidad = contexto.get('modalidad')
     texto_tokens = _tokens_selector(texto) - SELECTOR_HIBRIDO_STOPWORDS
     candidatos = []
 
@@ -329,6 +416,9 @@ def sugerir_plantilla_hibrida_en_sombra(texto, usuario=None):
         ])
         regiones_plantilla = _regiones_en_texto_selector(corpus)
         if region and regiones_plantilla and region not in regiones_plantilla:
+            continue
+        modalidades_plantilla = _modalidades_en_texto_selector(corpus)
+        if modalidad and modalidades_plantilla and modalidad not in modalidades_plantilla:
             continue
 
         nombre_tokens = _tokens_selector(nombre_titulo) - SELECTOR_HIBRIDO_STOPWORDS
@@ -358,6 +448,8 @@ def sugerir_plantilla_hibrida_en_sombra(texto, usuario=None):
             score += 5
         if usuario and plantilla.creada_por_id == getattr(usuario, 'id', None):
             score += 5
+        if contexto.get('region_fuente') == 'explicita' and region in regiones_plantilla:
+            score += 10
 
         candidatos.append((round(score, 2), plantilla))
 
@@ -390,17 +482,44 @@ def sugerir_plantilla_hibrida_en_sombra(texto, usuario=None):
     }
 
 
+def resolver_seleccion_plantilla_agente(plantilla_legacy, plantilla_hibrida, contexto):
+    """Give control to the hybrid selector only inside the safe rollout limits."""
+    if not getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_ACTIVO', True):
+        return plantilla_legacy, 'legacy'
+
+    contexto = contexto or {}
+    sin_conflictos = not (
+        contexto.get('conflicto_region') or contexto.get('conflicto_modalidad')
+    )
+    score_minimo = float(
+        getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_SCORE_MINIMO', 45.0)
+    )
+    hibrido_confiable = bool(
+        plantilla_hibrida
+        and contexto.get('region')
+        and plantilla_hibrida.get('confianza_selector') == 'alta'
+        and float(plantilla_hibrida.get('score') or 0) >= score_minimo
+        and sin_conflictos
+    )
+    if hibrido_confiable:
+        return plantilla_hibrida, 'hibrido_alta'
+    if plantilla_legacy:
+        return plantilla_legacy, 'legacy'
+    return None, 'fallback'
+
+
 def _registrar_traza_agente(
     request, texto, plantilla_sugerida, contexto_clinico, result=None,
-    plantilla_sombra=None,
+    plantilla_sombra=None, plantilla_usada=None, origen_seleccion='',
     duracion_ms=0, error_detalle='',
 ):
     """Persist agent decisions while avoiding storage of raw clinical text."""
     result = result or {}
     sugerida = plantilla_sugerida or {}
     sombra = plantilla_sombra or {}
+    usada = plantilla_usada or sugerida
     plantilla_obj = None
-    codigo = sugerida.get('codigo', '')
+    codigo = usada.get('codigo', '')
     if codigo:
         plantilla_obj = PlantillaEstructurada.visibles_para_usuario(
             request.user,
@@ -416,6 +535,12 @@ def _registrar_traza_agente(
             lateralidad_detectada=(contexto_clinico or {}).get('lateralidad') or '',
             plantilla_seleccionada=plantilla_obj,
             codigo_plantilla=codigo,
+            codigo_plantilla_legacy=sugerida.get('codigo', ''),
+            origen_seleccion=origen_seleccion,
+            conflicto_contexto=bool(
+                (contexto_clinico or {}).get('conflicto_region')
+                or (contexto_clinico or {}).get('conflicto_modalidad')
+            ),
             score_selector=sugerida.get('score', 0),
             margen_selector=sugerida.get('margen', 0),
             confianza_selector=sugerida.get('confianza_selector', ''),
@@ -426,7 +551,8 @@ def _registrar_traza_agente(
             confianza_selector_sombra=sombra.get('confianza_selector', ''),
             candidatos_sombra=sombra.get('candidatos', []),
             selector_sombra_coincide=bool(
-                codigo and codigo == sombra.get('codigo')
+                sugerida.get('codigo')
+                and sugerida.get('codigo') == sombra.get('codigo')
             ),
             guardrails_aplicados=result.get('guardrails_aplicados', []),
             confianza_ia=result.get('confianza', 0.0) or 0.0,
@@ -1220,7 +1346,9 @@ def mejorar_texto_ia(request):
         plantilla = data.get('plantilla', None)
         field_name = data.get('field_name', None)
         plantilla_sugerida = None
+        plantilla_legacy = None
         plantilla_sombra = None
+        origen_seleccion = ''
         
         if not texto or texto.strip() == '':
             logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
@@ -1245,17 +1373,28 @@ def mejorar_texto_ia(request):
             texto_procesado = texto
         
         if modo == 'AGENTE':
-            plantilla_sugerida = sugerir_plantilla_para_dictado(texto_procesado, request.user)
-            if getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_SOMBRA', True):
+            contexto_seleccion = extraer_contexto_clinico_dictado(texto_procesado)
+            plantilla_legacy = sugerir_plantilla_para_dictado(texto_procesado, request.user)
+            calcular_hibrido = (
+                getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_SOMBRA', True)
+                or getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_ACTIVO', True)
+            )
+            if calcular_hibrido:
                 plantilla_sombra = sugerir_plantilla_hibrida_en_sombra(
                     texto_procesado,
                     request.user,
                 )
+            plantilla_sugerida, origen_seleccion = resolver_seleccion_plantilla_agente(
+                plantilla_legacy,
+                plantilla_sombra,
+                contexto_seleccion,
+            )
             if plantilla_sugerida:
                 tipo_plantilla = plantilla_sugerida['codigo']
                 logger.info(
-                    "Modo AGENTE: plantilla sugerida %s (score %s)",
+                    "Modo AGENTE: plantilla sugerida %s por %s (score %s)",
                     plantilla_sugerida['codigo'],
+                    origen_seleccion,
                     plantilla_sugerida['score'],
                 )
             else:
@@ -1330,10 +1469,12 @@ def mejorar_texto_ia(request):
             _registrar_traza_agente(
                 request=request,
                 texto=texto_procesado,
-                plantilla_sugerida=plantilla_sugerida,
+                plantilla_sugerida=plantilla_legacy,
                 contexto_clinico=contexto_clinico,
                 result=result,
                 plantilla_sombra=plantilla_sombra,
+                plantilla_usada=plantilla_sugerida,
+                origen_seleccion=origen_seleccion,
                 duracion_ms=tiempo_total_ms,
             )
 
@@ -1352,6 +1493,7 @@ def mejorar_texto_ia(request):
             'terminos_sospechosos': result.get('terminos_sospechosos', []),
             'plantilla_sugerida': plantilla_sugerida,
             'tipo_plantilla_usada': tipo_plantilla,
+            'selector_origen': origen_seleccion,
             'contexto_clinico': contexto_clinico,
         })
     
@@ -1384,9 +1526,11 @@ def mejorar_texto_ia(request):
             _registrar_traza_agente(
                 request=request,
                 texto=locals().get('texto_procesado', locals().get('texto', '')),
-                plantilla_sugerida=locals().get('plantilla_sugerida'),
+                plantilla_sugerida=locals().get('plantilla_legacy'),
                 contexto_clinico=locals().get('contexto_clinico', {}),
                 plantilla_sombra=locals().get('plantilla_sombra'),
+                plantilla_usada=locals().get('plantilla_sugerida'),
+                origen_seleccion=locals().get('origen_seleccion', ''),
                 duracion_ms=int((time.time() - tiempo_inicio) * 1000),
                 error_detalle=error_detalle,
             )

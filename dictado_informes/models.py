@@ -835,6 +835,9 @@ class TrazaAgenteDictado(models.Model):
         related_name='trazas_seleccion',
     )
     codigo_plantilla = models.CharField(max_length=50, blank=True)
+    codigo_plantilla_legacy = models.CharField(max_length=50, blank=True)
+    origen_seleccion = models.CharField(max_length=20, blank=True)
+    conflicto_contexto = models.BooleanField(default=False)
     score_selector = models.IntegerField(default=0)
     margen_selector = models.IntegerField(default=0)
     confianza_selector = models.CharField(max_length=10, blank=True)

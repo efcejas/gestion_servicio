@@ -459,30 +459,54 @@ la longitud de entrada y una huella SHA-256 irreversible para correlacion tecnic
 Las trazas son de solo lectura en Django Admin y se generan exclusivamente en
 modo `AGENTE`.
 
-### Selector hibrido en sombra
+### Selector hibrido con activacion gradual
 
-El selector `hibrido_v1` calcula una segunda recomendacion sin modificar la
-plantilla utilizada por el agente. Combina:
+El selector `hibrido_v1` calcula una segunda recomendacion y puede tomar control
+solo cuando alcanza confianza alta, supera el puntaje minimo y no detecta
+contradicciones explicitas. Combina:
 
 - filtro obligatorio de compatibilidad anatomica;
 - similitud de tokens con nombre, titulo, tecnica, comentarios y guia de estilo;
 - similitud textual con nombre y titulo;
 - prioridad moderada para plantillas propias del usuario.
 
-La traza conserva la recomendacion, cinco candidatas, puntaje, margen, confianza
-y si coincide con el selector activo. Esto permite calibrarlo con casos reales
-antes de darle control. Puede apagarse sin rollback con:
+La extraccion de contexto separa:
+
+- modalidad (`RES`, `TOM`, `RAD`, `ECO`);
+- region anatomica explicita;
+- region inferida desde el dato clinico;
+- lateralidad del estudio y lateralidad de la indicacion clinica;
+- conflictos entre regiones o modalidades explicitas.
+
+Una region mencionada directamente tiene prioridad sobre la inferida. Por
+ejemplo, en "gonalgia derecha, resonancia de ambas caderas", el estudio se
+clasifica como caderas bilateral y conserva "Gonalgia derecha" como informacion
+clinica.
+
+Si el hibrido no cumple todas las condiciones, continua el selector legacy. La
+traza conserva ambas recomendaciones, la plantilla realmente usada, el origen
+de la seleccion y cualquier conflicto de contexto.
+
+Configuracion:
 
 ```env
-DICTADO_SELECTOR_HIBRIDO_SOMBRA=False
+DICTADO_SELECTOR_HIBRIDO_ACTIVO=True
+DICTADO_SELECTOR_HIBRIDO_SCORE_MINIMO=45.0
+DICTADO_SELECTOR_HIBRIDO_SOMBRA=True
+```
+
+Rollback inmediato al selector anterior:
+
+```env
+DICTADO_SELECTOR_HIBRIDO_ACTIVO=False
 ```
 
 ### Etapa de calibracion en produccion
 
 Durante esta etapa el usuario puede utilizar el agente normalmente. Se recomienda
-reunir inicialmente entre 30 y 50 informes variados, incluyendo regiones con
-plantillas similares. El selector hibrido no modifica la plantilla utilizada ni
-la salida visible.
+continuar reuniendo informes variados, especialmente de regiones con plantillas
+similares. El selector hibrido solo modifica la plantilla utilizada cuando entra
+en el carril de alta confianza; los demas casos conservan el flujo anterior.
 
 Para el analisis posterior se necesitan solamente datos agregados de
 `TrazaAgenteDictado`:
@@ -591,7 +615,7 @@ No changes detected in app 'dictado_informes'
 
 ## Riesgos conocidos
 
-- El selector sigue siendo deterministico y basado en palabras clave; puede requerir agregar regiones/terminos nuevos segun uso real.
+- La cobertura explicita de regiones aun debe ampliarse segun la casuistica real.
 - Las plantillas con titulos muy genericos pueden competir peor que plantillas especificas.
 - El aprendizaje de orden usa similitud textual; si el usuario reescribe completamente una linea movida, puede no detectarla como la misma linea.
 - El modo `agente con confirmacion` esta modelado pero todavia no tiene una UI conversacional completa de aceptar/rechazar cambios por paso.
@@ -599,7 +623,7 @@ No changes detected in app 'dictado_informes'
 
 ## Pendientes recomendados
 
-1. Evaluar el selector hibrido en sombra y definir umbrales de activacion.
+1. Calibrar el puntaje minimo del selector hibrido con trazas de produccion.
 2. Crear UI para ver "memoria fuerte" activa por usuario.
 3. Permitir desactivar una regla aprendida desde el admin o panel del usuario.
 4. Registrar explicitamente `tipo_plantilla` y `modo_dictado` en `CorreccionAprendizaje`.
@@ -621,9 +645,13 @@ La respuesta de `/dictado_informes/api/mejorar-texto/` incluye:
     "score": 123
   },
   "tipo_plantilla_usada": "...",
+  "selector_origen": "legacy|hibrido_alta|fallback",
   "contexto_clinico": {
     "region": "...",
-    "lateralidad": "..."
+    "region_fuente": "explicita|inferida",
+    "modalidad": "RES|TOM|RAD|ECO",
+    "lateralidad": "...",
+    "conflicto_region": false
   }
 }
 ```
