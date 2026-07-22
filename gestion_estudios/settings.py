@@ -585,6 +585,11 @@ DICTADO_SELECTOR_HIBRIDO_SCORE_MINIMO = config(
     default=45.0,
     cast=float,
 )
+DICTADO_SELECTOR_CONFIRMACION_ACTIVA = config(
+    'DICTADO_SELECTOR_CONFIRMACION_ACTIVA',
+    default=True,
+    cast=bool,
+)
 
 # Modelo de redaccion de informes. Volver a gpt-4.1-mini permite rollback sin codigo.
 OPENAI_LLM_MODEL = config('OPENAI_LLM_MODEL', default='gpt-5.6-terra')

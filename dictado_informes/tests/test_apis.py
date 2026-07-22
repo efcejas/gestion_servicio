@@ -15,6 +15,8 @@ import base64
 
 from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
 from dictado_informes.views import (
+    construir_candidatos_confirmacion_plantilla,
+    debe_confirmar_plantilla_agente,
     extraer_contexto_clinico_dictado,
     resolver_seleccion_plantilla_agente,
     sugerir_plantilla_hibrida_en_sombra,
@@ -188,6 +190,7 @@ class TestAPIsMejora(TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['texto_mejorado'], 'Texto mejorado por IA')
 
+    @override_settings(DICTADO_SELECTOR_CONFIRMACION_ACTIVA=False)
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')
     def test_mejorar_texto_acepta_texto_transcrito(self, mock_improve):
         mock_improve.return_value = {
@@ -511,6 +514,44 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(elegida['codigo'], 'LEGACY')
         self.assertEqual(origen, 'legacy')
 
+    def test_confirmacion_combina_candidatos_sin_duplicarlos(self):
+        legacy = {
+            'codigo': 'GENERAL',
+            'nombre': 'RM general',
+            'candidatos': [
+                {'codigo': 'GENERAL', 'nombre': 'RM general', 'score': 80},
+                {'codigo': 'MENISCAL', 'nombre': 'RM meniscal', 'score': 70},
+            ],
+        }
+        hibrida = {
+            'codigo': 'MENISCAL',
+            'nombre': 'RM meniscal',
+            'candidatos': [
+                {'codigo': 'MENISCAL', 'nombre': 'RM meniscal', 'score': 55},
+                {'codigo': 'GENERAL', 'nombre': 'RM general', 'score': 52},
+            ],
+        }
+
+        candidatos = construir_candidatos_confirmacion_plantilla(legacy, hibrida)
+
+        self.assertEqual([item['codigo'] for item in candidatos], ['MENISCAL', 'GENERAL'])
+        self.assertTrue(candidatos[0]['consenso_selectores'])
+        self.assertTrue(candidatos[0]['recomendada'])
+
+    @override_settings(DICTADO_SELECTOR_CONFIRMACION_ACTIVA=True)
+    def test_confianza_media_requiere_confirmacion(self):
+        legacy = {'codigo': 'GENERAL', 'confianza_selector': 'media'}
+
+        confirmar = debe_confirmar_plantilla_agente(
+            legacy,
+            'legacy',
+            legacy,
+            None,
+            {'region': 'RODILLA'},
+        )
+
+        self.assertTrue(confirmar)
+
     @override_settings(
         DICTADO_SELECTOR_HIBRIDO_ACTIVO=True,
         DICTADO_SELECTOR_HIBRIDO_SOMBRA=True,
@@ -564,6 +605,99 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(traza.codigo_plantilla, 'HIBRIDA')
         self.assertEqual(traza.codigo_plantilla_legacy, 'LEGACY')
         self.assertEqual(traza.origen_seleccion, 'hibrido_alta')
+
+    @override_settings(
+        DICTADO_SELECTOR_CONFIRMACION_ACTIVA=True,
+        DICTADO_SELECTOR_HIBRIDO_ACTIVO=True,
+        DICTADO_SELECTOR_HIBRIDO_SCORE_MINIMO=45.0,
+    )
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_modo_agente_pide_y_registra_confirmacion_de_plantilla(self, mock_improve):
+        for codigo, nombre in [('GENERAL', 'RM rodilla general'), ('MENISCAL', 'RM rodilla meniscal')]:
+            PlantillaEstructurada.objects.create(
+                codigo=codigo,
+                nombre=nombre,
+                titulo='RM DE RODILLA',
+                seccion_tecnica='Se exploro la rodilla.',
+                comentarios_base=['Meniscos conservados.'],
+                creada_por=self.user,
+                origen='user',
+            )
+        contexto = extraer_contexto_clinico_dictado('RM de rodilla con desgarro meniscal')
+        legacy = {
+            'codigo': 'GENERAL', 'nombre': 'RM rodilla general', 'score': 60,
+            'margen': 6, 'confianza_selector': 'media',
+            'candidatos': [
+                {'codigo': 'GENERAL', 'nombre': 'RM rodilla general', 'score': 60},
+                {'codigo': 'MENISCAL', 'nombre': 'RM rodilla meniscal', 'score': 54},
+            ],
+            'contexto_clinico': contexto,
+        }
+        hibrida = {
+            'codigo': 'MENISCAL', 'nombre': 'RM rodilla meniscal', 'score': 43.0,
+            'margen': 7.0, 'confianza_selector': 'media',
+            'candidatos': [
+                {'codigo': 'MENISCAL', 'nombre': 'RM rodilla meniscal', 'score': 43.0},
+                {'codigo': 'GENERAL', 'nombre': 'RM rodilla general', 'score': 36.0},
+            ],
+            'contexto_clinico': contexto,
+        }
+        mock_improve.return_value = {
+            'texto_mejorado': 'Informe con plantilla confirmada',
+            'confianza': 0.9,
+            'model_used': 'gpt-5.6-terra',
+        }
+
+        with patch('dictado_informes.views.sugerir_plantilla_para_dictado', return_value=legacy), patch(
+            'dictado_informes.views.sugerir_plantilla_hibrida_en_sombra', return_value=hibrida
+        ):
+            propuesta = self.client.post(
+                '/dictado_informes/api/mejorar-texto/',
+                data=json.dumps({
+                    'texto_original': 'RM de rodilla con desgarro meniscal',
+                    'modo': 'AGENTE',
+                }),
+                content_type='application/json',
+            )
+
+            self.assertEqual(propuesta.status_code, 200)
+            self.assertTrue(propuesta.json()['requiere_seleccion_plantilla'])
+            self.assertEqual(propuesta.json()['candidatos_plantilla'][0]['codigo'], 'MENISCAL')
+            mock_improve.assert_not_called()
+            self.assertFalse(TrazaAgenteDictado.objects.exists())
+
+            confirmada = self.client.post(
+                '/dictado_informes/api/mejorar-texto/',
+                data=json.dumps({
+                    'texto_original': 'RM de rodilla con desgarro meniscal',
+                    'modo': 'AGENTE',
+                    'plantilla_confirmada_codigo': 'MENISCAL',
+                }),
+                content_type='application/json',
+            )
+
+        self.assertEqual(confirmada.status_code, 200)
+        self.assertFalse(confirmada.json()['requiere_seleccion_plantilla'])
+        self.assertEqual(confirmada.json()['tipo_plantilla_usada'], 'MENISCAL')
+        contexto_ia = mock_improve.call_args.args[2]
+        self.assertEqual(contexto_ia['tipo_plantilla'], 'MENISCAL')
+        traza = TrazaAgenteDictado.objects.get()
+        self.assertEqual(traza.codigo_plantilla, 'MENISCAL')
+        self.assertEqual(traza.origen_seleccion, 'usuario_confirmada')
+
+    def test_modo_agente_rechaza_plantilla_confirmada_no_visible(self):
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'RM de rodilla derecha',
+                'modo': 'AGENTE',
+                'plantilla_confirmada_codigo': 'INEXISTENTE',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('no esta disponible', response.json()['error'])
 
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')
     def test_modo_agente_usa_plantilla_sugerida(self, mock_improve):
@@ -667,6 +801,87 @@ class TestAPIsMejora(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(TrazaAgenteDictado.objects.exists())
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
+class TestAPICorreccionBorrador(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='admin_correccion',
+            password='admin123',
+        )
+        self.client = Client()
+        self.client.login(username='admin_correccion', password='admin123')
+
+    @patch('dictado_informes.ai_services.AIService.edit_medical_report')
+    def test_corrige_borrador_sin_reseleccionar_plantilla(self, mock_edit):
+        mock_edit.return_value = {
+            'texto_editado': 'COMENTARIO\nDerrame moderado.',
+            'operaciones_aplicadas': [{'tipo': 'reemplazar'}],
+            'resumen_cambios': ['Se modificó la cuantía del derrame.'],
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/corregir-borrador/',
+            data=json.dumps({
+                'texto_actual': 'COMENTARIO\nDerrame leve.',
+                'instruccion': 'Cambiá leve por moderado.',
+                'fragmento_objetivo': 'Derrame leve.',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['texto_editado'], 'COMENTARIO\nDerrame moderado.')
+        mock_edit.assert_called_once_with(
+            texto_actual='COMENTARIO\nDerrame leve.',
+            instruccion='Cambiá leve por moderado.',
+            fragmento_objetivo='Derrame leve.',
+        )
+
+    @patch('dictado_informes.ai_services.AIService.edit_medical_report')
+    def test_rechaza_instruccion_vacia_sin_llamar_ia(self, mock_edit):
+        response = self.client.post(
+            '/dictado_informes/api/corregir-borrador/',
+            data=json.dumps({
+                'texto_actual': 'Informe actual.',
+                'instruccion': '',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_edit.assert_not_called()
+
+    @patch('dictado_informes.ai_services.AIService.edit_medical_report')
+    def test_error_de_operacion_no_modifica_borrador(self, mock_edit):
+        mock_edit.side_effect = ValueError('El fragmento original es ambiguo.')
+
+        response = self.client.post(
+            '/dictado_informes/api/corregir-borrador/',
+            data=json.dumps({
+                'texto_actual': 'Hallazgo repetido.\nHallazgo repetido.',
+                'instruccion': 'Cambiá el hallazgo.',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('ambiguo', response.json()['error'])
+
+    def test_requiere_usuario_autorizado(self):
+        self.client.logout()
+
+        response = self.client.post(
+            '/dictado_informes/api/corregir-borrador/',
+            data=json.dumps({
+                'texto_actual': 'Informe.',
+                'instruccion': 'Corregir.',
+            }),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 403)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])

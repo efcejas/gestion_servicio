@@ -508,6 +508,86 @@ def resolver_seleccion_plantilla_agente(plantilla_legacy, plantilla_hibrida, con
     return None, 'fallback'
 
 
+def construir_candidatos_confirmacion_plantilla(plantilla_legacy, plantilla_hibrida, limite=3):
+    """Combina rankings no calibrados usando posicion y consenso, no porcentajes."""
+    combinados = {}
+    for fuente, resultado in (('hibrido', plantilla_hibrida), ('legacy', plantilla_legacy)):
+        if not resultado:
+            continue
+        candidatos = resultado.get('candidatos') or [{
+            'codigo': resultado.get('codigo'),
+            'nombre': resultado.get('nombre'),
+            'score': resultado.get('score', 0),
+        }]
+        for posicion, candidato in enumerate(candidatos[:5], 1):
+            codigo = str(candidato.get('codigo') or '').strip()
+            if not codigo:
+                continue
+            item = combinados.setdefault(codigo, {
+                'codigo': codigo,
+                'nombre': candidato.get('nombre') or codigo,
+                'fuentes': [],
+                'puntaje_ranking': 0.0,
+                'posicion_hibrida': 999,
+            })
+            if fuente not in item['fuentes']:
+                item['fuentes'].append(fuente)
+                item['puntaje_ranking'] += 1 / posicion
+            if fuente == 'hibrido':
+                item['posicion_hibrida'] = min(item['posicion_hibrida'], posicion)
+            if candidato.get('nombre'):
+                item['nombre'] = candidato['nombre']
+
+    ordenados = sorted(
+        combinados.values(),
+        key=lambda item: (
+            -len(item['fuentes']),
+            -item['puntaje_ranking'],
+            item['posicion_hibrida'],
+            item['nombre'],
+        ),
+    )
+    for posicion, item in enumerate(ordenados[:limite], 1):
+        item['posicion'] = posicion
+        item['recomendada'] = posicion == 1
+        item['consenso_selectores'] = len(item['fuentes']) > 1
+        item.pop('puntaje_ranking', None)
+        item.pop('posicion_hibrida', None)
+    return ordenados[:limite]
+
+
+def debe_confirmar_plantilla_agente(
+    plantilla_elegida,
+    origen_seleccion,
+    plantilla_legacy,
+    plantilla_hibrida,
+    contexto,
+):
+    """Solicita decision humana solo cuando la seleccion no es claramente segura."""
+    if not getattr(settings, 'DICTADO_SELECTOR_CONFIRMACION_ACTIVA', True):
+        return False
+
+    contexto = contexto or {}
+    if contexto.get('conflicto_region') or contexto.get('conflicto_modalidad'):
+        return True
+    if origen_seleccion == 'hibrido_alta':
+        return False
+    if not plantilla_elegida:
+        return True
+
+    confianza_elegida = plantilla_elegida.get('confianza_selector', '')
+    if confianza_elegida in {'media', 'baja'}:
+        return True
+
+    if plantilla_hibrida and plantilla_legacy:
+        desacuerdo = plantilla_hibrida.get('codigo') != plantilla_legacy.get('codigo')
+        hibrido_relevante = plantilla_hibrida.get('confianza_selector') in {'alta', 'media'}
+        if desacuerdo and hibrido_relevante:
+            return True
+
+    return False
+
+
 def _registrar_traza_agente(
     request, texto, plantilla_sugerida, contexto_clinico, result=None,
     plantilla_sombra=None, plantilla_usada=None, origen_seleccion='',
@@ -1374,6 +1454,7 @@ def mejorar_texto_ia(request):
         
         if modo == 'AGENTE':
             contexto_seleccion = extraer_contexto_clinico_dictado(texto_procesado)
+            codigo_confirmado = str(data.get('plantilla_confirmada_codigo') or '').strip()
             plantilla_legacy = sugerir_plantilla_para_dictado(texto_procesado, request.user)
             calcular_hibrido = (
                 getattr(settings, 'DICTADO_SELECTOR_HIBRIDO_SOMBRA', True)
@@ -1389,6 +1470,53 @@ def mejorar_texto_ia(request):
                 plantilla_sombra,
                 contexto_seleccion,
             )
+            candidatos_confirmacion = construir_candidatos_confirmacion_plantilla(
+                plantilla_legacy,
+                plantilla_sombra,
+            )
+
+            if codigo_confirmado:
+                plantilla_confirmada = PlantillaEstructurada.visibles_para_usuario(
+                    request.user,
+                    solo_activas=True,
+                ).filter(codigo=codigo_confirmado).first()
+                if not plantilla_confirmada:
+                    return JsonResponse(
+                        {'error': 'La plantilla seleccionada no esta disponible.'},
+                        status=400,
+                    )
+                plantilla_sugerida = {
+                    'codigo': plantilla_confirmada.codigo,
+                    'nombre': plantilla_confirmada.nombre,
+                    'score': 0,
+                    'margen': 0,
+                    'confianza_selector': 'confirmada',
+                    'candidatos': candidatos_confirmacion,
+                    'contexto_clinico': contexto_seleccion,
+                }
+                origen_seleccion = 'usuario_confirmada'
+            elif debe_confirmar_plantilla_agente(
+                plantilla_sugerida,
+                origen_seleccion,
+                plantilla_legacy,
+                plantilla_sombra,
+                contexto_seleccion,
+            ):
+                logger.info(
+                    'Modo AGENTE: seleccion incierta; se solicita decision del usuario (%s candidatos)',
+                    len(candidatos_confirmacion),
+                )
+                return JsonResponse({
+                    'success': True,
+                    'requiere_seleccion_plantilla': True,
+                    'candidatos_plantilla': candidatos_confirmacion,
+                    'confianza_selector': (
+                        (plantilla_sugerida or {}).get('confianza_selector') or 'baja'
+                    ),
+                    'selector_origen': 'pendiente_usuario',
+                    'contexto_clinico': contexto_seleccion,
+                })
+
             if plantilla_sugerida:
                 tipo_plantilla = plantilla_sugerida['codigo']
                 logger.info(
@@ -1480,6 +1608,7 @@ def mejorar_texto_ia(request):
 
         return JsonResponse({
             'success': True,
+            'requiere_seleccion_plantilla': False,
             'texto_mejorado': texto_mejorado,
             'confianza': result.get('confianza', 0.0),
             'sugerencias': result.get('sugerencias', []),
@@ -1538,6 +1667,42 @@ def mejorar_texto_ia(request):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+
+@require_POST
+def corregir_borrador_ia(request):
+    """Aplica una instruccion localizada al informe actual sin regenerar la plantilla."""
+    if not user_can_access_dictado_module(request.user):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    try:
+        data = json.loads(request.body)
+        texto_actual = data.get('texto_actual', '')
+        instruccion = data.get('instruccion', '')
+        fragmento_objetivo = data.get('fragmento_objetivo', '')
+        if not str(texto_actual).strip():
+            return JsonResponse({'error': 'No se recibio el informe actual'}, status=400)
+        if not str(instruccion).strip():
+            return JsonResponse({'error': 'No se recibio una instruccion de correccion'}, status=400)
+        resultado = ai_service.edit_medical_report(
+            texto_actual=texto_actual,
+            instruccion=instruccion,
+            fragmento_objetivo=fragmento_objetivo,
+        )
+        return JsonResponse({
+            'success': True,
+            **resultado,
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Datos invalidos en la solicitud'}, status=400)
+    except ValueError as error:
+        logger.warning('Correccion de borrador rechazada: %s', error)
+        return JsonResponse({'error': str(error)}, status=400)
+    except Exception as error:
+        logger.error('Error corrigiendo borrador con IA: %s', error, exc_info=True)
+        return JsonResponse({
+            'error': 'No se pudo aplicar la correccion. El informe no fue modificado.'
         }, status=500)
 
 

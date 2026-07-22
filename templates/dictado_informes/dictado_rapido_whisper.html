@@ -407,6 +407,41 @@
                     </label>
                     <textarea id="textoMejorado"
                               class="min-h-32 w-full bg-gray-900 border-2 border-green-600 rounded-lg p-4 text-green-200 text-sm"></textarea>
+
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <button id="btnCorregirVoz" type="button"
+                                class="bg-indigo-700 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                            <i class="fas fa-microphone mr-1"></i>
+                            Corregir por voz
+                        </button>
+                        <button id="btnDeshacerCorreccion" type="button"
+                                class="hidden bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                            <i class="fas fa-undo mr-1"></i>
+                            Deshacer corrección
+                        </button>
+                    </div>
+
+                    <div id="panelCorreccionVoz" class="hidden mt-2 bg-indigo-950/50 border border-indigo-700 rounded-lg p-3">
+                        <div id="fragmentoCorreccion" class="hidden mb-2 text-xs text-indigo-200 bg-gray-900/70 rounded p-2"></div>
+                        <label for="instruccionCorreccion" class="block text-xs font-semibold text-indigo-200 mb-1">
+                            Instrucción para corregir el borrador
+                        </label>
+                        <textarea id="instruccionCorreccion" rows="2"
+                                  class="w-full bg-gray-900 border border-indigo-500 rounded-lg p-2 text-gray-100 text-sm"
+                                  placeholder="Ej.: Cambiá derrame leve por moderado o agregá una conclusión."></textarea>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <button id="btnAplicarCorreccion" type="button"
+                                    class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
+                                <i class="fas fa-wand-magic-sparkles mr-1"></i>
+                                Aplicar corrección
+                            </button>
+                            <button id="btnCancelarCorreccion" type="button"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm transition-colors">
+                                Cancelar
+                            </button>
+                            <span id="estadoCorreccionVoz" class="text-xs text-indigo-200"></span>
+                        </div>
+                    </div>
                     
                     <!-- Correcciones aplicadas -->
                     <div id="correcciones" class="hidden mt-3 bg-purple-900/30 border border-purple-600 rounded-lg p-3">
@@ -478,6 +513,45 @@
             <div id="toast" class="hidden fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-2xl z-50 animate-fade-in-down">
                 <i class="fas fa-check-circle mr-2"></i>
                 <span id="toastTexto"></span>
+            </div>
+
+            <div id="modalSeleccionPlantilla" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div class="bg-gray-800 border border-purple-600 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden"
+                     role="dialog" aria-modal="true" aria-labelledby="tituloSeleccionPlantilla">
+                    <div class="px-4 py-3 border-b border-gray-700">
+                        <h3 id="tituloSeleccionPlantilla" class="text-lg font-bold text-white">
+                            <i class="fas fa-file-medical mr-2 text-purple-400"></i>
+                            Elegí la plantilla
+                        </h3>
+                        <p id="motivoSeleccionPlantilla" class="text-xs text-gray-300 mt-1"></p>
+                    </div>
+                    <div class="p-4">
+                        <div id="candidatosSeleccionPlantilla" class="space-y-2"></div>
+
+                        <div class="mt-4 pt-3 border-t border-gray-700">
+                            <label for="plantillaManualAgente" class="block text-xs font-semibold text-gray-300 mb-1">
+                                Buscar en todas las plantillas visibles
+                            </label>
+                            <select id="plantillaManualAgente"
+                                    class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white">
+                                {% for p in plantillas_estructuradas %}
+                                    <option value="{{ p.codigo }}">{{ p.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                            <button id="btnCancelarSeleccionPlantilla" type="button"
+                                    class="px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm text-white transition-colors">
+                                Cancelar
+                            </button>
+                            <button id="btnUsarPlantillaManual" type="button"
+                                    class="px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-sm font-semibold text-white transition-colors">
+                                Usar plantilla seleccionada
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Modal Historial -->
@@ -557,6 +631,13 @@ let motivoConfirmacionIA = '';
 let terminosSospechososIA = [];
 let editorTextoMejorado = null;
 let feedbackCalidadEnviado = false;
+let mediaRecorderCorreccion = null;
+let audioChunksCorreccion = [];
+let grabandoCorreccion = false;
+let fragmentoCorreccionSeleccionado = '';
+let htmlAntesUltimaCorreccion = '';
+let descartarAudioCorreccion = false;
+let resolverSeleccionPlantillaPendiente = null;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -759,6 +840,307 @@ async function inicializarEditorTextoMejorado() {
     }
 }
 
+function obtenerFragmentoSeleccionadoEditor() {
+    if (!editorTextoMejorado) {
+        return (window.getSelection()?.toString() || '').trim();
+    }
+
+    const seleccionDom = window.getSelection();
+    const editable = editorTextoMejorado.ui.view.editable.element;
+    if (seleccionDom?.anchorNode && editable?.contains(seleccionDom.anchorNode)) {
+        const textoDom = seleccionDom.toString().trim();
+        if (textoDom) return textoDom;
+    }
+
+    const partes = [];
+    for (const rango of editorTextoMejorado.model.document.selection.getRanges()) {
+        for (const item of rango.getItems()) {
+            if (item.is('$textProxy')) {
+                partes.push(item.data);
+            }
+        }
+    }
+    return partes.join('').trim();
+}
+
+function mostrarFragmentoCorreccion(fragmento) {
+    const contenedor = document.getElementById('fragmentoCorreccion');
+    if (!contenedor) return;
+
+    if (fragmento) {
+        contenedor.textContent = `Fragmento seleccionado: “${fragmento}”`;
+        contenedor.classList.remove('hidden');
+    } else {
+        contenedor.textContent = '';
+        contenedor.classList.add('hidden');
+    }
+}
+
+function actualizarBotonCorreccion(estado = 'listo') {
+    const boton = document.getElementById('btnCorregirVoz');
+    if (!boton) return;
+
+    boton.classList.remove('bg-indigo-700', 'hover:bg-indigo-600', 'bg-red-700', 'hover:bg-red-600');
+    if (estado === 'grabando') {
+        boton.classList.add('bg-red-700', 'hover:bg-red-600');
+        boton.innerHTML = '<i class="fas fa-stop mr-1"></i> Detener corrección';
+        return;
+    }
+
+    boton.classList.add('bg-indigo-700', 'hover:bg-indigo-600');
+    boton.innerHTML = '<i class="fas fa-microphone mr-1"></i> Corregir por voz';
+    boton.disabled = estado === 'procesando';
+    boton.classList.toggle('opacity-60', estado === 'procesando');
+}
+
+function obtenerMimeAudioCorreccion() {
+    const candidatos = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/wav',
+    ];
+    return candidatos.find(tipo => MediaRecorder.isTypeSupported(tipo)) || '';
+}
+
+function blobADataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function iniciarGrabacionCorreccion() {
+    if (!getTextoMejoradoTextoPlano().trim()) {
+        mostrarToast('Primero genera un informe para corregir', 'info');
+        return;
+    }
+    if (grabandoActivo) {
+        mostrarToast('Finaliza el dictado principal antes de corregir', 'info');
+        return;
+    }
+
+    fragmentoCorreccionSeleccionado = obtenerFragmentoSeleccionadoEditor();
+    mostrarFragmentoCorreccion(fragmentoCorreccionSeleccionado);
+    document.getElementById('panelCorreccionVoz')?.classList.remove('hidden');
+    const estado = document.getElementById('estadoCorreccionVoz');
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {channelCount: 1, echoCancellation: true, noiseSuppression: true},
+        });
+        const mimeType = obtenerMimeAudioCorreccion();
+        mediaRecorderCorreccion = new MediaRecorder(stream, mimeType ? {mimeType} : {});
+        audioChunksCorreccion = [];
+        descartarAudioCorreccion = false;
+        mediaRecorderCorreccion.ondataavailable = event => {
+            if (event.data.size > 0) audioChunksCorreccion.push(event.data);
+        };
+        mediaRecorderCorreccion.onstop = procesarAudioCorreccion;
+        mediaRecorderCorreccion.start(500);
+        grabandoCorreccion = true;
+        actualizarBotonCorreccion('grabando');
+        if (estado) estado.textContent = 'Escuchando la corrección...';
+    } catch (error) {
+        console.error('Error accediendo al micrófono para corregir:', error);
+        if (estado) estado.textContent = 'No se pudo acceder al micrófono.';
+        mostrarToast('No se pudo acceder al micrófono', 'error');
+    }
+}
+
+function detenerGrabacionCorreccion() {
+    if (!mediaRecorderCorreccion || mediaRecorderCorreccion.state !== 'recording') return;
+    grabandoCorreccion = false;
+    actualizarBotonCorreccion('procesando');
+    const estado = document.getElementById('estadoCorreccionVoz');
+    if (estado) estado.textContent = 'Transcribiendo instrucción...';
+    mediaRecorderCorreccion.stop();
+    mediaRecorderCorreccion.stream.getTracks().forEach(track => track.stop());
+}
+
+async function procesarAudioCorreccion() {
+    if (descartarAudioCorreccion) {
+        descartarAudioCorreccion = false;
+        actualizarBotonCorreccion();
+        return;
+    }
+
+    const estado = document.getElementById('estadoCorreccionVoz');
+    try {
+        const tipo = mediaRecorderCorreccion?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksCorreccion, {type: tipo});
+        if (audioBlob.size < 500) {
+            throw new Error('La instrucción fue demasiado corta.');
+        }
+        const audioBase64 = await blobADataUrl(audioBlob);
+        const response = await fetch('{% url "dictado_informes:transcribir_whisper" %}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({audio: audioBase64}),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'No se pudo transcribir la instrucción.');
+        }
+        document.getElementById('instruccionCorreccion').value = data.texto_transcrito || '';
+        if (estado) estado.textContent = 'Revisá la instrucción antes de aplicarla.';
+    } catch (error) {
+        console.error('Error transcribiendo corrección:', error);
+        if (estado) estado.textContent = error.message;
+        mostrarToast(error.message, 'error');
+    } finally {
+        actualizarBotonCorreccion();
+    }
+}
+
+async function aplicarCorreccionBorrador() {
+    const instruccion = document.getElementById('instruccionCorreccion')?.value.trim() || '';
+    const textoActual = getTextoMejoradoTextoPlano();
+    const htmlActual = getTextoMejoradoHtml();
+    const boton = document.getElementById('btnAplicarCorreccion');
+    const estado = document.getElementById('estadoCorreccionVoz');
+    if (!instruccion) {
+        mostrarToast('Revisá o escribí la instrucción de corrección', 'info');
+        return;
+    }
+
+    boton.disabled = true;
+    boton.classList.add('opacity-60');
+    if (estado) estado.textContent = 'Aplicando únicamente el cambio solicitado...';
+    try {
+        const response = await fetch('{% url "dictado_informes:corregir_borrador" %}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({
+                texto_actual: textoActual,
+                instruccion,
+                fragmento_objetivo: fragmentoCorreccionSeleccionado,
+            }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'No se pudo aplicar la corrección.');
+        }
+        if (getTextoMejoradoTextoPlano() !== textoActual) {
+            throw new Error('El informe cambió mientras se procesaba. Volvé a aplicar la instrucción.');
+        }
+
+        htmlAntesUltimaCorreccion = htmlActual;
+        setTextoMejoradoContenido(data.texto_editado);
+        document.getElementById('btnDeshacerCorreccion')?.classList.remove('hidden');
+        const resumen = (data.resumen_cambios || []).join(' ');
+        if (estado) estado.textContent = resumen || 'Corrección aplicada.';
+        mostrarToast('Corrección aplicada al borrador', 'success');
+    } catch (error) {
+        console.error('Error aplicando corrección:', error);
+        if (estado) estado.textContent = error.message;
+        mostrarToast(error.message, 'error');
+    } finally {
+        boton.disabled = false;
+        boton.classList.remove('opacity-60');
+    }
+}
+
+function cancelarCorreccionVoz() {
+    if (grabandoCorreccion) {
+        descartarAudioCorreccion = true;
+        detenerGrabacionCorreccion();
+    }
+    document.getElementById('panelCorreccionVoz')?.classList.add('hidden');
+    document.getElementById('estadoCorreccionVoz').textContent = '';
+    actualizarBotonCorreccion();
+}
+
+function deshacerUltimaCorreccion() {
+    if (!htmlAntesUltimaCorreccion) return;
+    setTextoMejoradoContenido(htmlAntesUltimaCorreccion);
+    htmlAntesUltimaCorreccion = '';
+    document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
+    mostrarToast('Corrección deshecha', 'info');
+}
+
+function reiniciarEstadoCorreccion() {
+    htmlAntesUltimaCorreccion = '';
+    fragmentoCorreccionSeleccionado = '';
+    document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
+    document.getElementById('panelCorreccionVoz')?.classList.add('hidden');
+    const instruccion = document.getElementById('instruccionCorreccion');
+    if (instruccion) instruccion.value = '';
+}
+
+function finalizarSeleccionPlantilla(codigo = null) {
+    document.getElementById('modalSeleccionPlantilla')?.classList.add('hidden');
+    if (resolverSeleccionPlantillaPendiente) {
+        const resolver = resolverSeleccionPlantillaPendiente;
+        resolverSeleccionPlantillaPendiente = null;
+        resolver(codigo);
+    }
+}
+
+function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
+    const modal = document.getElementById('modalSeleccionPlantilla');
+    const lista = document.getElementById('candidatosSeleccionPlantilla');
+    const motivo = document.getElementById('motivoSeleccionPlantilla');
+    const selectorManual = document.getElementById('plantillaManualAgente');
+    lista.innerHTML = '';
+
+    const region = contexto?.region ? ` para ${contexto.region.toLowerCase()}` : '';
+    motivo.textContent = `La selección automática tiene confianza ${confianza || 'baja'}${region}. Confirmá antes de generar el informe.`;
+
+    if (!candidatos || candidatos.length === 0) {
+        const vacio = document.createElement('p');
+        vacio.className = 'text-sm text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg p-3';
+        vacio.textContent = 'No hubo una coincidencia clara. Elegí una plantilla de la lista completa.';
+        lista.appendChild(vacio);
+    } else {
+        candidatos.forEach(candidato => {
+            const boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'w-full flex items-center justify-between gap-3 text-left bg-gray-900 hover:bg-purple-950/50 border border-gray-700 hover:border-purple-500 rounded-lg px-3 py-2 transition-colors';
+
+            const texto = document.createElement('span');
+            texto.className = 'min-w-0';
+            const nombre = document.createElement('span');
+            nombre.className = 'block text-sm font-semibold text-white truncate';
+            nombre.textContent = candidato.nombre;
+            texto.appendChild(nombre);
+
+            const detalle = document.createElement('span');
+            detalle.className = 'block text-xs text-gray-400 mt-0.5';
+            detalle.textContent = candidato.consenso_selectores
+                ? 'Coincidencia entre ambos selectores'
+                : (candidato.recomendada ? 'Mejor candidata disponible' : 'Candidata alternativa');
+            texto.appendChild(detalle);
+
+            const accion = document.createElement('span');
+            accion.className = 'shrink-0 text-xs font-semibold text-purple-300';
+            accion.textContent = candidato.recomendada ? 'Sugerida' : 'Usar';
+            boton.append(texto, accion);
+            boton.addEventListener('click', () => finalizarSeleccionPlantilla(candidato.codigo));
+            lista.appendChild(boton);
+        });
+
+        if (selectorManual && candidatos[0]?.codigo) {
+            selectorManual.value = candidatos[0].codigo;
+        }
+    }
+
+    modal?.classList.remove('hidden');
+    return new Promise(resolve => {
+        resolverSeleccionPlantillaPendiente = resolve;
+    });
+}
+
+document.getElementById('btnUsarPlantillaManual')?.addEventListener('click', () => {
+    const codigo = document.getElementById('plantillaManualAgente')?.value || '';
+    if (codigo) finalizarSeleccionPlantilla(codigo);
+});
+document.getElementById('btnCancelarSeleccionPlantilla')?.addEventListener('click', () => {
+    finalizarSeleccionPlantilla(null);
+});
+
 // 🚀 WEB SPEECH API para preview en tiempo real
 let recognition = null;
 let previewActivo = false;
@@ -878,6 +1260,10 @@ async function cargarInfoAprendizaje() {
 // Grabación por toggle (iniciar/detener)
 btnGrabar.addEventListener('click', (e) => {
     e.preventDefault();
+    if (grabandoCorreccion) {
+        mostrarToast('Finaliza la corrección por voz antes de iniciar otro dictado', 'info');
+        return;
+    }
     if (grabandoActivo) {
         detenerGrabacion();
     } else {
@@ -1169,29 +1555,49 @@ async function procesarAudio() {
             const t3 = Date.now();
             const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
             const tipoPlantilla = document.getElementById('tipoPlantilla').value;
-            
-            const responseMejora = await fetch('{% url "dictado_informes:mejorar_texto" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    texto_original: textoTranscrito,
-                    modo: modoIA,
-                    tipo_plantilla: tipoPlantilla
-                })
-            });
-            
-            const dataMejora = await responseMejora.json();
+            const payloadMejora = {
+                texto_original: textoTranscrito,
+                modo: modoIA,
+                tipo_plantilla: tipoPlantilla,
+            };
+            const ejecutarMejora = async () => {
+                const response = await fetch('{% url "dictado_informes:mejorar_texto" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify(payloadMejora),
+                });
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Error en mejora IA');
+                }
+                return data;
+            };
+
+            let dataMejora = await ejecutarMejora();
+            if (dataMejora.requiere_seleccion_plantilla) {
+                estadoGrabacion.textContent = 'Elegí una plantilla para continuar';
+                const codigoElegido = await solicitarSeleccionPlantilla(
+                    dataMejora.candidatos_plantilla || [],
+                    dataMejora.contexto_clinico || {},
+                    dataMejora.confianza_selector || 'baja',
+                );
+                if (!codigoElegido) {
+                    const errorCancelacion = new Error('Selección de plantilla cancelada.');
+                    errorCancelacion.seleccionPlantillaCancelada = true;
+                    throw errorCancelacion;
+                }
+                payloadMejora.plantilla_confirmada_codigo = codigoElegido;
+                estadoGrabacion.textContent = 'Generando informe con la plantilla elegida...';
+                dataMejora = await ejecutarMejora();
+            }
+
             const t4 = Date.now();
             console.log(`⏱️ Mejora IA completada en ${t4-t3}ms`);
             console.log(`⏱️ TIEMPO TOTAL: ${t4-t1}ms (Whisper: ${t2-t1}ms, IA: ${t4-t3}ms)`);
             
-            if (!dataMejora.success) {
-                throw new Error(dataMejora.error || 'Error en mejora IA');
-            }
-
             requiereConfirmacionIA = !!dataMejora.requiere_confirmacion;
             motivoConfirmacionIA = dataMejora.motivo_confianza || '';
             terminosSospechososIA = dataMejora.terminos_sospechosos || [];
@@ -1214,7 +1620,8 @@ async function procesarAudio() {
             } else if (guardrailsResumen) {
                 guardrailsResumen.classList.add('hidden');
             }
-                        setTextoMejoradoContenido(dataMejora.texto_mejorado);
+            setTextoMejoradoContenido(dataMejora.texto_mejorado);
+            reiniciarEstadoCorreccion();
             
             // Guardar texto IA para aprendizaje
             textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(dataMejora.texto_mejorado));
@@ -1259,6 +1666,17 @@ async function procesarAudio() {
             
         } catch (error) {
             console.error('🚨 Error procesando audio:', error);
+
+            if (error.seleccionPlantillaCancelada) {
+                estadoGrabacion.textContent = 'Selección cancelada. Podés grabar nuevamente.';
+                estadoGrabacion.classList.remove('text-blue-400', 'text-red-400');
+                estadoGrabacion.classList.add('text-gray-300');
+                document.getElementById('procesando').classList.add('hidden');
+                document.getElementById('estadoInicial').classList.remove('hidden');
+                document.getElementById('contenedorResultado').classList.add('hidden');
+                mostrarToast('Generación cancelada sin modificar el informe', 'info');
+                return;
+            }
             
             // Manejar errores específicos de audio
             let mensajeError = error.message;
@@ -1499,6 +1917,16 @@ async function copiarTexto(modoCopia = 'rich') {
 document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
 document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
 document.getElementById('btnCopiarNetterm')?.addEventListener('click', () => copiarTexto('netterm'));
+document.getElementById('btnCorregirVoz')?.addEventListener('click', () => {
+    if (grabandoCorreccion) {
+        detenerGrabacionCorreccion();
+    } else {
+        iniciarGrabacionCorreccion();
+    }
+});
+document.getElementById('btnAplicarCorreccion')?.addEventListener('click', aplicarCorreccionBorrador);
+document.getElementById('btnCancelarCorreccion')?.addEventListener('click', cancelarCorreccionVoz);
+document.getElementById('btnDeshacerCorreccion')?.addEventListener('click', deshacerUltimaCorreccion);
 document.getElementById('btnFeedbackCorrecto')?.addEventListener('click', () => registrarFeedbackCalidad('correcto'));
 document.getElementById('btnFeedbackCorreccion')?.addEventListener('click', () => registrarFeedbackCalidad('correccion'));
 
@@ -1624,6 +2052,7 @@ function recuperarDictado(index) {
         
         document.getElementById('textoTranscrito').textContent = dictado.original || dictado.mejorado;
         setTextoMejoradoContenido(dictado.mejorado);
+        reiniciarEstadoCorreccion();
         
         textoOriginalGlobal = dictado.original || dictado.mejorado;
         textoIAGlobal = dictado.mejorado;

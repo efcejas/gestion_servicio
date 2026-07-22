@@ -79,6 +79,133 @@ Desgarro meniscal.
         self.assertIn('Se realizo tecnica habitual.', texto_final)
         self.assertIn('Sin informacion adicional.', texto_final)
 
+    def test_edicion_localizada_reemplaza_solo_el_fragmento_indicado(self):
+        informe = """RM DE RODILLA DERECHA
+
+COMENTARIO
+Derrame articular leve.
+Meniscos de altura y señal normales.
+
+CONCLUSIÓN
+Derrame articular leve."""
+
+        editado, operaciones = self.ai._aplicar_operaciones_edicion(informe, [{
+            'tipo': 'reemplazar',
+            'original': 'COMENTARIO\nDerrame articular leve.',
+            'nuevo': 'COMENTARIO\nDerrame articular moderado.',
+        }])
+
+        self.assertIn('Derrame articular moderado.', editado)
+        self.assertEqual(editado.count('Derrame articular leve.'), 1)
+        self.assertIn('Meniscos de altura y señal normales.', editado)
+        self.assertEqual(len(operaciones), 1)
+
+    def test_edicion_con_ia_solicita_operaciones_json_y_las_aplica(self):
+        respuesta = MagicMock()
+        respuesta.choices[0].message.content = '''{
+            "operaciones": [{
+                "tipo": "reemplazar",
+                "original": "Derrame leve.",
+                "nuevo": "Derrame moderado."
+            }],
+            "resumen_cambios": ["Se corrigió la cuantía del derrame."]
+        }'''
+        self.ai.llm_enabled = True
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-4.1-mini'
+        self.ai.llm_fallback_model = None
+        self.ai.llm_reasoning_effort = None
+
+        resultado = self.ai.edit_medical_report(
+            'COMENTARIO\nDerrame leve.',
+            'Cambiá leve por moderado.',
+            'Derrame leve.',
+        )
+
+        self.assertEqual(resultado['texto_editado'], 'COMENTARIO\nDerrame moderado.')
+        self.assertEqual(resultado['resumen_cambios'], ['Se corrigió la cuantía del derrame.'])
+        kwargs = self.ai.llm_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(kwargs['response_format'], {'type': 'json_object'})
+
+    def test_edicion_localizada_rechaza_fragmento_ambiguo(self):
+        informe = 'Derrame leve.\nDerrame leve.'
+
+        with self.assertRaisesMessage(ValueError, 'ambiguo'):
+            self.ai._aplicar_operaciones_edicion(informe, [{
+                'tipo': 'reemplazar',
+                'original': 'Derrame leve.',
+                'nuevo': 'Derrame moderado.',
+            }])
+
+    def test_edicion_localizada_rechaza_reescritura_amplia(self):
+        informe = 'TITULO\nTECNICA\nTecnica original.\nHALLAZGOS\nHallazgo original.\nCONCLUSION\nConclusion original.'
+
+        with self.assertRaisesMessage(ValueError, 'demasiado amplia'):
+            self.ai._aplicar_operaciones_edicion(informe, [{
+                'tipo': 'reemplazar',
+                'original': informe,
+                'nuevo': 'Informe completamente regenerado.',
+            }])
+
+    def test_edicion_localizada_mueve_linea_sin_regenerar_informe(self):
+        informe = 'COMENTARIO\nMeniscos normales.\nLigamentos conservados.\nDerrame articular.'
+
+        editado, _ = self.ai._aplicar_operaciones_edicion(informe, [{
+            'tipo': 'mover_despues',
+            'original': 'Ligamentos conservados.',
+            'referencia': 'Derrame articular.',
+        }])
+
+        self.assertEqual(
+            editado,
+            'COMENTARIO\nMeniscos normales.\nDerrame articular.\nLigamentos conservados.',
+        )
+
+    def test_edicion_localizada_agrega_conclusion_solicitada(self):
+        informe = 'RM DE RODILLA\n\nHALLAZGOS\nDesgarro del menisco interno.'
+
+        editado, operaciones = self.ai._aplicar_operaciones_edicion(
+            informe,
+            [{
+                'tipo': 'agregar_al_final',
+                'nuevo': 'CONCLUSIÓN\nDesgarro del menisco interno.',
+            }],
+            instruccion='Agregá una conclusión con los hallazgos patológicos.',
+        )
+
+        self.assertEqual(
+            editado,
+            f'{informe}\n\nCONCLUSIÓN\nDesgarro del menisco interno.',
+        )
+        self.assertEqual(operaciones[0]['tipo'], 'agregar_al_final')
+
+    def test_edicion_localizada_no_crea_seccion_sin_pedido_explicito(self):
+        informe = 'RM DE RODILLA\n\nHALLAZGOS\nDesgarro del menisco interno.'
+
+        with self.assertRaisesMessage(ValueError, 'no fue solicitada'):
+            self.ai._aplicar_operaciones_edicion(
+                informe,
+                [{
+                    'tipo': 'agregar_al_final',
+                    'nuevo': 'CONCLUSIÓN\nDesgarro del menisco interno.',
+                }],
+                instruccion='Corregí la redacción del hallazgo.',
+            )
+
+    def test_edicion_localizada_no_duplica_seccion_existente(self):
+        informe = 'HALLAZGOS\nDesgarro meniscal.\n\nCONCLUSIÓN\nDesgarro meniscal.'
+
+        with self.assertRaisesMessage(ValueError, 'ya existe'):
+            self.ai._aplicar_operaciones_edicion(
+                informe,
+                [{
+                    'tipo': 'agregar_al_final',
+                    'nuevo': 'CONCLUSIÓN\nDesgarro meniscal.',
+                }],
+                instruccion='Agregá una conclusión.',
+            )
+
     def test_guardrail_restaurar_linea_no_mencionada(self):
         texto_original = "Rodilla derecha con desgarro del ligamento cruzado anterior y derrame articular."
         texto_mejorado = """RM DE RODILLA DERECHA

@@ -487,18 +487,48 @@ Si el hibrido no cumple todas las condiciones, continua el selector legacy. La
 traza conserva ambas recomendaciones, la plantilla realmente usada, el origen
 de la seleccion y cualquier conflicto de contexto.
 
+### Confirmacion humana para selecciones inciertas
+
+El modo agente separa seleccion y generacion cuando la decision no es segura:
+
+- confianza alta, puntaje suficiente y sin conflictos: genera automaticamente;
+- confianza media o baja: propone hasta tres candidatas;
+- desacuerdo relevante entre selector legacy e hibrido: propone candidatas;
+- conflicto de region o modalidad: exige eleccion del usuario;
+- sin coincidencia clara: permite elegir entre todas las plantillas visibles.
+
+La primera llamada a `/api/mejorar-texto/` devuelve
+`requiere_seleccion_plantilla=true` y no invoca el LLM de redaccion. La interfaz
+muestra candidatos combinados por posicion y consenso, sin presentar sus scores
+como porcentajes porque los dos selectores usan escalas diferentes.
+
+Al elegir una opcion, el frontend repite la solicitud con:
+
+```json
+{
+  "plantilla_confirmada_codigo": "CODIGO_VISIBLE"
+}
+```
+
+El servidor vuelve a validar que la plantilla este activa y visible. La traza
+final registra `origen_seleccion=usuario_confirmada`, la plantilla elegida y los
+rankings legacy e hibrido. Esto permite calibrar posteriormente desacuerdos y
+preferencias sin almacenar texto clinico.
+
 Configuracion:
 
 ```env
 DICTADO_SELECTOR_HIBRIDO_ACTIVO=True
 DICTADO_SELECTOR_HIBRIDO_SCORE_MINIMO=45.0
 DICTADO_SELECTOR_HIBRIDO_SOMBRA=True
+DICTADO_SELECTOR_CONFIRMACION_ACTIVA=True
 ```
 
 Rollback inmediato al selector anterior:
 
 ```env
 DICTADO_SELECTOR_HIBRIDO_ACTIVO=False
+DICTADO_SELECTOR_CONFIRMACION_ACTIVA=False
 ```
 
 ### Etapa de calibracion en produccion
@@ -533,6 +563,7 @@ Cambios relevantes:
 
 - modo `AGENTE` visible segun feature flag;
 - muestra plantilla sugerida por el agente;
+- solicita eleccion entre candidatas cuando la seleccion es incierta;
 - muestra guardrails aplicados;
 - guarda aprendizaje cuando el usuario corrige y confirma al copiar;
 - mantiene flujo de copia con formato y texto plano.
@@ -604,6 +635,57 @@ Resultado:
 ```text
 No changes detected in app 'dictado_informes'
 ```
+
+## Correccion conversacional del borrador
+
+El dictado rapido permite corregir el informe generado sin volver a ejecutar el selector de plantillas.
+
+Flujo de usuario:
+
+1. Seleccionar opcionalmente un fragmento en el editor.
+2. Presionar `Corregir por voz` y dictar una instruccion puntual.
+3. Revisar o editar la transcripcion de la instruccion.
+4. Presionar `Aplicar correccion`.
+5. Usar `Deshacer correccion` si el resultado no es el esperado.
+
+La voz se transcribe con el endpoint Whisper existente. La edicion usa:
+
+```text
+POST /dictado_informes/api/corregir-borrador/
+```
+
+Payload:
+
+```json
+{
+  "texto_actual": "informe visible en el editor",
+  "instruccion": "cambia derrame leve por moderado",
+  "fragmento_objetivo": "Derrame articular leve."
+}
+```
+
+El LLM no devuelve un informe nuevo. Devuelve operaciones JSON de tipo:
+
+- `reemplazar`;
+- `eliminar`;
+- `insertar_antes` / `insertar_despues`;
+- `mover_antes` / `mover_despues`.
+- `agregar_al_final` para una seccion nueva solicitada explicitamente.
+
+Guardrails del servidor:
+
+- aplica operaciones solo sobre fragmentos exactos y unicos del borrador;
+- rechaza objetivos inexistentes o ambiguos;
+- limita la cantidad de operaciones por solicitud;
+- solo permite crear segmentos cuando la instruccion pide agregar, incluir, crear o generar una seccion;
+- al crear una conclusion, el prompt exige usar solo patologias ya presentes y omitir normalidades;
+- evita duplicar una seccion que ya existe;
+- rechaza reemplazos amplios y resultados que reescriben demasiado contenido;
+- no ejecuta seleccion de plantilla ni el flujo completo del agente;
+- ante cualquier error devuelve el borrador sin modificar;
+- la conversion para NetTerm no participa de este flujo ni del aprendizaje.
+
+El aprendizaje conserva el comportamiento previo: si la correccion por voz cambia el informe, al copiar se puede confirmar el guardado usando el texto clinico normal del editor.
 
 ## Commits relevantes
 

@@ -79,6 +79,28 @@ class DictadoPilotoAccessTests(TestCase):
         self.assertContains(response, 'Copiar para NetTerm')
         self.assertContains(response, "copiarTexto('netterm')")
 
+    def test_dictado_rapido_ofrece_correccion_por_voz_y_deshacer(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="btnCorregirVoz"')
+        self.assertContains(response, 'id="instruccionCorreccion"')
+        self.assertContains(response, 'id="btnDeshacerCorreccion"')
+        self.assertContains(response, reverse('dictado_informes:corregir_borrador'))
+
+    def test_dictado_rapido_ofrece_confirmacion_de_plantilla_ambigua(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="modalSeleccionPlantilla"')
+        self.assertContains(response, 'id="candidatosSeleccionPlantilla"')
+        self.assertContains(response, 'id="plantillaManualAgente"')
+        self.assertContains(response, 'requiere_seleccion_plantilla')
+
     @override_settings(DICTADO_AGENTE_HABILITADO=False)
     def test_dictado_rapido_oculta_agente_si_flag_apagado(self):
         self.client.force_login(self.piloto)
