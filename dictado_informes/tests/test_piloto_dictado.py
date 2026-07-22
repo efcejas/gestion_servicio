@@ -69,6 +69,16 @@ class DictadoPilotoAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_dictado_rapido_ofrece_copiado_compatible_con_netterm(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="btnCopiarNetterm"')
+        self.assertContains(response, 'Copiar para NetTerm')
+        self.assertContains(response, "copiarTexto('netterm')")
+
     @override_settings(DICTADO_AGENTE_HABILITADO=False)
     def test_dictado_rapido_oculta_agente_si_flag_apagado(self):
         self.client.force_login(self.piloto)

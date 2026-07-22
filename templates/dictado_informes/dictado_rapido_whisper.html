@@ -31,6 +31,36 @@
     .fa-waveform-lines {
         animation: waveform 1s ease-in-out infinite;
     }
+
+    .copy-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+
+    .copy-action {
+        min-height: 2.75rem;
+        padding: 0.625rem 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        line-height: 1.15;
+    }
+
+    .copy-action-primary {
+        grid-column: 1 / -1;
+    }
+
+    @media (max-width: 420px) {
+        .copy-actions {
+            grid-template-columns: 1fr;
+        }
+
+        .copy-action-primary {
+            grid-column: auto;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -396,8 +426,8 @@
                 </div>
 
                 <!-- Opciones de copiado -->
-                <div class="mt-3 flex items-center justify-end">
-                    <label class="flex items-center cursor-pointer text-sm text-gray-300 hover:text-white transition-colors">
+                <div class="mt-2 flex items-center justify-start">
+                    <label class="flex items-center cursor-pointer text-xs text-gray-300 hover:text-white transition-colors">
                         <input type="checkbox" id="checkCopiadoAuto" class="mr-2 w-4 h-4 text-green-600 rounded focus:ring-green-500">
                         <i class="fas fa-magic mr-1 text-green-400"></i>
                         Copiar automáticamente al terminar
@@ -406,22 +436,29 @@
 
                 <!-- CSRF token para AJAX -->
                 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
-                <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="copy-actions mt-3">
                     <button id="btnCopiar" 
-                            class="bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors shadow-lg group">
-                        <i class="fas fa-copy mr-2"></i>
-                        Copiar con Formato <span class="ml-1 text-xs">✨ Guarda automáticamente</span>
-                        <span class="ml-2 text-xs opacity-70">Ctrl+Enter</span>
+                            class="copy-action copy-action-primary bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors shadow group"
+                            title="Copia el informe conservando su formato">
+                        <i class="fas fa-copy"></i>
+                        <span>Copiar con formato</span>
+                        <span class="text-xs opacity-70">Ctrl+Enter</span>
                     </button>
                     <button id="btnCopiarPlano"
-                            class="bg-teal-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-teal-700 transition-colors shadow-lg group">
-                        <i class="fas fa-file-alt mr-2"></i>
-                        Copiar Texto Plano
+                            class="copy-action bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors shadow group">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Copiar texto plano</span>
+                    </button>
+                    <button id="btnCopiarNetterm"
+                            class="copy-action bg-cyan-700 text-white rounded-lg font-semibold hover:bg-cyan-600 transition-colors shadow group"
+                            title="Copia texto plano compatible con NetTerm, sin tildes ni caracteres especiales">
+                        <i class="fas fa-terminal"></i>
+                        <span>Copiar para NetTerm</span>
                     </button>
                 </div>
 
-                <div id="panelFeedbackCalidad" class="hidden mt-4 bg-gray-900/70 border border-gray-700 rounded-lg p-3">
-                    <p class="text-xs font-bold text-gray-300 mb-2">
+                <div id="panelFeedbackCalidad" class="hidden mt-3 bg-gray-900/70 border border-gray-700 rounded-lg p-2.5">
+                    <p class="text-xs font-bold text-gray-300 mb-1.5">
                         <i class="fas fa-clipboard-check mr-1 text-cyan-400"></i>
                         Feedback rápido de calidad
                     </p>
@@ -593,6 +630,14 @@ function normalizarEspaciadoSegmentosTexto(texto) {
         .join('\n')
         .replace(/\n{3,}/g, '\n\n')
         .trim();
+}
+
+function convertirTextoParaNetterm(texto) {
+    return (texto || '')
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\x00-\x7F]/g, '')
+        .replace(/\r?\n/g, '\r\n');
 }
 
 function normalizarEspaciadoSegmentosHtml(html) {
@@ -1392,7 +1437,10 @@ if (copiadoGuardado === 'true') {
 // Función de copiado mejorada
 async function copiarTexto(modoCopia = 'rich') {
     const textoBase = limpiarCorchetesTexto(getTextoMejoradoTextoPlano());
-    const texto = normalizarEspaciadoSegmentosTexto(textoBase);
+    const textoNormalizado = normalizarEspaciadoSegmentosTexto(textoBase);
+    const texto = modoCopia === 'netterm'
+        ? convertirTextoParaNetterm(textoNormalizado)
+        : textoNormalizado;
     const htmlBase = limpiarCorchetesHtml(getTextoMejoradoHtml());
     const html = normalizarEspaciadoSegmentosHtml(htmlBase);
 
@@ -1410,15 +1458,23 @@ async function copiarTexto(modoCopia = 'rich') {
     }
     
     try {
-        await copiarAlPortapapeles(html, texto, modoCopia);
-        if (modoCopia === 'plain') {
+        const modoPortapapeles = modoCopia === 'netterm' ? 'plain' : modoCopia;
+        await copiarAlPortapapeles(html, texto, modoPortapapeles);
+        if (modoCopia === 'netterm') {
+            mostrarToast('Texto copiado para NetTerm', 'success');
+        } else if (modoCopia === 'plain') {
             mostrarToast('✅ Texto plano copiado al portapapeles', 'success');
         } else {
             mostrarToast('✅ Texto con formato copiado al portapapeles', 'success');
         }
         
         // Feedback visual en el botón
-        const btn = document.getElementById('btnCopiar');
+        const botonesPorModo = {
+            rich: 'btnCopiar',
+            plain: 'btnCopiarPlano',
+            netterm: 'btnCopiarNetterm',
+        };
+        const btn = document.getElementById(botonesPorModo[modoCopia] || 'btnCopiar');
         const textoOriginal = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-check mr-2"></i>¡Copiado!';
         setTimeout(() => {
@@ -1442,6 +1498,7 @@ async function copiarTexto(modoCopia = 'rich') {
 
 document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
 document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
+document.getElementById('btnCopiarNetterm')?.addEventListener('click', () => copiarTexto('netterm'));
 document.getElementById('btnFeedbackCorrecto')?.addEventListener('click', () => registrarFeedbackCalidad('correcto'));
 document.getElementById('btnFeedbackCorreccion')?.addEventListener('click', () => registrarFeedbackCalidad('correccion'));
 
