@@ -11,6 +11,15 @@ from .models import (
 
 User = get_user_model()
 
+DEMO_PATIENT_SENTINEL = '[DEMO]'
+PATIENT_IDENTITY_FIELDS = (
+    'apellido_paciente',
+    'nombre_paciente',
+    'dni_paciente',
+    'edad_paciente',
+    'sexo_paciente',
+)
+
 
 class PreinformeForm(forms.ModelForm):
     """Formulario para crear/editar preinformes"""
@@ -112,6 +121,8 @@ class PreinformeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         # Extraer el usuario del kwargs
         user = kwargs.pop('user', None)
+        self.user = user
+        self.is_demo_user = bool(getattr(user, 'is_demo_user', False))
         super().__init__(*args, **kwargs)
         
         # Configurar el campo revisor para mostrar nombre completo
@@ -119,6 +130,10 @@ class PreinformeForm(forms.ModelForm):
         
         # Hacer que el DNI no sea obligatorio para residentes
         self.fields['dni_paciente'].required = False
+
+        if self.is_demo_user:
+            for field_name in PATIENT_IDENTITY_FIELDS:
+                self.fields.pop(field_name, None)
         
         # Si estamos procesando datos del formulario (POST), permitir todas las plantillas activas
         # para que pase la validación inicial. El método clean_plantilla_utilizada validará correctamente
@@ -192,6 +207,20 @@ class PreinformeForm(forms.ModelForm):
     def clean_informe_html(self):
         contenido = self.cleaned_data.get('informe_html', '')
         return prepare_editor_html_content(contenido)
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if self.is_demo_user:
+            instance.apellido_paciente = DEMO_PATIENT_SENTINEL
+            instance.nombre_paciente = DEMO_PATIENT_SENTINEL
+            instance.dni_paciente = ''
+            instance.edad_paciente = None
+            instance.sexo_paciente = None
+            instance.es_registro_demo = True
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class FiltroPreinformesForm(forms.Form):
@@ -271,6 +300,13 @@ class FiltroPreinformesForm(forms.Form):
             'placeholder': 'Buscar por nombre de paciente...'
         })
     )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if getattr(user, 'is_demo_user', False):
+            self.fields.pop('apellido_paciente', None)
+            self.fields.pop('nombre_paciente', None)
 
 
 class RevisionPreinformeForm(forms.ModelForm):

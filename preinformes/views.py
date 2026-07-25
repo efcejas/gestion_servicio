@@ -3,7 +3,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import models, IntegrityError, transaction
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, HttpResponseForbidden
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -40,6 +40,14 @@ logger = logging.getLogger(__name__)
 MAX_ADJUNTOS_POR_ORIGEN = 3
 MAX_ADJUNTO_SIZE_MB = 5
 ALLOWED_ADJUNTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
+
+
+def _preinformes_visibles_para(user):
+    """Evita que registros demo entren en flujos clínicos de otros usuarios."""
+    qs = Preinforme.objects.all()
+    if getattr(user, 'is_demo_user', False):
+        return qs.filter(Q(es_registro_demo=False) | Q(es_registro_demo=True, residente=user))
+    return qs.filter(es_registro_demo=False)
 
 from .services import (
     evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar,
@@ -353,7 +361,7 @@ def crear_preinforme(request):
             preinforme.residente = request.user
             preinforme.save()
 
-            archivos = request.FILES.getlist('imagenes_residente')
+            archivos = [] if request.user.is_demo_user else request.FILES.getlist('imagenes_residente')
             cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
                 preinforme=preinforme,
                 archivos=archivos,
@@ -429,7 +437,7 @@ def crear_preinforme(request):
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def editar_preinforme(request, pk):
     """Editar preinforme existente (solo si está pendiente de revisión y es el creador)"""
-    preinforme = get_object_or_404(Preinforme, pk=pk)
+    preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
     if preinforme.residente != request.user:
         messages.error(request, 'No tiene permiso para editar este preinforme.')
         return redirect('preinformes:mis_preinformes')
@@ -505,6 +513,9 @@ def editar_preinforme(request, pk):
 @require_http_methods(["POST"])
 def eliminar_preinforme(request, pk):
     """Permite al preinformante eliminar sus preinformes no tomados por staff."""
+    if request.user.is_demo_user:
+        return HttpResponseForbidden('La eliminación de preinformes no está disponible en modo demo.')
+
     preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
     next_url = request.POST.get('next') or reverse('preinformes:mis_preinformes')
     if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
@@ -532,7 +543,7 @@ def eliminar_preinforme(request, pk):
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def mis_preinformes(request):
     """Lista de preinformes del residente"""
-    form = FiltroPreinformesForm(request.GET)
+    form = FiltroPreinformesForm(request.GET, user=request.user)
     preinformes = Preinforme.objects.filter(residente=request.user)
     
     # Aplicar filtros
@@ -551,9 +562,9 @@ def mis_preinformes(request):
             preinformes = preinformes.filter(fecha_creacion__date__lte=form.cleaned_data['fecha_hasta'])
         if form.cleaned_data['numero_estudio']:
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
-        if form.cleaned_data['apellido_paciente']:
+        if not request.user.is_demo_user and form.cleaned_data.get('apellido_paciente'):
             preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
-        if form.cleaned_data['nombre_paciente']:
+        if not request.user.is_demo_user and form.cleaned_data.get('nombre_paciente'):
             preinformes = preinformes.filter(nombre_paciente__icontains=form.cleaned_data['nombre_paciente'])
     
     # Filtro por etiquetas (parámetro GET)
@@ -590,12 +601,15 @@ def mis_preinformes(request):
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def ver_preinforme(request, pk):
     """Ver detalle de preinforme con revisión si existe"""
-    preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
+    if request.user.is_demo_user:
+        preinforme = get_object_or_404(Preinforme, pk=pk)
+    else:
+        preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
     
     context = {
         'preinforme': preinforme,
-        'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
-        'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
+        'adjuntos_residente': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='residente', activo=True),
+        'adjuntos_revisor': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='revisor', activo=True),
         'title': f'Preinforme {preinforme.numero_estudio}'
     }
     
@@ -612,13 +626,14 @@ def lista_banco_informes(request):
     No muestra datos de evaluación (puntuación, comentarios del revisor).
     """
     qs = Preinforme.objects.filter(
+        es_registro_demo=False,
         estado='finalizado',
         residente__rol='medico_residente',
     ).select_related('residente', 'tipo_estudio', 'region', 'revision').order_by('-fecha_finalizacion')
 
     # Filtros GET
     q_numero = request.GET.get('numero_estudio', '').strip()
-    q_paciente = request.GET.get('paciente', '').strip()
+    q_paciente = '' if request.user.is_demo_user else request.GET.get('paciente', '').strip()
     q_tipo = request.GET.get('tipo_estudio', '')
     q_region = request.GET.get('region', '')
 
@@ -660,7 +675,7 @@ def ver_banco_preinforme(request, pk):
     Sin datos de la evaluación (puntuación, comentarios al residente).
     """
     preinforme = get_object_or_404(
-        Preinforme,
+        _preinformes_visibles_para(request.user),
         pk=pk,
         estado='finalizado',
         residente__rol='medico_residente',
@@ -682,17 +697,19 @@ def dashboard_staff(request):
     mis_asignados = get_asignados_de(request.user).count()
     
     # Preinformes sin asignar (pendientes de revisión sin revisor)
-    pendientes_revision = get_pendientes_sin_revisor().count()
+    pendientes_revision = get_pendientes_sin_revisor(request.user).count()
     asignados_otros = get_asignados_a_otros(request.user).count()
     
     # Preinformes en revisión por este usuario
     en_revision = Preinforme.objects.filter(
+        es_registro_demo=False,
         estado='en_revision',
         revisor=request.user
     ).count()
     
     # Estadísticas generales
     total_preinformes_mes = Preinforme.objects.filter(
+        es_registro_demo=False,
         fecha_creacion__month=timezone.now().month,
         fecha_creacion__year=timezone.now().year
     ).count()
@@ -701,7 +718,7 @@ def dashboard_staff(request):
     mis_ultimos_asignados = get_asignados_de(request.user).order_by('-fecha_envio_revision')[:5]
     
     # Últimos preinformes pendientes sin asignar
-    ultimos_pendientes = get_pendientes_sin_revisor().order_by('-fecha_envio_revision')[:5]
+    ultimos_pendientes = get_pendientes_sin_revisor(request.user).order_by('-fecha_envio_revision')[:5]
     
     context = {
         'mis_asignados': mis_asignados,
@@ -720,7 +737,7 @@ def dashboard_staff(request):
 @role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def lista_revision(request):
     """Lista de preinformes para revisar"""
-    form = FiltroPreinformesForm(request.GET)
+    form = FiltroPreinformesForm(request.GET, user=request.user)
     
     # Filtro para mostrar diferentes categorías
     mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'compartidos', 'todos', 'finalizados'
@@ -793,7 +810,7 @@ def lista_revision(request):
             preinformes = preinformes.filter(fecha_envio_revision__date__lte=form.cleaned_data['fecha_hasta'])
         if form.cleaned_data.get('numero_estudio'):
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
-        if form.cleaned_data.get('apellido_paciente'):
+        if not request.user.is_demo_user and form.cleaned_data.get('apellido_paciente'):
             preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
     
     preinformes = preinformes.order_by('-fecha_envio_revision')
@@ -817,7 +834,7 @@ def lista_revision(request):
 @role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def asignar_revisor(request, pk):
     """Asignar un revisor a un preinforme (o asignarse a uno mismo)"""
-    preinforme = get_object_or_404(Preinforme, pk=pk)
+    preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
     
     # Obtener de dónde viene para redirigir correctamente
     mostrar = request.GET.get('mostrar', 'asignados')
@@ -884,7 +901,7 @@ def tomar_estudio(request, pk):
         # Usar transacción atómica con lock pesimista para evitar race conditions
         with transaction.atomic():
             # select_for_update bloquea la fila hasta que termine la transacción
-            preinforme = Preinforme.objects.select_for_update().get(pk=pk)
+            preinforme = _preinformes_visibles_para(request.user).select_for_update().get(pk=pk)
             
             # Validar que el estudio puede ser tomado
             if not preinforme.puede_ser_tomado_por(request.user):
@@ -924,7 +941,7 @@ def tomar_estudio(request, pk):
 def revisar_preinforme(request, pk):
     """Revisar y corregir preinforme"""
     preinforme = get_object_or_404(
-        Preinforme, 
+        _preinformes_visibles_para(request.user),
         pk=pk,
         estado__in=['pendiente_revision', 'en_revision', 'finalizado']
     )
@@ -973,7 +990,7 @@ def revisar_preinforme(request, pk):
             # El informe final ya está en informe_final_html, no necesitamos generar nada
             revision.save()
 
-            archivos = request.FILES.getlist('imagenes_revisor')
+            archivos = [] if request.user.is_demo_user else request.FILES.getlist('imagenes_revisor')
             cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
                 preinforme=preinforme,
                 archivos=archivos,
@@ -1012,8 +1029,8 @@ def revisar_preinforme(request, pk):
         'preinforme': preinforme,
         'revision': revision,
         'resumen_ia_revision': revision.resumen_ia_revision or {},
-        'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
-        'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
+        'adjuntos_residente': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='residente', activo=True),
+        'adjuntos_revisor': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='revisor', activo=True),
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
         'es_edicion_finalizada': es_edicion_finalizada,
         'title': f'Editar Revision {preinforme.numero_estudio}' if es_edicion_finalizada else f'Revisar Preinforme {preinforme.numero_estudio}'
@@ -1317,7 +1334,7 @@ def autosave_preinforme(request, pk):
 def generar_informe_final(request, pk):
     """Obtener informe final actual de la revisión"""
     try:
-        preinforme = get_object_or_404(Preinforme, pk=pk)
+        preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
         
         # Verificar permisos
         if not (
@@ -1344,7 +1361,7 @@ def generar_informe_final(request, pk):
 @login_required
 def copiar_informe_final(request, pk):
     """Copiar informe final al portapapeles"""
-    preinforme = get_object_or_404(Preinforme, pk=pk)
+    preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
     
     # Verificar permisos
     if not (
@@ -1376,6 +1393,7 @@ def _agregar_promedio_evaluacion_final_ia(residentes):
     acumulados = {}
     revisiones = RevisionPreinforme.objects.filter(
         preinforme__residente_id__in=[residente.pk for residente in residentes],
+        preinforme__es_registro_demo=False,
     ).exclude(evaluacion_ia_final={}).values_list(
         'preinforme__residente_id', 'evaluacion_ia_final'
     )
@@ -1403,12 +1421,21 @@ def estadisticas(request):
     residentes_stats = User.objects.filter(
         rol='medico_residente'
     ).annotate(
-        total_preinformes=Count('preinformes_realizados'),
+        total_preinformes=Count(
+            'preinformes_realizados',
+            filter=Q(preinformes_realizados__es_registro_demo=False),
+        ),
         preinformes_finalizados=Count(
             'preinformes_realizados',
-            filter=Q(preinformes_realizados__estado='finalizado')
+            filter=Q(
+                preinformes_realizados__estado='finalizado',
+                preinformes_realizados__es_registro_demo=False,
+            )
         ),
-        promedio_puntuacion=Avg('preinformes_realizados__revision__puntuacion'),
+        promedio_puntuacion=Avg(
+            'preinformes_realizados__revision__puntuacion',
+            filter=Q(preinformes_realizados__es_registro_demo=False),
+        ),
         promedio_scoring_ia=Avg(
             'conversaciones_asistente_preinforme__puntuacion_global',
             filter=Q(conversaciones_asistente_preinforme__evaluada=True)
@@ -1418,11 +1445,15 @@ def estadisticas(request):
     
     # Estadísticas por tipo de estudio
     estudios_stats = TipoEstudio.objects.annotate(
-        total_preinformes=Count('preinforme')
+        total_preinformes=Count(
+            'preinforme',
+            filter=Q(preinforme__es_registro_demo=False),
+        )
     ).order_by('-total_preinformes')
     
     # Estadísticas temporales
     preinformes_mes_actual = Preinforme.objects.filter(
+        es_registro_demo=False,
         fecha_creacion__month=timezone.now().month,
         fecha_creacion__year=timezone.now().year
     ).count()
@@ -1452,18 +1483,31 @@ def panel_docencia(request):
         rol='medico_residente',
         perfil_completo=True,
     ).annotate(
-        total_preinformes=Count('preinformes_realizados', distinct=True),
+        total_preinformes=Count(
+            'preinformes_realizados',
+            filter=Q(preinformes_realizados__es_registro_demo=False),
+            distinct=True,
+        ),
         preinformes_finalizados=Count(
             'preinformes_realizados',
-            filter=Q(preinformes_realizados__estado='finalizado'),
+            filter=Q(
+                preinformes_realizados__estado='finalizado',
+                preinformes_realizados__es_registro_demo=False,
+            ),
             distinct=True,
         ),
         preinformes_pendientes=Count(
             'preinformes_realizados',
-            filter=Q(preinformes_realizados__estado__in=['borrador', 'pendiente_revision']),
+            filter=Q(
+                preinformes_realizados__estado__in=['borrador', 'pendiente_revision'],
+                preinformes_realizados__es_registro_demo=False,
+            ),
             distinct=True,
         ),
-        promedio_puntuacion=Avg('preinformes_realizados__revision__puntuacion'),
+        promedio_puntuacion=Avg(
+            'preinformes_realizados__revision__puntuacion',
+            filter=Q(preinformes_realizados__es_registro_demo=False),
+        ),
         promedio_ia=Avg(
             'conversaciones_asistente_preinforme__puntuacion_global',
             filter=Q(conversaciones_asistente_preinforme__evaluada=True),
@@ -1474,7 +1518,8 @@ def panel_docencia(request):
     # Última actividad por residente (calculada en Python para compatibilidad con SQLite)
     ultima_actividad = {}
     for p in Preinforme.objects.filter(
-        residente__in=residentes
+        residente__in=residentes,
+        es_registro_demo=False,
     ).order_by('residente_id', '-fecha_modificacion'):
         if p.residente_id not in ultima_actividad:
             ultima_actividad[p.residente_id] = p.fecha_modificacion
@@ -1499,7 +1544,7 @@ def panel_docencia(request):
 @login_required
 def ver_comparacion_revision(request, pk):
     """Vista para que el residente vea la comparación entre su versión y la del staff"""
-    preinforme = get_object_or_404(Preinforme, pk=pk)
+    preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
     
     # Verificar permisos: solo el residente autor o staff puede ver
     if not (
@@ -1608,6 +1653,12 @@ def buscar_etiquetas(request):
 @login_required
 def verificar_duplicado_preinforme(request):
     """Verificar si existe un preinforme duplicado (AJAX)"""
+    if request.user.is_demo_user:
+        return JsonResponse(
+            {'error': 'La verificación de datos de paciente no está disponible en modo demo.'},
+            status=403,
+        )
+
     numero_estudio = request.GET.get('numero_estudio', '').strip()
     dni_paciente = request.GET.get('dni_paciente', '').strip()
     tipo_estudio_id = request.GET.get('tipo_estudio')
@@ -1617,7 +1668,10 @@ def verificar_duplicado_preinforme(request):
     
     # Buscar por número de estudio (más preciso)
     if numero_estudio:
-        query = Preinforme.objects.filter(numero_estudio__iexact=numero_estudio)
+        query = Preinforme.objects.filter(
+            numero_estudio__iexact=numero_estudio,
+            es_registro_demo=False,
+        )
         
         # Excluir el preinforme actual si estamos editando
         if preinforme_actual_id:
@@ -1643,7 +1697,8 @@ def verificar_duplicado_preinforme(request):
         try:
             query = Preinforme.objects.filter(
                 dni_paciente__iexact=dni_paciente,
-                tipo_estudio_id=tipo_estudio_id
+                tipo_estudio_id=tipo_estudio_id,
+                es_registro_demo=False,
             )
             
             if preinforme_actual_id:
@@ -1871,6 +1926,7 @@ def perfil_residente_docente(request, pk):
     conversaciones_evaluadas = ConversacionAsistentePreinforme.objects.filter(
         usuario=residente,
         evaluada=True,
+        preinforme__es_registro_demo=False,
     ).select_related('preinforme__tipo_estudio', 'preinforme__region').order_by('-fecha_actualizacion')
 
     promedio_scoring = conversaciones_evaluadas.aggregate(
@@ -1881,6 +1937,7 @@ def perfil_residente_docente(request, pk):
 
     revisiones_evaluadas_qs = RevisionPreinforme.objects.filter(
         preinforme__residente=residente,
+        preinforme__es_registro_demo=False,
     ).exclude(evaluacion_ia_final={}).select_related(
         'preinforme__tipo_estudio', 'preinforme__region', 'revisor'
     ).order_by('-evaluacion_ia_final_generada_en', '-fecha_modificacion')

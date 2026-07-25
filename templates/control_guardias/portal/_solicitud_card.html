@@ -55,7 +55,7 @@ Variables: solicitud, gestor (bool)
         <!-- Acciones -->
         <div class="flex flex-col gap-2 shrink-0">
 
-            {% if gestor and solicitud.estado == 'PENDIENTE_JEFE' %}
+            {% if gestor and solicitud.estado == 'PENDIENTE_JEFE' and not request.user.is_demo_user %}
             <a href="{% url 'control_guardias:cambio_revisar' solicitud.pk %}?return_to={{ request.path|urlencode }}&focus={{ solicitud.pk }}"
                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-medium rounded-lg transition-colors">
                 <i class="fas fa-gavel"></i>Revisar

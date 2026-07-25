@@ -54,7 +54,7 @@
                         <h1 class="text-3xl font-bold text-white">
                             {% if es_edicion_finalizada %}Editar Revisión{% else %}Revisión de Preinforme{% endif %}
                         </h1>
-                        <p class="text-purple-100 mt-1">{{ preinforme.numero_estudio }} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                        <p class="text-purple-100 mt-1">{{ preinforme.numero_estudio }}{% if not request.user.is_demo_user %} - {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}{% endif %}</p>
                     </div>
                 </div>
                 <div>
@@ -80,10 +80,10 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
                 <h2 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
                     <i class="fas fa-clipboard-list text-purple-600 mr-2"></i>
-                    Estudio y paciente
+                    Estudio
                 </h2>
 
-                <div class="mb-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
+                {% if not request.user.is_demo_user %}<div class="mb-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Paciente</p>
                     <p class="text-base font-semibold text-gray-900 leading-snug">
                         {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
@@ -95,7 +95,7 @@
                         {% if preinforme.dni_paciente and preinforme.edad_paciente or preinforme.dni_paciente and preinforme.sexo_paciente %}<span class="text-gray-300">•</span>{% endif %}
                         {% if preinforme.dni_paciente %}<span>DNI {{ preinforme.dni_paciente }}</span>{% endif %}
                     </div>
-                </div>
+                </div>{% endif %}
 
                 <div class="rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Estudio</p>
@@ -263,6 +263,7 @@
                     {% endif %}
                 </div>
 
+                {% if not request.user.is_demo_user %}
                 <!-- Evidencia Visual -->
                 <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
@@ -335,6 +336,7 @@
                     </div>
                 </div>
 
+                {% endif %}
                 <!-- Feedback -->
                 <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
                     <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">

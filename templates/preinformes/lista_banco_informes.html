@@ -35,12 +35,12 @@
                        placeholder="Ej: TEST-2026-010"
                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
             </div>
-            <div>
+            {% if not request.user.is_demo_user %}<div>
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Paciente</label>
                 <input type="text" name="paciente" value="{{ q_paciente }}"
                        placeholder="Apellido o nombre"
                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-            </div>
+            </div>{% endif %}
             <div>
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo de estudio</label>
                 <select name="tipo_estudio"
@@ -95,10 +95,10 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div class="min-w-0">
                             <p class="text-base font-semibold text-gray-900">{{ preinforme.numero_estudio }}</p>
-                            <p class="text-sm font-medium text-gray-900 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                            {% if not request.user.is_demo_user %}<p class="text-sm font-medium text-gray-900 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
                             {% if preinforme.dni_paciente %}
                             <p class="text-xs text-gray-400">DNI {{ preinforme.dni_paciente }}</p>
-                            {% endif %}
+                            {% endif %}{% endif %}
                         </div>
                         <div>
                             {% if preinforme.sistema_destino == 'netterm' %}

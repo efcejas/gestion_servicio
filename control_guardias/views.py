@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import models
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -80,6 +80,11 @@ class JefeInstructorMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         user = self.request.user
         return user.rol in ['jefe_residentes', 'instructor_residentes'] or user.is_superuser
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated and request.user.is_demo_user and request.method != 'GET':
+            return HttpResponseForbidden('Las operaciones de gestión de guardias no están disponibles en modo demo.')
+        return super().dispatch(request, *args, **kwargs)
 
 
 class ResidenteMixin(LoginRequiredMixin, UserPassesTestMixin):

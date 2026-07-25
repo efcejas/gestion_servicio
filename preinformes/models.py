@@ -544,6 +544,11 @@ class Preinforme(models.Model):
         verbose_name="Asignación compartida",
         help_text="Si está activado, el estudio estará en el pool compartido para jefes/instructores"
     )
+    es_registro_demo = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Identifica registros técnicos creados durante una demostración.',
+    )
     
     # Etiquetas clínicas para clasificación y búsqueda
     etiquetas = models.ManyToManyField(
@@ -864,7 +869,10 @@ class HistorialEstudios(models.Model):
     
     def actualizar_estadisticas(self):
         """Actualiza las estadísticas del residente"""
-        preinformes = Preinforme.objects.filter(residente=self.residente)
+        preinformes = Preinforme.objects.filter(
+            residente=self.residente,
+            es_registro_demo=False,
+        )
         self.total_preinformes = preinformes.count()
         self.preinformes_finalizados = preinformes.filter(estado='finalizado').count()
         

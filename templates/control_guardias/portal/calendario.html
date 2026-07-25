@@ -218,7 +218,7 @@
       </div>
       {% endif %}
 
-      {% if es_gestor %}
+      {% if es_gestor and not request.user.is_demo_user %}
       <div id="modalEliminarExcepcionCalendario" class="fixed inset-0 z-50 hidden bg-gray-900/40 px-4 py-6">
         <div class="flex min-h-full items-center justify-center">
           <div class="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-200">

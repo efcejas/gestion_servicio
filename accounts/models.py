@@ -110,6 +110,12 @@ class CustomUser(AbstractUser):
         default=True,
         help_text='Recibir notificaciones por email'
     )
+
+    is_demo_user = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Aplica restricciones de privacidad para demostraciones sin modificar el rol.',
+    )
     
     def get_avatar_url(self):
         """Retorna la URL del avatar si existe, None si no."""

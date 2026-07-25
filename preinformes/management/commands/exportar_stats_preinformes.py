@@ -31,7 +31,7 @@ class Command(BaseCommand):
         from preinformes.models import EncuestaResidente, Preinforme
 
         # Filtro de fechas
-        qs = Preinforme.objects.all()
+        qs = Preinforme.objects.filter(es_registro_demo=False)
         if options['desde']:
             qs = qs.filter(fecha_creacion__date__gte=options['desde'])
         if options['hasta']:

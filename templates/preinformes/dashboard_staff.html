@@ -225,9 +225,9 @@
                     <div class="flex items-center justify-between p-3 border-l-4 border-indigo-500 bg-indigo-50 rounded-lg">
                         <div class="flex-1">
                             <h4 class="font-medium text-gray-900">{{ preinforme.numero_estudio }}</h4>
-                            <p class="text-sm text-gray-600">
+                            {% if not request.user.is_demo_user %}<p class="text-sm text-gray-600">
                                 {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
-                            </p>
+                            </p>{% endif %}
                             <p class="text-xs text-gray-500">
                                 Por {{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}
                             </p>
@@ -289,9 +289,9 @@
                     <div class="flex flex-col p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
                         <div class="flex-1">
                             <h4 class="font-medium text-gray-900">{{ preinforme.numero_estudio }}</h4>
-                            <p class="text-sm text-gray-600 mt-1">
+                            {% if not request.user.is_demo_user %}<p class="text-sm text-gray-600 mt-1">
                                 {{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}
-                            </p>
+                            </p>{% endif %}
                             <p class="text-xs text-gray-500 mt-1">
                                 Por {{ preinforme.residente.first_name }} {{ preinforme.residente.last_name }}
                             </p>

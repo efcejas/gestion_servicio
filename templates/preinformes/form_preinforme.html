@@ -25,12 +25,12 @@
         {% csrf_token %}
         <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
 
-        <!-- Información del Estudio y Paciente -->
+        <!-- Información del Estudio -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
             <div class="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-2 border-b border-gray-200">
                 <h2 class="text-sm font-semibold text-gray-800 flex items-center">
                     <i class="fas fa-info-circle text-blue-600 mr-1.5 text-xs"></i>
-                    Datos del Estudio y Paciente
+                    Datos del Estudio{% if not request.user.is_demo_user %} y Paciente{% endif %}
                 </h2>
             </div>
             <div class="p-4 sm:p-5">
@@ -125,6 +125,7 @@
                         {% endif %}
                     </div>
 
+                    {% if not request.user.is_demo_user %}
                     <!-- Fila 2: Datos del Paciente -->
                     <div class="sm:col-span-1 md:col-span-3">
                         <label for="{{ form.apellido_paciente.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
@@ -175,6 +176,7 @@
                             <div class="text-red-600 text-xs mt-0.5">{{ form.sexo_paciente.errors.0 }}</div>
                         {% endif %}
                     </div>
+                    {% endif %}
 
                     <div class="sm:col-span-2 md:col-span-8">
                         <label for="{{ form.contexto_clinico.id_for_label }}" class="block text-xs font-medium text-gray-600 mb-0.5">
@@ -322,6 +324,7 @@
             </div>
         </div>
 
+        {% if not request.user.is_demo_user %}
         <!-- Evidencia Visual (debajo del editor) -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
             <div class="bg-gradient-to-r from-emerald-50 to-teal-100 px-4 py-3 border-b border-emerald-200">
@@ -402,6 +405,7 @@
             </div>
         </div>
 
+        {% endif %}
         <!-- Botones de acción -->
         <div class="bg-white rounded-2xl shadow-lg p-6">
             <div class="flex flex-col sm:flex-row gap-4 justify-end">
@@ -429,6 +433,7 @@
     <!-- CKEditor 5 Media (JS/CSS) -->
     {{ form.media }}
     
+    {% if not request.user.is_demo_user %}
     <!-- Modal de Alerta de Duplicados -->
     <div id="modal-duplicados" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 xl:w-2/5 shadow-lg rounded-2xl bg-white">
@@ -474,6 +479,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <script>
@@ -1632,6 +1638,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     } // Fin del else if (btnAbrir)
     
+    {% if not request.user.is_demo_user %}
     // === SISTEMA DE DETECCIÓN DE DUPLICADOS ===
     
     const numeroEstudioInput = document.getElementById('id_numero_estudio');
@@ -1915,6 +1922,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    {% endif %}
     // Cerrar modal con tecla Escape
     document.addEventListener('keydown', function(e) {
         if (DICTADO_CURSOR_HABILITADO && e.altKey && e.shiftKey && e.code === 'KeyD') {
@@ -1927,7 +1935,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        if (e.key === 'Escape') {
+        {% if not request.user.is_demo_user %}if (e.key === 'Escape') {
             const modal = document.getElementById('modal-duplicados');
             if (modal && !modal.classList.contains('hidden')) {
                 const checkbox = document.getElementById('checkbox-verificado-duplicado');
@@ -1939,7 +1947,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     cerrarModalDuplicados();
                 }
             }
-        }
+        }{% endif %}
     });
 
     if (DICTADO_CURSOR_HABILITADO && dictadoToggleButton) {
@@ -2205,7 +2213,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
             <span id="asistenteCharCount" style="font-size:.68rem;color:#9ca3af;">0/500</span>
-            <span style="font-size:.68rem;color:#9ca3af;" title="Se envían edad, sexo y contexto del estudio, pero nunca nombre ni DNI."><i class="fas fa-lock" style="margin-right:2px;"></i>Sin nombre ni DNI del paciente</span>
+            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>{% if request.user.is_demo_user %}Sin datos identificatorios{% else %}Sin nombre ni DNI del paciente{% endif %}</span>
         </div>
     </div>
 </div>
@@ -2257,7 +2265,7 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;">
             <span id="asistenteCharCountLateral" style="font-size:.68rem;color:#9ca3af;">0/500</span>
-            <span style="font-size:.68rem;color:#9ca3af;" title="Se envían edad, sexo y contexto del estudio, pero nunca nombre ni DNI."><i class="fas fa-lock" style="margin-right:2px;"></i>Sin nombre ni DNI del paciente</span>
+            <span style="font-size:.68rem;color:#9ca3af;"><i class="fas fa-lock" style="margin-right:2px;"></i>{% if request.user.is_demo_user %}Sin datos identificatorios{% else %}Sin nombre ni DNI del paciente{% endif %}</span>
         </div>
     </div>
 </div>
@@ -2318,8 +2326,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // Tipo de estudio (texto del option seleccionado)
         const tipoEl = document.getElementById('id_tipo_estudio');
         const regionEl = document.getElementById('id_region');
+        {% if not request.user.is_demo_user %}
         const edadEl = document.getElementById('id_edad_paciente');
         const sexoEl = document.getElementById('id_sexo_paciente');
+        {% endif %}
         const contextoClinicoEl = document.getElementById('id_contexto_clinico');
 
         const tipo_estudio = tipoEl
@@ -2328,8 +2338,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const region = regionEl
             ? (regionEl.options[regionEl.selectedIndex]?.text || '')
             : '';
+        {% if not request.user.is_demo_user %}
         const edad = edadEl ? (edadEl.value || '') : '';
         const sexo = sexoEl ? (sexoEl.value || '') : '';
+        {% endif %}
         const contexto_clinico = contextoClinicoEl ? (contextoClinicoEl.value || '') : '';
 
         // Contenido del editor CKEditor5 (ya tiene strip HTML en el servidor)
@@ -2346,8 +2358,10 @@ document.addEventListener('DOMContentLoaded', function() {
         return {
             tipo_estudio,
             region,
+            {% if not request.user.is_demo_user %}
             edad,
             sexo,
+            {% endif %}
             contexto_clinico,
             contenido_editor,
             preinforme_id: '{% if preinforme.pk %}{{ preinforme.pk }}{% endif %}',

@@ -136,6 +136,10 @@ class HomeView(LoginRequiredMixin, TemplateView):
         user = self.request.user
         hoy = timezone.now().date()
 
+        if user.is_demo_user:
+            context['cantidad_eventos_abiertos'] = 0
+            return context
+
         # Últimos registros médicos
         ultimos_medicos = (
             RegistroEstudiosPorMedico.objects

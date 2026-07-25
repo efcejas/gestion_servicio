@@ -77,7 +77,72 @@
         <!-- ========== CARDS SEGÚN EL ROL DEL USUARIO ========== -->
         
         <!-- RESIDENTES (médico_residente, jefe_residentes, instructor_residentes) -->
-        {% if user.rol == 'cardiologo' %}
+        {% if user.is_demo_user %}
+        <div class="container mx-auto mt-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white rounded-2xl shadow-lg border border-purple-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl mb-4">
+                        <i class="fas fa-file-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Preinformes</h5>
+                    <p class="text-gray-600 mb-4">Flujo real de revisión y docencia, sin identidad de pacientes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:dashboard_residente' %}" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                            <i class="fas fa-arrow-right mr-2"></i>Ver preinformes
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-yellow-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl mb-4">
+                        <i class="fas fa-graduation-cap text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Clases</h5>
+                    <p class="text-gray-600 mb-4">Material académico para residentes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'clases_residentes:lista' %}" class="inline-flex items-center px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors">
+                            <i class="fas fa-arrow-right mr-2"></i>Ver clases
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-blue-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl mb-4">
+                        <i class="fas fa-book-medical text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Protocolos</h5>
+                    <p class="text-gray-600 mb-4">Protocolos radiológicos del servicio.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'protocolos:elegir' %}" class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-arrow-right mr-2"></i>Ver protocolos
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-emerald-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl mb-4">
+                        <i class="fas fa-chart-line text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Estadísticas</h5>
+                    <p class="text-gray-600 mb-4">Productividad y métricas docentes reales.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'preinformes:estadisticas' %}" class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                            <i class="fas fa-arrow-right mr-2"></i>Ver estadísticas
+                        </a>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg border border-indigo-100 p-6 hover:shadow-xl transition-shadow">
+                    <div class="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl mb-4">
+                        <i class="fas fa-calendar-alt text-2xl text-white"></i>
+                    </div>
+                    <h5 class="text-xl font-bold text-gray-900 mb-2">Guardias</h5>
+                    <p class="text-gray-600 mb-4">Calendario y organización de residentes.</p>
+                    <div class="flex justify-end">
+                        <a href="{% url 'control_guardias:index' %}" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                            <i class="fas fa-arrow-right mr-2"></i>Ver guardias
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% elif user.rol == 'cardiologo' %}
         <div class="container mx-auto mt-6 mb-6">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-6">
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-xl transition-shadow">

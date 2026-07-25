@@ -189,6 +189,30 @@ def navbar_links(request):
 
     groups = []
 
+    # El rol conserva la autorización funcional. El flag demo únicamente reduce
+    # la superficie visible a los módulos académicos aprobados.
+    if getattr(user, 'is_demo_user', False):
+        groups = [g for g in [
+            group('Recursos', 'fa-toolbox',
+                i_protocolos(),
+            ),
+            group('Docencia', 'fa-graduation-cap',
+                i_clases(),
+                i_guia(),
+                i_preinformes(),
+                i_revision(),
+                i_banco(),
+                item('Estadísticas de residentes', 'fa-chart-bar',
+                     'preinformes:estadisticas',
+                     active_url_names=['estadisticas', 'perfil_residente']),
+            ),
+            group('Guardias', 'fa-shield-alt',
+                item('Portal de Guardias', 'fa-calendar-alt',
+                     'control_guardias:index', active_ns='control_guardias'),
+            ),
+        ] if g]
+        return {'nav_groups': groups}
+
     # ── SUPERUSUARIO ──────────────────────────────────────────────────────────
     if user.is_superuser:
         groups = [g for g in [

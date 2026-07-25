@@ -64,6 +64,7 @@
                     </div>
                 </div>
 
+                {% if not request.user.is_demo_user %}
                 <!-- Formulario de revisión -->
                 <div class="shrink-0 w-full sm:w-72">
                     <form method="post" action="{% url 'control_guardias:slot_vacante_revisar' sol.pk %}">
@@ -84,6 +85,7 @@
                         </div>
                     </form>
                 </div>
+                {% endif %}
 
             </div>
         </div>

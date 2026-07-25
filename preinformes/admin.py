@@ -102,6 +102,7 @@ class PreinformeAdmin(admin.ModelAdmin):
         'residente', 
         'tipo_estudio', 
         'region', 
+        'es_registro_demo',
         'estado', 
         'fecha_creacion'
     ]
@@ -109,6 +110,7 @@ class PreinformeAdmin(admin.ModelAdmin):
         'estado', 
         'tipo_estudio', 
         'region', 
+        'es_registro_demo',
         'fecha_creacion',
         'residente__username'
     ]

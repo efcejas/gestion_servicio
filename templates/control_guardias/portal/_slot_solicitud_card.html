@@ -12,7 +12,7 @@
             {% if sol.notas_solicitante %}<p class="mt-2 text-sm italic text-gray-500">“{{ sol.notas_solicitante }}”</p>{% endif %}
             {% if sol.notas_jefe %}<p class="mt-2 text-sm text-gray-600"><span class="font-medium">Respuesta:</span> {{ sol.notas_jefe }}</p>{% endif %}
         </div>
-        {% if gestor and sol.estado == 'PENDIENTE' %}
+        {% if gestor and sol.estado == 'PENDIENTE' and not request.user.is_demo_user %}
         <form method="post" action="{% url 'control_guardias:slot_vacante_revisar' sol.pk %}" class="w-full shrink-0 sm:w-72">
             {% csrf_token %}<input type="hidden" name="return_to" value="{{ request.get_full_path }}">
             <textarea name="notas_jefe" rows="2" placeholder="Notas (opcional)..." class="mb-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>

@@ -108,10 +108,10 @@
                 <label class="block text-sm font-medium text-gray-700 mb-1">Número de Estudio</label>
                 {{ form.numero_estudio }}
             </div>
-            <div>
+            {% if not request.user.is_demo_user %}<div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Apellido del Paciente</label>
                 {{ form.apellido_paciente }}
-            </div>
+            </div>{% endif %}
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
                 {{ form.fecha_desde }}
@@ -149,12 +149,12 @@
                                 </span>
                                 {% endif %}
                             </div>
-                            <p class="text-sm text-gray-700 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
+                            {% if not request.user.is_demo_user %}<p class="text-sm text-gray-700 mt-1">{{ preinforme.apellido_paciente }}, {{ preinforme.nombre_paciente }}</p>
                             {% if preinforme.edad_paciente or preinforme.sexo_paciente %}
                             <p class="text-xs text-gray-500 mt-0.5">
                                 {% if preinforme.edad_paciente %}{{ preinforme.edad_paciente }} años{% endif %}{% if preinforme.edad_paciente and preinforme.sexo_paciente %} - {% endif %}{% if preinforme.sexo_paciente %}{{ preinforme.get_sexo_paciente_display }}{% endif %}
                             </p>
-                            {% endif %}
+                            {% endif %}{% endif %}
                         </div>
                         <span class="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-xl shadow-sm
                             {% if preinforme.estado == 'pendiente_revision' %}bg-gradient-to-r from-yellow-400 to-orange-400 text-white

@@ -26,6 +26,15 @@ MODOS_LISTA_REVISION = [
 ]
 
 
+def _aplicar_scope_demo(qs, usuario=None):
+    if getattr(usuario, 'is_demo_user', False):
+        return qs.filter(
+            Q(es_registro_demo=False) |
+            Q(es_registro_demo=True, residente=usuario)
+        )
+    return qs.filter(es_registro_demo=False)
+
+
 def get_asignados_de(revisor):
     """
     Preinformes activos asignados a un revisor.
@@ -34,26 +43,26 @@ def get_asignados_de(revisor):
         get_asignados_de(request.user).count()
         get_asignados_de(request.user).order_by('-fecha_envio_revision')[:5]
     """
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         revisor=revisor,
         estado__in=ESTADOS_ACTIVOS,
-    )
+    ), revisor)
 
 
-def get_pendientes_sin_revisor():
+def get_pendientes_sin_revisor(usuario=None):
     """
     Preinformes en pendiente_revision que aun no tienen revisor asignado.
 
     Se conserva para contadores historicos del dashboard. Para la bandeja
     operativa de revision usar get_sin_asignar_para_revision().
     """
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         estado='pendiente_revision',
         revisor__isnull=True,
-    )
+    ), usuario)
 
 
-def get_sin_asignar_para_revision():
+def get_sin_asignar_para_revision(usuario=None):
     """
     Bandeja operativa de estudios sin revisor.
 
@@ -61,11 +70,11 @@ def get_sin_asignar_para_revision():
     instructores. Incluye en_revision sin revisor por compatibilidad con datos
     previos o estados intermedios.
     """
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         estado__in=ESTADOS_ACTIVOS,
         revisor__isnull=True,
         asignacion_compartida=False,
-    )
+    ), usuario)
 
 
 def get_pool_compartido_para(usuario):
@@ -76,19 +85,19 @@ def get_pool_compartido_para(usuario):
     if getattr(usuario, 'rol', None) not in ROLES_POOL_COMPARTIDO:
         return Preinforme.objects.none()
 
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         asignacion_compartida=True,
         revisor__isnull=True,
         estado__in=ESTADOS_ACTIVOS,
-    )
+    ), usuario)
 
 
 def get_finalizados_de(revisor):
     """Preinformes finalizados por un revisor."""
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         revisor=revisor,
         estado='finalizado',
-    )
+    ), revisor)
 
 
 def get_asignados_a_otros(usuario):
@@ -98,10 +107,10 @@ def get_asignados_a_otros(usuario):
     Permite ubicar errores de asignacion y tomar el estudio cuando corresponde.
     No incluye finalizados para evitar reabrir historiales ajenos.
     """
-    return Preinforme.objects.filter(
+    return _aplicar_scope_demo(Preinforme.objects.filter(
         estado__in=ESTADOS_ACTIVOS,
         revisor__isnull=False,
-    ).exclude(revisor=usuario)
+    ).exclude(revisor=usuario), usuario)
 
 
 def get_revision_todos_para(usuario):
@@ -122,7 +131,7 @@ def get_revision_todos_para(usuario):
             asignacion_compartida=False,
         )
 
-    return Preinforme.objects.filter(base_filter)
+    return _aplicar_scope_demo(Preinforme.objects.filter(base_filter), usuario)
 
 
 def get_revision_queryset(usuario, mostrar):
@@ -136,7 +145,7 @@ def get_revision_queryset(usuario, mostrar):
     if mostrar == 'asignados':
         return get_asignados_de(usuario)
     if mostrar == 'sin_asignar':
-        return get_sin_asignar_para_revision()
+        return get_sin_asignar_para_revision(usuario)
     if mostrar == 'asignados_otros':
         return get_asignados_a_otros(usuario)
     if mostrar == 'compartidos':

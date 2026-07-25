@@ -196,6 +196,7 @@
 
     <!-- Acciones rápidas del gestor -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        {% if not request.user.is_demo_user %}
         <a href="{% url 'control_guardias:distribucion' %}"
            class="bg-white border border-gray-200 hover:border-emerald-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
             <div class="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-emerald-200 transition-colors">
@@ -232,6 +233,7 @@
             </span>
             {% endif %}
         </a>
+        {% endif %}
 
         <a href="{% url 'control_guardias:calendario' %}"
            class="bg-white border border-gray-200 hover:border-blue-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
@@ -254,14 +256,14 @@
             </p>
         </a>
 
-        <a href="{% url 'control_guardias:configuracion' %}"
+        {% if not request.user.is_demo_user %}<a href="{% url 'control_guardias:configuracion' %}"
            class="bg-white border border-gray-200 hover:border-gray-400 rounded-xl p-5 transition-colors group shadow-sm hover:shadow">
             <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-gray-200 transition-colors">
                 <i class="fas fa-gear text-gray-600"></i>
             </div>
             <p class="font-semibold text-gray-900">Configuración</p>
             <p class="text-sm text-gray-500 mt-0.5">Tipos de guardia, cuotas, feriados</p>
-        </a>
+        </a>{% endif %}
     </div>
 
     <!-- Guardias próximas publicadas -->
