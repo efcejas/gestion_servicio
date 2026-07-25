@@ -32,14 +32,14 @@
 
     {% else %}
         <!-- ========== CARTEL DE BIENVENIDA PARA TODOS LOS DEMÁS USUARIOS ========== -->
-        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary rounded-2xl p-8 text-white mb-6">
-            <div class="flex items-center">
-                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mr-6">
+        <div class="bg-gradient-to-r from-medical-primary to-medical-secondary rounded-2xl p-5 md:p-8 text-white mb-6">
+            <div class="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-0">
+                <div class="w-14 h-14 md:w-20 md:h-20 bg-white/20 rounded-full flex items-center justify-center md:mr-6 shrink-0">
                     <i class="fas fa-user-circle text-3xl"></i>
                 </div>
-                <div class="ml-4">
-                    <div class="flex items-center gap-3 mb-2">
-                        <h2 class="text-2xl font-bold">¡Hola, {{ user.first_name }}!</h2>
+                <div class="w-full md:ml-4 min-w-0">
+                    <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 mb-2">
+                        <h2 class="text-xl md:text-2xl font-bold leading-tight break-words">¡Hola, {{ user.first_name }}!</h2>
                         {% if user.is_superuser %}
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/20 text-white border border-white/30 backdrop-blur-sm">
                                 <i class="fas fa-cog mr-1.5"></i>
@@ -55,20 +55,20 @@
                     </div>
                     {% if user.es_medico %}
                         {% if user.rol == 'medico_residente' %}
-                            <p class="text-white/90 text-lg">Bienvenido a tu espacio de formación. Accede a protocolos, novedades y más. ¡Éxitos en tu aprendizaje!</p>
+                            <p class="text-white/90 text-base md:text-lg leading-relaxed">Bienvenido a tu espacio de formación. Accede a protocolos, novedades y más. ¡Éxitos en tu aprendizaje!</p>
                         {% elif user.rol == 'jefe_residentes' %}
-                            <p class="text-white/90 text-lg">Como jefe de residentes, coordina la formación y accede a los recursos del servicio. ¡Gracias por tu liderazgo!</p>
+                            <p class="text-white/90 text-base md:text-lg leading-relaxed">Como jefe de residentes, coordina la formación y accede a los recursos del servicio. ¡Gracias por tu liderazgo!</p>
                         {% elif user.rol == 'instructor_residentes' %}
-                            <p class="text-white/90 text-lg">Guía la formación de los residentes con las herramientas del servicio. ¡Gracias por tu dedicación!</p>
+                            <p class="text-white/90 text-base md:text-lg leading-relaxed">Guía la formación de los residentes con las herramientas del servicio. ¡Gracias por tu dedicación!</p>
                         {% elif user.rol == 'cardiologo' %}
-                            <p class="text-white/90 text-lg">Accedé rápido a tus estudios, al resumen mensual y a las herramientas clínicas del servicio.</p>
+                            <p class="text-white/90 text-base md:text-lg leading-relaxed">Accedé rápido a tus estudios, al resumen mensual y a las herramientas clínicas del servicio.</p>
                         {% else %}
-                            <p class="text-white/90 text-lg">Gestiona tus estudios, procedimientos y accede a los protocolos del servicio. ¡Gracias por tu compromiso!</p>
+                            <p class="text-white/90 text-base md:text-lg leading-relaxed">Gestiona tus estudios, procedimientos y accede a los protocolos del servicio. ¡Gracias por tu compromiso!</p>
                         {% endif %}
                     {% elif user.rol == 'tecnico' %}
-                        <p class="text-white/90 text-lg">Accede a protocolos técnicos y novedades del servicio de imágenes. ¡Gracias por tu trabajo!</p>
+                        <p class="text-white/90 text-base md:text-lg leading-relaxed">Accede a protocolos técnicos y novedades del servicio de imágenes. ¡Gracias por tu trabajo!</p>
                     {% else %}
-                        <p class="text-white/90 text-lg">Bienvenido a la plataforma del servicio de imágenes. Aquí encontrarás todo lo necesario para tu gestión diaria.</p>
+                        <p class="text-white/90 text-base md:text-lg leading-relaxed">Bienvenido a la plataforma del servicio de imágenes. Aquí encontrarás todo lo necesario para tu gestión diaria.</p>
                     {% endif %}
                 </div>
             </div>
