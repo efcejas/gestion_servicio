@@ -113,6 +113,29 @@ class DemoPrivacyTests(TestCase):
         self.assertIn('apellido_paciente', form.errors)
         self.assertIn('nombre_paciente', form.errors)
 
+    def test_demo_user_is_not_available_as_reviewer_for_residents(self):
+        form = PreinformeForm(user=self.residente)
+
+        self.assertNotIn(self.demo, form.fields['revisor'].queryset)
+        self.assertIn(self.jefe, form.fields['revisor'].queryset)
+
+        bound_form = PreinformeForm(
+            data={
+                'numero_estudio': 'INTENTO-ASIGNAR-DEMO',
+                'tipo_estudio': self.preinforme.tipo_estudio_id,
+                'region': self.preinforme.region_id,
+                'sistema_destino': 'eges',
+                'revisor': self.demo.pk,
+                'apellido_paciente': 'Paciente',
+                'nombre_paciente': 'Produccion',
+                'informe_html': '<p>Informe</p>',
+            },
+            user=self.residente,
+        )
+
+        self.assertFalse(bound_form.is_valid())
+        self.assertIn('revisor', bound_form.errors)
+
     def test_demo_navbar_and_home_are_restricted(self):
         self.client.force_login(self.demo)
         response = self.client.get(reverse('home'))

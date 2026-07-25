@@ -27,7 +27,8 @@ class PreinformeForm(forms.ModelForm):
     # Campo adicional para asignar revisor
     revisor = forms.ModelChoiceField(
         queryset=User.objects.filter(
-            rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+            rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'],
+            is_demo_user=False,
         ).order_by('first_name', 'last_name'),
         required=False,
         empty_label="Asignar revisor (opcional)",
@@ -153,12 +154,14 @@ class PreinformeForm(forms.ModelForm):
             if user.rol == 'medico_residente':
                 # Residentes pueden asignar a: staff, jefes, instructores y jefe servicio
                 self.fields['revisor'].queryset = User.objects.filter(
-                    rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio']
+                    rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'],
+                    is_demo_user=False,
                 ).order_by('first_name', 'last_name')
             elif user.rol in ['jefe_residentes', 'instructor_residentes']:
                 # Jefes e instructores solo pueden asignar a: staff y jefe servicio
                 self.fields['revisor'].queryset = User.objects.filter(
-                    rol__in=['medico_staff', 'jefe_servicio']
+                    rol__in=['medico_staff', 'jefe_servicio'],
+                    is_demo_user=False,
                 ).order_by('first_name', 'last_name')
     
     def clean_plantilla_utilizada(self):
