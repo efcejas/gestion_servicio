@@ -24,6 +24,8 @@
     <form method="post" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
         <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
+        <input type="hidden" name="propuesta_plantilla_ia_id" id="propuestaPlantillaIAId" value="">
+        <input type="hidden" name="valores_plantilla_ia" id="valoresPlantillaIA" value="">
 
         <!-- Información del Estudio -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -112,6 +114,16 @@
                                     <i class="fas fa-plus mr-1"></i>
                                     <span class="hidden sm:inline">Nueva</span>
                                 </button>
+                                {% if generador_plantillas_ia_habilitado %}
+                                <button type="button"
+                                        id="btnGenerarPlantillaIA"
+                                        disabled
+                                        class="flex-shrink-0 inline-flex items-center px-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-medium rounded transition shadow-sm"
+                                        title="Seleccioná tipo de estudio y región primero">
+                                    <i class="fas fa-wand-magic-sparkles mr-1"></i>
+                                    <span class="hidden sm:inline">Generar con IA</span>
+                                </button>
+                                {% endif %}
                             {% endif %}
                         </div>
                         {% if preinforme.pk %}
@@ -480,12 +492,119 @@
         </div>
     </div>
     {% endif %}
+
+    {% if generador_plantillas_ia_habilitado and not preinforme.pk %}
+    <div id="modalGeneradorPlantillaIA"
+         class="hidden fixed inset-0 z-50 overflow-y-auto bg-white bg-opacity-20 backdrop-blur-sm"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="tituloGeneradorPlantillaIA">
+        <div id="generadorPlantillaIABackdrop" class="min-h-screen px-4 py-8 flex items-start justify-center">
+            <div class="w-full max-w-3xl bg-white rounded-2xl shadow-xl overflow-hidden">
+                <div class="px-6 py-4 bg-indigo-700 text-white flex items-center justify-between">
+                    <div>
+                        <h3 id="tituloGeneradorPlantillaIA" class="text-lg font-semibold">Generador de plantilla</h3>
+                        <p class="text-xs text-indigo-100">La propuesta será revisada antes de incorporarse a la biblioteca.</p>
+                    </div>
+                    <button type="button" id="cerrarGeneradorPlantillaIA" class="text-indigo-100 hover:text-white" aria-label="Cerrar">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="p-6 space-y-5">
+                    <div id="generadorPasoSolicitud" class="space-y-4">
+                        <div>
+                            <label for="iaEstudioEspecifico" class="block text-sm font-medium text-gray-700 mb-1">¿Qué estudio necesitás?</label>
+                            <input id="iaEstudioEspecifico" type="text" maxlength="200"
+                                   placeholder="Ej.: RM de muñeca"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="iaInstruccionUsuario" class="block text-sm font-medium text-gray-700 mb-1">Indicaciones adicionales <span class="text-gray-400">(opcional)</span></label>
+                            <textarea id="iaInstruccionUsuario" rows="2" maxlength="500"
+                                      placeholder="Ej.: plantilla breve para estudio normal"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">No ingreses nombres, DNI ni otros datos del paciente.</p>
+                        </div>
+                    </div>
+
+                    <div id="generadorPasoPreview" class="hidden space-y-4">
+                        <div>
+                            <label for="iaPreviewTitulo" class="block text-sm font-medium text-gray-700 mb-1">Título</label>
+                            <input id="iaPreviewTitulo" type="text" maxlength="500"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label for="iaPreviewEncabezado" class="block text-sm font-medium text-gray-700 mb-1">Encabezado</label>
+                            <textarea id="iaPreviewEncabezado" rows="3" readonly
+                                      class="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-700 rounded-lg"></textarea>
+                            <p class="mt-1 text-xs text-gray-500">Las condiciones técnicas se completan al cargar la plantilla.</p>
+                        </div>
+                        <div>
+                            <label for="iaPreviewHallazgos" class="block text-sm font-medium text-gray-700 mb-1">Hallazgos <span class="text-gray-400">(una oración por línea)</span></label>
+                            <textarea id="iaPreviewHallazgos" rows="7"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                        <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                            <label for="iaObservacionRegeneracion" class="block text-sm font-medium text-indigo-900 mb-1">
+                                ¿Qué querés modificar? <span class="font-normal text-indigo-500">(opcional)</span>
+                            </label>
+                            <textarea id="iaObservacionRegeneracion" rows="2" maxlength="500"
+                                      placeholder="Ej.: hacerlo más breve o priorizar la evaluación vascular"
+                                      class="w-full px-3 py-2 border border-indigo-200 bg-white rounded-lg"></textarea>
+                            <p class="mt-1 text-xs text-indigo-700">La propuesta actual se conservará si la regeneración falla.</p>
+                        </div>
+                    </div>
+
+                    <div id="generadorPasoVariables" class="hidden space-y-4">
+                        <div class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-3">
+                            <h4 class="text-sm font-semibold text-indigo-900">Datos de este estudio</h4>
+                            <p class="mt-1 text-xs text-indigo-700">La plantilla ya quedó guardada como pendiente. Completá estos datos para cargarla en el preinforme.</p>
+                        </div>
+                        <div id="iaVariablesContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                    </div>
+
+                    <div id="iaGeneradorError" class="hidden px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+
+                    <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4 border-t">
+                        <button type="button" id="iaCancelarGeneracion"
+                                class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                        <button type="button" id="iaGenerarPropuesta"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+                            <i class="fas fa-wand-magic-sparkles mr-1"></i>Generar propuesta
+                        </button>
+                        <button type="button" id="iaUsarPropuesta"
+                                class="hidden px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+                            <i class="fas fa-check mr-1"></i>Aceptar y cargar
+                        </button>
+                        <button type="button" id="iaRegenerarPropuesta"
+                                class="hidden px-4 py-2 border border-indigo-300 text-indigo-700 bg-white rounded-lg text-sm font-medium hover:bg-indigo-50">
+                            <i class="fas fa-rotate mr-1"></i>Regenerar
+                        </button>
+                        <button type="button" id="iaCargarPreinforme"
+                                class="hidden px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+                            <i class="fas fa-file-import mr-1"></i>Cargar en el preinforme
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const DICTADO_CURSOR_HABILITADO = {{ dictado_cursor_habilitado|yesno:'true,false' }};
     const TRANSCRIBIR_URL = '{% url "dictado_informes:transcribir_whisper" %}';
+    function getCsrfToken() {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (input?.value) return input.value;
+        const cookie = document.cookie.match(/csrftoken=([^;]+)/);
+        return cookie ? decodeURIComponent(cookie[1]) : '';
+    }
     const dictadoToggleButton = document.getElementById('dictado-toggle');
     const dictadoStatusLabel = document.getElementById('dictado-status');
     let dictadoMediaRecorder = null;
@@ -977,6 +1096,14 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('📋 Aplicando plantilla ID:', plantillaId);
         
+        if (plantillaId.startsWith('propuesta-')) {
+            const propuestaId = plantillaId.replace('propuesta-', '');
+            if (window.abrirPropuestaPlantillaIA) {
+                window.abrirPropuestaPlantillaIA(propuestaId);
+            }
+            return;
+        }
+
         // Mostrar spinner
         const spinner = document.getElementById('plantillaLoadingSpinner');
         if (spinner) {
@@ -1637,6 +1764,385 @@ document.addEventListener('DOMContentLoaded', function() {
             form.submit();
         });
     } // Fin del else if (btnAbrir)
+
+    const btnGenerarPlantillaIA = document.getElementById('btnGenerarPlantillaIA');
+    const modalGeneradorPlantillaIA = document.getElementById('modalGeneradorPlantillaIA');
+    if (btnGenerarPlantillaIA && modalGeneradorPlantillaIA) {
+        const pasoSolicitud = document.getElementById('generadorPasoSolicitud');
+        const pasoPreview = document.getElementById('generadorPasoPreview');
+        const pasoVariables = document.getElementById('generadorPasoVariables');
+        const btnGenerarPropuesta = document.getElementById('iaGenerarPropuesta');
+        const btnUsarPropuesta = document.getElementById('iaUsarPropuesta');
+        const btnRegenerarPropuesta = document.getElementById('iaRegenerarPropuesta');
+        const btnCargarPreinforme = document.getElementById('iaCargarPreinforme');
+        const errorGenerador = document.getElementById('iaGeneradorError');
+        const variablesContainer = document.getElementById('iaVariablesContainer');
+        let propuestaActualId = null;
+        let borradorActualToken = null;
+        let equiposDisponibles = [];
+
+        function actualizarBotonGeneradorIA() {
+            const habilitado = Boolean(tipoEstudioSelect?.value && regionSelect?.value);
+            btnGenerarPlantillaIA.disabled = !habilitado;
+            btnGenerarPlantillaIA.title = habilitado
+                ? 'Generar una propuesta para este tipo de estudio y región'
+                : 'Seleccioná tipo de estudio y región primero';
+        }
+
+        function mostrarErrorGenerador(mensaje) {
+            errorGenerador.textContent = mensaje;
+            errorGenerador.classList.remove('hidden');
+        }
+
+        function limpiarErrorGenerador() {
+            errorGenerador.textContent = '';
+            errorGenerador.classList.add('hidden');
+        }
+
+        function cerrarGenerador() {
+            modalGeneradorPlantillaIA.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            btnGenerarPlantillaIA.focus();
+        }
+
+        function crearCampoVariable(variable) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'space-y-1';
+            const label = document.createElement('label');
+            label.className = 'block text-sm font-medium text-gray-700';
+            const etiquetas = {
+                lateralidad: 'Lateralidad',
+                equipo: 'Equipo utilizado',
+                contraste_ev: 'Contraste endovenoso',
+                marca_contraste: 'Marca del contraste',
+                volumen_contraste_ml: 'Volumen de contraste EV (ml)',
+                contraste_oral: 'Contraste oral',
+            };
+            label.textContent = etiquetas[variable.codigo] || variable.codigo;
+            wrapper.appendChild(label);
+
+            let input;
+            let detalleValorFijo = null;
+            if (variable.codigo === 'lateralidad') {
+                input = document.createElement('select');
+                variable.opciones.forEach((opcion) => {
+                    const option = document.createElement('option');
+                    option.value = opcion;
+                    option.textContent = opcion.charAt(0).toUpperCase() + opcion.slice(1);
+                    input.appendChild(option);
+                });
+            } else if (variable.codigo === 'equipo') {
+                input = document.createElement('select');
+                const empty = document.createElement('option');
+                empty.value = '';
+                empty.textContent = 'No consignar equipo';
+                input.appendChild(empty);
+                equiposDisponibles.forEach((equipo) => {
+                    const option = document.createElement('option');
+                    option.value = equipo.id;
+                    const detalle = [equipo.fabricante, equipo.modelo].filter(Boolean).join(' ');
+                    option.textContent = detalle ? `${equipo.nombre} — ${detalle}` : equipo.nombre;
+                    input.appendChild(option);
+                });
+            } else if (variable.tipo === 'booleano') {
+                input = document.createElement('select');
+                [['false', 'No'], ['true', 'Sí']].forEach(([value, text]) => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = text;
+                    input.appendChild(option);
+                });
+                if (Object.prototype.hasOwnProperty.call(variable, 'valor_fijo')) {
+                    input.value = variable.valor_fijo ? 'true' : 'false';
+                    input.disabled = true;
+                    detalleValorFijo = document.createElement('p');
+                    detalleValorFijo.className = 'text-xs text-indigo-600 mt-1';
+                    detalleValorFijo.textContent = variable.motivo_valor_fijo || 'Valor definido por el protocolo institucional.';
+                }
+            } else if (variable.tipo === 'texto') {
+                input = document.createElement('input');
+                input.type = 'text';
+                input.maxLength = 120;
+                input.value = variable.codigo === 'marca_contraste' ? 'Otro' : '';
+            } else {
+                input = document.createElement('input');
+                input.type = 'number';
+                input.min = '0.01';
+                input.max = '999';
+                input.step = '0.01';
+            }
+            input.dataset.variableCodigo = variable.codigo;
+            input.className = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm';
+            wrapper.appendChild(input);
+            if (detalleValorFijo) wrapper.appendChild(detalleValorFijo);
+            return wrapper;
+        }
+
+        function renderizarVariables(variables) {
+            variablesContainer.innerHTML = '';
+            variables.forEach((variable) => {
+                variablesContainer.appendChild(crearCampoVariable(variable));
+            });
+            const contrasteSelect = variablesContainer.querySelector('[data-variable-codigo="contraste_ev"]');
+            const volumenInput = variablesContainer.querySelector('[data-variable-codigo="volumen_contraste_ml"]');
+            const marcaInput = variablesContainer.querySelector('[data-variable-codigo="marca_contraste"]');
+            if (contrasteSelect && volumenInput && marcaInput) {
+                const volumenWrapper = volumenInput.parentElement;
+                const marcaWrapper = marcaInput.parentElement;
+                const actualizarVolumen = () => {
+                    const mostrar = contrasteSelect.value === 'true';
+                    volumenWrapper.classList.toggle('hidden', !mostrar);
+                    marcaWrapper.classList.toggle('hidden', !mostrar);
+                    if (!mostrar) {
+                        volumenInput.value = '';
+                        marcaInput.value = '';
+                    } else if (!marcaInput.value) {
+                        marcaInput.value = 'Otro';
+                    }
+                };
+                contrasteSelect.addEventListener('change', actualizarVolumen);
+                actualizarVolumen();
+            }
+        }
+
+        function obtenerValoresVariables() {
+            const valores = {};
+            variablesContainer.querySelectorAll('[data-variable-codigo]').forEach((input) => {
+                const codigo = input.dataset.variableCodigo;
+                if (input.tagName === 'SELECT' && ['contraste_ev', 'contraste_oral'].includes(codigo)) {
+                    valores[codigo] = input.value === 'true';
+                } else {
+                    valores[codigo] = input.value;
+                }
+            });
+            if (valores.contraste_ev === false && 'volumen_contraste_ml' in valores) {
+                valores.volumen_contraste_ml = '';
+            }
+            return valores;
+        }
+
+        window.abrirPropuestaPlantillaIA = async (propuestaId) => {
+            limpiarErrorGenerador();
+            borradorActualToken = null;
+            try {
+                const response = await fetch(
+                    '{% url "preinformes:propuesta_plantilla_json" pk=0 %}'.replace('/0/', `/${propuestaId}/`)
+                );
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'No se pudo cargar la plantilla pendiente.');
+
+                propuestaActualId = data.propuesta.id;
+                equiposDisponibles = data.equipos || [];
+                renderizarVariables(data.propuesta.variables);
+                pasoSolicitud.classList.add('hidden');
+                pasoPreview.classList.add('hidden');
+                pasoVariables.classList.remove('hidden');
+                btnGenerarPropuesta.classList.add('hidden');
+                btnUsarPropuesta.classList.add('hidden');
+                btnRegenerarPropuesta.classList.add('hidden');
+                btnCargarPreinforme.classList.remove('hidden');
+                modalGeneradorPlantillaIA.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            } catch (error) {
+                mostrarErrorGenerador(error.message);
+                modalGeneradorPlantillaIA.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+        };
+
+        btnGenerarPlantillaIA.addEventListener('click', () => {
+            if (!tipoEstudioSelect.value || !regionSelect.value) return;
+            propuestaActualId = null;
+            borradorActualToken = null;
+            pasoSolicitud.classList.remove('hidden');
+            pasoPreview.classList.add('hidden');
+            pasoVariables.classList.add('hidden');
+            btnGenerarPropuesta.classList.remove('hidden');
+            btnUsarPropuesta.classList.add('hidden');
+            btnRegenerarPropuesta.classList.add('hidden');
+            btnCargarPreinforme.classList.add('hidden');
+            limpiarErrorGenerador();
+            modalGeneradorPlantillaIA.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            setTimeout(() => document.getElementById('iaEstudioEspecifico')?.focus(), 0);
+        });
+
+        document.getElementById('cerrarGeneradorPlantillaIA')?.addEventListener('click', cerrarGenerador);
+        document.getElementById('iaCancelarGeneracion')?.addEventListener('click', cerrarGenerador);
+        document.getElementById('generadorPlantillaIABackdrop')?.addEventListener('click', (event) => {
+            if (event.target === event.currentTarget) cerrarGenerador();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modalGeneradorPlantillaIA.classList.contains('hidden')) {
+                cerrarGenerador();
+            }
+        });
+
+        btnGenerarPropuesta.addEventListener('click', async () => {
+            limpiarErrorGenerador();
+            const estudioEspecifico = document.getElementById('iaEstudioEspecifico').value.trim();
+            if (estudioEspecifico.length < 2) {
+                mostrarErrorGenerador('Indicá el estudio específico que necesitás.');
+                return;
+            }
+            btnGenerarPropuesta.disabled = true;
+            btnGenerarPropuesta.textContent = 'Generando...';
+            try {
+                const response = await fetch('{% url "preinformes:generar_plantilla_ia" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        tipo_estudio: tipoEstudioSelect.value,
+                        region: regionSelect.value,
+                        estudio_especifico: estudioEspecifico,
+                        instruccion_usuario: document.getElementById('iaInstruccionUsuario').value,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'No se pudo generar la propuesta.');
+
+                borradorActualToken = data.borrador_token;
+                equiposDisponibles = data.equipos || [];
+                document.getElementById('iaPreviewTitulo').value = data.propuesta.titulo;
+                document.getElementById('iaPreviewEncabezado').value = data.propuesta.encabezado;
+                document.getElementById('iaPreviewHallazgos').value = data.propuesta.hallazgos;
+                pasoSolicitud.classList.add('hidden');
+                pasoPreview.classList.remove('hidden');
+                btnGenerarPropuesta.classList.add('hidden');
+                btnUsarPropuesta.classList.remove('hidden');
+                btnRegenerarPropuesta.classList.remove('hidden');
+            } catch (error) {
+                mostrarErrorGenerador(error.message);
+            } finally {
+                btnGenerarPropuesta.disabled = false;
+                btnGenerarPropuesta.innerHTML = '<i class="fas fa-wand-magic-sparkles mr-1"></i>Generar propuesta';
+            }
+        });
+
+        btnRegenerarPropuesta.addEventListener('click', async () => {
+            limpiarErrorGenerador();
+            const observacion = document.getElementById('iaObservacionRegeneracion').value.trim();
+            const estudioEspecifico = document.getElementById('iaEstudioEspecifico').value.trim();
+            btnRegenerarPropuesta.disabled = true;
+            btnRegenerarPropuesta.textContent = 'Regenerando...';
+            try {
+                const indicacionBase = document.getElementById('iaInstruccionUsuario').value.trim();
+                const instruccion = [indicacionBase, observacion && `Ajuste solicitado: ${observacion}`]
+                    .filter(Boolean)
+                    .join('\n')
+                    .slice(0, 500);
+                const response = await fetch('{% url "preinformes:generar_plantilla_ia" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        tipo_estudio: tipoEstudioSelect.value,
+                        region: regionSelect.value,
+                        estudio_especifico: estudioEspecifico,
+                        instruccion_usuario: instruccion,
+                    }),
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'No se pudo regenerar la propuesta.');
+
+                borradorActualToken = data.borrador_token;
+                equiposDisponibles = data.equipos || [];
+                document.getElementById('iaPreviewTitulo').value = data.propuesta.titulo;
+                document.getElementById('iaPreviewEncabezado').value = data.propuesta.encabezado;
+                document.getElementById('iaPreviewHallazgos').value = data.propuesta.hallazgos;
+                document.getElementById('iaObservacionRegeneracion').value = '';
+            } catch (error) {
+                mostrarErrorGenerador(
+                    `${error.message} La propuesta anterior continúa disponible.`
+                );
+            } finally {
+                btnRegenerarPropuesta.disabled = false;
+                btnRegenerarPropuesta.innerHTML = '<i class="fas fa-rotate mr-1"></i>Regenerar';
+            }
+        });
+
+        btnUsarPropuesta.addEventListener('click', async () => {
+            if (!borradorActualToken) return;
+            limpiarErrorGenerador();
+            btnUsarPropuesta.disabled = true;
+            try {
+                const response = await fetch(
+                    '{% url "preinformes:aceptar_borrador_plantilla_ia" %}',
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCsrfToken(),
+                        },
+                        body: JSON.stringify({
+                            borrador_token: borradorActualToken,
+                            titulo: document.getElementById('iaPreviewTitulo').value,
+                            hallazgos: document.getElementById('iaPreviewHallazgos').value,
+                        }),
+                    }
+                );
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'No se pudo aceptar la propuesta.');
+
+                propuestaActualId = data.propuesta_id;
+                renderizarVariables(data.variables);
+                pasoPreview.classList.add('hidden');
+                pasoVariables.classList.remove('hidden');
+                btnUsarPropuesta.classList.add('hidden');
+                btnRegenerarPropuesta.classList.add('hidden');
+                btnCargarPreinforme.classList.remove('hidden');
+            } catch (error) {
+                mostrarErrorGenerador(error.message);
+            } finally {
+                btnUsarPropuesta.disabled = false;
+            }
+        });
+
+        btnCargarPreinforme.addEventListener('click', async () => {
+            if (!propuestaActualId) return;
+            limpiarErrorGenerador();
+            const editor = initializeEditorIfNeeded();
+            const contenidoActual = editor ? editor.getData().trim() : '';
+            if (contenidoActual && !confirm('El editor ya contiene texto. ¿Querés reemplazarlo con la plantilla generada?')) {
+                return;
+            }
+            btnCargarPreinforme.disabled = true;
+            try {
+                const response = await fetch(
+                    '{% url "preinformes:aplicar_plantilla_ia" pk=0 %}'.replace('/0/', `/${propuestaActualId}/`),
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCsrfToken(),
+                        },
+                        body: JSON.stringify({ valores: obtenerValoresVariables() }),
+                    }
+                );
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || 'No se pudo cargar la plantilla.');
+
+                setEditorContent(data.contenido, false);
+                document.getElementById('propuestaPlantillaIAId').value = data.propuesta_id;
+                document.getElementById('valoresPlantillaIA').value = JSON.stringify(data.valores);
+                if (plantillaSelect) plantillaSelect.value = '';
+                cerrarGenerador();
+            } catch (error) {
+                mostrarErrorGenerador(error.message);
+            } finally {
+                btnCargarPreinforme.disabled = false;
+            }
+        });
+
+        tipoEstudioSelect?.addEventListener('change', actualizarBotonGeneradorIA);
+        regionSelect?.addEventListener('change', actualizarBotonGeneradorIA);
+        actualizarBotonGeneradorIA();
+    }
     
     {% if not request.user.is_demo_user %}
     // === SISTEMA DE DETECCIÓN DE DUPLICADOS ===

@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     TipoEstudio, Region, PlantillaPreinforme, Preinforme, 
     RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
-    AdjuntoPreinforme
+    AdjuntoPreinforme, PropuestaPlantillaPreinforme,
+    VersionPlantillaPreinforme, AplicacionPlantillaPreinforme,
 )
 
 
@@ -86,6 +87,52 @@ class PlantillaPreinformeAdmin(admin.ModelAdmin):
             obj.contenido = normalize_html_content_soft(obj.contenido)
         
         super().save_model(request, obj, form, change)
+
+
+@admin.register(PropuestaPlantillaPreinforme)
+class PropuestaPlantillaPreinformeAdmin(admin.ModelAdmin):
+    list_display = [
+        'estudio_especifico', 'tipo_estudio', 'region', 'tipo_solicitud',
+        'estado', 'autor', 'revisor', 'fecha_creacion',
+    ]
+    list_filter = [
+        'estado', 'tipo_solicitud', 'tipo_estudio', 'region', 'fecha_creacion',
+    ]
+    search_fields = [
+        'estudio_especifico', 'titulo', 'autor__username', 'revisor__username',
+    ]
+    readonly_fields = [
+        'fecha_creacion', 'fecha_modificacion', 'fecha_envio_revision',
+        'fecha_inicio_revision', 'fecha_resolucion',
+    ]
+
+
+@admin.register(VersionPlantillaPreinforme)
+class VersionPlantillaPreinformeAdmin(admin.ModelAdmin):
+    list_display = [
+        'plantilla', 'numero', 'vigente', 'aprobada_por', 'fecha_aprobacion',
+    ]
+    list_filter = ['vigente', 'fecha_aprobacion', 'plantilla__tipo_estudio']
+    search_fields = [
+        'plantilla__nombre', 'titulo', 'aprobada_por__username',
+    ]
+    readonly_fields = ['fecha_aprobacion']
+
+
+@admin.register(AplicacionPlantillaPreinforme)
+class AplicacionPlantillaPreinformeAdmin(admin.ModelAdmin):
+    list_display = [
+        'preinforme', 'plantilla', 'version', 'propuesta',
+        'aplicada_por', 'fecha_aplicacion',
+    ]
+    list_filter = [
+        'contraste_ev', 'contraste_oral', 'lateralidad', 'fecha_aplicacion',
+    ]
+    search_fields = [
+        'preinforme__numero_estudio', 'plantilla__nombre',
+        'propuesta__estudio_especifico', 'aplicada_por__username',
+    ]
+    readonly_fields = ['fecha_aplicacion']
 
 
 class RevisionPreinformeInline(admin.StackedInline):

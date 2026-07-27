@@ -10,6 +10,8 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.paginator import Paginator
 from django.core.files.uploadedfile import UploadedFile
 from django.core.cache import cache
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core import signing
 from django.db.models import Q, Count, Avg
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
@@ -20,22 +22,29 @@ import re
 import html
 import unicodedata
 
-from accounts.decorators import role_required
+from accounts.decorators import medical_staff_required, role_required
 from .models import (
     Preinforme, TipoEstudio, Region, PlantillaPreinforme, 
     RevisionPreinforme, HistorialEstudios, EtiquetaPreinforme,
     AdjuntoPreinforme,
     EncuestaResidente,
+    AplicacionPlantillaPreinforme, PropuestaPlantillaPreinforme,
+    VersionPlantillaPreinforme,
     prepare_editor_html_content,
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
     RevisionPreinformeForm, PlantillaPreinformeForm,
-    NuevaPlantillaResidenteForm
+    NuevaPlantillaResidenteForm, GenerarPlantillaIAForm,
 )
+from .exceptions import GeneracionPlantillaError
+from .template_generator_service import TemplateGeneratorService
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+
+BORRADOR_PLANTILLA_IA_SALT = 'preinformes.borrador-plantilla-ia.v1'
+BORRADOR_PLANTILLA_IA_MAX_AGE = 60 * 60
 
 MAX_ADJUNTOS_POR_ORIGEN = 3
 MAX_ADJUNTO_SIZE_MB = 5
@@ -107,6 +116,333 @@ def _guardar_adjuntos_preinforme(preinforme, archivos, subido_por, origen):
         return 0, 'No se pudieron guardar las imágenes. Inténtalo nuevamente.'
 
     return len(creados), None
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body.decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+
+def _area_equipo_para_tipo_estudio(tipo_estudio):
+    nombre = unicodedata.normalize('NFKD', tipo_estudio.nombre or '')
+    nombre = ''.join(char for char in nombre if not unicodedata.combining(char)).lower()
+    if 'reson' in nombre or nombre.strip() == 'rm':
+        return 'RM'
+    if 'tomograf' in nombre or nombre.strip() in {'tc', 'tom'}:
+        return 'TOM'
+    if 'radiograf' in nombre or 'rayos' in nombre or nombre.strip() == 'rx':
+        return 'RX'
+    if 'ecograf' in nombre or nombre.strip() == 'eco':
+        return 'ECO'
+    return None
+
+
+@require_http_methods(['POST'])
+@medical_staff_required
+def generar_plantilla_ia(request):
+    """Genera una propuesta privada y estructurada para vista previa."""
+    if not getattr(settings, 'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO', False):
+        return JsonResponse({'error': 'El generador no está habilitado.'}, status=404)
+
+    payload = _json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'La solicitud no contiene JSON válido.'}, status=400)
+
+    form = GenerarPlantillaIAForm(payload)
+    if not form.is_valid():
+        return JsonResponse(
+            {'error': 'Revisá los datos ingresados.', 'fields': form.errors},
+            status=400,
+        )
+
+    servicio = TemplateGeneratorService()
+    condiciones = servicio.inferir_condiciones(
+        form.cleaned_data['tipo_estudio'],
+        form.cleaned_data['estudio_especifico'],
+    )
+    try:
+        propuesta = servicio.generar_propuesta(
+            autor=request.user,
+            tipo_estudio=form.cleaned_data['tipo_estudio'],
+            region=form.cleaned_data['region'],
+            estudio_especifico=form.cleaned_data['estudio_especifico'],
+            instruccion_usuario=form.cleaned_data['instruccion_usuario'],
+            **condiciones,
+            fuentes_autorizadas=[],
+            persistir=False,
+        )
+    except GeneracionPlantillaError as error:
+        logger.warning(
+            'No se pudo generar plantilla IA para usuario %s: %s',
+            request.user.pk,
+            error,
+        )
+        return JsonResponse({'error': str(error)}, status=422)
+
+    from equipos.models import EquipoImagen
+    equipos_queryset = EquipoImagen.objects.filter(en_servicio=True)
+    area_equipo = _area_equipo_para_tipo_estudio(form.cleaned_data['tipo_estudio'])
+    if area_equipo:
+        equipos_queryset = equipos_queryset.filter(area=area_equipo)
+    equipos = list(
+        equipos_queryset
+        .values('id', 'nombre', 'fabricante', 'modelo', 'area')
+        .order_by('area', 'nombre')
+    )
+    return JsonResponse({
+        'propuesta': {
+            'titulo': propuesta.titulo,
+            'encabezado': propuesta.encabezado,
+            'hallazgos': propuesta.hallazgos,
+            'variables': propuesta.variables,
+        },
+        'borrador_token': signing.dumps(
+            {
+                'autor_id': request.user.pk,
+                'tipo_estudio_id': propuesta.tipo_estudio_id,
+                'region_id': propuesta.region_id,
+                'estudio_especifico': propuesta.estudio_especifico,
+                'instruccion_usuario': propuesta.instruccion_usuario,
+                'titulo': propuesta.titulo,
+                'encabezado': propuesta.encabezado,
+                'hallazgos': propuesta.hallazgos,
+                'variables': propuesta.variables,
+                'fuentes': propuesta.fuentes,
+                'proveedor_ia': propuesta.proveedor_ia,
+                'modelo_ia': propuesta.modelo_ia,
+                'version_instrucciones': propuesta.version_instrucciones,
+                'observacion_revision': propuesta.observacion_revision,
+            },
+            salt=BORRADOR_PLANTILLA_IA_SALT,
+            compress=True,
+        ),
+        'equipos': equipos,
+    })
+
+
+@require_http_methods(['POST'])
+@medical_staff_required
+def aceptar_borrador_plantilla_ia(request):
+    """Persiste y envía a revisión el borrador temporal aceptado."""
+    if not getattr(settings, 'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO', False):
+        return JsonResponse({'error': 'El generador no está habilitado.'}, status=404)
+
+    payload = _json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'La solicitud no contiene JSON válido.'}, status=400)
+    token = payload.get('borrador_token', '')
+    try:
+        borrador = signing.loads(
+            token,
+            salt=BORRADOR_PLANTILLA_IA_SALT,
+            max_age=BORRADOR_PLANTILLA_IA_MAX_AGE,
+        )
+    except signing.SignatureExpired:
+        return JsonResponse({
+            'error': 'El borrador temporal venció. Generá nuevamente la propuesta.'
+        }, status=410)
+    except signing.BadSignature:
+        return JsonResponse({'error': 'El borrador temporal no es válido.'}, status=400)
+
+    if borrador.get('autor_id') != request.user.pk:
+        return JsonResponse({'error': 'El borrador pertenece a otro usuario.'}, status=403)
+
+    servicio = TemplateGeneratorService()
+    try:
+        with transaction.atomic():
+            propuesta = PropuestaPlantillaPreinforme.objects.create(
+                autor=request.user,
+                tipo_estudio_id=borrador['tipo_estudio_id'],
+                region_id=borrador['region_id'],
+                estudio_especifico=borrador['estudio_especifico'],
+                instruccion_usuario=borrador.get('instruccion_usuario', ''),
+                titulo=borrador['titulo'],
+                encabezado=borrador['encabezado'],
+                hallazgos=borrador['hallazgos'],
+                variables=borrador.get('variables', []),
+                fuentes=borrador.get('fuentes', []),
+                proveedor_ia=borrador.get('proveedor_ia', ''),
+                modelo_ia=borrador.get('modelo_ia', ''),
+                version_instrucciones=borrador.get('version_instrucciones', ''),
+                observacion_revision=borrador.get('observacion_revision', ''),
+            )
+            servicio.actualizar_borrador(
+                propuesta=propuesta,
+                usuario=request.user,
+                titulo=payload.get('titulo', ''),
+                encabezado=propuesta.encabezado,
+                hallazgos=payload.get('hallazgos', ''),
+            )
+            propuesta.enviar_a_revision()
+    except (KeyError, GeneracionPlantillaError, ValidationError) as error:
+        return JsonResponse({'error': str(error)}, status=422)
+
+    return JsonResponse({
+        'propuesta_id': propuesta.pk,
+        'variables': propuesta.variables,
+        'estado': propuesta.estado,
+    })
+
+
+@require_http_methods(['POST'])
+@medical_staff_required
+def aceptar_plantilla_ia(request, pk):
+    """Guarda la base en la biblioteca pendiente y abre los datos del estudio."""
+    if not getattr(settings, 'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO', False):
+        return JsonResponse({'error': 'El generador no está habilitado.'}, status=404)
+
+    payload = _json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'La solicitud no contiene JSON válido.'}, status=400)
+
+    propuesta = get_object_or_404(
+        PropuestaPlantillaPreinforme,
+        pk=pk,
+        autor=request.user,
+    )
+    servicio = TemplateGeneratorService()
+    try:
+        servicio.actualizar_borrador(
+            propuesta=propuesta,
+            usuario=request.user,
+            titulo=payload.get('titulo', ''),
+            encabezado=propuesta.encabezado,
+            hallazgos=payload.get('hallazgos', ''),
+        )
+        propuesta.enviar_a_revision()
+    except (GeneracionPlantillaError, ValidationError) as error:
+        return JsonResponse({'error': str(error)}, status=422)
+
+    return JsonResponse({
+        'propuesta_id': propuesta.pk,
+        'variables': propuesta.variables,
+        'estado': propuesta.estado,
+    })
+
+
+@require_http_methods(['POST'])
+@medical_staff_required
+def aplicar_plantilla_ia(request, pk):
+    """Resuelve los datos del estudio y carga la base aceptada."""
+    if not getattr(settings, 'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO', False):
+        return JsonResponse({'error': 'El generador no está habilitado.'}, status=404)
+
+    payload = _json_body(request)
+    if payload is None:
+        return JsonResponse({'error': 'La solicitud no contiene JSON válido.'}, status=400)
+
+    propuesta = get_object_or_404(
+        PropuestaPlantillaPreinforme,
+        Q(
+            autor=request.user,
+            estado__in=[
+                PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+                PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+            ],
+        ) | Q(
+            estado=PropuestaPlantillaPreinforme.ESTADO_APROBADA,
+            version_publicada__vigente=True,
+            version_publicada__plantilla__activa=True,
+            version_publicada__plantilla__estado='publica',
+        ),
+        pk=pk,
+    )
+    try:
+        valores = payload.get('valores', {})
+        fuente = (
+            propuesta.version_publicada
+            if propuesta.estado == PropuestaPlantillaPreinforme.ESTADO_APROBADA
+            else propuesta
+        )
+        contenido = TemplateGeneratorService().renderizar_propuesta(
+            propuesta=fuente,
+            valores=valores,
+        )
+    except (GeneracionPlantillaError, ValidationError) as error:
+        return JsonResponse({'error': str(error)}, status=422)
+    except Exception:
+        logger.exception('Error inesperado al aplicar propuesta de plantilla %s', propuesta.pk)
+        return JsonResponse({
+            'error': 'No se pudo cargar la plantilla. Intentá nuevamente.'
+        }, status=500)
+
+    return JsonResponse({
+        'propuesta_id': propuesta.pk,
+        'contenido': contenido,
+        'valores': valores,
+        'estado': propuesta.estado,
+    })
+
+
+def _registrar_aplicacion_plantilla_ia(request, preinforme):
+    propuesta_id = request.POST.get('propuesta_plantilla_ia_id', '').strip()
+    valores_raw = request.POST.get('valores_plantilla_ia', '').strip()
+    if not propuesta_id:
+        return None
+
+    try:
+        valores = json.loads(valores_raw)
+        propuesta = PropuestaPlantillaPreinforme.objects.get(
+            Q(
+                autor=request.user,
+                estado__in=[
+                    PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+                    PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+                ],
+            ) | Q(
+                estado=PropuestaPlantillaPreinforme.ESTADO_APROBADA,
+                version_publicada__vigente=True,
+                version_publicada__plantilla__activa=True,
+                version_publicada__plantilla__estado='publica',
+            ),
+            pk=propuesta_id,
+        )
+        version = (
+            propuesta.version_publicada
+            if propuesta.estado == PropuestaPlantillaPreinforme.ESTADO_APROBADA
+            else None
+        )
+        TemplateGeneratorService().renderizar_propuesta(
+            propuesta=version or propuesta,
+            valores=valores,
+        )
+        equipo = None
+        if valores.get('equipo'):
+            from equipos.models import EquipoImagen
+            equipo = EquipoImagen.objects.get(pk=valores['equipo'], en_servicio=True)
+
+        aplicacion = AplicacionPlantillaPreinforme(
+            preinforme=preinforme,
+            plantilla=version.plantilla if version else None,
+            version=version,
+            propuesta=propuesta,
+            valores_variables=valores,
+            equipo=equipo,
+            lateralidad=valores.get('lateralidad', ''),
+            contraste_ev=valores.get('contraste_ev'),
+            volumen_contraste_ml=valores.get('volumen_contraste_ml') or None,
+            marca_contraste=valores.get('marca_contraste', ''),
+            contraste_oral=valores.get('contraste_oral'),
+            contenido_renderizado=preinforme.informe_html or '',
+            aplicada_por=request.user,
+        )
+        aplicacion.full_clean()
+        aplicacion.save()
+        return None
+    except (
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+        ObjectDoesNotExist,
+        PropuestaPlantillaPreinforme.DoesNotExist,
+        ValidationError,
+    ):
+        return (
+            'El preinforme se guardó, pero no pudo registrarse la trazabilidad '
+            'de la plantilla generada.'
+        )
 
 
 def _asegurar_resumen_ia_revision(revision):
@@ -360,6 +696,12 @@ def crear_preinforme(request):
             preinforme = form.save(commit=False)
             preinforme.residente = request.user
             preinforme.save()
+            error_aplicacion_ia = _registrar_aplicacion_plantilla_ia(
+                request,
+                preinforme,
+            )
+            if error_aplicacion_ia:
+                messages.warning(request, error_aplicacion_ia)
 
             archivos = [] if request.user.is_demo_user else request.FILES.getlist('imagenes_residente')
             cantidad_adjuntos, error_adjuntos = _guardar_adjuntos_preinforme(
@@ -427,6 +769,11 @@ def crear_preinforme(request):
         'adjuntos_residente': [],
         'adjuntos_revisor': [],
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
+        'generador_plantillas_ia_habilitado': getattr(
+            settings,
+            'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO',
+            False,
+        ),
         'title': 'Nuevo Preinforme'
     }
     
@@ -1120,19 +1467,187 @@ def cargar_plantillas(request):
     else:
         plantillas = plantillas.filter(estado='publica')
     
-    plantillas_data = [
+    plantillas_data = []
+    for plantilla in plantillas.prefetch_related('versiones_institucionales'):
+        version = next(
+            (
+                item for item in plantilla.versiones_institucionales.all()
+                if item.vigente and item.propuesta_origen_id
+            ),
+            None,
+        )
+        plantillas_data.append({
+            'id': (
+                f'propuesta-{version.propuesta_origen_id}'
+                if version else plantilla.id
+            ),
+            'nombre': plantilla.nombre,
+            'contenido': (
+                '' if version else _normalizar_html_editor(plantilla.contenido)
+            ),
+            'es_propia': (
+                plantilla.creada_por == request.user
+                if request.user.is_authenticated else False
+            ),
+            'es_propuesta_ia': bool(version),
+            'es_institucional': bool(version),
+            'estado': plantilla.estado,
+            'sistema_destino': (
+                'Institucional'
+                if version else plantilla.get_sistema_destino_display()
+            ),
+        })
+
+    propuestas = PropuestaPlantillaPreinforme.objects.filter(
+        autor=request.user,
+        estado__in=[
+            PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+            PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+        ],
+    )
+    if tipo_estudio_id:
+        propuestas = propuestas.filter(tipo_estudio_id=tipo_estudio_id)
+    if region_id:
+        propuestas = propuestas.filter(region_id=region_id)
+    plantillas_data.extend([
         {
-            'id': p.id, 
-            'nombre': p.nombre,
-            'contenido': _normalizar_html_editor(p.contenido),
-            'es_propia': p.creada_por == request.user if request.user.is_authenticated else False,
-            'estado': p.estado,
-            'sistema_destino': p.get_sistema_destino_display()
-        } 
-        for p in plantillas
-    ]
+            'id': f'propuesta-{propuesta.pk}',
+            'nombre': propuesta.estudio_especifico,
+            'contenido': '',
+            'es_propia': True,
+            'es_propuesta_ia': True,
+            'estado': propuesta.estado,
+            'sistema_destino': 'Pendiente de aprobación',
+        }
+        for propuesta in propuestas
+    ])
     
     return JsonResponse({'plantillas': plantillas_data})
+
+
+@login_required
+def propuesta_plantilla_json(request, pk):
+    """Carga una propuesta propia pendiente o una versión institucional."""
+    propuesta = get_object_or_404(
+        PropuestaPlantillaPreinforme,
+        Q(
+            autor=request.user,
+            estado__in=[
+                PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+                PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+            ],
+        ) | Q(
+            estado=PropuestaPlantillaPreinforme.ESTADO_APROBADA,
+            version_publicada__vigente=True,
+            version_publicada__plantilla__activa=True,
+            version_publicada__plantilla__estado='publica',
+        ),
+        pk=pk,
+    )
+    if propuesta.estado != PropuestaPlantillaPreinforme.ESTADO_APROBADA:
+        TemplateGeneratorService().actualizar_contrato_propuesta(propuesta)
+    from equipos.models import EquipoImagen
+    equipos_queryset = EquipoImagen.objects.filter(en_servicio=True)
+    area = _area_equipo_para_tipo_estudio(propuesta.tipo_estudio)
+    if area:
+        equipos_queryset = equipos_queryset.filter(area=area)
+    return JsonResponse({
+        'propuesta': {
+            'id': propuesta.pk,
+            'nombre': propuesta.estudio_especifico,
+            'variables': propuesta.variables,
+            'estado': propuesta.estado,
+        },
+        'equipos': list(
+            equipos_queryset.values(
+                'id', 'nombre', 'fabricante', 'modelo', 'area'
+            ).order_by('area', 'nombre')
+        ),
+    })
+
+
+@role_required('jefe_servicio')
+def lista_validacion_plantillas(request):
+    estado = request.GET.get('estado', 'pendientes')
+    propuestas = PropuestaPlantillaPreinforme.objects.select_related(
+        'autor', 'tipo_estudio', 'region', 'revisor',
+    ).annotate(total_usos=Count('aplicaciones'))
+    if estado == 'resueltas':
+        propuestas = propuestas.filter(estado__in=[
+            PropuestaPlantillaPreinforme.ESTADO_APROBADA,
+            PropuestaPlantillaPreinforme.ESTADO_RECHAZADA,
+        ])
+    else:
+        estado = 'pendientes'
+        propuestas = propuestas.filter(estado__in=[
+            PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+            PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+        ])
+    return render(request, 'preinformes/plantillas_validacion_lista.html', {
+        'propuestas': propuestas,
+        'estado_filtro': estado,
+        'pendientes_total': PropuestaPlantillaPreinforme.objects.filter(
+            estado__in=[
+                PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+                PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+            ],
+        ).count(),
+    })
+
+
+@role_required('jefe_servicio')
+def validar_plantilla(request, pk):
+    propuesta = get_object_or_404(
+        PropuestaPlantillaPreinforme.objects.select_related(
+            'autor', 'tipo_estudio', 'region', 'revisor',
+        ).annotate(total_usos=Count('aplicaciones')),
+        pk=pk,
+    )
+    editable = propuesta.estado in {
+        PropuestaPlantillaPreinforme.ESTADO_PENDIENTE,
+        PropuestaPlantillaPreinforme.ESTADO_EN_REVISION,
+    }
+    if request.method == 'POST':
+        if not editable:
+            messages.error(request, 'La propuesta ya fue resuelta.')
+            return redirect('preinformes:validar_plantilla', pk=pk)
+        accion = request.POST.get('accion')
+        observacion = request.POST.get('observacion_revision', '').strip()
+        servicio = TemplateGeneratorService()
+        try:
+            servicio.actualizar_borrador(
+                propuesta=propuesta,
+                usuario=request.user,
+                titulo=request.POST.get('titulo', ''),
+                encabezado=request.POST.get('encabezado', ''),
+                hallazgos=request.POST.get('hallazgos', ''),
+            )
+            if accion == 'aprobar':
+                version = servicio.aprobar_y_publicar(
+                    propuesta=propuesta,
+                    usuario=request.user,
+                    observacion=observacion,
+                )
+                messages.success(
+                    request,
+                    f'Plantilla aprobada y publicada como versión {version.numero}.',
+                )
+                return redirect('preinformes:lista_validacion_plantillas')
+            if accion == 'rechazar':
+                propuesta.rechazar(request.user, observacion)
+                messages.success(request, 'La propuesta fue rechazada.')
+                return redirect('preinformes:lista_validacion_plantillas')
+            if propuesta.estado == PropuestaPlantillaPreinforme.ESTADO_PENDIENTE:
+                propuesta.iniciar_revision(request.user)
+            messages.success(request, 'Cambios guardados. La propuesta quedó en revisión.')
+            return redirect('preinformes:validar_plantilla', pk=pk)
+        except (GeneracionPlantillaError, ValidationError) as error:
+            messages.error(request, str(error))
+
+    return render(request, 'preinformes/plantillas_validacion_detalle.html', {
+        'propuesta': propuesta,
+        'editable': editable,
+    })
 
 
 @login_required

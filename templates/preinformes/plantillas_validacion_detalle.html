@@ -1,0 +1,117 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Revisar plantilla{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    {% include 'components/breadcrumb.html' with section_label="Validación de plantillas" section_url="preinformes:lista_validacion_plantillas" current_label=propuesta.estudio_especifico %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <form method="post" class="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {% csrf_token %}
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">{{ propuesta.estudio_especifico }}</h1>
+                        <p class="text-sm text-gray-500 mt-1">{{ propuesta.tipo_estudio.nombre }} · {{ propuesta.region.nombre }}</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-sm font-semibold
+                        {% if propuesta.estado == 'aprobada' %}bg-green-100 text-green-800
+                        {% elif propuesta.estado == 'rechazada' %}bg-red-100 text-red-800
+                        {% elif propuesta.estado == 'en_revision' %}bg-blue-100 text-blue-800
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ propuesta.get_estado_display }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="p-6 space-y-5">
+                <div>
+                    <label for="titulo" class="block text-sm font-semibold text-gray-700 mb-1">Título institucional</label>
+                    <input id="titulo" name="titulo" value="{{ propuesta.titulo }}" {% if not editable %}readonly{% endif %}
+                           class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-50">
+                </div>
+                <div>
+                    <label for="encabezado" class="block text-sm font-semibold text-gray-700 mb-1">Encabezado / técnica</label>
+                    <textarea id="encabezado" name="encabezado" rows="5" {% if not editable %}readonly{% endif %}
+                              class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">{{ propuesta.encabezado }}</textarea>
+                    <p class="text-xs text-gray-500 mt-1">Conservá las variables estructuradas que correspondan al estudio.</p>
+                </div>
+                <div>
+                    <label for="hallazgos" class="block text-sm font-semibold text-gray-700 mb-1">Hallazgos normales de base</label>
+                    <textarea id="hallazgos" name="hallazgos" rows="13" {% if not editable %}readonly{% endif %}
+                              class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">{{ propuesta.hallazgos }}</textarea>
+                </div>
+                <div>
+                    <label for="observacion_revision" class="block text-sm font-semibold text-gray-700 mb-1">
+                        Observación del revisor {% if editable %}<span class="font-normal text-gray-500">(obligatoria para rechazar)</span>{% endif %}
+                    </label>
+                    <textarea id="observacion_revision" name="observacion_revision" rows="3" {% if not editable %}readonly{% endif %}
+                              class="w-full rounded-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500">{{ propuesta.observacion_revision }}</textarea>
+                </div>
+            </div>
+
+            {% if editable %}
+            <div class="p-5 bg-gray-50 border-t border-gray-200 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
+                <button type="submit" name="accion" value="rechazar"
+                        onclick="return confirm('¿Rechazar esta propuesta? La observación es obligatoria.');"
+                        class="px-4 py-2.5 rounded-lg border border-red-300 text-red-700 font-semibold hover:bg-red-50">
+                    Rechazar
+                </button>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="submit" name="accion" value="guardar"
+                            class="px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-white">
+                        Guardar revisión
+                    </button>
+                    <button type="submit" name="accion" value="aprobar"
+                            onclick="return confirm('¿Aprobar y publicar esta plantilla en la biblioteca institucional?');"
+                            class="px-4 py-2.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">
+                        Aprobar y publicar
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </form>
+
+        <aside class="space-y-5">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h2 class="font-semibold text-gray-900 mb-4">Trazabilidad</h2>
+                <dl class="space-y-3 text-sm">
+                    <div><dt class="text-gray-500">Autor</dt><dd class="font-medium text-gray-900">{{ propuesta.autor.get_full_name|default:propuesta.autor.username }}</dd></div>
+                    <div><dt class="text-gray-500">Creada</dt><dd class="text-gray-900">{{ propuesta.fecha_creacion|date:"d/m/Y H:i" }}</dd></div>
+                    <div><dt class="text-gray-500">Usos antes de aprobación</dt><dd class="text-gray-900">{{ propuesta.total_usos }}</dd></div>
+                    {% if propuesta.revisor %}
+                    <div><dt class="text-gray-500">Revisor</dt><dd class="text-gray-900">{{ propuesta.revisor.get_full_name|default:propuesta.revisor.username }}</dd></div>
+                    {% endif %}
+                    {% if propuesta.fecha_resolucion %}
+                    <div><dt class="text-gray-500">Resolución</dt><dd class="text-gray-900">{{ propuesta.fecha_resolucion|date:"d/m/Y H:i" }}</dd></div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <h2 class="font-semibold text-gray-900 mb-3">Variables controladas</h2>
+                {% if propuesta.variables %}
+                <ul class="space-y-2">
+                    {% for variable in propuesta.variables %}
+                    <li class="rounded-lg bg-indigo-50 px-3 py-2">
+                        <span class="block text-sm font-medium text-indigo-900">{{ variable.etiqueta|default:variable.codigo }}</span>
+                        <span class="text-xs text-indigo-700">{{ variable.tipo }}{% if variable.requerida %} · requerida{% endif %}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500">Esta plantilla no requiere datos variables.</p>
+                {% endif %}
+            </div>
+
+            {% if propuesta.instruccion_usuario %}
+            <div class="bg-amber-50 rounded-2xl border border-amber-200 p-5">
+                <h2 class="font-semibold text-amber-900 mb-2">Pedido original</h2>
+                <p class="text-sm text-amber-900 whitespace-pre-line">{{ propuesta.instruccion_usuario }}</p>
+            </div>
+            {% endif %}
+        </aside>
+    </div>
+</div>
+{% endblock %}

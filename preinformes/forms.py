@@ -409,6 +409,27 @@ class PlantillaPreinformeForm(forms.ModelForm):
         return prepare_editor_html_content(contenido)
 
 
+class GenerarPlantillaIAForm(forms.Form):
+    """Datos mínimos que orientan la propuesta estructurada."""
+
+    tipo_estudio = forms.ModelChoiceField(
+        queryset=TipoEstudio.objects.filter(activo=True),
+    )
+    region = forms.ModelChoiceField(
+        queryset=Region.objects.filter(activo=True),
+    )
+    estudio_especifico = forms.CharField(min_length=2, max_length=200)
+    instruccion_usuario = forms.CharField(
+        required=False,
+        max_length=500,
+        widget=forms.Textarea,
+    )
+    lateralidad_aplicable = forms.BooleanField(required=False)
+    equipo_aplicable = forms.BooleanField(required=False)
+    contraste_ev_aplicable = forms.BooleanField(required=False)
+    contraste_oral_aplicable = forms.BooleanField(required=False)
+
+
 class NuevaPlantillaResidenteForm(forms.ModelForm):
     """Formulario simplificado para que residentes creen plantillas"""
     compartir = forms.BooleanField(

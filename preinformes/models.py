@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 from django_ckeditor_5.fields import CKEditor5Field
 import re
@@ -430,6 +431,346 @@ class PlantillaPreinforme(models.Model):
     
     def __str__(self):
         return f"{self.tipo_estudio.nombre} - {self.region.nombre} - {self.nombre}"
+
+
+class PropuestaPlantillaPreinforme(models.Model):
+    """Borrador estructurado que puede convertirse en plantilla institucional."""
+
+    TIPO_NUEVA = 'nueva'
+    TIPO_MODIFICACION = 'modificacion'
+    TIPO_CHOICES = [
+        (TIPO_NUEVA, 'Nueva plantilla'),
+        (TIPO_MODIFICACION, 'Modificación de plantilla vigente'),
+    ]
+
+    ESTADO_BORRADOR = 'borrador'
+    ESTADO_PENDIENTE = 'pendiente'
+    ESTADO_EN_REVISION = 'en_revision'
+    ESTADO_APROBADA = 'aprobada'
+    ESTADO_RECHAZADA = 'rechazada'
+    ESTADO_CANCELADA = 'cancelada'
+    ESTADO_CHOICES = [
+        (ESTADO_BORRADOR, 'Borrador generado'),
+        (ESTADO_PENDIENTE, 'Pendiente de revisión'),
+        (ESTADO_EN_REVISION, 'En revisión'),
+        (ESTADO_APROBADA, 'Aprobada'),
+        (ESTADO_RECHAZADA, 'Rechazada'),
+        (ESTADO_CANCELADA, 'Cancelada'),
+    ]
+
+    tipo_solicitud = models.CharField(
+        max_length=20,
+        choices=TIPO_CHOICES,
+        default=TIPO_NUEVA,
+    )
+    estado = models.CharField(
+        max_length=20,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_BORRADOR,
+        db_index=True,
+    )
+    autor = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='propuestas_plantilla_creadas',
+    )
+    revisor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='propuestas_plantilla_revisadas',
+    )
+    tipo_estudio = models.ForeignKey(TipoEstudio, on_delete=models.PROTECT)
+    region = models.ForeignKey(Region, on_delete=models.PROTECT)
+    estudio_especifico = models.CharField(max_length=200)
+    instruccion_usuario = models.TextField(blank=True, default='')
+
+    titulo = models.CharField(max_length=500)
+    encabezado = models.TextField()
+    hallazgos = models.TextField()
+    variables = models.JSONField(default=list, blank=True)
+    fuentes = models.JSONField(default=list, blank=True)
+
+    proveedor_ia = models.CharField(max_length=50, blank=True, default='')
+    modelo_ia = models.CharField(max_length=100, blank=True, default='')
+    version_instrucciones = models.CharField(max_length=50, blank=True, default='')
+
+    preinforme_origen = models.ForeignKey(
+        'Preinforme',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='propuestas_plantilla_originadas',
+    )
+    plantilla_base = models.ForeignKey(
+        PlantillaPreinforme,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='solicitudes_modificacion',
+    )
+    motivo_modificacion = models.TextField(blank=True, default='')
+    observacion_revision = models.TextField(blank=True, default='')
+    fecha_envio_revision = models.DateTimeField(null=True, blank=True)
+    fecha_inicio_revision = models.DateTimeField(null=True, blank=True)
+    fecha_resolucion = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Propuesta de plantilla de preinforme'
+        verbose_name_plural = 'Propuestas de plantillas de preinformes'
+        ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['estado', 'fecha_creacion']),
+            models.Index(fields=['tipo_estudio', 'region', 'estado']),
+        ]
+
+    def __str__(self):
+        return f"{self.estudio_especifico} - {self.get_estado_display()}"
+
+    @staticmethod
+    def usuario_puede_generar(usuario):
+        if not usuario or not getattr(usuario, 'is_authenticated', False):
+            return False
+        if usuario.is_superuser:
+            return True
+        if usuario.rol == 'medico_residente':
+            return usuario.es_residente_activo()
+        return usuario.es_medico()
+
+    @staticmethod
+    def usuario_puede_validar(usuario):
+        return bool(
+            usuario
+            and getattr(usuario, 'is_authenticated', False)
+            and (usuario.is_superuser or usuario.rol == 'jefe_servicio')
+        )
+
+    def puede_ser_editada_por(self, usuario):
+        if self.usuario_puede_validar(usuario) and self.estado in {
+            self.ESTADO_PENDIENTE,
+            self.ESTADO_EN_REVISION,
+        }:
+            return True
+        return (
+            usuario
+            and getattr(usuario, 'is_authenticated', False)
+            and self.autor_id == usuario.id
+            and self.estado == self.ESTADO_BORRADOR
+        )
+
+    def clean(self):
+        super().clean()
+        if self.tipo_solicitud == self.TIPO_MODIFICACION and not self.plantilla_base_id:
+            raise ValidationError({
+                'plantilla_base': 'Una modificación debe indicar la plantilla institucional de origen.'
+            })
+        if self.tipo_solicitud == self.TIPO_NUEVA and self.plantilla_base_id:
+            raise ValidationError({
+                'plantilla_base': 'Una propuesta nueva no debe indicar una plantilla de origen.'
+            })
+        if not isinstance(self.variables, list):
+            raise ValidationError({'variables': 'Las variables deben representarse como una lista.'})
+        if not isinstance(self.fuentes, list):
+            raise ValidationError({'fuentes': 'Las fuentes deben representarse como una lista.'})
+
+    def enviar_a_revision(self):
+        if self.estado != self.ESTADO_BORRADOR:
+            raise ValidationError('Solo un borrador puede enviarse a revisión.')
+        self.estado = self.ESTADO_PENDIENTE
+        self.fecha_envio_revision = timezone.now()
+        self.save(update_fields=['estado', 'fecha_envio_revision', 'fecha_modificacion'])
+
+    def iniciar_revision(self, usuario):
+        if not self.usuario_puede_validar(usuario):
+            raise ValidationError('El usuario no puede validar plantillas institucionales.')
+        if self.estado != self.ESTADO_PENDIENTE:
+            raise ValidationError('Solo una propuesta pendiente puede pasar a revisión.')
+        self.estado = self.ESTADO_EN_REVISION
+        self.revisor = usuario
+        self.fecha_inicio_revision = timezone.now()
+        self.save(update_fields=[
+            'estado', 'revisor', 'fecha_inicio_revision', 'fecha_modificacion'
+        ])
+
+    def aprobar(self, usuario, observacion=''):
+        if not self.usuario_puede_validar(usuario):
+            raise ValidationError('El usuario no puede aprobar plantillas institucionales.')
+        if self.estado not in {self.ESTADO_PENDIENTE, self.ESTADO_EN_REVISION}:
+            raise ValidationError('La propuesta no se encuentra en revisión.')
+        self.estado = self.ESTADO_APROBADA
+        self.revisor = usuario
+        self.observacion_revision = observacion
+        self.fecha_resolucion = timezone.now()
+        self.save(update_fields=[
+            'estado', 'revisor', 'observacion_revision',
+            'fecha_resolucion', 'fecha_modificacion',
+        ])
+
+    def rechazar(self, usuario, observacion):
+        if not self.usuario_puede_validar(usuario):
+            raise ValidationError('El usuario no puede rechazar plantillas institucionales.')
+        if self.estado not in {self.ESTADO_PENDIENTE, self.ESTADO_EN_REVISION}:
+            raise ValidationError('La propuesta no se encuentra en revisión.')
+        if not observacion or not observacion.strip():
+            raise ValidationError('El rechazo debe incluir una observación.')
+        self.estado = self.ESTADO_RECHAZADA
+        self.revisor = usuario
+        self.observacion_revision = observacion.strip()
+        self.fecha_resolucion = timezone.now()
+        self.save(update_fields=[
+            'estado', 'revisor', 'observacion_revision',
+            'fecha_resolucion', 'fecha_modificacion',
+        ])
+
+
+class VersionPlantillaPreinforme(models.Model):
+    """Versión inmutable del contenido institucional aprobado."""
+
+    plantilla = models.ForeignKey(
+        PlantillaPreinforme,
+        on_delete=models.PROTECT,
+        related_name='versiones_institucionales',
+    )
+    numero = models.PositiveIntegerField()
+    propuesta_origen = models.OneToOneField(
+        PropuestaPlantillaPreinforme,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='version_publicada',
+    )
+    titulo = models.CharField(max_length=500)
+    encabezado = models.TextField()
+    hallazgos = models.TextField()
+    variables = models.JSONField(default=list, blank=True)
+    fuentes = models.JSONField(default=list, blank=True)
+    vigente = models.BooleanField(default=True, db_index=True)
+    aprobada_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='versiones_plantilla_aprobadas',
+    )
+    motivo_cambio = models.TextField(blank=True, default='')
+    fecha_aprobacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = 'Versión de plantilla de preinforme'
+        verbose_name_plural = 'Versiones de plantillas de preinformes'
+        ordering = ['plantilla', '-numero']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['plantilla', 'numero'],
+                name='unique_numero_version_plantilla_preinforme',
+            ),
+            models.UniqueConstraint(
+                fields=['plantilla'],
+                condition=models.Q(vigente=True),
+                name='unique_version_vigente_plantilla_preinforme',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.plantilla.nombre} v{self.numero}"
+
+    def clean(self):
+        super().clean()
+        if not isinstance(self.variables, list):
+            raise ValidationError({'variables': 'Las variables deben representarse como una lista.'})
+        if not isinstance(self.fuentes, list):
+            raise ValidationError({'fuentes': 'Las fuentes deben representarse como una lista.'})
+        if not PropuestaPlantillaPreinforme.usuario_puede_validar(self.aprobada_por):
+            raise ValidationError({
+                'aprobada_por': 'La versión debe ser aprobada por el jefe de servicio o un superusuario.'
+            })
+
+
+class AplicacionPlantillaPreinforme(models.Model):
+    """Snapshot de una plantilla o propuesta aplicada a un preinforme."""
+
+    preinforme = models.ForeignKey(
+        'Preinforme',
+        on_delete=models.CASCADE,
+        related_name='aplicaciones_plantilla',
+    )
+    plantilla = models.ForeignKey(
+        PlantillaPreinforme,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='aplicaciones_estructuradas',
+    )
+    version = models.ForeignKey(
+        VersionPlantillaPreinforme,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='aplicaciones',
+    )
+    propuesta = models.ForeignKey(
+        PropuestaPlantillaPreinforme,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='aplicaciones',
+    )
+    valores_variables = models.JSONField(default=dict, blank=True)
+    equipo = models.ForeignKey(
+        'equipos.EquipoImagen',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='aplicaciones_plantilla_preinforme',
+    )
+    lateralidad = models.CharField(max_length=20, blank=True, default='')
+    contraste_ev = models.BooleanField(null=True, blank=True)
+    volumen_contraste_ml = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+    )
+    marca_contraste = models.CharField(max_length=120, blank=True, default='')
+    contraste_oral = models.BooleanField(null=True, blank=True)
+    contenido_renderizado = models.TextField()
+    aplicada_por = models.ForeignKey(
+        User,
+        on_delete=models.PROTECT,
+        related_name='aplicaciones_plantilla_realizadas',
+    )
+    fecha_aplicacion = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Aplicación de plantilla de preinforme'
+        verbose_name_plural = 'Aplicaciones de plantillas de preinformes'
+        ordering = ['-fecha_aplicacion']
+
+    def __str__(self):
+        return f"Plantilla aplicada a {self.preinforme}"
+
+    def clean(self):
+        super().clean()
+        if not self.plantilla_id and not self.propuesta_id:
+            raise ValidationError('La aplicación debe referenciar una plantilla o una propuesta.')
+        if self.version_id and self.plantilla_id != self.version.plantilla_id:
+            raise ValidationError({
+                'version': 'La versión seleccionada no pertenece a la plantilla indicada.'
+            })
+        if self.contraste_ev is True and self.volumen_contraste_ml is None:
+            raise ValidationError({
+                'volumen_contraste_ml': 'Debe registrar el volumen cuando se utilizó contraste EV.'
+            })
+        if self.contraste_ev is True and not self.marca_contraste.strip():
+            raise ValidationError({
+                'marca_contraste': 'Debe registrar la marca cuando se utilizó contraste EV.'
+            })
+        if not isinstance(self.valores_variables, dict):
+            raise ValidationError({
+                'valores_variables': 'Los valores de variables deben representarse como un objeto.'
+            })
 
 
 class Preinforme(models.Model):

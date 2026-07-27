@@ -30,3 +30,13 @@ class RevisorNoDisponibleError(PreinformeError):
 class EnvioRevisionError(PreinformeError):
     """El preinforme no puede ser enviado a revisión en su estado actual."""
     pass
+
+
+class GeneracionPlantillaError(PreinformeError):
+    """No fue posible generar una propuesta de plantilla segura y válida."""
+    pass
+
+
+class RespuestaPlantillaInvalidaError(GeneracionPlantillaError):
+    """La respuesta del modelo no cumple el contrato institucional."""
+    pass

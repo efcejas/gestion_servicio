@@ -130,6 +130,64 @@ class AIService:
 
         raise ultimo_error
 
+    def generate_structured_json(
+        self,
+        *,
+        messages,
+        schema,
+        schema_name,
+        max_tokens=1800,
+        temperature=0.1,
+    ):
+        """Genera y decodifica una respuesta JSON validada por esquema."""
+        if not self.llm_enabled or not self.llm_client:
+            raise RuntimeError('El servicio de lenguaje no está configurado.')
+
+        if self.llm_provider == 'openai':
+            response_format = {
+                'type': 'json_schema',
+                'json_schema': {
+                    'name': schema_name,
+                    'strict': True,
+                    'schema': schema,
+                },
+            }
+            response, model_used = self._crear_chat_completion_openai(
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format=response_format,
+            )
+        else:
+            response = self.llm_client.chat.completions.create(
+                model=self.llm_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={'type': 'json_object'},
+            )
+            model_used = self.llm_model
+
+        message = response.choices[0].message
+        refusal = getattr(message, 'refusal', None)
+        if refusal:
+            raise RuntimeError(f'El modelo rechazó la generación: {refusal}')
+
+        content = message.content
+        if not content:
+            raise RuntimeError('El modelo devolvió una respuesta vacía.')
+
+        try:
+            payload = json.loads(content)
+        except (TypeError, json.JSONDecodeError) as error:
+            raise RuntimeError('El modelo devolvió JSON inválido.') from error
+
+        return {
+            'data': payload,
+            'model_used': model_used,
+            'provider': self.llm_provider,
+        }
+
     def _get_plantilla_estructurada(self, tipo_plantilla, usuario=None):
         """
         Obtiene plantilla estructurada desde BD con fallback a hardcode.
