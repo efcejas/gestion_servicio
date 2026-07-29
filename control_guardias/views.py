@@ -51,6 +51,7 @@ _RESIDENTE_PALETTE = [
 from .services import (
     CambioGuardiaError,
     DistribucionError,
+    MovimientoBorradorError,
     aceptar_cambio_receptor,
     aprobar_cambio,
     aprobar_slot_vacante,
@@ -402,15 +403,43 @@ class MoverGuardiaBorradorView(JefeInstructorMixin, TemplateView):
             )
 
         try:
-            guardia = mover_guardia_borrador(guardia, nueva_fecha)
-        except DistribucionError as exc:
-            return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+            ocupante_esperado = request.POST.get('ocupante_id', '').strip()
+            resultado = mover_guardia_borrador(
+                guardia,
+                nueva_fecha,
+                usuario=request.user,
+                forzar=request.POST.get('forzar') == '1',
+                intercambiar=request.POST.get('intercambiar') == '1',
+                ocupante_esperado_id=(
+                    int(ocupante_esperado) if ocupante_esperado else None
+                ),
+            )
+        except (TypeError, ValueError):
+            return JsonResponse(
+                {'ok': False, 'error': 'La guardia ocupante indicada no es válida.'},
+                status=400,
+            )
+        except MovimientoBorradorError as exc:
+            status = 409 if exc.permite_excepcion or exc.permite_intercambio else 400
+            return JsonResponse({
+                'ok': False,
+                'error': str(exc),
+                'codigo': exc.codigo,
+                'permite_excepcion': exc.permite_excepcion,
+                'permite_intercambio': exc.permite_intercambio,
+                'detalles': exc.detalles,
+            }, status=status)
+
+        guardia = resultado['guardia']
+        intercambiada = resultado['intercambiada']
 
         return JsonResponse({
             'ok': True,
             'guardia_id': guardia.pk,
             'fecha': guardia.fecha.isoformat(),
             'es_feriado': guardia.es_feriado,
+            'intercambiada_id': intercambiada.pk if intercambiada else None,
+            'excepcional': resultado['excepcional'],
         })
 
 

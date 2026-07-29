@@ -36,6 +36,25 @@ class DistribucionError(Exception):
     pass
 
 
+class MovimientoBorradorError(DistribucionError):
+    """Error estructurado para movimientos manuales desde el calendario."""
+
+    def __init__(
+        self,
+        mensaje,
+        *,
+        codigo='MOVIMIENTO_INVALIDO',
+        permite_excepcion=False,
+        permite_intercambio=False,
+        detalles=None,
+    ):
+        super().__init__(mensaje)
+        self.codigo = codigo
+        self.permite_excepcion = permite_excepcion
+        self.permite_intercambio = permite_intercambio
+        self.detalles = detalles or {}
+
+
 def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False, restricciones_anio=False):
     """
     Genera asignaciones en estado BORRADOR para el periodo mes/año indicado.
@@ -482,13 +501,101 @@ def cancelar_borrador(mes, anio):
     return count or 0
 
 
-def mover_guardia_borrador(guardia, nueva_fecha):
-    """
-    Mueve una asignación BORRADOR a otra fecha del mismo mes.
+def _violaciones_movimiento_borrador(guardia, nueva_fecha, excluir_ids=None):
+    """Retorna reglas operativas incumplidas por una fecha propuesta."""
+    excluir_ids = set(excluir_ids or [])
+    tipo = guardia.tipo_guardia
+    residente = guardia.residente
+    violaciones = []
 
-    Conserva residente y tipo de guardia, y vuelve a validar las restricciones
-    operativas porque la fecha pudo cambiar desde que se generó el borrador.
-    """
+    es_feriado = Feriado.objects.filter(fecha=nueva_fecha).exists()
+    dias_aplicables = {
+        DIA_SEMANA_MAP[d]
+        for d in tipo.dias_semana.split(',')
+        if d in DIA_SEMANA_MAP
+    }
+    if es_feriado and not tipo.aplica_feriados:
+        violaciones.append(f"{tipo.nombre} no está configurada para días feriados.")
+    elif not es_feriado and nueva_fecha.weekday() not in dias_aplicables:
+        violaciones.append(
+            f"{tipo.nombre} no está configurada para ese día de la semana."
+        )
+
+    activas = AsignacionGuardia.objects.filter(
+        estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+    ).exclude(pk__in=excluir_ids)
+
+    if activas.filter(residente=residente, fecha=nueva_fecha).exists():
+        violaciones.append(f"{residente.get_full_name()} ya tiene otra guardia ese día.")
+
+    if activas.filter(
+        residente=residente,
+        fecha__in=[
+            nueva_fecha - timedelta(days=1),
+            nueva_fecha + timedelta(days=1),
+        ],
+    ).exists():
+        violaciones.append(
+            f"El cambio dejaría a {residente.get_full_name()} con guardias en días consecutivos."
+        )
+
+    semana = _clave_semana(nueva_fecha)
+    if any(
+        _clave_semana(fecha) == semana
+        for fecha in activas.filter(residente=residente).values_list('fecha', flat=True)
+    ):
+        violaciones.append(
+            f"{residente.get_full_name()} ya tiene una guardia en esa semana."
+        )
+
+    if AusenciaResidente.objects.filter(
+        residente=residente,
+        estado='PENDIENTE',
+        fecha_inicio__lte=nueva_fecha,
+        fecha_fin__gte=nueva_fecha,
+    ).exists():
+        violaciones.append(
+            f"{residente.get_full_name()} tiene una ausencia informada para esa fecha."
+        )
+
+    return violaciones
+
+
+def _violaciones_acompanamiento_r1(propuestas, excluir_ids=None):
+    """Advierte si una doble cobertura deja a un R1 acompañado solo por otro R1."""
+    excluir_ids = set(excluir_ids or [])
+    por_fecha = defaultdict(list)
+    for guardia, fecha in propuestas:
+        por_fecha[fecha].append(guardia.residente.anio_residencia)
+
+    violaciones = []
+    for fecha, anios_propuestos in por_fecha.items():
+        anios = list(
+            AsignacionGuardia.objects.filter(
+                fecha=fecha,
+                estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+            )
+            .exclude(pk__in=excluir_ids)
+            .values_list('residente__anio_residencia', flat=True)
+        )
+        anios.extend(anios_propuestos)
+        if len(anios) >= 2 and 'R1' in anios and set(anios) == {'R1'}:
+            violaciones.append(
+                f"El {fecha.strftime('%d/%m/%Y')} los R1 quedarían acompañados solo por otro R1."
+            )
+    return violaciones
+
+
+def mover_guardia_borrador(
+    guardia,
+    nueva_fecha,
+    *,
+    usuario,
+    forzar=False,
+    intercambiar=False,
+    ocupante_esperado_id=None,
+):
+    """Mueve o intercambia guardias BORRADOR con validación y trazabilidad."""
     with transaction.atomic():
         guardia = (
             AsignacionGuardia.objects
@@ -497,67 +604,132 @@ def mover_guardia_borrador(guardia, nueva_fecha):
             .get(pk=guardia.pk)
         )
         if guardia.estado != 'BORRADOR':
-            raise DistribucionError("Solo se pueden mover guardias en estado BORRADOR.")
+            raise MovimientoBorradorError(
+                "Solo se pueden mover guardias en estado BORRADOR."
+            )
         if (nueva_fecha.year, nueva_fecha.month) != (guardia.fecha.year, guardia.fecha.month):
-            raise DistribucionError("La guardia debe permanecer dentro del mismo mes del borrador.")
+            raise MovimientoBorradorError(
+                "La guardia debe permanecer dentro del mismo mes del borrador."
+            )
         if nueva_fecha == guardia.fecha:
-            return guardia
+            return {'guardia': guardia, 'intercambiada': None, 'excepcional': False}
 
-        tipo = guardia.tipo_guardia
-        es_feriado = Feriado.objects.filter(fecha=nueva_fecha).exists()
-        dias_aplicables = {
-            DIA_SEMANA_MAP[d]
-            for d in tipo.dias_semana.split(',')
-            if d in DIA_SEMANA_MAP
-        }
-        if es_feriado:
-            if not tipo.aplica_feriados:
-                raise DistribucionError(
-                    f"{tipo.nombre} no está configurada para días feriados."
-                )
-        elif nueva_fecha.weekday() not in dias_aplicables:
-            raise DistribucionError(
-                f"{tipo.nombre} no está configurada para ese día de la semana."
+        ocupante = (
+            AsignacionGuardia.objects
+            .select_for_update()
+            .select_related('residente', 'tipo_guardia')
+            .filter(
+                fecha=nueva_fecha,
+                tipo_guardia=guardia.tipo_guardia,
+                estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+            )
+            .exclude(pk=guardia.pk)
+            .first()
+        )
+
+        if ocupante and not intercambiar:
+            nombre = ocupante.residente.get_full_name() or ocupante.residente.username
+            raise MovimientoBorradorError(
+                f"El slot está ocupado por {nombre} "
+                f"({ocupante.residente.anio_residencia or 'sin año'}), "
+                f"{ocupante.tipo_guardia.nombre}.",
+                codigo='SLOT_OCUPADO',
+                permite_intercambio=ocupante.estado == 'BORRADOR',
+                detalles={
+                    'ocupante_id': ocupante.pk,
+                    'ocupante_nombre': nombre,
+                    'ocupante_anio': ocupante.residente.anio_residencia or '',
+                    'fecha_origen': guardia.fecha.isoformat(),
+                    'fecha_destino': nueva_fecha.isoformat(),
+                },
             )
 
-        asignaciones_activas = AsignacionGuardia.objects.select_for_update().filter(
+        if intercambiar and not ocupante:
+            raise MovimientoBorradorError(
+                "El slot dejó de estar ocupado; actualizá el calendario e intentá nuevamente."
+            )
+        if (
+            intercambiar
+            and ocupante_esperado_id is not None
+            and ocupante.pk != ocupante_esperado_id
+        ):
+            raise MovimientoBorradorError(
+                "La guardia que ocupaba el destino cambió; actualizá el calendario antes de confirmar."
+            )
+        if ocupante and ocupante.estado != 'BORRADOR':
+            raise MovimientoBorradorError(
+                "El slot está ocupado por una guardia publicada y no puede intercambiarse."
+            )
+        if ocupante and ocupante.residente_id == guardia.residente_id:
+            raise MovimientoBorradorError(
+                "Ambos slots pertenecen al mismo residente; el intercambio no produciría cambios."
+            )
+
+        excluir_ids = {guardia.pk}
+        propuestas = [(guardia, nueva_fecha)]
+        if ocupante:
+            excluir_ids.add(ocupante.pk)
+            propuestas.append((ocupante, guardia.fecha))
+
+        asignaciones_restantes = AsignacionGuardia.objects.select_for_update().filter(
             estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
-        ).exclude(pk=guardia.pk)
+        ).exclude(pk__in=excluir_ids)
+        for asignacion, fecha_propuesta in propuestas:
+            if asignaciones_restantes.filter(
+                fecha=fecha_propuesta,
+                tipo_guardia=asignacion.tipo_guardia,
+            ).exists():
+                raise MovimientoBorradorError(
+                    f"El slot {asignacion.tipo_guardia.nombre} del "
+                    f"{fecha_propuesta:%d/%m/%Y} tiene otra asignación y no puede sobrescribirse."
+                )
 
-        if asignaciones_activas.filter(
-            fecha=nueva_fecha,
-            tipo_guardia=tipo,
-        ).exists():
-            raise DistribucionError("Ese slot ya está ocupado por otra guardia.")
+        violaciones = []
+        for asignacion, fecha_propuesta in propuestas:
+            violaciones.extend(
+                _violaciones_movimiento_borrador(
+                    asignacion,
+                    fecha_propuesta,
+                    excluir_ids=excluir_ids,
+                )
+            )
+        violaciones.extend(
+            _violaciones_acompanamiento_r1(propuestas, excluir_ids=excluir_ids)
+        )
+        violaciones = list(dict.fromkeys(violaciones))
 
-        if asignaciones_activas.filter(
-            residente=guardia.residente,
-            fecha=nueva_fecha,
-        ).exists():
-            raise DistribucionError("El residente ya tiene otra guardia ese día.")
-
-        if asignaciones_activas.filter(
-            residente=guardia.residente,
-            fecha__in=[
-                nueva_fecha - timedelta(days=1),
-                nueva_fecha + timedelta(days=1),
-            ],
-        ).exists():
-            raise DistribucionError(
-                "El movimiento dejaría al residente con guardias en días consecutivos."
+        if violaciones and not forzar:
+            raise MovimientoBorradorError(
+                "El cambio necesita confirmación excepcional.",
+                codigo='REQUIERE_EXCEPCION',
+                permite_excepcion=True,
+                detalles={
+                    'violaciones': violaciones,
+                    'intercambio': bool(ocupante),
+                },
             )
 
-        if AusenciaResidente.objects.filter(
-            residente=guardia.residente,
-            estado='PENDIENTE',
-            fecha_inicio__lte=nueva_fecha,
-            fecha_fin__gte=nueva_fecha,
-        ).exists():
-            raise DistribucionError("El residente tiene una ausencia informada para esa fecha.")
-
+        fecha_origen = guardia.fecha
+        marca = "Excepción manual" if forzar else "Edición manual"
+        actor = usuario.get_full_name() or usuario.username
         guardia.fecha = nueva_fecha
-        guardia.save(update_fields=['fecha', 'es_feriado', 'fecha_actualizacion'])
-        return guardia
+        guardia.notas = (
+            f"{guardia.notas}\n" if guardia.notas else ""
+        ) + f"{marca} por {actor}: {fecha_origen:%d/%m/%Y} → {nueva_fecha:%d/%m/%Y}."
+        guardia.save(update_fields=['fecha', 'es_feriado', 'notas', 'fecha_actualizacion'])
+
+        if ocupante:
+            ocupante.fecha = fecha_origen
+            ocupante.notas = (
+                f"{ocupante.notas}\n" if ocupante.notas else ""
+            ) + f"{marca} por {actor}: {nueva_fecha:%d/%m/%Y} → {fecha_origen:%d/%m/%Y}."
+            ocupante.save(update_fields=['fecha', 'es_feriado', 'notas', 'fecha_actualizacion'])
+
+        return {
+            'guardia': guardia,
+            'intercambiada': ocupante,
+            'excepcional': bool(forzar),
+        }
 
 
 def obtener_metricas_mes(mes, anio):

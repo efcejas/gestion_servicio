@@ -413,21 +413,65 @@
   async function moverBorrador(info) {
     hideTooltip();
     const url = moverBorradorBaseUrl.replace('999999', String(info.event.id));
-    const body = new URLSearchParams({ fecha: fechaLocalIso(info.event.start) });
+    const opciones = {};
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': getCookie('csrftoken'),
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        },
-        body: body.toString(),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
+      while (true) {
+        const body = new URLSearchParams({
+          fecha: fechaLocalIso(info.event.start),
+          intercambiar: opciones.intercambiar ? '1' : '0',
+          forzar: opciones.forzar ? '1' : '0',
+          ocupante_id: opciones.ocupanteId || '',
+        });
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          },
+          body: body.toString(),
+        });
+        const data = await response.json();
+        if (response.ok && data.ok) {
+          calendar.refetchEvents();
+          return;
+        }
+
+        if (data.permite_intercambio) {
+          const detalle = data.detalles || {};
+          const acepta = window.confirm(
+            `${data.error}\n\n` +
+            `¿Querés intercambiar las asignaciones?\n` +
+            `${detalle.ocupante_nombre || 'El ocupante'} pasará al ${detalle.fecha_origen} ` +
+            `y la guardia arrastrada pasará al ${detalle.fecha_destino}.`
+          );
+          if (!acepta) {
+            info.revert();
+            return;
+          }
+          opciones.intercambiar = true;
+          opciones.ocupanteId = detalle.ocupante_id || '';
+          continue;
+        }
+
+        if (data.permite_excepcion) {
+          const violaciones = (data.detalles && data.detalles.violaciones) || [];
+          const acepta = window.confirm(
+            `El cambio presenta estas advertencias:\n\n` +
+            `${violaciones.map((item) => `• ${item}`).join('\n')}\n\n` +
+            `¿Aplicarlo igualmente como excepción antes de publicar?`
+          );
+          if (!acepta) {
+            info.revert();
+            return;
+          }
+          opciones.forzar = true;
+          opciones.intercambiar = opciones.intercambiar ||
+            Boolean(data.detalles && data.detalles.intercambio);
+          continue;
+        }
+
         throw new Error(data.error || 'No se pudo mover la guardia.');
       }
-      calendar.refetchEvents();
     } catch (error) {
       info.revert();
       window.alert(error.message || 'No se pudo mover la guardia.');

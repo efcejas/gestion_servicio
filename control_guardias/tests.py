@@ -878,13 +878,14 @@ class CalendarioViewTests(TestCase):
                 'control_guardias:guardia_borrador_mover',
                 kwargs={'pk': self.guardia_bor.pk},
             ),
-            {'fecha': '2026-05-07'},
+            {'fecha': '2026-05-18'},
         )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()['ok'])
         self.guardia_bor.refresh_from_db()
-        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 7))
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 18))
+        self.assertIn('Edición manual', self.guardia_bor.notas)
 
     def test_residente_no_puede_mover_guardia_borrador(self):
         self.client.force_login(self.residente)
@@ -936,8 +937,14 @@ class CalendarioViewTests(TestCase):
             {'fecha': '2026-05-09'},  # sábado; el tipo solo aplica L-V
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('día de la semana', response.json()['error'])
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(response.json()['permite_excepcion'])
+        self.assertTrue(
+            any(
+                'día de la semana' in item
+                for item in response.json()['detalles']['violaciones']
+            )
+        )
 
     def test_no_mueve_borrador_si_genera_dias_consecutivos(self):
         AsignacionGuardia.objects.create(
@@ -956,8 +963,162 @@ class CalendarioViewTests(TestCase):
             {'fecha': '2026-05-07'},
         )
 
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(response.json()['permite_excepcion'])
+        self.assertTrue(
+            any(
+                'consecutivos' in item
+                for item in response.json()['detalles']['violaciones']
+            )
+        )
+
+    def test_conflicto_informa_ocupante_y_ofrece_intercambio(self):
+        otro = crear_residente('ocupante_borrador', 'R3')
+        ocupante = AsignacionGuardia.objects.create(
+            residente=otro,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 18),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-18'},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertTrue(data['permite_intercambio'])
+        self.assertEqual(data['detalles']['ocupante_id'], ocupante.pk)
+        self.assertIn(otro.get_full_name(), data['error'])
+        self.assertIn('R3', data['error'])
+
+    def test_intercambia_dos_guardias_borrador_atomicamente(self):
+        otro = crear_residente('intercambio_borrador', 'R3')
+        ocupante = AsignacionGuardia.objects.create(
+            residente=otro,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 18),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {
+                'fecha': '2026-05-18',
+                'intercambiar': '1',
+                'ocupante_id': str(ocupante.pk),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.guardia_bor.refresh_from_db()
+        ocupante.refresh_from_db()
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 18))
+        self.assertEqual(ocupante.fecha, datetime.date(2026, 5, 5))
+        self.assertIn('Edición manual', self.guardia_bor.notas)
+        self.assertIn('Edición manual', ocupante.notas)
+
+    def test_no_intercambia_si_cambio_el_ocupante_confirmado(self):
+        otro = crear_residente('ocupante_cambio_concurrente', 'R3')
+        ocupante = AsignacionGuardia.objects.create(
+            residente=otro,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 18),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {
+                'fecha': '2026-05-18',
+                'intercambiar': '1',
+                'ocupante_id': str(ocupante.pk + 999),
+            },
+        )
+
         self.assertEqual(response.status_code, 400)
-        self.assertIn('consecutivos', response.json()['error'])
+        self.guardia_bor.refresh_from_db()
+        ocupante.refresh_from_db()
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 5))
+        self.assertEqual(ocupante.fecha, datetime.date(2026, 5, 18))
+
+    def test_aplica_movimiento_excepcional_con_trazabilidad(self):
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 8),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-07', 'forzar': '1'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['excepcional'])
+        self.guardia_bor.refresh_from_db()
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 7))
+        self.assertIn('Excepción manual', self.guardia_bor.notas)
+
+    def test_advierte_si_movimiento_deja_doble_cobertura_r1_r1(self):
+        self.residente.anio_residencia = 'R1'
+        self.residente.save(update_fields=['anio_residencia'])
+        otro_r1 = crear_residente('otro_r1_manual', 'R1')
+        otro_tipo = ConfiguracionTipoGuardia.objects.create(
+            nombre='Refuerzo',
+            hora_inicio=datetime.time(20, 0),
+            hora_fin=datetime.time(8, 0),
+            dias_semana='L,M,X,J,V',
+            activo=True,
+            creado_por=self.jefe,
+        )
+        AsignacionGuardia.objects.create(
+            residente=otro_r1,
+            tipo_guardia=otro_tipo,
+            fecha=datetime.date(2026, 5, 18),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-18'},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(response.json()['permite_excepcion'])
+        self.assertTrue(
+            any(
+                'R1' in item
+                for item in response.json()['detalles']['violaciones']
+            )
+        )
 
     def test_api_residente_puede_ver_todas_las_publicadas_si_lo_pide(self):
         otro_residente = crear_residente('otro_cal', 'R3')
