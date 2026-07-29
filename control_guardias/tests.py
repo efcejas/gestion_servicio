@@ -1,7 +1,9 @@
 import datetime
+from unittest.mock import patch
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core import mail
+from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -385,6 +387,85 @@ class ServicioDistribucionTest(TestCase):
                 self.assertNotEqual(delta, 1,
                     msg=f"{residente.username} tiene guardias consecutivas: {fechas[i]} y {fechas[i+1]}")
 
+    def test_distribucion_reparte_cuota_entre_semanas_cuando_hay_opciones(self):
+        """Evita acumular dos guardias semanales si puede usar semanas distintas."""
+        from collections import Counter
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+
+        for residente in [self.r1, self.r2, self.r3]:
+            semanas = Counter(
+                (fecha.isocalendar().year, fecha.isocalendar().week)
+                for fecha in AsignacionGuardia.objects.filter(
+                    residente=residente,
+                    estado='BORRADOR',
+                ).values_list('fecha', flat=True)
+            )
+            self.assertTrue(
+                all(cantidad == 1 for cantidad in semanas.values()),
+                msg=(
+                    f'{residente.username} recibió más de una guardia en una semana '
+                    'aunque había semanas alternativas disponibles.'
+                ),
+            )
+
+    def test_doble_cobertura_acompania_r1_con_residente_de_anio_superior(self):
+        """Si hay un residente mayor disponible, evita que dos R1 queden juntos."""
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        crear_residente('r1_adicional', 'R1')
+        self.r2.is_active = False
+        self.r2.save(update_fields=['is_active'])
+        CuotaMensualGuardia.objects.filter(
+            anio_residencia__in=['R1', 'R3']
+        ).update(guardias_por_mes=2)
+
+        fecha_doble = self._fecha(4)
+        Feriado.objects.create(
+            fecha=fecha_doble,
+            descripcion='Doble cobertura de prueba',
+        )
+        tipo_a = ConfiguracionTipoGuardia.objects.create(
+            nombre='Feriado A',
+            hora_inicio=datetime.time(8, 0),
+            hora_fin=datetime.time(20, 0),
+            dias_semana='',
+            aplica_feriados=True,
+            creado_por=self.jefe,
+        )
+        tipo_b = ConfiguracionTipoGuardia.objects.create(
+            nombre='Feriado B',
+            hora_inicio=datetime.time(8, 0),
+            hora_fin=datetime.time(20, 0),
+            dias_semana='',
+            aplica_feriados=True,
+            creado_por=self.jefe,
+        )
+
+        generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=CTG.objects.filter(pk__in=[tipo_a.pk, tipo_b.pk]),
+            creado_por=self.jefe,
+        )
+
+        asignados = list(
+            AsignacionGuardia.objects.filter(
+                fecha=fecha_doble,
+                estado='BORRADOR',
+            ).select_related('residente')
+        )
+        self.assertEqual(len(asignados), 2)
+        anios = {guardia.residente.anio_residencia for guardia in asignados}
+        self.assertIn('R1', anios)
+        self.assertIn('R3', anios)
+
     def test_distribucion_excluye_residente_con_ausencia_en_rango(self):
         """Un residente ausente en el período no debe recibir guardias en ese rango."""
         from .models import ConfiguracionTipoGuardia as CTG
@@ -515,6 +596,86 @@ class ServicioDistribucionTest(TestCase):
         # Deben existir borradores y no haberse duplicado
         self.assertGreater(count_segunda, 0)
         self.assertLessEqual(count_segunda, count_primera + 2)
+
+    def test_reemplazar_borradores_con_error_conserva_borrador_anterior(self):
+        """Si falla la nueva creación, la transacción restaura el borrador anterior."""
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        qs = CTG.objects.filter(pk=self.tipo.pk)
+        generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=qs,
+            creado_por=self.jefe,
+        )
+        pks_anteriores = set(
+            AsignacionGuardia.objects.filter(estado='BORRADOR')
+            .values_list('pk', flat=True)
+        )
+
+        with patch(
+            'django.db.models.query.QuerySet.bulk_create',
+            side_effect=IntegrityError('fallo simulado'),
+        ):
+            with self.assertRaises(IntegrityError):
+                generar_distribucion(
+                    mes=self.test_month,
+                    anio=self.test_year,
+                    tipos_guardia=qs,
+                    creado_por=self.jefe,
+                    reemplazar_borradores=True,
+                )
+
+        self.assertSetEqual(
+            set(
+                AsignacionGuardia.objects.filter(estado='BORRADOR')
+                .values_list('pk', flat=True)
+            ),
+            pks_anteriores,
+        )
+
+    def test_eleccion_respeta_prioridad_completa_antes_del_azar(self):
+        """Una prioridad secundaria mejor no se pierde por tener igual carga."""
+        from .services import _elegir_candidato_priorizado
+
+        candidatos = [self.r1, self.r2, self.r3]
+        prioridades = {
+            self.r1.pk: (1, 1),
+            self.r2.pk: (1, 0),
+            self.r3.pk: (2, 0),
+        }
+
+        with patch('control_guardias.services.random.choice') as elegir:
+            elegir.side_effect = lambda grupo: grupo[0]
+            elegido = _elegir_candidato_priorizado(
+                candidatos,
+                lambda residente: prioridades[residente.pk],
+            )
+
+        self.assertEqual(elegido, self.r2)
+        elegir.assert_called_once_with([self.r2])
+
+    def test_balance_semanal_es_prioridad_blanda_y_no_bloquea_candidatos(self):
+        """La carga semanal ordena candidatos, pero ninguno queda eliminado."""
+        from .services import _elegir_candidato_priorizado
+
+        candidatos = [self.r1, self.r2]
+        cargas_semanales = {self.r1.pk: 1, self.r2.pk: 0}
+
+        elegido = _elegir_candidato_priorizado(
+            candidatos,
+            lambda residente: (cargas_semanales[residente.pk],),
+        )
+
+        self.assertEqual(elegido, self.r2)
+        # Si solo queda R1 por otras restricciones, sigue siendo seleccionable.
+        self.assertEqual(
+            _elegir_candidato_priorizado(
+                [self.r1],
+                lambda residente: (cargas_semanales[residente.pk],),
+            ),
+            self.r1,
+        )
 
     def test_score_cercania_penaliza_residente_con_guardia_a_dos_dias(self):
         """El helper marca con score 1 al residente con una guardia a exactamente 2 días."""
@@ -1192,6 +1353,47 @@ class ResolverAusenciaConReasignacionTest(TestCase):
         self.resolver(ausencia, self.jefe, reasignaciones={guardia.pk: self.reemplazante.pk})
         self.assertTrue(
             NotificacionGuardia.objects.filter(destinatario=self.ausente).exists()
+        )
+
+    def test_rechaza_reemplazante_inactivo_y_revierte_la_operacion(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        self.reemplazante.is_active = False
+        self.reemplazante.save(update_fields=['is_active'])
+
+        from .services import CambioGuardiaError
+        with self.assertRaises(CambioGuardiaError):
+            self.resolver(
+                ausencia,
+                self.jefe,
+                reasignaciones={guardia.pk: self.reemplazante.pk},
+            )
+
+        guardia.refresh_from_db()
+        ausencia.refresh_from_db()
+        self.assertEqual(guardia.estado, 'PUBLICADA')
+        self.assertEqual(ausencia.estado, 'PENDIENTE')
+
+    def test_rechaza_reemplazante_con_guardia_consecutiva(self):
+        ausencia, guardia = self._ausencia_con_guardia()
+        crear_guardia_publicada(
+            self.reemplazante,
+            self.hoy - datetime.timedelta(days=1),
+            tipo=self.tipo,
+        )
+
+        from .services import CambioGuardiaError
+        with self.assertRaises(CambioGuardiaError):
+            self.resolver(
+                ausencia,
+                self.jefe,
+                reasignaciones={guardia.pk: self.reemplazante.pk},
+            )
+
+        self.assertFalse(
+            AsignacionGuardia.objects.filter(
+                residente=self.reemplazante,
+                fecha=self.hoy,
+            ).exists()
         )
 
 

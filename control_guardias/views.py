@@ -972,7 +972,12 @@ class ResolverAusenciaView(JefeInstructorMixin, TemplateView):
                 except ValueError:
                     pass
 
-        resolver_ausencia(ausencia, request.user, reasignaciones=reasignaciones)
+        try:
+            resolver_ausencia(ausencia, request.user, reasignaciones=reasignaciones)
+        except CambioGuardiaError as exc:
+            messages.error(request, str(exc))
+            ausencia.refresh_from_db()
+            return self.render_to_response(self._build_context(ausencia))
 
         n_total = ausencia.guardias_afectadas.count()
         n_reasig = len(reasignaciones)

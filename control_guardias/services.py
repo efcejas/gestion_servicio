@@ -200,9 +200,9 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     slots = []
     for ronda in sorted(slots_por_ronda):
-        grupo = slots_por_ronda[ronda]
-        random.shuffle(grupo)   # fechas en orden aleatorio dentro de la ronda
-        slots.extend(grupo)
+        # Intercalar semanas evita consumir toda la cuota mensual en un bloque
+        # del mes antes de haber considerado fechas de las demás semanas.
+        slots.extend(_intercalar_slots_por_semana(slots_por_ronda[ronda]))
 
     # ------------------------------------------------------------------
     # 5. Contadores históricos de feriados (para trato equitativo)
@@ -218,9 +218,6 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     # ------------------------------------------------------------------
     # 6. Eliminar borradores previos si se solicitó
     # ------------------------------------------------------------------
-    if reemplazar_borradores and borradores_existentes.exists():
-        borradores_existentes.delete()
-
     # ------------------------------------------------------------------
     # 7. Algoritmo de asignación greedy equitativo
     # ------------------------------------------------------------------
@@ -229,18 +226,31 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     random.shuffle(residentes)
 
     guardias_en_borrador = defaultdict(int)   # residente_pk → guardias generadas en esta corrida
+    guardias_por_semana = defaultdict(int)    # (residente_pk, año_iso, semana_iso) → cantidad
     anio_por_fecha = defaultdict(set)         # fecha → set de anio_residencia ya asignados ese día
 
     # Pre-cargar fechas ya asignadas en BD para el período (publicadas o borradores restantes)
     # Evita IntegrityError por violación del unique_together (residente, fecha, tipo_guardia)
     fechas_asignadas = defaultdict(set)   # residente_pk → set(fecha, tipo_guardia_id)
     fechas_ocupadas = defaultdict(set)    # residente_pk → set(fecha) — un residente no puede tener 2 guardias el mismo día
-    for asig in AsignacionGuardia.objects.filter(
+    asignaciones_existentes = AsignacionGuardia.objects.filter(
         fecha__gte=primer_dia,
         fecha__lte=ultimo_dia,
-    ).select_related('residente').values('residente_id', 'fecha', 'tipo_guardia_id', 'residente__anio_residencia'):
+    )
+    if reemplazar_borradores:
+        # El borrador anterior se reemplaza por completo y no debe condicionar
+        # el cálculo del nuevo. Se elimina recién al persistir, dentro del mismo
+        # bloque atómico que crea las asignaciones nuevas.
+        asignaciones_existentes = asignaciones_existentes.exclude(estado='BORRADOR')
+
+    for asig in asignaciones_existentes.select_related('residente').values(
+        'residente_id', 'fecha', 'tipo_guardia_id', 'residente__anio_residencia'
+    ):
         fechas_asignadas[asig['residente_id']].add((asig['fecha'], asig['tipo_guardia_id']))
         fechas_ocupadas[asig['residente_id']].add(asig['fecha'])
+        guardias_por_semana[
+            (asig['residente_id'], *_clave_semana(asig['fecha']))
+        ] += 1
         anio_por_fecha[asig['fecha']].add(asig['residente__anio_residencia'])
 
     # Pre-cargar fechas bloqueadas por ausencias reportadas dentro del período.
@@ -277,6 +287,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
     for fecha, tipo, es_feriado_slot in slots:
         weekday = fecha.weekday()  # 0=Lunes … 6=Domingo
+        clave_semana = _clave_semana(fecha)
         # Candidatos elegibles: cuota disponible, sin guardia ese día (ningún tipo), sin día consecutivo
         dia_anterior = fecha - timedelta(days=1)
         dia_siguiente = fecha + timedelta(days=1)
@@ -325,29 +336,31 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         # Ordenar candidatos según equidad
         if es_feriado_slot:
             # Para feriados: primero menos guardias este mes, luego menos feriados históricos
-            candidatos.sort(key=lambda r: (
+            prioridad = lambda r: (
+                guardias_por_semana[(r.pk, *clave_semana)],
                 guardias_en_borrador[r.pk],
                 feriados_historicos[r.pk],
-            ))
+                _score_cercania(r.pk, fecha, fechas_ocupadas),
+            )
         elif weekday == 3 and residentes_en_rotacion:
             # Jueves con rotantes: dar prioridad a residentes en rotación externa
             # (tienen disponibilidad reducida entre semana, el jueves les conviene más)
-            candidatos.sort(key=lambda r: (
+            prioridad = lambda r: (
                 0 if r.pk in residentes_en_rotacion else 1,
+                guardias_por_semana[(r.pk, *clave_semana)],
                 guardias_en_borrador[r.pk],
                 _score_cercania(r.pk, fecha, fechas_ocupadas),
-            ))
+            )
         else:
             # Para días normales: primero menos guardias, luego penalización por cercanía de 2 días
-            candidatos.sort(key=lambda r: (
+            prioridad = lambda r: (
+                guardias_por_semana[(r.pk, *clave_semana)],
                 guardias_en_borrador[r.pk],
                 _score_cercania(r.pk, fecha, fechas_ocupadas),
-            ))
+            )
 
-        # Tomar el grupo de empate y elegir al azar para evitar sesgo
-        min_count = guardias_en_borrador[candidatos[0].pk]
-        grupo_empate = [r for r in candidatos if guardias_en_borrador[r.pk] == min_count]
-        elegido = random.choice(grupo_empate)
+        # El azar solo desempata candidatos con la misma prioridad completa.
+        elegido = _elegir_candidato_priorizado(candidatos, prioridad)
 
         asignaciones_a_crear.append(AsignacionGuardia(
             residente=elegido,
@@ -360,6 +373,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
 
         # Actualizar contadores
         guardias_en_borrador[elegido.pk] += 1
+        guardias_por_semana[(elegido.pk, *clave_semana)] += 1
         cuota_disponible[elegido.pk] -= 1
         fechas_asignadas[elegido.pk].add((fecha, tipo.pk))  # reservado para posible uso futuro
         fechas_ocupadas[elegido.pk].add(fecha)
@@ -371,9 +385,14 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     # 8. Persistir en una sola transacción
     # ------------------------------------------------------------------
     with transaction.atomic():
+        if reemplazar_borradores:
+            AsignacionGuardia.objects.filter(
+                fecha__gte=primer_dia,
+                fecha__lte=ultimo_dia,
+                estado='BORRADOR',
+            ).delete()
         AsignacionGuardia.objects.bulk_create(asignaciones_a_crear)
 
-    advertencias = []
     if slots_fallback_anio:
         advertencias.append(
             f"{slots_fallback_anio} slot(s) cubierto(s) por residentes fuera de las restricciones "
@@ -541,6 +560,48 @@ def _score_cercania(residente_pk, fecha, fechas_ocupadas):
     dos_despues = fecha + timedelta(days=2)
     ocupadas = fechas_ocupadas[residente_pk]
     return 1 if (dos_antes in ocupadas or dos_despues in ocupadas) else 0
+
+
+def _clave_semana(fecha):
+    """Identifica la semana calendario de una fecha sin confundir cambios de año."""
+    calendario_iso = fecha.isocalendar()
+    return calendario_iso.year, calendario_iso.week
+
+
+def _intercalar_slots_por_semana(slots):
+    """
+    Reparte el orden de procesamiento entre semanas.
+
+    Dentro de cada semana conserva azar, pero toma como máximo un slot de cada
+    semana por vuelta. Así, si la cuota total no alcanza para todos los slots,
+    no se agota accidentalmente en una sola parte del mes.
+    """
+    por_semana = defaultdict(list)
+    for slot in slots:
+        por_semana[_clave_semana(slot[0])].append(slot)
+
+    semanas = list(por_semana)
+    random.shuffle(semanas)
+    for grupo in por_semana.values():
+        random.shuffle(grupo)
+
+    intercalados = []
+    while any(por_semana[semana] for semana in semanas):
+        random.shuffle(semanas)
+        for semana in semanas:
+            if por_semana[semana]:
+                intercalados.append(por_semana[semana].pop())
+    return intercalados
+
+
+def _elegir_candidato_priorizado(candidatos, prioridad):
+    """Elige al azar solo entre candidatos con la mejor prioridad completa."""
+    mejor_prioridad = min(prioridad(candidato) for candidato in candidatos)
+    grupo_empate = [
+        candidato for candidato in candidatos
+        if prioridad(candidato) == mejor_prioridad
+    ]
+    return random.choice(grupo_empate)
 
 
 def _anio_puede_cubrir_slot(anio_residencia, weekday, es_feriado):
@@ -802,6 +863,14 @@ def sugerir_reemplazo(guardia):
         .exclude(pk=guardia.residente_id)
         .order_by('last_name', 'first_name')
     )
+    residentes_ausentes = set(
+        AusenciaResidente.objects.filter(
+            residente_id__in=[r.pk for r in residentes],
+            fecha_inicio__lte=fecha,
+            fecha_fin__gte=fecha,
+            estado='PENDIENTE',
+        ).values_list('residente_id', flat=True)
+    )
 
     fechas_ocupadas = defaultdict(set)
     guardias_mes_count = defaultdict(int)
@@ -817,6 +886,7 @@ def sugerir_reemplazo(guardia):
         if fecha not in fechas_ocupadas[r.pk]
         and dia_anterior not in fechas_ocupadas[r.pk]
         and dia_siguiente not in fechas_ocupadas[r.pk]
+        and r.pk not in residentes_ausentes
     ]
 
     # Ordenar: menor carga mensual primero; empate → alfabético (ya viene así)
@@ -842,16 +912,43 @@ def resolver_ausencia(ausencia, jefe, reasignaciones=None):
 
     Notifica al ausente y a cada reemplazante elegido.
     """
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-
     reasig = reasignaciones or {}
 
     with transaction.atomic():
-        for guardia in ausencia.guardias_afectadas.select_related('tipo_guardia', 'residente'):
+        ausencia = (
+            AusenciaResidente.objects
+            .select_for_update()
+            .get(pk=ausencia.pk)
+        )
+        if ausencia.estado != 'PENDIENTE':
+            raise CambioGuardiaError("La ausencia ya fue resuelta.")
+
+        guardias_afectadas = list(
+            ausencia.guardias_afectadas
+            .select_for_update()
+            .select_related('tipo_guardia', 'residente')
+        )
+        guardias_ids = {guardia.pk for guardia in guardias_afectadas}
+        if set(reasig) - guardias_ids:
+            raise CambioGuardiaError(
+                "Se intentó reasignar una guardia que no pertenece a esta ausencia."
+            )
+
+        for guardia in guardias_afectadas:
             reemplazante_pk = reasig.get(guardia.pk)
             if reemplazante_pk:
-                reemplazante = User.objects.get(pk=reemplazante_pk)
+                candidatos, _ = sugerir_reemplazo(guardia)
+                candidatos_por_id = {
+                    candidato['residente'].pk: candidato['residente']
+                    for candidato in candidatos
+                }
+                try:
+                    reemplazante = candidatos_por_id[int(reemplazante_pk)]
+                except (KeyError, TypeError, ValueError):
+                    raise CambioGuardiaError(
+                        "El reemplazante seleccionado ya no está disponible "
+                        "o no cumple las reglas de guardias."
+                    )
 
                 # Guardia original → REASIGNADA
                 guardia.estado = 'REASIGNADA'
