@@ -868,6 +868,96 @@ class CalendarioViewTests(TestCase):
         # Publicada → color de paleta según pk del residente
         color_esperado = _RESIDENTE_PALETTE[self.residente.pk % len(_RESIDENTE_PALETTE)]
         self.assertEqual(por_id[str(self.guardia_pub.pk)]['backgroundColor'], color_esperado)
+        self.assertTrue(por_id[str(self.guardia_bor.pk)]['editable'])
+        self.assertFalse(por_id[str(self.guardia_pub.pk)]['editable'])
+
+    def test_jefe_mueve_guardia_borrador_desde_calendario(self):
+        self.client.force_login(self.jefe)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-07'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['ok'])
+        self.guardia_bor.refresh_from_db()
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 7))
+
+    def test_residente_no_puede_mover_guardia_borrador(self):
+        self.client.force_login(self.residente)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-07'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.guardia_bor.refresh_from_db()
+        self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 5))
+
+    def test_no_mueve_guardia_publicada(self):
+        self.client.force_login(self.jefe)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_pub.pk},
+            ),
+            {'fecha': '2026-05-07'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('BORRADOR', response.json()['error'])
+
+    def test_no_mueve_borrador_fuera_del_mes(self):
+        self.client.force_login(self.jefe)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-06-01'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('mismo mes', response.json()['error'])
+
+    def test_no_mueve_borrador_a_dia_no_configurado(self):
+        self.client.force_login(self.jefe)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-09'},  # sábado; el tipo solo aplica L-V
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('día de la semana', response.json()['error'])
+
+    def test_no_mueve_borrador_si_genera_dias_consecutivos(self):
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 5, 8),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': self.guardia_bor.pk},
+            ),
+            {'fecha': '2026-05-07'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('consecutivos', response.json()['error'])
 
     def test_api_residente_puede_ver_todas_las_publicadas_si_lo_pide(self):
         otro_residente = crear_residente('otro_cal', 'R3')

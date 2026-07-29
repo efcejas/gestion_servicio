@@ -19,6 +19,7 @@ from .views import (
     GuardiasApiView,
     GuardiasIndexView,
     MisGuardiasView,
+    MoverGuardiaBorradorView,
     NotificacionesGuardiaView,
     PublicarBorradorView,
     ReportarAusenciaView,
@@ -46,6 +47,11 @@ urlpatterns = [
     path('mis-guardias/', MisGuardiasView.as_view(), name='mis_guardias'),
     path('notificaciones/', NotificacionesGuardiaView.as_view(), name='notificaciones'),
     path('api/guardias/', GuardiasApiView.as_view(), name='guardias_api'),
+    path(
+        'api/guardias/<int:pk>/mover-borrador/',
+        MoverGuardiaBorradorView.as_view(),
+        name='guardia_borrador_mover',
+    ),
 
     # -- Configuración (jefes/instructores) --
     path('configuracion/', ConfiguracionView.as_view(), name='configuracion'),

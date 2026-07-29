@@ -482,6 +482,84 @@ def cancelar_borrador(mes, anio):
     return count or 0
 
 
+def mover_guardia_borrador(guardia, nueva_fecha):
+    """
+    Mueve una asignación BORRADOR a otra fecha del mismo mes.
+
+    Conserva residente y tipo de guardia, y vuelve a validar las restricciones
+    operativas porque la fecha pudo cambiar desde que se generó el borrador.
+    """
+    with transaction.atomic():
+        guardia = (
+            AsignacionGuardia.objects
+            .select_for_update()
+            .select_related('tipo_guardia', 'residente')
+            .get(pk=guardia.pk)
+        )
+        if guardia.estado != 'BORRADOR':
+            raise DistribucionError("Solo se pueden mover guardias en estado BORRADOR.")
+        if (nueva_fecha.year, nueva_fecha.month) != (guardia.fecha.year, guardia.fecha.month):
+            raise DistribucionError("La guardia debe permanecer dentro del mismo mes del borrador.")
+        if nueva_fecha == guardia.fecha:
+            return guardia
+
+        tipo = guardia.tipo_guardia
+        es_feriado = Feriado.objects.filter(fecha=nueva_fecha).exists()
+        dias_aplicables = {
+            DIA_SEMANA_MAP[d]
+            for d in tipo.dias_semana.split(',')
+            if d in DIA_SEMANA_MAP
+        }
+        if es_feriado:
+            if not tipo.aplica_feriados:
+                raise DistribucionError(
+                    f"{tipo.nombre} no está configurada para días feriados."
+                )
+        elif nueva_fecha.weekday() not in dias_aplicables:
+            raise DistribucionError(
+                f"{tipo.nombre} no está configurada para ese día de la semana."
+            )
+
+        asignaciones_activas = AsignacionGuardia.objects.select_for_update().filter(
+            estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+        ).exclude(pk=guardia.pk)
+
+        if asignaciones_activas.filter(
+            fecha=nueva_fecha,
+            tipo_guardia=tipo,
+        ).exists():
+            raise DistribucionError("Ese slot ya está ocupado por otra guardia.")
+
+        if asignaciones_activas.filter(
+            residente=guardia.residente,
+            fecha=nueva_fecha,
+        ).exists():
+            raise DistribucionError("El residente ya tiene otra guardia ese día.")
+
+        if asignaciones_activas.filter(
+            residente=guardia.residente,
+            fecha__in=[
+                nueva_fecha - timedelta(days=1),
+                nueva_fecha + timedelta(days=1),
+            ],
+        ).exists():
+            raise DistribucionError(
+                "El movimiento dejaría al residente con guardias en días consecutivos."
+            )
+
+        if AusenciaResidente.objects.filter(
+            residente=guardia.residente,
+            estado='PENDIENTE',
+            fecha_inicio__lte=nueva_fecha,
+            fecha_fin__gte=nueva_fecha,
+        ).exists():
+            raise DistribucionError("El residente tiene una ausencia informada para esa fecha.")
+
+        guardia.fecha = nueva_fecha
+        guardia.save(update_fields=['fecha', 'es_feriado', 'fecha_actualizacion'])
+        return guardia
+
+
 def obtener_metricas_mes(mes, anio):
     """
     Calcula métricas de equidad para las asignaciones publicadas/cumplidas de un mes.

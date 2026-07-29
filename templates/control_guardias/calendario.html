@@ -74,6 +74,11 @@
         </div>
         {% endfor %}
         {% endif %}
+        {% if es_gestor %}
+        <span class="text-gray-400">
+            <i class="fas fa-hand-pointer mr-1"></i>Arrastrá las guardias en borrador para cambiar su fecha.
+        </span>
+        {% endif %}
     </div>
 
     <!-- Calendario -->
@@ -224,9 +229,11 @@
   const tooltip      = document.getElementById('guardiaTooltip');
   const filtroEl     = document.getElementById('filtroResidente');
   const apiUrl       = "{% url 'control_guardias:guardias_api' %}";
+  const moverBorradorBaseUrl = "{% url 'control_guardias:guardia_borrador_mover' pk=999999 %}";
   const FERIADOS     = new Set({{ feriados_json|safe }});
   const INITIAL_DATE = "{{ calendario_initial_date|default:'' }}";
   const CALENDAR_TODAY = "{{ calendario_hoy }}";
+  const ES_GESTOR = {{ es_gestor|yesno:'true,false' }};
 
   let calendar = null;
 
@@ -274,6 +281,39 @@
 
   function hideTooltip() {
     tooltip.classList.add('hidden');
+  }
+
+  function getCookie(name) {
+    const item = document.cookie.split('; ').find((row) => row.startsWith(`${name}=`));
+    return item ? decodeURIComponent(item.split('=').slice(1).join('=')) : '';
+  }
+
+  function fechaLocalIso(fecha) {
+    return `${fecha.getFullYear()}-${String(fecha.getMonth()+1).padStart(2,'0')}-${String(fecha.getDate()).padStart(2,'0')}`;
+  }
+
+  async function moverBorrador(info) {
+    hideTooltip();
+    const url = moverBorradorBaseUrl.replace('999999', String(info.event.id));
+    const body = new URLSearchParams({ fecha: fechaLocalIso(info.event.start) });
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCookie('csrftoken'),
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        },
+        body: body.toString(),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'No se pudo mover la guardia.');
+      }
+      calendar.refetchEvents();
+    } catch (error) {
+      info.revert();
+      window.alert(error.message || 'No se pudo mover la guardia.');
+    }
   }
 
   // ── eventContent — chip por guardia ──────────────────────────────────────
@@ -339,6 +379,11 @@
       navLinks: false,
       showNonCurrentDates: true,
       dayMaxEventRows: 4,
+      editable: ES_GESTOR,
+      eventDurationEditable: false,
+      eventAllow: (dropInfo, draggedEvent) =>
+        ES_GESTOR && draggedEvent.extendedProps.estado === 'BORRADOR',
+      eventDrop: moverBorrador,
       eventContent: buildEventContent,
       headerToolbar: {
         left: 'prev,next today',

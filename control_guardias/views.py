@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -60,6 +60,7 @@ from .services import (
     cancelar_slot_vacante,
     eliminar_guardia_excepcion,
     generar_distribucion,
+    mover_guardia_borrador,
     obtener_metricas_mes,
     publicar_borrador,
     rechazar_cambio_jefe,
@@ -361,6 +362,7 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
                 'title': f'{nombre} – {asignacion.tipo_guardia.nombre}',
                 'start': asignacion.fecha.isoformat(),
                 'allDay': True,
+                'editable': es_gestor and asignacion.estado == 'BORRADOR',
                 'backgroundColor': color,
                 'borderColor': color,
                 'textColor': '#fff',
@@ -382,6 +384,34 @@ class GuardiasApiView(LoginRequiredMixin, TemplateView):
             })
 
         return JsonResponse(eventos, safe=False)
+
+
+class MoverGuardiaBorradorView(JefeInstructorMixin, TemplateView):
+    """POST JSON: mueve una guardia borrador desde el calendario."""
+    template_name = None
+    http_method_names = ['post']
+
+    def post(self, request, pk, *args, **kwargs):
+        guardia = get_object_or_404(AsignacionGuardia, pk=pk)
+        try:
+            nueva_fecha = date.fromisoformat(request.POST.get('fecha', ''))
+        except (TypeError, ValueError):
+            return JsonResponse(
+                {'ok': False, 'error': 'La fecha de destino no es válida.'},
+                status=400,
+            )
+
+        try:
+            guardia = mover_guardia_borrador(guardia, nueva_fecha)
+        except DistribucionError as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+        return JsonResponse({
+            'ok': True,
+            'guardia_id': guardia.pk,
+            'fecha': guardia.fecha.isoformat(),
+            'es_feriado': guardia.es_feriado,
+        })
 
 
 # ---------------------------------------------------------------------------
