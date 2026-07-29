@@ -4,6 +4,7 @@ Documentacion funcional de modulos, flujos y reglas de negocio.
 
 ## Incluye
 
+- [CONTROL_GUARDIAS.md](CONTROL_GUARDIAS.md) - Fuente funcional principal del modulo de guardias.
 - [README_PROTOCOLOS.md](README_PROTOCOLOS.md)
 - [SISTEMA_PERFILES_README.md](SISTEMA_PERFILES_README.md)
 - [SISTEMA_RESIDENTES_README.md](SISTEMA_RESIDENTES_README.md)

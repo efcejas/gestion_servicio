@@ -10,6 +10,8 @@ Documentos de uso frecuente para correr, desplegar, configurar y mantener el sis
 - [CORREO_RESUMEN_SYNC.md](CORREO_RESUMEN_SYNC.md) - Configuracion, prueba, scheduler y manejo operativo por hilos del resumen de correos institucionales.
 - [HEROKU_CONFIG_VARS.md](HEROKU_CONFIG_VARS.md) - Variables de entorno utiles.
 - [TESTS_README.md](TESTS_README.md) - Ejecucion de tests.
+- [CONTROL_GUARDIAS_DISTRIBUCION_MEJORAS.md](CONTROL_GUARDIAS_DISTRIBUCION_MEJORAS.md) - Logica y criterios de distribucion de guardias.
+- [CONTROL_GUARDIAS_NOTIFICACIONES_EMAIL.md](CONTROL_GUARDIAS_NOTIFICACIONES_EMAIL.md) - Matriz de eventos, destinatarios y pruebas de email.
 - [FRONTEND_TAILWIND_WORKFLOW.md](FRONTEND_TAILWIND_WORKFLOW.md) - Flujo de trabajo Tailwind + VS Code IntelliSense.
 - [DEPLOY_HEROKU_PEDIDOS.md](DEPLOY_HEROKU_PEDIDOS.md) - Deploy especifico del sistema de pedidos.
 - [DEPLOY_ACTUALIZACION_SEGURIDAD.md](DEPLOY_ACTUALIZACION_SEGURIDAD.md) - Runbook de actualizacion de seguridad en Heroku.

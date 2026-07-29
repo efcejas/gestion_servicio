@@ -20,6 +20,7 @@
 ### Sistemas activos
 
 - **[producto/README.md](producto/README.md)** - Índice de documentación funcional.
+- **[producto/CONTROL_GUARDIAS.md](producto/CONTROL_GUARDIAS.md)** - Fuente funcional principal del módulo de guardias.
 - **[producto/README_PROTOCOLOS.md](producto/README_PROTOCOLOS.md)** - Navegación del sistema de protocolos.
 - **[producto/SISTEMA_PERFILES_README.md](producto/SISTEMA_PERFILES_README.md)** - Roles, perfiles y flujo de usuario.
 - **[producto/SISTEMA_RESIDENTES_README.md](producto/SISTEMA_RESIDENTES_README.md)** - Módulo de residentes.
@@ -48,6 +49,8 @@
 ### Calidad y seguridad
 
 - **[operativa/TESTS_README.md](operativa/TESTS_README.md)** - Ejecución y alcance de tests.
+- **[operativa/CONTROL_GUARDIAS_DISTRIBUCION_MEJORAS.md](operativa/CONTROL_GUARDIAS_DISTRIBUCION_MEJORAS.md)** - Reglas y mejoras de distribución de guardias.
+- **[operativa/CONTROL_GUARDIAS_NOTIFICACIONES_EMAIL.md](operativa/CONTROL_GUARDIAS_NOTIFICACIONES_EMAIL.md)** - Matriz operativa de notificaciones del módulo.
 - **[security/SECURITY_README.md](security/SECURITY_README.md)** - Índice detallado de documentos de seguridad.
 - **[security/DASHBOARD_ADMIN_SEGURIDAD.md](security/DASHBOARD_ADMIN_SEGURIDAD.md)** - Restricciones de acceso del dashboard administrativo.
 

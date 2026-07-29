@@ -15,7 +15,7 @@ Esta propuesta está pensada para implementarse sobre la estructura actual, sin 
 
 La función actual de distribución es:
 
-- [control_guardias/services.py](control_guardias/services.py#L29)
+- [control_guardias/services.py](../../control_guardias/services.py)
 
 ### Qué hace hoy
 
@@ -55,7 +55,7 @@ Las ausencias hoy se usan de forma reactiva para reasignación posterior, no com
 
 Referencia:
 
-- [control_guardias/services.py](control_guardias/services.py#L567)
+- [control_guardias/services.py](../../control_guardias/services.py)
 
 ### Problema 2 - Guardias demasiado cercanas
 
@@ -73,7 +73,7 @@ La lógica solo bloquea diferencia de 1 día. Es decir:
 
 Referencia:
 
-- [control_guardias/services.py](control_guardias/services.py#L213)
+- [control_guardias/services.py](../../control_guardias/services.py)
 
 ## Propuesta funcional
 
