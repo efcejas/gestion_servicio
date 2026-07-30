@@ -1347,6 +1347,32 @@ class CopiarInformeFinalSmokeTest(TestCase):
         for acento in ['á', 'é', 'í', 'ó', 'ú', 'Á', 'É', 'Í', 'Ó', 'Ú']:
             self.assertNotIn(acento, texto, f"NetTerm texto no debe contener '{acento}'")
 
+    def test_copiar_sistema_netterm_no_trunca_informe_largo(self):
+        """El endpoint entrega completo un informe NetTerm extenso."""
+        parrafos = [
+            f'<p>Hallazgo {numero:04d}: descripcion extensa sin alteraciones.</p>'
+            for numero in range(1500)
+        ]
+        p = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-CP003',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Extenso',
+            nombre_paciente='NetTerm',
+            informe_html=''.join(parrafos),
+            sistema_destino='netterm',
+        )
+        self.client.login(username='res_copiar', password='pass123')
+
+        response = self.client.get(self._url(p.pk))
+
+        self.assertEqual(response.status_code, 200)
+        texto = response.json()['informe_texto']
+        self.assertIn('Hallazgo 0000', texto)
+        self.assertIn('Hallazgo 1499', texto)
+        self.assertEqual(texto.count('Hallazgo'), 1500)
+
 
 class CargarPlantillasSmokeTest(TestCase):
     """Tests del endpoint cargar_plantillas (GET /preinformes/cargar-plantillas/)."""

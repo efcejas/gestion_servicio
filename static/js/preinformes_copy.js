@@ -5,22 +5,47 @@
         }
     }
 
-    function copyPlainText(text, notify) {
+    function copyPlainTextFallback(text, notify) {
         const textarea = document.createElement('textarea');
         textarea.value = text;
+        textarea.setAttribute('readonly', '');
         textarea.style.position = 'fixed';
         textarea.style.left = '-9999px';
+        textarea.style.top = '0';
         document.body.appendChild(textarea);
+        textarea.focus();
         textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
 
         try {
-            document.execCommand('copy');
+            if (!document.execCommand('copy')) {
+                throw new Error('execCommand falló');
+            }
             notify('¡Informe copiado en texto plano para NetTerm!', 'success');
+            return true;
         } catch (error) {
             notify('Error al copiar al portapapeles', 'error');
+            return false;
         } finally {
             document.body.removeChild(textarea);
         }
+    }
+
+    function copyPlainText(text, notify) {
+        // Evita las limitaciones del mecanismo legacy con informes extensos.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text)
+                .then(() => {
+                    notify('¡Informe copiado en texto plano para NetTerm!', 'success');
+                    return true;
+                })
+                .catch((error) => {
+                    console.error('Error con Clipboard.writeText:', error);
+                    return copyPlainTextFallback(text, notify);
+                });
+        }
+
+        return Promise.resolve(copyPlainTextFallback(text, notify));
     }
 
     function copyHtmlWithFallback(htmlContent, plainText, notify) {
@@ -70,8 +95,7 @@
 
                 const sistemaDestino = data.sistema_destino || defaultSistemaDestino;
                 if (sistemaDestino === 'netterm') {
-                    copyPlainText(data.informe_texto || '', notify);
-                    return true;
+                    return copyPlainText(data.informe_texto || '', notify);
                 }
 
                 const htmlContent = data.informe_html;
