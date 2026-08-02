@@ -13,6 +13,11 @@ from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
 HORA_INTRA_DESDE = time(8, 0)
 HORA_INTRA_HASTA = time(17, 0)
 TIPOS_LIQUIDACION_ECO = {'ECO', 'DOP', 'ECOCAR'}
+SINONIMOS_PRACTICAS_ECO = {
+    'abdomen': {'abdominal', 'eco_abdominal'},
+    'abdominal': {'abdomen', 'eco_abdominal'},
+    'eco_abdominal': {'abdomen', 'abdominal'},
+}
 
 
 def _normalizar_texto(valor):
@@ -25,10 +30,14 @@ def _normalizar_texto(valor):
 
 
 def _tokens(valor):
-    return {
+    tokens = {
         token for token in _normalizar_texto(valor).split()
         if len(token) >= 3 and token not in {'eco', 'ecografia', 'ecografica', 'con', 'sin'}
     }
+    expandidos = set(tokens)
+    for token in tokens:
+        expandidos.update(SINONIMOS_PRACTICAS_ECO.get(token, set()))
+    return expandidos
 
 
 def _nombre_usuario_eges(user):

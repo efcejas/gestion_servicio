@@ -56,6 +56,15 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             precio_otras_os=Decimal('1000.00'),
             activo=True,
         )
+        self.estudio_abdominal_corto = Estudios.objects.create(
+            nombre='ECO ABDOMINAL',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
 
     def _registro(self, horario='INTRA', fecha=date(2026, 5, 12), dni='12345678', estudios=None):
         registro = RegistroEstudiosPorMedico.objects.create(
@@ -221,6 +230,19 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(len(resultado['matches_practicas']), 2)
         self.assertEqual(resultado['candidatos_count'], 2)
         self.assertNotIn('Hay mÃºltiples coincidencias EGES posibles.', resultado['motivos'])
+
+    def test_eco_abdominal_equivale_a_ecografia_completa_de_abdomen(self):
+        self._registro(horario='INTRA', estudios=[self.estudio_abdominal_corto])
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['ok'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(resultado['estado'], 'ok')
+        self.assertEqual(len(resultado['matches_practicas']), 1)
+        self.assertFalse(resultado['liquidacion_sin_match'])
+        self.assertFalse(resultado['eges_sin_liquidacion'])
 
     def test_practica_del_mismo_turno_con_otro_profesional_genera_advertencia(self):
         self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
