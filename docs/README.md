@@ -32,7 +32,7 @@
 - **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
 - **[producto/PREINFORMES_REVISION_STAFF.md](producto/PREINFORMES_REVISION_STAFF.md)** - Circuito vigente de revision staff de preinformes.
 
-- **[liquidacion/reglas-descuento-residencia.md](liquidacion/reglas-descuento-residencia.md)** - Reglas vigentes de descuento residencia, B2/B3, diagnostico de recalculo, preparacion RRHH y checklist de cierre.
+- **[liquidacion/reglas-descuento-residencia.md](liquidacion/reglas-descuento-residencia.md)** - Reglas vigentes de descuento residencia, B2/B3, diagnostico de recalculo, preparacion RRHH, checklist de cierre, auditoria ECO/PACS y validacion EGES.
 
 ### IA y dictado
 

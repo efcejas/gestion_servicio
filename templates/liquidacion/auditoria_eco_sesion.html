@@ -250,7 +250,7 @@
                     <tr class="hover:bg-gray-50">
                         {% if puede_correccion_masiva_pacs %}
                         <td class="px-4 py-3 text-sm">
-                            {% if puede_revision_masiva_eco and not registro.revision_auditoria_eco and not registro.correccion_pacs %}
+                            {% if puede_revision_masiva_eco and not registro.revision_auditoria_eco and not registro.auditoria_eco_resuelta_por_eges and not registro.correccion_pacs %}
                             <label class="inline-flex items-center gap-1 text-xs text-emerald-800">
                                 <input type="checkbox" name="registros" value="{{ registro.registro_id }}" form="bulk-revision-eco-form"
                                        class="bulk-revision-eco rounded border-gray-300 text-emerald-700 focus:ring-emerald-500">
@@ -259,6 +259,8 @@
                             {% elif registro.correccion_pacs %}
                             <input type="checkbox" name="registros" value="{{ registro.registro_id }}" form="bulk-correccion-pacs-form"
                                    class="bulk-ajuste-pacs rounded border-gray-300 text-blue-700 focus:ring-blue-500">
+                            {% elif registro.auditoria_eco_resuelta_por_eges %}
+                            <span class="text-xs font-semibold text-cyan-700">EGES</span>
                             {% else %}
                             <span class="text-xs text-gray-300">-</span>
                             {% endif %}
@@ -306,6 +308,13 @@
                                 <p class="mt-0.5 text-blue-700">{{ registro.correccion_pacs.observacion|truncatechars:80 }}</p>
                             </div>
                             {% endif %}
+                            {% elif registro.revision_cruce_eges %}
+                            <div class="rounded-md border border-cyan-100 bg-cyan-50 px-2 py-1 text-xs text-cyan-800">
+                                <p class="font-semibold">{{ registro.revision_cruce_eges.get_estado_display }}</p>
+                                <p>{{ registro.revision_cruce_eges.fecha_revision|date:"d/m/Y H:i" }} · {{ registro.revision_cruce_eges.revisado_por|default:"-" }}</p>
+                                <p class="mt-0.5 text-cyan-700">{{ registro.revision_cruce_eges.observacion|truncatechars:80 }}</p>
+                                <p class="mt-0.5 text-cyan-600">Validacion operativa EGES, sin impacto economico.</p>
+                            </div>
                             {% else %}
                             <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">Sin revisar</span>
                             {% endif %}
@@ -323,6 +332,7 @@
                                     Liquidacion
                                 </a>
                             </div>
+                            {% if not registro.auditoria_eco_resuelta_por_eges %}
                             <form method="post"
                                   action="{% url 'liquidacion:auditoria_eco_registro_resolver' sesion.pk registro.registro_id %}"
                                   class="mt-2 rounded-md border border-slate-200 bg-slate-50 p-2">
@@ -346,6 +356,7 @@
                                     </button>
                                 </div>
                             </form>
+                            {% endif %}
                             {% if registro.revision_auditoria_eco.estado == 'REQUIERE_CORRECCION' and not registro.correccion_pacs %}
                             <form method="post"
                                   action="{% url 'liquidacion:auditoria_eco_registro_corregir' sesion.pk registro.registro_id %}"

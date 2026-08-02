@@ -1,19 +1,20 @@
 ---
 name: liquidacion-operativo
-description: "Skill para cambios focales en liquidacion: calculo, reglas residencia, B2/B3, cierre mensual, RRHH, checklist, permisos y trazabilidad. Usar cuando el cambio pueda afectar dinero, estados de sesion o registros historicos."
+description: "Skill para cambios focales en liquidacion: calculo, reglas residencia, B2/B3, cierre mensual, RRHH, checklist, EGES/PACS, permisos y trazabilidad. Usar cuando el cambio pueda afectar dinero, estados de sesion, validacion operativa o registros historicos."
 ---
 
 # Skill: Liquidacion Operativa
 
-> Ultima actualizacion: 28/06/2026
+> Ultima actualizacion: 02/08/2026
 
 ## Checklist rapida
 
-- Confirmar alcance exacto: calculo, permisos, B2/B3, residencia, RRHH, checklist, UI o docs.
+- Confirmar alcance exacto: calculo, permisos, B2/B3, residencia, RRHH, checklist, EGES/PACS, UI o docs.
 - Leer `.github/instructions/liquidacion.instructions.md` antes de tocar codigo del modulo.
 - Identificar si el cambio toca dinero persistido, historial, snapshot o estado de sesion.
 - Si el cambio toca facturacion, verificar requisito RRHH: con practicas de residencia requiere preparacion `PREPARADO`; sin residencia es `No requerido`.
 - Si el cambio toca bloqueantes de cierre, distinguir navegacion/inspeccion de correccion real.
+- Si el cambio toca EGES, distinguir validacion operativa de correccion economica.
 - Mantener la logica economica fuera de templates.
 - Usar servicios existentes antes de crear nuevas reglas.
 - Evitar recalculos masivos.
@@ -29,6 +30,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Snapshot RRHH D1 y requisito para facturar: `liquidacion/services_rrhh.py`.
 - Checklist E1 y acciones E2: `liquidacion/services_cierre.py`, `liquidacion/services_auditoria.py`, `liquidacion/views.py`.
 - Auditoria ECO/PACS E3/E4: `RevisionAuditoriaEcoRegistro`, `CorreccionPacsRegistro`, `AuditoriaEcoSesionView`, `AuditoriaEcoRegistroCorregirView`.
+- Cruce EGES: `liquidacion/services_eges.py`, `RevisionCruceEgesRegistro`, `eges_import/models.py`, `templates/liquidacion/cruce_eges_liquidacion_preview.html`.
 - Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
 - Clasificacion automatica y override: `liquidacion/signals.py`.
 
@@ -40,8 +42,10 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - `liquidacion/services_rrhh.py`: snapshot auditable para RRHH, deteccion de practicas de residencia y requisito para facturar; no recalcula.
 - `liquidacion/services_cierre.py`: checklist visual/operativo; no calcula montos.
 - `liquidacion/services_auditoria.py`: gate administrativo y hallazgos accionables; no corrige datos por si solo.
+- `liquidacion/services_eges.py`: cruce EGES contra registros ECO de residencia; no recalcula ni modifica registros.
 - `RevisionAuditoriaEcoRegistro`: revision administrativa ECO/PACS; no modifica montos.
 - `CorreccionPacsRegistro`: historial de ajuste economico puntual por control PACS; puede guardar cambio de horario y monto recalculado.
+- `RevisionCruceEgesRegistro`: decision administrativa del cruce EGES; `VALIDADO`/`DESCARTADO` resuelven alertas, `REQUIERE_CORRECCION` mantiene pendiente.
 - `liquidacion/signals.py`: clasificacion automatica; debe respetar override Extra Residencia.
 - `templates/liquidacion/*`: UX; no fuente de verdad economica.
 - `liquidacion/tests_auditoria_2026_05_11.py`: regresiones B2/B3/sesiones/gate.
@@ -98,6 +102,31 @@ python manage.py makemigrations --check --dry-run
 ```
 
 Usar cuando el cambio toque revision de alertas ECO, control PACS, `RevisionAuditoriaEcoRegistro`, `CorreccionPacsRegistro`, visibilidad del ajuste en la lista profesional o acciones desde `auditoria_eco_sesion`.
+
+### Cruce EGES
+
+```bash
+python manage.py test liquidacion.tests_cruce_eges --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+Usar cuando el cambio toque importacion EGES enriquecida, preview de cruce, matching de paciente/profesional/practicas ECO, filtros, validacion masiva de OK visibles o `RevisionCruceEgesRegistro`.
+
+Reglas rapidas:
+
+- Solo compara ECO en esta etapa.
+- Agrupa multiples filas EGES del mismo turno.
+- `VALIDADO` y `DESCARTADO` limpian la alerta operativa; `REQUIERE_CORRECCION` la mantiene pendiente.
+- No modifica `RegistroEstudiosPorMedico`, `monto_calculado`, `horario`, paciente ni estudios.
+
+### DNI de practica
+
+```bash
+python manage.py test liquidacion.tests.ClasificacionHorarioResidenciaProxyTest --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+Usar cuando el cambio toque `PracticaForm` o carga/edicion de registros. El DNI debe ser numerico, sin nombres, puntos, espacios ni letras.
 
 ### Override Extra Residencia
 

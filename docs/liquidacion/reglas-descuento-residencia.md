@@ -1,8 +1,8 @@
 # Reglas de descuento residencia
 
-Documento vigente del flujo de descuento INTRA residencia y cierre operativo de liquidacion de residencia.
+Documento vigente del flujo de descuento INTRA residencia, cierre operativo de liquidacion de residencia y validacion administrativa ECO/EGES/PACS.
 
-Ultima actualizacion: junio 2026.
+Ultima actualizacion: agosto 2026.
 
 ## Problema resuelto
 
@@ -293,6 +293,105 @@ La vista completa de auditoria permite:
 - fecha de revision.
 
 La revision por si sola no modifica montos.
+
+### E5 - Cruce EGES contra liquidacion ECO
+
+El cruce EGES permite validar registros de residencia contra turnos importados desde EGES/PACS antes de cerrar una sesion. Es una capa de validacion operativa; no calcula dinero y no modifica registros.
+
+Ruta operativa:
+
+- `sesiones/<pk>/cruce-eges/`
+
+Fuentes:
+
+- registros de `RegistroEstudiosPorMedico` de la sesion para roles:
+  - `medico_residente`;
+  - `jefe_residentes`;
+  - `instructor_residentes`;
+- batch EGES importado desde `eges_import`.
+
+Alcance actual:
+
+- compara solo modalidad ECO;
+- excluye insumos;
+- usa datos persistidos en liquidacion y EGES;
+- no recalcula `monto_calculado`;
+- no modifica horario, paciente ni estudios del registro.
+
+Matching esperado:
+
+1. Paciente por DNI o HC.
+2. Misma fecha.
+3. Misma modalidad ECO.
+4. Practicas equivalentes o candidatas.
+5. Profesional como informante o actuante.
+6. Horario EGES cercano o esperable.
+
+Reglas de agrupacion EGES:
+
+- varias filas EGES del mismo paciente, fecha, hora, centro y tipo de atencion pueden representar un mismo turno con varias practicas;
+- la UI debe mostrar esas filas agrupadas como candidatas del mismo turno;
+- si una practica del mismo turno pertenece a otro profesional, debe advertirse sin marcar todo automaticamente como OK.
+
+Equivalencias de practica:
+
+- `ECO ABDOMINAL` equivale a `ECOGRAFIA COMPLETA DE ABDOMEN`.
+- Mantener sinonimos ECO en el servicio de cruce, no en templates.
+
+Horario esperado:
+
+- dias habiles 08:00-17:00: `INTRA`;
+- fuera de ese rango: `EXTRA`;
+- sabados, domingos y feriados: `EXTRA`;
+- si el turno cruza una frontera horaria o no es claro: `MANUAL`.
+
+Guardias:
+
+- si EGES marca guardia entre 08:00 y 17:00 en dia habil, se espera `INTRA`;
+- si es fuera de ese horario, sabado, domingo o feriado, se espera `EXTRA`.
+
+Estados del cruce:
+
+- `OK`: coincide paciente, fecha, medico/practicas ECO y horario esperado.
+- `ADVERTENCIA`: hay match parcial, multiples candidatos, practica faltante/sobrante, medico no claro o diferencia operativa.
+- `MANUAL`: requiere decision humana por ambiguedad.
+
+Revision administrativa:
+
+`RevisionCruceEgesRegistro`
+
+Estados:
+
+- `VALIDADO`: se acepta la coincidencia.
+- `REQUIERE_CORRECCION`: el caso queda pendiente para resolver por otro flujo.
+- `DESCARTADO`: la alerta no corresponde.
+
+Reglas:
+
+- `VALIDADO` y `DESCARTADO` limpian la alerta operativa de auditoria ECO si no hay revision PACS pendiente;
+- `REQUIERE_CORRECCION` mantiene el caso visible como pendiente;
+- la accion masiva **Validar OK visibles** solo persiste registros `OK` visibles por los filtros actuales y sin revision previa;
+- ninguna revision EGES aplica correcciones economicas por si misma.
+
+Filtros esperados en la pantalla:
+
+- batch EGES;
+- profesional;
+- estado del cruce;
+- estado de revision;
+- rango de fechas;
+- paciente o DNI.
+
+El panel de sesiones debe reducir pendientes de auditoria ECO a medida que los registros queden `VALIDADO` o `DESCARTADO` por EGES/PACS, y debe mantener pendientes los casos `REQUIERE_CORRECCION`.
+
+### DNI numerico en carga de practicas
+
+El campo DNI de paciente en la carga/edicion de practicas debe aceptar solo numeros. No deben guardarse nombres, puntos, espacios ni letras en ese campo.
+
+Regla de validacion:
+
+- backend: `PracticaForm.clean_dni_paciente()`;
+- frontend: input numerico como ayuda, sin reemplazar la validacion backend.
 
 ### E4 - Correccion puntual por control PACS
 

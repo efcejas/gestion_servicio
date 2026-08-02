@@ -1769,4 +1769,76 @@ Fase D - Consolidación:
 
 ---
 
+## 11. Estado vigente agregado - Validacion EGES y cierre operativo residencia
+
+Esta seccion resume el comportamiento vigente agregado al modulo de liquidacion durante 2026. Para reglas operativas detalladas, usar como fuente principal `docs/liquidacion/reglas-descuento-residencia.md`.
+
+### 11.1 Cierre administrativo residencia
+
+El circuito minimo para liquidar residencia es:
+
+1. Registrar practicas por `medico_residente`, `jefe_residentes` e `instructor_residentes`.
+2. Resolver solicitudes de revision horaria.
+3. Revisar auditoria ECO/PACS/EGES.
+4. Preparar snapshot RRHH.
+5. Facturar.
+6. Pagar.
+
+Para pasar una sesion `CERRADA` a `FACTURADA`, si tiene practicas de residencia debe existir una `PreparacionLiquidacionRRHH` en estado `PREPARADO`. Si no hay practicas de residencia, RRHH queda como `No requerido`.
+
+### 11.2 Revision horaria y recalculo puntual
+
+- B2 aplica solicitudes aprobadas de forma atomica y con locks simples.
+- B3 permite recalcular puntualmente una solicitud ya aplicada con la logica vigente de `calcular_monto()`.
+- B3 crea historial y no cambia `monto_anterior`, `horario_anterior`, `fecha_aplicacion` ni `aplicado_por`.
+- No se permiten recalculos masivos en estos flujos.
+
+### 11.3 Reglas residencia y Extra Residencia
+
+- `ReglaDescuentoResidencia` permite decidir que estudios o grupos descuentan INTRA para roles de residencia.
+- Doppler solo descuenta si existe regla activa explicita.
+- Jefes e instructores solo descuentan si la regla los habilita explicitamente.
+- Jefes e instructores pueden marcar `liquidar_como_extra_residencia` para liquidar una carga como EXTRA por actividad asistencial fuera del rol docente.
+- Ese override se recuerda temporalmente en sesion Django para cargas sucesivas, solo para esos roles.
+
+### 11.4 Auditoria ECO/PACS
+
+La auditoria ECO detecta registros sospechosos y permite revision administrativa:
+
+- `VALIDADO`: se acepta el registro.
+- `REQUIERE_CORRECCION`: queda pendiente de ajuste.
+- `DESCARTADO`: se descarta la alerta.
+
+La revision no modifica montos. La correccion economica PACS es un flujo separado, puntual y auditado mediante `CorreccionPacsRegistro`.
+
+### 11.5 Cruce EGES contra liquidacion
+
+El cruce EGES compara registros ECO de residencia contra turnos importados desde EGES/PACS.
+
+Reglas vigentes:
+
+- compara solo modalidad ECO;
+- usa DNI/HC, fecha, modalidad, practicas, profesional informante/actuante y horario;
+- agrupa multiples filas EGES del mismo turno para soportar pacientes con varias practicas;
+- tolera diferencias de orden en nombres del profesional;
+- reconoce sinonimos ECO, por ejemplo `ECO ABDOMINAL` y `ECOGRAFIA COMPLETA DE ABDOMEN`;
+- sabados, domingos y feriados esperan `EXTRA`;
+- dias habiles 08:00-17:00 esperan `INTRA`;
+- fuera de ese rango espera `EXTRA`;
+- casos ambiguos quedan `MANUAL`.
+
+`RevisionCruceEgesRegistro` guarda la decision administrativa:
+
+- `VALIDADO`;
+- `REQUIERE_CORRECCION`;
+- `DESCARTADO`.
+
+Validar o descartar desde EGES limpia alertas operativas de auditoria ECO cuando no hay PACS pendiente. `REQUIERE_CORRECCION` mantiene el caso pendiente. Ninguna accion EGES recalcula ni modifica el registro.
+
+### 11.6 DNI numerico
+
+El DNI del paciente en la carga de practicas debe contener solo numeros. El backend rechaza nombres, letras, puntos y espacios para evitar que el cruce EGES/PACS pierda capacidad de match.
+
+---
+
 🚀 **ARRANCANDO CON LA IMPLEMENTACIÓN AHORA...**

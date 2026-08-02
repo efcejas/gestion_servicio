@@ -255,7 +255,10 @@ def _filtrar_registros_alerta_auditoria_eco(
     filtrados = []
     for registro in registros:
         revision = registro.get('revision_auditoria_eco')
-        estado_actual = revision.estado if revision else 'SIN_REVISAR'
+        revision_eges = registro.get('revision_cruce_eges')
+        estado_actual = revision.estado if revision else (
+            revision_eges.estado if revision_eges else 'SIN_REVISAR'
+        )
         fecha_informe = registro.get('fecha_informe') or ''
 
         if estado_revision and estado_actual != estado_revision:
@@ -1202,6 +1205,16 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
         for revision in revisiones:
             if revision.registro_id not in revisiones_por_registro:
                 revisiones_por_registro[revision.registro_id] = revision
+        revisiones_eges_por_registro = {}
+        revisiones_eges = (
+            RevisionCruceEgesRegistro.objects
+            .filter(sesion_contable=self.sesion, registro_id__in=registro_ids)
+            .select_related('revisado_por', 'batch_eges')
+            .order_by('registro_id', '-fecha_revision')
+        )
+        for revision in revisiones_eges:
+            if revision.registro_id not in revisiones_eges_por_registro:
+                revisiones_eges_por_registro[revision.registro_id] = revision
         correcciones_por_registro = {}
         correcciones = (
             CorreccionPacsRegistro.objects
@@ -1213,7 +1226,18 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             if correccion.registro_id not in correcciones_por_registro:
                 correcciones_por_registro[correccion.registro_id] = correccion
         for registro in registros_alerta:
-            registro['revision_auditoria_eco'] = revisiones_por_registro.get(registro['registro_id'])
+            revision_auditoria = revisiones_por_registro.get(registro['registro_id'])
+            revision_eges = revisiones_eges_por_registro.get(registro['registro_id'])
+            registro['revision_auditoria_eco'] = revision_auditoria
+            registro['revision_cruce_eges'] = revision_eges
+            registro['auditoria_eco_resuelta_por_eges'] = bool(
+                not revision_auditoria
+                and revision_eges
+                and revision_eges.estado in (
+                    RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                    RevisionCruceEgesRegistro.ESTADO_DESCARTADO,
+                )
+            )
             registro['correccion_pacs'] = correcciones_por_registro.get(registro['registro_id'])
 
         registros_alerta = _filtrar_registros_alerta_auditoria_eco(

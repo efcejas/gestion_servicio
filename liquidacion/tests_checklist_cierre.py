@@ -8,6 +8,8 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from eges_import.models import ImportBatch
+
 from .models import (
     Estudios,
     GrupoTarifario,
@@ -17,6 +19,7 @@ from .models import (
     RegistroEstudio,
     RegistroEstudiosPorMedico,
     RevisionAuditoriaEcoRegistro,
+    RevisionCruceEgesRegistro,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
     TarifaGrupoTarifario,
@@ -486,6 +489,40 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Sin revisar')
         self.assertNotContains(response, 'Validado contra PACS.')
+
+    def test_vista_completa_auditoria_eco_toma_validacion_eges_como_resuelta(self):
+        revisado = self._crear_registro(monto=Decimal('1000.00'))
+        batch = ImportBatch.objects.create(usuario=self.admin, archivo_nombre='Turnos-Junio-ECO.xls')
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=revisado,
+            batch_eges=batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+            motivos_json=['Coincidencia EGES OK.'],
+            snapshot_json={},
+            observacion='Validado por cruce EGES.',
+            revisado_por=self.admin,
+        )
+        for _ in range(34):
+            self._crear_registro(monto=Decimal('1000.00'))
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]) + '?estado_revision=SIN_REVISAR',
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sin revisar')
+        self.assertNotContains(response, 'Validado por cruce EGES.')
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertContains(response, 'Validado contra EGES')
+        self.assertContains(response, 'Validacion operativa EGES, sin impacto economico.')
 
     def test_vista_completa_auditoria_eco_filtra_por_fecha_informe(self):
         for _ in range(35):

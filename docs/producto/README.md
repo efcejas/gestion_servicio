@@ -12,7 +12,7 @@ Documentacion funcional de modulos, flujos y reglas de negocio.
 - [SISTEMA_CONSULTORIOS.md](SISTEMA_CONSULTORIOS.md)
 - [SISTEMA_LIQUIDACION_COLEGIALES_V2.md](SISTEMA_LIQUIDACION_COLEGIALES_V2.md)
 - [RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md](RESUMEN_LOGICA_REGISTRO_ESTUDIOS.md)
-- [../liquidacion/reglas-descuento-residencia.md](../liquidacion/reglas-descuento-residencia.md)
+- [../liquidacion/reglas-descuento-residencia.md](../liquidacion/reglas-descuento-residencia.md) - Reglas vigentes de residencia, cierre, RRHH, auditoria ECO/PACS y validacion EGES.
 - [NOTIFICACIONES_TOKEN_README.md](NOTIFICACIONES_TOKEN_README.md)
 - [PREINFORMES_FORMATO_WORD.md](PREINFORMES_FORMATO_WORD.md)
 - [PREINFORMES_REVISION_STAFF.md](PREINFORMES_REVISION_STAFF.md)

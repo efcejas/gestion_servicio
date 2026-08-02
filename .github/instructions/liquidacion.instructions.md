@@ -4,7 +4,7 @@ applyTo: "liquidacion/**/*.py"
 
 # Instrucciones para liquidacion
 
-> Ultima actualizacion: 28/06/2026
+> Ultima actualizacion: 02/08/2026
 
 ## Prioridad del modulo
 
@@ -139,6 +139,30 @@ applyTo: "liquidacion/**/*.py"
   - aplicarse si el monto nuevo coincide con el actual.
 - En pantallas operativas, mostrar como dato principal la hora PACS asociada a la fecha del registro; la fecha administrativa de aplicacion queda como trazabilidad secundaria.
 
+## Cruce EGES y validacion operativa
+
+- El cruce EGES valida registros de residencia contra turnos importados desde EGES/PACS; no es fuente de calculo economico.
+- `construir_preview_cruce_liquidacion_eges` cruza por paciente/DNI o HC, fecha, modalidad ECO y practicas candidatas.
+- En esta etapa el cruce compara solo modalidad ECO. No mezclar con TC/RM/RX/MAM sin tarea explicita.
+- Los turnos EGES pueden traer varias practicas para el mismo paciente, fecha, hora, centro y tipo de atencion; deben agruparse como un mismo turno candidato.
+- La coincidencia de medico debe tolerar orden de nombre/apellido y apellidos adicionales.
+- `ECO ABDOMINAL` y `ECOGRAFIA COMPLETA DE ABDOMEN` son equivalentes para el cruce.
+- Horario esperado EGES:
+  - dias habiles 08:00-17:00: `INTRA`;
+  - fuera de ese rango: `EXTRA`;
+  - sabado, domingo y feriado: `EXTRA`;
+  - cruces ambiguos o turnos que atraviesan el limite deben quedar `MANUAL`.
+- Guardias en EGES entre 08:00 y 17:00 se esperan `INTRA`, salvo sabados, domingos y feriados.
+- `RevisionCruceEgesRegistro` registra la decision administrativa del cruce:
+  - `VALIDADO`: coincidencia aceptada;
+  - `REQUIERE_CORRECCION`: queda pendiente para resolver por otro flujo;
+  - `DESCARTADO`: alerta descartada.
+- Validar o descartar un cruce EGES no modifica `RegistroEstudiosPorMedico`, no recalcula montos y no crea correcciones economicas.
+- `REQUIERE_CORRECCION` tampoco aplica correccion por si mismo; solo deja trazabilidad y mantiene el caso pendiente.
+- La auditoria ECO de sesiones puede considerar resuelto un registro si existe revision EGES `VALIDADO` o `DESCARTADO` y no hay revision PACS pendiente. `REQUIERE_CORRECCION` debe seguir visible.
+- La accion masiva `Validar OK visibles` solo debe persistir resultados `OK` del filtro actual y sin revision previa.
+- El campo DNI de carga de practicas debe aceptar solo numeros. No permitir nombres, puntos, espacios ni letras.
+
 ## Permisos y trazabilidad
 
 - Validar permisos en backend (`dispatch`, `test_func`, queryset restringido), no solo en template.
@@ -163,6 +187,8 @@ applyTo: "liquidacion/**/*.py"
 - Cambio B2/B3 o sesiones: usar tests focales en `liquidacion.tests_auditoria_2026_05_11` antes de suites largas.
 - Cambio RRHH D1: `python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1`.
 - Cambio checklist E1: `python manage.py test liquidacion.tests_checklist_cierre --verbosity=1`.
+- Cambio cruce/validacion EGES: `python manage.py test liquidacion.tests_cruce_eges --verbosity=1`.
+- Cambio validacion DNI de practica: `python manage.py test liquidacion.tests.ClasificacionHorarioResidenciaProxyTest --verbosity=1`.
 - Cambio de transicion `CERRADA -> FACTURADA`: agregar/ejecutar test focal en `liquidacion.tests_auditoria_2026_05_11.SesionContableWorkflowPermissionsTest`.
 - Si se toca modelo: `python manage.py makemigrations --check --dry-run`.
 - Correr suite completa `python manage.py test liquidacion --verbosity=1` solo cuando el alcance/riesgo lo justifique o el usuario lo pida.
