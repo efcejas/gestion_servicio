@@ -39,16 +39,32 @@ def _nombre_usuario_eges(user):
     return _normalizar_texto(nombre or getattr(user, 'username', ''))
 
 
+def _tokens_nombre_medico(valor):
+    stopwords = {'medico', 'no', 'especificado', 'sin', 'dr', 'dra', 'doctor', 'doctora'}
+    return {
+        token for token in _normalizar_texto(valor).split()
+        if len(token) >= 3 and token not in stopwords
+    }
+
+
+def _nombre_medico_coincide(tokens_esperados, nombre_eges):
+    tokens_eges = _tokens_nombre_medico(nombre_eges)
+    if not tokens_esperados or not tokens_eges:
+        return False
+    if tokens_esperados.issubset(tokens_eges):
+        return True
+    return len(tokens_esperados & tokens_eges) >= 2
+
+
 def _medico_coincide(fila, medico):
     esperado = _nombre_usuario_eges(medico)
-    if not esperado:
+    tokens_esperados = _tokens_nombre_medico(esperado)
+    if not tokens_esperados:
         return False, None
 
-    informante = _normalizar_texto(fila.medico_informante)
-    actuante = _normalizar_texto(fila.medico_actuante)
-    if esperado and (esperado in informante or informante in esperado):
+    if _nombre_medico_coincide(tokens_esperados, fila.medico_informante):
         return True, 'informante'
-    if esperado and (esperado in actuante or actuante in esperado):
+    if _nombre_medico_coincide(tokens_esperados, fila.medico_actuante):
         return True, 'actuante'
     return False, None
 

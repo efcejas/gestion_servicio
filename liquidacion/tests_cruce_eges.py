@@ -85,6 +85,8 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         codigo_practica='180112/0',
         modalidad='ECO',
         servicio='Ecografia',
+        medico_informante='Médico No Especificado',
+        medico_actuante='PUENTE CARLOS',
     ):
         return EgesRow.objects.create(
             batch=self.batch,
@@ -95,8 +97,8 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             hora_turno=hora_turno,
             hora_hasta=hora_hasta,
             tipo_atencion=tipo_atencion,
-            medico_informante='Médico No Especificado',
-            medico_actuante='PUENTE CARLOS',
+            medico_informante=medico_informante,
+            medico_actuante=medico_actuante,
             practica=practica,
             codigo_practica=codigo_practica,
             cantidad=Decimal('1.00'),
@@ -118,6 +120,30 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(resultado['estado'], 'ok')
         self.assertEqual(resultado['mejor_match']['horario_esperado'], 'INTRA')
         self.assertEqual(resultado['mejor_match']['rol_medico_eges'], 'actuante')
+
+    def test_medico_coincide_con_nombre_en_distinto_orden_y_apellido_extra(self):
+        self.residente.first_name = 'Juan David'
+        self.residente.last_name = 'Cervantes'
+        self.residente.save(update_fields=['first_name', 'last_name'])
+        self._registro(horario='INTRA')
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            tipo_atencion='Guardia',
+            medico_informante='CERVANTES ALVAREZ JUAN DAVID',
+            medico_actuante='CERVANTES ALVAREZ JUAN DAVID',
+        )
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['ok'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(resultado['estado'], 'ok')
+        self.assertEqual(resultado['mejor_match']['rol_medico_eges'], 'informante')
+        self.assertNotIn(
+            'El profesional no coincide claramente como informante ni actuante.',
+            resultado['motivos'],
+        )
 
     def test_guardia_fuera_de_17_alerta_si_liquidacion_esta_intra(self):
         self._registro(horario='INTRA')
