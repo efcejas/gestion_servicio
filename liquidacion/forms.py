@@ -428,6 +428,8 @@ class PracticaForm(forms.ModelForm):
             'dni_paciente': forms.TextInput(attrs={
                 'class': TAILWIND_INPUT_CLASSES,
                 'maxlength': 8,
+                'inputmode': 'numeric',
+                'pattern': '[0-9]*',
                 'placeholder': 'DNI sin puntos'
             }),
             'estudio': forms.SelectMultiple(attrs={
@@ -525,6 +527,12 @@ class PracticaForm(forms.ModelForm):
             self.fields.pop('liquidar_como_extra_residencia', None)
 
         # Horario: clasificación canónica post-M2M en services.py; save() deja fallback legacy.
+
+    def clean_dni_paciente(self):
+        dni = (self.cleaned_data.get('dni_paciente') or '').strip()
+        if not dni.isdigit():
+            raise forms.ValidationError('El DNI debe contener solo numeros, sin nombres, puntos ni espacios.')
+        return dni
 
     def clean_cantidad_regiones(self):
         cantidad = self.cleaned_data.get('cantidad_regiones')

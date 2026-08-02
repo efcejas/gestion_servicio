@@ -1544,6 +1544,42 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertNotIn('liquidar_como_extra_residencia', form.cleaned_data)
 
+    def test_form_rechaza_dni_con_letras_o_nombre(self):
+        form = PracticaForm(
+            data={
+                'tipo_estudio': 'ECO',
+                'fecha_del_informe': '2026-05-27',
+                'nombre_paciente': 'Juan',
+                'apellido_paciente': 'Perez',
+                'dni_paciente': 'Juan 12345678',
+                'estudio': [str(self.estudio_eco.id)],
+                'cantidad_regiones': '1',
+                'tipo_obra_social': 'COBER',
+            },
+            user=self.residente,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('dni_paciente', form.errors)
+
+    def test_form_acepta_dni_solo_numerico(self):
+        form = PracticaForm(
+            data={
+                'tipo_estudio': 'ECO',
+                'fecha_del_informe': '2026-05-27',
+                'nombre_paciente': 'Juan',
+                'apellido_paciente': 'Perez',
+                'dni_paciente': '12345678',
+                'estudio': [str(self.estudio_eco.id)],
+                'cantidad_regiones': '1',
+                'tipo_obra_social': 'COBER',
+            },
+            user=self.residente,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['dni_paciente'], '12345678')
+
     def test_signal_respeta_extra_residencia_jefe_eco_intra_y_monto_100(self):
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.jefe_residentes,
