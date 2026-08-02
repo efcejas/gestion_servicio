@@ -56,7 +56,7 @@
     <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
         <div class="border-b border-slate-200 px-4 py-3">
             <h2 class="text-base font-semibold text-slate-900">Resultados del cruce</h2>
-            <p class="text-xs text-slate-500">La expectativa horaria EGES usa 08:00-17:00 como INTRA; fuera de ese rango, EXTRA. Si cruza 17:00 queda manual.</p>
+            <p class="text-xs text-slate-500">Cruza solo modalidad ECO. La expectativa horaria EGES usa día hábil 08:00-17:00 como INTRA; sábados, domingos, feriados y fuera de ese rango esperan EXTRA.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
@@ -89,9 +89,32 @@
                             <p class="mt-1 text-xs font-semibold text-slate-700">Liquidación: {{ item.registro.horario }} · ${{ item.registro.monto_calculado|floatformat:2 }}</p>
                         </td>
                         <td class="px-3 py-3 align-top">
-                            {% for practica in item.practicas_liquidacion %}
-                            <p class="text-slate-700">{{ practica }}</p>
-                            {% endfor %}
+                            {% if item.matches_practicas %}
+                                <p class="mb-1 text-xs font-semibold uppercase text-emerald-700">Con match EGES</p>
+                                {% for match_practica in item.matches_practicas %}
+                                <p class="text-slate-700">
+                                    {{ match_practica.liquidacion.display }}
+                                    {% if not match_practica.cantidad_ok %}
+                                    <span class="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                                        EGES cant. {{ match_practica.fila_eges.cantidad }}
+                                    </span>
+                                    {% endif %}
+                                </p>
+                                {% endfor %}
+                            {% endif %}
+                            {% if item.liquidacion_sin_match %}
+                                <p class="mt-2 text-xs font-semibold uppercase text-red-700">Cargadas sin EGES</p>
+                                {% for practica in item.liquidacion_sin_match %}
+                                <p class="text-red-700">{{ practica.display }}</p>
+                                {% endfor %}
+                            {% endif %}
+                            {% if not item.matches_practicas and not item.liquidacion_sin_match %}
+                                {% for practica in item.practicas_liquidacion %}
+                                <p class="text-slate-700">{{ practica }}</p>
+                                {% empty %}
+                                <span class="text-slate-500">Sin prácticas ECO</span>
+                                {% endfor %}
+                            {% endif %}
                         </td>
                         <td class="px-3 py-3 align-top">
                             {% if item.mejor_match %}
@@ -104,6 +127,14 @@
                                 <p class="mt-1 text-xs font-semibold text-amber-700">{{ item.candidatos_count }} candidatos EGES</p>
                                 {% endif %}
                                 {% endwith %}
+                                {% if item.eges_sin_liquidacion %}
+                                <div class="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2">
+                                    <p class="text-xs font-semibold uppercase text-amber-700">EGES no cargadas</p>
+                                    {% for fila_eges in item.eges_sin_liquidacion %}
+                                    <p class="text-xs text-amber-800">{{ fila_eges.practica }} · {{ fila_eges.hora_turno|time:"H:i" }}</p>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             {% else %}
                                 <span class="text-slate-500">Sin coincidencia EGES</span>
                             {% endif %}

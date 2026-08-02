@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from eges_import.models import EgesRow, ImportBatch
+from control_guardias.models import Feriado
 
 from .models import (
     Estudios,
@@ -46,8 +47,17 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             precio_otras_os=Decimal('1000.00'),
             activo=True,
         )
+        self.estudio_tv = Estudios.objects.create(
+            nombre='ECOGRAFIA TRANSVAGINAL SIN BIOPSIA',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
 
-    def _registro(self, horario='INTRA', fecha=date(2026, 5, 10), dni='12345678'):
+    def _registro(self, horario='INTRA', fecha=date(2026, 5, 12), dni='12345678', estudios=None):
         registro = RegistroEstudiosPorMedico.objects.create(
             sesion_contable=self.sesion,
             medico=self.residente,
@@ -60,27 +70,39 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             cantidad_regiones=1,
             monto_calculado=Decimal('1000.00'),
         )
-        RegistroEstudio.objects.create(registro=registro, estudio=self.estudio, cantidad=1)
+        for estudio in estudios or [self.estudio]:
+            RegistroEstudio.objects.create(registro=registro, estudio=estudio, cantidad=1)
         return registro
 
-    def _eges_row(self, hora_turno, hora_hasta, tipo_atencion='Guardia', dni='12345678'):
+    def _eges_row(
+        self,
+        hora_turno,
+        hora_hasta,
+        tipo_atencion='Guardia',
+        dni='12345678',
+        fecha=date(2026, 5, 12),
+        practica='ECOGRAFIA COMPLETA DE ABDOMEN',
+        codigo_practica='180112/0',
+        modalidad='ECO',
+        servicio='Ecografia',
+    ):
         return EgesRow.objects.create(
             batch=self.batch,
             dni_paciente=dni,
             historia_clinica=dni,
             apellido_nombre='PEREZ JUAN',
-            fecha_turno=date(2026, 5, 10),
+            fecha_turno=fecha,
             hora_turno=hora_turno,
             hora_hasta=hora_hasta,
             tipo_atencion=tipo_atencion,
             medico_informante='Médico No Especificado',
             medico_actuante='PUENTE CARLOS',
-            practica='ECOGRAFIA COMPLETA DE ABDOMEN',
-            codigo_practica='180112/0',
+            practica=practica,
+            codigo_practica=codigo_practica,
             cantidad=Decimal('1.00'),
-            servicio='Ecografia',
+            servicio=servicio,
             estado_turno='Informado',
-            modalidad='ECO',
+            modalidad=modalidad,
             sub_modalidad='ECO_ABDOMINAL',
             es_insumo=False,
         )
@@ -107,6 +129,86 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         resultado = preview['resultados'][0]
         self.assertEqual(resultado['mejor_match']['horario_esperado'], 'EXTRA')
         self.assertIn('EGES sugiere EXTRA; liquidación figura INTRA.', resultado['motivos'])
+
+    def test_sabado_de_manana_alerta_si_liquidacion_esta_intra(self):
+        fecha_sabado = date(2026, 5, 9)
+        self._registro(horario='INTRA', fecha=fecha_sabado)
+        self._eges_row(time(10, 0), time(10, 15), tipo_atencion='Guardia', fecha=fecha_sabado)
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['advertencia'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(resultado['mejor_match']['horario_esperado'], 'EXTRA')
+        self.assertIn('EGES sugiere EXTRA; liquidación figura INTRA.', resultado['motivos'])
+
+    def test_feriado_de_manana_alerta_si_liquidacion_esta_intra(self):
+        fecha_feriado = date(2026, 5, 11)
+        Feriado.objects.create(fecha=fecha_feriado, descripcion='Feriado test')
+        self._registro(horario='INTRA', fecha=fecha_feriado)
+        self._eges_row(time(10, 0), time(10, 15), tipo_atencion='Guardia', fecha=fecha_feriado)
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['advertencia'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(resultado['mejor_match']['horario_esperado'], 'EXTRA')
+        self.assertIn('EGES sugiere EXTRA; liquidación figura INTRA.', resultado['motivos'])
+
+    def test_detecta_practica_eges_mismo_turno_no_cargada_en_liquidacion(self):
+        self._registro(horario='INTRA', estudios=[self.estudio])
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            practica='ECOGRAFIA TRANSVAGINAL SIN BIOPSIA',
+            codigo_practica='180118/0',
+        )
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['advertencia'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(len(resultado['matches_practicas']), 1)
+        self.assertEqual(len(resultado['eges_sin_liquidacion']), 1)
+        self.assertEqual(resultado['eges_sin_liquidacion'][0].practica, 'ECOGRAFIA TRANSVAGINAL SIN BIOPSIA')
+        self.assertIn(
+            'Hay prácticas EGES ECO del mismo paciente/fecha/profesional no cargadas en liquidación.',
+            resultado['motivos'],
+        )
+
+    def test_detecta_practica_liquidada_sin_match_eges(self):
+        self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['advertencia'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(len(resultado['matches_practicas']), 1)
+        self.assertEqual(len(resultado['liquidacion_sin_match']), 1)
+        self.assertEqual(resultado['liquidacion_sin_match'][0]['nombre'], 'ECOGRAFIA TRANSVAGINAL SIN BIOPSIA')
+        self.assertIn(
+            'Hay prácticas cargadas en liquidación sin coincidencia EGES ECO.',
+            resultado['motivos'],
+        )
+
+    def test_no_contrasta_filas_eges_de_otra_modalidad(self):
+        self._registro(horario='INTRA', estudios=[self.estudio])
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            practica='RADIOGRAFIA DE TORAX',
+            codigo_practica='RX/1',
+            modalidad='RX',
+            servicio='Radiologia',
+        )
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['manual'], 1)
+        resultado = preview['resultados'][0]
+        self.assertIn('No se encontró práctica EGES ECO para el DNI y fecha del registro.', resultado['motivos'])
 
     def test_vista_renderiza_preview_con_batch(self):
         self._registro(horario='INTRA')
