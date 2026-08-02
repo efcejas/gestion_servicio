@@ -27,12 +27,13 @@ class ImportBatchAdmin(admin.ModelAdmin):
 
 @admin.register(EgesRow)
 class EgesRowAdmin(admin.ModelAdmin):
-    list_display = ['id', 'batch', 'historia_clinica', 'apellido_nombre', 'fecha_turno',
-                    'practica', 'obra_social', 'modalidad', 'sub_modalidad', 'medico_informante',
+    list_display = ['id', 'batch', 'dni_paciente', 'apellido_nombre', 'fecha_turno',
+                    'hora_turno', 'tipo_atencion', 'practica', 'cantidad', 'obra_social',
+                    'modalidad', 'sub_modalidad', 'medico_informante', 'medico_actuante',
                     'estado_turno', 'es_insumo']
-    list_filter = ['modalidad', 'sub_modalidad', 'es_insumo', 'estado_turno', 'batch']
+    list_filter = ['modalidad', 'sub_modalidad', 'tipo_atencion', 'es_insumo', 'estado_turno', 'batch']
     search_fields = ['historia_clinica', 'apellido_nombre', 'practica', 'servicio',
-                     'medico_informante', 'obra_social']
+                     'dni_paciente', 'medico_informante', 'medico_actuante', 'obra_social']
 
 
 @admin.register(NombreObraSocial)

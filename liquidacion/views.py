@@ -87,6 +87,8 @@ from .services_rrhh import (
     proxima_version_preparacion_rrhh,
 )
 from .services_cierre import construir_checklist_cierre_sesion
+from .services_eges import construir_preview_cruce_liquidacion_eges
+from eges_import.models import ImportBatch
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -1255,6 +1257,41 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             ],
             'motivos_disponibles': motivos_disponibles,
             'current_path': self.request.get_full_path(),
+        })
+        return context
+
+
+class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Preview read-only del cruce entre registros de residencia y un batch EGES."""
+
+    template_name = 'liquidacion/cruce_eges_liquidacion_preview.html'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para revisar el cruce EGES.')
+        return redirect('home')
+
+    def dispatch(self, request, *args, **kwargs):
+        self.sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        batch_id = (self.request.GET.get('batch') or '').strip()
+        batches = ImportBatch.objects.all().order_by('-fecha_importacion')
+        batch = None
+        preview = None
+        if batch_id:
+            batch = get_object_or_404(ImportBatch, pk=batch_id)
+            preview = construir_preview_cruce_liquidacion_eges(self.sesion, batch)
+
+        context.update({
+            'sesion': self.sesion,
+            'batches': batches,
+            'batch_seleccionado': batch,
+            'preview': preview,
         })
         return context
 

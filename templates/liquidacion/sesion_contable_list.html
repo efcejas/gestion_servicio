@@ -418,6 +418,10 @@
                                                     Resolver pendientes
                                                 </a>
                                                 {% endif %}
+                                                <a href="{% url 'liquidacion:cruce_eges_liquidacion_preview' dato.sesion.pk %}"
+                                                   class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold bg-sky-100 text-sky-800 hover:bg-sky-200 whitespace-nowrap">
+                                                    Cruzar EGES
+                                                </a>
                                             </div>
 
                                             {% if dato.auditoria_residentes_eco.top_alertas_pendientes %}

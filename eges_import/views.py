@@ -17,6 +17,7 @@ from .services import (
     calcular_kpis as _calcular_kpis,
     agrupar_periodo as _agrupar_periodo,
     verificar_token as _verificar_token,
+    procesar_excel_eges as _procesar_excel_eges,
 )
 
 # Paleta de colores consistente para todas las vistas y el portal del director
@@ -134,7 +135,7 @@ def importar_eges(request):
             try:
                 # Procesar el Excel
                 print(f"[EGES] Procesando Excel...")
-                resultado = procesar_excel_eges(archivo, batch)
+                resultado = _procesar_excel_eges(archivo, batch)
                 
                 print(f"[EGES] Resultado: {resultado['creadas']} nuevas, {resultado['duplicadas']} duplicadas, {resultado['errores']} errores")
                 
@@ -187,12 +188,24 @@ def detalle_batch(request, batch_id):
     """
     batch = get_object_or_404(ImportBatch, id=batch_id)
     
-    # Obtener algunas filas de ejemplo
+    # Obtener algunas filas de ejemplo y datos operativos para auditoría
     filas_ejemplo = batch.filas.all()[:20]
+    tipos_atencion = batch.filas.exclude(tipo_atencion__isnull=True).exclude(tipo_atencion='').values(
+        'tipo_atencion'
+    ).annotate(total=Count('id')).order_by('-total', 'tipo_atencion')
+    estados_turno = batch.filas.exclude(estado_turno__isnull=True).exclude(estado_turno='').values(
+        'estado_turno'
+    ).annotate(total=Count('id')).order_by('-total', 'estado_turno')
+    total_doppler = batch.filas.filter(sub_modalidad='DOPPLER').count()
+    total_guardia = batch.filas.filter(tipo_atencion__iexact='Guardia').count()
     
     context = {
         'batch': batch,
         'filas_ejemplo': filas_ejemplo,
+        'tipos_atencion': tipos_atencion,
+        'estados_turno': estados_turno,
+        'total_doppler': total_doppler,
+        'total_guardia': total_guardia,
         'titulo_pagina': f'Resumen Batch #{batch.id}',
     }
     return render(request, 'eges_import/detalle_batch.html', context)

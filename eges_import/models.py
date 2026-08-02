@@ -117,20 +117,29 @@ class EgesRow(models.Model):
     numero_turno = models.CharField(max_length=50, blank=True, null=True)
     fecha_turno = models.DateField(null=True, blank=True)
     hora_turno = models.TimeField(null=True, blank=True)
+    hora_hasta = models.TimeField(null=True, blank=True)
     centro_atencion = models.CharField(max_length=100, blank=True, null=True)
+    tipo_atencion = models.CharField(max_length=50, blank=True, null=True)
 
     # Paciente
+    dni_paciente = models.CharField(max_length=20, blank=True, null=True)
     historia_clinica = models.CharField(max_length=50, blank=True, null=True)
+    numero_afiliado = models.CharField(max_length=50, blank=True, null=True)
     apellido_nombre = models.CharField(max_length=200, blank=True, null=True)
 
     # Estudio
     servicio = models.CharField(max_length=200, blank=True, null=True)
     equipo = models.CharField(max_length=100, blank=True, null=True)
     estado_turno = models.CharField(max_length=50, blank=True, null=True)
+    estado_informe = models.CharField(max_length=50, blank=True, null=True)
+    tipo_turno = models.CharField(max_length=50, blank=True, null=True)
+    tipo_paciente = models.CharField(max_length=50, blank=True, null=True)
+    region_informe = models.CharField(max_length=100, blank=True, null=True)
 
     # Práctica específica: nomenclador EGES — más específico que 'servicio'
     practica = models.CharField(max_length=300, blank=True, null=True)
     codigo_practica = models.CharField(max_length=30, blank=True, null=True)
+    cantidad = models.DecimalField(max_digits=8, decimal_places=2, default=1)
 
     # Cobertura / obra social
     obra_social = models.CharField(max_length=200, blank=True, null=True)
@@ -138,6 +147,7 @@ class EgesRow(models.Model):
 
     # Médico informante (capturado desde la columna del Excel si existe)
     medico_informante = models.CharField(max_length=200, blank=True, null=True)
+    medico_actuante = models.CharField(max_length=200, blank=True, null=True)
 
     # Clasificación principal
     es_insumo = models.BooleanField(default=False)
@@ -163,6 +173,9 @@ class EgesRow(models.Model):
             models.Index(fields=['batch', 'modalidad', 'estado_turno']),
             models.Index(fields=['fecha_turno', 'modalidad']),
             models.Index(fields=['medico_informante', 'fecha_turno']),
+            models.Index(fields=['medico_actuante', 'fecha_turno']),
+            models.Index(fields=['dni_paciente', 'fecha_turno']),
+            models.Index(fields=['tipo_atencion', 'fecha_turno']),
             models.Index(fields=['obra_social', 'fecha_turno']),
             models.Index(fields=['codigo_practica']),
         ]

@@ -1,0 +1,146 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+
+{% block title %}Cruce EGES - Liquidación{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <a href="{% url 'liquidacion:sesiones_list' %}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">
+                ← Volver a sesiones
+            </a>
+            <h1 class="mt-2 text-2xl font-bold text-slate-900">Cruce EGES vs Liquidación</h1>
+            <p class="text-sm text-slate-600">Sesión {{ sesion.mes }}/{{ sesion.año }} · Preview sin impacto económico</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <form method="get" class="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <div>
+                <label for="batch" class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Batch EGES</label>
+                <select id="batch" name="batch" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="">Elegir batch importado</option>
+                    {% for batch in batches %}
+                    <option value="{{ batch.pk }}" {% if batch_seleccionado and batch.pk == batch_seleccionado.pk %}selected{% endif %}>
+                        #{{ batch.pk }} · {{ batch.archivo_nombre }} · {{ batch.fecha_importacion|date:"d/m/Y H:i" }} · {{ batch.total_estudios_finalizados }} finalizados
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="inline-flex justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+                Cruzar datos
+            </button>
+        </form>
+    </div>
+
+    {% if preview %}
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase text-slate-500">Registros residencia</p>
+            <p class="mt-2 text-2xl font-bold text-slate-900">{{ preview.resumen.total }}</p>
+        </div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <p class="text-xs font-semibold uppercase text-emerald-700">OK</p>
+            <p class="mt-2 text-2xl font-bold text-emerald-700">{{ preview.resumen.ok }}</p>
+        </div>
+        <div class="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p class="text-xs font-semibold uppercase text-amber-700">Advertencias</p>
+            <p class="mt-2 text-2xl font-bold text-amber-700">{{ preview.resumen.advertencia }}</p>
+        </div>
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4">
+            <p class="text-xs font-semibold uppercase text-red-700">Manual</p>
+            <p class="mt-2 text-2xl font-bold text-red-700">{{ preview.resumen.manual }}</p>
+        </div>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-200 px-4 py-3">
+            <h2 class="text-base font-semibold text-slate-900">Resultados del cruce</h2>
+            <p class="text-xs text-slate-500">La expectativa horaria EGES usa 08:00-17:00 como INTRA; fuera de ese rango, EXTRA. Si cruza 17:00 queda manual.</p>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Estado</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Liquidación</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Prácticas</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Match EGES</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Horario</th>
+                        <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Motivo</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in preview.resultados %}
+                    <tr class="{% if item.estado == 'ok' %}bg-emerald-50/40{% elif item.estado == 'advertencia' %}bg-amber-50/40{% else %}bg-red-50/40{% endif %}">
+                        <td class="px-3 py-3 align-top">
+                            {% if item.estado == 'ok' %}
+                                <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">OK</span>
+                            {% elif item.estado == 'advertencia' %}
+                                <span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Advertencia</span>
+                            {% else %}
+                                <span class="rounded-full bg-red-100 px-2 py-1 text-xs font-semibold text-red-800">Manual</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 align-top">
+                            <p class="font-semibold text-slate-900">{{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</p>
+                            <p class="text-slate-600">DNI {{ item.registro.dni_paciente }} · {{ item.registro.fecha_del_informe|date:"d/m/Y" }}</p>
+                            <p class="text-slate-600">{{ item.registro.medico.get_full_name|default:item.registro.medico.username }} · {{ item.registro.medico.rol }}</p>
+                            <p class="mt-1 text-xs font-semibold text-slate-700">Liquidación: {{ item.registro.horario }} · ${{ item.registro.monto_calculado|floatformat:2 }}</p>
+                        </td>
+                        <td class="px-3 py-3 align-top">
+                            {% for practica in item.practicas_liquidacion %}
+                            <p class="text-slate-700">{{ practica }}</p>
+                            {% endfor %}
+                        </td>
+                        <td class="px-3 py-3 align-top">
+                            {% if item.mejor_match %}
+                                {% with match=item.mejor_match %}
+                                <p class="font-semibold text-slate-900">{{ match.fila_eges.apellido_nombre }}</p>
+                                <p class="text-slate-600">{{ match.fila_eges.practica }}</p>
+                                <p class="text-xs text-slate-500">Código {{ match.fila_eges.codigo_practica|default:"-" }} · Cant. {{ match.fila_eges.cantidad }}</p>
+                                <p class="text-xs text-slate-500">EGES: {{ match.fila_eges.tipo_atencion|default:"-" }} · {{ match.rol_medico_eges|default:"médico no claro" }}</p>
+                                {% if item.candidatos_count > 1 %}
+                                <p class="mt-1 text-xs font-semibold text-amber-700">{{ item.candidatos_count }} candidatos EGES</p>
+                                {% endif %}
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-slate-500">Sin coincidencia EGES</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 align-top">
+                            {% if item.mejor_match %}
+                                {% with match=item.mejor_match %}
+                                <p class="text-slate-700">
+                                    {{ match.fila_eges.hora_turno|time:"H:i" }}{% if match.fila_eges.hora_hasta %} - {{ match.fila_eges.hora_hasta|time:"H:i" }}{% endif %}
+                                </p>
+                                <p class="text-xs {% if match.horario_ok %}text-emerald-700{% else %}text-amber-700{% endif %}">
+                                    Esperado: {{ match.horario_esperado }}
+                                </p>
+                                {% endwith %}
+                            {% else %}
+                                <span class="text-slate-500">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 align-top">
+                            {% for motivo in item.motivos %}
+                            <p class="text-slate-700">• {{ motivo }}</p>
+                            {% endfor %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="px-3 py-6 text-center text-slate-500">La sesión no tiene registros de residencia para cruzar.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+        Elegí un batch EGES para previsualizar el cruce. Esta pantalla no guarda resultados ni modifica liquidación.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

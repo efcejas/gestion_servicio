@@ -31,6 +31,7 @@ from .views import (
     AuditoriaEcoBulkResolverView,
     AuditoriaEcoRegistroCorregirView,
     AuditoriaEcoCorreccionPacsBulkView,
+    CruceEgesLiquidacionPreviewView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -114,6 +115,11 @@ urlpatterns = [
         'sesiones/<int:pk>/auditoria-eco/corregir-ajustes-masivo/',
         AuditoriaEcoCorreccionPacsBulkView.as_view(),
         name='auditoria_eco_correccion_pacs_masiva',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/',
+        CruceEgesLiquidacionPreviewView.as_view(),
+        name='cruce_eges_liquidacion_preview',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',
