@@ -222,6 +222,34 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(resultado['candidatos_count'], 2)
         self.assertNotIn('Hay mÃºltiples coincidencias EGES posibles.', resultado['motivos'])
 
+    def test_practica_del_mismo_turno_con_otro_profesional_genera_advertencia(self):
+        self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            practica='ECOGRAFIA COMPLETA DE ABDOMEN',
+            medico_informante='GAVILANES IBARRA ANGEL CAMILO',
+            medico_actuante='GAVILANES IBARRA ANGEL CAMILO',
+        )
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            practica='ECOGRAFIA TRANSVAGINAL SIN BIOPSIA',
+            codigo_practica='180118/0',
+        )
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        self.assertEqual(preview['resumen']['advertencia'], 1)
+        resultado = preview['resultados'][0]
+        self.assertEqual(resultado['estado'], 'advertencia')
+        self.assertEqual(len(resultado['matches_practicas']), 2)
+        self.assertTrue(any(not match['medico_ok'] for match in resultado['matches_practicas']))
+        self.assertIn(
+            'Hay prácticas EGES del mismo paciente/fecha realizadas por otro profesional.',
+            resultado['motivos'],
+        )
+
     def test_detecta_practica_liquidada_sin_match_eges(self):
         self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
         self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')

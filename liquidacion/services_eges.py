@@ -98,10 +98,11 @@ def _practica_compatible(tokens_liquidacion, fila_eges):
     return bool(interseccion), interseccion
 
 
-def _evaluar_cobertura_practicas(practicas_liquidacion, filas_eges):
+def _evaluar_cobertura_practicas(practicas_liquidacion, filas_eges, evaluados_por_pk=None):
     matches = []
     eges_usadas = set()
     liquidacion_sin_match = []
+    evaluados_por_pk = evaluados_por_pk or {}
 
     for practica in practicas_liquidacion:
         candidatos = []
@@ -115,9 +116,12 @@ def _evaluar_cobertura_practicas(practicas_liquidacion, filas_eges):
             fila, tokens_match = candidatos[0]
             eges_usadas.add(fila.pk)
             cantidad_ok = int(practica['cantidad']) == int(fila.cantidad or 0)
+            evaluacion_eges = evaluados_por_pk.get(fila.pk, {})
             matches.append({
                 'liquidacion': practica,
                 'fila_eges': fila,
+                'medico_ok': evaluacion_eges.get('medico_ok', False),
+                'rol_medico_eges': evaluacion_eges.get('rol_medico_eges'),
                 'tokens_match': tokens_match,
                 'cantidad_ok': cantidad_ok,
             })
@@ -140,8 +144,6 @@ def _clave_grupo_turno_eges(fila):
         fila.hora_hasta,
         _normalizar_texto(fila.centro_atencion),
         _normalizar_texto(fila.tipo_atencion),
-        _normalizar_texto(fila.medico_informante),
-        _normalizar_texto(fila.medico_actuante),
     )
 
 
@@ -243,7 +245,12 @@ def _evaluar_registro(registro, batch):
         matches_grupo, liquidacion_sin_match_grupo, eges_sin_liquidacion_grupo = _evaluar_cobertura_practicas(
             practicas,
             filas_grupo,
+            evaluados_por_pk=evaluados_por_pk,
         )
+        practicas_otro_profesional = [
+            match for match in matches_grupo
+            if not match['medico_ok']
+        ]
 
         puntaje = 0
         puntaje += 4 if grupo_medico_ok else 0
@@ -251,6 +258,7 @@ def _evaluar_registro(registro, batch):
         puntaje += 3 * len(matches_grupo)
         puntaje -= 2 * len(liquidacion_sin_match_grupo)
         puntaje -= len(eges_sin_liquidacion_grupo)
+        puntaje -= 2 * len(practicas_otro_profesional)
 
         grupos_evaluados.append({
             **representante,
@@ -262,6 +270,7 @@ def _evaluar_registro(registro, batch):
             'matches_practicas': matches_grupo,
             'liquidacion_sin_match': liquidacion_sin_match_grupo,
             'eges_sin_liquidacion': eges_sin_liquidacion_grupo,
+            'practicas_otro_profesional': practicas_otro_profesional,
             'puntaje': puntaje,
         })
 
@@ -294,6 +303,8 @@ def _evaluar_registro(registro, batch):
             motivos.append('Hay prácticas cargadas en liquidación sin coincidencia EGES ECO.')
         if eges_sin_liquidacion:
             motivos.append('Hay prácticas EGES ECO del mismo paciente/fecha/profesional no cargadas en liquidación.')
+        if mejor.get('practicas_otro_profesional'):
+            motivos.append('Hay prácticas EGES del mismo paciente/fecha realizadas por otro profesional.')
         if any(not match['cantidad_ok'] for match in matches_practicas):
             motivos.append('Hay prácticas con cantidad distinta entre liquidación y EGES.')
         if mejor['horario_esperado'] == 'MANUAL':
