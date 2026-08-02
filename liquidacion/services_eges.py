@@ -238,6 +238,7 @@ def _evaluar_registro(registro, batch):
         'motivos': motivos,
         'mejor_match': mejor,
         'candidatos_count': len(candidatos),
+        'candidatos_eges': evaluados,
         'otros_candidatos': evaluados[1:4],
     }
 

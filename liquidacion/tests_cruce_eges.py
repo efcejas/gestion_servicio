@@ -224,3 +224,6 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertContains(response, 'Cruce EGES vs Liquidación')
         self.assertContains(response, 'EGES: Guardia · actuante')
         self.assertContains(response, 'Esperado: INTRA')
+        self.assertContains(response, 'Ver 1 práctica EGES encontrada')
+        self.assertContains(response, 'Informante:')
+        self.assertContains(response, 'Actuante:')
