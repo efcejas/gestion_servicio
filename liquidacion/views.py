@@ -1288,14 +1288,154 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
         if batch_id:
             batch = get_object_or_404(ImportBatch, pk=batch_id)
             preview = construir_preview_cruce_liquidacion_eges(self.sesion, batch)
+            preview['profesionales'] = _opciones_profesionales_cruce_eges(preview['resultados'])
+            preview['resultados_original_total'] = len(preview['resultados'])
+            preview['resultados'] = _filtrar_resultados_cruce_eges(preview['resultados'], self.request.GET)
+            preview['resultados_filtrados_total'] = len(preview['resultados'])
 
         context.update({
             'sesion': self.sesion,
             'batches': batches,
             'batch_seleccionado': batch,
             'preview': preview,
+            'filtros_cruce': {
+                'profesional': self.request.GET.get('profesional', ''),
+                'estado_cruce': self.request.GET.get('estado_cruce', ''),
+                'estado_revision': self.request.GET.get('estado_revision', ''),
+                'fecha_desde': self.request.GET.get('fecha_desde', ''),
+                'fecha_hasta': self.request.GET.get('fecha_hasta', ''),
+                'q': self.request.GET.get('q', ''),
+            },
         })
         return context
+
+
+def _snapshot_cruce_eges_item(item):
+    return {
+        'estado_cruce': item['estado'],
+        'motivos': item['motivos'],
+        'practicas_liquidacion': item['practicas_liquidacion'],
+        'matches_practicas': [
+            {
+                'liquidacion': match['liquidacion']['display'],
+                'eges_practica': match['fila_eges'].practica,
+                'eges_codigo': match['fila_eges'].codigo_practica,
+                'eges_medico_ok': match['medico_ok'],
+                'eges_rol_medico': match['rol_medico_eges'],
+                'cantidad_ok': match['cantidad_ok'],
+            }
+            for match in item['matches_practicas']
+        ],
+        'liquidacion_sin_match': [
+            practica['display'] for practica in item['liquidacion_sin_match']
+        ],
+        'eges_sin_liquidacion': [
+            {
+                'practica': fila.practica,
+                'codigo': fila.codigo_practica,
+                'hora': fila.hora_turno.isoformat() if fila.hora_turno else None,
+                'informante': fila.medico_informante,
+                'actuante': fila.medico_actuante,
+            }
+            for fila in item['eges_sin_liquidacion']
+        ],
+    }
+
+
+def _parse_fecha_cruce_eges(valor):
+    try:
+        return datetime.strptime(valor, '%Y-%m-%d').date() if valor else None
+    except ValueError:
+        return None
+
+
+def _filtrar_resultados_cruce_eges(resultados, params):
+    profesional = (params.get('profesional') or '').strip()
+    estado_cruce = (params.get('estado_cruce') or '').strip()
+    estado_revision = (params.get('estado_revision') or '').strip()
+    fecha_desde = _parse_fecha_cruce_eges((params.get('fecha_desde') or '').strip())
+    fecha_hasta = _parse_fecha_cruce_eges((params.get('fecha_hasta') or '').strip())
+    busqueda = (params.get('q') or '').strip().lower()
+
+    filtrados = []
+    for item in resultados:
+        registro = item['registro']
+        revision = item.get('revision_cruce_eges')
+        if profesional and str(registro.medico_id) != profesional:
+            continue
+        if estado_cruce and item['estado'] != estado_cruce:
+            continue
+        if fecha_desde and registro.fecha_del_informe < fecha_desde:
+            continue
+        if fecha_hasta and registro.fecha_del_informe > fecha_hasta:
+            continue
+        if busqueda:
+            texto = ' '.join([
+                registro.apellido_paciente or '',
+                registro.nombre_paciente or '',
+                registro.dni_paciente or '',
+            ]).lower()
+            if busqueda not in texto:
+                continue
+        if estado_revision == 'SIN_REVISAR' and revision:
+            continue
+        if estado_revision and estado_revision != 'SIN_REVISAR':
+            if not revision or revision.estado != estado_revision:
+                continue
+        filtrados.append(item)
+    return filtrados
+
+
+def _opciones_profesionales_cruce_eges(resultados):
+    opciones = {}
+    for item in resultados:
+        medico = item['registro'].medico
+        opciones[medico.pk] = medico.get_full_name() or medico.username
+    return [
+        {'id': pk, 'nombre': nombre}
+        for pk, nombre in sorted(opciones.items(), key=lambda par: par[1])
+    ]
+
+
+class CruceEgesBulkValidarOkView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Valida automaticamente los OK visibles del cruce EGES, sin impacto economico."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para validar el cruce EGES.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = request.POST.get('next') or (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+        preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+        visibles = _filtrar_resultados_cruce_eges(preview['resultados'], request.POST)
+        creadas = []
+        for item in visibles:
+            if item['estado'] != 'ok' or item.get('revision_cruce_eges'):
+                continue
+            creadas.append(RevisionCruceEgesRegistro(
+                sesion_contable=sesion,
+                registro=item['registro'],
+                batch_eges=batch,
+                estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                motivos_json=item['motivos'],
+                snapshot_json=_snapshot_cruce_eges_item(item),
+                observacion='Validado automaticamente desde cruce EGES OK visible.',
+                revisado_por=request.user,
+            ))
+        if creadas:
+            RevisionCruceEgesRegistro.objects.bulk_create(creadas)
+            messages.success(request, f'Se validaron {len(creadas)} registro(s) OK visibles.')
+        else:
+            messages.info(request, 'No habia registros OK visibles sin revision para validar.')
+        return redirect(redirect_url)
 
 
 class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, View):
@@ -1335,35 +1475,7 @@ class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, Vie
             messages.error(request, 'No se encontro el registro dentro del cruce EGES seleccionado.')
             return redirect(redirect_url)
 
-        snapshot = {
-            'estado_cruce': item['estado'],
-            'motivos': item['motivos'],
-            'practicas_liquidacion': item['practicas_liquidacion'],
-            'matches_practicas': [
-                {
-                    'liquidacion': match['liquidacion']['display'],
-                    'eges_practica': match['fila_eges'].practica,
-                    'eges_codigo': match['fila_eges'].codigo_practica,
-                    'eges_medico_ok': match['medico_ok'],
-                    'eges_rol_medico': match['rol_medico_eges'],
-                    'cantidad_ok': match['cantidad_ok'],
-                }
-                for match in item['matches_practicas']
-            ],
-            'liquidacion_sin_match': [
-                practica['display'] for practica in item['liquidacion_sin_match']
-            ],
-            'eges_sin_liquidacion': [
-                {
-                    'practica': fila.practica,
-                    'codigo': fila.codigo_practica,
-                    'hora': fila.hora_turno.isoformat() if fila.hora_turno else None,
-                    'informante': fila.medico_informante,
-                    'actuante': fila.medico_actuante,
-                }
-                for fila in item['eges_sin_liquidacion']
-            ],
-        }
+        snapshot = _snapshot_cruce_eges_item(item)
 
         RevisionCruceEgesRegistro.objects.create(
             sesion_contable=sesion,

@@ -15,6 +15,7 @@ from .models import (
     RevisionCruceEgesRegistro,
     SesionContable,
 )
+from .services_auditoria import resumir_pendientes_auditoria_eco
 from .services_eges import construir_preview_cruce_liquidacion_eges
 
 
@@ -371,3 +372,78 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
         self.assertEqual(preview['resumen']['pendientes_revision'], 0)
         self.assertEqual(preview['resumen']['resueltos'], 1)
+
+    def test_validar_ok_visibles_crea_revision_eges(self):
+        registro = self._registro(horario='INTRA')
+        registro.refresh_from_db()
+        monto_original = registro.monto_calculado
+        self._eges_row(time(9, 0), time(9, 15), tipo_atencion='Guardia')
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:cruce_eges_validar_ok', kwargs={'pk': self.sesion.pk}),
+            {
+                'batch': self.batch.pk,
+                'estado_cruce': 'ok',
+                'estado_revision': 'SIN_REVISAR',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        revision = RevisionCruceEgesRegistro.objects.get(registro=registro, batch_eges=self.batch)
+        self.assertEqual(revision.estado, RevisionCruceEgesRegistro.ESTADO_VALIDADO)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+
+    def test_resumen_auditoria_eco_descuenta_revision_eges_validada(self):
+        registro = self._registro(horario='INTRA')
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=self.batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+            motivos_json=['Coincidencia EGES OK.'],
+            snapshot_json={},
+            observacion='Validado por cruce EGES.',
+            revisado_por=self.admin,
+        )
+        auditoria = {
+            'items': [{
+                'medico_id': self.residente.pk,
+                'medico_nombre': 'Carlos Puente',
+                'severidad': 'roja',
+                'alertas': [{'severidad': 'roja'}],
+                'registros_alerta': [{'registro_id': registro.pk}],
+            }]
+        }
+
+        resumen = resumir_pendientes_auditoria_eco(auditoria)
+
+        self.assertEqual(resumen['registros_alerta_pendientes_total'], 0)
+        self.assertEqual(resumen['residentes_con_alertas_pendientes'], 0)
+
+    def test_resumen_auditoria_eco_mantiene_pendiente_si_eges_requiere_correccion(self):
+        registro = self._registro(horario='INTRA')
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=self.batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['Requiere correccion.'],
+            snapshot_json={},
+            observacion='Debe corregirse.',
+            revisado_por=self.admin,
+        )
+        auditoria = {
+            'items': [{
+                'medico_id': self.residente.pk,
+                'medico_nombre': 'Carlos Puente',
+                'severidad': 'roja',
+                'alertas': [{'severidad': 'roja'}],
+                'registros_alerta': [{'registro_id': registro.pk}],
+            }]
+        }
+
+        resumen = resumir_pendientes_auditoria_eco(auditoria)
+
+        self.assertEqual(resumen['registros_alerta_pendientes_total'], 1)

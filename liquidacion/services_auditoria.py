@@ -540,7 +540,11 @@ def resumir_pendientes_auditoria_eco(auditoria):
     cierre, en cambio, solo debe quedar pendiente lo que todavia requiere accion:
     registros sin revision o con revision "requiere correccion" sin ajuste PACS.
     """
-    from .models import CorreccionPacsRegistro, RevisionAuditoriaEcoRegistro
+    from .models import (
+        CorreccionPacsRegistro,
+        RevisionAuditoriaEcoRegistro,
+        RevisionCruceEgesRegistro,
+    )
 
     registro_ids = [
         registro_alerta.get('registro_id')
@@ -560,6 +564,16 @@ def resumir_pendientes_auditoria_eco(auditoria):
         for revision in revisiones:
             revisiones_por_registro.setdefault(revision.registro_id, revision)
 
+    revisiones_eges_por_registro = {}
+    if registro_ids:
+        revisiones_eges = (
+            RevisionCruceEgesRegistro.objects
+            .filter(registro_id__in=registro_ids)
+            .order_by('registro_id', '-fecha_revision')
+        )
+        for revision in revisiones_eges:
+            revisiones_eges_por_registro.setdefault(revision.registro_id, revision)
+
     registros_con_correccion = set()
     if registro_ids:
         registros_con_correccion = set(
@@ -578,6 +592,7 @@ def resumir_pendientes_auditoria_eco(auditoria):
         for registro_alerta in item.get('registros_alerta', []):
             registro_id = registro_alerta.get('registro_id')
             revision = revisiones_por_registro.get(registro_id)
+            revision_eges = revisiones_eges_por_registro.get(registro_id)
             tiene_correccion = registro_id in registros_con_correccion
 
             pendiente = (
@@ -587,6 +602,8 @@ def resumir_pendientes_auditoria_eco(auditoria):
                     and not tiene_correccion
                 )
             )
+            if revision is None and revision_eges:
+                pendiente = revision_eges.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
             registro_alerta['auditoria_eco_pendiente'] = pendiente
             if pendiente:
                 registros_pendientes.append(registro_alerta)
