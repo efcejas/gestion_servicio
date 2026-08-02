@@ -1,6 +1,7 @@
 from datetime import time
 import re
 import unicodedata
+from collections import OrderedDict
 
 from django.db.models import Q
 
@@ -131,6 +132,29 @@ def _evaluar_cobertura_practicas(practicas_liquidacion, filas_eges):
     return matches, liquidacion_sin_match, eges_sin_liquidacion
 
 
+def _clave_grupo_turno_eges(fila):
+    return (
+        fila.historia_clinica or fila.dni_paciente or '',
+        fila.fecha_turno,
+        fila.hora_turno,
+        fila.hora_hasta,
+        _normalizar_texto(fila.centro_atencion),
+        _normalizar_texto(fila.tipo_atencion),
+        _normalizar_texto(fila.medico_informante),
+        _normalizar_texto(fila.medico_actuante),
+    )
+
+
+def _agrupar_por_turno_eges(filas):
+    grupos = OrderedDict()
+    for fila in filas:
+        clave = _clave_grupo_turno_eges(fila)
+        if clave not in grupos:
+            grupos[clave] = []
+        grupos[clave].append(fila)
+    return list(grupos.values())
+
+
 def horario_esperado_por_eges(fila_eges):
     """
     Reglas de auditoría alineadas a liquidación:
@@ -198,7 +222,51 @@ def _evaluar_registro(registro, batch):
         })
 
     evaluados.sort(key=lambda item: item['puntaje'], reverse=True)
-    mejor = evaluados[0] if evaluados else None
+    grupos_evaluados = []
+    evaluados_por_pk = {item['fila_eges'].pk: item for item in evaluados}
+
+    for filas_grupo in _agrupar_por_turno_eges(candidatos):
+        filas_evaluadas = [
+            evaluados_por_pk[fila.pk]
+            for fila in filas_grupo
+            if fila.pk in evaluados_por_pk
+        ]
+        if not filas_evaluadas:
+            continue
+
+        representante = filas_evaluadas[0]
+        grupo_medico_ok = any(item['medico_ok'] for item in filas_evaluadas)
+        rol_medico_eges = next(
+            (item['rol_medico_eges'] for item in filas_evaluadas if item['rol_medico_eges']),
+            None,
+        )
+        matches_grupo, liquidacion_sin_match_grupo, eges_sin_liquidacion_grupo = _evaluar_cobertura_practicas(
+            practicas,
+            filas_grupo,
+        )
+
+        puntaje = 0
+        puntaje += 4 if grupo_medico_ok else 0
+        puntaje += 2 if representante['horario_ok'] else 0
+        puntaje += 3 * len(matches_grupo)
+        puntaje -= 2 * len(liquidacion_sin_match_grupo)
+        puntaje -= len(eges_sin_liquidacion_grupo)
+
+        grupos_evaluados.append({
+            **representante,
+            'filas_eges': filas_grupo,
+            'filas_evaluadas': filas_evaluadas,
+            'filas_count': len(filas_grupo),
+            'medico_ok': grupo_medico_ok,
+            'rol_medico_eges': rol_medico_eges,
+            'matches_practicas': matches_grupo,
+            'liquidacion_sin_match': liquidacion_sin_match_grupo,
+            'eges_sin_liquidacion': eges_sin_liquidacion_grupo,
+            'puntaje': puntaje,
+        })
+
+    grupos_evaluados.sort(key=lambda item: item['puntaje'], reverse=True)
+    mejor = grupos_evaluados[0] if grupos_evaluados else None
 
     estado = 'manual'
     motivos = []
@@ -214,16 +282,11 @@ def _evaluar_registro(registro, batch):
         motivos.append('No se encontró práctica EGES ECO para el DNI y fecha del registro.')
         liquidacion_sin_match = practicas
     else:
-        filas_para_cobertura = [
-            item['fila_eges'] for item in evaluados
-            if item['medico_ok']
-        ] or [item['fila_eges'] for item in evaluados]
-        matches_practicas, liquidacion_sin_match, eges_sin_liquidacion = _evaluar_cobertura_practicas(
-            practicas,
-            filas_para_cobertura,
-        )
+        matches_practicas = mejor['matches_practicas']
+        liquidacion_sin_match = mejor['liquidacion_sin_match']
+        eges_sin_liquidacion = mejor['eges_sin_liquidacion']
 
-        if len([e for e in evaluados if e['puntaje'] == mejor['puntaje']]) > 1:
+        if len([grupo for grupo in grupos_evaluados if grupo['puntaje'] == mejor['puntaje']]) > 1:
             motivos.append('Hay múltiples coincidencias EGES posibles.')
         if not mejor['medico_ok']:
             motivos.append('El profesional no coincide claramente como informante ni actuante.')
