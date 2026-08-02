@@ -12,6 +12,7 @@ from .models import (
     Estudios,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    RevisionCruceEgesRegistro,
     SesionContable,
 )
 from .services_eges import construir_preview_cruce_liquidacion_eges
@@ -322,3 +323,51 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertContains(response, 'Ver 1 práctica EGES encontrada')
         self.assertContains(response, 'Informante:')
         self.assertContains(response, 'Actuante:')
+
+    def test_resolver_cruce_eges_crea_revision_sin_modificar_registro(self):
+        registro = self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
+        registro.refresh_from_db()
+        monto_original = registro.monto_calculado
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:cruce_eges_registro_resolver', kwargs={
+                'pk': self.sesion.pk,
+                'registro_pk': registro.pk,
+            }),
+            {
+                'batch': self.batch.pk,
+                'estado': RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                'observacion': 'Validado manualmente contra EGES.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        revision = RevisionCruceEgesRegistro.objects.get(registro=registro, batch_eges=self.batch)
+        self.assertEqual(revision.estado, RevisionCruceEgesRegistro.ESTADO_VALIDADO)
+        self.assertIn('Hay prácticas cargadas', revision.motivos_json[0])
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+
+    def test_preview_descuenta_pendiente_si_advertencia_fue_validada(self):
+        registro = self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+
+        preview_sin_revision = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+        self.assertEqual(preview_sin_revision['resumen']['pendientes_revision'], 1)
+
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=self.batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+            motivos_json=['Validado manual.'],
+            snapshot_json={},
+            observacion='Validado manualmente.',
+            revisado_por=self.admin,
+        )
+
+        preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+        self.assertEqual(preview['resumen']['pendientes_revision'], 0)
+        self.assertEqual(preview['resumen']['resueltos'], 1)

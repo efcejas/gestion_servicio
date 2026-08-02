@@ -16,6 +16,7 @@ from .models import (
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
     RevisionAuditoriaEcoRegistro,
+    RevisionCruceEgesRegistro,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
     TarifaGrupoTarifario,
@@ -892,6 +893,49 @@ class RevisionAuditoriaEcoRegistroAdmin(admin.ModelAdmin):
         'registro',
         'estado',
         'motivos_json',
+        'observacion',
+        'revisado_por',
+        'fecha_revision',
+    )
+    ordering = ('-fecha_revision',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RevisionCruceEgesRegistro)
+class RevisionCruceEgesRegistroAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'sesion_contable',
+        'registro',
+        'batch_eges',
+        'estado',
+        'revisado_por',
+        'fecha_revision',
+    )
+    list_filter = ('estado', 'sesion_contable', 'fecha_revision')
+    search_fields = (
+        'registro__id',
+        'registro__apellido_paciente',
+        'registro__nombre_paciente',
+        'registro__dni_paciente',
+        'batch_eges__archivo_nombre',
+        'observacion',
+    )
+    readonly_fields = (
+        'sesion_contable',
+        'registro',
+        'batch_eges',
+        'estado',
+        'motivos_json',
+        'snapshot_json',
         'observacion',
         'revisado_por',
         'fecha_revision',

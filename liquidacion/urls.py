@@ -32,6 +32,7 @@ from .views import (
     AuditoriaEcoRegistroCorregirView,
     AuditoriaEcoCorreccionPacsBulkView,
     CruceEgesLiquidacionPreviewView,
+    CruceEgesRegistroResolverView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
     GrupoTarifarioTarifaNuevaView,
@@ -120,6 +121,11 @@ urlpatterns = [
         'sesiones/<int:pk>/cruce-eges/',
         CruceEgesLiquidacionPreviewView.as_view(),
         name='cruce_eges_liquidacion_preview',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/<int:registro_pk>/resolver/',
+        CruceEgesRegistroResolverView.as_view(),
+        name='cruce_eges_registro_resolver',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',

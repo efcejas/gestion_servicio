@@ -1603,6 +1603,62 @@ class RevisionAuditoriaEcoRegistro(models.Model):
         return f"Revision ECO registro #{self.registro_id} - {self.estado}"
 
 
+class RevisionCruceEgesRegistro(models.Model):
+    """Resolucion administrativa del cruce EGES vs liquidacion, sin impacto economico."""
+
+    ESTADO_VALIDADO = 'VALIDADO'
+    ESTADO_REQUIERE_CORRECCION = 'REQUIERE_CORRECCION'
+    ESTADO_DESCARTADO = 'DESCARTADO'
+    ESTADO_CHOICES = [
+        (ESTADO_VALIDADO, 'Validado contra EGES'),
+        (ESTADO_REQUIERE_CORRECCION, 'Requiere correccion'),
+        (ESTADO_DESCARTADO, 'Descartado / no corresponde'),
+    ]
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='revisiones_cruce_eges',
+        verbose_name='Sesion contable',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.PROTECT,
+        related_name='revisiones_cruce_eges',
+        verbose_name='Registro',
+    )
+    batch_eges = models.ForeignKey(
+        'eges_import.ImportBatch',
+        on_delete=models.PROTECT,
+        related_name='revisiones_liquidacion',
+        verbose_name='Batch EGES',
+    )
+    estado = models.CharField(max_length=24, choices=ESTADO_CHOICES, verbose_name='Estado')
+    motivos_json = models.JSONField(default=list, blank=True, verbose_name='Motivos detectados')
+    snapshot_json = models.JSONField(default=dict, blank=True, verbose_name='Snapshot cruce EGES')
+    observacion = models.TextField(verbose_name='Observacion')
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='revisiones_cruce_eges_realizadas',
+        verbose_name='Revisado por',
+    )
+    fecha_revision = models.DateTimeField(auto_now_add=True, verbose_name='Fecha revision')
+
+    class Meta:
+        verbose_name = 'Revision cruce EGES'
+        verbose_name_plural = 'Revisiones cruce EGES'
+        ordering = ['-fecha_revision']
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha_revision']),
+            models.Index(fields=['registro', 'batch_eges', '-fecha_revision']),
+            models.Index(fields=['estado', '-fecha_revision']),
+        ]
+
+    def __str__(self):
+        return f"Revision EGES registro #{self.registro_id} - {self.estado}"
+
+
 class CorreccionPacsRegistro(models.Model):
     """Ajuste economico puntual aplicado luego de control contra PACS."""
 

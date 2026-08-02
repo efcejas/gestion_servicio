@@ -277,6 +277,29 @@ class RevisionAuditoriaEcoBulkForm(forms.Form):
         self.fields['registros'].choices = registro_choices or []
 
 
+class RevisionCruceEgesRegistroForm(forms.Form):
+    """Resolucion administrativa de una advertencia EGES sin modificar liquidacion."""
+
+    ESTADO_VALIDADO = 'VALIDADO'
+    ESTADO_REQUIERE_CORRECCION = 'REQUIERE_CORRECCION'
+    ESTADO_DESCARTADO = 'DESCARTADO'
+    ESTADO_CHOICES = [
+        (ESTADO_VALIDADO, 'Validar coincidencia'),
+        (ESTADO_REQUIERE_CORRECCION, 'Requiere correccion'),
+        (ESTADO_DESCARTADO, 'Descartar alerta'),
+    ]
+
+    estado = forms.ChoiceField(choices=ESTADO_CHOICES)
+    observacion = forms.CharField(
+        max_length=1000,
+        required=True,
+        widget=forms.Textarea(attrs={
+            'rows': 2,
+            'placeholder': 'Observacion de revision EGES',
+        }),
+    )
+
+
 class CorreccionPacsRegistroForm(forms.Form):
     """Correccion economica puntual posterior a control PACS."""
 

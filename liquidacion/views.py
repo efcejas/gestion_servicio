@@ -35,6 +35,7 @@ from .models import (
     HistorialRecalculoTarifaRegistro,
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
+    RevisionCruceEgesRegistro,
     CorreccionPacsRegistro,
     GuardiaPasiva,
     SesionContable,
@@ -67,6 +68,7 @@ from .forms import (
     SolicitudRevisionHorarioBulkActionForm,
     RevisionAuditoriaEcoRegistroForm,
     RevisionAuditoriaEcoBulkForm,
+    RevisionCruceEgesRegistroForm,
     CorreccionPacsRegistroForm,
     CorreccionPacsAplicadaBulkForm,
     PreparacionLiquidacionRRHHForm,
@@ -1294,6 +1296,87 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             'preview': preview,
         })
         return context
+
+
+class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Marca un resultado del cruce EGES como revisado, sin modificar liquidacion."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para resolver el cruce EGES.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        registro = get_object_or_404(
+            RegistroEstudiosPorMedico.objects.select_related('sesion_contable'),
+            pk=kwargs['registro_pk'],
+            sesion_contable=sesion,
+        )
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = request.POST.get('next') or (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+
+        form = RevisionCruceEgesRegistroForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, 'Debes indicar accion y observacion para resolver el cruce EGES.')
+            return redirect(redirect_url)
+
+        preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+        item = next(
+            (resultado for resultado in preview['resultados'] if resultado['registro'].pk == registro.pk),
+            None,
+        )
+        if not item:
+            messages.error(request, 'No se encontro el registro dentro del cruce EGES seleccionado.')
+            return redirect(redirect_url)
+
+        snapshot = {
+            'estado_cruce': item['estado'],
+            'motivos': item['motivos'],
+            'practicas_liquidacion': item['practicas_liquidacion'],
+            'matches_practicas': [
+                {
+                    'liquidacion': match['liquidacion']['display'],
+                    'eges_practica': match['fila_eges'].practica,
+                    'eges_codigo': match['fila_eges'].codigo_practica,
+                    'eges_medico_ok': match['medico_ok'],
+                    'eges_rol_medico': match['rol_medico_eges'],
+                    'cantidad_ok': match['cantidad_ok'],
+                }
+                for match in item['matches_practicas']
+            ],
+            'liquidacion_sin_match': [
+                practica['display'] for practica in item['liquidacion_sin_match']
+            ],
+            'eges_sin_liquidacion': [
+                {
+                    'practica': fila.practica,
+                    'codigo': fila.codigo_practica,
+                    'hora': fila.hora_turno.isoformat() if fila.hora_turno else None,
+                    'informante': fila.medico_informante,
+                    'actuante': fila.medico_actuante,
+                }
+                for fila in item['eges_sin_liquidacion']
+            ],
+        }
+
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=sesion,
+            registro=registro,
+            batch_eges=batch,
+            estado=form.cleaned_data['estado'],
+            motivos_json=item['motivos'],
+            snapshot_json=snapshot,
+            observacion=form.cleaned_data['observacion'],
+            revisado_por=request.user,
+        )
+        messages.success(request, f'Revision EGES registrada para el registro #{registro.pk}.')
+        return redirect(redirect_url)
 
 
 class AuditoriaEcoRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, View):

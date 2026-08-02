@@ -7,6 +7,7 @@ from django.db.models import Q
 
 from eges_import.models import EgesRow
 
+from .models import RevisionCruceEgesRegistro
 from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
 
 
@@ -356,11 +357,42 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch):
     )
 
     resultados = [_evaluar_registro(registro, batch) for registro in registros]
+    registro_ids = [resultado['registro'].pk for resultado in resultados]
+    revisiones = (
+        RevisionCruceEgesRegistro.objects
+        .filter(registro_id__in=registro_ids, batch_eges=batch)
+        .order_by('registro_id', '-fecha_revision')
+    )
+    revisiones_por_registro = {}
+    for revision in revisiones:
+        revisiones_por_registro.setdefault(revision.registro_id, revision)
+
+    for resultado in resultados:
+        revision = revisiones_por_registro.get(resultado['registro'].pk)
+        resultado['revision_cruce_eges'] = revision
+        resultado['cruce_eges_resuelto'] = bool(
+            revision
+            and revision.estado in {
+                RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                RevisionCruceEgesRegistro.ESTADO_DESCARTADO,
+            }
+        )
+        resultado['cruce_eges_requiere_correccion'] = bool(
+            revision
+            and revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+        )
+
     resumen = {
         'total': len(resultados),
         'ok': sum(1 for r in resultados if r['estado'] == 'ok'),
         'advertencia': sum(1 for r in resultados if r['estado'] == 'advertencia'),
         'manual': sum(1 for r in resultados if r['estado'] == 'manual'),
+        'pendientes_revision': sum(
+            1 for r in resultados
+            if r['estado'] != 'ok' and not r['cruce_eges_resuelto']
+        ),
+        'resueltos': sum(1 for r in resultados if r['cruce_eges_resuelto']),
+        'requieren_correccion': sum(1 for r in resultados if r['cruce_eges_requiere_correccion']),
     }
     return {
         'sesion': sesion,
