@@ -134,7 +134,7 @@
         </div>
         {% if preview.page_obj and preview.paginator.num_pages > 1 %}
         <div class="mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between md:mt-1.5 md:pt-1.5">
-            <span>PÃ¡gina {{ preview.page_obj.number }} de {{ preview.paginator.num_pages }}</span>
+            <span>Pagina {{ preview.page_obj.number }} de {{ preview.paginator.num_pages }}</span>
             <div class="flex gap-2">
                 {% if preview.page_obj.has_previous %}
                 <a href="?{{ request.GET.urlencode }}&page={{ preview.page_obj.previous_page_number }}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50">Anterior</a>
