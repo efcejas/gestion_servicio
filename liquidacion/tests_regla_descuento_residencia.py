@@ -165,11 +165,11 @@ class ReglaDescuentoResidenciaServiceTest(TestCase):
         self.assertFalse(resultado['aplica'])
         self.assertEqual(resultado['fuente'], 'rol_no_residencia')
 
-    def test_jefe_e_instructor_solo_aplican_si_regla_lo_permite(self):
+    def test_jefe_e_instructor_no_aplican_descuento_intra_aunque_regla_lo_permita(self):
         ReglaDescuentoResidencia.objects.create(
             estudio=self.estudio_dop,
             aplica_medico_residente=True,
-            aplica_jefe_residentes=False,
+            aplica_jefe_residentes=True,
             aplica_instructor_residentes=True,
             vigencia_desde=date(2026, 1, 1),
         )
@@ -186,7 +186,9 @@ class ReglaDescuentoResidenciaServiceTest(TestCase):
         )
 
         self.assertFalse(resultado_jefe['aplica'])
-        self.assertTrue(resultado_instructor['aplica'])
+        self.assertFalse(resultado_instructor['aplica'])
+        self.assertEqual(resultado_jefe['fuente'], 'rol_residencia_sin_descuento_intra')
+        self.assertEqual(resultado_instructor['fuente'], 'rol_residencia_sin_descuento_intra')
 
     def test_respeta_activo_y_vigencia(self):
         ReglaDescuentoResidencia.objects.create(

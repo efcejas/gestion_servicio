@@ -26,6 +26,10 @@ ROLES_RESIDENCIA = {
     'instructor_residentes',
 }
 
+ROLES_DESCUENTO_INTRA_RESIDENCIA = {
+    'medico_residente',
+}
+
 CAMPO_REGLA_DESCUENTO_POR_ROL = {
     'medico_residente': 'aplica_medico_residente',
     'jefe_residentes': 'aplica_jefe_residentes',
@@ -124,6 +128,12 @@ def estudio_aplica_descuento_residencia(estudio, rol, fecha=None):
             aplica=False,
             fuente='rol_no_residencia',
             motivo='El rol no pertenece a residencia.',
+        )
+    if rol not in ROLES_DESCUENTO_INTRA_RESIDENCIA:
+        return _resultado_descuento_residencia(
+            aplica=False,
+            fuente='rol_residencia_sin_descuento_intra',
+            motivo='El rol de residencia no aplica descuento INTRA.',
         )
 
     fecha_ref = fecha or timezone.localdate()

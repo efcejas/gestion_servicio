@@ -87,7 +87,7 @@ class ChecklistCierreSesionTest(TestCase):
             grupo_tarifario=self.grupo,
         )
 
-    def _crear_registro(self, sesion=None, monto=Decimal('1000.00'), medico=None):
+    def _crear_registro(self, sesion=None, monto=Decimal('1000.00'), medico=None, estudio=None):
         registro = RegistroEstudiosPorMedico.objects.create(
             sesion_contable=sesion or self.sesion,
             medico=medico or self.residente,
@@ -102,7 +102,7 @@ class ChecklistCierreSesionTest(TestCase):
         )
         RegistroEstudio.objects.create(
             registro=registro,
-            estudio=self.estudio,
+            estudio=estudio or self.estudio,
             cantidad=1,
             contexto='SERVICIO',
         )
@@ -523,6 +523,75 @@ class ChecklistCierreSesionTest(TestCase):
 
         self.assertContains(response, 'Validado contra EGES')
         self.assertContains(response, 'Validacion operativa EGES, sin impacto economico.')
+
+    def test_vista_completa_auditoria_eco_incluye_doppler_si_eges_requiere_correccion(self):
+        estudio_dop = Estudios.objects.create(
+            nombre='ECODOPPLER VENOSO MM INFERIORES',
+            tipo='DOP',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('12100.00'),
+            precio_otras_os=Decimal('12100.00'),
+            activo=True,
+        )
+        registro = self._crear_registro(
+            monto=Decimal('12100.00'),
+            estudio=estudio_dop,
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA')
+        registro.refresh_from_db()
+        batch = ImportBatch.objects.create(usuario=self.admin, archivo_nombre='Turnos-Junio-DOP.xls')
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['EGES sugiere INTRA; liquidacion figura NA.'],
+            snapshot_json={},
+            observacion='Debe corregirse a intra.',
+            revisado_por=self.admin,
+        )
+        ReglaDescuentoResidencia.objects.create(
+            estudio=estudio_dop,
+            aplica_medico_residente=True,
+            vigencia_desde=timezone.datetime(2026, 1, 1).date(),
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]),
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'ECODOPPLER VENOSO MM INFERIORES')
+        self.assertContains(response, 'EGES requiere correccion')
+        self.assertContains(response, 'Requiere correccion')
+        self.assertContains(response, 'Aplicar ajuste por control PACS')
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_corregir', args=[self.sesion.pk, registro.pk]),
+            {
+                'tipo_correccion': CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+                'horario_corregido': 'INTRA',
+                'hora_pacs': '11:23',
+                'observacion': 'Se corrige desde cruce EGES validado contra PACS.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('6050.000'))
+        self.assertTrue(
+            RevisionAuditoriaEcoRegistro.objects.filter(
+                registro=registro,
+                estado=RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION,
+                observacion__icontains='Puente automatico desde cruce EGES',
+            ).exists()
+        )
+        self.assertTrue(CorreccionPacsRegistro.objects.filter(registro=registro).exists())
 
     def test_vista_completa_auditoria_eco_filtra_por_fecha_informe(self):
         for _ in range(35):

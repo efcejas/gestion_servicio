@@ -32,6 +32,11 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
             password='testpass123',
             rol='jefe_residentes',
         )
+        self.instructor = User.objects.create_user(
+            username='instructor_c2',
+            password='testpass123',
+            rol='instructor_residentes',
+        )
         self.staff = User.objects.create_user(
             username='staff_c2',
             password='testpass123',
@@ -165,7 +170,7 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
 
         self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
 
-    def test_dop_jefe_con_flag_jefe_descuenta(self):
+    def test_dop_jefe_con_flag_jefe_no_descuenta(self):
         ReglaDescuentoResidencia.objects.create(
             estudio=self.estudio_dop,
             aplica_medico_residente=False,
@@ -175,7 +180,31 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
         registro = self._registro(medico=self.jefe)
         self._agregar_estudio(registro, self.estudio_dop)
 
-        self.assertEqual(registro.calcular_monto(), Decimal('100.000'))
+        self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
+
+    def test_eco_general_jefe_intra_no_descuenta_por_fallback(self):
+        registro = self._registro(medico=self.jefe)
+        self._agregar_estudio(registro, self.estudio_eco)
+
+        self.assertEqual(registro.calcular_monto(), Decimal('100.00'))
+
+    def test_eco_general_instructor_intra_no_descuenta_por_fallback(self):
+        registro = self._registro(medico=self.instructor)
+        self._agregar_estudio(registro, self.estudio_eco)
+
+        self.assertEqual(registro.calcular_monto(), Decimal('100.00'))
+
+    def test_dop_instructor_con_flag_instructor_no_descuenta(self):
+        ReglaDescuentoResidencia.objects.create(
+            estudio=self.estudio_dop,
+            aplica_medico_residente=False,
+            aplica_instructor_residentes=True,
+            vigencia_desde=date(2026, 1, 1),
+        )
+        registro = self._registro(medico=self.instructor)
+        self._agregar_estudio(registro, self.estudio_dop)
+
+        self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
 
     def test_grupo_permite_y_estudio_deniega_no_descuenta(self):
         ReglaDescuentoResidencia.objects.create(

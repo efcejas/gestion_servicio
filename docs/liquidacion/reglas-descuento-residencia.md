@@ -10,6 +10,8 @@ La modalidad clinica del estudio no alcanza para decidir si corresponde descuent
 
 El caso principal es Doppler: algunos estudios Doppler hechos por `medico_residente` deben descontar 50% cuando el registro esta en horario `INTRA`, pero otros Doppler no deben descontar. Antes, el comportamiento legado solo descontaba ECO general real y dejaba DOP/ECOCAR al 100%.
 
+Jefes de residentes e instructores no aplican descuento INTRA. Su actividad docente/asistencial se liquida al 100%; si necesitan marcar una carga asistencial fuera del rol docente, usan el override **liquidar como Extra Residencia**.
+
 ## Componentes implementados
 
 ### Modelo
@@ -54,11 +56,11 @@ Fallback legado:
 - DOP/ECOCAR no aplica.
 - Roles no residencia no aplican.
 
-Roles:
+Roles para descuento INTRA:
 
 - `medico_residente` aplica si la regla lo permite.
-- `jefe_residentes` aplica solo si la regla lo permite explicitamente.
-- `instructor_residentes` aplica solo si la regla lo permite explicitamente.
+- `jefe_residentes` no aplica descuento INTRA.
+- `instructor_residentes` no aplica descuento INTRA.
 
 ## Integracion con calculo de monto
 
@@ -67,7 +69,7 @@ Roles:
 Condiciones para aplicar descuento:
 
 - `registro.horario == "INTRA"`
-- rol de residencia
+- rol `medico_residente`
 - `estudio_aplica_descuento_residencia(...).aplica == True`
 
 Fecha de vigencia usada:
@@ -80,7 +82,7 @@ Esto mantiene el calculo economico alineado con la fecha del informe y evita que
 
 ## Doppler
 
-Un Doppler solo descuenta si existe regla activa vigente por estudio o por grupo tarifario que lo permita para el rol.
+Un Doppler solo descuenta si existe regla activa vigente por estudio o por grupo tarifario que lo permita para `medico_residente`.
 
 Si no hay regla:
 
@@ -484,8 +486,8 @@ Valores sugeridos:
 - `estudio`: Doppler especifico.
 - `grupo_tarifario`: vacio.
 - `aplica_medico_residente`: `True`.
-- `aplica_jefe_residentes`: `False`.
-- `aplica_instructor_residentes`: `False`.
+- `aplica_jefe_residentes`: `False` o sin uso operativo para descuento.
+- `aplica_instructor_residentes`: `False` o sin uso operativo para descuento.
 - `vigencia_desde`: fecha igual o anterior a `fecha_del_informe`.
 - `vigencia_hasta`: vacio si sigue vigente.
 - `activo`: `True`.

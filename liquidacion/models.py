@@ -980,10 +980,11 @@ class RegistroEstudiosPorMedico(models.Model):
         v3.4 - Junio 2026: INTRA residencia usa reglas explicitas de elegibilidad.
 
         Reglas de factor horario INTRA (50%):
-          - medico_residente / jefe_residentes / instructor_residentes:
+          - medico_residente:
             aplica a estudios elegibles por ReglaDescuentoResidencia.
             Sin regla explicita conserva fallback legado: ECO general real si;
             Doppler (DOP), ECOCAR y otros no.
+          - jefe_residentes / instructor_residentes: sin descuento INTRA.
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
         from .services import (
@@ -1114,13 +1115,13 @@ class RegistroEstudiosPorMedico(models.Model):
             estudios_nombres.append(label)
         
         # Porcentaje según horario
-        from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
+        from .services import ROLES_DESCUENTO_INTRA_RESIDENCIA, es_fecha_feriado_liquidacion
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
         es_feriado = es_fecha_feriado_liquidacion(fecha_referencia)
         porcentaje = (
             Decimal('0.5')
-            if self.horario == 'INTRA' and self.medico.rol in ROLES_RESIDENCIA and not es_feriado
+            if self.horario == 'INTRA' and self.medico.rol in ROLES_DESCUENTO_INTRA_RESIDENCIA and not es_feriado
             else Decimal('1.0')
         )
         subtotal = precio_total * Decimal(str(porcentaje))

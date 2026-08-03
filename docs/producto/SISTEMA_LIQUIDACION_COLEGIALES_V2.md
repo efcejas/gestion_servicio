@@ -1797,7 +1797,7 @@ Para pasar una sesion `CERRADA` a `FACTURADA`, si tiene practicas de residencia 
 
 - `ReglaDescuentoResidencia` permite decidir que estudios o grupos descuentan INTRA para roles de residencia.
 - Doppler solo descuenta si existe regla activa explicita.
-- Jefes e instructores solo descuentan si la regla los habilita explicitamente.
+- Jefes e instructores no aplican descuento INTRA; liquidan al 100% aunque existan flags historicos en reglas.
 - Jefes e instructores pueden marcar `liquidar_como_extra_residencia` para liquidar una carga como EXTRA por actividad asistencial fuera del rol docente.
 - Ese override se recuerda temporalmente en sesion Django para cargas sucesivas, solo para esos roles.
 

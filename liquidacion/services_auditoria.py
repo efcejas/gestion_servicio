@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from django.utils import timezone
 
-from .models import GrupoTarifario
+from .models import GrupoTarifario, RevisionCruceEgesRegistro
 from control_guardias.models import Feriado
 
 
@@ -24,6 +24,7 @@ ROLES_AUDITORIA_RESIDENCIA_ECO = {
     'jefe_residentes',
     'instructor_residentes',
 }
+TIPOS_AUDITORIA_RESIDENCIA_ECO = {'ECO', 'DOP', 'ECOCAR'}
 
 AUDIT_EXTRA_MENSUAL_AMARILLA = 35
 AUDIT_EXTRA_MENSUAL_ROJA = 50
@@ -323,6 +324,22 @@ def auditar_residentes_eco_por_sesion(sesion):
     if not practicas:
         return resultado
 
+    registro_ids = [registro.pk for registro in practicas]
+    revisiones_eges_requieren_correccion = set()
+    revisiones_eges = (
+        RevisionCruceEgesRegistro.objects
+        .filter(sesion_contable=sesion, registro_id__in=registro_ids)
+        .order_by('registro_id', '-fecha_revision')
+    )
+    ultimas_revisiones_eges = {}
+    for revision in revisiones_eges:
+        ultimas_revisiones_eges.setdefault(revision.registro_id, revision)
+    revisiones_eges_requieren_correccion = {
+        registro_id
+        for registro_id, revision in ultimas_revisiones_eges.items()
+        if revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+    }
+
     fechas_locales = []
     for registro in practicas:
         dt = registro.fecha_registro
@@ -341,7 +358,7 @@ def auditar_residentes_eco_por_sesion(sesion):
         if not relaciones:
             continue
 
-        if not any(rel.estudio.tipo == 'ECO' for rel in relaciones):
+        if not any(rel.estudio.tipo in TIPOS_AUDITORIA_RESIDENCIA_ECO for rel in relaciones):
             continue
 
         medico = registro.medico
@@ -396,6 +413,8 @@ def auditar_residentes_eco_por_sesion(sesion):
 
         item['_eco_por_dia'][fecha_local] += 1
         motivos_registro = []
+        if registro.pk in revisiones_eges_requieren_correccion:
+            motivos_registro.append('EGES requiere correccion')
         if registro.horario == 'EXTRA':
             motivos_registro.append('EXTRA')
         if hora_local >= AUDIT_HORA_NOCTURNA_DESDE or hora_local < AUDIT_HORA_NOCTURNA_HASTA:
@@ -410,6 +429,11 @@ def auditar_residentes_eco_por_sesion(sesion):
             'fecha_informe': registro.fecha_del_informe.isoformat() if registro.fecha_del_informe else '',
             'fecha_carga': dt.isoformat(),
             'fecha_local': fecha_local.isoformat(),
+            'estudios': ', '.join(
+                rel.estudio.nombre
+                for rel in relaciones
+                if rel.estudio.tipo in TIPOS_AUDITORIA_RESIDENCIA_ECO
+            ),
             'paciente': f'{registro.apellido_paciente}, {registro.nombre_paciente}',
             'dni_paciente': registro.dni_paciente,
             'horario': registro.horario,
@@ -476,6 +500,19 @@ def auditar_residentes_eco_por_sesion(sesion):
             AUDIT_MAX_ECO_DIA_ROJA,
             'Volumen diario ECO inusual',
         )
+        registros_eges_requieren_correccion = sum(
+            1
+            for registro_alerta in registros_eco
+            if 'EGES requiere correccion' in registro_alerta.get('motivos', [])
+        )
+        _agregar_alerta(
+            item['alertas'],
+            'eges_requiere_correccion',
+            registros_eges_requieren_correccion,
+            1,
+            1,
+            'Cruce EGES requiere correccion',
+        )
 
         if any(alerta['severidad'] == 'roja' for alerta in item['alertas']):
             item['severidad'] = 'roja'
@@ -498,6 +535,7 @@ def auditar_residentes_eco_por_sesion(sesion):
                 or ('nocturnos' in tipos_alerta and 'Nocturno' in motivos)
                 or ('finde_feriado' in tipos_alerta and 'Finde/Feriado' in motivos)
                 or ('volumen_diario' in tipos_alerta and 'Dia pico' in motivos)
+                or ('eges_requiere_correccion' in tipos_alerta and 'EGES requiere correccion' in motivos)
             )
             if aporta:
                 registros_alerta.append(registro_alerta)

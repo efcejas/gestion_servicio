@@ -1238,6 +1238,11 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
                     RevisionCruceEgesRegistro.ESTADO_DESCARTADO,
                 )
             )
+            registro['auditoria_eco_requiere_correccion_por_eges'] = bool(
+                not revision_auditoria
+                and revision_eges
+                and revision_eges.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+            )
             registro['correccion_pacs'] = correcciones_por_registro.get(registro['registro_id'])
 
         registros_alerta = _filtrar_registros_alerta_auditoria_eco(
@@ -1665,6 +1670,28 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 .order_by('-fecha_revision')
                 .first()
             )
+            if not revision:
+                revision_eges = (
+                    RevisionCruceEgesRegistro.objects
+                    .filter(sesion_contable=sesion, registro=registro)
+                    .order_by('-fecha_revision')
+                    .first()
+                )
+                if (
+                    revision_eges
+                    and revision_eges.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+                ):
+                    revision = RevisionAuditoriaEcoRegistro.objects.create(
+                        sesion_contable=sesion,
+                        registro=registro,
+                        estado=RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION,
+                        motivos_json=revision_eges.motivos_json or ['EGES requiere correccion'],
+                        observacion=(
+                            'Puente automatico desde cruce EGES para aplicar correccion. '
+                            f'{revision_eges.observacion}'
+                        ),
+                        revisado_por=request.user,
+                    )
 
             if not revision or revision.estado != RevisionAuditoriaEcoRegistro.ESTADO_REQUIERE_CORRECCION:
                 messages.error(

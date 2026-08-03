@@ -31,13 +31,14 @@ applyTo: "liquidacion/**/*.py"
 - Fecha de vigencia para descuento residencia: `registro.fecha_del_informe or timezone.now().date()`.
 - Descuento INTRA residencia solo aplica si:
   - `registro.horario == "INTRA"`;
-  - el rol pertenece a residencia;
+  - el rol es `medico_residente`;
   - el servicio de reglas devuelve `aplica=True`.
 - Fallback legado sin regla explicita:
   - ECO general real descuenta;
   - DOP/ECOCAR no descuenta;
   - roles no residencia no descuentan.
 - Doppler solo descuenta con regla activa explicita por estudio o grupo tarifario para el rol correspondiente.
+- `jefe_residentes` e `instructor_residentes` no aplican descuento INTRA, aunque existan flags historicos en reglas.
 - `EXTRA` y `NA` liquidan al 100%.
 - Bonus urgencia RM: respetar regla existente de remoto + paciente internado + ventana temporal definida.
 
@@ -47,7 +48,7 @@ applyTo: "liquidacion/**/*.py"
 - La regla por estudio tiene prioridad sobre la regla por grupo.
 - Respetar `activo`, `vigencia_desde` y `vigencia_hasta`.
 - `medico_residente` aplica si la regla lo permite.
-- `jefe_residentes` e `instructor_residentes` aplican solo si la regla los permite explicitamente.
+- `jefe_residentes` e `instructor_residentes` no aplican descuento INTRA.
 - No modificar `ReglaDescuentoResidencia` ni `services.py` salvo tarea explicita sobre reglas de descuento.
 
 ## Override Extra Residencia
