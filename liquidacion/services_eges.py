@@ -1,9 +1,10 @@
 from datetime import time
 import re
 import unicodedata
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 from django.db.models import Q
+from django.utils.dateparse import parse_date
 
 from eges_import.models import EgesRow
 
@@ -194,7 +195,11 @@ def horario_esperado_por_eges(fila_eges):
     return 'EXTRA', 'Horario EGES fuera de 08:00 a 17:00.'
 
 
-def _buscar_candidatos_eges(registro, batch):
+def _buscar_candidatos_eges(registro, batch, indice_candidatos=None):
+    if indice_candidatos is not None:
+        clave = (registro.fecha_del_informe, str(registro.dni_paciente or '').strip())
+        return indice_candidatos.get(clave, [])
+
     qs = EgesRow.objects.filter(
         batch=batch,
         fecha_turno=registro.fecha_del_informe,
@@ -209,9 +214,9 @@ def _buscar_candidatos_eges(registro, batch):
     return list(qs.order_by('hora_turno', 'practica'))
 
 
-def _evaluar_registro(registro, batch):
+def _evaluar_registro(registro, batch, indice_candidatos=None):
     practicas = _practicas_liquidacion(registro)
-    candidatos = _buscar_candidatos_eges(registro, batch)
+    candidatos = _buscar_candidatos_eges(registro, batch, indice_candidatos=indice_candidatos)
     evaluados = []
 
     for fila in candidatos:
@@ -343,7 +348,72 @@ def _evaluar_registro(registro, batch):
     }
 
 
-def construir_preview_cruce_liquidacion_eges(sesion, batch):
+def _parse_fecha_filtro(valor):
+    return parse_date(str(valor or '').strip()) if valor else None
+
+
+def _aplicar_filtros_base_registros(registros, filtros=None, registro_ids=None):
+    filtros = filtros or {}
+
+    if registro_ids is not None:
+        registros = registros.filter(pk__in=registro_ids)
+
+    profesional = str(filtros.get('profesional') or '').strip()
+    if profesional:
+        registros = registros.filter(medico_id=profesional)
+
+    fecha_desde = _parse_fecha_filtro(filtros.get('fecha_desde'))
+    if fecha_desde:
+        registros = registros.filter(fecha_del_informe__gte=fecha_desde)
+
+    fecha_hasta = _parse_fecha_filtro(filtros.get('fecha_hasta'))
+    if fecha_hasta:
+        registros = registros.filter(fecha_del_informe__lte=fecha_hasta)
+
+    busqueda = str(filtros.get('q') or '').strip()
+    if busqueda:
+        registros = registros.filter(
+            Q(dni_paciente__icontains=busqueda)
+            | Q(apellido_paciente__icontains=busqueda)
+            | Q(nombre_paciente__icontains=busqueda)
+        )
+
+    return registros
+
+
+def _indexar_candidatos_eges(batch, registros):
+    claves = {
+        (registro.fecha_del_informe, str(registro.dni_paciente or '').strip())
+        for registro in registros
+        if registro.fecha_del_informe and registro.dni_paciente
+    }
+    if not claves:
+        return {}
+
+    fechas = {fecha for fecha, _dni in claves}
+    dnis = {dni for _fecha, dni in claves}
+    filas = (
+        EgesRow.objects
+        .filter(
+            batch=batch,
+            fecha_turno__in=fechas,
+            modalidad='ECO',
+            es_insumo=False,
+        )
+        .filter(Q(dni_paciente__in=dnis) | Q(historia_clinica__in=dnis))
+        .order_by('fecha_turno', 'dni_paciente', 'hora_turno', 'practica')
+    )
+
+    indice = defaultdict(list)
+    for fila in filas:
+        for identificador in {fila.dni_paciente, fila.historia_clinica}:
+            identificador = str(identificador or '').strip()
+            if identificador:
+                indice[(fila.fecha_turno, identificador)].append(fila)
+    return indice
+
+
+def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None):
     registros = (
         sesion.practicas
         .filter(
@@ -355,8 +425,14 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch):
         .prefetch_related('registroestudio_set__estudio')
         .order_by('medico__last_name', 'medico__first_name', 'fecha_del_informe', 'apellido_paciente')
     )
+    registros = _aplicar_filtros_base_registros(registros, filtros=filtros, registro_ids=registro_ids)
+    registros = list(registros)
 
-    resultados = [_evaluar_registro(registro, batch) for registro in registros]
+    indice_candidatos = _indexar_candidatos_eges(batch, registros)
+    resultados = [
+        _evaluar_registro(registro, batch, indice_candidatos=indice_candidatos)
+        for registro in registros
+    ]
     registro_ids = [resultado['registro'].pk for resultado in resultados]
     revisiones = (
         RevisionCruceEgesRegistro.objects

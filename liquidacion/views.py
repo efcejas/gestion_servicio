@@ -7,6 +7,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
@@ -1316,11 +1317,15 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
         preview = None
         if batch_id:
             batch = get_object_or_404(ImportBatch, pk=batch_id)
-            preview = construir_preview_cruce_liquidacion_eges(self.sesion, batch)
+            preview = construir_preview_cruce_liquidacion_eges(self.sesion, batch, filtros=self.request.GET)
             preview['profesionales'] = _opciones_profesionales_cruce_eges(preview['resultados'])
             preview['resultados_original_total'] = len(preview['resultados'])
-            preview['resultados'] = _filtrar_resultados_cruce_eges(preview['resultados'], self.request.GET)
-            preview['resultados_filtrados_total'] = len(preview['resultados'])
+            resultados_filtrados = _filtrar_resultados_cruce_eges(preview['resultados'], self.request.GET)
+            paginacion = _paginar_resultados_cruce_eges(resultados_filtrados, self.request.GET)
+            preview['resultados'] = paginacion['resultados']
+            preview['resultados_filtrados_total'] = paginacion['total']
+            preview['page_obj'] = paginacion['page_obj']
+            preview['paginator'] = paginacion['paginator']
 
         context.update({
             'sesion': self.sesion,
@@ -1415,6 +1420,17 @@ def _filtrar_resultados_cruce_eges(resultados, params):
     return filtrados
 
 
+def _paginar_resultados_cruce_eges(resultados, params, por_pagina=100):
+    paginator = Paginator(resultados, por_pagina)
+    page_obj = paginator.get_page(params.get('page') or 1)
+    return {
+        'resultados': list(page_obj.object_list),
+        'page_obj': page_obj,
+        'paginator': paginator,
+        'total': paginator.count,
+    }
+
+
 def _opciones_profesionales_cruce_eges(resultados):
     opciones = {}
     for item in resultados:
@@ -1443,8 +1459,9 @@ class CruceEgesBulkValidarOkView(LoginRequiredMixin, UserPassesTestMixin, View):
             reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
             + f'?batch={batch.pk}'
         )
-        preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+        preview = construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=request.POST)
         visibles = _filtrar_resultados_cruce_eges(preview['resultados'], request.POST)
+        visibles = _paginar_resultados_cruce_eges(visibles, request.POST)['resultados']
         creadas = []
         for item in visibles:
             if item['estado'] != 'ok' or item.get('revision_cruce_eges'):
@@ -1495,7 +1512,11 @@ class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, Vie
             messages.error(request, 'Debes indicar accion y observacion para resolver el cruce EGES.')
             return redirect(redirect_url)
 
-        preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+        preview = construir_preview_cruce_liquidacion_eges(
+            sesion,
+            batch,
+            registro_ids=[registro.pk],
+        )
         item = next(
             (resultado for resultado in preview['resultados'] if resultado['registro'].pk == registro.pk),
             None,

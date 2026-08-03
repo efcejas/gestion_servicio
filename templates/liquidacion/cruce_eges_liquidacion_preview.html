@@ -96,11 +96,25 @@
                 <input type="hidden" name="fecha_desde" value="{{ filtros_cruce.fecha_desde }}">
                 <input type="hidden" name="fecha_hasta" value="{{ filtros_cruce.fecha_hasta }}">
                 <input type="hidden" name="q" value="{{ filtros_cruce.q }}">
+                <input type="hidden" name="page" value="{{ preview.page_obj.number }}">
                 <button type="submit" class="h-9 rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-700 md:h-8 md:px-3 md:text-[13px]">
                     Validar OK visibles
                 </button>
             </form>
         </div>
+        {% if preview.page_obj and preview.paginator.num_pages > 1 %}
+        <div class="mt-2 flex flex-col gap-2 border-t border-slate-100 pt-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between md:mt-1.5 md:pt-1.5">
+            <span>PÃ¡gina {{ preview.page_obj.number }} de {{ preview.paginator.num_pages }}</span>
+            <div class="flex gap-2">
+                {% if preview.page_obj.has_previous %}
+                <a href="?{{ request.GET.urlencode }}&page={{ preview.page_obj.previous_page_number }}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50">Anterior</a>
+                {% endif %}
+                {% if preview.page_obj.has_next %}
+                <a href="?{{ request.GET.urlencode }}&page={{ preview.page_obj.next_page_number }}" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50">Siguiente</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-4 lg:grid-cols-7">
