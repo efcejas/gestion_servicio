@@ -12,6 +12,8 @@ from .models import (
     HistorialRecalculoTarifaRegistro,
     HistorialSesionContable,
     PreparacionLiquidacionRRHH,
+    ControlEgesSesion,
+    ResultadoControlEgesRegistro,
     CorreccionPacsRegistro,
     ReglaDescuentoResidencia,
     RegistroEstudiosPorMedico,
@@ -941,6 +943,64 @@ class RevisionCruceEgesRegistroAdmin(admin.ModelAdmin):
         'fecha_revision',
     )
     ordering = ('-fecha_revision',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ControlEgesSesion)
+class ControlEgesSesionAdmin(admin.ModelAdmin):
+    list_display = (
+        'id',
+        'sesion_contable',
+        'version',
+        'batch_eges',
+        'total_registros',
+        'total_ok',
+        'total_advertencias',
+        'total_manuales',
+        'procesado_por',
+        'fecha_procesamiento',
+    )
+    list_filter = ('sesion_contable', 'fecha_procesamiento')
+    readonly_fields = (
+        'sesion_contable',
+        'batch_eges',
+        'version',
+        'total_registros',
+        'total_ok',
+        'total_advertencias',
+        'total_manuales',
+        'procesado_por',
+        'fecha_procesamiento',
+    )
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ResultadoControlEgesRegistro)
+class ResultadoControlEgesRegistroAdmin(admin.ModelAdmin):
+    list_display = ('id', 'control', 'registro', 'estado')
+    list_filter = ('estado', 'control__sesion_contable')
+    search_fields = (
+        'registro__id',
+        'registro__apellido_paciente',
+        'registro__nombre_paciente',
+        'registro__dni_paciente',
+    )
+    readonly_fields = ('control', 'registro', 'estado', 'motivos_json', 'snapshot_json')
 
     def has_add_permission(self, request):
         return False

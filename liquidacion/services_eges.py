@@ -3,12 +3,18 @@ import re
 import unicodedata
 from collections import OrderedDict, defaultdict
 
-from django.db.models import Q
+from django.db import transaction
+from django.db.models import Max, Q
 from django.utils.dateparse import parse_date
 
 from eges_import.models import EgesRow
 
-from .models import RevisionCruceEgesRegistro
+from .models import (
+    ControlEgesSesion,
+    CorreccionPacsRegistro,
+    ResultadoControlEgesRegistro,
+    RevisionCruceEgesRegistro,
+)
 from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
 
 
@@ -413,8 +419,8 @@ def _indexar_candidatos_eges(batch, registros):
     return indice
 
 
-def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None):
-    registros = (
+def _queryset_registros_cruce_eges(sesion):
+    return (
         sesion.practicas
         .filter(
             medico__rol__in=ROLES_RESIDENCIA,
@@ -425,6 +431,10 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
         .prefetch_related('registroestudio_set__estudio')
         .order_by('medico__last_name', 'medico__first_name', 'fecha_del_informe', 'apellido_paciente')
     )
+
+
+def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None):
+    registros = _queryset_registros_cruce_eges(sesion)
     registros = _aplicar_filtros_base_registros(registros, filtros=filtros, registro_ids=registro_ids)
     registros = list(registros)
 
@@ -475,4 +485,155 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
         'batch': batch,
         'resumen': resumen,
         'resultados': resultados,
+    }
+
+
+def serializar_resultado_control_eges(item):
+    """Snapshot estable del diagnostico EGES, sin referencias ORM."""
+    return {
+        'estado_cruce': item['estado'],
+        'motivos': item['motivos'],
+        'practicas_liquidacion': item['practicas_liquidacion'],
+        'matches_practicas': [
+            {
+                'liquidacion': match['liquidacion']['display'],
+                'eges_practica': match['fila_eges'].practica,
+                'eges_codigo': match['fila_eges'].codigo_practica,
+                'eges_medico_ok': match['medico_ok'],
+                'eges_rol_medico': match['rol_medico_eges'],
+                'cantidad_ok': match['cantidad_ok'],
+            }
+            for match in item['matches_practicas']
+        ],
+        'liquidacion_sin_match': [
+            practica['display'] for practica in item['liquidacion_sin_match']
+        ],
+        'eges_sin_liquidacion': [
+            {
+                'practica': fila.practica,
+                'codigo': fila.codigo_practica,
+                'hora': fila.hora_turno.isoformat() if fila.hora_turno else None,
+                'informante': fila.medico_informante,
+                'actuante': fila.medico_actuante,
+            }
+            for fila in item['eges_sin_liquidacion']
+        ],
+    }
+
+
+@transaction.atomic
+def procesar_control_eges_sesion(sesion, batch, usuario):
+    """Calcula una vez el control completo y persiste una nueva version auditable."""
+    preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+    resumen = preview['resumen']
+    type(sesion).objects.select_for_update().get(pk=sesion.pk)
+    ultima_version = (
+        ControlEgesSesion.objects
+        .filter(sesion_contable=sesion)
+        .aggregate(max_version=Max('version'))['max_version']
+        or 0
+    )
+    control = ControlEgesSesion.objects.create(
+        sesion_contable=sesion,
+        batch_eges=batch,
+        version=ultima_version + 1,
+        total_registros=resumen['total'],
+        total_ok=resumen['ok'],
+        total_advertencias=resumen['advertencia'],
+        total_manuales=resumen['manual'],
+        procesado_por=usuario,
+    )
+    estado_por_cruce = {
+        'ok': ResultadoControlEgesRegistro.ESTADO_OK,
+        'advertencia': ResultadoControlEgesRegistro.ESTADO_ADVERTENCIA,
+        'manual': ResultadoControlEgesRegistro.ESTADO_MANUAL,
+    }
+    ResultadoControlEgesRegistro.objects.bulk_create([
+        ResultadoControlEgesRegistro(
+            control=control,
+            registro=item['registro'],
+            estado=estado_por_cruce[item['estado']],
+            motivos_json=item['motivos'],
+            snapshot_json=serializar_resultado_control_eges(item),
+        )
+        for item in preview['resultados']
+    ])
+    return control
+
+
+def resumir_control_eges_sesion(sesion):
+    """Resumen liviano del ultimo control persistido para panel y checklist."""
+    control = (
+        ControlEgesSesion.objects
+        .filter(sesion_contable=sesion)
+        .select_related('batch_eges', 'procesado_por')
+        .order_by('-version')
+        .first()
+    )
+    if not control:
+        return {
+            'estado': 'NO_REALIZADO',
+            'control': None,
+            'total': 0,
+            'ok': 0,
+            'advertencias': 0,
+            'manuales': 0,
+            'pendientes': 0,
+            'requieren_correccion': 0,
+            'resueltos': 0,
+            'desactualizado': False,
+        }
+
+    resultados = list(control.resultados.only('registro_id', 'estado'))
+    registro_ids = [resultado.registro_id for resultado in resultados]
+    revisiones_por_registro = {}
+    revisiones = (
+        RevisionCruceEgesRegistro.objects
+        .filter(batch_eges=control.batch_eges, registro_id__in=registro_ids)
+        .order_by('registro_id', '-fecha_revision')
+    )
+    for revision in revisiones:
+        revisiones_por_registro.setdefault(revision.registro_id, revision)
+
+    registros_corregidos = set(
+        CorreccionPacsRegistro.objects
+        .filter(sesion_contable=sesion, registro_id__in=registro_ids)
+        .values_list('registro_id', flat=True)
+    )
+    pendientes = 0
+    requieren_correccion = 0
+    resueltos_excepcion = 0
+    for resultado in resultados:
+        if resultado.estado == ResultadoControlEgesRegistro.ESTADO_OK:
+            continue
+        revision = revisiones_por_registro.get(resultado.registro_id)
+        resuelto = bool(
+            resultado.registro_id in registros_corregidos
+            or (
+                revision
+                and revision.estado in {
+                    RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                    RevisionCruceEgesRegistro.ESTADO_DESCARTADO,
+                }
+            )
+        )
+        if resuelto:
+            resueltos_excepcion += 1
+            continue
+        pendientes += 1
+        if revision and revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION:
+            requieren_correccion += 1
+
+    total_actual = _queryset_registros_cruce_eges(sesion).count()
+    return {
+        'estado': 'COMPLETADO',
+        'control': control,
+        'total': control.total_registros,
+        'ok': control.total_ok,
+        'advertencias': control.total_advertencias,
+        'manuales': control.total_manuales,
+        'pendientes': pendientes,
+        'requieren_correccion': requieren_correccion,
+        'resueltos': control.total_ok + resueltos_excepcion,
+        'desactualizado': total_actual != control.total_registros,
     }

@@ -3572,8 +3572,9 @@ class SesionContableFase3TrazabilidadYExportTest(TestCase):
         response = self.client.get(reverse('liquidacion:sesiones_list'))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Auditoría residentes ECO')
-        self.assertContains(response, 'Detalle próximamente.')
+        self.assertContains(response, 'Control EGES')
+        self.assertContains(response, 'Control no realizado')
+        self.assertNotContains(response, 'Cantidad de registros EXTRA mensual elevada')
 
 
 class NavegacionLiquidacionResidentesTest(TestCase):

@@ -1660,6 +1660,97 @@ class RevisionCruceEgesRegistro(models.Model):
         return f"Revision EGES registro #{self.registro_id} - {self.estado}"
 
 
+class ControlEgesSesion(models.Model):
+    """Ejecucion persistida del cruce EGES de una sesion contable."""
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable',
+        on_delete=models.PROTECT,
+        related_name='controles_eges',
+        verbose_name='Sesion contable',
+    )
+    batch_eges = models.ForeignKey(
+        'eges_import.ImportBatch',
+        on_delete=models.PROTECT,
+        related_name='controles_liquidacion',
+        verbose_name='Batch EGES',
+    )
+    version = models.PositiveIntegerField(verbose_name='Version')
+    total_registros = models.PositiveIntegerField(default=0)
+    total_ok = models.PositiveIntegerField(default=0)
+    total_advertencias = models.PositiveIntegerField(default=0)
+    total_manuales = models.PositiveIntegerField(default=0)
+    procesado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='controles_eges_procesados',
+        verbose_name='Procesado por',
+    )
+    fecha_procesamiento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Control EGES de sesion'
+        verbose_name_plural = 'Controles EGES de sesiones'
+        ordering = ['-fecha_procesamiento']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['sesion_contable', 'version'],
+                name='liq_control_eges_sesion_version_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['sesion_contable', '-fecha_procesamiento']),
+            models.Index(fields=['batch_eges', '-fecha_procesamiento']),
+        ]
+
+    def __str__(self):
+        return f"Control EGES {self.sesion_contable} v{self.version}"
+
+
+class ResultadoControlEgesRegistro(models.Model):
+    """Resultado congelado del cruce EGES para un registro de liquidacion."""
+
+    ESTADO_OK = 'OK'
+    ESTADO_ADVERTENCIA = 'ADVERTENCIA'
+    ESTADO_MANUAL = 'MANUAL'
+    ESTADO_CHOICES = [
+        (ESTADO_OK, 'Coincidencia'),
+        (ESTADO_ADVERTENCIA, 'Advertencia'),
+        (ESTADO_MANUAL, 'Revision manual'),
+    ]
+
+    control = models.ForeignKey(
+        ControlEgesSesion,
+        on_delete=models.PROTECT,
+        related_name='resultados',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.PROTECT,
+        related_name='resultados_control_eges',
+    )
+    estado = models.CharField(max_length=16, choices=ESTADO_CHOICES)
+    motivos_json = models.JSONField(default=list, blank=True)
+    snapshot_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Resultado de control EGES'
+        verbose_name_plural = 'Resultados de control EGES'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['control', 'registro'],
+                name='liq_resultado_control_eges_registro_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['control', 'estado']),
+            models.Index(fields=['registro']),
+        ]
+
+    def __str__(self):
+        return f"Control EGES #{self.control_id} registro #{self.registro_id}: {self.estado}"
+
+
 class CorreccionPacsRegistro(models.Model):
     """Ajuste economico puntual aplicado luego de control contra PACS."""
 

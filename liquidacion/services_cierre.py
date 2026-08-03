@@ -1,9 +1,6 @@
 from .models import PreparacionLiquidacionRRHH, SolicitudRevisionHorarioRegistro
-from .services_auditoria import (
-    auditar_residentes_eco_por_sesion,
-    evaluar_gate_consistencia_sesion,
-    resumir_pendientes_auditoria_eco,
-)
+from .services_auditoria import evaluar_gate_consistencia_sesion
+from .services_eges import resumir_control_eges_sesion
 from .services_rrhh import evaluar_requisito_rrhh_para_facturar
 
 
@@ -53,7 +50,7 @@ def construir_checklist_cierre_sesion(
     user=None,
     *,
     gate=None,
-    auditoria=None,
+    control_eges=None,
     requisito_rrhh=None,
 ):
     siguiente_para_gate = {
@@ -86,18 +83,24 @@ def construir_checklist_cierre_sesion(
         fecha_aplicacion__isnull=True,
     ).count()
 
-    if auditoria is None:
-        auditoria = resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion))
-    auditoria_alertas = auditoria.get('alertas_rojas_pendientes', 0) + auditoria.get('alertas_amarillas_pendientes', 0)
-    if auditoria_alertas:
-        estado_auditoria = 'advertencia'
-        detalle_auditoria = (
-            f"{auditoria.get('alertas_rojas_pendientes', 0)} roja(s), "
-            f"{auditoria.get('alertas_amarillas_pendientes', 0)} amarilla(s)"
-        )
+    if control_eges is None:
+        control_eges = resumir_control_eges_sesion(sesion)
+    if control_eges['estado'] == 'NO_REALIZADO':
+        estado_control_eges = 'pendiente'
+        detalle_control_eges = 'Control no realizado'
+        pendientes_control_eges = 0
+    elif control_eges['desactualizado']:
+        estado_control_eges = 'advertencia'
+        detalle_control_eges = 'Hay registros posteriores al control'
+        pendientes_control_eges = control_eges['pendientes']
+    elif control_eges['pendientes']:
+        estado_control_eges = 'advertencia'
+        pendientes_control_eges = control_eges['pendientes']
+        detalle_control_eges = f'{pendientes_control_eges} caso(s) pendiente(s)'
     else:
-        estado_auditoria = 'ok'
-        detalle_auditoria = 'Sin pendientes'
+        estado_control_eges = 'ok'
+        detalle_control_eges = 'Control completo'
+        pendientes_control_eges = 0
 
     if requisito_rrhh is None:
         requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
@@ -119,10 +122,16 @@ def construir_checklist_cierre_sesion(
         detalle_rrhh = f'Preparado v{ultima_preparacion.version}'
 
     rrhh_preparado = requisito_rrhh['ok']
+    control_eges_completo = (
+        control_eges['estado'] == 'COMPLETADO'
+        and not control_eges['desactualizado']
+        and control_eges['pendientes'] == 0
+    )
     sin_bloqueantes_operativos = (
         not gate['bloqueantes']
         and pendientes_count == 0
         and aprobadas_sin_aplicar_count == 0
+        and control_eges_completo
     )
     if sesion.estado in {'FACTURADA', 'PAGADA'}:
         estado_facturar = 'ok'
@@ -150,7 +159,13 @@ def construir_checklist_cierre_sesion(
             f'{aprobadas_sin_aplicar_count} sin aplicar' if aprobadas_sin_aplicar_count else 'Sin pendientes',
             aprobadas_sin_aplicar_count,
         ),
-        _item('auditoria_residentes_eco', 'Auditoria ECO', estado_auditoria, detalle_auditoria, auditoria_alertas),
+        _item(
+            'control_eges',
+            'Control EGES',
+            estado_control_eges,
+            detalle_control_eges,
+            pendientes_control_eges,
+        ),
         _item('preparacion_rrhh', 'Preparacion RRHH', estado_rrhh, detalle_rrhh),
         _item('lista_para_facturar', 'Lista para facturar', estado_facturar, detalle_facturar),
         _item(

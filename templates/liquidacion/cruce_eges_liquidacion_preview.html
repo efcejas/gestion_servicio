@@ -34,6 +34,36 @@
     </div>
 
     {% if preview %}
+    <div class="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <p class="text-sm font-semibold text-indigo-950">Consolidar control EGES del periodo</p>
+                <p class="mt-1 text-xs text-indigo-800">
+                    Ejecutalo cuando los profesionales hayan terminado de cargar el mes. Solo entonces los casos sin coincidencia se mostraran como pendientes administrativos.
+                </p>
+                {% if control_eges.estado == 'COMPLETADO' %}
+                <p class="mt-1 text-xs font-semibold text-indigo-900">
+                    Ultimo control: v{{ control_eges.control.version }} · {{ control_eges.control.fecha_procesamiento|date:"d/m/Y H:i" }} · {{ control_eges.pendientes }} pendiente(s)
+                </p>
+                {% endif %}
+            </div>
+            {% if sesion.estado == 'REVISION' or sesion.estado == 'CERRADA' %}
+            <form method="post" action="{% url 'liquidacion:cruce_eges_procesar_control' sesion.pk %}" class="shrink-0">
+                {% csrf_token %}
+                <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
+                <button type="submit"
+                        class="inline-flex h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold"
+                        style="background-color: #4338ca; color: #ffffff;">
+                    Consolidar control
+                </button>
+            </form>
+            {% else %}
+            <span class="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                Disponible en REVISION o CERRADA
+            </span>
+            {% endif %}
+        </div>
+    </div>
     <div class="rounded-xl border border-slate-200 bg-white p-3 shadow-sm md:p-2.5">
         <form method="get" class="space-y-2">
             <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
@@ -313,6 +343,50 @@
                                     {{ item.revision_cruce_eges.revisado_por|default:"-" }} · {{ item.revision_cruce_eges.fecha_revision|date:"d/m/Y H:i" }}
                                 </p>
                             </div>
+                            {% if item.revision_cruce_eges.estado == 'REQUIERE_CORRECCION' and sesion.estado != 'FACTURADA' and sesion.estado != 'PAGADA' %}
+                            <details class="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs">
+                                <summary class="cursor-pointer font-semibold text-red-800">Revisar y aplicar ajuste economico</summary>
+                                <form method="post"
+                                      action="{% url 'liquidacion:auditoria_eco_registro_corregir' sesion.pk item.registro.pk %}"
+                                      class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <label class="sm:col-span-2">
+                                        <span class="mb-1 block font-semibold text-slate-600">Tipo de ajuste</span>
+                                        <select name="tipo_correccion" class="w-full rounded-md border border-slate-300 px-2 py-1.5">
+                                            <option value="HORARIO_RECALCULADO">Corregir horario y recalcular</option>
+                                            <option value="MONTO_MANUAL">Monto manual excepcional</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span class="mb-1 block font-semibold text-slate-600">Horario correcto</span>
+                                        <select name="horario_corregido" class="w-full rounded-md border border-slate-300 px-2 py-1.5">
+                                            <option value="">Elegir</option>
+                                            <option value="INTRA">INTRA</option>
+                                            <option value="EXTRA">EXTRA</option>
+                                            <option value="NA">NA</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span class="mb-1 block font-semibold text-slate-600">Hora verificada en PACS</span>
+                                        <input type="time" name="hora_pacs" class="w-full rounded-md border border-slate-300 px-2 py-1.5">
+                                    </label>
+                                    <label class="sm:col-span-2">
+                                        <span class="mb-1 block font-semibold text-slate-600">Monto manual, solo si corresponde</span>
+                                        <input type="number" name="monto_nuevo" step="0.01" min="0.01" class="w-full rounded-md border border-slate-300 px-2 py-1.5">
+                                    </label>
+                                    <label class="sm:col-span-2">
+                                        <span class="mb-1 block font-semibold text-slate-600">Motivo</span>
+                                        <textarea name="observacion" rows="2" required class="w-full rounded-md border border-slate-300 px-2 py-1.5" placeholder="Verificacion EGES/PACS y motivo del ajuste"></textarea>
+                                    </label>
+                                    <button type="submit"
+                                            class="sm:col-span-2 rounded-md px-3 py-2 font-semibold"
+                                            style="background-color: #b91c1c; color: #ffffff;">
+                                        Aplicar ajuste auditado
+                                    </button>
+                                </form>
+                            </details>
+                            {% endif %}
                             {% endif %}
                             {% if item.estado != 'ok' %}
                             <form method="post"

@@ -90,7 +90,12 @@ from .services_rrhh import (
     proxima_version_preparacion_rrhh,
 )
 from .services_cierre import construir_checklist_cierre_sesion
-from .services_eges import construir_preview_cruce_liquidacion_eges
+from .services_eges import (
+    construir_preview_cruce_liquidacion_eges,
+    procesar_control_eges_sesion,
+    resumir_control_eges_sesion,
+    serializar_resultado_control_eges,
+)
 from eges_import.models import ImportBatch
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -127,7 +132,10 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
             f'{base_solicitudes_url}?sesion={sesion_pk}'
             f'&estado={SolicitudRevisionHorarioRegistro.ESTADO_APROBADA}'
         ),
-        'auditoria_residentes_eco': f'#auditoria-eco-sesion-{sesion_pk}',
+        'control_eges': reverse(
+            'liquidacion:cruce_eges_liquidacion_preview',
+            kwargs={'pk': sesion_pk},
+        ),
         'preparacion_rrhh': (
             reverse('liquidacion:preparacion_rrhh_preview', kwargs={'pk': sesion_pk})
             if sesion_rrhh_habilitada
@@ -140,7 +148,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         'registros_validos': 'Registros',
         'solicitudes_pendientes': 'Solicitudes',
         'aprobadas_sin_aplicar': 'Aplicaciones',
-        'auditoria_residentes_eco': 'Auditoría ECO',
+        'control_eges': 'Control EGES',
         'preparacion_rrhh': 'RRHH',
         'lista_para_facturar': 'Facturación',
         'sesion_pagada': 'Pago',
@@ -150,7 +158,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         'registros_validos': 'Abrir el Gate Administrativo para ver bloqueantes, advertencias y acciones sugeridas.',
         'solicitudes_pendientes': 'Ir a la bandeja de revision horaria filtrada por solicitudes pendientes.',
         'aprobadas_sin_aplicar': 'Ir a solicitudes aprobadas que aun deben aplicarse economicamente.',
-        'auditoria_residentes_eco': 'Abrir el resumen ECO; desde ahi podes resolver pendientes contra PACS.',
+        'control_eges': 'Cruzar el periodo con EGES y resolver solo las diferencias encontradas.',
         'preparacion_rrhh': 'Preparar o completar el snapshot RRHH de residencia.',
         'lista_para_facturar': 'Volver a la accion principal cuando los pasos previos esten listos.',
         'sesion_pagada': 'Revisar historial y estado final de pago.',
@@ -159,7 +167,7 @@ def _enriquecer_checklist_cierre_visual(checklist, sesion):
         'registros_validos': 'Resolver hallazgos del Gate Administrativo.',
         'solicitudes_pendientes': 'Revisar y aprobar/rechazar solicitudes pendientes.',
         'aprobadas_sin_aplicar': 'Aplicar solicitudes aprobadas para actualizar horario y monto.',
-        'auditoria_residentes_eco': 'Revisar contra PACS los registros ECO pendientes.',
+        'control_eges': 'Consolidar el cruce EGES o resolver sus casos pendientes.',
         'preparacion_rrhh': 'Guardar la preparacion RRHH en estado PREPARADO.',
         'lista_para_facturar': 'Completar pasos previos y ejecutar la transicion correspondiente.',
         'sesion_pagada': 'Confirmar pago cuando la sesion este FACTURADA.',
@@ -1332,6 +1340,7 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             'batches': batches,
             'batch_seleccionado': batch,
             'preview': preview,
+            'control_eges': resumir_control_eges_sesion(self.sesion),
             'filtros_cruce': {
                 'profesional': self.request.GET.get('profesional', ''),
                 'estado_cruce': self.request.GET.get('estado_cruce', ''),
@@ -1344,36 +1353,47 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
         return context
 
 
+class CruceEgesProcesarControlView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Consolida el cruce del periodo para usarlo como control operativo."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para procesar el control EGES.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+        if sesion.estado == 'ABIERTA':
+            messages.error(
+                request,
+                'El control EGES se consolida cuando el periodo ya esta en REVISION o CERRADA.',
+            )
+            return redirect(redirect_url)
+        if sesion.estado in {'FACTURADA', 'PAGADA'}:
+            messages.error(request, 'No se puede reprocesar el control de una sesion facturada o pagada.')
+            return redirect(redirect_url)
+
+        control = procesar_control_eges_sesion(sesion, batch, request.user)
+        pendientes = control.total_advertencias + control.total_manuales
+        messages.success(
+            request,
+            (
+                f'Control EGES v{control.version} consolidado: '
+                f'{control.total_ok} coincidencia(s) y {pendientes} caso(s) para revisar.'
+            ),
+        )
+        return redirect(redirect_url)
+
+
 def _snapshot_cruce_eges_item(item):
-    return {
-        'estado_cruce': item['estado'],
-        'motivos': item['motivos'],
-        'practicas_liquidacion': item['practicas_liquidacion'],
-        'matches_practicas': [
-            {
-                'liquidacion': match['liquidacion']['display'],
-                'eges_practica': match['fila_eges'].practica,
-                'eges_codigo': match['fila_eges'].codigo_practica,
-                'eges_medico_ok': match['medico_ok'],
-                'eges_rol_medico': match['rol_medico_eges'],
-                'cantidad_ok': match['cantidad_ok'],
-            }
-            for match in item['matches_practicas']
-        ],
-        'liquidacion_sin_match': [
-            practica['display'] for practica in item['liquidacion_sin_match']
-        ],
-        'eges_sin_liquidacion': [
-            {
-                'practica': fila.practica,
-                'codigo': fila.codigo_practica,
-                'hora': fila.hora_turno.isoformat() if fila.hora_turno else None,
-                'informante': fila.medico_informante,
-                'actuante': fila.medico_actuante,
-            }
-            for fila in item['eges_sin_liquidacion']
-        ],
-    }
+    return serializar_resultado_control_eges(item)
 
 
 def _parse_fecha_cruce_eges(valor):
@@ -4418,20 +4438,14 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             gate_preview = {'bloqueantes': [], 'advertencias': []}
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
-            auditoria_residentes_eco_base = resumir_pendientes_auditoria_eco(
-                auditar_residentes_eco_por_sesion(sesion)
-            )
+            control_eges = resumir_control_eges_sesion(sesion)
             requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
-            auditoria_residentes_eco = _enriquecer_auditoria_residentes_eco_visual(
-                auditoria_residentes_eco_base,
-                sesion,
-            )
             checklist_cierre = _enriquecer_checklist_cierre_visual(
                 construir_checklist_cierre_sesion(
                     sesion,
                     user=user,
                     gate=gate_preview if siguiente else None,
-                    auditoria=auditoria_residentes_eco_base,
+                    control_eges=control_eges,
                     requisito_rrhh=requisito_rrhh,
                 ),
                 sesion,
@@ -4474,7 +4488,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                     sesion=sesion,
                     limite=3,
                 ),
-                'auditoria_residentes_eco': auditoria_residentes_eco,
+                'control_eges': control_eges,
                 'checklist_cierre': checklist_cierre,
                 'requisito_rrhh': requisito_rrhh,
                 'recalculo_tarifas': recalculo_tarifas,

@@ -9,14 +9,20 @@ from eges_import.models import EgesRow, ImportBatch
 from control_guardias.models import Feriado
 
 from .models import (
+    ControlEgesSesion,
     Estudios,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    ResultadoControlEgesRegistro,
     RevisionCruceEgesRegistro,
     SesionContable,
 )
 from .services_auditoria import resumir_pendientes_auditoria_eco
-from .services_eges import construir_preview_cruce_liquidacion_eges
+from .services_eges import (
+    construir_preview_cruce_liquidacion_eges,
+    procesar_control_eges_sesion,
+    resumir_control_eges_sesion,
+)
 
 
 User = get_user_model()
@@ -447,3 +453,72 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         resumen = resumir_pendientes_auditoria_eco(auditoria)
 
         self.assertEqual(resumen['registros_alerta_pendientes_total'], 1)
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': self.sesion.pk}),
+            {'batch': self.batch.pk},
+        )
+        self.assertContains(response, 'Aplicar ajuste auditado')
+
+    def test_control_eges_no_genera_alertas_antes_de_consolidar(self):
+        self._registro(horario='INTRA')
+        self._eges_row(time(18, 0), time(18, 15), tipo_atencion='Guardia')
+
+        resumen = resumir_control_eges_sesion(self.sesion)
+
+        self.assertEqual(resumen['estado'], 'NO_REALIZADO')
+        self.assertEqual(resumen['pendientes'], 0)
+
+    def test_consolidar_control_persiste_resultados_y_pendientes(self):
+        registro = self._registro(horario='INTRA')
+        self._eges_row(time(18, 0), time(18, 15), tipo_atencion='Guardia')
+
+        control = procesar_control_eges_sesion(self.sesion, self.batch, self.admin)
+
+        self.assertEqual(control.version, 1)
+        self.assertEqual(control.total_advertencias, 1)
+        resultado = ResultadoControlEgesRegistro.objects.get(control=control, registro=registro)
+        self.assertEqual(resultado.estado, ResultadoControlEgesRegistro.ESTADO_ADVERTENCIA)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['estado'], 'COMPLETADO')
+        self.assertEqual(resumen['pendientes'], 1)
+
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=self.batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+            motivos_json=['Excepcion revisada.'],
+            snapshot_json={},
+            observacion='Validado administrativamente.',
+            revisado_por=self.admin,
+        )
+        resumen_resuelto = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen_resuelto['pendientes'], 0)
+
+    def test_post_consolidar_crea_nueva_version_sin_modificar_monto(self):
+        registro = self._registro(horario='INTRA')
+        registro.refresh_from_db()
+        monto_original = registro.monto_calculado
+        self._eges_row(time(9, 0), time(9, 15), tipo_atencion='Guardia')
+        self.client.force_login(self.admin)
+
+        for _ in range(2):
+            response = self.client.post(
+                reverse('liquidacion:cruce_eges_procesar_control', kwargs={'pk': self.sesion.pk}),
+                {'batch': self.batch.pk},
+            )
+            self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(ControlEgesSesion.objects.filter(sesion_contable=self.sesion).count(), 2)
+        self.assertEqual(
+            list(
+                ControlEgesSesion.objects
+                .filter(sesion_contable=self.sesion)
+                .order_by('version')
+                .values_list('version', flat=True)
+            ),
+            [1, 2],
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)

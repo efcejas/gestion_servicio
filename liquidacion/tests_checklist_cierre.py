@@ -12,6 +12,7 @@ from django.utils import timezone
 from eges_import.models import ImportBatch
 
 from .models import (
+    ControlEgesSesion,
     Estudios,
     GrupoTarifario,
     PreparacionLiquidacionRRHH,
@@ -19,6 +20,7 @@ from .models import (
     ReglaDescuentoResidencia,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    ResultadoControlEgesRegistro,
     RevisionAuditoriaEcoRegistro,
     RevisionCruceEgesRegistro,
     SesionContable,
@@ -121,6 +123,26 @@ class ChecklistCierreSesionTest(TestCase):
     def _item(self, checklist, key):
         return next(item for item in checklist['items'] if item['key'] == key)
 
+    def _crear_control_eges(self, registros):
+        batch = ImportBatch.objects.create(usuario=self.admin, archivo_nombre='Turnos-Junio-ECO.xls')
+        control = ControlEgesSesion.objects.create(
+            sesion_contable=self.sesion,
+            batch_eges=batch,
+            version=1,
+            total_registros=len(registros),
+            total_ok=len(registros),
+            procesado_por=self.admin,
+        )
+        ResultadoControlEgesRegistro.objects.bulk_create([
+            ResultadoControlEgesRegistro(
+                control=control,
+                registro=registro,
+                estado=ResultadoControlEgesRegistro.ESTADO_OK,
+            )
+            for registro in registros
+        ])
+        return control
+
     def test_sesion_sin_bloqueantes_devuelve_registros_validos_ok(self):
         self._crear_registro()
 
@@ -216,7 +238,8 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(self._item(checklist, 'preparacion_rrhh')['estado'], 'advertencia')
 
     def test_preparacion_rrhh_preparado_devuelve_ok(self):
-        self._crear_registro()
+        registro = self._crear_registro()
+        self._crear_control_eges([registro])
         PreparacionLiquidacionRRHH.objects.create(
             sesion_contable=self.sesion,
             version=1,
@@ -279,7 +302,7 @@ class ChecklistCierreSesionTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(gate_mock.call_count, 1)
-        self.assertEqual(auditoria_mock.call_count, 1)
+        self.assertEqual(auditoria_mock.call_count, 0)
 
     def test_vista_pagina_sesiones_para_acotar_el_trabajo(self):
         for mes in range(1, 6):
@@ -307,7 +330,7 @@ class ChecklistCierreSesionTest(TestCase):
         response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Pendientes')
+        self.assertContains(response, 'Solicitudes pendientes')
         self.assertContains(response, 'Revisar y aprobar/rechazar solicitudes pendientes.')
         self.assertContains(
             response,
@@ -354,19 +377,17 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         sesiones_data = response.context['sesiones_data']
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
-        auditoria_item = next(
+        control_item = next(
             item for item in dato['checklist_cierre']['items']
-            if item['key'] == 'auditoria_residentes_eco'
+            if item['key'] == 'control_eges'
         )
-        self.assertEqual(auditoria_item['url'], f'#auditoria-eco-sesion-{self.sesion.pk}')
-        self.assertContains(response, 'Cantidad de registros EXTRA mensual elevada')
-        self.assertContains(response, 'Resolver pendientes')
-        self.assertContains(response, 'Registros pendientes de revisión')
-        self.assertContains(response, 'Inspeccionar')
-        self.assertContains(
-            response,
-            reverse('liquidacion:registroestudios_admin_detalle', args=[registros[-1].pk]),
+        self.assertEqual(
+            control_item['url'],
+            reverse('liquidacion:cruce_eges_liquidacion_preview', args=[self.sesion.pk]),
         )
+        self.assertEqual(control_item['estado'], 'pendiente')
+        self.assertNotContains(response, 'Cantidad de registros EXTRA mensual elevada')
+        self.assertContains(response, 'Control no realizado')
         self.assertContains(response, reverse('liquidacion:auditoria_eco_sesion', args=[self.sesion.pk]))
 
     def test_vista_sesion_contable_auditoria_eco_no_muestra_residentes_ya_validados(self):
@@ -389,15 +410,14 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         sesiones_data = response.context['sesiones_data']
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
-        auditoria = dato['auditoria_residentes_eco']
-        auditoria_item = next(
+        control = dato['control_eges']
+        control_item = next(
             item for item in dato['checklist_cierre']['items']
-            if item['key'] == 'auditoria_residentes_eco'
+            if item['key'] == 'control_eges'
         )
-        self.assertEqual(auditoria['residentes_con_alertas_pendientes'], 0)
-        self.assertEqual(auditoria['registros_alerta_pendientes_total'], 0)
-        self.assertEqual(auditoria_item['estado'], 'ok')
-        self.assertContains(response, 'Sin pendientes de auditoría ECO en esta sesión.')
+        self.assertEqual(control['estado'], 'NO_REALIZADO')
+        self.assertEqual(control_item['estado'], 'pendiente')
+        self.assertContains(response, 'Control no realizado')
 
     def test_vista_sesion_contable_auditoria_eco_mantiene_pendiente_correccion_sin_ajuste(self):
         registros = []
@@ -423,9 +443,8 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         sesiones_data = response.context['sesiones_data']
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
-        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 1)
-        self.assertEqual(dato['auditoria_residentes_eco']['registros_alerta_pendientes_total'], 1)
-        self.assertContains(response, 'Resolver pendientes')
+        self.assertEqual(dato['control_eges']['estado'], 'NO_REALIZADO')
+        self.assertContains(response, 'Control no realizado')
 
     def test_vista_sesion_contable_auditoria_eco_no_muestra_pendiente_con_ajuste_pacs(self):
         registros = []
@@ -463,9 +482,8 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(response.status_code, 200)
         sesiones_data = response.context['sesiones_data']
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
-        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 0)
-        self.assertEqual(dato['auditoria_residentes_eco']['registros_alerta_pendientes_total'], 0)
-        self.assertContains(response, 'Sin pendientes de auditoría ECO en esta sesión.')
+        self.assertEqual(dato['control_eges']['estado'], 'NO_REALIZADO')
+        self.assertContains(response, 'Control no realizado')
 
     def test_vista_completa_auditoria_eco_lista_registros_sospechosos(self):
         registros = []
@@ -742,7 +760,7 @@ class ChecklistCierreSesionTest(TestCase):
 
         response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
         dato = next(item for item in response.context['sesiones_data'] if item['sesion'].pk == self.sesion.pk)
-        self.assertEqual(dato['auditoria_residentes_eco']['residentes_con_alertas_pendientes'], 0)
+        self.assertEqual(dato['control_eges']['estado'], 'NO_REALIZADO')
 
     def test_revision_masiva_eco_descarta_sin_correccion(self):
         registros = [self._crear_registro(monto=Decimal('1000.00')) for _ in range(2)]
