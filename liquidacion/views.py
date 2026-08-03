@@ -4365,6 +4365,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = SesionContable
     template_name = 'liquidacion/sesion_contable_list.html'
     context_object_name = 'sesiones'
+    paginate_by = 2
 
     def test_func(self):
         return self.request.user.is_superuser or self.request.user.rol in ['administrativo', 'jefe_servicio']
@@ -4417,15 +4418,24 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             gate_preview = {'bloqueantes': [], 'advertencias': []}
             if siguiente:
                 gate_preview = evaluar_gate_consistencia_sesion(sesion, siguiente)
+            auditoria_residentes_eco_base = resumir_pendientes_auditoria_eco(
+                auditar_residentes_eco_por_sesion(sesion)
+            )
+            requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
             auditoria_residentes_eco = _enriquecer_auditoria_residentes_eco_visual(
-                resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion)),
+                auditoria_residentes_eco_base,
                 sesion,
             )
             checklist_cierre = _enriquecer_checklist_cierre_visual(
-                construir_checklist_cierre_sesion(sesion, user=user),
+                construir_checklist_cierre_sesion(
+                    sesion,
+                    user=user,
+                    gate=gate_preview if siguiente else None,
+                    auditoria=auditoria_residentes_eco_base,
+                    requisito_rrhh=requisito_rrhh,
+                ),
                 sesion,
             )
-            requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
             recalculo_tarifas = _resumen_recalculo_tarifas_pendiente_sesion(sesion)
 
             historial_ordenado = getattr(sesion, 'historial_ordenado', [])

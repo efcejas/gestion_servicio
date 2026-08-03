@@ -1,6 +1,7 @@
 import io
 from datetime import time
 from decimal import Decimal
+from unittest.mock import patch
 
 import openpyxl
 from django.contrib.auth import get_user_model
@@ -25,6 +26,10 @@ from .models import (
     TarifaGrupoTarifario,
 )
 from .services_cierre import construir_checklist_cierre_sesion
+from .services_auditoria import (
+    auditar_residentes_eco_por_sesion,
+    evaluar_gate_consistencia_sesion,
+)
 
 
 User = get_user_model()
@@ -258,6 +263,35 @@ class ChecklistCierreSesionTest(TestCase):
         dato = next(item for item in sesiones_data if item['sesion'].pk == self.sesion.pk)
         self.assertIn('checklist_cierre', dato)
         self.assertEqual(dato['checklist_cierre']['sesion_id'], self.sesion.pk)
+
+    def test_vista_reutiliza_gate_y_auditoria_en_checklist(self):
+        self._crear_registro()
+        self.client.force_login(self.admin)
+
+        with patch(
+            'liquidacion.views.evaluar_gate_consistencia_sesion',
+            wraps=evaluar_gate_consistencia_sesion,
+        ) as gate_mock, patch(
+            'liquidacion.views.auditar_residentes_eco_por_sesion',
+            wraps=auditar_residentes_eco_por_sesion,
+        ) as auditoria_mock:
+            response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(gate_mock.call_count, 1)
+        self.assertEqual(auditoria_mock.call_count, 1)
+
+    def test_vista_pagina_sesiones_para_acotar_el_trabajo(self):
+        for mes in range(1, 6):
+            SesionContable.objects.create(mes=mes, estado='PAGADA', **{'a\u00f1o': 2025})
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse('liquidacion:sesiones_list'), secure=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_paginated'])
+        self.assertEqual(len(response.context['sesiones_data']), 2)
+        self.assertContains(response, 'Siguiente')
 
     def test_vista_sesion_contable_checklist_muestra_pasos_de_resolucion(self):
         registro = self._crear_registro()

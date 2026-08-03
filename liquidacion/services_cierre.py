@@ -48,7 +48,14 @@ def _proximo_paso(items):
     return None
 
 
-def construir_checklist_cierre_sesion(sesion, user=None):
+def construir_checklist_cierre_sesion(
+    sesion,
+    user=None,
+    *,
+    gate=None,
+    auditoria=None,
+    requisito_rrhh=None,
+):
     siguiente_para_gate = {
         'ABIERTA': 'REVISION',
         'REVISION': 'CERRADA',
@@ -56,7 +63,8 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         'FACTURADA': 'PAGADA',
     }.get(sesion.estado, 'PAGADA')
 
-    gate = evaluar_gate_consistencia_sesion(sesion, siguiente_para_gate)
+    if gate is None:
+        gate = evaluar_gate_consistencia_sesion(sesion, siguiente_para_gate)
     if gate['bloqueantes']:
         estado_gate = 'bloqueante'
         detalle_gate = f"{len(gate['bloqueantes'])} bloqueante(s)"
@@ -78,7 +86,8 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         fecha_aplicacion__isnull=True,
     ).count()
 
-    auditoria = resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion))
+    if auditoria is None:
+        auditoria = resumir_pendientes_auditoria_eco(auditar_residentes_eco_por_sesion(sesion))
     auditoria_alertas = auditoria.get('alertas_rojas_pendientes', 0) + auditoria.get('alertas_amarillas_pendientes', 0)
     if auditoria_alertas:
         estado_auditoria = 'advertencia'
@@ -90,7 +99,8 @@ def construir_checklist_cierre_sesion(sesion, user=None):
         estado_auditoria = 'ok'
         detalle_auditoria = 'Sin pendientes'
 
-    requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
+    if requisito_rrhh is None:
+        requisito_rrhh = evaluar_requisito_rrhh_para_facturar(sesion)
     ultima_preparacion = requisito_rrhh['ultima_preparacion']
     if not requisito_rrhh['requiere_rrhh']:
         estado_rrhh = 'ok'

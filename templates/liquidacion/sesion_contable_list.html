@@ -540,6 +540,32 @@
         {% endfor %}
     </div>
 
+    {% if is_paginated %}
+    <nav class="mb-6 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+         aria-label="PaginaciÃ³n de sesiones contables">
+        <p class="text-sm text-slate-600">
+            PÃ¡gina <span class="font-semibold text-slate-900">{{ page_obj.number }}</span>
+            de <span class="font-semibold text-slate-900">{{ paginator.num_pages }}</span>
+        </p>
+        <div class="flex items-center gap-2">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}"
+               class="inline-flex min-h-10 items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}"
+               class="inline-flex min-h-10 items-center gap-2 rounded-md bg-slate-800 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-900">
+                Siguiente
+                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+
     <!-- Ayuda operativa -->
     <div class="bg-white rounded-xl border border-gray-200 shadow-md p-5 md:p-6">
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Ayuda operativa</p>
