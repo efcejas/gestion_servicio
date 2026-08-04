@@ -42,14 +42,6 @@
         </div>
     </div>
     
-    {% if messages %}
-        {% for message in messages %}
-            <div class="mb-4 rounded-lg border border-{{ message.tags }}-300 bg-{{ message.tags }}-50 p-4 text-{{ message.tags }}-800">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-    
     {% if estudios %}
     <div class="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto w-full">

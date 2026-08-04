@@ -98,6 +98,20 @@ class AnulacionRegistroEstudioTest(TestCase):
             'No corresponde segun control administrativo.',
         )
 
+    def test_anulacion_muestra_mensaje_en_el_portal_de_liquidacion(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse('liquidacion:registroestudios_anular', args=[self.registro.pk]),
+            {'motivo': 'Control administrativo confirmado.'},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'Registro anulado. Se conserva la trazabilidad y queda excluido de liquidacion y exportaciones.',
+        )
+
     def test_residente_no_puede_anular(self):
         response = self._anular(user=self.residente)
 

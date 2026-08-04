@@ -63,6 +63,34 @@
 
     <!-- Contenido principal -->
     <main class="py-6 flex-1">
+        {% if messages %}
+        <div class="container mx-auto px-4 mb-4 no-print" aria-live="polite">
+            <div class="space-y-2">
+                {% for message in messages %}
+                <div role="alert"
+                     class="flex items-start justify-between gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow-sm
+                     {% if 'success' in message.tags %}border-emerald-200 bg-emerald-50 text-emerald-800
+                     {% elif 'warning' in message.tags %}border-amber-200 bg-amber-50 text-amber-800
+                     {% elif 'error' in message.tags %}border-rose-200 bg-rose-50 text-rose-800
+                     {% else %}border-blue-200 bg-blue-50 text-blue-800{% endif %}">
+                    <div class="flex min-w-0 items-start gap-2">
+                        <i class="fas mt-0.5 shrink-0
+                           {% if 'success' in message.tags %}fa-check-circle
+                           {% elif 'warning' in message.tags %}fa-exclamation-triangle
+                           {% elif 'error' in message.tags %}fa-exclamation-circle
+                           {% else %}fa-info-circle{% endif %}" aria-hidden="true"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    <button type="button" onclick="this.parentElement.remove()"
+                            class="shrink-0 opacity-60 transition-opacity hover:opacity-100"
+                            aria-label="Cerrar mensaje" title="Cerrar mensaje">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
 
