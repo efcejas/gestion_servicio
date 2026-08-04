@@ -931,7 +931,7 @@ class ChecklistCierreSesionTest(TestCase):
         ultima_revision = RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).order_by('-fecha_revision').first()
         self.assertEqual(ultima_revision.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
 
-    def test_vista_auditoria_no_muestra_formulario_de_ajuste_si_ya_hay_correccion_pacs(self):
+    def test_nueva_correccion_manual_reemplaza_monto_y_conserva_historial(self):
         registro = self._crear_registro(monto=Decimal('650.00'))
         revision = RevisionAuditoriaEcoRegistro.objects.create(
             sesion_contable=self.sesion,
@@ -963,7 +963,29 @@ class ChecklistCierreSesionTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Ajuste PACS aplicado')
-        self.assertNotContains(response, 'Aplicar ajuste por control PACS')
+        self.assertContains(response, 'Aplicar nueva correccion')
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_corregir', args=[self.sesion.pk, registro.pk]),
+            {
+                'tipo_correccion': CorreccionPacsRegistro.TIPO_MONTO_MANUAL,
+                'monto_nuevo': '800.00',
+                'observacion': 'Se rectifica el monto manual cargado previamente.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('800.00'))
+        correcciones = CorreccionPacsRegistro.objects.filter(registro=registro).order_by('fecha_correccion')
+        self.assertEqual(correcciones.count(), 2)
+        nueva_correccion = correcciones.last()
+        self.assertEqual(nueva_correccion.monto_anterior, Decimal('650.00'))
+        self.assertEqual(nueva_correccion.monto_nuevo, Decimal('800.00'))
+        self.assertEqual(nueva_correccion.revision_auditoria_eco, revision)
+        ultima_revision = RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).first()
+        self.assertEqual(ultima_revision.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
 
     def test_vista_auditoria_filtra_registros_con_ajuste_pacs(self):
         corregido = self._crear_registro(monto=Decimal('650.00'))
