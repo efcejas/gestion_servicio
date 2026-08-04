@@ -212,6 +212,10 @@
                             <p class="text-slate-600">DNI {{ item.registro.dni_paciente }} · {{ item.registro.fecha_del_informe|date:"d/m/Y" }}</p>
                             <p class="text-slate-600">{{ item.registro.medico.get_full_name|default:item.registro.medico.username }} · {{ item.registro.medico.rol }}</p>
                             <p class="mt-1 text-xs font-semibold text-slate-700">Liquidación: {{ item.registro.horario }} · ${{ item.registro.monto_calculado|floatformat:2 }}</p>
+                            <a href="{% url 'liquidacion:registroestudios_admin_detalle' item.registro.pk %}?volver_sesion={{ sesion.pk }}"
+                               class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900">
+                                <i class="fas fa-search"></i> Inspeccionar / anular
+                            </a>
                         </td>
                         <td class="px-3 py-3 align-top">
                             {% if item.matches_practicas %}

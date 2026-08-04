@@ -122,7 +122,7 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
     resultado = {'bloqueantes': [], 'advertencias': [], 'items': []}
 
     practicas = list(
-        sesion.practicas.select_related('medico', 'sesion_contable').prefetch_related('registroestudio_set__estudio')
+        sesion.practicas.filter(anulado=False).select_related('medico', 'sesion_contable').prefetch_related('registroestudio_set__estudio')
     )
     guardias = list(sesion.guardias_pasivas.all())
 
@@ -318,7 +318,7 @@ def auditar_residentes_eco_por_sesion(sesion):
     }
 
     practicas = list(
-        sesion.practicas.select_related('medico').prefetch_related('registroestudio_set__estudio')
+        sesion.practicas.filter(anulado=False).select_related('medico').prefetch_related('registroestudio_set__estudio')
         .filter(medico__rol__in=ROLES_AUDITORIA_RESIDENCIA_ECO)
     )
     if not practicas:

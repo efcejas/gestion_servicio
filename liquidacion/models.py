@@ -959,6 +959,21 @@ class RegistroEstudiosPorMedico(models.Model):
     )
     fecha_modificacion = models.DateTimeField(null=True, blank=True)
     motivo_modificacion = models.TextField(blank=True)
+    anulado = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name='Anulado',
+    )
+    fecha_anulacion = models.DateTimeField(null=True, blank=True)
+    anulado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='practicas_anuladas',
+        verbose_name='Anulado por',
+    )
+    motivo_anulacion = models.TextField(blank=True)
 
     class Meta:
         verbose_name = 'Registro de estudio por médico'
@@ -966,6 +981,7 @@ class RegistroEstudiosPorMedico(models.Model):
         ordering = ['-fecha_del_informe', '-fecha_registro']
         indexes = [
             models.Index(fields=['sesion_contable', 'medico']),
+            models.Index(fields=['sesion_contable', 'anulado']),
             models.Index(fields=['fecha_del_informe']),
         ]
 

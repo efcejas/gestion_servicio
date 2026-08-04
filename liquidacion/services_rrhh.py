@@ -3,7 +3,7 @@ import json
 from collections import defaultdict
 from decimal import Decimal
 
-from django.db.models import Max
+from django.db.models import Count, Max, Sum
 
 from .models import (
     HistorialRecalculoSolicitudRevisionHorario,
@@ -26,6 +26,7 @@ def sesion_tiene_practicas_residencia(sesion):
     return RegistroEstudiosPorMedico.objects.filter(
         sesion_contable=sesion,
         medico__rol__in=ROLES_RESIDENCIA,
+        anulado=False,
     ).exists()
 
 
@@ -66,6 +67,31 @@ def evaluar_requisito_rrhh_para_facturar(sesion):
             'mensaje': f'La ultima preparacion RRHH esta en estado {ultima.estado}; debe estar PREPARADO para facturar.',
         }
 
+    totales_snapshot = (ultima.resumen_json or {}).get('totales', {})
+    if {'cantidad_practicas', 'monto_practicas'} <= set(totales_snapshot):
+        totales_actuales = RegistroEstudiosPorMedico.objects.filter(
+            sesion_contable=sesion,
+            medico__rol__in=ROLES_RESIDENCIA,
+            anulado=False,
+        ).aggregate(
+            cantidad=Count('id'),
+            monto=Sum('monto_calculado'),
+        )
+        snapshot_desactualizado = (
+            int(totales_snapshot['cantidad_practicas']) != totales_actuales['cantidad']
+            or Decimal(totales_snapshot['monto_practicas'])
+            != Decimal(totales_actuales['monto'] or 0).quantize(Decimal('0.01'))
+        )
+        if snapshot_desactualizado:
+            return {
+                'ok': False,
+                'requiere_rrhh': True,
+                'ultima_preparacion': ultima,
+                'mensaje': (
+                    f'La preparacion RRHH v{ultima.version} quedo desactualizada; '
+                    'debe generarse una nueva version antes de facturar.'
+                ),
+            }
     return {
         'ok': True,
         'requiere_rrhh': True,
@@ -190,6 +216,7 @@ def construir_snapshot_liquidacion_rrhh(sesion):
         RegistroEstudiosPorMedico.objects.filter(
             sesion_contable=sesion,
             medico__rol__in=ROLES_RESIDENCIA,
+            anulado=False,
         )
         .select_related('medico')
         .prefetch_related('registroestudio_set')

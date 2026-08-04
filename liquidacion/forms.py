@@ -359,6 +359,19 @@ class CorreccionPacsRegistroForm(forms.Form):
         return cleaned
 
 
+class AnulacionRegistroEstudioForm(forms.Form):
+    motivo = forms.CharField(
+        max_length=1000,
+        required=True,
+        strip=True,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'class': TAILWIND_INPUT_CLASSES,
+            'placeholder': 'Motivo administrativo de la anulacion',
+        }),
+    )
+
+
 class CorreccionPacsAplicadaBulkForm(forms.Form):
     """Nueva correccion auditada sobre ajustes PACS ya aplicados."""
 

@@ -6,6 +6,7 @@ from .views import (
     SolicitudRevisionHorarioRegistroCreateView,
     RegistroEstudiosPorMedicoCreateView,
     RegistroEstudiosPorMedicoAdminDetailView,
+    RegistroEstudiosPorMedicoAnularView,
     RegistroEstudiosPorMedicoListView,
     RegistroEstudiosPorMedicoUpdateView,
     RegistroEstudiosPorMedicoDeleteView,
@@ -169,6 +170,7 @@ urlpatterns = [
     path('registro_estudios_por_medico/', RegistroEstudiosPorMedicoListView.as_view(), name='registroestudios_list'),
     path('registro_estudios_por_medico/exportar-excel/', exportar_excel_mis_registros, name='exportar_excel_mis_registros'),
     path('registro_estudios_por_medico/<int:pk>/inspeccionar/', RegistroEstudiosPorMedicoAdminDetailView.as_view(), name='registroestudios_admin_detalle'),
+    path('registro_estudios_por_medico/<int:pk>/anular/', RegistroEstudiosPorMedicoAnularView.as_view(), name='registroestudios_anular'),
     path(
         'registro_estudios_por_medico/<int:registro_pk>/solicitar-revision/',
         SolicitudRevisionHorarioRegistroCreateView.as_view(),

@@ -423,6 +423,7 @@ def _queryset_registros_cruce_eges(sesion):
     return (
         sesion.practicas
         .filter(
+            anulado=False,
             medico__rol__in=ROLES_RESIDENCIA,
             registroestudio__estudio__tipo__in=TIPOS_LIQUIDACION_ECO,
         )
@@ -584,7 +585,11 @@ def resumir_control_eges_sesion(sesion):
             'desactualizado': False,
         }
 
-    resultados = list(control.resultados.only('registro_id', 'estado'))
+    resultados = list(
+        control.resultados
+        .filter(registro__anulado=False)
+        .only('registro_id', 'estado')
+    )
     registro_ids = [resultado.registro_id for resultado in resultados]
     revisiones_por_registro = {}
     revisiones = (
@@ -601,10 +606,12 @@ def resumir_control_eges_sesion(sesion):
         .values_list('registro_id', flat=True)
     )
     pendientes = 0
+    ok_vigentes = 0
     requieren_correccion = 0
     resueltos_excepcion = 0
     for resultado in resultados:
         if resultado.estado == ResultadoControlEgesRegistro.ESTADO_OK:
+            ok_vigentes += 1
             continue
         revision = revisiones_por_registro.get(resultado.registro_id)
         resuelto = bool(
@@ -628,12 +635,18 @@ def resumir_control_eges_sesion(sesion):
     return {
         'estado': 'COMPLETADO',
         'control': control,
-        'total': control.total_registros,
-        'ok': control.total_ok,
-        'advertencias': control.total_advertencias,
-        'manuales': control.total_manuales,
+        'total': len(resultados),
+        'ok': ok_vigentes,
+        'advertencias': sum(
+            1 for resultado in resultados
+            if resultado.estado == ResultadoControlEgesRegistro.ESTADO_ADVERTENCIA
+        ),
+        'manuales': sum(
+            1 for resultado in resultados
+            if resultado.estado == ResultadoControlEgesRegistro.ESTADO_MANUAL
+        ),
         'pendientes': pendientes,
         'requieren_correccion': requieren_correccion,
-        'resueltos': control.total_ok + resueltos_excepcion,
-        'desactualizado': total_actual != control.total_registros,
+        'resueltos': ok_vigentes + resueltos_excepcion,
+        'desactualizado': total_actual != len(resultados),
     }

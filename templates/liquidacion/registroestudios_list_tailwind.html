@@ -356,8 +356,14 @@
                 </thead>
                 <tbody class="divide-y divide-gray-200">
                     {% for registro in registros_tabla %}
-                    <tr id="registro-{{ registro.pk }}" class="hover:bg-gray-50 transition-colors">
-                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">{{ registro.nombre_paciente }} {{ registro.apellido_paciente }}</td>
+                    <tr id="registro-{{ registro.pk }}" class="{% if registro.anulado %}bg-red-50 opacity-75{% else %}hover:bg-gray-50{% endif %} transition-colors">
+                        <td class="px-4 py-3 text-sm text-gray-900 font-medium">
+                            {{ registro.nombre_paciente }} {{ registro.apellido_paciente }}
+                            {% if registro.anulado %}
+                            <span class="mt-1 block w-fit rounded bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-800">ANULADO</span>
+                            <span class="mt-1 block max-w-xs text-[11px] font-normal text-red-700" title="{{ registro.motivo_anulacion }}">{{ registro.motivo_anulacion|truncatechars:70 }}</span>
+                            {% endif %}
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-600">{{ registro.dni_paciente }}</td>
                         <td class="px-4 py-3 text-sm text-gray-600 text-center">{{ registro.fecha_del_informe|date:"d/m/Y" }}</td>
                         <td class="px-4 py-3 text-sm">
@@ -417,9 +423,14 @@
                             {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
-                        <td class="px-4 py-3 text-sm text-gray-900 font-bold text-right">${{ registro.monto_calculado|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-sm font-bold text-right {% if registro.anulado %}text-red-700 line-through{% else %}text-gray-900{% endif %}">${{ registro.monto_calculado|floatformat:2 }}</td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-2">
+                                {% if registro.anulado %}
+                                <span class="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded-lg" title="Registro anulado administrativamente">
+                                    <i class="fas fa-ban text-sm"></i>
+                                </span>
+                                {% else %}
                                 <button type="button" class="inline-flex items-center justify-center w-8 h-8 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors shadow-sm hover:shadow" title="Ver desglose" onclick="toggleDetalleRegistro('{{ registro.pk }}')">
                                     <i class="fas fa-calculator text-sm"></i>
                                 </button>
@@ -441,6 +452,7 @@
                                 <a href="{% url 'liquidacion:registroestudios_delete' registro.pk %}" class="inline-flex items-center justify-center w-8 h-8 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm hover:shadow" title="Eliminar registro" onclick="sessionStorage.setItem('scrollToRegistro', '{{ registro.pk }}'); sessionStorage.setItem('filtrosColapsados', document.getElementById('filtros-content').classList.contains('hidden')); return confirm('¿Estás seguro de que deseas eliminar este registro?');">
                                     <i class="fas fa-trash-alt text-sm"></i>
                                 </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

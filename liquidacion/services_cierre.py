@@ -72,7 +72,7 @@ def construir_checklist_cierre_sesion(
         estado_gate = 'ok'
         detalle_gate = 'Sin hallazgos'
 
-    registro_ids = list(sesion.practicas.values_list('id', flat=True))
+    registro_ids = list(sesion.practicas.filter(anulado=False).values_list('id', flat=True))
     solicitudes = SolicitudRevisionHorarioRegistro.objects.filter(registro_id__in=registro_ids)
 
     pendientes_count = solicitudes.filter(

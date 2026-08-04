@@ -563,6 +563,7 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         'horario',
         'cantidad_regiones',
         'monto_calculado',
+        'anulado',
         'sesion_contable'
     )
     list_filter = (
@@ -570,6 +571,7 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         'sesion_contable__mes',
         'tipo_obra_social',
         'horario',
+        'anulado',
         'medico',
         # 'estudio' removido - ahora es M2M through
     )
@@ -586,6 +588,10 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
         'fecha_registro',
         'modificado_por',
         'fecha_modificacion',
+        'anulado',
+        'fecha_anulacion',
+        'anulado_por',
+        'motivo_anulacion',
         'desglose_monto_display'
     )
     date_hierarchy = 'fecha_del_informe'
@@ -618,6 +624,10 @@ class RegistroEstudiosPorMedicoAdmin(admin.ModelAdmin):
                 'fecha_hora_solicitud',
                 'fecha_hora_informe'
             ),
+            'classes': ('collapse',)
+        }),
+        ('Anulacion administrativa', {
+            'fields': ('anulado', 'fecha_anulacion', 'anulado_por', 'motivo_anulacion'),
             'classes': ('collapse',)
         }),
         ('Auditoría', {

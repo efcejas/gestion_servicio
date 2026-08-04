@@ -236,7 +236,8 @@ def generar_buffer_pdf_liquidacion():
         Story.append(Spacer(1, 5))
 
         registros = RegistroEstudiosPorMedico.objects.filter(
-            medico=medico
+            medico=medico,
+            anulado=False,
         ).prefetch_related("estudio").order_by("-fecha_registro")
 
         if registros.exists():
@@ -361,7 +362,7 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     medico_id = medico.id if medico else None
     nombre_medico = f"{medico.first_name}_{medico.last_name}" if medico else "todos_los_medicos"
 
-    registros = RegistroEstudiosPorMedico.objects.prefetch_related(
+    registros = RegistroEstudiosPorMedico.objects.filter(anulado=False).prefetch_related(
         Prefetch('estudio', queryset=Estudios.objects.all())
     ).distinct()
 

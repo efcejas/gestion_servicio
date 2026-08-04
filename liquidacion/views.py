@@ -72,6 +72,7 @@ from .forms import (
     RevisionCruceEgesRegistroForm,
     CorreccionPacsRegistroForm,
     CorreccionPacsAplicadaBulkForm,
+    AnulacionRegistroEstudioForm,
     PreparacionLiquidacionRRHHForm,
     RegistroEstudiosPorMedicoCreateViewForm,  # Alias de PracticaForm (compatibilidad)
     PracticaForm,
@@ -1161,6 +1162,14 @@ class RegistroEstudiosPorMedicoAdminDetailView(LoginRequiredMixin, UserPassesTes
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['volver_sesion_url'] = _volver_sesion_url(self.request)
+        context['anulacion_form'] = AnulacionRegistroEstudioForm()
+        context['puede_anular'] = (
+            not self.object.anulado
+            and (
+                not self.object.sesion_contable
+                or self.object.sesion_contable.estado not in {'FACTURADA', 'PAGADA'}
+            )
+        )
         context['solicitudes_revision'] = (
             SolicitudRevisionHorarioRegistro.objects
             .filter(registro=self.object)
@@ -1169,6 +1178,70 @@ class RegistroEstudiosPorMedicoAdminDetailView(LoginRequiredMixin, UserPassesTes
         )
         return context
 
+
+class RegistroEstudiosPorMedicoAnularView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Anula economicamente un registro sin borrar su evidencia historica."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para anular registros de liquidacion.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        form = AnulacionRegistroEstudioForm(request.POST)
+        redirect_url = request.POST.get('next') or reverse(
+            'liquidacion:registroestudios_admin_detalle',
+            kwargs={'pk': kwargs['pk']},
+        )
+        if not form.is_valid():
+            messages.error(request, 'Debes indicar el motivo de la anulacion.')
+            return redirect(redirect_url)
+
+        resultado = None
+        with transaction.atomic():
+            registro = RegistroEstudiosPorMedico.objects.select_for_update().get(pk=kwargs['pk'])
+            sesion = (
+                SesionContable.objects.filter(pk=registro.sesion_contable_id).first()
+                if registro.sesion_contable_id
+                else None
+            )
+            if registro.anulado:
+                resultado = 'YA_ANULADO'
+            elif sesion and sesion.estado in {'FACTURADA', 'PAGADA'}:
+                resultado = 'SESION_BLOQUEADA'
+            else:
+                fecha = now()
+                motivo = form.cleaned_data['motivo']
+                registro.anulado = True
+                registro.fecha_anulacion = fecha
+                registro.anulado_por = request.user
+                registro.motivo_anulacion = motivo
+                registro.modificado_por = request.user
+                registro.fecha_modificacion = fecha
+                registro.motivo_modificacion = f'Registro anulado administrativamente. {motivo}'
+                registro.save(update_fields=[
+                    'anulado',
+                    'fecha_anulacion',
+                    'anulado_por',
+                    'motivo_anulacion',
+                    'modificado_por',
+                    'fecha_modificacion',
+                    'motivo_modificacion',
+                ])
+                resultado = 'ANULADO'
+
+        if resultado == 'ANULADO':
+            messages.success(
+                request,
+                'Registro anulado. Se conserva la trazabilidad y queda excluido de liquidacion y exportaciones.',
+            )
+        elif resultado == 'YA_ANULADO':
+            messages.info(request, 'El registro ya estaba anulado.')
+        else:
+            messages.error(request, 'No se puede anular un registro de una sesion FACTURADA o PAGADA.')
+        return redirect(redirect_url)
 
 class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     """Vista completa read-only de registros ECO sospechosos por sesion."""
@@ -1520,6 +1593,7 @@ class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, Vie
             RegistroEstudiosPorMedico.objects.select_related('sesion_contable'),
             pk=kwargs['registro_pk'],
             sesion_contable=sesion,
+            anulado=False,
         )
         batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
         redirect_url = request.POST.get('next') or (
@@ -1577,6 +1651,7 @@ class AuditoriaEcoRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, 
             RegistroEstudiosPorMedico.objects.select_related('sesion_contable'),
             pk=kwargs['registro_pk'],
             sesion_contable=sesion,
+            anulado=False,
         )
         form = RevisionAuditoriaEcoRegistroForm(request.POST)
         redirect_url = request.POST.get('next') or reverse('liquidacion:auditoria_eco_sesion', kwargs={'pk': sesion.pk})
@@ -1646,7 +1721,7 @@ class AuditoriaEcoBulkResolverView(LoginRequiredMixin, UserPassesTestMixin, View
         )
         registros_validos = list(
             RegistroEstudiosPorMedico.objects
-            .filter(pk__in=seleccionados, sesion_contable=sesion)
+            .filter(pk__in=seleccionados, sesion_contable=sesion, anulado=False)
             .exclude(pk__in=revisados)
             .exclude(pk__in=con_correccion)
             .order_by('pk')
@@ -1703,6 +1778,7 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 RegistroEstudiosPorMedico.objects.select_for_update(),
                 pk=kwargs['registro_pk'],
                 sesion_contable=sesion,
+                anulado=False,
             )
             revision = (
                 RevisionAuditoriaEcoRegistro.objects
@@ -1851,7 +1927,7 @@ class AuditoriaEcoCorreccionPacsBulkView(LoginRequiredMixin, UserPassesTestMixin
             registros = list(
                 RegistroEstudiosPorMedico.objects
                 .select_for_update()
-                .filter(pk__in=seleccionados, sesion_contable=sesion)
+                .filter(pk__in=seleccionados, sesion_contable=sesion, anulado=False)
                 .order_by('pk')
             )
             registros_por_id = {registro.pk: registro for registro in registros}
@@ -2021,6 +2097,9 @@ def _aplicar_solicitud_revision_horario_b2(solicitud_pk, user, observacion_aplic
         except RegistroEstudiosPorMedico.DoesNotExist:
             return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'Registro asociado inexistente.'}
 
+        if registro.anulado:
+            return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'El registro esta anulado.'}
+
         if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
             return {'ok': False, 'solicitud_id': solicitud.pk, 'motivo': 'No esta APROBADA.'}
 
@@ -2155,6 +2234,9 @@ class SolicitudRevisionHorarioBulkActionView(LoginRequiredMixin, UserPassesTestM
                     registro = RegistroEstudiosPorMedico.objects.select_related('sesion_contable').get(
                         pk=solicitud.registro_id,
                     )
+                    if registro.anulado:
+                        omitidas.append(f'#{solicitud.pk}: registro anulado')
+                        continue
                     sesion = registro.sesion_contable
                     if sesion and sesion.estado in ['FACTURADA', 'PAGADA']:
                         omitidas.append(f'#{solicitud.pk}: sesion {sesion.estado}')
@@ -2231,6 +2313,10 @@ class SolicitudRevisionHorarioRecalcularAplicacionView(LoginRequiredMixin, UserP
             registro = RegistroEstudiosPorMedico.objects.select_for_update().get(
                 pk=solicitud.registro_id,
             )
+
+            if registro.anulado:
+                messages.error(request, 'No se puede recalcular una solicitud de un registro anulado.')
+                return redirect('liquidacion:solicitudes_revision_horario_detalle', pk=solicitud.pk)
 
             if solicitud.estado != SolicitudRevisionHorarioRegistro.ESTADO_APROBADA:
                 messages.error(request, 'Solo se puede recalcular una solicitud en estado APROBADA.')
@@ -2437,7 +2523,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
         # Tipo de estudio seleccionado (para filtrar estudios con JS)
         tipo_estudio_seleccionado = self.request.POST.get('tipo_estudio', '')
         if not tipo_estudio_seleccionado:
-            ultimo_registro = RegistroEstudiosPorMedico.objects.filter(medico=user).order_by('-fecha_registro').first()
+            ultimo_registro = RegistroEstudiosPorMedico.objects.filter(medico=user, anulado=False).order_by('-fecha_registro').first()
             if ultimo_registro and ultimo_registro.estudio.exists():
                 tipo_estudio_seleccionado = ultimo_registro.estudio.first().tipo
 
@@ -2479,6 +2565,7 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                 medico=user,
                 sesion_contable=sesion,
                 fecha_registro__date=now().date(),
+                anulado=False,
             ).prefetch_related('registroestudio_set__estudio').order_by('-fecha_registro')
         )
 
@@ -2556,7 +2643,8 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
             medico=user,
             dni_paciente=dni_paciente,
             fecha_del_informe=fecha_informe,
-            fecha_registro__gte=hace_5_minutos
+            fecha_registro__gte=hace_5_minutos,
+            anulado=False,
         )
         
         # Verificar si alguno tiene los mismos estudios
@@ -3135,16 +3223,16 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         # Lista unificada para tabla principal
         registros_tabla = list(registros.distinct())
 
-        # Mantener subtotales de compatibilidad para tarjetas superiores
+        # Los anulados siguen visibles, pero no integran cantidades ni montos.
+        registros_vigentes = [reg for reg in registros_tabla if not reg.anulado]
         registros_eco = [
-            reg for reg in registros_tabla
+            reg for reg in registros_vigentes
             if any(rel.estudio.tipo == 'ECO' for rel in reg.registroestudio_set.all())
         ]
         registros_otros = [
-            reg for reg in registros_tabla
+            reg for reg in registros_vigentes
             if not any(rel.estudio.tipo == 'ECO' for rel in reg.registroestudio_set.all())
         ]
-
         # Adjuntar desglose calculado por backend para mostrar en la tabla
         puede_admin = puede_ver_desglose_administrativo(self.request.user)
         registros_ids = [registro.id for registro in registros_tabla]
@@ -3189,7 +3277,8 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             )
             registro.tiene_revision_pendiente = registro.id in pendientes_ids
             registro.puede_solicitar_revision = (
-                (not sesion_bloqueada_revision)
+                (not registro.anulado)
+                and (not sesion_bloqueada_revision)
                 and (not registro.tiene_revision_pendiente)
             )
 
@@ -3236,7 +3325,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         total_monto_guardias = sum(g.monto for g in guardias)
         
         # Totales generales del mes
-        total_practicas = len(registros_tabla)
+        total_practicas = len(registros_vigentes)
         total_regiones_general = total_regiones_eco + total_regiones_otros
         total_monto_practicas = total_monto_eco + total_monto_otros
         total_general = total_monto_practicas + total_monto_guardias
@@ -3307,6 +3396,7 @@ def _get_registros_personales_filtrados(request):
             medico=request.user,
             fecha_del_informe__year=año,
             fecha_del_informe__month=mes,
+            anulado=False,
         )
         .select_related('sesion_contable')
         .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
@@ -3523,7 +3613,7 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         # Filtra los registros que pertenecen al usuario logueado
-        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
+        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user, anulado=False)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -3804,6 +3894,10 @@ class SolicitudRevisionHorarioRegistroCreateView(LoginRequiredMixin, SuccessMess
             pk=kwargs['registro_pk'],
         )
 
+        if self.registro.anulado:
+            messages.error(request, 'No se puede solicitar revision sobre un registro anulado.')
+            return redirect('liquidacion:registroestudios_list')
+
         if self.registro.medico_id != request.user.id:
             messages.error(request, '❌ No puedes solicitar revisión sobre registros de otro usuario.')
             return redirect('liquidacion:registroestudios_list')
@@ -3852,7 +3946,7 @@ class RegistroEstudiosPorMedicoDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_queryset(self):
         # Limita los registros a los del usuario logueado
-        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user)
+        return RegistroEstudiosPorMedico.objects.filter(medico=self.request.user, anulado=False)
 
     def get_success_url(self):
         # Mantener el filtro de mes/año y tipo de estudio tras eliminar
@@ -3951,7 +4045,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
 
             # Filtrar TODAS las prácticas (sin excluir ningún tipo)
             from liquidacion.models import RegistroEstudio
-            registros = RegistroEstudiosPorMedico.objects.select_related(
+            registros = RegistroEstudiosPorMedico.objects.filter(anulado=False).select_related(
                 'medico', 'sesion_contable'
             ).prefetch_related(
                 Prefetch('estudio', queryset=Estudios.objects.all()),
@@ -4427,7 +4521,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         sesiones_data = []
         for sesion in context['sesiones']:
             total_monto = (
-                sesion.practicas.aggregate(t=Sum('monto_calculado'))['t'] or 0
+                sesion.practicas.filter(anulado=False).aggregate(t=Sum('monto_calculado'))['t'] or 0
             )
             total_guardias_monto = (
                 sesion.guardias_pasivas.aggregate(t=Sum('monto'))['t'] or 0
@@ -4457,7 +4551,7 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             sesiones_data.append({
                 'sesion': sesion,
                 'mes_nombre': _MESES[sesion.mes] if 1 <= sesion.mes <= 12 else str(sesion.mes),
-                'count_practicas': sesion.practicas.count(),
+                'count_practicas': sesion.practicas.filter(anulado=False).count(),
                 'count_guardias': sesion.guardias_pasivas.count(),
                 'total_monto_practicas': total_monto,
                 'total_monto_guardias': total_guardias_monto,
@@ -4544,6 +4638,7 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
                 sesion_contable=self.sesion,
                 fecha_del_informe__gte=fecha_desde,
                 fecha_del_informe__lte=fecha_hasta,
+                anulado=False,
             )
             .select_related('medico')
             .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
@@ -4684,6 +4779,7 @@ class SesionContableRecalculoTarifasView(LoginRequiredMixin, UserPassesTestMixin
                     sesion_contable=self.sesion,
                     fecha_del_informe__gte=fecha_desde,
                     fecha_del_informe__lte=fecha_hasta,
+                    anulado=False,
                 )
                 .select_related('medico')
                 .prefetch_related('registroestudio_set__estudio__grupo_tarifario')
