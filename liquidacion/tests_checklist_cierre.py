@@ -664,6 +664,61 @@ class ChecklistCierreSesionTest(TestCase):
             revisiones_eges[-1].observacion,
         )
 
+    def test_correccion_eges_nueva_prevalece_sobre_revision_eco_validada_previa(self):
+        registro = self._crear_registro(monto=Decimal('650.00'))
+        revision_previa = RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+            motivos_json=['Correccion previa'],
+            observacion='Ajuste anterior validado.',
+            revisado_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision_previa,
+            tipo_correccion=CorreccionPacsRegistro.TIPO_MONTO_MANUAL,
+            monto_anterior=Decimal('1000.00'),
+            monto_nuevo=Decimal('650.00'),
+            observacion='Monto manual previo.',
+            corregido_por=self.admin,
+        )
+        batch = ImportBatch.objects.create(
+            usuario=self.admin,
+            archivo_nombre='Turnos-Junio-segunda-correccion.xls',
+        )
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['EGES requiere una nueva correccion.'],
+            snapshot_json={},
+            observacion='El monto anterior fue cargado incorrectamente.',
+            revisado_por=self.admin,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_eco_registro_corregir', args=[self.sesion.pk, registro.pk]),
+            {
+                'tipo_correccion': CorreccionPacsRegistro.TIPO_MONTO_MANUAL,
+                'monto_nuevo': '800.00',
+                'observacion': 'Se reemplaza el monto manual erroneo.',
+            },
+            secure=True,
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('800.00'))
+        self.assertEqual(CorreccionPacsRegistro.objects.filter(registro=registro).count(), 2)
+        ultima_revision_eco = RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).first()
+        self.assertEqual(ultima_revision_eco.estado, RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO)
+        ultima_revision_eges = RevisionCruceEgesRegistro.objects.filter(registro=registro).first()
+        self.assertEqual(ultima_revision_eges.estado, RevisionCruceEgesRegistro.ESTADO_VALIDADO)
+
     def test_vista_completa_auditoria_eco_filtra_por_fecha_informe(self):
         for _ in range(35):
             self._crear_registro(monto=Decimal('1000.00'))
