@@ -1196,8 +1196,8 @@ class ChecklistCierreSesionTest(TestCase):
         self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
         self.assertFalse(CorreccionPacsRegistro.objects.exists())
 
-    def test_lista_personal_muestra_ajuste_pacs_aplicado(self):
-        registro = self._crear_registro(monto=Decimal('650.00'))
+    def test_lista_personal_muestra_ajuste_pacs_consolidado(self):
+        registro = self._crear_registro(monto=Decimal('800.00'))
         revision = RevisionAuditoriaEcoRegistro.objects.create(
             sesion_contable=self.sesion,
             registro=registro,
@@ -1212,7 +1212,16 @@ class ChecklistCierreSesionTest(TestCase):
             revision_auditoria_eco=revision,
             monto_anterior=Decimal('1000.00'),
             monto_nuevo=Decimal('650.00'),
-            observacion='PACS confirma menor valor.',
+            observacion='Primera correccion PACS.',
+            corregido_por=self.admin,
+        )
+        CorreccionPacsRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            revision_auditoria_eco=revision,
+            monto_anterior=Decimal('650.00'),
+            monto_nuevo=Decimal('800.00'),
+            observacion='Monto final rectificado.',
             corregido_por=self.admin,
         )
         self.client.force_login(self.residente)
@@ -1224,8 +1233,20 @@ class ChecklistCierreSesionTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Ajuste PACS aplicado')
-        self.assertContains(response, 'PACS confirma menor valor.')
-
+        self.assertContains(response, 'Monto final rectificado.')
+        registro_mostrado = response.context['registros_tabla'][0]
+        self.assertEqual(
+            registro_mostrado.monto_original_correccion_pacs,
+            Decimal('1000.00'),
+        )
+        self.assertEqual(
+            registro_mostrado.monto_vigente_correccion_pacs,
+            Decimal('800.00'),
+        )
+        self.assertEqual(
+            registro_mostrado.impacto_correccion_pacs,
+            Decimal('-200.00'),
+        )
     def test_liquidacion_mensual_muestra_resumen_y_detalle_de_ajustes_pacs(self):
         registro = self._crear_registro(monto=Decimal('650.00'))
         revision = RevisionAuditoriaEcoRegistro.objects.create(

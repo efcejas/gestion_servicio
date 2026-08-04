@@ -418,7 +418,7 @@
                                 {% if registro.correccion_pacs_info.hora_pacs %}
                                 <span>Hora PACS {{ registro.correccion_pacs_info.hora_pacs|time:"H:i" }}</span>
                                 {% endif %}
-                                <span>${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}</span>
+                                <span>${{ registro.monto_original_correccion_pacs|floatformat:2 }} -> ${{ registro.monto_vigente_correccion_pacs|floatformat:2 }}</span>
                             </div>
                             {% endif %}
                         </td>
@@ -522,7 +522,7 @@
                                     </p>
                                     {% endif %}
                                     <p class="font-medium text-blue-900">
-                                        ${{ registro.correccion_pacs_info.monto_anterior|floatformat:2 }} -> ${{ registro.correccion_pacs_info.monto_nuevo|floatformat:2 }}
+                                        ${{ registro.monto_original_correccion_pacs|floatformat:2 }} -> ${{ registro.monto_vigente_correccion_pacs|floatformat:2 }}
                                     </p>
                                     <p class="mt-1 text-blue-800 whitespace-pre-line">{{ registro.correccion_pacs_info.observacion }}</p>
                                 </div>

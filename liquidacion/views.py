@@ -3264,7 +3264,7 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['modalidades_clear_query'] = params_clear_modalidades.urlencode()
 
         # Lista unificada para tabla principal
-        registros_tabla = list(registros.distinct())
+        registros_tabla = adjuntar_ultima_correccion_pacs(registros.distinct())
 
         # Los anulados siguen visibles, pero no integran cantidades ni montos.
         registros_vigentes = [reg for reg in registros_tabla if not reg.anulado]
@@ -3297,17 +3297,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             if revision.registro_id not in ultima_revision_por_registro:
                 ultima_revision_por_registro[revision.registro_id] = revision
 
-        correcciones_pacs_por_registro = {}
-        correcciones_pacs_qs = (
-            CorreccionPacsRegistro.objects
-            .filter(registro_id__in=registros_ids)
-            .select_related('corregido_por')
-            .order_by('registro_id', '-fecha_correccion')
-        )
-        for correccion in correcciones_pacs_qs:
-            if correccion.registro_id not in correcciones_pacs_por_registro:
-                correcciones_pacs_por_registro[correccion.registro_id] = correccion
-
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
@@ -3330,8 +3319,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             registro.tiene_revision = revision is not None
             registro.revision_badge_label = ''
             registro.revision_badge_classes = ''
-            registro.correccion_pacs_info = correcciones_pacs_por_registro.get(registro.id)
-            registro.tiene_correccion_pacs = registro.correccion_pacs_info is not None
 
             if revision:
                 if revision.fecha_aplicacion:

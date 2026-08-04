@@ -38,10 +38,11 @@ CAMPO_REGLA_DESCUENTO_POR_ROL = {
 
 
 def adjuntar_ultima_correccion_pacs(registros):
-    """Adjunta la ultima correccion PACS a cada registro, sin recalcular montos."""
+    """Adjunta el resultado consolidado de correcciones PACS, sin recalcular montos."""
     registros = list(registros)
     registro_ids = [registro.pk for registro in registros]
-    correcciones_por_registro = {}
+    ultima_correccion_por_registro = {}
+    monto_original_por_registro = {}
 
     if registro_ids:
         correcciones = (
@@ -51,15 +52,22 @@ def adjuntar_ultima_correccion_pacs(registros):
             .order_by('registro_id', '-fecha_correccion')
         )
         for correccion in correcciones:
-            if correccion.registro_id not in correcciones_por_registro:
-                correcciones_por_registro[correccion.registro_id] = correccion
+            if correccion.registro_id not in ultima_correccion_por_registro:
+                ultima_correccion_por_registro[correccion.registro_id] = correccion
+            # El recorrido descendente termina dejando el monto anterior
+            # de la primera correccion aplicada sobre el registro.
+            monto_original_por_registro[correccion.registro_id] = correccion.monto_anterior
 
     for registro in registros:
-        correccion = correcciones_por_registro.get(registro.pk)
+        correccion = ultima_correccion_por_registro.get(registro.pk)
+        monto_original = monto_original_por_registro.get(registro.pk)
+        monto_vigente = correccion.monto_nuevo if correccion else None
         registro.correccion_pacs_info = correccion
         registro.tiene_correccion_pacs = correccion is not None
+        registro.monto_original_correccion_pacs = monto_original
+        registro.monto_vigente_correccion_pacs = monto_vigente
         registro.impacto_correccion_pacs = (
-            correccion.monto_nuevo - correccion.monto_anterior
+            monto_vigente - monto_original
             if correccion
             else 0
         )
@@ -423,8 +431,8 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
             correccion.get_tipo_correccion_display() if correccion else "",
             correccion.horario_anterior if correccion and correccion.horario_anterior else "",
             correccion.horario_nuevo if correccion and correccion.horario_nuevo else "",
-            float(correccion.monto_anterior) if correccion else "",
-            float(correccion.monto_nuevo) if correccion else "",
+            float(registro.monto_original_correccion_pacs) if correccion else "",
+            float(registro.monto_vigente_correccion_pacs) if correccion else "",
             correccion.hora_pacs.strftime("%H:%M") if correccion and correccion.hora_pacs else "",
             correccion.observacion if correccion else "",
         ])
