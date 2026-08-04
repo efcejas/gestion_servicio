@@ -1469,6 +1469,34 @@ def _snapshot_cruce_eges_item(item):
     return serializar_resultado_control_eges(item)
 
 
+def _cerrar_revision_eges_por_correccion(sesion, registro, correccion, user):
+    ultima_revision = (
+        RevisionCruceEgesRegistro.objects
+        .filter(sesion_contable=sesion, registro=registro)
+        .order_by('-fecha_revision')
+        .first()
+    )
+    if (
+        not ultima_revision
+        or ultima_revision.estado != RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+    ):
+        return None
+
+    return RevisionCruceEgesRegistro.objects.create(
+        sesion_contable=sesion,
+        registro=registro,
+        batch_eges=ultima_revision.batch_eges,
+        estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+        motivos_json=ultima_revision.motivos_json,
+        snapshot_json=ultima_revision.snapshot_json,
+        observacion=(
+            f'Correccion economica #{correccion.pk} aplicada. '
+            'Revision EGES cerrada automaticamente.'
+        ),
+        revisado_por=user,
+    )
+
+
 def _parse_fecha_cruce_eges(valor):
     try:
         return datetime.strptime(valor, '%Y-%m-%d').date() if valor else None
@@ -1860,7 +1888,7 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
             if horario_nuevo:
                 update_fields.append('horario')
             registro.save(update_fields=update_fields)
-            CorreccionPacsRegistro.objects.create(
+            correccion = CorreccionPacsRegistro.objects.create(
                 sesion_contable=sesion,
                 registro=registro,
                 revision_auditoria_eco=revision,
@@ -1872,6 +1900,12 @@ class AuditoriaEcoRegistroCorregirView(LoginRequiredMixin, UserPassesTestMixin, 
                 monto_nuevo=monto_nuevo,
                 observacion=observacion,
                 corregido_por=request.user,
+            )
+            _cerrar_revision_eges_por_correccion(
+                sesion,
+                registro,
+                correccion,
+                request.user,
             )
             RevisionAuditoriaEcoRegistro.objects.create(
                 sesion_contable=sesion,
@@ -2005,6 +2039,12 @@ class AuditoriaEcoCorreccionPacsBulkView(LoginRequiredMixin, UserPassesTestMixin
                         f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
                     ),
                     revisado_por=request.user,
+                )
+                _cerrar_revision_eges_por_correccion(
+                    sesion,
+                    registro,
+                    nueva_correccion,
+                    request.user,
                 )
                 aplicados += 1
 

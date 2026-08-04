@@ -643,7 +643,26 @@ class ChecklistCierreSesionTest(TestCase):
                 observacion__icontains='Puente automatico desde cruce EGES',
             ).exists()
         )
-        self.assertTrue(CorreccionPacsRegistro.objects.filter(registro=registro).exists())
+        correccion = CorreccionPacsRegistro.objects.get(registro=registro)
+        revisiones_eges = list(
+            RevisionCruceEgesRegistro.objects
+            .filter(registro=registro)
+            .order_by('fecha_revision')
+        )
+        self.assertEqual(len(revisiones_eges), 2)
+        self.assertEqual(
+            revisiones_eges[0].estado,
+            RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
+        )
+        self.assertEqual(
+            revisiones_eges[-1].estado,
+            RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+        )
+        self.assertEqual(revisiones_eges[-1].batch_eges, batch)
+        self.assertIn(
+            f'Correccion economica #{correccion.pk} aplicada',
+            revisiones_eges[-1].observacion,
+        )
 
     def test_vista_completa_auditoria_eco_filtra_por_fecha_informe(self):
         for _ in range(35):
