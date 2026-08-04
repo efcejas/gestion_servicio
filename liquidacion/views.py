@@ -1167,8 +1167,13 @@ class RegistroEstudiosPorMedicoAdminDetailView(LoginRequiredMixin, UserPassesTes
             not self.object.anulado
             and (
                 not self.object.sesion_contable
-                or self.object.sesion_contable.estado not in {'FACTURADA', 'PAGADA'}
+                or self.object.sesion_contable.estado in {'ABIERTA', 'REVISION'}
             )
+        )
+        context['sesion_requiere_reapertura'] = bool(
+            not self.object.anulado
+            and self.object.sesion_contable
+            and self.object.sesion_contable.estado == 'CERRADA'
         )
         context['solicitudes_revision'] = (
             SolicitudRevisionHorarioRegistro.objects
@@ -1209,7 +1214,7 @@ class RegistroEstudiosPorMedicoAnularView(LoginRequiredMixin, UserPassesTestMixi
             )
             if registro.anulado:
                 resultado = 'YA_ANULADO'
-            elif sesion and sesion.estado in {'FACTURADA', 'PAGADA'}:
+            elif sesion and sesion.estado not in {'ABIERTA', 'REVISION'}:
                 resultado = 'SESION_BLOQUEADA'
             else:
                 fecha = now()
@@ -1240,7 +1245,7 @@ class RegistroEstudiosPorMedicoAnularView(LoginRequiredMixin, UserPassesTestMixi
         elif resultado == 'YA_ANULADO':
             messages.info(request, 'El registro ya estaba anulado.')
         else:
-            messages.error(request, 'No se puede anular un registro de una sesion FACTURADA o PAGADA.')
+            messages.error(request, 'La sesion debe estar ABIERTA o EN REVISION para anular el registro. Reabrila antes de continuar.')
         return redirect(redirect_url)
 
 class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -4588,6 +4593,10 @@ class SesionContableListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 'total_general': total_monto + total_guardias_monto,
                 'siguiente_estado': siguiente,
                 'puede_transicionar': puede,
+                'puede_reabrir': (
+                    sesion.estado == 'CERRADA'
+                    and _puede_acceder_panel_administrativo(user)
+                ),
                 'requiere_motivo': (sesion.estado, siguiente) in [
                     ('CERRADA', 'FACTURADA'),
                     ('FACTURADA', 'PAGADA'),
@@ -5002,6 +5011,59 @@ class PreparacionLiquidacionRRHHPreviewView(LoginRequiredMixin, UserPassesTestMi
             f'Preparacion RRHH v{preparacion.version} guardada como {preparacion.estado}.',
         )
         return redirect('liquidacion:preparacion_rrhh_preview', pk=self.sesion.pk)
+
+
+@login_required
+def sesion_contable_reabrir(request, pk):
+    """Reabre una sesion CERRADA a REVISION con trazabilidad obligatoria."""
+    if request.method != 'POST':
+        return redirect('liquidacion:sesiones_list')
+
+    if not _puede_acceder_panel_administrativo(request.user):
+        messages.error(request, 'No tienes permisos para reabrir sesiones contables.')
+        return redirect('liquidacion:sesiones_list')
+
+    motivo = (request.POST.get('motivo') or '').strip()
+    if not motivo:
+        messages.error(request, 'Debes indicar el motivo de la reapertura.')
+        return redirect('liquidacion:sesiones_list')
+
+    resultado = None
+    with transaction.atomic():
+        sesion = get_object_or_404(
+            SesionContable.objects.select_for_update(),
+            pk=pk,
+        )
+        if sesion.estado != 'CERRADA':
+            resultado = 'ESTADO_INVALIDO'
+        else:
+            estado_anterior = sesion.estado
+            sesion.estado = 'REVISION'
+            sesion.fecha_cierre = None
+            sesion.cerrada_por = None
+            sesion.save(update_fields=['estado', 'fecha_cierre', 'cerrada_por'])
+            HistorialSesionContable.objects.create(
+                sesion_contable=sesion,
+                estado_anterior=estado_anterior,
+                estado_nuevo=sesion.estado,
+                usuario=request.user,
+                motivo=motivo,
+                origen=HistorialSesionContable.ORIGEN_WEB,
+                observacion_sistema='Reapertura excepcional para correcciones administrativas.',
+            )
+            resultado = 'REABIERTA'
+
+    if resultado == 'REABIERTA':
+        messages.success(
+            request,
+            f'Sesion {sesion.mes}/{sesion.año} reabierta en REVISION. Ya pueden aplicarse correcciones.',
+        )
+    else:
+        messages.error(
+            request,
+            'Solo pueden reabrirse sesiones que se encuentren en estado CERRADA.',
+        )
+    return redirect('liquidacion:sesiones_list')
 
 
 @login_required

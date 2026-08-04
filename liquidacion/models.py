@@ -518,17 +518,18 @@ class SesionContable(models.Model):
         return f"{mes_nombre} {self.año} ({self.get_estado_display()})"
     
     def puede_registrar_practicas(self, usuario):
-        """Verifica si se pueden registrar prácticas en esta sesión"""
-        # Medicos solo en ABIERTA o REVISION
-        if usuario.rol in ['jefe_residentes', 'instructor_residentes', 'medico_residente', 'medico_staff', 'cardiologo', 'jefe_servicio']:
-            return self.estado in ['ABIERTA', 'REVISION']
-        
-        # Admin puede cargar incluso en CERRADA
-        if usuario.is_superuser or usuario.rol == 'administrativo':
-            return self.estado != 'PAGADA'  # Solo bloquear después de pagar
-        
-        return False
-
+        """Verifica si la sesion admite altas o modificaciones de practicas."""
+        roles_habilitados = {
+            'jefe_residentes',
+            'instructor_residentes',
+            'medico_residente',
+            'medico_staff',
+            'cardiologo',
+            'jefe_servicio',
+            'administrativo',
+        }
+        usuario_habilitado = usuario.is_superuser or usuario.rol in roles_habilitados
+        return usuario_habilitado and self.estado in {'ABIERTA', 'REVISION'}
 
 class HistorialSesionContable(models.Model):
     """Historial de transiciones de estado de una sesión contable."""

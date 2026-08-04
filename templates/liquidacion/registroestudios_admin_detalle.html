@@ -50,7 +50,15 @@
             </button>
         </form>
     </details>
-    {% endif %}
+    {% elif sesion_requiere_reapertura %}
+    <div class="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">
+        <p class="font-semibold">La sesión está cerrada</p>
+        <p class="mt-1 text-sm">Reabrila en Revisión desde la pantalla de sesiones antes de anular o modificar este registro.</p>
+        <a href="{% url 'liquidacion:sesiones_list' %}#sesion-card-{{ registro.sesion_contable_id }}"
+           class="mt-3 inline-flex items-center gap-2 rounded-md bg-amber-700 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-800">
+            <i class="fas fa-arrow-left"></i> Ir a la sesión contable
+        </a>
+    </div>    {% endif %}
     <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-6">
         <div class="xl:col-span-2 rounded-xl border border-gray-200 bg-white shadow-md p-5">
             <h2 class="text-sm font-bold text-gray-900 mb-4">Datos principales</h2>

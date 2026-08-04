@@ -128,6 +128,16 @@ class AnulacionRegistroEstudioTest(TestCase):
         self.registro.refresh_from_db()
         self.assertFalse(self.registro.anulado)
 
+    def test_sesion_cerrada_debe_reabrirse_antes_de_anular(self):
+        self.sesion.estado = 'CERRADA'
+        self.sesion.save(update_fields=['estado'])
+
+        response = self._anular()
+
+        self.assertEqual(response.status_code, 302)
+        self.registro.refresh_from_db()
+        self.assertFalse(self.registro.anulado)
+
     def test_excel_personal_excluye_registro_anulado(self):
         self._anular()
         self.client.force_login(self.residente)
@@ -231,6 +241,14 @@ class AnulacionRegistroEstudioTest(TestCase):
             creado_por=self.admin,
             actualizado_por=self.admin,
         )
+
+        self.client.force_login(self.admin)
+        self.client.post(
+            reverse('liquidacion:sesion_reabrir', args=[self.sesion.pk]),
+            {'motivo': 'Anular registro detectado luego del cierre.'},
+        )
+        self.sesion.refresh_from_db()
+        self.assertEqual(self.sesion.estado, 'REVISION')
 
         self._anular()
         requisito = evaluar_requisito_rrhh_para_facturar(self.sesion)

@@ -44,6 +44,7 @@ from .views import (
     SesionContableListView,       # [NUEVO Fase B] Gestión del ciclo contable
     PreparacionLiquidacionRRHHPreviewView,
     sesion_contable_transicion,   # [NUEVO Fase B] Transición de estado
+    sesion_contable_reabrir,
 )
 
 # [ELIMINADO - 16 de feb 2026] 
@@ -203,4 +204,5 @@ urlpatterns = [
     path('sesiones/', SesionContableListView.as_view(), name='sesiones_list'),
     path('sesiones/<int:pk>/rrhh/preview/', PreparacionLiquidacionRRHHPreviewView.as_view(), name='preparacion_rrhh_preview'),
     path('sesiones/<int:pk>/transicion/', sesion_contable_transicion, name='sesion_transicion'),
+    path('sesiones/<int:pk>/reabrir/', sesion_contable_reabrir, name='sesion_reabrir'),
 ]

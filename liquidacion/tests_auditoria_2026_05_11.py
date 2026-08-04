@@ -346,18 +346,19 @@ class SesionContableConstraintTest(TestCase):
         self.assertFalse(puede,
             "❌ FALLA: Residente NO debe poder registrar en sesión CERRADA")
     
-    def test_admin_puede_registrar_en_cerrada(self):
-        """Admin CAN registrar incluso en sesión CERRADA"""
+    def test_admin_debe_reabrir_antes_de_registrar_en_cerrada(self):
+        """Admin no modifica practicas hasta reabrir la sesion en REVISION."""
         admin = User.objects.create_superuser(
             username='admin',
             email='admin@test.com',
             password='testpass123'
         )
-        
-        puede = self.sesion_cerrada.puede_registrar_practicas(admin)
-        self.assertTrue(puede,
-            "❌ FALLA: Admin debe poder registrar en sesión CERRADA")
 
+        puede = self.sesion_cerrada.puede_registrar_practicas(admin)
+        self.assertFalse(
+            puede,
+            "Admin debe reabrir la sesion CERRADA antes de modificar practicas",
+        )
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class PermisosYTrazabilidadViewTest(TestCase):
@@ -2640,6 +2641,71 @@ class SesionContableWorkflowPermissionsTest(TestCase):
         sesion.refresh_from_db()
         self.assertEqual(sesion.estado, 'ABIERTA')
 
+    def test_reabrir_cerrada_a_revision_permitida_y_auditada(self):
+        for user in [self.admin, self.jefe_servicio, self.superuser]:
+            sesion = self._crear_sesion('CERRADA')
+            sesion.fecha_cierre = timezone.now()
+            sesion.cerrada_por = self.admin
+            sesion.save(update_fields=['fecha_cierre', 'cerrada_por'])
+            self.client.logout()
+            self._login(user)
+
+            response = self.client.post(
+                reverse('liquidacion:sesion_reabrir', kwargs={'pk': sesion.pk}),
+                {'motivo': 'Correccion excepcional de un registro auditado.'},
+            )
+
+            self.assertEqual(response.status_code, 302)
+            sesion.refresh_from_db()
+            self.assertEqual(sesion.estado, 'REVISION')
+            self.assertIsNone(sesion.fecha_cierre)
+            self.assertIsNone(sesion.cerrada_por)
+            historial = HistorialSesionContable.objects.get(sesion_contable=sesion)
+            self.assertEqual(historial.estado_anterior, 'CERRADA')
+            self.assertEqual(historial.estado_nuevo, 'REVISION')
+            self.assertEqual(historial.usuario, user)
+            self.assertEqual(
+                historial.motivo,
+                'Correccion excepcional de un registro auditado.',
+            )
+
+    def test_reabrir_exige_motivo_y_sesion_cerrada(self):
+        sesion_cerrada = self._crear_sesion('CERRADA')
+        sesion_facturada = self._crear_sesion('FACTURADA')
+        self._login(self.superuser)
+
+        self.client.post(
+            reverse('liquidacion:sesion_reabrir', kwargs={'pk': sesion_cerrada.pk}),
+            {'motivo': ''},
+        )
+        self.client.post(
+            reverse('liquidacion:sesion_reabrir', kwargs={'pk': sesion_facturada.pk}),
+            {'motivo': 'Intento de retroceso financiero.'},
+        )
+
+        sesion_cerrada.refresh_from_db()
+        sesion_facturada.refresh_from_db()
+        self.assertEqual(sesion_cerrada.estado, 'CERRADA')
+        self.assertEqual(sesion_facturada.estado, 'FACTURADA')
+        self.assertFalse(
+            HistorialSesionContable.objects.filter(
+                sesion_contable__in=[sesion_cerrada, sesion_facturada]
+            ).exists()
+        )
+
+    def test_reabrir_deniega_rol_no_administrativo(self):
+        sesion = self._crear_sesion('CERRADA')
+        self._login(self.medico_staff)
+
+        response = self.client.post(
+            reverse('liquidacion:sesion_reabrir', kwargs={'pk': sesion.pk}),
+            {'motivo': 'Intento no autorizado.'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        sesion.refresh_from_db()
+        self.assertEqual(sesion.estado, 'CERRADA')
+        self.assertFalse(HistorialSesionContable.objects.filter(sesion_contable=sesion).exists())
     def test_transicion_abierta_a_revision_permitida_para_admin_y_jefe_servicio(self):
         for user in [self.admin, self.jefe_servicio, self.superuser]:
             sesion = self._crear_sesion('ABIERTA')
