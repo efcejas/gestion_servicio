@@ -36,6 +36,12 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             rol='administrativo',
             perfil_completo=True,
         )
+        self.jefe = User.objects.create_user(
+            username='jefe_eges',
+            password='x',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
         self.residente = User.objects.create_user(
             username='res_eges',
             password='x',
@@ -400,6 +406,113 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(revision.estado, RevisionCruceEgesRegistro.ESTADO_VALIDADO)
         registro.refresh_from_db()
         self.assertEqual(registro.monto_calculado, monto_original)
+
+    def test_validar_seleccion_masiva_valida_advertencia_y_manual_sin_cambiar_montos(self):
+        advertencia = self._registro(
+            horario='INTRA',
+            dni='11111111',
+            estudios=[self.estudio, self.estudio_tv],
+        )
+        manual = self._registro(horario='INTRA', dni='22222222')
+        self._eges_row(
+            time(9, 0),
+            time(9, 15),
+            dni='11111111',
+            practica='ECOGRAFIA COMPLETA DE ABDOMEN',
+        )
+        advertencia.refresh_from_db()
+        manual.refresh_from_db()
+        montos_originales = {
+            advertencia.pk: advertencia.monto_calculado,
+            manual.pk: manual.monto_calculado,
+        }
+        horarios_originales = {
+            advertencia.pk: advertencia.horario,
+            manual.pk: manual.horario,
+        }
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse('liquidacion:cruce_eges_validar_seleccion', kwargs={'pk': self.sesion.pk}),
+            {
+                'batch': self.batch.pk,
+                'registros': [advertencia.pk, manual.pk],
+                'observacion': 'Coincidencias verificadas sin correccion economica.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        revisiones = RevisionCruceEgesRegistro.objects.filter(
+            batch_eges=self.batch,
+            registro_id__in=[advertencia.pk, manual.pk],
+        )
+        self.assertEqual(revisiones.count(), 2)
+        self.assertFalse(revisiones.exclude(estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO).exists())
+        for registro in (advertencia, manual):
+            registro.refresh_from_db()
+            self.assertEqual(registro.monto_calculado, montos_originales[registro.pk])
+            self.assertEqual(registro.horario, horarios_originales[registro.pk])
+
+    def test_validar_seleccion_masiva_omite_registro_con_revision_previa(self):
+        registro = self._registro(horario='INTRA')
+        revision = RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion,
+            registro=registro,
+            batch_eges=self.batch,
+            estado=RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
+            motivos_json=['Pendiente.'],
+            snapshot_json={},
+            observacion='Requiere correccion previa.',
+            revisado_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        self.client.post(
+            reverse('liquidacion:cruce_eges_validar_seleccion', kwargs={'pk': self.sesion.pk}),
+            {
+                'batch': self.batch.pk,
+                'registros': [registro.pk],
+                'observacion': 'Intento de validacion masiva.',
+            },
+        )
+
+        self.assertEqual(
+            RevisionCruceEgesRegistro.objects.filter(registro=registro, batch_eges=self.batch).count(),
+            1,
+        )
+        revision.refresh_from_db()
+        self.assertEqual(revision.estado, RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION)
+
+    def test_administrativo_no_puede_validar_seleccion_masiva(self):
+        registro = self._registro(horario='INTRA')
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse('liquidacion:cruce_eges_validar_seleccion', kwargs={'pk': self.sesion.pk}),
+            {
+                'batch': self.batch.pk,
+                'registros': [registro.pk],
+                'observacion': 'No autorizado.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(RevisionCruceEgesRegistro.objects.filter(registro=registro).exists())
+
+    def test_jefe_ve_seleccion_masiva_en_advertencia_sin_revisar(self):
+        registro = self._registro(horario='INTRA', estudios=[self.estudio, self.estudio_tv])
+        self._eges_row(time(9, 0), time(9, 15), practica='ECOGRAFIA COMPLETA DE ABDOMEN')
+        self.client.force_login(self.jefe)
+
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': self.sesion.pk}),
+            {'batch': self.batch.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Validar seleccionadas')
+        self.assertContains(response, f'value="{registro.pk}"')
+        self.assertContains(response, 'form="bulk-eges-form"')
 
     def test_resumen_auditoria_eco_descuenta_revision_eges_validada(self):
         registro = self._registro(horario='INTRA')

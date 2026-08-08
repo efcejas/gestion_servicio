@@ -300,6 +300,23 @@ class RevisionCruceEgesRegistroForm(forms.Form):
     )
 
 
+class RevisionCruceEgesBulkValidarForm(forms.Form):
+    """Validacion masiva selectiva de cruces EGES sin impacto economico."""
+
+    registros = forms.MultipleChoiceField(required=True)
+    observacion = forms.CharField(max_length=1000, required=True)
+
+    def __init__(self, *args, registro_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['registros'].choices = registro_choices or []
+
+    def clean_registros(self):
+        registros = self.cleaned_data['registros']
+        if len(registros) > 100:
+            raise forms.ValidationError('Solo se pueden validar hasta 100 registros por operacion.')
+        return registros
+
+
 class CorreccionPacsRegistroForm(forms.Form):
     """Correccion economica puntual posterior a control PACS."""
 

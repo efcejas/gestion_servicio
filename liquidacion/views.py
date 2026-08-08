@@ -70,6 +70,7 @@ from .forms import (
     RevisionAuditoriaEcoRegistroForm,
     RevisionAuditoriaEcoBulkForm,
     RevisionCruceEgesRegistroForm,
+    RevisionCruceEgesBulkValidarForm,
     CorreccionPacsRegistroForm,
     CorreccionPacsAplicadaBulkForm,
     AnulacionRegistroEstudioForm,
@@ -1419,6 +1420,10 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             'batch_seleccionado': batch,
             'preview': preview,
             'control_eges': resumir_control_eges_sesion(self.sesion),
+            'puede_validacion_masiva_eges': (
+                _puede_accion_masiva_revision_horaria(self.request.user)
+                and self.sesion.estado not in {'FACTURADA', 'PAGADA'}
+            ),
             'filtros_cruce': {
                 'profesional': self.request.GET.get('profesional', ''),
                 'estado_cruce': self.request.GET.get('estado_cruce', ''),
@@ -1607,6 +1612,94 @@ class CruceEgesBulkValidarOkView(LoginRequiredMixin, UserPassesTestMixin, View):
             messages.success(request, f'Se validaron {len(creadas)} registro(s) OK visibles.')
         else:
             messages.info(request, 'No habia registros OK visibles sin revision para validar.')
+        return redirect(redirect_url)
+
+
+class CruceEgesBulkValidarSeleccionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Valida advertencias/manuales seleccionados sin modificar la liquidacion."""
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            'Solo superusuarios o jefatura de servicio pueden validar cruces EGES en forma masiva.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = request.POST.get('next') or (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+        if sesion.estado in {'FACTURADA', 'PAGADA'}:
+            messages.error(request, 'No se puede validar masivamente una sesion facturada o pagada.')
+            return redirect(redirect_url)
+
+        registro_ids = request.POST.getlist('registros')
+        form = RevisionCruceEgesBulkValidarForm(
+            request.POST,
+            registro_choices=[(pk, pk) for pk in registro_ids],
+        )
+        if not form.is_valid():
+            messages.error(
+                request,
+                'Selecciona entre 1 y 100 registros e indica una observacion para validar.',
+            )
+            return redirect(redirect_url)
+
+        seleccionados = [int(pk) for pk in form.cleaned_data['registros']]
+        observacion = form.cleaned_data['observacion']
+        creadas = []
+
+        with transaction.atomic():
+            registros_bloqueados = list(
+                RegistroEstudiosPorMedico.objects
+                .select_for_update()
+                .filter(pk__in=seleccionados, sesion_contable=sesion, anulado=False)
+                .order_by('pk')
+            )
+            ids_validos = {registro.pk for registro in registros_bloqueados}
+            ids_revisados = set(
+                RevisionCruceEgesRegistro.objects
+                .filter(batch_eges=batch, registro_id__in=ids_validos)
+                .values_list('registro_id', flat=True)
+            )
+            ids_pendientes = ids_validos - ids_revisados
+            preview = construir_preview_cruce_liquidacion_eges(
+                sesion,
+                batch,
+                registro_ids=ids_pendientes,
+            )
+            for item in preview['resultados']:
+                if item['estado'] not in {'advertencia', 'manual'}:
+                    continue
+                if item.get('revision_cruce_eges'):
+                    continue
+                creadas.append(RevisionCruceEgesRegistro(
+                    sesion_contable=sesion,
+                    registro=item['registro'],
+                    batch_eges=batch,
+                    estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
+                    motivos_json=item['motivos'],
+                    snapshot_json=_snapshot_cruce_eges_item(item),
+                    observacion=observacion,
+                    revisado_por=request.user,
+                ))
+            if creadas:
+                RevisionCruceEgesRegistro.objects.bulk_create(creadas)
+
+        omitidos = len(seleccionados) - len(creadas)
+        if creadas:
+            messages.success(
+                request,
+                f'{len(creadas)} cruce(s) EGES validado(s) en forma masiva. Omitidos: {omitidos}.',
+            )
+        else:
+            messages.warning(request, f'No se validaron cruces EGES. Omitidos: {omitidos}.')
         return redirect(redirect_url)
 
 

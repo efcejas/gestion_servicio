@@ -183,10 +183,46 @@
             <h2 class="text-base font-semibold text-slate-900">Resultados del cruce</h2>
             <p class="text-xs text-slate-500">Cruza solo modalidad ECO. La expectativa horaria EGES usa día hábil 08:00-17:00 como INTRA; sábados, domingos, feriados y fuera de ese rango esperan EXTRA.</p>
         </div>
+        {% if puede_validacion_masiva_eges %}
+        <form id="bulk-eges-form"
+              method="post"
+              action="{% url 'liquidacion:cruce_eges_validar_seleccion' sesion.pk %}"
+              class="border-b border-emerald-200 bg-emerald-50 px-4 py-3">
+            {% csrf_token %}
+            <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="grid grid-cols-1 gap-2 md:grid-cols-[auto_minmax(16rem,1fr)_auto] md:items-end">
+                <button id="seleccionar-eges-visibles"
+                        type="button"
+                        class="h-9 rounded-lg border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
+                    Seleccionar visibles sin revisar
+                </button>
+                <label>
+                    <span class="mb-1 block text-xs font-semibold uppercase text-emerald-800">Observación común</span>
+                    <input type="text"
+                           name="observacion"
+                           maxlength="1000"
+                           required
+                           placeholder="Coincidencias verificadas sin corrección económica"
+                           class="h-9 w-full rounded-lg border border-emerald-300 bg-white px-3 text-sm">
+                </label>
+                <button type="submit"
+                        class="h-9 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800">
+                    Validar seleccionadas (<span id="cantidad-eges-seleccionada">0</span>)
+                </button>
+            </div>
+            <p class="mt-2 text-xs text-emerald-800">
+                Solo valida advertencias o casos manuales seleccionados. No modifica horarios ni montos.
+            </p>
+        </form>
+        {% endif %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                     <tr>
+                        {% if puede_validacion_masiva_eges %}
+                        <th class="w-10 px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Sel.</th>
+                        {% endif %}
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Estado</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Liquidación</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Prácticas</th>
@@ -198,6 +234,18 @@
                 <tbody class="divide-y divide-slate-100">
                     {% for item in preview.resultados %}
                     <tr class="{% if item.estado == 'ok' %}bg-emerald-50/40{% elif item.estado == 'advertencia' %}bg-amber-50/40{% else %}bg-red-50/40{% endif %}">
+                        {% if puede_validacion_masiva_eges %}
+                        <td class="px-3 py-3 align-top">
+                            {% if item.estado != 'ok' and not item.revision_cruce_eges %}
+                            <input type="checkbox"
+                                   name="registros"
+                                   value="{{ item.registro.pk }}"
+                                   form="bulk-eges-form"
+                                   class="checkbox-eges h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                                   aria-label="Seleccionar registro {{ item.registro.pk }}">
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td class="px-3 py-3 align-top">
                             {% if item.estado == 'ok' %}
                                 <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">OK</span>
@@ -419,7 +467,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="6" class="px-3 py-6 text-center text-slate-500">La sesión no tiene registros de residencia para cruzar.</td>
+                        <td colspan="{% if puede_validacion_masiva_eges %}7{% else %}6{% endif %}" class="px-3 py-6 text-center text-slate-500">La sesión no tiene registros de residencia para cruzar.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -432,4 +480,34 @@
     </div>
     {% endif %}
 </div>
+{% if puede_validacion_masiva_eges %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = Array.from(document.querySelectorAll('.checkbox-eges'));
+    const count = document.getElementById('cantidad-eges-seleccionada');
+    const toggle = document.getElementById('seleccionar-eges-visibles');
+    const form = document.getElementById('bulk-eges-form');
+    const updateCount = () => {
+        count.textContent = checkboxes.filter((checkbox) => checkbox.checked).length;
+    };
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateCount));
+    if (toggle) {
+        toggle.addEventListener('click', function () {
+            const shouldSelect = checkboxes.some((checkbox) => !checkbox.checked);
+            checkboxes.forEach((checkbox) => { checkbox.checked = shouldSelect; });
+            toggle.textContent = shouldSelect ? 'Quitar selección' : 'Seleccionar visibles sin revisar';
+            updateCount();
+        });
+    }
+    if (form) {
+        form.addEventListener('submit', function (event) {
+            const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+            if (!selected || !window.confirm(`Validar ${selected} cruce(s) EGES sin modificar montos ni horarios?`)) {
+                event.preventDefault();
+            }
+        });
+    }
+});
+</script>
+{% endif %}
 {% endblock %}

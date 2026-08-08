@@ -35,6 +35,7 @@ from .views import (
     CruceEgesLiquidacionPreviewView,
     CruceEgesProcesarControlView,
     CruceEgesBulkValidarOkView,
+    CruceEgesBulkValidarSeleccionView,
     CruceEgesRegistroResolverView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
@@ -140,6 +141,11 @@ urlpatterns = [
         'sesiones/<int:pk>/cruce-eges/validar-ok/',
         CruceEgesBulkValidarOkView.as_view(),
         name='cruce_eges_validar_ok',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/validar-seleccion/',
+        CruceEgesBulkValidarSeleccionView.as_view(),
+        name='cruce_eges_validar_seleccion',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',
