@@ -12,7 +12,7 @@ from django.core.files.uploadedfile import UploadedFile
 from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core import signing
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count, Avg, Case, When, Value, IntegerField
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 import json
@@ -985,6 +985,9 @@ def lista_banco_informes(request):
     q_tipo = request.GET.get('tipo_estudio', '')
     q_region = request.GET.get('region', '')
     q_contenido = request.GET.get('contenido', '').strip()
+    q_ia = request.GET.get('q_ia', '').strip()[:500]
+    interpretacion_ia = None
+    error_ia = ''
 
     if q_numero:
         qs = qs.filter(numero_estudio__icontains=q_numero)
@@ -1001,17 +1004,69 @@ def lista_banco_informes(request):
     if contenido_normalizado:
         qs = qs.filter(revision__informe_final_busqueda__icontains=contenido_normalizado)
 
+    terminos_busqueda = [contenido_normalizado] if contenido_normalizado else []
+    if q_ia and getattr(settings, 'PREINFORMES_BUSCADOR_IA_HABILITADO', True):
+        from .buscador_casos_service import BuscadorCasosIA
+
+        interpretacion_ia = BuscadorCasosIA().interpretar(q_ia)
+        error_ia = interpretacion_ia.get('error', '')
+        terminos_ia = [
+            normalizar_texto_busqueda(termino)
+            for termino in interpretacion_ia.get('terminos', [])
+            if normalizar_texto_busqueda(termino)
+        ]
+        if terminos_ia:
+            filtro_ia = Q()
+            puntaje_ia = Value(0, output_field=IntegerField())
+            for posicion, termino in enumerate(terminos_ia):
+                condicion = Q(revision__informe_final_busqueda__icontains=termino)
+                filtro_ia |= condicion
+                puntaje_ia += Case(
+                    When(condicion, then=Value(max(1, 10 - posicion))),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            qs = qs.filter(filtro_ia).annotate(relevancia_ia=puntaje_ia)
+            qs = qs.order_by('-relevancia_ia', '-fecha_finalizacion')
+            terminos_busqueda.extend(terminos_ia)
+
+        def ids_catalogo_compatibles(modelo, texto):
+            buscado = normalizar_texto_busqueda(texto)
+            if not buscado:
+                return []
+            tokens = {token for token in buscado.split() if len(token) >= 2}
+            ids = []
+            for objeto in modelo.objects.only('id', 'nombre'):
+                nombre = normalizar_texto_busqueda(objeto.nombre)
+                nombre_tokens = set(nombre.split())
+                if buscado in nombre or nombre in buscado or tokens & nombre_tokens:
+                    ids.append(objeto.id)
+            return ids
+
+        tipo_ia = interpretacion_ia.get('tipo_estudio', '')
+        region_ia = interpretacion_ia.get('region', '')
+        tipos_ids = ids_catalogo_compatibles(TipoEstudio, tipo_ia)
+        regiones_ids = ids_catalogo_compatibles(Region, region_ia)
+        if tipos_ids:
+            qs = qs.filter(tipo_estudio_id__in=tipos_ids)
+        if regiones_ids:
+            qs = qs.filter(region_id__in=regiones_ids)
+
     paginator = Paginator(qs, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    if contenido_normalizado:
+    if terminos_busqueda:
         for preinforme in page_obj.object_list:
             texto = preinforme.revision.informe_final_texto
             texto_normalizado = preinforme.revision.informe_final_busqueda
-            inicio = texto_normalizado.find(contenido_normalizado)
+            termino_encontrado = next(
+                (termino for termino in terminos_busqueda if termino in texto_normalizado),
+                '',
+            )
+            inicio = texto_normalizado.find(termino_encontrado)
             if inicio >= 0:
-                fin = inicio + len(contenido_normalizado)
+                fin = inicio + len(termino_encontrado)
                 margen = 100
                 preinforme.coincidencia_antes = (
                     ('…' if inicio > margen else '') + texto[max(0, inicio - margen):inicio]
@@ -1021,7 +1076,6 @@ def lista_banco_informes(request):
                     texto[fin:fin + margen] + ('…' if fin + margen < len(texto) else '')
                 )
 
-    from .models import TipoEstudio, Region
     context = {
         'page_obj': page_obj,
         'tipos_estudio': TipoEstudio.objects.all().order_by('nombre'),
@@ -1031,6 +1085,12 @@ def lista_banco_informes(request):
         'q_tipo': q_tipo,
         'q_region': q_region,
         'q_contenido': q_contenido,
+        'q_ia': q_ia,
+        'interpretacion_ia': interpretacion_ia,
+        'error_ia': error_ia,
+        'buscador_ia_habilitado': getattr(
+            settings, 'PREINFORMES_BUSCADOR_IA_HABILITADO', True
+        ),
         'title': 'Banco de Informes',
     }
     return render(request, 'preinformes/lista_banco_informes.html', context)

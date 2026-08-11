@@ -606,6 +606,11 @@ PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO = config(
     default=not bool(os.getenv('DYNO')),
     cast=bool,
 )
+PREINFORMES_BUSCADOR_IA_HABILITADO = config(
+    'PREINFORMES_BUSCADOR_IA_HABILITADO',
+    default=True,
+    cast=bool,
+)
 
 SESSION_COOKIE_HTTPONLY = True
 

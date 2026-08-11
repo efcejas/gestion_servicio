@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from unittest.mock import patch
 
 from .models import Preinforme, Region, RevisionPreinforme, TipoEstudio
 
@@ -72,3 +73,38 @@ class BusquedaContenidoBancoTest(TestCase):
 
         self.assertIn('consolidacion basal', self.revision.informe_final_busqueda)
         self.assertNotIn('neumonia redonda', self.revision.informe_final_busqueda)
+
+    @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')
+    def test_busqueda_ia_expande_consulta_y_muestra_interpretacion(self, interpretar):
+        caso_colon = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='BUSQ-COLON',
+            tipo_estudio=self.tipo,
+            region=self.region,
+            informe_html='<p>Borrador.</p>',
+            estado='finalizado',
+            fecha_finalizacion=timezone.now(),
+        )
+        RevisionPreinforme.objects.create(
+            preinforme=caso_colon,
+            revisor=self.revisor,
+            informe_final_html=(
+                '<p>Engrosamiento compatible con adenocarcinoma de colon.</p>'
+            ),
+        )
+        interpretar.return_value = {
+            'success': True,
+            'consulta_corregida': 'tumor de colon',
+            'terminos': ['adenocarcinoma de colon', 'neoplasia colónica'],
+            'tipo_estudio': '',
+            'region': 'colon',
+            'explicacion': 'Se buscarán neoplasias de colon y términos equivalentes.',
+        }
+
+        response = self.client.get(self.url, {'q_ia': 'tumro de colon'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'BUSQ-COLON')
+        self.assertContains(response, 'Interpretación de la búsqueda')
+        self.assertContains(response, 'adenocarcinoma de colon')
+        interpretar.assert_called_once_with('tumro de colon')

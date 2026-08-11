@@ -28,6 +28,32 @@
 
     <!-- Filtros -->
     <form method="get" class="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-4 mb-4">
+        {% if buscador_ia_habilitado %}
+        <div class="mb-4 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
+            <div class="mb-2 flex items-start gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                    <i class="fas fa-magic"></i>
+                </div>
+                <div>
+                    <h2 class="text-sm font-semibold text-indigo-950">Buscador inteligente de casos</h2>
+                    <p class="text-xs text-indigo-700">Describí qué casos necesitás. La IA corregirá errores y buscará términos clínicos relacionados.</p>
+                </div>
+            </div>
+            <div class="flex flex-col gap-2 sm:flex-row">
+                <input type="search" name="q_ia" value="{{ q_ia }}" maxlength="500"
+                       placeholder="Ej: Necesito casos de tumor de colon con compromiso hepático"
+                       class="min-w-0 flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                <button type="submit"
+                        class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+                    <i class="fas fa-search mr-1.5"></i>Buscar con IA
+                </button>
+            </div>
+            <p class="mt-2 text-[11px] text-indigo-600">
+                <i class="fas fa-shield-alt mr-1"></i>No ingreses nombres, DNI ni otros datos identificatorios. Los resultados son orientativos.
+            </p>
+        </div>
+        {% endif %}
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div class="sm:col-span-2 lg:col-span-2">
                 <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Buscar en el informe</label>
@@ -73,7 +99,7 @@
                     class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors">
                 <i class="fas fa-search mr-1.5"></i>Buscar
             </button>
-            {% if q_contenido or q_numero or q_paciente or q_tipo or q_region %}
+            {% if q_ia or q_contenido or q_numero or q_paciente or q_tipo or q_region %}
             <a href="{% url 'preinformes:lista_banco_informes' %}"
                class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
                 <i class="fas fa-times mr-1.5"></i>Limpiar
@@ -81,6 +107,33 @@
             {% endif %}
         </div>
     </form>
+
+    {% if q_ia and interpretacion_ia.success %}
+    <div class="mb-4 rounded-xl border border-indigo-200 bg-white px-5 py-4 shadow-sm">
+        <div class="flex items-start gap-3">
+            <i class="fas fa-brain mt-0.5 text-indigo-600"></i>
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-gray-900">Interpretación de la búsqueda</p>
+                <p class="mt-1 text-sm text-gray-600">{{ interpretacion_ia.explicacion }}</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    {% for termino in interpretacion_ia.terminos %}
+                    <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700">{{ termino }}</span>
+                    {% endfor %}
+                    {% if interpretacion_ia.tipo_estudio %}
+                    <span class="rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-medium text-cyan-700">Estudio: {{ interpretacion_ia.tipo_estudio }}</span>
+                    {% endif %}
+                    {% if interpretacion_ia.region %}
+                    <span class="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-medium text-teal-700">Región: {{ interpretacion_ia.region }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% elif q_ia and error_ia %}
+    <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+        <i class="fas fa-exclamation-triangle mr-1.5"></i>{{ error_ia }}
+    </div>
+    {% endif %}
 
     <!-- Tabla + Paginación -->
     {% if page_obj.object_list %}
