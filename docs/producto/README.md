@@ -16,3 +16,4 @@ Documentacion funcional de modulos, flujos y reglas de negocio.
 - [NOTIFICACIONES_TOKEN_README.md](NOTIFICACIONES_TOKEN_README.md)
 - [PREINFORMES_FORMATO_WORD.md](PREINFORMES_FORMATO_WORD.md)
 - [PREINFORMES_REVISION_STAFF.md](PREINFORMES_REVISION_STAFF.md)
+- [PREINFORMES_BANCO_INFORMES.md](PREINFORMES_BANCO_INFORMES.md) - Búsqueda tradicional e inteligente sobre informes definitivos aprobados.

@@ -36,6 +36,22 @@ SANATORIO_MODO=Colegiales
 
 ## 🟢 NUEVAS (No requeridas, pero recomendadas)
 
+### Para búsqueda inteligente de casos en preinformes
+
+```bash
+# Requiere la misma clave utilizada por los demás asistentes del sistema
+OPENAI_API_KEY=<clave-openai>
+
+# Opcional; default: True
+PREINFORMES_BUSCADOR_IA_HABILITADO=True
+```
+
+Para desactivarlo sin desplegar código:
+
+```bash
+heroku config:set PREINFORMES_BUSCADOR_IA_HABILITADO=False --app <tu-app>
+```
+
 ### Para Logging y Monitoreo
 
 ```bash

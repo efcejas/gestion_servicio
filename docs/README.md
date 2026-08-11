@@ -31,6 +31,7 @@
 - **[producto/NOTIFICACIONES_TOKEN_README.md](producto/NOTIFICACIONES_TOKEN_README.md)** - Acceso por token y notificaciones para médicos.
 - **[producto/PREINFORMES_FORMATO_WORD.md](producto/PREINFORMES_FORMATO_WORD.md)** - Compatibilidad de preinformes con Word y EGES.
 - **[producto/PREINFORMES_REVISION_STAFF.md](producto/PREINFORMES_REVISION_STAFF.md)** - Circuito vigente de revision staff de preinformes.
+- **[producto/PREINFORMES_BANCO_INFORMES.md](producto/PREINFORMES_BANCO_INFORMES.md)** - Banco de informes, búsqueda por contenido y buscador inteligente de casos.
 
 - **[liquidacion/reglas-descuento-residencia.md](liquidacion/reglas-descuento-residencia.md)** - Reglas vigentes de descuento residencia, B2/B3, diagnostico de recalculo, preparacion RRHH, checklist de cierre, auditoria ECO/PACS y validacion EGES.
 
