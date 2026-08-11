@@ -31,6 +31,7 @@ from .models import (
     AplicacionPlantillaPreinforme, PropuestaPlantillaPreinforme,
     VersionPlantillaPreinforme,
     prepare_editor_html_content,
+    normalizar_texto_busqueda,
 )
 from .forms import (
     PreinformeForm, FiltroPreinformesForm, 
@@ -983,6 +984,7 @@ def lista_banco_informes(request):
     q_paciente = '' if request.user.is_demo_user else request.GET.get('paciente', '').strip()
     q_tipo = request.GET.get('tipo_estudio', '')
     q_region = request.GET.get('region', '')
+    q_contenido = request.GET.get('contenido', '').strip()
 
     if q_numero:
         qs = qs.filter(numero_estudio__icontains=q_numero)
@@ -995,10 +997,29 @@ def lista_banco_informes(request):
         qs = qs.filter(tipo_estudio_id=q_tipo)
     if q_region:
         qs = qs.filter(region_id=q_region)
+    contenido_normalizado = normalizar_texto_busqueda(q_contenido)
+    if contenido_normalizado:
+        qs = qs.filter(revision__informe_final_busqueda__icontains=contenido_normalizado)
 
     paginator = Paginator(qs, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+
+    if contenido_normalizado:
+        for preinforme in page_obj.object_list:
+            texto = preinforme.revision.informe_final_texto
+            texto_normalizado = preinforme.revision.informe_final_busqueda
+            inicio = texto_normalizado.find(contenido_normalizado)
+            if inicio >= 0:
+                fin = inicio + len(contenido_normalizado)
+                margen = 100
+                preinforme.coincidencia_antes = (
+                    ('…' if inicio > margen else '') + texto[max(0, inicio - margen):inicio]
+                )
+                preinforme.coincidencia_texto = texto[inicio:fin]
+                preinforme.coincidencia_despues = (
+                    texto[fin:fin + margen] + ('…' if fin + margen < len(texto) else '')
+                )
 
     from .models import TipoEstudio, Region
     context = {
@@ -1009,6 +1030,7 @@ def lista_banco_informes(request):
         'q_paciente': q_paciente,
         'q_tipo': q_tipo,
         'q_region': q_region,
+        'q_contenido': q_contenido,
         'title': 'Banco de Informes',
     }
     return render(request, 'preinformes/lista_banco_informes.html', context)

@@ -7,6 +7,7 @@ from django_ckeditor_5.fields import CKEditor5Field
 import re
 import html
 import os
+import unicodedata
 from bs4 import BeautifulSoup
 
 User = get_user_model()
@@ -287,6 +288,22 @@ def strip_html_tags(text):
     if not text:
         return ''
     return re.sub(r'<[^>]+>', '', text).strip()
+
+
+def extraer_texto_informe(html_content):
+    """Convierte el HTML del informe en texto plano legible y estable."""
+    if not html_content:
+        return ''
+    soup = BeautifulSoup(html_content, 'html.parser')
+    texto = html.unescape(soup.get_text(' ', strip=True))
+    return re.sub(r'\s+', ' ', texto).strip()
+
+
+def normalizar_texto_busqueda(texto):
+    """Normaliza texto para búsquedas sin diferencias de tildes o mayúsculas."""
+    texto = unicodedata.normalize('NFKD', texto or '')
+    texto = ''.join(char for char in texto if not unicodedata.combining(char))
+    return re.sub(r'\s+', ' ', texto.casefold()).strip()
 
 
 def upload_adjunto_preinforme(instance, filename):
@@ -1050,6 +1067,19 @@ class RevisionPreinforme(models.Model):
         help_text="Informe final editado por el staff - se inicializa con el contenido del residente",
         blank=True
     )
+    informe_final_texto = models.TextField(
+        blank=True,
+        default='',
+        editable=False,
+        help_text="Versión en texto plano del informe final para extractos de búsqueda",
+    )
+    informe_final_busqueda = models.TextField(
+        blank=True,
+        default='',
+        editable=False,
+        db_index=True,
+        help_text="Versión normalizada del informe final para búsqueda de contenido",
+    )
     
     # Comentarios generales
     comentarios_generales = models.TextField(
@@ -1108,6 +1138,18 @@ class RevisionPreinforme(models.Model):
     
     def __str__(self):
         return f"Revisión de {self.preinforme.numero_estudio} por {self.revisor.username}"
+
+    def save(self, *args, **kwargs):
+        self.informe_final_texto = extraer_texto_informe(self.informe_final_html)
+        self.informe_final_busqueda = normalizar_texto_busqueda(self.informe_final_texto)
+
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None and 'informe_final_html' in update_fields:
+            kwargs['update_fields'] = set(update_fields) | {
+                'informe_final_texto',
+                'informe_final_busqueda',
+            }
+        super().save(*args, **kwargs)
     
     def generar_informe_original_residente(self):
         """
