@@ -282,12 +282,13 @@
                             Contenido del Preinforme
                         </h2>
                         {% if dictado_cursor_habilitado %}
-                        <div class="mt-2 flex items-center gap-2">
+                        <div id="dictado-anchor" class="mt-2 flex items-center gap-2">
                             <button
                                 type="button"
                                 id="dictado-toggle"
-                                class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
+                                class="dictado-toggle-button inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
                                 title="Atajo: Alt + Shift + D"
+                                aria-pressed="false"
                             >
                                 <i class="fas fa-microphone mr-2"></i>
                                 Iniciar dictado
@@ -606,6 +607,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return cookie ? decodeURIComponent(cookie[1]) : '';
     }
     const dictadoToggleButton = document.getElementById('dictado-toggle');
+    const dictadoAnchor = document.getElementById('dictado-anchor');
+    const dictadoEditorContainer = document.getElementById('editor-container');
     const dictadoStatusLabel = document.getElementById('dictado-status');
     let dictadoMediaRecorder = null;
     let dictadoChunks = [];
@@ -819,6 +822,23 @@ document.addEventListener('DOMContentLoaded', function() {
         dictadoStatusLabel.className = isError ? 'text-xs text-red-600' : 'text-xs text-gray-600';
     }
 
+    function setDictadoButtonState(state) {
+        if (!dictadoToggleButton) return;
+
+        dictadoToggleButton.disabled = state === 'transcribing';
+        dictadoToggleButton.classList.toggle('dictado-recording', state === 'recording');
+        dictadoToggleButton.classList.toggle('dictado-transcribing', state === 'transcribing');
+        dictadoToggleButton.setAttribute('aria-pressed', state === 'recording' ? 'true' : 'false');
+
+        if (state === 'recording') {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-stop mr-2"></i>Detener dictado';
+        } else if (state === 'transcribing') {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Transcribiendo...';
+        } else {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
+        }
+    }
+
     function normalizarTextoDictado(texto) {
         if (!texto) return '';
 
@@ -928,6 +948,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function procesarDictadoGrabado() {
         if (!dictadoChunks.length) {
             setDictadoStatus('No se detectó audio para transcribir.', true);
+            setDictadoButtonState('ready');
             return;
         }
 
@@ -935,10 +956,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const audioBlob = new Blob(dictadoChunks, { type: mimeType });
         if (audioBlob.size < 500) {
             setDictadoStatus('Audio muy corto. Dicta al menos 1 segundo.', true);
+            setDictadoButtonState('ready');
             return;
         }
 
         setDictadoStatus('Transcribiendo...');
+        setDictadoButtonState('transcribing');
 
         try {
             const audioBase64 = await blobToDataURL(audioBlob);
@@ -960,6 +983,8 @@ document.addEventListener('DOMContentLoaded', function() {
             setDictadoStatus('Texto insertado en la posición del cursor.');
         } catch (error) {
             setDictadoStatus(error.message || 'Error durante transcripción.', true);
+        } finally {
+            setDictadoButtonState('ready');
         }
     }
 
@@ -989,10 +1014,7 @@ document.addEventListener('DOMContentLoaded', function() {
             dictadoMediaRecorder.start(500);
             dictadoActivo = true;
 
-            if (dictadoToggleButton) {
-                dictadoToggleButton.innerHTML = '<i class="fas fa-stop mr-2"></i>Detener dictado';
-                dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition';
-            }
+            setDictadoButtonState('recording');
             setDictadoStatus('Grabando... hablá y luego presiona detener.');
         } catch (error) {
             setDictadoStatus('No se pudo acceder al micrófono.', true);
@@ -1003,10 +1025,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!dictadoMediaRecorder || dictadoMediaRecorder.state === 'inactive') return;
         dictadoMediaRecorder.stop();
         dictadoActivo = false;
-        if (dictadoToggleButton) {
-            dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
-            dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition';
-        }
+        setDictadoButtonState('transcribing');
     }
 
     function cargarPlantillas() {
@@ -2464,6 +2483,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 iniciarDictado();
             }
         });
+
+        if (dictadoAnchor && dictadoEditorContainer) {
+            let dictadoPositionFrame = null;
+
+            const actualizarPosicionDictado = () => {
+                dictadoPositionFrame = null;
+                const anchorRect = dictadoAnchor.getBoundingClientRect();
+                const editorRect = dictadoEditorContainer.getBoundingClientRect();
+                const margenInferior = window.innerWidth <= 640 ? 12 : 24;
+                const debeFlotar = anchorRect.bottom < 0 && editorRect.bottom > 0;
+
+                dictadoToggleButton.classList.toggle('dictado-floating', debeFlotar);
+
+                if (debeFlotar) {
+                    // Mantener el botón dentro del marco del editor: alineado a su
+                    // esquina inferior derecha y limitado por su borde inferior.
+                    const limiteEditor = window.innerHeight - editorRect.bottom + 12;
+                    const margenHorizontal = 12;
+                    const posicionIzquierda = Math.max(
+                        editorRect.left + margenHorizontal,
+                        editorRect.right - dictadoToggleButton.offsetWidth - margenHorizontal
+                    );
+                    dictadoToggleButton.style.left = `${posicionIzquierda}px`;
+                    dictadoToggleButton.style.bottom = `${Math.max(margenInferior, limiteEditor)}px`;
+                } else {
+                    dictadoToggleButton.style.removeProperty('left');
+                    dictadoToggleButton.style.removeProperty('bottom');
+                }
+            };
+
+            const solicitarActualizacionDictado = () => {
+                if (dictadoPositionFrame !== null) return;
+                dictadoPositionFrame = window.requestAnimationFrame(actualizarPosicionDictado);
+            };
+
+            window.addEventListener('scroll', solicitarActualizacionDictado, { passive: true });
+            window.addEventListener('resize', solicitarActualizacionDictado);
+            if ('ResizeObserver' in window) {
+                const dictadoResizeObserver = new ResizeObserver(solicitarActualizacionDictado);
+                dictadoResizeObserver.observe(dictadoEditorContainer);
+            }
+            actualizarPosicionDictado();
+        }
     }
 });
 </script>
@@ -2475,6 +2537,54 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Estilos del asistente -->
 <style>
+.dictado-toggle-button { white-space: nowrap; }
+.dictado-toggle-button.dictado-floating {
+    position: fixed;
+    left: max(1rem, env(safe-area-inset-left));
+    bottom: max(1.5rem, env(safe-area-inset-bottom));
+    z-index: 9998;
+    padding: .75rem 1rem;
+    color: #fff;
+    background: linear-gradient(135deg, #7e22ce, #9333ea);
+    border: 1px solid rgba(255, 255, 255, .28);
+    border-radius: 9999px;
+    box-shadow: 0 10px 30px rgba(126, 34, 206, .35);
+}
+.dictado-toggle-button.dictado-floating:hover {
+    background: linear-gradient(135deg, #6b21a8, #7e22ce);
+    transform: translateY(-1px);
+}
+.dictado-toggle-button.dictado-recording {
+    color: #fff;
+    background: #dc2626;
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, .55);
+    animation: dictado-pulse 1.6s infinite;
+}
+.dictado-toggle-button.dictado-recording:hover { background: #b91c1c; }
+.dictado-toggle-button.dictado-transcribing,
+.dictado-toggle-button.dictado-transcribing:hover {
+    color: #fff;
+    background: #6b7280;
+    cursor: wait;
+    transform: none;
+    animation: none;
+}
+@keyframes dictado-pulse {
+    70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+@media (max-width: 640px) {
+    .dictado-toggle-button.dictado-floating {
+        left: max(.75rem, env(safe-area-inset-left));
+        bottom: max(.75rem, env(safe-area-inset-bottom));
+        max-width: calc(100vw - 5.75rem);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dictado-toggle-button.dictado-recording { animation: none; }
+}
 /* Animación de puntos de escritura */
 @keyframes asistente-bounce {
     0%, 80%, 100% { transform: translateY(0); }
