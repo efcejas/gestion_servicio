@@ -74,8 +74,11 @@ class BusquedaContenidoBancoTest(TestCase):
         self.assertIn('consolidacion basal', self.revision.informe_final_busqueda)
         self.assertNotIn('neumonia redonda', self.revision.informe_final_busqueda)
 
+    @patch('preinformes.busqueda_semantica_service.BusquedaSemanticaInformes.buscar')
     @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')
-    def test_busqueda_ia_expande_consulta_y_muestra_interpretacion(self, interpretar):
+    def test_busqueda_ia_expande_consulta_y_muestra_interpretacion(
+        self, interpretar, buscar_semantico
+    ):
         caso_colon = Preinforme.objects.create(
             residente=self.residente,
             numero_estudio='BUSQ-COLON',
@@ -100,6 +103,11 @@ class BusquedaContenidoBancoTest(TestCase):
             'region': 'colon',
             'explicacion': 'Se buscarán neoplasias de colon y términos equivalentes.',
         }
+        buscar_semantico.return_value = {
+            'success': True,
+            'resultados': [],
+            'indexadas': 0,
+        }
 
         response = self.client.get(self.url, {'q_ia': 'tumro de colon'})
 
@@ -108,3 +116,33 @@ class BusquedaContenidoBancoTest(TestCase):
         self.assertContains(response, 'Interpretación de la búsqueda')
         self.assertContains(response, 'adenocarcinoma de colon')
         interpretar.assert_called_once_with('tumro de colon')
+
+    @patch('preinformes.busqueda_semantica_service.BusquedaSemanticaInformes.buscar')
+    @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')
+    def test_resultado_semantico_aparece_sin_frase_literal(
+        self, interpretar, buscar_semantico
+    ):
+        interpretar.return_value = {
+            'success': True,
+            'consulta_corregida': 'tumor cerebral',
+            'terminos': ['neoplasia intracraneal'],
+            'tipo_estudio': '',
+            'region': '',
+            'explicacion': 'Busca lesiones tumorales cerebrales.',
+        }
+        buscar_semantico.return_value = {
+            'success': True,
+            'resultados': [{
+                'revision_id': self.revision.pk,
+                'preinforme_id': self.preinforme.pk,
+                'similitud': 0.72,
+            }],
+            'indexadas': 1,
+        }
+
+        response = self.client.get(self.url, {'q_ia': 'tumor cerebral'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'BUSQ-001')
+        self.assertContains(response, 'Coincidencia semántica')
+        self.assertContains(response, 'Relevancia Alta')

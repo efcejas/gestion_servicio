@@ -44,6 +44,11 @@ OPENAI_API_KEY=<clave-openai>
 
 # Opcional; default: True
 PREINFORMES_BUSCADOR_IA_HABILITADO=True
+
+# Opcionales; valores predeterminados mostrados
+PREINFORMES_EMBEDDING_MODEL=text-embedding-3-small
+PREINFORMES_EMBEDDING_UMBRAL=0.30
+PREINFORMES_EMBEDDING_MAX_RESULTADOS=50
 ```
 
 Para desactivarlo sin desplegar código:
@@ -51,6 +56,14 @@ Para desactivarlo sin desplegar código:
 ```bash
 heroku config:set PREINFORMES_BUSCADOR_IA_HABILITADO=False --app <tu-app>
 ```
+
+Después del primer deploy, generar el índice histórico:
+
+```bash
+heroku run python manage.py indexar_busqueda_semantica --app <tu-app>
+```
+
+Programar el mismo comando en Heroku Scheduler mantiene indexados los informes nuevos y corregidos; el comando omite automáticamente los que ya están vigentes.
 
 ### Para Logging y Monitoreo
 

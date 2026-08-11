@@ -988,6 +988,8 @@ def lista_banco_informes(request):
     q_ia = request.GET.get('q_ia', '').strip()[:500]
     interpretacion_ia = None
     error_ia = ''
+    estado_semantico = None
+    puntajes_semanticos = {}
 
     if q_numero:
         qs = qs.filter(numero_estudio__icontains=q_numero)
@@ -1015,20 +1017,7 @@ def lista_banco_informes(request):
             for termino in interpretacion_ia.get('terminos', [])
             if normalizar_texto_busqueda(termino)
         ]
-        if terminos_ia:
-            filtro_ia = Q()
-            puntaje_ia = Value(0, output_field=IntegerField())
-            for posicion, termino in enumerate(terminos_ia):
-                condicion = Q(revision__informe_final_busqueda__icontains=termino)
-                filtro_ia |= condicion
-                puntaje_ia += Case(
-                    When(condicion, then=Value(max(1, 10 - posicion))),
-                    default=Value(0),
-                    output_field=IntegerField(),
-                )
-            qs = qs.filter(filtro_ia).annotate(relevancia_ia=puntaje_ia)
-            qs = qs.order_by('-relevancia_ia', '-fecha_finalizacion')
-            terminos_busqueda.extend(terminos_ia)
+        terminos_busqueda.extend(terminos_ia)
 
         def ids_catalogo_compatibles(modelo, texto):
             buscado = normalizar_texto_busqueda(texto)
@@ -1052,6 +1041,53 @@ def lista_banco_informes(request):
         if regiones_ids:
             qs = qs.filter(region_id__in=regiones_ids)
 
+        filtro_literal_ia = Q()
+        puntaje_ia = Value(0, output_field=IntegerField())
+        for posicion, termino in enumerate(terminos_ia):
+            condicion = Q(revision__informe_final_busqueda__icontains=termino)
+            filtro_literal_ia |= condicion
+            puntaje_ia += Case(
+                When(condicion, then=Value(max(1, 100 - posicion))),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+
+        from .busqueda_semantica_service import BusquedaSemanticaInformes
+
+        consulta_semantica = interpretacion_ia.get('consulta_corregida') or q_ia
+        if terminos_ia:
+            consulta_semantica += '. Conceptos relacionados: ' + ', '.join(terminos_ia)
+        revisiones_semanticas = RevisionPreinforme.objects.filter(
+            preinforme_id__in=qs.values('pk'),
+            embedding_busqueda__isnull=False,
+        ).only('id', 'preinforme_id', 'embedding_busqueda', 'embedding_modelo')
+        resultado_semantico = BusquedaSemanticaInformes().buscar(
+            consulta_semantica,
+            revisiones_semanticas,
+        )
+        estado_semantico = resultado_semantico
+        ids_semanticos = [
+            resultado['preinforme_id']
+            for resultado in resultado_semantico.get('resultados', [])
+        ]
+        puntajes_semanticos = {
+            resultado['preinforme_id']: resultado['similitud']
+            for resultado in resultado_semantico.get('resultados', [])
+        }
+
+        filtro_combinado = filtro_literal_ia
+        if ids_semanticos:
+            filtro_combinado |= Q(pk__in=ids_semanticos)
+            for preinforme_id, similitud in puntajes_semanticos.items():
+                puntaje_ia += Case(
+                    When(pk=preinforme_id, then=Value(round(similitud * 1000))),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+        if terminos_ia or ids_semanticos:
+            qs = qs.filter(filtro_combinado).annotate(relevancia_ia=puntaje_ia)
+            qs = qs.order_by('-relevancia_ia', '-fecha_finalizacion')
+
     paginator = Paginator(qs, 20)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -1064,7 +1100,7 @@ def lista_banco_informes(request):
                 (termino for termino in terminos_busqueda if termino in texto_normalizado),
                 '',
             )
-            inicio = texto_normalizado.find(termino_encontrado)
+            inicio = texto_normalizado.find(termino_encontrado) if termino_encontrado else -1
             if inicio >= 0:
                 fin = inicio + len(termino_encontrado)
                 margen = 100
@@ -1075,6 +1111,17 @@ def lista_banco_informes(request):
                 preinforme.coincidencia_despues = (
                     texto[fin:fin + margen] + ('…' if fin + margen < len(texto) else '')
                 )
+            elif preinforme.pk in puntajes_semanticos:
+                preinforme.resumen_semantico = (
+                    texto[:220] + ('…' if len(texto) > 220 else '')
+                )
+                preinforme.similitud_semantica = puntajes_semanticos[preinforme.pk]
+                if preinforme.similitud_semantica >= 0.55:
+                    preinforme.relevancia_semantica = 'Alta'
+                elif preinforme.similitud_semantica >= 0.40:
+                    preinforme.relevancia_semantica = 'Media'
+                else:
+                    preinforme.relevancia_semantica = 'Relacionada'
 
     context = {
         'page_obj': page_obj,
@@ -1088,6 +1135,7 @@ def lista_banco_informes(request):
         'q_ia': q_ia,
         'interpretacion_ia': interpretacion_ia,
         'error_ia': error_ia,
+        'estado_semantico': estado_semantico,
         'buscador_ia_habilitado': getattr(
             settings, 'PREINFORMES_BUSCADOR_IA_HABILITADO', True
         ),

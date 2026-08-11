@@ -43,7 +43,40 @@ El residente puede escribir, por ejemplo:
 7. devuelve la interpretación a Django;
 8. Django aplica permisos, construye el ORM y ordena por relevancia.
 
-El modelo solo recibe la consulta sanitizada. No recibe cuerpos de informes, nombres de pacientes ni acceso SQL.
+La interpretación conversacional solo recibe la consulta sanitizada. No recibe cuerpos de informes ni acceso SQL.
+
+## Recuperación semántica por embeddings
+
+La expansión literal se complementa con `preinformes.busqueda_semantica_service.BusquedaSemanticaInformes`. El servicio genera embeddings con `text-embedding-3-small`, los guarda en `RevisionPreinforme.embedding_busqueda` como datos binarios compactos y calcula similitud coseno en la aplicación. Esto evita depender de `pgvector` y funciona tanto en SQLite como en PostgreSQL/Heroku.
+
+Antes de generar un embedding se eliminan del texto el nombre, apellido, DNI y número de estudio conocidos, además de correos y secuencias compatibles con documentos. El proveedor recibe solamente el cuerpo anonimizado más tipo de estudio y región.
+
+Los campos de control son:
+
+- `embedding_busqueda`;
+- `embedding_modelo`;
+- `embedding_fuente_hash`;
+- `embedding_actualizado_en`.
+
+Si cambia el informe definitivo, el vector anterior se invalida automáticamente.
+
+### Indexación histórica y continua
+
+Después del despliegue debe ejecutarse:
+
+```bash
+python manage.py indexar_busqueda_semantica
+```
+
+Opciones:
+
+```bash
+python manage.py indexar_busqueda_semantica --limit 100
+python manage.py indexar_busqueda_semantica --batch-size 25
+python manage.py indexar_busqueda_semantica --force
+```
+
+El comando omite vectores vigentes, por lo que puede programarse periódicamente en Heroku Scheduler para incorporar informes nuevos o corregidos.
 
 ## Resultados
 
@@ -60,6 +93,9 @@ Los resultados pueden mostrar metadatos del estudio, fragmento definitivo, coinc
 ```env
 OPENAI_API_KEY=<clave>
 PREINFORMES_BUSCADOR_IA_HABILITADO=True
+PREINFORMES_EMBEDDING_MODEL=text-embedding-3-small
+PREINFORMES_EMBEDDING_UMBRAL=0.30
+PREINFORMES_EMBEDDING_MAX_RESULTADOS=50
 ```
 
 `PREINFORMES_BUSCADOR_IA_HABILITADO` es opcional y vale `True` por defecto. En `False`, oculta y desactiva el buscador inteligente.
@@ -68,7 +104,7 @@ PREINFORMES_BUSCADOR_IA_HABILITADO=True
 
 - La interfaz pide no ingresar nombres, DNI ni otros identificadores.
 - El backend reemplaza documentos y correos detectables antes de llamar al proveedor.
-- No se envían cuerpos de informes al modelo.
+- Para embeddings se envía exclusivamente el cuerpo anonimizado; la interpretación conversacional no recibe informes.
 - Los permisos se verifican antes de presentar resultados.
 - Los registros demo no ingresan al Banco compartido.
 
@@ -79,4 +115,3 @@ python manage.py test \
   preinformes.test_busqueda_contenido_banco \
   preinformes.test_buscador_casos_service
 ```
-

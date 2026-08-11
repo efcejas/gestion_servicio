@@ -611,6 +611,20 @@ PREINFORMES_BUSCADOR_IA_HABILITADO = config(
     default=True,
     cast=bool,
 )
+PREINFORMES_EMBEDDING_MODEL = config(
+    'PREINFORMES_EMBEDDING_MODEL',
+    default='text-embedding-3-small',
+)
+PREINFORMES_EMBEDDING_UMBRAL = config(
+    'PREINFORMES_EMBEDDING_UMBRAL',
+    default=0.30,
+    cast=float,
+)
+PREINFORMES_EMBEDDING_MAX_RESULTADOS = config(
+    'PREINFORMES_EMBEDDING_MAX_RESULTADOS',
+    default=50,
+    cast=int,
+)
 
 SESSION_COOKIE_HTTPONLY = True
 

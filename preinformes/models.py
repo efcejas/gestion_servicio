@@ -8,6 +8,7 @@ import re
 import html
 import os
 import unicodedata
+import hashlib
 from bs4 import BeautifulSoup
 
 User = get_user_model()
@@ -1079,6 +1080,15 @@ class RevisionPreinforme(models.Model):
         editable=False,
         help_text="Versión normalizada del informe final para búsqueda de contenido",
     )
+    embedding_busqueda = models.BinaryField(
+        blank=True,
+        null=True,
+        editable=False,
+        help_text="Vector semántico compacto del informe definitivo anonimizado",
+    )
+    embedding_modelo = models.CharField(max_length=80, blank=True, default='', editable=False)
+    embedding_fuente_hash = models.CharField(max_length=64, blank=True, default='', editable=False)
+    embedding_actualizado_en = models.DateTimeField(blank=True, null=True, editable=False)
     
     # Comentarios generales
     comentarios_generales = models.TextField(
@@ -1142,11 +1152,22 @@ class RevisionPreinforme(models.Model):
         self.informe_final_texto = extraer_texto_informe(self.informe_final_html)
         self.informe_final_busqueda = normalizar_texto_busqueda(self.informe_final_texto)
 
+        fuente_hash = hashlib.sha256(self.informe_final_texto.encode('utf-8')).hexdigest()
+        if self.embedding_fuente_hash and self.embedding_fuente_hash != fuente_hash:
+            self.embedding_busqueda = None
+            self.embedding_modelo = ''
+            self.embedding_fuente_hash = ''
+            self.embedding_actualizado_en = None
+
         update_fields = kwargs.get('update_fields')
         if update_fields is not None and 'informe_final_html' in update_fields:
             kwargs['update_fields'] = set(update_fields) | {
                 'informe_final_texto',
                 'informe_final_busqueda',
+                'embedding_busqueda',
+                'embedding_modelo',
+                'embedding_fuente_hash',
+                'embedding_actualizado_en',
             }
         super().save(*args, **kwargs)
     
