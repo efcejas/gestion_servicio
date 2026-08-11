@@ -1077,7 +1077,6 @@ class RevisionPreinforme(models.Model):
         blank=True,
         default='',
         editable=False,
-        db_index=True,
         help_text="Versión normalizada del informe final para búsqueda de contenido",
     )
     

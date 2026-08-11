@@ -50,7 +50,6 @@ class Migration(migrations.Migration):
             name='informe_final_busqueda',
             field=models.TextField(
                 blank=True,
-                db_index=True,
                 default='',
                 editable=False,
                 help_text='Versión normalizada del informe final para búsqueda de contenido',
