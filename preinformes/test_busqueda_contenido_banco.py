@@ -122,6 +122,12 @@ class BusquedaContenidoBancoTest(TestCase):
     def test_resultado_semantico_aparece_sin_frase_literal(
         self, interpretar, buscar_semantico
     ):
+        self.revision.informe_final_html = (
+            '<p>Se identifica una neoplasia de localización intracraneal.</p>'
+        )
+        self.revision.embedding_busqueda = b'embedding-prueba'
+        self.revision.embedding_modelo = 'text-embedding-3-small'
+        self.revision.save()
         interpretar.return_value = {
             'success': True,
             'consulta_corregida': 'tumor cerebral',
@@ -146,6 +152,41 @@ class BusquedaContenidoBancoTest(TestCase):
         self.assertContains(response, 'BUSQ-001')
         self.assertContains(response, 'Coincidencia semántica')
         self.assertContains(response, 'Relevancia Alta')
+
+    @patch('preinformes.busqueda_semantica_service.BusquedaSemanticaInformes.buscar')
+    @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')
+    def test_descarta_coincidencia_semantica_media_aunque_tenga_vocabulario(
+        self, interpretar, buscar_semantico
+    ):
+        self.revision.informe_final_html = (
+            '<p>Se identifica una neoplasia de localización intracraneal.</p>'
+        )
+        self.revision.embedding_busqueda = b'embedding-prueba'
+        self.revision.embedding_modelo = 'text-embedding-3-small'
+        self.revision.save()
+        interpretar.return_value = {
+            'success': True,
+            'consulta_corregida': 'tumor cerebral',
+            'terminos': ['neoplasia intracraneal'],
+            'tipo_estudio': '',
+            'region': '',
+            'explicacion': 'Busca lesiones tumorales cerebrales.',
+        }
+        buscar_semantico.return_value = {
+            'success': True,
+            'resultados': [{
+                'revision_id': self.revision.pk,
+                'preinforme_id': self.preinforme.pk,
+                'similitud': 0.45,
+            }],
+            'indexadas': 1,
+            'max_resultados': 50,
+        }
+
+        response = self.client.get(self.url, {'q_ia': 'tumor cerebral'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'BUSQ-001')
 
     @patch('preinformes.busqueda_semantica_service.BusquedaSemanticaInformes.buscar')
     @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')

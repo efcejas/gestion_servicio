@@ -1022,6 +1022,30 @@ def _resumen_visual_semantico(texto, conceptos):
         mejor = mejor[:300].rsplit(' ', 1)[0] + '…'
     return mejor
 
+
+PALABRAS_BUSQUEDA_GENERICAS = {
+    'casos', 'caso', 'informe', 'informes', 'necesito', 'buscar', 'estudio',
+    'estudios', 'tomografia', 'computada', 'resonancia', 'radiografia',
+}
+
+
+def _tiene_evidencia_clinica(texto_normalizado, conceptos):
+    """Exige vocabulario clínico concreto antes de aceptar una similitud global."""
+    palabras_informe = set(re.findall(r'\b\w{4,}\b', texto_normalizado))
+    for concepto in conceptos:
+        palabras = {
+            palabra
+            for palabra in normalizar_texto_busqueda(concepto).split()
+            if len(palabra) >= 4 and palabra not in PALABRAS_BUSQUEDA_GENERICAS
+        }
+        if not palabras:
+            continue
+        minimo = 1 if len(palabras) == 1 else 2
+        presentes = len(palabras & palabras_informe)
+        if presentes >= minimo:
+            return True
+    return False
+
 @login_required
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def lista_banco_informes(request):
@@ -1104,8 +1128,14 @@ def lista_banco_informes(request):
         for posicion, termino in enumerate(terminos_ia):
             condicion = Q(revision__informe_final_busqueda__icontains=termino)
             filtro_literal_ia |= condicion
+            if posicion == 0:
+                peso_literal = 10000
+            elif posicion == 1:
+                peso_literal = 8000
+            else:
+                peso_literal = max(2000, 5000 - (posicion * 300))
             puntaje_ia += Case(
-                When(condicion, then=Value(max(1, 100 - posicion))),
+                When(condicion, then=Value(peso_literal)),
                 default=Value(0),
                 output_field=IntegerField(),
             )
@@ -1115,14 +1145,39 @@ def lista_banco_informes(request):
         consulta_semantica = consulta_corregida
         if terminos_ia:
             consulta_semantica += '. Conceptos relacionados: ' + ', '.join(terminos_ia)
-        revisiones_semanticas = RevisionPreinforme.objects.filter(
+        revisiones_semanticas = list(RevisionPreinforme.objects.filter(
             preinforme_id__in=qs.values('pk'),
             embedding_busqueda__isnull=False,
-        ).only('id', 'preinforme_id', 'embedding_busqueda', 'embedding_modelo')
+        ).only(
+            'id', 'preinforme_id', 'embedding_busqueda', 'embedding_modelo',
+            'informe_final_busqueda',
+        ))
         resultado_semantico = BusquedaSemanticaInformes().buscar(
             consulta_semantica,
             revisiones_semanticas,
         )
+        revisiones_por_id = {revision.id: revision for revision in revisiones_semanticas}
+        umbral_preciso = getattr(
+            settings, 'PREINFORMES_EMBEDDING_UMBRAL_PRECISO', 0.50
+        )
+        resultados_originales = resultado_semantico.get('resultados', [])
+        resultados_con_evidencia = []
+        for resultado in resultados_originales:
+            revision = revisiones_por_id.get(resultado['revision_id'])
+            if (
+                revision
+                and resultado['similitud'] >= umbral_preciso
+                and _tiene_evidencia_clinica(
+                    revision.informe_final_busqueda, terminos_ia
+                )
+            ):
+                resultados_con_evidencia.append(resultado)
+        resultado_semantico['resultados'] = resultados_con_evidencia
+        resultado_semantico['descartados_sin_evidencia'] = (
+            len(resultados_originales) - len(resultados_con_evidencia)
+        )
+        if len(resultados_con_evidencia) < resultado_semantico.get('max_resultados', 50):
+            resultado_semantico['limite_alcanzado'] = False
         estado_semantico = resultado_semantico
         ids_semanticos = [
             resultado['preinforme_id']
@@ -1183,10 +1238,8 @@ def lista_banco_informes(request):
                 preinforme.similitud_semantica = puntajes_semanticos[preinforme.pk]
                 if preinforme.similitud_semantica >= 0.55:
                     preinforme.relevancia_semantica = 'Alta'
-                elif preinforme.similitud_semantica >= 0.40:
-                    preinforme.relevancia_semantica = 'Media'
                 else:
-                    preinforme.relevancia_semantica = 'Relacionada'
+                    preinforme.relevancia_semantica = 'Fuerte'
 
     context = {
         'page_obj': page_obj,
