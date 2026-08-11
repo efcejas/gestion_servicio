@@ -27,86 +27,159 @@
     </div>
 
     <!-- Filtros -->
-    <form method="get" class="bg-white rounded-xl shadow-sm border border-gray-100 px-5 py-4 mb-4">
-        {% if buscador_ia_habilitado %}
-        <div class="mb-4 rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
-            <div class="mb-2 flex items-start gap-3">
-                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                    <i class="fas fa-magic"></i>
-                </div>
-                <div>
-                    <h2 class="text-sm font-semibold text-indigo-950">Buscador inteligente de casos</h2>
-                    <p class="text-xs text-indigo-700">Describí qué casos necesitás. La IA corregirá errores y buscará términos clínicos relacionados.</p>
-                </div>
-            </div>
-            <div class="flex flex-col gap-2 sm:flex-row">
-                <input type="search" name="q_ia" value="{{ q_ia }}" maxlength="500"
-                       placeholder="Ej: Necesito casos de tumor de colon con compromiso hepático"
-                       class="min-w-0 flex-1 rounded-lg border border-indigo-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
-                <button type="submit"
-                        class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
-                    <i class="fas fa-search mr-1.5"></i>Buscar con IA
-                </button>
-            </div>
-            <p class="mt-2 text-[11px] text-indigo-600">
-                <i class="fas fa-shield-alt mr-1"></i>No ingreses nombres, DNI ni otros datos identificatorios. Los resultados son orientativos.
-            </p>
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 px-4 sm:px-5 py-4 mb-4">
+        <div class="mb-4 rounded-lg border border-sky-100 bg-sky-50 px-3 py-2.5 text-xs text-sky-800">
+            <i class="fas fa-circle-info mr-1.5"></i>
+            Cada tarjeta tiene su propio Buscar y Limpiar. Al buscar desde una tarjeta, se mantienen los filtros de las otras que ya esten cargados.
         </div>
-        {% endif %}
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-            <div class="sm:col-span-2 lg:col-span-2">
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Buscar en el informe</label>
-                <input type="search" name="contenido" value="{{ q_contenido }}"
-                       placeholder="Ej: neumonía redonda"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">N° Estudio</label>
-                <input type="text" name="numero_estudio" value="{{ q_numero }}"
-                       placeholder="Ej: TEST-2026-010"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-            </div>
-            {% if not request.user.is_demo_user %}<div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Paciente</label>
-                <input type="text" name="paciente" value="{{ q_paciente }}"
-                       placeholder="Apellido o nombre"
-                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-            </div>{% endif %}
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo de estudio</label>
-                <select name="tipo_estudio"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-                    <option value="">Todos</option>
-                    {% for tipo in tipos_estudio %}
-                    <option value="{{ tipo.id }}" {% if q_tipo == tipo.id|stringformat:"s" %}selected{% endif %}>{{ tipo.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Región</label>
-                <select name="region"
-                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
-                    <option value="">Todas</option>
-                    {% for region in regiones %}
-                    <option value="{{ region.id }}" {% if q_region == region.id|stringformat:"s" %}selected{% endif %}>{{ region.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <form method="get" class="rounded-xl border border-teal-100 bg-teal-50/40 p-4">
+                <input type="hidden" name="contenido" value="{{ q_contenido }}">
+                <input type="hidden" name="q_ia" value="{{ q_ia }}">
+
+                <div class="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                        <h2 class="text-sm font-semibold text-teal-900">Filtros básicos</h2>
+                        <p class="text-xs text-teal-700">N° estudio, paciente, tipo y región.</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-medium text-teal-700">
+                        Básicos
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">N° Estudio</label>
+                        <input type="text" name="numero_estudio" value="{{ q_numero }}"
+                               placeholder="Ej: TEST-2026-010"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    </div>
+
+                    {% if not request.user.is_demo_user %}
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Paciente</label>
+                        <input type="text" name="paciente" value="{{ q_paciente }}"
+                               placeholder="Apellido o nombre"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Tipo de estudio</label>
+                        <select name="tipo_estudio"
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                            <option value="">Todos</option>
+                            {% for tipo in tipos_estudio %}
+                            <option value="{{ tipo.id }}" {% if q_tipo == tipo.id|stringformat:"s" %}selected{% endif %}>{{ tipo.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Región</label>
+                        <select name="region"
+                                class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                            <option value="">Todas</option>
+                            {% for region in regiones %}
+                            <option value="{{ region.id }}" {% if q_region == region.id|stringformat:"s" %}selected{% endif %}>{{ region.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="submit"
+                            class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors">
+                        <i class="fas fa-search mr-1.5"></i>Buscar
+                    </button>
+                    <a href="{% url 'preinformes:lista_banco_informes' %}{% if q_contenido or q_ia %}?{% endif %}{% if q_contenido %}contenido={{ q_contenido|urlencode }}{% endif %}{% if q_contenido and q_ia %}&{% endif %}{% if q_ia %}q_ia={{ q_ia|urlencode }}{% endif %}"
+                       class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                        <i class="fas fa-times mr-1.5"></i>Limpiar
+                    </a>
+                </div>
+            </form>
+
+            <section class="flex flex-col gap-4 md:border-l md:border-gray-100 md:pl-4">
+                <form method="get" class="rounded-xl border border-cyan-100 bg-cyan-50/40 p-4">
+                    <input type="hidden" name="numero_estudio" value="{{ q_numero }}">
+                    {% if not request.user.is_demo_user %}<input type="hidden" name="paciente" value="{{ q_paciente }}">{% endif %}
+                    <input type="hidden" name="tipo_estudio" value="{{ q_tipo }}">
+                    <input type="hidden" name="region" value="{{ q_region }}">
+                    <input type="hidden" name="q_ia" value="{{ q_ia }}">
+
+                    <div class="mb-3 flex items-start justify-between gap-2">
+                        <div>
+                            <h2 class="text-sm font-semibold text-cyan-900">Filtros especializados</h2>
+                            <p class="text-xs text-cyan-700">Búsqueda por texto dentro del informe definitivo.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-cyan-100 px-2 py-0.5 text-[11px] font-medium text-cyan-700">
+                            Especializados
+                        </span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Buscar en el informe</label>
+                        <input type="search" name="contenido" value="{{ q_contenido }}"
+                               placeholder="Ej: neumonía redonda"
+                               class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500">
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-sm font-medium rounded-lg transition-colors">
+                            <i class="fas fa-search mr-1.5"></i>Buscar
+                        </button>
+                        <a href="{% url 'preinformes:lista_banco_informes' %}?numero_estudio={{ q_numero|urlencode }}{% if not request.user.is_demo_user %}&paciente={{ q_paciente|urlencode }}{% endif %}&tipo_estudio={{ q_tipo|urlencode }}&region={{ q_region|urlencode }}{% if q_ia %}&q_ia={{ q_ia|urlencode }}{% endif %}"
+                           class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                            <i class="fas fa-times mr-1.5"></i>Limpiar
+                        </a>
+                    </div>
+                </form>
+
+                {% if buscador_ia_habilitado %}
+                <form method="get" class="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4">
+                    <input type="hidden" name="numero_estudio" value="{{ q_numero }}">
+                    {% if not request.user.is_demo_user %}<input type="hidden" name="paciente" value="{{ q_paciente }}">{% endif %}
+                    <input type="hidden" name="tipo_estudio" value="{{ q_tipo }}">
+                    <input type="hidden" name="region" value="{{ q_region }}">
+                    <input type="hidden" name="contenido" value="{{ q_contenido }}">
+
+                    <div class="mb-2 flex items-start gap-3">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
+                            <i class="fas fa-magic"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-semibold text-indigo-950">Buscador inteligente de casos</h2>
+                            <p class="text-xs text-indigo-700">Consulta libre con apoyo IA y combinacion con filtros vigentes.</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <input type="search" name="q_ia" value="{{ q_ia }}" maxlength="500"
+                               placeholder="Ej: Necesito casos de tumor de colon con compromiso hepático"
+                               class="w-full rounded-lg border border-indigo-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-2 justify-start">
+                        <button type="submit"
+                                class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                            <i class="fas fa-search mr-1.5"></i>Buscar con IA
+                        </button>
+                        <a href="{% url 'preinformes:lista_banco_informes' %}?numero_estudio={{ q_numero|urlencode }}{% if not request.user.is_demo_user %}&paciente={{ q_paciente|urlencode }}{% endif %}&tipo_estudio={{ q_tipo|urlencode }}&region={{ q_region|urlencode }}{% if q_contenido %}&contenido={{ q_contenido|urlencode }}{% endif %}"
+                           class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
+                            <i class="fas fa-times mr-1.5"></i>Limpiar
+                        </a>
+                    </div>
+
+                    <p class="mt-2 text-[11px] text-indigo-600">
+                        <i class="fas fa-shield-alt mr-1"></i>No ingreses nombres, DNI ni otros datos identificatorios. Los resultados son orientativos.
+                    </p>
+                </form>
+                {% endif %}
+            </section>
         </div>
-        <div class="flex gap-2 mt-3">
-            <button type="submit"
-                    class="inline-flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors">
-                <i class="fas fa-search mr-1.5"></i>Buscar
-            </button>
-            {% if q_ia or q_contenido or q_numero or q_paciente or q_tipo or q_region %}
-            <a href="{% url 'preinformes:lista_banco_informes' %}"
-               class="inline-flex items-center px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium rounded-lg transition-colors">
-                <i class="fas fa-times mr-1.5"></i>Limpiar
-            </a>
-            {% endif %}
-        </div>
-    </form>
+    </div>
 
     {% if q_ia and interpretacion_ia.success %}
     <div class="mb-4 rounded-xl border border-indigo-200 bg-white px-5 py-4 shadow-sm">
@@ -151,6 +224,9 @@
             <p class="text-sm text-gray-500">
                 <span class="font-semibold text-gray-700">{{ page_obj.paginator.count }}</span>
                 informe{{ page_obj.paginator.count|pluralize }} encontrado{{ page_obj.paginator.count|pluralize }}
+                {% if estado_semantico.limite_alcanzado %}
+                <span class="ml-1 text-xs text-indigo-600">Se muestran los {{ estado_semantico.max_resultados }} más relevantes.</span>
+                {% endif %}
             </p>
         </div>
 
@@ -197,17 +273,19 @@
 
                     {% if preinforme.coincidencia_texto %}
                     <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-gray-700">
-                        <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                            <i class="fas fa-search mr-1"></i>Coincidencia en el informe definitivo
+                        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                            <i class="fas fa-search mr-1"></i>{% if preinforme.coincidencia_seccion == 'Informe definitivo' %}Coincidencia en el informe definitivo{% else %}Coincidencia en {{ preinforme.coincidencia_seccion }}{% endif %}
                         </p>
-                        <p>{{ preinforme.coincidencia_antes }}<mark class="rounded bg-yellow-300 px-0.5 font-semibold text-gray-900">{{ preinforme.coincidencia_texto }}</mark>{{ preinforme.coincidencia_despues }}</p>
+                        <p class="mt-1 text-xs font-medium text-amber-800">{{ preinforme.coincidencia_explicacion }}</p>
+                        <p class="mt-1.5 border-l-2 border-amber-300 pl-2">{{ preinforme.coincidencia_antes }}<mark class="rounded bg-yellow-300 px-0.5 font-semibold text-gray-900">{{ preinforme.coincidencia_texto }}</mark>{{ preinforme.coincidencia_despues }}</p>
                     </div>
                     {% elif preinforme.resumen_semantico %}
                     <div class="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm leading-relaxed text-gray-700">
                         <p class="mb-1 text-xs font-semibold uppercase tracking-wide text-indigo-700">
                             <i class="fas fa-brain mr-1"></i>Coincidencia semántica · Relevancia {{ preinforme.relevancia_semantica }}
                         </p>
-                        <p>{{ preinforme.resumen_semantico }}</p>
+                        <p class="text-xs font-medium text-indigo-800">{{ preinforme.explicacion_semantica }}</p>
+                        <p class="mt-1.5 border-l-2 border-indigo-300 pl-2">{{ preinforme.resumen_semantico }}</p>
                     </div>
                     {% endif %}
 
@@ -227,7 +305,7 @@
         <div class="bg-white px-6 py-3 flex items-center justify-between border-t border-gray-200">
             <p class="text-sm text-gray-600">
                 Mostrando <span class="font-medium">{{ page_obj.start_index }}</span>–<span class="font-medium">{{ page_obj.end_index }}</span>
-                de <span class="font-medium">{{ page_obj.paginator.count }}</span> resultados
+                de <span class="font-medium">{{ page_obj.paginator.count }}</span> resultados{% if estado_semantico.limite_alcanzado %} (se muestran los {{ estado_semantico.max_resultados }} más relevantes){% endif %}
             </p>
             <nav class="inline-flex rounded-md shadow-sm -space-x-px">
                 {% if page_obj.has_previous %}

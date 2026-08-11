@@ -966,6 +966,62 @@ def ver_preinforme(request, pk):
 
 # === BANCO DE INFORMES (pool compartido de finalizados) ===
 
+SECCIONES_INFORME_BUSQUEDA = (
+    ('datos clinicos', 'Datos clínicos'),
+    ('indicacion', 'Indicación'),
+    ('tecnica', 'Técnica'),
+    ('hallazgos', 'Hallazgos'),
+    ('conclusion', 'Conclusión'),
+    ('impresion diagnostica', 'Impresión diagnóstica'),
+    ('diagnostico', 'Diagnóstico'),
+)
+
+
+def _seccion_de_coincidencia(texto_normalizado, posicion):
+    """Identifica el encabezado clínico más cercano anterior a una coincidencia."""
+    encontrada = ('Informe definitivo', -1)
+    for marcador, etiqueta in SECCIONES_INFORME_BUSQUEDA:
+        inicio = texto_normalizado.rfind(marcador, 0, posicion + 1)
+        if inicio > encontrada[1]:
+            encontrada = (etiqueta, inicio)
+    return encontrada[0]
+
+
+def _fragmento_alrededor(texto, inicio, fin, margen=125):
+    antes_inicio = max(0, inicio - margen)
+    despues_fin = min(len(texto), fin + margen)
+    return {
+        'antes': ('…' if antes_inicio else '') + texto[antes_inicio:inicio],
+        'texto': texto[inicio:fin],
+        'despues': texto[fin:despues_fin] + ('…' if despues_fin < len(texto) else ''),
+    }
+
+
+def _resumen_visual_semantico(texto, conceptos):
+    """Elige el pasaje con más vocabulario de la consulta sin inventar contenido."""
+    palabras = {
+        palabra
+        for concepto in conceptos
+        for palabra in normalizar_texto_busqueda(concepto).split()
+        if len(palabra) >= 4 and palabra not in {'casos', 'caso', 'informe', 'informes', 'necesito'}
+    }
+    fragmentos = [
+        fragmento.strip()
+        for fragmento in re.split(r'(?<=[.!?;])\s+', texto)
+        if fragmento.strip()
+    ]
+    if not fragmentos:
+        return ''
+    mejor = max(
+        fragmentos,
+        key=lambda fragmento: sum(
+            palabra in normalizar_texto_busqueda(fragmento) for palabra in palabras
+        ),
+    )
+    if len(mejor) > 300:
+        mejor = mejor[:300].rsplit(' ', 1)[0] + '…'
+    return mejor
+
 @login_required
 @role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
 def lista_banco_informes(request):
@@ -1012,11 +1068,13 @@ def lista_banco_informes(request):
 
         interpretacion_ia = BuscadorCasosIA().interpretar(q_ia)
         error_ia = interpretacion_ia.get('error', '')
+        consulta_corregida = interpretacion_ia.get('consulta_corregida') or q_ia
         terminos_ia = [
             normalizar_texto_busqueda(termino)
-            for termino in interpretacion_ia.get('terminos', [])
+            for termino in [q_ia, consulta_corregida, *interpretacion_ia.get('terminos', [])]
             if normalizar_texto_busqueda(termino)
         ]
+        terminos_ia = list(dict.fromkeys(terminos_ia))
         terminos_busqueda.extend(terminos_ia)
 
         def ids_catalogo_compatibles(modelo, texto):
@@ -1054,7 +1112,7 @@ def lista_banco_informes(request):
 
         from .busqueda_semantica_service import BusquedaSemanticaInformes
 
-        consulta_semantica = interpretacion_ia.get('consulta_corregida') or q_ia
+        consulta_semantica = consulta_corregida
         if terminos_ia:
             consulta_semantica += '. Conceptos relacionados: ' + ', '.join(terminos_ia)
         revisiones_semanticas = RevisionPreinforme.objects.filter(
@@ -1103,17 +1161,24 @@ def lista_banco_informes(request):
             inicio = texto_normalizado.find(termino_encontrado) if termino_encontrado else -1
             if inicio >= 0:
                 fin = inicio + len(termino_encontrado)
-                margen = 100
-                preinforme.coincidencia_antes = (
-                    ('…' if inicio > margen else '') + texto[max(0, inicio - margen):inicio]
+                fragmento = _fragmento_alrededor(texto, inicio, fin)
+                preinforme.coincidencia_antes = fragmento['antes']
+                preinforme.coincidencia_texto = fragmento['texto']
+                preinforme.coincidencia_despues = fragmento['despues']
+                preinforme.coincidencia_seccion = _seccion_de_coincidencia(
+                    texto_normalizado, inicio
                 )
-                preinforme.coincidencia_texto = texto[inicio:fin]
-                preinforme.coincidencia_despues = (
-                    texto[fin:fin + margen] + ('…' if fin + margen < len(texto) else '')
+                preinforme.coincidencia_explicacion = (
+                    f'El informe menciona “{preinforme.coincidencia_texto}” '
+                    f'en {preinforme.coincidencia_seccion.lower()}.'
                 )
             elif preinforme.pk in puntajes_semanticos:
-                preinforme.resumen_semantico = (
-                    texto[:220] + ('…' if len(texto) > 220 else '')
+                preinforme.resumen_semantico = _resumen_visual_semantico(
+                    texto, [q_ia, *terminos_busqueda]
+                )
+                preinforme.explicacion_semantica = (
+                    'El contenido global del informe es clínicamente relacionado con la búsqueda, '
+                    'aunque no contiene una frase equivalente exacta.'
                 )
                 preinforme.similitud_semantica = puntajes_semanticos[preinforme.pk]
                 if preinforme.similitud_semantica >= 0.55:

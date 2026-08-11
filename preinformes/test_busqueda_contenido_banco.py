@@ -146,3 +146,35 @@ class BusquedaContenidoBancoTest(TestCase):
         self.assertContains(response, 'BUSQ-001')
         self.assertContains(response, 'Coincidencia semántica')
         self.assertContains(response, 'Relevancia Alta')
+
+    @patch('preinformes.busqueda_semantica_service.BusquedaSemanticaInformes.buscar')
+    @patch('preinformes.buscador_casos_service.BuscadorCasosIA.interpretar')
+    def test_busqueda_ia_resalta_consulta_original_y_explica_seccion(
+        self, interpretar, buscar_semantico
+    ):
+        self.revision.informe_final_html = (
+            '<p>DATOS CLÍNICOS: Convulsiones. Antecedente de tumor cerebral.</p>'
+            '<p>HALLAZGOS: Sin efecto de masa.</p>'
+        )
+        self.revision.save()
+        interpretar.return_value = {
+            'success': True,
+            'consulta_corregida': 'tumor cerebral',
+            'terminos': ['neoplasia intracraneal'],
+            'tipo_estudio': '',
+            'region': '',
+            'explicacion': 'Busca lesiones tumorales cerebrales.',
+        }
+        buscar_semantico.return_value = {
+            'success': True,
+            'resultados': [],
+            'indexadas': 0,
+        }
+
+        response = self.client.get(self.url, {'q_ia': 'tumor cerebral'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Coincidencia en Datos clínicos')
+        self.assertContains(response, 'El informe menciona')
+        self.assertContains(response, '<mark', html=False)
+        self.assertContains(response, 'tumor cerebral')

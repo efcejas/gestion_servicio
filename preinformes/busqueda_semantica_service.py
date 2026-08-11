@@ -156,11 +156,14 @@ class BusquedaSemanticaInformes:
                         'similitud': similitud,
                     })
             resultados.sort(key=lambda item: item['similitud'], reverse=True)
+            limite_alcanzado = len(resultados) > self.max_resultados
             return {
                 'success': True,
                 'resultados': resultados[:self.max_resultados],
                 'indexadas': indexadas,
                 'modelo': self.modelo,
+                'limite_alcanzado': limite_alcanzado,
+                'max_resultados': self.max_resultados,
             }
         except Exception:
             logger.exception('Error en búsqueda semántica de informes')
