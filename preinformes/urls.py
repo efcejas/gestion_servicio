@@ -14,6 +14,7 @@ urlpatterns = [
     path('eliminar/<int:pk>/', views.eliminar_preinforme, name='eliminar_preinforme'),
     path('mis-preinformes/', views.mis_preinformes, name='mis_preinformes'),
     path('ver/<int:pk>/', views.ver_preinforme, name='ver_preinforme'),
+    path('ver/<int:pk>/marcar-correccion-vista/', views.marcar_correccion_vista, name='marcar_correccion_vista'),
     
     # Banco de Informes (pool compartido de finalizados)
     path('banco/', views.lista_banco_informes, name='lista_banco_informes'),

@@ -938,6 +938,11 @@ class Preinforme(models.Model):
     fecha_envio_revision = models.DateTimeField(null=True, blank=True)
     fecha_inicio_revision = models.DateTimeField(null=True, blank=True)
     fecha_finalizacion = models.DateTimeField(null=True, blank=True)
+    fecha_correccion_vista = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Momento en que el residente confirmó haber revisado la corrección.',
+    )
     
     class Meta:
         verbose_name = "Preinforme"
@@ -994,6 +999,7 @@ class Preinforme(models.Model):
         """Finaliza la revisión"""
         self.estado = 'finalizado'
         self.fecha_finalizacion = timezone.now()
+        self.fecha_correccion_vista = None
         self.save()
     
     def marcar_en_edicion(self, usuario):

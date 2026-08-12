@@ -53,6 +53,16 @@
 <div class="max-w-full px-4 sm:px-6 lg:px-10 py-0">
     {% include 'components/breadcrumb.html' with section_label="Preinformes" section_url="preinformes:mis_preinformes" current_label=title %}
 
+    {% if en_cola_correcciones %}
+    <div class="mb-4 flex flex-col gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm font-semibold text-violet-900">Revisión de correcciones pendientes</p>
+            <p class="text-xs text-violet-700">Quedan {{ correcciones_pendientes }} incluida esta corrección.</p>
+        </div>
+        <a href="{% url 'preinformes:mis_preinformes' %}" class="text-sm font-medium text-violet-700 hover:text-violet-900">Salir de la revisión</a>
+    </div>
+    {% endif %}
+
     <!-- ═══ HEADER COMPACTO ═══ -->
     <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg overflow-hidden mb-4">
         <div class="px-6 py-4">
@@ -559,9 +569,9 @@
     {% endif %}
 
     <!-- Botones de navegación -->
-    <div class="flex justify-between">
+    <div class="flex flex-col gap-3 sm:flex-row sm:justify-between">
         {% if user.rol == 'medico_residente' or user.rol == 'jefe_residentes' %}
-            <a href="{% url 'preinformes:mis_preinformes' %}" 
+            <a href="{{ volver_url }}"
                class="bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors">
                 ← Volver a Mis Preinformes
             </a>
@@ -579,6 +589,25 @@
                     Editar Preinforme
                 </a>
             {% endif %}
+        {% endif %}
+
+        {% if preinforme.estado == 'finalizado' and preinforme.revision and not preinforme.fecha_correccion_vista %}
+        <form method="post" action="{% url 'preinformes:marcar_correccion_vista' preinforme.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ volver_url }}">
+            {% if en_cola_correcciones %}<input type="hidden" name="cola" value="correcciones">{% endif %}
+            <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-violet-600 px-5 py-2.5 font-semibold text-white hover:bg-violet-700 sm:w-auto">
+                <i class="fas fa-check mr-2"></i>Marcar como revisado{% if en_cola_correcciones %} y ver siguiente{% endif %}
+            </button>
+        </form>
+        {% elif en_cola_correcciones %}
+        <form method="post" action="{% url 'preinformes:marcar_correccion_vista' preinforme.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="cola" value="correcciones">
+            <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-violet-600 px-5 py-2.5 font-semibold text-white hover:bg-violet-700 sm:w-auto">
+                Ver siguiente pendiente <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+        </form>
         {% endif %}
     </div>
 </div>

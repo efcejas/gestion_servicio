@@ -643,6 +643,12 @@ def dashboard_residente(request):
         residente=request.user,
         estado='en_revision'
     ).count()
+    correcciones_pendientes = Preinforme.objects.filter(
+        residente=request.user,
+        estado='finalizado',
+        revision__isnull=False,
+        fecha_correccion_vista__isnull=True,
+    ).count()
     
     # Últimos preinformes
     ultimos_preinformes = Preinforme.objects.filter(
@@ -665,6 +671,7 @@ def dashboard_residente(request):
         'historial': historial,
         'preinformes_pendientes': preinformes_pendientes,
         'preinformes_en_revision': preinformes_en_revision,
+        'correcciones_pendientes': correcciones_pendientes,
         'ultimos_preinformes': ultimos_preinformes,
         'preinformes_en_edicion': preinformes_en_edicion,
         'encuesta_completada': encuesta_completada,
@@ -892,7 +899,15 @@ def eliminar_preinforme(request, pk):
 def mis_preinformes(request):
     """Lista de preinformes del residente"""
     form = FiltroPreinformesForm(request.GET, user=request.user)
-    preinformes = Preinforme.objects.filter(residente=request.user)
+    preinformes = Preinforme.objects.filter(residente=request.user).select_related('revision')
+    correcciones_qs = Preinforme.objects.filter(
+        residente=request.user,
+        estado='finalizado',
+        revision__isnull=False,
+        fecha_correccion_vista__isnull=True,
+    ).order_by('fecha_finalizacion', 'pk')
+    correcciones_pendientes = correcciones_qs.count()
+    primera_correccion_pendiente = correcciones_qs.first()
     
     # Aplicar filtros
     if form.is_valid():
@@ -939,6 +954,8 @@ def mis_preinformes(request):
         'form': form,
         'etiquetas_disponibles': etiquetas_disponibles,
         'etiquetas_seleccionadas': [int(id) for id in etiquetas_ids],
+        'correcciones_pendientes': correcciones_pendientes,
+        'primera_correccion_pendiente': primera_correccion_pendiente,
         'title': 'Mis Preinformes'
     }
     
@@ -953,15 +970,79 @@ def ver_preinforme(request, pk):
         preinforme = get_object_or_404(Preinforme, pk=pk)
     else:
         preinforme = get_object_or_404(Preinforme, pk=pk, residente=request.user)
-    
+
+    en_cola_correcciones = (
+        request.GET.get('cola') == 'correcciones'
+        and preinforme.residente_id == request.user.id
+        and preinforme.estado == 'finalizado'
+    )
+    volver_url = request.GET.get('next') or reverse('preinformes:mis_preinformes')
+    if not url_has_allowed_host_and_scheme(
+        volver_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        volver_url = reverse('preinformes:mis_preinformes')
+    correcciones_pendientes = Preinforme.objects.filter(
+        residente=request.user,
+        estado='finalizado',
+        revision__isnull=False,
+        fecha_correccion_vista__isnull=True,
+    ).count()
+
     context = {
         'preinforme': preinforme,
         'adjuntos_residente': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='revisor', activo=True),
+        'en_cola_correcciones': en_cola_correcciones,
+        'correcciones_pendientes': correcciones_pendientes,
+        'volver_url': volver_url,
         'title': f'Preinforme {preinforme.numero_estudio}'
     }
     
     return render(request, 'preinformes/ver_preinforme.html', context)
+
+
+@login_required
+@role_required('medico_residente', 'jefe_residentes', 'instructor_residentes')
+@require_http_methods(['POST'])
+def marcar_correccion_vista(request, pk):
+    """Confirma la lectura y avanza a la siguiente corrección pendiente."""
+    preinforme = get_object_or_404(
+        Preinforme,
+        pk=pk,
+        residente=request.user,
+        estado='finalizado',
+        revision__isnull=False,
+    )
+    if preinforme.fecha_correccion_vista is None:
+        preinforme.fecha_correccion_vista = timezone.now()
+        preinforme.save(update_fields=['fecha_correccion_vista', 'fecha_modificacion'])
+
+    volver_url = request.POST.get('next') or reverse('preinformes:mis_preinformes')
+    if not url_has_allowed_host_and_scheme(
+        volver_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        volver_url = reverse('preinformes:mis_preinformes')
+    if request.POST.get('cola') != 'correcciones':
+        messages.success(request, 'Corrección marcada como revisada.')
+        return redirect(volver_url)
+
+    siguiente = Preinforme.objects.filter(
+        residente=request.user,
+        estado='finalizado',
+        revision__isnull=False,
+        fecha_correccion_vista__isnull=True,
+    ).exclude(pk=preinforme.pk).order_by('fecha_finalizacion', 'pk').first()
+    if siguiente:
+        return redirect(
+            f"{reverse('preinformes:ver_preinforme', args=[siguiente.pk])}?cola=correcciones"
+        )
+
+    messages.success(request, 'Ya revisaste todas tus correcciones pendientes.')
+    return redirect('preinformes:mis_preinformes')
 
 
 # === BANCO DE INFORMES (pool compartido de finalizados) ===
