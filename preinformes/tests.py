@@ -639,6 +639,10 @@ class PreinformeViewTest(TestCase):
         self.assertContains(response, 'preinformes_dictado_flotante.css')
         self.assertContains(response, 'preinformes_dictado_flotante.js')
         self.assertContains(response, 'inicializarDictadoFlotante')
+        self.assertContains(response, "setDictadoButtonState('recording')")
+        self.assertContains(response, "setDictadoButtonState('transcribing')")
+        self.assertContains(response, "addEventListener('pointerdown'")
+        self.assertNotContains(response, 'dictadoToggleButton.className =')
 
     def test_crear_preinforme_post(self):
         """Test POST del formulario de creación"""
@@ -1206,6 +1210,11 @@ class RevisionFinalizadaEditTest(TestCase):
         self.assertContains(response, 'preinformes_dictado_flotante.css')
         self.assertContains(response, 'preinformes_dictado_flotante.js')
         self.assertContains(response, 'inicializarDictadoFlotante')
+        self.assertContains(response, "setDictadoButtonState('recording')")
+        self.assertContains(response, "setDictadoButtonState('transcribing')")
+        self.assertContains(response, "addEventListener('pointerdown'")
+        self.assertContains(response, 'model.insertContent')
+        self.assertNotContains(response, 'dictadoToggleButton.className =')
 
     @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
     def test_primera_correccion_incluye_dictado_flotante_compartido(self):

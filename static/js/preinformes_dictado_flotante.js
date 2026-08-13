@@ -52,6 +52,7 @@
         window.addEventListener('scroll', solicitarActualizacion, { passive: true });
         window.addEventListener('resize', solicitarActualizacion);
         window.addEventListener('pageshow', solicitarActualizacion);
+        boton.addEventListener('dictado:estado', solicitarActualizacion);
         if ('ResizeObserver' in window) {
             const observador = new ResizeObserver(solicitarActualizacion);
             observador.observe(editor);

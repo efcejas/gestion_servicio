@@ -599,6 +599,24 @@
             : 'text-xs text-gray-600';
     }
 
+    function setDictadoButtonState(state) {
+        if (!dictadoToggleButton) return;
+
+        dictadoToggleButton.disabled = state === 'transcribing';
+        dictadoToggleButton.classList.toggle('dictado-recording', state === 'recording');
+        dictadoToggleButton.classList.toggle('dictado-transcribing', state === 'transcribing');
+        dictadoToggleButton.setAttribute('aria-pressed', state === 'recording' ? 'true' : 'false');
+
+        if (state === 'recording') {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-stop mr-2"></i>Detener dictado';
+        } else if (state === 'transcribing') {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Transcribiendo...';
+        } else {
+            dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
+        }
+        dictadoToggleButton.dispatchEvent(new CustomEvent('dictado:estado'));
+    }
+
     function normalizarTextoDictado(texto) {
         if (!texto) return '';
 
@@ -675,7 +693,10 @@
                 const insertPosition = editorInstance.model.document.selection.getFirstPosition();
                 const { charBefore, charAfter } = getCkEditorNeighborChars(insertPosition);
                 textoLimpio = ajustarPuntuacionPorContexto(textoLimpio, charBefore, charAfter);
-                writer.insertText(textoLimpio, insertPosition);
+                const textNode = writer.createText(textoLimpio);
+                // insertContent inserta en la selección y deja el cursor después
+                // del texto, permitiendo continuar con dictados sucesivos.
+                editorInstance.model.insertContent(textNode, editorInstance.model.document.selection);
             });
             return;
         }
@@ -698,6 +719,7 @@
     async function procesarDictadoGrabado() {
         if (!dictadoChunks.length) {
             setDictadoStatus('No se detectó audio para transcribir.', true);
+            setDictadoButtonState('ready');
             return;
         }
 
@@ -706,10 +728,12 @@
 
         if (audioBlob.size < 500) {
             setDictadoStatus('Audio muy corto. Dicta al menos 1 segundo.', true);
+            setDictadoButtonState('ready');
             return;
         }
 
         setDictadoStatus('Transcribiendo...');
+        setDictadoButtonState('transcribing');
 
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
@@ -733,6 +757,8 @@
                 setDictadoStatus('Texto insertado en la posición del cursor.');
             } catch (error) {
                 setDictadoStatus(error.message || 'Error durante transcripción.', true);
+            } finally {
+                setDictadoButtonState('ready');
             }
         };
     }
@@ -763,10 +789,7 @@
             dictadoMediaRecorder.start(500);
             dictadoActivo = true;
 
-            if (dictadoToggleButton) {
-                dictadoToggleButton.innerHTML = '<i class="fas fa-stop mr-2"></i>Detener dictado';
-                dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 transition';
-            }
+            setDictadoButtonState('recording');
             setDictadoStatus('Grabando... hablé y luego presiona detener.');
         } catch (error) {
             setDictadoStatus('No se pudo acceder al micrófono.', true);
@@ -777,10 +800,7 @@
         if (!dictadoMediaRecorder || dictadoMediaRecorder.state === 'inactive') return;
         dictadoMediaRecorder.stop();
         dictadoActivo = false;
-        if (dictadoToggleButton) {
-            dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
-            dictadoToggleButton.className = 'inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition';
-        }
+        setDictadoButtonState('transcribing');
     }
 
     // --- Ciclo periódico servidor (respaldo) ---
@@ -922,6 +942,10 @@
     }
 
     if (DICTADO_CURSOR_HABILITADO && dictadoToggleButton) {
+        dictadoToggleButton.addEventListener('pointerdown', function(event) {
+            // Mantener el foco y la selección elegida dentro de CKEditor.
+            event.preventDefault();
+        });
         dictadoToggleButton.addEventListener('click', function() {
             if (dictadoActivo) {
                 detenerDictado();

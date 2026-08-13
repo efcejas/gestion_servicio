@@ -828,6 +828,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             dictadoToggleButton.innerHTML = '<i class="fas fa-microphone mr-2"></i>Iniciar dictado';
         }
+        dictadoToggleButton.dispatchEvent(new CustomEvent('dictado:estado'));
     }
 
     function normalizarTextoDictado(texto) {
@@ -2467,6 +2468,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (DICTADO_CURSOR_HABILITADO && dictadoToggleButton) {
+        dictadoToggleButton.addEventListener('pointerdown', function(event) {
+            // Evitar que el botón quite el foco y la selección actual del editor.
+            event.preventDefault();
+        });
         dictadoToggleButton.addEventListener('click', function() {
             if (dictadoActivo) {
                 detenerDictado();
