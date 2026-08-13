@@ -625,6 +625,21 @@ class PreinformeViewTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Nuevo Preinforme')
 
+    @override_settings(
+        PREINFORMES_DICTADO_CURSOR_HABILITADO=True,
+        STORAGES=TEST_STORAGES,
+    )
+    def test_creacion_incluye_dictado_flotante_compartido(self):
+        self.client.login(username='residente1', password='testpass123')
+
+        response = self.client.get(reverse('preinformes:crear_preinforme'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="dictado-toggle"')
+        self.assertContains(response, 'preinformes_dictado_flotante.css')
+        self.assertContains(response, 'preinformes_dictado_flotante.js')
+        self.assertContains(response, 'inicializarDictadoFlotante')
+
     def test_crear_preinforme_post(self):
         """Test POST del formulario de creación"""
         self.client.login(username='residente1', password='testpass123')
@@ -645,7 +660,10 @@ class PreinformeViewTest(TestCase):
         # Verificar que se creó el preinforme
         self.assertTrue(Preinforme.objects.filter(numero_estudio='2024-001234').exists())
 
-    @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
+    @override_settings(
+        PREINFORMES_DICTADO_CURSOR_HABILITADO=True,
+        STORAGES=TEST_STORAGES,
+    )
     def test_editar_preinforme_confirmado_mantiene_dictado_flotante(self):
         preinforme = Preinforme.objects.create(
             residente=self.residente,
@@ -666,8 +684,9 @@ class PreinformeViewTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="dictado-toggle"')
-        self.assertContains(response, 'dictado-floating')
-        self.assertContains(response, "window.addEventListener('pageshow'")
+        self.assertContains(response, 'preinformes_dictado_flotante.css')
+        self.assertContains(response, 'preinformes_dictado_flotante.js')
+        self.assertContains(response, 'inicializarDictadoFlotante')
 
     def test_staff_dashboard_access(self):
         """Test acceso al dashboard de staff"""
@@ -1175,6 +1194,42 @@ class RevisionFinalizadaEditTest(TestCase):
         response = self.client.get(self._url())
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Editar Revisi')
+
+    @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
+    def test_edicion_finalizada_incluye_dictado_flotante_compartido(self):
+        self.client.login(username='rev_final_edit', password='pass123')
+
+        response = self.client.get(self._url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="dictado-toggle"')
+        self.assertContains(response, 'preinformes_dictado_flotante.css')
+        self.assertContains(response, 'preinformes_dictado_flotante.js')
+        self.assertContains(response, 'inicializarDictadoFlotante')
+
+    @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
+    def test_primera_correccion_incluye_dictado_flotante_compartido(self):
+        pendiente = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-DICT-REV-001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Primera',
+            nombre_paciente='Corrección',
+            informe_html='<p>Informe del residente.</p>',
+            estado='pendiente_revision',
+            revisor=self.revisor,
+        )
+        self.client.login(username='rev_final_edit', password='pass123')
+
+        response = self.client.get(
+            reverse('preinformes:revisar_preinforme', kwargs={'pk': pendiente.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="dictado-toggle"')
+        self.assertContains(response, 'preinformes_dictado_flotante.js')
+        self.assertContains(response, 'inicializarDictadoFlotante')
 
     def test_revisor_asignado_puede_guardar_finalizado(self):
         self.client.login(username='rev_final_edit', password='pass123')

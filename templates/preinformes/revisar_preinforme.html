@@ -4,6 +4,7 @@
 {% block title %}{{ title }}{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'styles/preinformes_dictado_flotante.css' %}">
 <!-- Preload CKEditor para carga más rápida -->
 <link rel="preconnect" href="https://cdn.ckeditor.com">
 <link rel="dns-prefetch" href="https://cdn.ckeditor.com">
@@ -213,18 +214,7 @@
                             </h2>
                             <p class="text-sm text-gray-600 mt-1">El informe del residente está cargado. Realice las modificaciones necesarias.</p>
                             {% if dictado_cursor_habilitado %}
-                            <div class="mt-2 flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    id="dictado-toggle"
-                                    class="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
-                                    title="Atajo: Alt + Shift + D"
-                                >
-                                    <i class="fas fa-microphone mr-2"></i>
-                                    Iniciar dictado
-                                </button>
-                                <span id="dictado-status" class="text-xs text-gray-600">Dictado en cursor listo (Alt + Shift + D).</span>
-                            </div>
+                            {% include 'components/dictado_cursor_button.html' %}
                             {% endif %}
                         </div>
                         <div id="autosave-indicator" class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 transition-colors duration-200">
@@ -424,6 +414,7 @@
 </div>
 
 <script src="{% static 'js/preinformes_copy.js' %}"></script>
+<script src="{% static 'js/preinformes_dictado_flotante.js' %}"></script>
 <script>
 // === SISTEMA DE AUTOGUARDADO REVISOR (localStorage + servidor) ===
 (function() {
@@ -938,6 +929,7 @@
                 iniciarDictado();
             }
         });
+        window.inicializarDictadoFlotante();
     }
 
     document.addEventListener('keydown', function(e) {

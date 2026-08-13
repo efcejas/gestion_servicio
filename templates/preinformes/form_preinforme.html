@@ -3,6 +3,10 @@
 
 {% block title %}{{ title }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'styles/preinformes_dictado_flotante.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="max-w-6xl mx-auto px-4">
     {% include 'components/breadcrumb.html' with section_label="Preinformes" section_url="preinformes:dashboard_residente" current_label=title %}
@@ -282,19 +286,7 @@
                             Contenido del Preinforme
                         </h2>
                         {% if dictado_cursor_habilitado %}
-                        <div id="dictado-anchor" class="mt-2 flex items-center gap-2">
-                            <button
-                                type="button"
-                                id="dictado-toggle"
-                                class="dictado-toggle-button inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium bg-purple-100 text-purple-700 hover:bg-purple-200 transition"
-                                title="Atajo: Alt + Shift + D"
-                                aria-pressed="false"
-                            >
-                                <i class="fas fa-microphone mr-2"></i>
-                                Iniciar dictado
-                            </button>
-                            <span id="dictado-status" class="text-xs text-gray-600">Dictado en cursor listo (Alt + Shift + D).</span>
-                        </div>
+                        {% include 'components/dictado_cursor_button.html' %}
                         {% endif %}
                     </div>
                     <div id="autosave-indicator" class="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-sm text-gray-600 transition-colors duration-200">
@@ -596,6 +588,7 @@
     {% endif %}
 </div>
 
+<script src="{% static 'js/preinformes_dictado_flotante.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const DICTADO_CURSOR_HABILITADO = {{ dictado_cursor_habilitado|yesno:'true,false' }};
@@ -607,8 +600,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return cookie ? decodeURIComponent(cookie[1]) : '';
     }
     const dictadoToggleButton = document.getElementById('dictado-toggle');
-    const dictadoAnchor = document.getElementById('dictado-anchor');
-    const dictadoEditorContainer = document.getElementById('editor-container');
     const dictadoStatusLabel = document.getElementById('dictado-status');
     let dictadoMediaRecorder = null;
     let dictadoChunks = [];
@@ -2484,58 +2475,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        if (dictadoAnchor && dictadoEditorContainer) {
-            let dictadoPositionFrame = null;
-
-            const actualizarPosicionDictado = () => {
-                dictadoPositionFrame = null;
-                const anchorRect = dictadoAnchor.getBoundingClientRect();
-                const editorRect = dictadoEditorContainer.getBoundingClientRect();
-                const margenInferior = window.innerWidth <= 640 ? 12 : 24;
-                const margenSuperior = window.innerWidth <= 640 ? 8 : 16;
-                const altoBoton = dictadoToggleButton.offsetHeight || 44;
-                // En creación y edición, mantener el micrófono accesible desde que
-                // su ubicación original sale del viewport y mientras siga visible
-                // el marco del editor. Esto también contempla scroll restaurado.
-                const debeFlotar = (
-                    anchorRect.bottom <= margenSuperior
-                    && editorRect.top < window.innerHeight
-                    && editorRect.bottom > altoBoton + margenInferior
-                );
-
-                dictadoToggleButton.classList.toggle('dictado-floating', debeFlotar);
-
-                if (debeFlotar) {
-                    // Mantener el botón dentro del marco del editor: alineado a su
-                    // esquina inferior derecha y limitado por su borde inferior.
-                    const limiteEditor = window.innerHeight - editorRect.bottom + 12;
-                    const margenHorizontal = 12;
-                    const posicionIzquierda = Math.max(
-                        editorRect.left + margenHorizontal,
-                        editorRect.right - dictadoToggleButton.offsetWidth - margenHorizontal
-                    );
-                    dictadoToggleButton.style.left = `${posicionIzquierda}px`;
-                    dictadoToggleButton.style.bottom = `${Math.max(margenInferior, limiteEditor)}px`;
-                } else {
-                    dictadoToggleButton.style.removeProperty('left');
-                    dictadoToggleButton.style.removeProperty('bottom');
-                }
-            };
-
-            const solicitarActualizacionDictado = () => {
-                if (dictadoPositionFrame !== null) return;
-                dictadoPositionFrame = window.requestAnimationFrame(actualizarPosicionDictado);
-            };
-
-            window.addEventListener('scroll', solicitarActualizacionDictado, { passive: true });
-            window.addEventListener('resize', solicitarActualizacionDictado);
-            window.addEventListener('pageshow', solicitarActualizacionDictado);
-            if ('ResizeObserver' in window) {
-                const dictadoResizeObserver = new ResizeObserver(solicitarActualizacionDictado);
-                dictadoResizeObserver.observe(dictadoEditorContainer);
-            }
-            actualizarPosicionDictado();
-        }
+        window.inicializarDictadoFlotante();
     }
 });
 </script>
@@ -2547,54 +2487,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Estilos del asistente -->
 <style>
-.dictado-toggle-button { white-space: nowrap; }
-.dictado-toggle-button.dictado-floating {
-    position: fixed;
-    left: max(1rem, env(safe-area-inset-left));
-    bottom: max(1.5rem, env(safe-area-inset-bottom));
-    z-index: 9998;
-    padding: .75rem 1rem;
-    color: #fff;
-    background: linear-gradient(135deg, #7e22ce, #9333ea);
-    border: 1px solid rgba(255, 255, 255, .28);
-    border-radius: 9999px;
-    box-shadow: 0 10px 30px rgba(126, 34, 206, .35);
-}
-.dictado-toggle-button.dictado-floating:hover {
-    background: linear-gradient(135deg, #6b21a8, #7e22ce);
-    transform: translateY(-1px);
-}
-.dictado-toggle-button.dictado-recording {
-    color: #fff;
-    background: #dc2626;
-    box-shadow: 0 0 0 0 rgba(220, 38, 38, .55);
-    animation: dictado-pulse 1.6s infinite;
-}
-.dictado-toggle-button.dictado-recording:hover { background: #b91c1c; }
-.dictado-toggle-button.dictado-transcribing,
-.dictado-toggle-button.dictado-transcribing:hover {
-    color: #fff;
-    background: #6b7280;
-    cursor: wait;
-    transform: none;
-    animation: none;
-}
-@keyframes dictado-pulse {
-    70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
-}
-@media (max-width: 640px) {
-    .dictado-toggle-button.dictado-floating {
-        left: max(.75rem, env(safe-area-inset-left));
-        bottom: max(.75rem, env(safe-area-inset-bottom));
-        max-width: calc(100vw - 5.75rem);
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
-@media (prefers-reduced-motion: reduce) {
-    .dictado-toggle-button.dictado-recording { animation: none; }
-}
 /* Animación de puntos de escritura */
 @keyframes asistente-bounce {
     0%, 80%, 100% { transform: translateY(0); }
