@@ -489,7 +489,7 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.client.login(username='staff_flow', password='pass123')
         response = self.client.post(
             reverse('preinformes:asignar_revisor', kwargs={'pk': preinforme.pk}) + '?mostrar=asignados_otros',
-            {'action': 'asignarme'},
+            {'action': 'asignarme', 'confirmar_reasignacion': '1'},
         )
 
         self.assertEqual(response.status_code, 302)
@@ -509,6 +509,66 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertEqual(response.status_code, 302)
         preinforme.refresh_from_db()
         self.assertEqual(preinforme.revisor, self.otro_staff)
+
+    def test_busqueda_en_mis_asignados_incluye_paciente_asignado_a_otro(self):
+        propio = self._preinforme('FLOW-BUSQ-PROPIO', revisor=self.staff)
+        ajeno = self._preinforme('FLOW-BUSQ-AJENO', revisor=self.otro_staff)
+        ajeno.dni_paciente = '30111222'
+        ajeno.apellido_paciente = 'Hallable'
+        ajeno.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': '30111222'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, ajeno.numero_estudio)
+        self.assertNotContains(response, propio.numero_estudio)
+        self.assertContains(response, 'Tomar para mi')
+        self.assertContains(response, 'Asignado a otro profesional')
+        self.assertContains(response, self.otro_staff.get_full_name())
+
+    def test_mis_asignados_sin_busqueda_no_muestra_asignados_a_otros(self):
+        propio = self._preinforme('FLOW-SOLO-PROPIO', revisor=self.staff)
+        ajeno = self._preinforme('FLOW-NO-AJENO', revisor=self.otro_staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'), {'mostrar': 'asignados'}
+        )
+
+        self.assertContains(response, propio.numero_estudio)
+        self.assertNotContains(response, ajeno.numero_estudio)
+
+    def test_tomar_asignado_a_otro_conserva_busqueda(self):
+        preinforme = self._preinforme('FLOW-RETORNO', revisor=self.otro_staff)
+        retorno = reverse('preinformes:lista_revision') + '?mostrar=asignados&paciente=Paciente&page=2'
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.post(
+            reverse('preinformes:asignar_revisor', kwargs={'pk': preinforme.pk}) + '?mostrar=asignados',
+            {'action': 'asignarme', 'confirmar_reasignacion': '1', 'next': retorno},
+        )
+
+        self.assertRedirects(response, retorno, fetch_redirect_response=False)
+        preinforme.refresh_from_db()
+        self.assertEqual(preinforme.revisor, self.staff)
+
+    def test_no_reasigna_estudio_ajeno_sin_confirmacion_explicita(self):
+        preinforme = self._preinforme('FLOW-SIN-CONFIRMAR', revisor=self.otro_staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.post(
+            reverse('preinformes:asignar_revisor', kwargs={'pk': preinforme.pk}),
+            {'action': 'asignarme'},
+            follow=True,
+        )
+
+        preinforme.refresh_from_db()
+        self.assertEqual(preinforme.revisor, self.otro_staff)
+        self.assertContains(response, 'Confirmá expresamente')
 
     def test_staff_puede_liberar_revision_accidental(self):
         preinforme = self._preinforme('FLOW-009', estado='en_revision', revisor=self.staff)

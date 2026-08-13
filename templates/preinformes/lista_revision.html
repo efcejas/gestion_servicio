@@ -109,6 +109,11 @@
                 {{ form.numero_estudio }}
             </div>
             {% if not request.user.is_demo_user %}<div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Paciente</label>
+                {{ form.paciente }}
+                {% if mostrar == 'asignados' %}<p class="mt-1 text-xs text-gray-500">También busca coincidencias asignadas a otros revisores.</p>{% endif %}
+            </div>{% endif %}
+            {% if not request.user.is_demo_user %}<div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Apellido del Paciente</label>
                 {{ form.apellido_paciente }}
             </div>{% endif %}
@@ -146,6 +151,11 @@
                                 {% if preinforme.asignacion_compartida %}
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
                                     <i class="fas fa-users mr-1"></i>Compartido
+                                </span>
+                                {% endif %}
+                                {% if preinforme.revisor and preinforme.revisor != user %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>Asignado a otro profesional
                                 </span>
                                 {% endif %}
                             </div>
@@ -190,6 +200,23 @@
                             <p class="text-gray-700">{{ preinforme.fecha_envio_revision|date:"d/m/Y H:i" }}</p>
                         </div>
                     </div>
+
+                    {% if preinforme.revisor and preinforme.revisor != user %}
+                    <div class="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950" role="alert">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-exclamation-triangle mt-0.5 text-amber-600"></i>
+                            <p>
+                                Este estudio está asignado a
+                                <strong>{% firstof preinforme.revisor.get_full_name preinforme.revisor.username %}</strong>.
+                                {% if preinforme.estado == 'pendiente_revision' %}
+                                    Si lo tomás, dejará de estar asignado a ese profesional.
+                                {% else %}
+                                    Ya comenzó su revisión y no puede ser reasignado.
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <div class="mt-4 sm:mt-3 flex flex-wrap gap-2">
                         {% if preinforme.estado == 'finalizado' %}
@@ -241,18 +268,19 @@
                                                 Asignarme para despues
                                             </button>
                                         </form>
-                                    {% elif preinforme.revisor != user and mostrar == 'asignados_otros' and preinforme.estado == 'pendiente_revision' %}
+                                    {% elif preinforme.revisor != user and preinforme.estado == 'pendiente_revision' %}
                                         <form method="post" action="{% url 'preinformes:asignar_revisor' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="asignarme">
-                                            <button type="submit"
-                                                    class="inline-flex items-center justify-center px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-colors shadow-sm text-sm"
-                                                    onclick="return confirm('Este estudio esta asignado a otro revisor. ¿Tomarlo para vos?')">
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button type="submit" name="confirmar_reasignacion" value="1"
+                                                    class="inline-flex items-center justify-center px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shadow-sm text-sm font-semibold"
+                                                    onclick="return confirm('Este estudio está asignado a {% firstof preinforme.revisor.get_full_name preinforme.revisor.username %}. Si lo tomás, dejará de estar asignado a ese profesional. ¿Confirmás que querés tomarlo?')">
                                                 <i class="fas fa-user-check mr-1"></i>
                                                 Tomar para mi
                                             </button>
                                         </form>
-                                    {% elif preinforme.revisor != user and mostrar == 'asignados_otros' and preinforme.estado == 'en_revision' %}
+                                    {% elif preinforme.revisor != user and preinforme.estado == 'en_revision' %}
                                         <span class="inline-flex items-center justify-center px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-sm">
                                             <i class="fas fa-lock mr-1"></i>
                                             En revision por otro staff

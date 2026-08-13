@@ -1470,6 +1470,20 @@ def lista_revision(request):
     
     # Aplicar filtros
     if form.is_valid():
+        q_paciente_staff = (
+            '' if request.user.is_demo_user else (form.cleaned_data.get('paciente') or '').strip()
+        )
+        busqueda_identificatoria = bool(
+            q_paciente_staff
+            or form.cleaned_data.get('numero_estudio')
+            or form.cleaned_data.get('apellido_paciente')
+            or form.cleaned_data.get('nombre_paciente')
+        )
+        if mostrar == 'asignados' and busqueda_identificatoria:
+            preinformes = _preinformes_visibles_para(request.user).filter(
+                estado__in=['pendiente_revision', 'en_revision'],
+                revisor__isnull=False,
+            )
         if form.cleaned_data.get('estado'):
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
         if form.cleaned_data.get('sistema_destino'):
@@ -1486,6 +1500,12 @@ def lista_revision(request):
             preinformes = preinformes.filter(fecha_envio_revision__date__lte=form.cleaned_data['fecha_hasta'])
         if form.cleaned_data.get('numero_estudio'):
             preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
+        if q_paciente_staff:
+            preinformes = preinformes.filter(
+                Q(dni_paciente__icontains=q_paciente_staff)
+                | Q(apellido_paciente__icontains=q_paciente_staff)
+                | Q(nombre_paciente__icontains=q_paciente_staff)
+            )
         if not request.user.is_demo_user and form.cleaned_data.get('apellido_paciente'):
             preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
     
@@ -1510,57 +1530,62 @@ def lista_revision(request):
 @role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def asignar_revisor(request, pk):
     """Asignar un revisor a un preinforme (o asignarse a uno mismo)"""
-    preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
-    
-    # Obtener de dónde viene para redirigir correctamente
     mostrar = request.GET.get('mostrar', 'asignados')
-    redirect_url = f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
-    
-    # Solo se pueden asignar preinformes pendientes o en revisión
-    if preinforme.estado not in ['pendiente_revision', 'en_revision']:
-        messages.error(request, 'Solo se pueden asignar preinformes pendientes o en revisión.')
-        return redirect(redirect_url)
-    
+    redirect_url = request.POST.get('next') or f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
+    if not url_has_allowed_host_and_scheme(
+        redirect_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        redirect_url = f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
+
     if request.method == 'POST':
-        action = request.POST.get('action')
-        
-        if action == 'asignarme':
-            # Asignarse a sí mismo
-            revisor_anterior = preinforme.revisor
-            if revisor_anterior and revisor_anterior != request.user and preinforme.estado == 'en_revision':
-                messages.error(
-                    request,
-                    'No se puede tomar un preinforme que ya esta en revision por otro staff.'
-                )
+        with transaction.atomic():
+            preinforme = get_object_or_404(
+                _preinformes_visibles_para(request.user).select_for_update(), pk=pk
+            )
+            if preinforme.estado not in ['pendiente_revision', 'en_revision']:
+                messages.error(request, 'Solo se pueden asignar preinformes pendientes o en revisión.')
                 return redirect(redirect_url)
-            preinforme.revisor = request.user
-            preinforme.save()
-            if revisor_anterior and revisor_anterior != request.user:
-                messages.success(
-                    request,
-                    f'Tomaste el preinforme #{preinforme.numero_estudio}, antes asignado a {revisor_anterior.get_full_name()}.'
-                )
+
+            action = request.POST.get('action')
+            if action == 'asignarme':
+                revisor_anterior = preinforme.revisor
+                if revisor_anterior and revisor_anterior != request.user and preinforme.estado == 'en_revision':
+                    messages.error(request, 'No se puede tomar un preinforme que ya está en revisión por otro staff.')
+                    return redirect(redirect_url)
+                if (
+                    revisor_anterior
+                    and revisor_anterior != request.user
+                    and request.POST.get('confirmar_reasignacion') != '1'
+                ):
+                    nombre_revisor = revisor_anterior.get_full_name() or revisor_anterior.username
+                    messages.warning(
+                        request,
+                        f'El preinforme #{preinforme.numero_estudio} sigue asignado a '
+                        f'{nombre_revisor}. Confirmá expresamente si querés tomarlo.',
+                    )
+                    return redirect(redirect_url)
+                preinforme.revisor = request.user
+                preinforme.save(update_fields=['revisor', 'fecha_modificacion'])
+                if revisor_anterior and revisor_anterior != request.user:
+                    messages.success(request, f'Tomaste el preinforme #{preinforme.numero_estudio}, antes asignado a {revisor_anterior.get_full_name()}.')
+                else:
+                    messages.success(request, f'Te asignaste el preinforme #{preinforme.numero_estudio}.')
+            elif action == 'desasignar':
+                preinforme.revisor = None
+                if preinforme.estado == 'en_revision':
+                    preinforme.estado = 'pendiente_revision'
+                preinforme.save()
+                messages.success(request, f'Desasignaste el preinforme #{preinforme.numero_estudio}.')
             else:
-                messages.success(request, f'Te asignaste el preinforme #{preinforme.numero_estudio}.')
-        elif action == 'desasignar':
-            # Desasignar el preinforme
-            preinforme.revisor = None
-            # Si estaba en revisión, volver a pendiente
-            if preinforme.estado == 'en_revision':
-                preinforme.estado = 'pendiente_revision'
-            preinforme.save()
-            messages.success(request, f'Desasignaste el preinforme #{preinforme.numero_estudio}.')
-        else:
-            # Asignar a otro usuario específico
-            revisor_id = request.POST.get('revisor_id')
-            if revisor_id:
-                try:
-                    revisor = User.objects.get(pk=revisor_id, rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'])
-                    preinforme.revisor = revisor
-                    preinforme.save()
-                    messages.success(request, f'Asignaste el preinforme #{preinforme.numero_estudio} a {revisor.get_full_name()}.')
-                except User.DoesNotExist:
-                    messages.error(request, 'Revisor no válido.')
+                revisor_id = request.POST.get('revisor_id')
+                if revisor_id:
+                    try:
+                        revisor = User.objects.get(pk=revisor_id, rol__in=['medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio'])
+                        preinforme.revisor = revisor
+                        preinforme.save()
+                        messages.success(request, f'Asignaste el preinforme #{preinforme.numero_estudio} a {revisor.get_full_name()}.')
+                    except User.DoesNotExist:
+                        messages.error(request, 'Revisor no válido.')
     
     return redirect(redirect_url)
 

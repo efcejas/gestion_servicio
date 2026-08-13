@@ -304,10 +304,19 @@ class FiltroPreinformesForm(forms.Form):
         })
     )
 
+    paciente = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
+            'placeholder': 'DNI, apellido o nombre...',
+        }),
+    )
+
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         if getattr(user, 'is_demo_user', False):
+            self.fields.pop('paciente', None)
             self.fields.pop('apellido_paciente', None)
             self.fields.pop('nombre_paciente', None)
 
