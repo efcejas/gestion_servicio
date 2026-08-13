@@ -2492,7 +2492,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 const anchorRect = dictadoAnchor.getBoundingClientRect();
                 const editorRect = dictadoEditorContainer.getBoundingClientRect();
                 const margenInferior = window.innerWidth <= 640 ? 12 : 24;
-                const debeFlotar = anchorRect.bottom < 0 && editorRect.bottom > 0;
+                const margenSuperior = window.innerWidth <= 640 ? 8 : 16;
+                const altoBoton = dictadoToggleButton.offsetHeight || 44;
+                // En creación y edición, mantener el micrófono accesible desde que
+                // su ubicación original sale del viewport y mientras siga visible
+                // el marco del editor. Esto también contempla scroll restaurado.
+                const debeFlotar = (
+                    anchorRect.bottom <= margenSuperior
+                    && editorRect.top < window.innerHeight
+                    && editorRect.bottom > altoBoton + margenInferior
+                );
 
                 dictadoToggleButton.classList.toggle('dictado-floating', debeFlotar);
 
@@ -2520,6 +2529,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             window.addEventListener('scroll', solicitarActualizacionDictado, { passive: true });
             window.addEventListener('resize', solicitarActualizacionDictado);
+            window.addEventListener('pageshow', solicitarActualizacionDictado);
             if ('ResizeObserver' in window) {
                 const dictadoResizeObserver = new ResizeObserver(solicitarActualizacionDictado);
                 dictadoResizeObserver.observe(dictadoEditorContainer);

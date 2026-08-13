@@ -645,6 +645,30 @@ class PreinformeViewTest(TestCase):
         # Verificar que se creó el preinforme
         self.assertTrue(Preinforme.objects.filter(numero_estudio='2024-001234').exists())
 
+    @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
+    def test_editar_preinforme_confirmado_mantiene_dictado_flotante(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='EDIT-DICTADO-001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            sistema_destino='eges',
+            apellido_paciente='Paciente',
+            nombre_paciente='Prueba',
+            informe_html='<p>Informe confirmado pendiente de revisión.</p>',
+            estado='pendiente_revision',
+        )
+
+        self.client.login(username='residente1', password='testpass123')
+        response = self.client.get(
+            reverse('preinformes:editar_preinforme', kwargs={'pk': preinforme.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="dictado-toggle"')
+        self.assertContains(response, 'dictado-floating')
+        self.assertContains(response, "window.addEventListener('pageshow'")
+
     def test_staff_dashboard_access(self):
         """Test acceso al dashboard de staff"""
         self.client.login(username='staff1', password='testpass123')
