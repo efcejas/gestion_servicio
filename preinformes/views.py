@@ -116,6 +116,7 @@ from .services import (
 from .selectors import (
     get_asignados_de,
     get_asignados_a_otros,
+    get_busqueda_revision_para,
     get_pendientes_sin_revisor,
     get_revision_queryset,
 )
@@ -1495,10 +1496,7 @@ def lista_revision(request):
                 if request.GET.get(campo, '').strip()
             ), '')
         if mostrar == 'asignados' and busqueda_rapida:
-            preinformes = _preinformes_visibles_para(request.user).filter(
-                estado__in=['pendiente_revision', 'en_revision'],
-                revisor__isnull=False,
-            )
+            preinformes = get_busqueda_revision_para(request.user)
         if form.cleaned_data.get('estado'):
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
         if form.cleaned_data.get('sistema_destino'):

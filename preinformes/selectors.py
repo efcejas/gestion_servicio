@@ -113,6 +113,27 @@ def get_asignados_a_otros(usuario):
     ).exclude(revisor=usuario), usuario)
 
 
+def get_busqueda_revision_para(usuario):
+    """Estudios activos localizables desde la busqueda de "Mis asignados".
+
+    Incluye asignaciones propias, asignaciones de otros revisores y casos sin
+    revisor que el usuario puede tomar. El pool compartido sigue reservado a
+    jefes e instructores.
+    """
+    base_filter = Q(estado__in=ESTADOS_ACTIVOS, revisor__isnull=False)
+
+    if getattr(usuario, 'rol', None) in ROLES_POOL_COMPARTIDO:
+        base_filter |= Q(estado__in=ESTADOS_ACTIVOS, revisor__isnull=True)
+    else:
+        base_filter |= Q(
+            estado__in=ESTADOS_ACTIVOS,
+            revisor__isnull=True,
+            asignacion_compartida=False,
+        )
+
+    return _aplicar_scope_demo(Preinforme.objects.filter(base_filter), usuario)
+
+
 def get_revision_todos_para(usuario):
     """
     Bandeja "todos" del staff: mis activos + disponibles para tomar.

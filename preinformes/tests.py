@@ -547,6 +547,52 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertContains(response, 'Asignado a otro profesional')
         self.assertContains(response, self.otro_staff.get_full_name())
 
+    def test_busqueda_en_mis_asignados_incluye_estudio_sin_revisor(self):
+        propio = self._preinforme('FLOW-BUSQ-PROPIO-DISP', revisor=self.staff)
+        disponible = self._preinforme('FLOW-BUSQ-DISPONIBLE')
+        disponible.dni_paciente = '28777666'
+        disponible.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': '28.777.666'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, disponible.numero_estudio)
+        self.assertNotContains(response, propio.numero_estudio)
+        self.assertContains(response, 'Disponible &middot; sin revisor')
+        self.assertContains(response, 'Tomar y revisar')
+
+    def test_busqueda_mis_asignados_staff_no_incluye_pool_compartido(self):
+        compartido = self._preinforme('FLOW-BUSQ-POOL-STAFF', compartido=True)
+        compartido.apellido_paciente = 'Reservado'
+        compartido.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': 'Reservado'},
+        )
+
+        self.assertNotContains(response, compartido.numero_estudio)
+
+    def test_busqueda_mis_asignados_jefe_incluye_pool_compartido(self):
+        compartido = self._preinforme('FLOW-BUSQ-POOL-JEFE', compartido=True)
+        compartido.apellido_paciente = 'Reservado'
+        compartido.save()
+
+        self.client.login(username='jefe_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': 'Reservado'},
+        )
+
+        self.assertContains(response, compartido.numero_estudio)
+        self.assertContains(response, 'Disponible &middot; sin revisor')
+        self.assertContains(response, 'Tomar y revisar')
+
     def test_busqueda_unificada_acepta_nombre_apellido_en_cualquier_orden(self):
         ajeno = self._preinforme('FLOW-NOMBRE-COMPUESTO', revisor=self.otro_staff)
         ajeno.nombre_paciente = 'Juan Carlos'
@@ -630,6 +676,7 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
     def test_mis_asignados_sin_busqueda_no_muestra_asignados_a_otros(self):
         propio = self._preinforme('FLOW-SOLO-PROPIO', revisor=self.staff)
         ajeno = self._preinforme('FLOW-NO-AJENO', revisor=self.otro_staff)
+        sin_asignar = self._preinforme('FLOW-NO-SIN-ASIGNAR')
 
         self.client.login(username='staff_flow', password='pass123')
         response = self.client.get(
@@ -638,6 +685,7 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
 
         self.assertContains(response, propio.numero_estudio)
         self.assertNotContains(response, ajeno.numero_estudio)
+        self.assertNotContains(response, sin_asignar.numero_estudio)
 
     def test_filtros_adicionales_quedan_desplegados_al_recargar(self):
         self._preinforme('FLOW-FILTRO-ABIERTO', revisor=self.staff)
