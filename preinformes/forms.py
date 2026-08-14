@@ -279,7 +279,7 @@ class FiltroPreinformesForm(forms.Form):
             'type': 'date'
         })
     )
-    
+
     numero_estudio = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={
@@ -308,7 +308,8 @@ class FiltroPreinformesForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={
             'class': 'w-full px-3 py-2 border border-gray-300 bg-white text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500',
-            'placeholder': 'DNI, apellido o nombre...',
+            'placeholder': 'DNI, nombre, apellido o N.º de estudio...',
+            'autocomplete': 'off',
         }),
     )
 
@@ -319,6 +320,16 @@ class FiltroPreinformesForm(forms.Form):
             self.fields.pop('paciente', None)
             self.fields.pop('apellido_paciente', None)
             self.fields.pop('nombre_paciente', None)
+
+
+class FiltroRevisionPreinformesForm(FiltroPreinformesForm):
+    """Filtros de staff con una única búsqueda identificatoria."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.pop('numero_estudio', None)
+        self.fields.pop('apellido_paciente', None)
+        self.fields.pop('nombre_paciente', None)
 
 
 class RevisionPreinformeForm(forms.ModelForm):

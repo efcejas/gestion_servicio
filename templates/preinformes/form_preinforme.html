@@ -27,6 +27,7 @@
 
     <form method="post" enctype="multipart/form-data" class="space-y-6">
         {% csrf_token %}
+        {% if volver_url %}<input type="hidden" name="next" value="{{ volver_url }}">{% endif %}
         <input type="hidden" name="asistente_conversacion_id" id="asistenteConversacionIdInput" value="">
         <input type="hidden" name="propuesta_plantilla_ia_id" id="propuestaPlantillaIAId" value="">
         <input type="hidden" name="valores_plantilla_ia" id="valoresPlantillaIA" value="">
@@ -414,7 +415,7 @@
         <!-- Botones de acción -->
         <div class="bg-white rounded-2xl shadow-lg p-6">
             <div class="flex flex-col sm:flex-row gap-4 justify-end">
-                <a href="{% url 'preinformes:dashboard_residente' %}" 
+                <a href="{{ volver_url|default_if_none:'#' }}"
                    class="inline-flex justify-center items-center py-3 px-6 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-200">
                     <i class="fas fa-times mr-2"></i>
                     Cancelar

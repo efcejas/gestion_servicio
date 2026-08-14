@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from unittest.mock import patch
 from io import StringIO
+from urllib.parse import urlencode
 
 from .models import TipoEstudio, Region, PlantillaPreinforme, Preinforme, RevisionPreinforme, HistorialEstudios, AdjuntoPreinforme
 
@@ -242,6 +243,22 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         qs = get_revision_queryset(self.jefe, 'compartidos')
 
         self.assertIn(compartido, qs)
+
+    def test_tomar_compartido_lleva_retorno_filtrado_a_revision(self):
+        compartido = self._preinforme('FLOW-COMPARTIDO-RETORNO', compartido=True)
+        retorno = reverse('preinformes:lista_revision') + '?mostrar=compartidos&region=1&page=2'
+        self.client.login(username='jefe_flow', password='pass123')
+
+        response = self.client.post(
+            reverse('preinformes:tomar_estudio', kwargs={'pk': compartido.pk}),
+            {'next': retorno},
+        )
+
+        revisar_url = reverse(
+            'preinformes:revisar_preinforme', kwargs={'pk': compartido.pk}
+        )
+        esperado = f'{revisar_url}?{urlencode({"next": retorno})}'
+        self.assertRedirects(response, esperado, fetch_redirect_response=False)
 
     def test_revision_queryset_muestra_asignados_a_otros(self):
         from .selectors import get_revision_queryset
@@ -530,6 +547,86 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
         self.assertContains(response, 'Asignado a otro profesional')
         self.assertContains(response, self.otro_staff.get_full_name())
 
+    def test_busqueda_unificada_acepta_nombre_apellido_en_cualquier_orden(self):
+        ajeno = self._preinforme('FLOW-NOMBRE-COMPUESTO', revisor=self.otro_staff)
+        ajeno.nombre_paciente = 'Juan Carlos'
+        ajeno.apellido_paciente = 'Perez Gomez'
+        ajeno.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        for busqueda in (
+            'Juan Perez',
+            'Perez Juan',
+            'Perez, Juan',
+            'Perez,Juan',
+            'Perez / Juan',
+            '  Perez   Juan  ',
+        ):
+            with self.subTest(busqueda=busqueda):
+                response = self.client.get(
+                    reverse('preinformes:lista_revision'),
+                    {'mostrar': 'asignados', 'paciente': busqueda},
+                )
+                self.assertContains(response, ajeno.numero_estudio)
+
+    def test_busqueda_unificada_normaliza_formato_dni(self):
+        ajeno = self._preinforme('FLOW-DNI-FORMATO', revisor=self.otro_staff)
+        ajeno.dni_paciente = '30111222'
+        ajeno.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': '30.111.222'},
+        )
+
+        self.assertContains(response, ajeno.numero_estudio)
+
+    def test_busqueda_unificada_encuentra_numero_de_estudio(self):
+        ajeno = self._preinforme('FLOW-ESTUDIO-7788', revisor=self.otro_staff)
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'paciente': 'ESTUDIO-7788'},
+        )
+
+        self.assertContains(response, ajeno.numero_estudio)
+
+    def test_busqueda_unificada_respeta_alcance_sin_asignar(self):
+        sin_asignar = self._preinforme('FLOW-SIN-ASIGNAR-BUSQ', revisor=None)
+        sin_asignar.apellido_paciente = 'Encontrable'
+        sin_asignar.save()
+        ajeno = self._preinforme('FLOW-AJENO-NO-SIN-ASIG', revisor=self.otro_staff)
+        ajeno.apellido_paciente = 'Encontrable'
+        ajeno.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'sin_asignar', 'paciente': 'Encontrable'},
+        )
+
+        self.assertContains(response, sin_asignar.numero_estudio)
+        self.assertNotContains(response, ajeno.numero_estudio)
+
+    def test_busqueda_unificada_respeta_alcance_asignados_a_otros(self):
+        propio = self._preinforme('FLOW-PROPIO-NO-OTROS', revisor=self.staff)
+        propio.apellido_paciente = 'Alcance'
+        propio.save()
+        ajeno = self._preinforme('FLOW-AJENO-SI-OTROS', revisor=self.otro_staff)
+        ajeno.apellido_paciente = 'Alcance'
+        ajeno.save()
+
+        self.client.login(username='staff_flow', password='pass123')
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados_otros', 'paciente': 'Alcance'},
+        )
+
+        self.assertContains(response, ajeno.numero_estudio)
+        self.assertNotContains(response, propio.numero_estudio)
+
     def test_mis_asignados_sin_busqueda_no_muestra_asignados_a_otros(self):
         propio = self._preinforme('FLOW-SOLO-PROPIO', revisor=self.staff)
         ajeno = self._preinforme('FLOW-NO-AJENO', revisor=self.otro_staff)
@@ -541,6 +638,19 @@ class RevisionStaffWorkflowRefactorTest(TestCase):
 
         self.assertContains(response, propio.numero_estudio)
         self.assertNotContains(response, ajeno.numero_estudio)
+
+    def test_filtros_adicionales_quedan_desplegados_al_recargar(self):
+        self._preinforme('FLOW-FILTRO-ABIERTO', revisor=self.staff)
+        self.client.login(username='staff_flow', password='pass123')
+
+        response = self.client.get(
+            reverse('preinformes:lista_revision'),
+            {'mostrar': 'asignados', 'estado': 'pendiente_revision'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['filtros_adicionales_activos'])
+        self.assertContains(response, 'filtros-operativos-titulo" open')
 
     def test_tomar_asignado_a_otro_conserva_busqueda(self):
         preinforme = self._preinforme('FLOW-RETORNO', revisor=self.otro_staff)
@@ -617,6 +727,72 @@ class PreinformeViewTest(TestCase):
         response = self.client.get(reverse('preinformes:dashboard_residente'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Dashboard - Preinformes')
+
+    def test_mis_preinformes_busqueda_unificada_respeta_propietario_y_coma(self):
+        propio = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='RES-BUSQ-001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Perez',
+            nombre_paciente='Juan',
+            dni_paciente='30111222',
+            informe_html='<p>Propio</p>',
+        )
+        otro_residente = User.objects.create_user(
+            username='residente_otro_busqueda',
+            password='testpass123',
+            rol='medico_residente',
+            perfil_completo=True,
+        )
+        ajeno = Preinforme.objects.create(
+            residente=otro_residente,
+            numero_estudio='RES-BUSQ-AJENO',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Perez',
+            nombre_paciente='Juan',
+            informe_html='<p>Ajeno</p>',
+        )
+
+        self.client.login(username='residente1', password='testpass123')
+        response = self.client.get(
+            reverse('preinformes:mis_preinformes'),
+            {'paciente': 'Perez, Juan'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, propio.numero_estudio)
+        self.assertNotContains(response, ajeno.numero_estudio)
+        self.assertContains(response, 'Busca solamente dentro de tus preinformes.')
+
+    @override_settings(STORAGES=TEST_STORAGES)
+    def test_editar_desde_lista_conserva_retorno_y_filtros_desplegados(self):
+        preinforme = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='RES-RETORNO-001',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Retorno',
+            nombre_paciente='Filtros',
+            informe_html='<p>Informe</p>',
+        )
+        retorno = reverse('preinformes:mis_preinformes') + '?estado=borrador&region=1&page=2'
+        self.client.login(username='residente1', password='testpass123')
+
+        lista = self.client.get(
+            reverse('preinformes:mis_preinformes'),
+            {'estado': 'borrador'},
+        )
+        edicion = self.client.get(
+            reverse('preinformes:editar_preinforme', kwargs={'pk': preinforme.pk}),
+            {'next': retorno},
+        )
+
+        self.assertTrue(lista.context['filtros_adicionales_activos'])
+        self.assertContains(lista, 'filtros-residente-titulo" open')
+        self.assertEqual(edicion.context['volver_url'], retorno)
+        self.assertContains(edicion, f'value="{retorno.replace("&", "&amp;")}"')
 
     def test_crear_preinforme_get(self):
         """Test GET del formulario de creación"""
@@ -1199,6 +1375,16 @@ class RevisionFinalizadaEditTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Editar Revisi')
 
+    def test_cancelar_revision_conserva_lista_filtrada(self):
+        retorno = reverse('preinformes:lista_revision') + '?mostrar=finalizados&region=1&page=2'
+        self.client.login(username='rev_final_edit', password='pass123')
+
+        response = self.client.get(self._url(), {'next': retorno})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['volver_url'], retorno)
+        self.assertContains(response, f'href="{retorno.replace("&", "&amp;")}"')
+
     @override_settings(PREINFORMES_DICTADO_CURSOR_HABILITADO=True)
     def test_edicion_finalizada_incluye_dictado_flotante_compartido(self):
         self.client.login(username='rev_final_edit', password='pass123')
@@ -1259,6 +1445,28 @@ class RevisionFinalizadaEditTest(TestCase):
         self.assertEqual(self.preinforme.estado, 'finalizado')
         self.assertEqual(self.revision.informe_final_html, '<p>Informe corregido luego de finalizado</p>')
         self.assertEqual(self.revision.comentarios_generales, 'Agrego comentario tardio.')
+
+    @patch('preinformes.views._generar_evaluacion_ia_final_revision')
+    def test_finalizar_revision_vuelve_a_lista_filtrada(self, generar_evaluacion):
+        retorno = (
+            reverse('preinformes:lista_revision')
+            + '?mostrar=finalizados&estado=finalizado&region=1&page=2'
+        )
+        self.client.login(username='rev_final_edit', password='pass123')
+
+        response = self.client.post(
+            self._url(),
+            {
+                'informe_final_html': '<p>Informe final conservando retorno</p>',
+                'comentarios_generales': '',
+                'puntuacion': '',
+                'finalizar_revision': '1',
+                'next': retorno,
+            },
+        )
+
+        self.assertRedirects(response, retorno, fetch_redirect_response=False)
+        generar_evaluacion.assert_called_once()
 
     def test_otro_revisor_no_puede_editar_finalizado(self):
         self.client.login(username='otro_final_edit', password='pass123')

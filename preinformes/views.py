@@ -13,6 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core import signing
 from django.db.models import Q, Count, Avg, Case, When, Value, IntegerField
+from django.db.models.functions import Replace
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_http_methods
 import json
@@ -21,6 +22,7 @@ import os
 import re
 import html
 import unicodedata
+from urllib.parse import urlencode
 
 from accounts.decorators import medical_staff_required, role_required
 from .models import (
@@ -34,7 +36,7 @@ from .models import (
     normalizar_texto_busqueda,
 )
 from .forms import (
-    PreinformeForm, FiltroPreinformesForm, 
+    PreinformeForm, FiltroPreinformesForm, FiltroRevisionPreinformesForm,
     RevisionPreinformeForm, PlantillaPreinformeForm,
     NuevaPlantillaResidenteForm, GenerarPlantillaIAForm,
 )
@@ -58,6 +60,54 @@ def _preinformes_visibles_para(user):
     if getattr(user, 'is_demo_user', False):
         return qs.filter(Q(es_registro_demo=False) | Q(es_registro_demo=True, residente=user))
     return qs.filter(es_registro_demo=False)
+
+
+def _filtrar_preinformes_busqueda_rapida(queryset, texto):
+    """Busca paciente o estudio tolerando formatos habituales de escritura."""
+    texto = (texto or '').strip()
+    if not texto:
+        return queryset
+
+    terminos = re.findall(r'[^\W_]+', texto, flags=re.UNICODE)
+    dni_normalizado = re.sub(r'[^0-9A-Za-z]', '', texto)
+    queryset = queryset.annotate(
+        dni_sin_formato=Replace(
+            Replace(Replace('dni_paciente', Value('.'), Value('')), Value('-'), Value('')),
+            Value(' '),
+            Value(''),
+        )
+    )
+    for termino in terminos:
+        termino_documento = re.sub(r'[^0-9A-Za-z]', '', termino)
+        queryset = queryset.filter(
+            Q(numero_estudio__icontains=termino)
+            | Q(apellido_paciente__icontains=termino)
+            | Q(nombre_paciente__icontains=termino)
+            | Q(dni_paciente__icontains=termino)
+            | Q(dni_sin_formato__icontains=termino_documento)
+        )
+    if dni_normalizado and re.fullmatch(r'[\d.\-\s]+', texto):
+        queryset = queryset.filter(
+            Q(dni_sin_formato__icontains=dni_normalizado)
+            | Q(numero_estudio__icontains=texto)
+        )
+    return queryset
+
+
+def _url_retorno_segura(request, default_url):
+    """Obtiene una URL de retorno local desde POST o GET."""
+    retorno = request.POST.get('next') or request.GET.get('next') or default_url
+    if not url_has_allowed_host_and_scheme(
+        retorno,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return default_url
+    return retorno
+
+
+def _hay_filtros_adicionales(form, campos):
+    return bool(form.is_valid() and any(form.cleaned_data.get(campo) for campo in campos))
 
 from .services import (
     evaluar_sesion_mentor as _autoevaluar_sesion_mentor_al_enviar,
@@ -782,6 +832,7 @@ def crear_preinforme(request):
             'PREINFORMES_GENERADOR_PLANTILLAS_IA_HABILITADO',
             False,
         ),
+        'volver_url': reverse('preinformes:dashboard_residente'),
         'title': 'Nuevo Preinforme'
     }
     
@@ -793,6 +844,7 @@ def crear_preinforme(request):
 def editar_preinforme(request, pk):
     """Editar preinforme existente (solo si está pendiente de revisión y es el creador)"""
     preinforme = get_object_or_404(_preinformes_visibles_para(request.user), pk=pk)
+    volver_url = _url_retorno_segura(request, reverse('preinformes:dashboard_residente'))
     if preinforme.residente != request.user:
         messages.error(request, 'No tiene permiso para editar este preinforme.')
         return redirect('preinformes:mis_preinformes')
@@ -835,7 +887,8 @@ def editar_preinforme(request, pk):
 
             if 'guardar_y_continuar' in request.POST:
                 preinforme.marcar_en_edicion(request.user)
-                return redirect('preinformes:editar_preinforme', pk=preinforme.pk)
+                editar_url = reverse('preinformes:editar_preinforme', kwargs={'pk': preinforme.pk})
+                return redirect(f'{editar_url}?{urlencode({"next": volver_url})}')
             elif 'guardar_y_enviar' in request.POST:
                 preinforme.enviar_a_revision()
                 _autoevaluar_sesion_mentor_al_enviar(
@@ -844,10 +897,10 @@ def editar_preinforme(request, pk):
                 )
                 preinforme.liberar_edicion()
                 messages.success(request, 'Preinforme enviado para revisión.')
-                return redirect('preinformes:dashboard_residente')
+                return redirect(volver_url)
             else:
                 preinforme.liberar_edicion()
-                return redirect('preinformes:dashboard_residente')
+                return redirect(volver_url)
     else:
         form = PreinformeForm(instance=preinforme, user=request.user)
 
@@ -857,6 +910,7 @@ def editar_preinforme(request, pk):
         'adjuntos_residente': preinforme.adjuntos.filter(origen='residente', activo=True),
         'adjuntos_revisor': preinforme.adjuntos.filter(origen='revisor', activo=True),
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
+        'volver_url': volver_url,
         'title': 'Editar Preinforme'
     }
 
@@ -911,6 +965,15 @@ def mis_preinformes(request):
     
     # Aplicar filtros
     if form.is_valid():
+        busqueda_rapida = (form.cleaned_data.get('paciente') or '').strip()
+        if request.user.is_demo_user:
+            busqueda_rapida = (form.cleaned_data.get('numero_estudio') or '').strip()
+        elif not busqueda_rapida:
+            busqueda_rapida = next((
+                (form.cleaned_data.get(campo) or '').strip()
+                for campo in ('numero_estudio', 'apellido_paciente', 'nombre_paciente')
+                if (form.cleaned_data.get(campo) or '').strip()
+            ), '')
         if form.cleaned_data['estado']:
             preinformes = preinformes.filter(estado=form.cleaned_data['estado'])
         if form.cleaned_data['sistema_destino']:
@@ -923,12 +986,7 @@ def mis_preinformes(request):
             preinformes = preinformes.filter(fecha_creacion__date__gte=form.cleaned_data['fecha_desde'])
         if form.cleaned_data['fecha_hasta']:
             preinformes = preinformes.filter(fecha_creacion__date__lte=form.cleaned_data['fecha_hasta'])
-        if form.cleaned_data['numero_estudio']:
-            preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
-        if not request.user.is_demo_user and form.cleaned_data.get('apellido_paciente'):
-            preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
-        if not request.user.is_demo_user and form.cleaned_data.get('nombre_paciente'):
-            preinformes = preinformes.filter(nombre_paciente__icontains=form.cleaned_data['nombre_paciente'])
+        preinformes = _filtrar_preinformes_busqueda_rapida(preinformes, busqueda_rapida)
     
     # Filtro por etiquetas (parámetro GET)
     etiquetas_ids = request.GET.getlist('etiquetas')
@@ -956,7 +1014,10 @@ def mis_preinformes(request):
         'etiquetas_seleccionadas': [int(id) for id in etiquetas_ids],
         'correcciones_pendientes': correcciones_pendientes,
         'primera_correccion_pendiente': primera_correccion_pendiente,
-        'title': 'Mis Preinformes'
+        'title': 'Mis Preinformes',
+        'filtros_adicionales_activos': _hay_filtros_adicionales(
+            form, ('estado', 'sistema_destino', 'tipo_estudio', 'region')
+        ),
     }
     
     return render(request, 'preinformes/mis_preinformes.html', context)
@@ -1413,73 +1474,27 @@ def dashboard_staff(request):
 @role_required('medico_staff', 'jefe_residentes', 'instructor_residentes', 'jefe_servicio')
 def lista_revision(request):
     """Lista de preinformes para revisar"""
-    form = FiltroPreinformesForm(request.GET, user=request.user)
+    form = FiltroRevisionPreinformesForm(request.GET, user=request.user)
     
     # Filtro para mostrar diferentes categorías
     mostrar = request.GET.get('mostrar', 'asignados')  # 'asignados', 'sin_asignar', 'compartidos', 'todos', 'finalizados'
     
-    if mostrar == 'asignados':
-        # Solo mis preinformes asignados
-        preinformes = Preinforme.objects.filter(
-            Q(revisor=request.user) & Q(estado__in=['pendiente_revision', 'en_revision'])
-        )
-    elif mostrar == 'sin_asignar':
-        # Preinformes sin revisor asignado (excluir compartidos)
-        preinformes = Preinforme.objects.filter(
-            estado__in=['pendiente_revision', 'en_revision'],
-            revisor__isnull=True,
-            asignacion_compartida=False
-        )
-    elif mostrar == 'compartidos':
-        # Pool compartido para jefes/instructores
-        if request.user.rol in ['jefe_residentes', 'instructor_residentes']:
-            preinformes = Preinforme.objects.filter(
-                asignacion_compartida=True,
-                revisor__isnull=True,
-                estado__in=['pendiente_revision', 'en_revision']
-            )
-        else:
-            # Si no tiene el rol adecuado, mostrar lista vacía
-            preinformes = Preinforme.objects.none()
-    elif mostrar == 'finalizados':
-        # Preinformes que ya revisé y están finalizados
-        preinformes = Preinforme.objects.filter(
-            revisor=request.user,
-            estado='finalizado',
-        ).select_related('revision', 'residente', 'tipo_estudio', 'region')
-    else:
-        # Todos: pendientes/en_revision sin asignar (excluir compartidos para staff), o asignados a mí
-        base_filter = Q(estado__in=['pendiente_revision', 'en_revision'], revisor=request.user)
-        
-        # Para estudios sin asignar, depende del rol
-        if request.user.rol in ['jefe_residentes', 'instructor_residentes']:
-            # Jefes e instructores ven todos los sin asignar (incluidos compartidos)
-            base_filter |= Q(estado__in=['pendiente_revision', 'en_revision'], revisor__isnull=True)
-        else:
-            # Staff solo ve sin asignar que NO sean compartidos
-            base_filter |= Q(
-                estado__in=['pendiente_revision', 'en_revision'], 
-                revisor__isnull=True,
-                asignacion_compartida=False
-            )
-        
-        preinformes = Preinforme.objects.filter(base_filter)
-
-    # Fuente efectiva de las bandejas: mantener centralizada la regla en selectors.py.
+    # Fuente única para el alcance y los permisos de cada bandeja.
     preinformes = get_revision_queryset(request.user, mostrar)
     
     # Aplicar filtros
     if form.is_valid():
-        q_paciente_staff = (
+        busqueda_rapida = (
             '' if request.user.is_demo_user else (form.cleaned_data.get('paciente') or '').strip()
         )
-        busqueda_identificatoria = bool(
-            q_paciente_staff
-            or form.cleaned_data.get('numero_estudio')
-            or form.cleaned_data.get('apellido_paciente')
-            or form.cleaned_data.get('nombre_paciente')
-        )
-        if mostrar == 'asignados' and busqueda_identificatoria:
+        if not busqueda_rapida and not request.user.is_demo_user:
+            # Compatibilidad con enlaces o favoritos creados con los filtros anteriores.
+            busqueda_rapida = next((
+                request.GET.get(campo, '').strip()
+                for campo in ('numero_estudio', 'apellido_paciente', 'nombre_paciente')
+                if request.GET.get(campo, '').strip()
+            ), '')
+        if mostrar == 'asignados' and busqueda_rapida:
             preinformes = _preinformes_visibles_para(request.user).filter(
                 estado__in=['pendiente_revision', 'en_revision'],
                 revisor__isnull=False,
@@ -1498,18 +1513,11 @@ def lista_revision(request):
             preinformes = preinformes.filter(fecha_envio_revision__date__gte=form.cleaned_data['fecha_desde'])
         if form.cleaned_data.get('fecha_hasta'):
             preinformes = preinformes.filter(fecha_envio_revision__date__lte=form.cleaned_data['fecha_hasta'])
-        if form.cleaned_data.get('numero_estudio'):
-            preinformes = preinformes.filter(numero_estudio__icontains=form.cleaned_data['numero_estudio'])
-        if q_paciente_staff:
-            preinformes = preinformes.filter(
-                Q(dni_paciente__icontains=q_paciente_staff)
-                | Q(apellido_paciente__icontains=q_paciente_staff)
-                | Q(nombre_paciente__icontains=q_paciente_staff)
-            )
-        if not request.user.is_demo_user and form.cleaned_data.get('apellido_paciente'):
-            preinformes = preinformes.filter(apellido_paciente__icontains=form.cleaned_data['apellido_paciente'])
+        preinformes = _filtrar_preinformes_busqueda_rapida(preinformes, busqueda_rapida)
     
-    preinformes = preinformes.order_by('-fecha_envio_revision')
+    preinformes = preinformes.select_related(
+        'residente', 'tipo_estudio', 'region', 'revisor'
+    ).order_by('-fecha_envio_revision')
     
     # Paginación
     paginator = Paginator(preinformes, 20)
@@ -1521,6 +1529,10 @@ def lista_revision(request):
         'form': form,
         'title': 'Preinformes para Revisar',
         'mostrar': mostrar,  # Para debugging y preservar filtro
+        'busqueda_rapida_activa': bool(form.is_valid() and form.cleaned_data.get('paciente')),
+        'filtros_adicionales_activos': _hay_filtros_adicionales(
+            form, ('estado', 'sistema_destino', 'tipo_estudio', 'region', 'residente')
+        ),
     }
     
     return render(request, 'preinformes/lista_revision.html', context)
@@ -1596,7 +1608,10 @@ def asignar_revisor(request, pk):
 def tomar_estudio(request, pk):
     """Tomar un estudio del pool compartido y asignarlo al usuario actual"""
     mostrar = request.GET.get('mostrar', 'compartidos')
-    redirect_url = f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}"
+    redirect_url = _url_retorno_segura(
+        request,
+        f"{reverse('preinformes:lista_revision')}?mostrar={mostrar}",
+    )
     
     try:
         # Usar transacción atómica con lock pesimista para evitar race conditions
@@ -1630,7 +1645,8 @@ def tomar_estudio(request, pk):
             )
             
             # Redirigir directamente a la vista de revisión
-            return redirect('preinformes:revisar_preinforme', pk=preinforme.pk)
+            revisar_url = reverse('preinformes:revisar_preinforme', kwargs={'pk': preinforme.pk})
+            return redirect(f'{revisar_url}?{urlencode({"next": redirect_url})}')
             
     except Preinforme.DoesNotExist:
         messages.error(request, 'El estudio no existe.')
@@ -1647,6 +1663,10 @@ def revisar_preinforme(request, pk):
         estado__in=['pendiente_revision', 'en_revision', 'finalizado']
     )
     es_edicion_finalizada = preinforme.estado == 'finalizado'
+    default_volver_url = reverse('preinformes:lista_revision')
+    if es_edicion_finalizada:
+        default_volver_url = f'{default_volver_url}?mostrar=finalizados'
+    volver_url = _url_retorno_segura(request, default_volver_url)
     
     # Lógica de asignación automática
     if preinforme.estado == 'pendiente_revision':
@@ -1678,10 +1698,10 @@ def revisar_preinforme(request, pk):
             preinforme.estado = 'pendiente_revision'
             preinforme.save(update_fields=['revisor', 'estado', 'fecha_modificacion'])
             messages.success(request, 'Liberaste la revisión. El residente podrá editar y el estudio queda disponible nuevamente.')
-            return redirect('preinformes:lista_revision')
+            return redirect(volver_url)
 
         messages.error(request, 'Solo podés liberar una revisión activa asignada a vos.')
-        return redirect('preinformes:lista_revision')
+        return redirect(volver_url)
 
     if request.method == 'POST':
         # Guardar y finalizar revisión
@@ -1705,7 +1725,8 @@ def revisar_preinforme(request, pk):
             
             if 'guardar_y_continuar' in request.POST:
                 messages.success(request, 'Revisión guardada exitosamente.')
-                return redirect('preinformes:revisar_preinforme', pk=pk)
+                revisar_url = reverse('preinformes:revisar_preinforme', kwargs={'pk': pk})
+                return redirect(f'{revisar_url}?{urlencode({"next": volver_url})}')
             elif 'finalizar_revision' in request.POST:
                 preinforme.finalizar_revision()
                 _generar_evaluacion_ia_final_revision(revision)
@@ -1714,12 +1735,12 @@ def revisar_preinforme(request, pk):
                 historial.actualizar_estadisticas()
                 if es_edicion_finalizada:
                     messages.success(request, 'Revision actualizada exitosamente.')
-                    return redirect(f"{reverse('preinformes:lista_revision')}?mostrar=finalizados")
+                    return redirect(volver_url)
                 messages.success(request, 'Revisión finalizada exitosamente.')
-                return redirect('preinformes:lista_revision')
+                return redirect(volver_url)
             else:
                 messages.success(request, 'Revisión guardada exitosamente.')
-                return redirect('preinformes:lista_revision')
+                return redirect(volver_url)
     else:
         # GET: El form se crea con la instancia que ya tiene informe_final_html cargado
         _asegurar_resumen_ia_revision(revision)
@@ -1734,6 +1755,7 @@ def revisar_preinforme(request, pk):
         'adjuntos_revisor': [] if request.user.is_demo_user else preinforme.adjuntos.filter(origen='revisor', activo=True),
         'dictado_cursor_habilitado': getattr(settings, 'PREINFORMES_DICTADO_CURSOR_HABILITADO', False),
         'es_edicion_finalizada': es_edicion_finalizada,
+        'volver_url': volver_url,
         'title': f'Editar Revision {preinforme.numero_estudio}' if es_edicion_finalizada else f'Revisar Preinforme {preinforme.numero_estudio}'
     }
     

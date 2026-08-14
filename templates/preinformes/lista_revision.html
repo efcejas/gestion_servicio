@@ -75,64 +75,73 @@
     </div>
 
     <!-- Filtros -->
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+    <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <i class="fas fa-filter text-orange-600 mr-2"></i>
-            Filtros de Búsqueda
+            Buscar estudios
         </h2>
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <form method="get" class="space-y-5">
             <!-- Campo oculto para preservar el filtro mostrar -->
             <input type="hidden" name="mostrar" value="{{ mostrar }}">
-            
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                {{ form.estado }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Estudio</label>
-                {{ form.tipo_estudio }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Región</label>
-                {{ form.region }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Sistema</label>
-                {{ form.sistema_destino }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Residente</label>
-                {{ form.residente }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Estudio</label>
-                {{ form.numero_estudio }}
-            </div>
-            {% if not request.user.is_demo_user %}<div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Paciente</label>
-                {{ form.paciente }}
-                {% if mostrar == 'asignados' %}<p class="mt-1 text-xs text-gray-500">También busca coincidencias asignadas a otros revisores.</p>{% endif %}
-            </div>{% endif %}
-            {% if not request.user.is_demo_user %}<div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Apellido del Paciente</label>
-                {{ form.apellido_paciente }}
-            </div>{% endif %}
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-                {{ form.fecha_desde }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-                {{ form.fecha_hasta }}
-            </div>
-            <div class="flex items-end gap-2">
+
+            <section class="rounded-xl border border-orange-200 bg-orange-50/50 p-4" aria-labelledby="busqueda-rapida-titulo">
+                <h3 id="busqueda-rapida-titulo" class="text-sm font-semibold text-gray-900 mb-3">
+                    <i class="fas fa-user-injured text-orange-600 mr-1.5"></i>Búsqueda rápida
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                    {% if not request.user.is_demo_user %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Paciente o N.º de estudio</label>
+                        {{ form.paciente }}
+                        <p class="mt-1 text-xs text-gray-600">
+                            {% if mostrar == 'asignados' %}
+                                Busca en tus asignados y también en estudios asignados a otros profesionales.
+                            {% elif mostrar == 'sin_asignar' %}
+                                Busca solamente entre los estudios sin asignar.
+                            {% elif mostrar == 'asignados_otros' %}
+                                Busca solamente entre los estudios asignados a otros profesionales.
+                            {% elif mostrar == 'compartidos' %}
+                                Busca solamente dentro del pool compartido.
+                            {% elif mostrar == 'finalizados' %}
+                                Busca solamente entre los estudios corregidos por vos.
+                            {% else %}
+                                Busca dentro de los estudios visibles en esta bandeja.
+                            {% endif %}
+                        </p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+                        {{ form.fecha_desde }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+                        {{ form.fecha_hasta }}
+                    </div>
+                </div>
+            </section>
+
+            <details class="rounded-xl border border-orange-200 bg-orange-50/50 p-4" aria-labelledby="filtros-operativos-titulo" {% if filtros_adicionales_activos %}open{% endif %}>
+                <summary class="flex cursor-pointer items-center text-sm font-semibold text-gray-700">
+                    <i class="fas fa-sliders-h text-orange-600 mr-1.5"></i><span id="filtros-operativos-titulo">Filtros adicionales</span>
+                </summary>
+                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>{{ form.estado }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Tipo de estudio</label>{{ form.tipo_estudio }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Región</label>{{ form.region }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Sistema</label>{{ form.sistema_destino }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Residente</label>{{ form.residente }}</div>
+                </div>
+            </details>
+
+            <div class="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <button type="submit" 
-                        class="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg">
-                    <i class="fas fa-search mr-2"></i>Filtrar
+                        class="bg-white border border-orange-300 hover:bg-orange-50 text-orange-700 font-medium py-2 px-5 rounded-xl transition-colors">
+                    <i class="fas fa-filter mr-1.5"></i>Aplicar filtros
                 </button>
                 <a href="{% url 'preinformes:lista_revision' %}?mostrar={{ mostrar }}" 
-                   class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg">
-                    <i class="fas fa-times mr-2"></i>Limpiar
+                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-xl transition-colors">
+                    <i class="fas fa-times mr-1.5"></i>Limpiar todo
                 </a>
             </div>
         </form>
@@ -221,7 +230,7 @@
                     <div class="mt-4 sm:mt-3 flex flex-wrap gap-2">
                         {% if preinforme.estado == 'finalizado' %}
                             {% if preinforme.revision %}
-                            <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
+                            <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}?next={{ request.get_full_path|urlencode }}"
                                class="inline-flex items-center justify-center px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shadow-sm text-sm">
                                 <i class="fas fa-edit mr-1"></i>
                                 Editar
@@ -236,6 +245,7 @@
                             {% if preinforme.asignacion_compartida and not preinforme.revisor %}
                                 <form method="post" action="{% url 'preinformes:tomar_estudio' preinforme.pk %}?mostrar={{ mostrar }}" class="m-0">
                                     {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                     <button type="submit"
                                             class="inline-flex items-center justify-center px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm text-sm font-semibold">
                                         <i class="fas fa-hand-point-right mr-1"></i>
@@ -244,7 +254,7 @@
                                 </form>
                             {% else %}
                                 {% if not preinforme.revisor or preinforme.revisor == user %}
-                                    <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}"
+                                    <a href="{% url 'preinformes:revisar_preinforme' preinforme.pk %}?next={{ request.get_full_path|urlencode }}"
                                        class="inline-flex items-center justify-center px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors shadow-sm text-sm">
                                         <i class="fas fa-{% if preinforme.estado == 'pendiente_revision' %}clipboard-check{% else %}arrow-right{% endif %} mr-1"></i>
                                         {% if not preinforme.revisor %}

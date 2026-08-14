@@ -53,56 +53,55 @@
     {% endif %}
 
     <!-- Filtros -->
-    <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
-        <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+    <div class="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <i class="fas fa-filter text-teal-600 mr-2"></i>
-            Filtros de Búsqueda
+            Buscar preinformes
         </h2>
-        <form method="get" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                {{ form.estado }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Estudio</label>
-                {{ form.tipo_estudio }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Región</label>
-                {{ form.region }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Sistema</label>
-                {{ form.sistema_destino }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Número de Estudio</label>
-                {{ form.numero_estudio }}
-            </div>
-            {% if not request.user.is_demo_user %}<div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Apellido de Paciente</label>
-                {{ form.apellido_paciente }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre de Paciente</label>
-                {{ form.nombre_paciente }}
-            </div>{% endif %}
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-                {{ form.fecha_desde }}
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-                {{ form.fecha_hasta }}
-            </div>
-            <div class="flex items-end gap-2">
+        <form method="get" class="space-y-5">
+            <section class="rounded-xl border border-teal-200 bg-teal-50/50 p-4" aria-labelledby="busqueda-residente-titulo">
+                <h3 id="busqueda-residente-titulo" class="text-sm font-semibold text-gray-900 mb-3">
+                    <i class="fas fa-search text-teal-600 mr-1.5"></i>Búsqueda rápida
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            {% if request.user.is_demo_user %}N.º de estudio{% else %}Paciente o N.º de estudio{% endif %}
+                        </label>
+                        {% if request.user.is_demo_user %}{{ form.numero_estudio }}{% else %}{{ form.paciente }}{% endif %}
+                        <p class="mt-1 text-xs text-gray-600">Busca solamente dentro de tus preinformes.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+                        {{ form.fecha_desde }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+                        {{ form.fecha_hasta }}
+                    </div>
+                </div>
+            </section>
+
+            <details class="rounded-xl border border-teal-200 bg-teal-50/50 p-4" aria-labelledby="filtros-residente-titulo" {% if filtros_adicionales_activos %}open{% endif %}>
+                <summary class="flex cursor-pointer items-center text-sm font-semibold text-gray-700">
+                    <i class="fas fa-sliders-h text-teal-600 mr-1.5"></i><span id="filtros-residente-titulo">Filtros adicionales</span>
+                </summary>
+                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Estado</label>{{ form.estado }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Tipo de estudio</label>{{ form.tipo_estudio }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Región</label>{{ form.region }}</div>
+                    <div><label class="block text-xs font-medium text-gray-600 mb-1">Sistema</label>{{ form.sistema_destino }}</div>
+                </div>
+            </details>
+
+            <div class="flex justify-end gap-2 border-t border-gray-100 pt-4">
                 <button type="submit" 
-                        class="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg">
-                    <i class="fas fa-search mr-2"></i>Filtrar
+                        class="bg-white border border-teal-300 hover:bg-teal-50 text-teal-700 font-medium py-2 px-5 rounded-xl transition-colors">
+                    <i class="fas fa-filter mr-1.5"></i>Aplicar filtros
                 </button>
                 <a href="{% url 'preinformes:mis_preinformes' %}" 
-                   class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-6 rounded-xl transition-all shadow-lg">
-                    <i class="fas fa-times mr-2"></i>Limpiar
+                   class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-5 rounded-xl transition-colors">
+                    <i class="fas fa-times mr-1.5"></i>Limpiar todo
                 </a>
             </div>
         </form>
@@ -217,7 +216,7 @@
                             </a>
 
                             {% if preinforme.estado == 'borrador' or preinforme.estado == 'pendiente_revision' %}
-                                <a href="{% url 'preinformes:editar_preinforme' preinforme.pk %}"
+                                <a href="{% url 'preinformes:editar_preinforme' preinforme.pk %}?next={{ request.get_full_path|urlencode }}"
                                    class="inline-flex items-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm text-sm">
                                     <i class="fas fa-edit mr-1"></i>Editar
                                 </a>
