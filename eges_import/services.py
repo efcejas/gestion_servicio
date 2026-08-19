@@ -7,6 +7,7 @@ desde vistas, management commands y tests sin levantar un servidor.
 """
 from datetime import date as date_type, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
+import hashlib
 import os
 import unicodedata
 
@@ -21,6 +22,16 @@ from .models import DirectorToken, EgesRow, NombreObraSocial
 NO_ESPECIFICADO = {'medico no especificado', 'médico no especificado', 'no especificado', 'sin especificar', 'none', ''}
 
 
+def calcular_sha256_archivo(archivo):
+    """Calcula una huella estable y restablece el cursor del archivo subido."""
+    digest = hashlib.sha256()
+    archivo.seek(0)
+    for bloque in iter(lambda: archivo.read(1024 * 1024), b''):
+        digest.update(bloque)
+    archivo.seek(0)
+    return digest.hexdigest()
+
+
 def _normalizar_header(valor):
     texto = str(valor or '').strip().lower()
     texto = ''.join(
@@ -31,7 +42,10 @@ def _normalizar_header(valor):
 
 
 def _valor_valido(valor):
-    return bool(valor and str(valor).strip().lower() not in NO_ESPECIFICADO)
+    if not valor:
+        return False
+    texto = _normalizar_header(str(valor).strip(' ,;.-'))
+    return texto not in {_normalizar_header(item) for item in NO_ESPECIFICADO}
 
 
 def _texto(valor):
@@ -61,7 +75,7 @@ def _fecha(valor, datemode=None):
     if isinstance(valor, (int, float)) and datemode is not None:
         return xlrd.xldate.xldate_as_datetime(valor, datemode).date()
     if isinstance(valor, str):
-        for fmt in ('%d/%m/%Y', '%Y-%m-%d'):
+        for fmt in ('%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%d/%m/%Y', '%Y-%m-%d'):
             try:
                 return datetime.strptime(valor.strip(), fmt).date()
             except ValueError:
@@ -79,7 +93,7 @@ def _hora(valor, datemode=None):
     if isinstance(valor, (int, float)) and datemode is not None:
         return xlrd.xldate.xldate_as_datetime(valor, datemode).time()
     if isinstance(valor, str):
-        for fmt in ('%H:%M:%S', '%H:%M'):
+        for fmt in ('%d/%m/%Y %H:%M:%S', '%d/%m/%Y %H:%M', '%H:%M:%S', '%H:%M'):
             try:
                 return datetime.strptime(valor.strip(), fmt).time()
             except ValueError:
@@ -154,13 +168,17 @@ def procesar_excel_eges(archivo, batch):
     print(f"[EGES] Columnas: {headers[:8]}...")
 
     idx_nro_turno = _indice(headers, 'Nro. Turno', ['Turno', 'Número'])
+    idx_protocolo = _indice(headers, 'Protocolo')
     idx_dni = _indice(headers, 'Dni', ['DNI', 'Documento'])
     idx_numero_afiliado = _indice(headers, 'Numero Afiliado', ['Número Afiliado', 'Nro Afiliado'])
     idx_fecha = _indice(headers, 'Fecha Turno', ['Fecha'])
     idx_hora = _indice(headers, 'Hora Turno', ['Hora Desde', 'Hora'])
+    if idx_hora is None:
+        # El reporte "Atendidos" combina fecha y hora en una sola columna.
+        idx_hora = idx_fecha
     idx_hora_hasta = _indice(headers, 'Hora Hasta')
     idx_centro = _indice(headers, 'Centro de Atención', ['Centro', 'Sucursal'])
-    idx_tipo_atencion = _indice(headers, 'Tipo Atencion', ['Tipo Atención'])
+    idx_tipo_atencion = _indice(headers, 'Tipo Atencion', ['Tipo Atención', 'Tipo Ingreso'])
     idx_hc = _indice(headers, 'Historia Clínica', ['HC', 'H.C.'])
     idx_nombre = _indice(headers, 'Apellido y Nombre', ['Paciente', 'Nombre'])
     idx_servicio = _indice(headers, 'Servicio', ['Prestación', 'Estudio'])
@@ -176,8 +194,13 @@ def procesar_excel_eges(archivo, batch):
     idx_obra_social = _indice(headers, 'Obra Social', ['Cobertura', 'Prepaga', 'O.S.'])
     idx_codigo_os = _indice(headers, 'Codigo OS', ['Cód. OS', 'Cod OS', 'Código OS', 'Cod.OS'])
     idx_nombre_os = _indice(headers, 'Nombre OS', ['Denominacion OS', 'Denominación OS', 'Desc. OS', 'Descripcion OS', 'Descripción OS'])
-    idx_medico = _indice(headers, 'Medico Informante', ['Médico Informante', 'Informante'])
-    idx_medico_actuante = _indice(headers, 'Medico Actuante', ['Médico Actuante', 'Actuante'])
+    idx_medico = _indice(headers, 'Informante', ['Medico Informante', 'Médico Informante'])
+    idx_medico_actuante = _indice(headers, 'Medico Actuante', ['Médico Actuante', 'Actuante', 'Medico', 'Médico'])
+    idx_tecnico = _indice(headers, 'Tecnico', ['Técnico'])
+    idx_duracion = _indice(headers, 'Duracion', ['Duración'])
+    idx_contraste = _indice(headers, 'Contraste')
+    idx_anestesia = _indice(headers, 'Anestesia')
+    idx_aplicacion_origen = _indice(headers, 'Aplicacion Origen', ['Aplicación Origen'])
 
     if idx_practica is None:
         print("[EGES] Aviso: columna Practica no encontrada; clasificación usará Servicio.")
@@ -205,7 +228,11 @@ def procesar_excel_eges(archivo, batch):
             centro = _texto(_celda(row, idx_centro))
             medico_inf = _texto(_celda(row, idx_medico)) or None
             medico_act = _texto(_celda(row, idx_medico_actuante)) or None
-            medico = medico_inf if _valor_valido(medico_inf) else (medico_act if _valor_valido(medico_act) else None)
+            tecnico = _texto(_celda(row, idx_tecnico)) or None
+            medico = next(
+                (valor for valor in (medico_inf, medico_act, tecnico) if _valor_valido(valor)),
+                None,
+            )
             codigo_os = _texto(_celda(row, idx_codigo_os)) or None
             nombre_os = _texto(_celda(row, idx_nombre_os)) or None
             obra_social = _texto(_celda(row, idx_obra_social)) or None
@@ -218,6 +245,7 @@ def procesar_excel_eges(archivo, batch):
             fila = EgesRow(
                 batch=batch,
                 numero_turno=_texto(_celda(row, idx_nro_turno)),
+                protocolo=_texto(_celda(row, idx_protocolo)) or None,
                 fecha_turno=fecha_turno,
                 hora_turno=hora_turno,
                 hora_hasta=_hora(_celda(row, idx_hora_hasta), datemode),
@@ -241,6 +269,14 @@ def procesar_excel_eges(archivo, batch):
                 codigo_obra_social=codigo_os,
                 medico_informante=medico,
                 medico_actuante=medico_act,
+                tecnico=tecnico,
+                duracion_minutos=(
+                    _decimal(_celda(row, idx_duracion), default='0')
+                    if _celda(row, idx_duracion) not in (None, '') else None
+                ),
+                contraste_eges=_texto(_celda(row, idx_contraste)) or None,
+                anestesia_eges=_texto(_celda(row, idx_anestesia)) or None,
+                aplicacion_origen=_texto(_celda(row, idx_aplicacion_origen)) or None,
             )
 
             fila.es_insumo = fila.clasificar_insumo()
@@ -270,6 +306,10 @@ def procesar_excel_eges(archivo, batch):
             'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'practica'
         )
     )
+    protocolos_existentes = set(
+        EgesRow.objects.exclude(protocolo__isnull=True).exclude(protocolo='')
+        .values_list('protocolo', flat=True)
+    )
     filas_nuevas = []
     filas_duplicadas = 0
 
@@ -281,9 +321,12 @@ def procesar_excel_eges(archivo, batch):
             fila.centro_atencion,
             fila.practica,
         )
-        if combinacion not in combinaciones_existentes:
+        protocolo_repetido = bool(fila.protocolo and fila.protocolo in protocolos_existentes)
+        if not protocolo_repetido and combinacion not in combinaciones_existentes:
             filas_nuevas.append(fila)
             combinaciones_existentes.add(combinacion)
+            if fila.protocolo:
+                protocolos_existentes.add(fila.protocolo)
         else:
             filas_duplicadas += 1
 

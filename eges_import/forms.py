@@ -52,8 +52,9 @@ class ImportarEGESForm(forms.Form):
             headers = leer_encabezados_eges(archivo)
             headers_normalizados = {str(col).strip().lower() for col in headers}
 
-            columnas_criticas = ['fecha turno', 'estado turno', 'practica']
-            columnas_encontradas = [col for col in columnas_criticas if col in headers_normalizados]
+            tiene_fecha = 'fecha turno' in headers_normalizados or 'fecha' in headers_normalizados
+            tiene_estado = 'estado turno' in headers_normalizados or 'estado' in headers_normalizados
+            tiene_practica = 'practica' in headers_normalizados or 'práctica' in headers_normalizados
             tiene_paciente = 'paciente' in headers_normalizados or 'apellido y nombre' in headers_normalizados
             tiene_documento = (
                 'dni' in headers_normalizados
@@ -61,7 +62,7 @@ class ImportarEGESForm(forms.Form):
                 or 'historia clinica' in headers_normalizados
             )
 
-            if len(columnas_encontradas) < 2 or not tiene_paciente or not tiene_documento:
+            if not (tiene_fecha and tiene_estado and tiene_practica and tiene_paciente and tiene_documento):
                 raise ValidationError(
                     'El Excel no tiene las columnas esperadas. '
                     f'Se esperaban columnas como: {", ".join(self.COLUMNAS_ESPERADAS)}'

@@ -1,4 +1,5 @@
 from io import BytesIO
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -7,7 +8,7 @@ from openpyxl import Workbook
 
 from .forms import ImportarEGESForm
 from .models import EgesRow, ImportBatch
-from .services import procesar_excel_eges
+from .services import calcular_sha256_archivo, procesar_excel_eges
 
 
 def _archivo_eges_xlsx():
@@ -92,6 +93,35 @@ def _archivo_eges_xlsx():
     return contenido.getvalue()
 
 
+def _archivo_atendidos_xlsx():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Turnos'
+    ws.append([
+        'Fecha', 'Paciente', 'Historia Clinica', 'Protocolo', 'Centro',
+        'Servicio', 'Práctica', 'Médico', 'Obra Social', 'Estado',
+        'Informante', 'Equipo', 'Duración', 'Contraste', 'Anestesia',
+        'Tipo Turno', 'Técnico', 'Tipo Ingreso', 'Aplicación Origen',
+    ])
+    filas = [
+        ('01/05/2026 09:00', 'PROTO-1', 'ACTUANTE UNO', 'INFORMANTE UNO', 'TECNICO UNO'),
+        ('01/05/2026 10:00', 'PROTO-2', 'ACTUANTE DOS', 'Médico No Especificado', 'TECNICO DOS'),
+        ('01/05/2026 11:00', 'PROTO-3', 'Médico No Especificado', ', Médico No Especificado', 'TECNICO TRES'),
+    ]
+    for numero, (fecha, protocolo, actuante, informante, tecnico) in enumerate(filas, start=1):
+        ws.append([
+            fecha, f'PACIENTE {numero}', str(1000 + numero), protocolo,
+            'Sanatorio Colegiales', 'Ecografia',
+            'ECOGRAFIA COMPLETA DE ABDOMEN', actuante, 'COBERTURA',
+            'Informado', informante, 'Ecografo 1', 15, 'No', 'No',
+            'Normal', tecnico, 'Ambulatorio', 'Portal',
+        ])
+    contenido = BytesIO()
+    wb.save(contenido)
+    contenido.seek(0)
+    return contenido.getvalue()
+
+
 class ImportacionEgesAuditoriaPacsTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='admin', password='x')
@@ -135,3 +165,171 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         form = ImportarEGESForm(files={'archivo': archivo})
 
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_reimportar_archivo_identico_no_crea_otro_lote_ni_duplica_filas(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        contenido = _archivo_eges_xlsx()
+
+        for nombre in ('Turnos-Mayo-ECO.xlsx', 'copia-renombrada.xlsx'):
+            response = self.client.post(
+                '/eges/importar/',
+                {'archivo': SimpleUploadedFile(
+                    nombre,
+                    contenido,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )},
+            )
+            self.assertEqual(response.status_code, 302)
+
+        self.assertEqual(ImportBatch.objects.count(), 1)
+        self.assertEqual(EgesRow.objects.count(), 1)
+        self.assertEqual(
+            ImportBatch.objects.get().archivo_sha256,
+            calcular_sha256_archivo(BytesIO(contenido)),
+        )
+
+    def test_reimportar_datos_de_lote_historico_sin_huella_descarta_lote_vacio(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        contenido = _archivo_eges_xlsx()
+        historico = ImportBatch.objects.create(
+            usuario=self.user,
+            archivo_nombre='historico-sin-huella.xlsx',
+        )
+        procesar_excel_eges(BytesIO(contenido), historico)
+        historico.calcular_metricas()
+
+        response = self.client.post(
+            '/eges/importar/',
+            {'archivo': SimpleUploadedFile(
+                'reintento-historico.xlsx',
+                contenido,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            )},
+        )
+
+        self.assertRedirects(response, '/eges/')
+        self.assertEqual(ImportBatch.objects.count(), 1)
+        self.assertEqual(EgesRow.objects.count(), 1)
+        self.assertTrue(ImportBatch.objects.filter(pk=historico.pk).exists())
+
+    def test_importa_formato_atendidos_y_resuelve_profesional_desde_tres_columnas(self):
+        contenido = _archivo_atendidos_xlsx()
+        archivo = SimpleUploadedFile(
+            'Atendidos-mayo-ECO.xlsx',
+            contenido,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        form = ImportarEGESForm(files={'archivo': archivo})
+        self.assertTrue(form.is_valid(), form.errors)
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre=archivo.name)
+
+        resultado = procesar_excel_eges(archivo, batch)
+
+        self.assertEqual(resultado['creadas'], 3)
+        filas = {fila.protocolo: fila for fila in EgesRow.objects.all()}
+        self.assertEqual(filas['PROTO-1'].medico_informante, 'INFORMANTE UNO')
+        self.assertEqual(filas['PROTO-2'].medico_informante, 'ACTUANTE DOS')
+        self.assertEqual(filas['PROTO-3'].medico_informante, 'TECNICO TRES')
+        self.assertEqual(filas['PROTO-1'].medico_actuante, 'ACTUANTE UNO')
+        self.assertEqual(filas['PROTO-1'].tecnico, 'TECNICO UNO')
+        self.assertEqual(str(filas['PROTO-1'].duracion_minutos), '15.00')
+        self.assertEqual(filas['PROTO-1'].aplicacion_origen, 'Portal')
+        self.assertEqual(filas['PROTO-1'].fecha_turno.isoformat(), '2026-05-01')
+        self.assertEqual(filas['PROTO-1'].hora_turno.strftime('%H:%M'), '09:00')
+
+    def test_protocolo_repetido_se_rechaza_aunque_cambien_otros_datos(self):
+        contenido = _archivo_atendidos_xlsx()
+        primero = ImportBatch.objects.create(usuario=self.user, archivo_nombre='primero.xlsx')
+        segundo = ImportBatch.objects.create(usuario=self.user, archivo_nombre='segundo.xlsx')
+
+        resultado_primero = procesar_excel_eges(BytesIO(contenido), primero)
+        resultado_segundo = procesar_excel_eges(BytesIO(contenido), segundo)
+
+        self.assertEqual(resultado_primero['creadas'], 3)
+        self.assertEqual(resultado_segundo['creadas'], 0)
+        self.assertEqual(resultado_segundo['duplicadas'], 3)
+        self.assertEqual(EgesRow.objects.count(), 3)
+
+    def _crear_estudio_dashboard(self, batch, protocolo, fecha, modalidad):
+        practica = 'TRANSITO DE INTESTINO' if modalidad == 'SERIE' else f'PRACTICA {protocolo}'
+        fila = EgesRow.objects.create(
+            batch=batch,
+            protocolo=protocolo,
+            historia_clinica=protocolo,
+            fecha_turno=fecha,
+            centro_atencion='Sanatorio Colegiales',
+            practica=practica,
+            estado_turno='Informado',
+            modalidad=modalidad,
+            es_insumo=False,
+            medico_informante='PROFESIONAL PRUEBA',
+        )
+        fila.modalidad = modalidad
+        fila.save(update_fields=['modalidad'])
+        return fila
+
+    def test_comparativa_respeta_modalidad_seleccionada(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='comparativa.xlsx')
+        actual_desde = date.today() - timedelta(days=9)
+        actual_hasta = date.today()
+        anterior_desde = actual_desde - timedelta(days=10)
+
+        self._crear_estudio_dashboard(batch, 'TC-ACTUAL-1', actual_desde, 'TC')
+        self._crear_estudio_dashboard(batch, 'TC-ACTUAL-2', actual_hasta, 'TC')
+        self._crear_estudio_dashboard(batch, 'TC-ANTERIOR-1', anterior_desde, 'TC')
+        for numero in range(5):
+            self._crear_estudio_dashboard(batch, f'RM-ACTUAL-{numero}', actual_desde, 'RM')
+            self._crear_estudio_dashboard(batch, f'RM-ANTERIOR-{numero}', anterior_desde, 'RM')
+
+        response = self.client.get('/eges/datos/comparativa/', {
+            'fecha_desde': actual_desde.isoformat(),
+            'fecha_hasta': actual_hasta.isoformat(),
+            'modalidades[]': 'TC',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['actual']['total_finalizados'], 2)
+        self.assertEqual(data['anterior']['total_finalizados'], 1)
+        self.assertEqual(data['delta']['total_finalizados'], 100.0)
+
+    def test_tendencia_y_productividad_incluyen_serie(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='serie.xlsx')
+        fila_serie = self._crear_estudio_dashboard(batch, 'SERIE-1', date.today(), 'SERIE')
+        fila_serie.refresh_from_db()
+
+        self.assertEqual(EgesRow.objects.filter(
+            modalidad='SERIE', estado_turno__iexact='Informado', es_insumo=False,
+        ).count(), 1, (fila_serie.modalidad, fila_serie.estado_turno, fila_serie.es_insumo))
+
+        temporal = self.client.get('/eges/datos/analisis-temporal/').json()
+        productividad = self.client.get('/eges/datos/productividad-medico/').json()
+
+        self.assertIn('Seriografía', [dataset['label'] for dataset in temporal['datasets']])
+        self.assertIn('Seriografía', [dataset['label'] for dataset in productividad['datasets']])
+
+    def test_dashboard_advierte_lote_con_posible_tope_eges(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        ImportBatch.objects.create(
+            usuario=self.user,
+            archivo_nombre='Atendidos-mayo-ECO.xls',
+            total_filas=1000,
+        )
+
+        response = self.client.get('/eges/estadisticas/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['lotes_posible_tope'], 1)
+        self.assertContains(response, 'podrían haber alcanzado el límite')

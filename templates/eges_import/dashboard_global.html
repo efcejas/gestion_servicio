@@ -17,59 +17,112 @@
 
 {% block content %}
 
+    <section class="mb-6 rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 md:p-7 text-white shadow-lg">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+                <div class="mb-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold">
+                    <i class="fa-solid fa-chart-line"></i>
+                    Tablero ejecutivo · Superuser
+                </div>
+                <h1 class="text-2xl font-bold md:text-3xl">Actividad de Diagnóstico por Imágenes</h1>
+                <p class="mt-2 max-w-3xl text-sm text-blue-100">
+                    Producción informada, demanda pendiente y distribución operativa consolidada desde EGES.
+                </p>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div class="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
+                    <p class="text-xs text-blue-100">Datos disponibles</p>
+                    <p class="mt-1 font-semibold">
+                        {% if fecha_min and fecha_max %}{{ fecha_min|date:"d/m/Y" }} – {{ fecha_max|date:"d/m/Y" }}{% else %}Sin datos{% endif %}
+                    </p>
+                </div>
+                <div class="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
+                    <p class="text-xs text-blue-100">Última importación</p>
+                    <p class="mt-1 font-semibold">
+                        {% if ultimo_batch %}{{ ultimo_batch.fecha_importacion|date:"d/m/Y H:i" }}{% else %}Sin importaciones{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {% if lotes_posible_tope %}
+    <div class="mb-5 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
+        <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
+        <div>
+            <p class="text-sm font-semibold">Revisar cobertura de {{ lotes_posible_tope }} lote{{ lotes_posible_tope|pluralize }}</p>
+            <p class="mt-0.5 text-xs">Tienen 1.000 registros o más y podrían haber alcanzado el límite de exportación de EGES. Conviene validar el rango o dividir la descarga.</p>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Panel de Filtros -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4 border border-gray-200 dark:border-gray-700">
-        <h3 class="text-base font-semibold text-gray-800 dark:text-white mb-4">Filtros</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <!-- Fecha Desde -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
+        <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Desde</label>
-                <input type="date" id="fecha-desde" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Período y modalidades</h2>
+                <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">Todos los indicadores y gráficos responden a esta selección.</p>
             </div>
-            
-            <!-- Fecha Hasta -->
-            <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Hasta</label>
-                <input type="date" id="fecha-hasta" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white">
+            <div class="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Períodos rápidos">
+                <button type="button" data-periodo="mes-actual" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes actual</button>
+                <button type="button" data-periodo="mes-anterior" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes anterior</button>
+                <button type="button" data-periodo="90-dias" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Últimos 90 días</button>
+                <button type="button" data-periodo="todo" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Todo</button>
             </div>
-            
-            <!-- Modalidades -->
+        </div>
+
+        <div class="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] xl:items-end">
+            <div class="grid grid-cols-2 gap-2">
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-300">Desde</label>
+                    <input type="date" id="fecha-desde" class="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.75 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                </div>
+
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-gray-700 dark:text-gray-300">Hasta</label>
+                    <input type="date" id="fecha-hasta" class="w-full rounded-lg border border-gray-300 bg-white px-2.5 py-1.75 text-sm text-gray-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-700 dark:text-white">
+                </div>
+            </div>
+
             <div>
-                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Modalidades</label>
-                <div class="grid grid-cols-2 gap-2">
-                    <label class="flex items-center">
-                        <input type="checkbox" value="TC" class="modalidad-check rounded text-blue-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">TC</span>
+                <div class="mb-1 flex items-center justify-between gap-2">
+                    <label class="block text-[11px] font-medium text-gray-700 dark:text-gray-300">Modalidades</label>
+                    <button type="button" id="btn-todas-modalidades" class="text-[11px] font-medium text-medical-primary hover:underline dark:text-blue-300">Todas</button>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="TC" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-blue-600 peer-checked:bg-blue-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">TC</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="RM" class="modalidad-check rounded text-purple-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">RM</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="RM" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-purple-600 peer-checked:bg-purple-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">RM</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="RX" class="modalidad-check rounded text-green-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">RX</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="RX" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-green-600 peer-checked:bg-green-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">RX</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="ECO" class="modalidad-check rounded text-yellow-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">ECO</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="ECO" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-amber-500 peer-checked:bg-amber-500 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">ECO</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="DX" class="modalidad-check rounded text-indigo-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">DX</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="DX" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-orange-500 peer-checked:bg-orange-500 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">DX</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="MAM" class="modalidad-check rounded text-pink-600 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">MAM</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="MAM" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-pink-600 peer-checked:bg-pink-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">MAM</span>
                     </label>
-                    <label class="flex items-center">
-                        <input type="checkbox" value="SERIE" class="modalidad-check rounded text-teal-500 mr-2" checked>
-                        <span class="text-sm dark:text-gray-300">SER</span>
+                    <label class="cursor-pointer">
+                        <input type="checkbox" value="SERIE" class="modalidad-check peer sr-only" checked>
+                        <span class="flex min-w-[42px] justify-center rounded-full border border-gray-300 px-2 py-1.5 text-[11px] font-semibold text-gray-600 transition peer-checked:border-teal-600 peer-checked:bg-teal-600 peer-checked:text-white dark:border-gray-600 dark:text-gray-300">SER</span>
                     </label>
                 </div>
             </div>
         </div>
         
-        <div class="mt-4 flex gap-2 flex-wrap">
+        <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-700">
             <button id="btn-aplicar-filtros" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
@@ -91,11 +144,17 @@
                 </svg>
                 Descargar PDF
             </a>
+            <p id="filtro-resumen" class="w-full text-xs text-gray-500 dark:text-gray-400 sm:ml-auto sm:w-auto"></p>
         </div>
     </div>
 
     <!-- KPIs dinámicos (actualizados al aplicar filtros) -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios informados</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2" id="kpi-total-finalizados">—</p>
+            <p class="text-xs text-gray-400 mt-1">producción del período</p>
+        </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Promedio / Día Hábil</p>
             <p class="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2" id="kpi-promedio-dia">—</p>
@@ -110,6 +169,11 @@
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios Pendientes</p>
             <p class="text-2xl font-bold text-amber-500 dark:text-amber-400 mt-2" id="kpi-pendientes">—</p>
             <p class="text-xs text-gray-400 mt-1">sin informe registrado</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">RX sin informe</p>
+            <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2" id="kpi-rx-sin-informe-resumen">—</p>
+            <p class="text-xs text-gray-400 mt-1">cerrados sin reporte médico</p>
         </div>
     </div>
     <!-- RX sin informe: se muestra solo si > 0 -->
@@ -374,6 +438,31 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const textoGrafico = document.documentElement.classList.contains('dark') ? '#d1d5db' : '#475569';
+    const grillaGrafico = document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,.14)' : 'rgba(148,163,184,.18)';
+    Chart.defaults.color = textoGrafico;
+    Chart.defaults.font.family = 'proxima-nova, ui-sans-serif, system-ui, sans-serif';
+    Chart.defaults.animation.duration = 300;
+    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, .94)';
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+
+    Chart.register({
+        id: 'estadoVacio',
+        afterDraw(chart) {
+            const datasets = chart.data.datasets || [];
+            const tieneDatos = datasets.some(ds => (ds.data || []).some(valor => Number(valor) > 0));
+            if (tieneDatos || !chart.chartArea) return;
+            const {ctx, chartArea} = chart;
+            ctx.save();
+            ctx.fillStyle = textoGrafico;
+            ctx.textAlign = 'center';
+            ctx.font = '500 13px proxima-nova, sans-serif';
+            ctx.fillText('No hay datos para los filtros seleccionados', (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2);
+            ctx.restore();
+        }
+    });
+
     // ── Instancias de gráficos ──────────────────────────────────────────────
     const charts = {};
     let tipoGraficoPrincipal = 'line';
@@ -411,21 +500,36 @@ document.addEventListener('DOMContentLoaded', function() {
         return params.toString();
     }
 
+    function actualizarResumenFiltro() {
+        const desde = document.getElementById('fecha-desde').value;
+        const hasta = document.getElementById('fecha-hasta').value;
+        const modalidades = [...document.querySelectorAll('.modalidad-check:checked')].map(cb => cb.value);
+        const periodo = desde || hasta ? `${desde || 'inicio'} a ${hasta || 'hoy'}` : 'Todo el período';
+        document.getElementById('filtro-resumen').textContent = `${periodo} · ${modalidades.join(', ')}`;
+    }
+
     // ── Funciones de carga individuales ─────────────────────────────────────
 
     function cargarKPIs(params) {
+        ['kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
+            .forEach(id => document.getElementById(id).textContent = '…');
         fetch("{% url 'eges_import:kpis_data' %}?" + params)
             .then(r => r.json())
             .then(d => {
+                document.getElementById('kpi-total-finalizados').textContent = Number(d.total_finalizados).toLocaleString('es-AR');
                 document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia;
                 document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion + '%';
                 document.getElementById('kpi-pendientes').textContent = Number(d.total_pendientes).toLocaleString('es-AR');
                 // Card informativa RX sin informe
                 const rxSI = d.rx_sin_informe || 0;
                 document.getElementById('kpi-rx-sin-informe').textContent = Number(rxSI).toLocaleString('es-AR');
+                document.getElementById('kpi-rx-sin-informe-resumen').textContent = Number(rxSI).toLocaleString('es-AR');
                 document.getElementById('kpi-rx-sin-informe-card').classList.toggle('hidden', rxSI === 0);
             })
-            .catch(() => {});
+            .catch(() => {
+                ['kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
+                    .forEach(id => document.getElementById(id).textContent = 'Error');
+            });
     }
 
     // Solo recarga el gráfico temporal — se llama al cambiar agrupacion o tipo
@@ -448,7 +552,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         options: {
                             responsive: true, maintainAspectRatio: false,
                             plugins: {
-                                legend: { display: true, position: 'top' },
+                                legend: { display: true, position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 16 } },
                                 tooltip: { mode: 'index', intersect: false }
                             },
                             scales: {
@@ -476,8 +580,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         data: { labels: data.labels, datasets: data.datasets },
                         options: {
                             responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: c => ` ${c.parsed.y.toLocaleString('es-AR')} estudios` } }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: grillaGrafico } },
+                                x: { grid: { display: false } }
+                            }
                         }
                     }
                 );
@@ -496,8 +606,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         data: { labels: data.labels, datasets: data.datasets },
                         options: {
                             responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
-                            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: { callbacks: { label: c => ` ${c.parsed.y.toLocaleString('es-AR')} estudios` } }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: grillaGrafico } },
+                                x: { grid: { display: false } }
+                            }
                         }
                     }
                 );
@@ -518,7 +634,11 @@ document.addEventListener('DOMContentLoaded', function() {
                             responsive: true, maintainAspectRatio: false,
                             plugins: {
                                 legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
-                                tooltip: { callbacks: { label: c => ` ${c.label}: ${c.parsed.toLocaleString('es-AR')}` } }
+                                tooltip: { callbacks: { label: c => {
+                                    const total = c.dataset.data.reduce((suma, valor) => suma + Number(valor || 0), 0);
+                                    const porcentaje = total ? (Number(c.parsed) / total * 100).toFixed(1) : '0.0';
+                                    return ` ${c.label}: ${c.parsed.toLocaleString('es-AR')} (${porcentaje}%)`;
+                                } } }
                             }
                         }
                     }
@@ -642,6 +762,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Recarga todo cuando cambian los filtros (fechas / modalidades)
     function cargarTodo() {
         const params = obtenerParametrosFiltro();
+        actualizarResumenFiltro();
+        const pdfBase = "{% url 'eges_import:exportar_pdf' %}";
+        document.getElementById('btn-exportar-pdf').href = params ? `${pdfBase}?${params}` : pdfBase;
         cargarKPIs(params);
         recargarTemporal();      // usa obtenerParametrosFiltro() internamente
         cargarDiaSemana(params);
@@ -692,6 +815,51 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
         document.getElementById('kpi-rx-sin-informe-card').classList.add('hidden');
         cargarTodo();
+    });
+
+    document.getElementById('btn-todas-modalidades').addEventListener('click', function() {
+        document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
+        cargarTodo();
+    });
+
+    document.querySelectorAll('.modalidad-check').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (!document.querySelector('.modalidad-check:checked')) this.checked = true;
+            cargarTodo();
+        });
+    });
+
+    function fechaISO(fecha) {
+        const y = fecha.getFullYear();
+        const m = String(fecha.getMonth() + 1).padStart(2, '0');
+        const d = String(fecha.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    document.querySelectorAll('.periodo-rapido').forEach(button => {
+        button.addEventListener('click', function() {
+            const hoy = new Date();
+            let desde = null;
+            let hasta = null;
+            if (this.dataset.periodo === 'mes-actual') {
+                desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+                hasta = hoy;
+            } else if (this.dataset.periodo === 'mes-anterior') {
+                desde = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+                hasta = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+            } else if (this.dataset.periodo === '90-dias') {
+                desde = new Date(hoy);
+                desde.setDate(desde.getDate() - 89);
+                hasta = hoy;
+            }
+            document.getElementById('fecha-desde').value = desde ? fechaISO(desde) : '';
+            document.getElementById('fecha-hasta').value = hasta ? fechaISO(hasta) : '';
+            document.querySelectorAll('.periodo-rapido').forEach(btn => {
+                btn.classList.remove('bg-medical-primary', 'text-white', 'border-medical-primary');
+            });
+            this.classList.add('bg-medical-primary', 'text-white', 'border-medical-primary');
+            cargarTodo();
+        });
     });
 
     // ── Estado inicial ───────────────────────────────────────────────────────

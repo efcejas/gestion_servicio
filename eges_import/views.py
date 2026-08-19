@@ -18,6 +18,7 @@ from .services import (
     agrupar_periodo as _agrupar_periodo,
     verificar_token as _verificar_token,
     procesar_excel_eges as _procesar_excel_eges,
+    calcular_sha256_archivo as _calcular_sha256_archivo,
 )
 
 # Paleta de colores consistente para todas las vistas y el portal del director
@@ -77,6 +78,8 @@ def dashboard_global(request):
     
     # Métricas globales consolidadas
     total_batches = batches.count()
+    lotes_posible_tope = batches.filter(total_filas__gte=1000).count()
+    ultimo_batch = batches.order_by('-fecha_importacion').first()
     total_filas_global = sum(b.total_filas for b in batches)
     total_estudios_finalizados_global = sum(b.total_estudios_finalizados for b in batches)
     
@@ -95,6 +98,8 @@ def dashboard_global(request):
     context = {
         'titulo_pagina': 'Dashboard Global EGES',
         'total_batches': total_batches,
+        'lotes_posible_tope': lotes_posible_tope,
+        'ultimo_batch': ultimo_batch,
         'total_filas_global': total_filas_global,
         'total_estudios_finalizados_global': total_estudios_finalizados_global,
         'total_tc_global': total_tc_global,
@@ -121,13 +126,27 @@ def importar_eges(request):
         
         if form.is_valid():
             archivo = request.FILES['archivo']
+            archivo_sha256 = _calcular_sha256_archivo(archivo)
+
+            lote_existente = ImportBatch.objects.filter(
+                archivo_sha256=archivo_sha256,
+            ).first()
+            if lote_existente:
+                messages.warning(
+                    request,
+                    'Este archivo ya fue importado exactamente igual '
+                    f'el {timezone.localtime(lote_existente.fecha_importacion):%d/%m/%Y a las %H:%M}. '
+                    'No se realizaron cambios.',
+                )
+                return redirect('eges_import:detalle_batch', batch_id=lote_existente.id)
             
             print(f"[EGES] Iniciando importación: {archivo.name} ({archivo.size} bytes)")
             
             # Crear el batch
             batch = ImportBatch.objects.create(
                 usuario=request.user,
-                archivo_nombre=archivo.name
+                archivo_nombre=archivo.name,
+                archivo_sha256=archivo_sha256,
             )
             
             print(f"[EGES] Batch #{batch.id} creado")
@@ -138,6 +157,19 @@ def importar_eges(request):
                 resultado = _procesar_excel_eges(archivo, batch)
                 
                 print(f"[EGES] Resultado: {resultado['creadas']} nuevas, {resultado['duplicadas']} duplicadas, {resultado['errores']} errores")
+
+                # Compatibilidad con lotes históricos, que no tienen huella porque
+                # el archivo original no se conservaba: si todo el contenido ya
+                # existe, descartamos solamente este lote vacío y no alteramos
+                # ninguna fila ni lote previo.
+                if resultado['creadas'] == 0 and resultado['duplicadas'] > 0:
+                    batch.delete()
+                    messages.warning(
+                        request,
+                        'Todos los estudios de este archivo ya estaban cargados. '
+                        'No se creó otro lote y no se realizaron cambios.',
+                    )
+                    return redirect('eges_import:lista_batches')
                 
                 # Calcular métricas
                 batch.calcular_metricas()
@@ -499,7 +531,7 @@ def grafico_batch_data(request, batch_id):
         datos_dict[key] = datos_dict.get(key, 0) + item['total']
 
     meses = sorted(set(k[0] for k in datos_dict))
-    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'SERIE', 'OTROS']
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
 
     datasets = []
@@ -658,7 +690,7 @@ def dashboard_global_grafico_data(request):
         datos_dict[key] = datos_dict.get(key, 0) + item['total']
 
     meses = sorted(set(k[0] for k in datos_dict))
-    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'SERIE', 'OTROS']
 
     datasets = []
     for modalidad in modalidades:
@@ -856,7 +888,7 @@ def _vista_analisis_temporal(request):
     else:
         labels = [p.strftime('%m/%Y') for p in periodos]
 
-    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'SERIE', 'OTROS']
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
 
     datasets = []
@@ -988,7 +1020,7 @@ def _vista_productividad_medico(request):
 
     # Desglose por modalidad para cada médico (top N)
     medicos_top = list(labels)
-    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    modalidades = ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'SERIE', 'OTROS']
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
 
     desglose = (
@@ -1091,9 +1123,9 @@ def _vista_comparativa_data(request):
     fh_prev = fd - timedelta(days=1)
 
     def kpis_para_rango(desde, hasta):
-        params = QueryDict(
-            f'fecha_desde={desde.strftime("%Y-%m-%d")}&fecha_hasta={hasta.strftime("%Y-%m-%d")}'
-        )
+        params = request.GET.copy()
+        params['fecha_desde'] = desde.strftime('%Y-%m-%d')
+        params['fecha_hasta'] = hasta.strftime('%Y-%m-%d')
         base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), params)
         candidatos = _aplicar_filtros_fecha_modalidad(
             EgesRow.objects.filter(es_insumo=False, fecha_turno__isnull=False), params
@@ -1354,7 +1386,8 @@ def _exportar_pdf(request):
     ROJO          = colors.HexColor('#dc2626')
     MOD_HEX = {
         'TC': '#3b82f6', 'RM': '#9333ea', 'RX': '#22c55e',
-        'DX': '#f97316', 'MAM': '#ec4899', 'ECO': '#eab308', 'OTROS': '#6b7280',
+        'DX': '#f97316', 'MAM': '#ec4899', 'ECO': '#eab308',
+        'SERIE': '#14b8a6', 'OTROS': '#6b7280',
     }
 
     # ── Estilos ReportLab ─────────────────────────────────────────────────────
@@ -1572,7 +1605,7 @@ def _exportar_pdf(request):
         temp_dict[key] = temp_dict.get(key, 0) + item['total']
     periodos = sorted(set(p for p, _ in temp_dict))
     temp_labels_list = [p.strftime('%m/%Y') for p in periodos]
-    mods_presentes = [m for m in ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'OTROS']
+    mods_presentes = [m for m in ['TC', 'RM', 'RX', 'DX', 'MAM', 'ECO', 'SERIE', 'OTROS']
                       if sum(temp_dict.get((p, m), 0) for p in periodos) > 0]
 
     # ── Generar imágenes matplotlib ─────────────────────────────────────────

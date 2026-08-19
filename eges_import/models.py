@@ -11,6 +11,14 @@ class ImportBatch(models.Model):
     """
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='batches_eges')
     archivo_nombre = models.CharField(max_length=255)
+    archivo_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        unique=True,
+        verbose_name='Huella SHA-256 del archivo',
+        help_text='Permite rechazar reimportaciones exactas sin alterar lotes históricos.',
+    )
     fecha_importacion = models.DateTimeField(default=timezone.now)
     total_filas = models.IntegerField(default=0)
 
@@ -115,6 +123,7 @@ class EgesRow(models.Model):
 
     # Identificación del turno/ingreso
     numero_turno = models.CharField(max_length=50, blank=True, null=True)
+    protocolo = models.CharField(max_length=80, blank=True, null=True, db_index=True)
     fecha_turno = models.DateField(null=True, blank=True)
     hora_turno = models.TimeField(null=True, blank=True)
     hora_hasta = models.TimeField(null=True, blank=True)
@@ -148,6 +157,13 @@ class EgesRow(models.Model):
     # Médico informante (capturado desde la columna del Excel si existe)
     medico_informante = models.CharField(max_length=200, blank=True, null=True)
     medico_actuante = models.CharField(max_length=200, blank=True, null=True)
+    tecnico = models.CharField(max_length=200, blank=True, null=True)
+
+    # Datos operativos disponibles en el reporte "Atendidos" de EGES
+    duracion_minutos = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True)
+    contraste_eges = models.CharField(max_length=30, blank=True, null=True)
+    anestesia_eges = models.CharField(max_length=30, blank=True, null=True)
+    aplicacion_origen = models.CharField(max_length=80, blank=True, null=True)
 
     # Clasificación principal
     es_insumo = models.BooleanField(default=False)
