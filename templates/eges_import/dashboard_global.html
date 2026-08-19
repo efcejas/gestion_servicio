@@ -508,6 +508,28 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('filtro-resumen').textContent = `${periodo} · ${modalidades.join(', ')}`;
     }
 
+    const coloresModalidad = {
+        TC: '#2563eb',
+        RM: '#9333ea',
+        RX: '#16a34a',
+        ECO: '#d97706',
+        DX: '#ea580c',
+        MAM: '#db2777',
+        SERIE: '#0d9488'
+    };
+
+    function actualizarEstilosModalidad() {
+        document.querySelectorAll('.modalidad-check').forEach(checkbox => {
+            const chip = checkbox.nextElementSibling;
+            const seleccionado = checkbox.checked;
+            chip.style.backgroundColor = seleccionado ? coloresModalidad[checkbox.value] : 'transparent';
+            chip.style.borderColor = seleccionado ? coloresModalidad[checkbox.value] : '';
+            chip.style.color = seleccionado ? '#ffffff' : '';
+            chip.style.boxShadow = seleccionado ? `0 0 0 2px ${coloresModalidad[checkbox.value]}33` : '';
+            checkbox.closest('label').setAttribute('aria-pressed', seleccionado ? 'true' : 'false');
+        });
+    }
+
     // ── Funciones de carga individuales ─────────────────────────────────────
 
     function cargarKPIs(params) {
@@ -813,18 +835,21 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('fecha-desde').value = '';
         document.getElementById('fecha-hasta').value = '';
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
+        actualizarEstilosModalidad();
         document.getElementById('kpi-rx-sin-informe-card').classList.add('hidden');
         cargarTodo();
     });
 
     document.getElementById('btn-todas-modalidades').addEventListener('click', function() {
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
+        actualizarEstilosModalidad();
         cargarTodo();
     });
 
     document.querySelectorAll('.modalidad-check').forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             if (!document.querySelector('.modalidad-check:checked')) this.checked = true;
+            actualizarEstilosModalidad();
             cargarTodo();
         });
     });
@@ -865,6 +890,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ── Estado inicial ───────────────────────────────────────────────────────
     actualizarBotonesAgrupacion('agrup-mes');
     actualizarBotonesTipo('line');
+    actualizarEstilosModalidad();
     cargarTodo();
 });
 </script>
