@@ -438,8 +438,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const textoGrafico = document.documentElement.classList.contains('dark') ? '#d1d5db' : '#475569';
-    const grillaGrafico = document.documentElement.classList.contains('dark') ? 'rgba(148,163,184,.14)' : 'rgba(148,163,184,.18)';
+    const modoOscuro = document.documentElement.classList.contains('dark') || document.body.classList.contains('dark');
+    const textoGrafico = modoOscuro ? '#d1d5db' : '#475569';
+    const grillaGrafico = modoOscuro ? 'rgba(148,163,184,.14)' : 'rgba(148,163,184,.18)';
     Chart.defaults.color = textoGrafico;
     Chart.defaults.font.family = 'proxima-nova, ui-sans-serif, system-ui, sans-serif';
     Chart.defaults.animation.duration = 300;
@@ -494,16 +495,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const fechaHasta = document.getElementById('fecha-hasta').value;
         if (fechaDesde) params.append('fecha_desde', fechaDesde);
         if (fechaHasta) params.append('fecha_hasta', fechaHasta);
-        document.querySelectorAll('.modalidad-check:checked').forEach(checkbox => {
-            params.append('modalidades[]', checkbox.value);
-        });
+        const modalidades = [...document.querySelectorAll('.modalidad-check')];
+        const seleccionadas = modalidades.filter(checkbox => checkbox.checked);
+        // Sin parametro de modalidad el backend interpreta correctamente "Todas"
+        // e incluye tambien registros clasificados como OTROS.
+        if (seleccionadas.length !== modalidades.length) {
+            seleccionadas.forEach(checkbox => params.append('modalidades[]', checkbox.value));
+        }
         return params.toString();
     }
 
     function actualizarResumenFiltro() {
         const desde = document.getElementById('fecha-desde').value;
         const hasta = document.getElementById('fecha-hasta').value;
-        const modalidades = [...document.querySelectorAll('.modalidad-check:checked')].map(cb => cb.value);
+        const controles = [...document.querySelectorAll('.modalidad-check')];
+        const seleccionadas = controles.filter(cb => cb.checked).map(cb => cb.value);
+        const modalidades = seleccionadas.length === controles.length ? ['Todas'] : seleccionadas;
         const periodo = desde || hasta ? `${desde || 'inicio'} a ${hasta || 'hoy'}` : 'Todo el período';
         document.getElementById('filtro-resumen').textContent = `${periodo} · ${modalidades.join(', ')}`;
     }
