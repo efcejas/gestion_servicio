@@ -65,6 +65,11 @@ def _decimal(valor, default='1'):
         return Decimal(default)
 
 
+def _normalizar_dni(valor):
+    """Normaliza DNI para contar pacientes sin crear identificadores alternativos."""
+    return ''.join(caracter for caracter in str(valor or '') if caracter.isdigit())
+
+
 def _fecha(valor, datemode=None):
     if not valor:
         return None
@@ -159,7 +164,8 @@ def procesar_excel_eges(archivo, batch):
     Procesa archivos EGES .xls/.xlsx y conserva campos útiles para auditoría PACS.
 
     Mantiene la regla histórica de no persistir insumos y de deduplicar por
-    documento/HC + fecha + hora + centro + práctica.
+    HC + fecha + hora + centro + práctica. El protocolo no identifica una
+    práctica única y no participa de la deduplicación.
     """
     print("[EGES] Abriendo workbook...")
     headers, rows, datemode = _abrir_workbook(archivo)
@@ -306,10 +312,6 @@ def procesar_excel_eges(archivo, batch):
             'historia_clinica', 'fecha_turno', 'hora_turno', 'centro_atencion', 'practica'
         )
     )
-    protocolos_existentes = set(
-        EgesRow.objects.exclude(protocolo__isnull=True).exclude(protocolo='')
-        .values_list('protocolo', flat=True)
-    )
     filas_nuevas = []
     filas_duplicadas = 0
 
@@ -321,12 +323,9 @@ def procesar_excel_eges(archivo, batch):
             fila.centro_atencion,
             fila.practica,
         )
-        protocolo_repetido = bool(fila.protocolo and fila.protocolo in protocolos_existentes)
-        if not protocolo_repetido and combinacion not in combinaciones_existentes:
+        if combinacion not in combinaciones_existentes:
             filas_nuevas.append(fila)
             combinaciones_existentes.add(combinacion)
-            if fila.protocolo:
-                protocolos_existentes.add(fila.protocolo)
         else:
             filas_duplicadas += 1
 
@@ -424,6 +423,15 @@ def calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_q
         promedio_dia, tasa_conversion, rx_sin_informe.
     """
     total_finalizados = estudios_finalizados_qs.count()
+    dnis = {
+        dni_normalizado
+        for dni in estudios_finalizados_qs.values_list('dni_paciente', flat=True)
+        if (dni_normalizado := _normalizar_dni(dni))
+    }
+    pacientes_atendidos = len(dnis)
+    pacientes_sin_dni = estudios_finalizados_qs.filter(
+        dni_paciente__isnull=True,
+    ).count() + estudios_finalizados_qs.filter(dni_paciente='').count()
     total_candidatos = estudios_candidatos_qs.count()
     rx_sin_informe = sin_informe_qs.count() if sin_informe_qs is not None else 0
     # Los "Entregado Sin Informe" son estudios cerrados, no pendientes reales
@@ -445,9 +453,14 @@ def calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_q
         promedio_dia = 0
 
     tasa_conversion = round((total_finalizados / total_candidatos * 100), 1) if total_candidatos else 0
+    practicas_por_paciente = round(total_finalizados / pacientes_atendidos, 2) if pacientes_atendidos else 0
 
     return {
         'total_finalizados': total_finalizados,
+        'practicas_realizadas': total_finalizados,
+        'pacientes_atendidos': pacientes_atendidos,
+        'pacientes_sin_dni': pacientes_sin_dni,
+        'practicas_por_paciente': practicas_por_paciente,
         'total_candidatos': total_candidatos,
         'total_pendientes': total_pendientes,
         'promedio_dia': promedio_dia,

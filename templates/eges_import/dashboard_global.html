@@ -149,7 +149,22 @@
     </div>
 
     <!-- KPIs dinámicos (actualizados al aplicar filtros) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Pacientes atendidos</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2" id="kpi-pacientes-atendidos">—</p>
+            <p class="text-xs text-gray-400 mt-1">DNI únicos del período</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas realizadas</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2" id="kpi-practicas-realizadas">—</p>
+            <p class="text-xs text-gray-400 mt-1">filas clínicas informadas</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas por paciente</p>
+            <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2" id="kpi-practicas-por-paciente">—</p>
+            <p class="text-xs text-gray-400 mt-1">promedio del período</p>
+        </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios informados</p>
             <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2" id="kpi-total-finalizados">—</p>
@@ -469,6 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let tipoGraficoPrincipal = 'line';
     let agrupacion = 'mes';
     let temporalAbortCtrl = null;  // cancela fetch anterior al cambiar agrupación/tipo
+    let dashboardRequestId = 0;
 
     // ── Clases de botones (con dark mode explícito en todos los estados) ────
     const CLS_AGRUP_ACTIVO   = 'agrup-btn px-2 py-1 text-xs rounded font-medium bg-blue-600 text-white transition-colors';
@@ -539,12 +555,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ── Funciones de carga individuales ─────────────────────────────────────
 
-    function cargarKPIs(params) {
-        ['kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
+    function cargarKPIs(params, requestId) {
+        ['kpi-pacientes-atendidos', 'kpi-practicas-realizadas', 'kpi-practicas-por-paciente', 'kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
             .forEach(id => document.getElementById(id).textContent = '…');
         fetch("{% url 'eges_import:kpis_data' %}?" + params)
             .then(r => r.json())
             .then(d => {
+                if (requestId !== dashboardRequestId) return;
+                document.getElementById('kpi-pacientes-atendidos').textContent = Number(d.pacientes_atendidos).toLocaleString('es-AR');
+                document.getElementById('kpi-practicas-realizadas').textContent = Number(d.practicas_realizadas).toLocaleString('es-AR');
+                document.getElementById('kpi-practicas-por-paciente').textContent = Number(d.practicas_por_paciente).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
                 document.getElementById('kpi-total-finalizados').textContent = Number(d.total_finalizados).toLocaleString('es-AR');
                 document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia;
                 document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion + '%';
@@ -556,13 +576,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('kpi-rx-sin-informe-card').classList.toggle('hidden', rxSI === 0);
             })
             .catch(() => {
-                ['kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
+                if (requestId !== dashboardRequestId) return;
+                ['kpi-pacientes-atendidos', 'kpi-practicas-realizadas', 'kpi-practicas-por-paciente', 'kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
                     .forEach(id => document.getElementById(id).textContent = 'Error');
             });
     }
 
     // Solo recarga el gráfico temporal — se llama al cambiar agrupacion o tipo
-    function recargarTemporal() {
+    function recargarTemporal(requestId = ++dashboardRequestId) {
         // Cancelar fetch anterior si sigue en vuelo
         if (temporalAbortCtrl) temporalAbortCtrl.abort();
         temporalAbortCtrl = new AbortController();
@@ -573,6 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch("{% url 'eges_import:analisis_temporal_data' %}?" + params + '&agrupacion=' + agrupacionActual, { signal })
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.principal) charts.principal.destroy();
                 charts.principal = new Chart(
                     document.getElementById('grafico-principal').getContext('2d'), {
@@ -598,10 +620,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(err => { if (err.name !== 'AbortError') console.error(err); });
     }
 
-    function cargarDiaSemana(params) {
+    function cargarDiaSemana(params, requestId) {
         fetch("{% url 'eges_import:dashboard_global_dia_semana_data' %}?" + params)
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.diaSemana) charts.diaSemana.destroy();
                 charts.diaSemana = new Chart(
                     document.getElementById('grafico-dia-semana').getContext('2d'), {
@@ -624,10 +647,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarFranja(params) {
+    function cargarFranja(params, requestId) {
         fetch("{% url 'eges_import:dashboard_global_franja_horaria_data' %}?" + params)
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.franja) charts.franja.destroy();
                 charts.franja = new Chart(
                     document.getElementById('grafico-franja-horaria').getContext('2d'), {
@@ -650,10 +674,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarDona(params) {
+    function cargarDona(params, requestId) {
         fetch("{% url 'eges_import:distribucion_modalidad_data' %}?" + params)
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.dona) charts.dona.destroy();
                 charts.dona = new Chart(
                     document.getElementById('grafico-dona-modalidad').getContext('2d'), {
@@ -676,10 +701,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarSubEco(params) {
+    function cargarSubEco(params, requestId) {
         fetch("{% url 'eges_import:sub_modalidades_eco_data' %}?" + params)
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.subEco) charts.subEco.destroy();
                 charts.subEco = new Chart(
                     document.getElementById('grafico-sub-eco').getContext('2d'), {
@@ -700,10 +726,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarComparativa(params) {
+    function cargarComparativa(params, requestId) {
         fetch("{% url 'eges_import:comparativa_data' %}?" + params)
             .then(r => r.json())
             .then(d => {
+                if (requestId !== dashboardRequestId) return;
                 document.getElementById('comp-total-actual').textContent =
                     Number(d.actual.total_finalizados).toLocaleString('es-AR');
                 document.getElementById('comp-promedio-actual').textContent = d.actual.promedio_dia;
@@ -734,10 +761,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarObrasSociales(params) {
+    function cargarObrasSociales(params, requestId) {
         fetch("{% url 'eges_import:obras_sociales_data' %}?" + params)
             .then(r => r.json())
             .then(d => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.obrasSociales) charts.obrasSociales.destroy();
                 charts.obrasSociales = new Chart(
                     document.getElementById('grafico-obras-sociales').getContext('2d'), {
@@ -761,10 +789,11 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
-    function cargarMedicos(params) {
+    function cargarMedicos(params, requestId) {
         fetch("{% url 'eges_import:productividad_medico_data' %}?" + params)
             .then(r => r.json())
             .then(data => {
+                if (requestId !== dashboardRequestId) return;
                 if (charts.medicos) charts.medicos.destroy();
                 charts.medicos = new Chart(
                     document.getElementById('grafico-medicos-top').getContext('2d'), {
@@ -790,19 +819,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Recarga todo cuando cambian los filtros (fechas / modalidades)
     function cargarTodo() {
+        const requestId = ++dashboardRequestId;
         const params = obtenerParametrosFiltro();
         actualizarResumenFiltro();
         const pdfBase = "{% url 'eges_import:exportar_pdf' %}";
         document.getElementById('btn-exportar-pdf').href = params ? `${pdfBase}?${params}` : pdfBase;
-        cargarKPIs(params);
-        recargarTemporal();      // usa obtenerParametrosFiltro() internamente
-        cargarDiaSemana(params);
-        cargarFranja(params);
-        cargarDona(params);
-        cargarSubEco(params);
-        cargarMedicos(params);
-        cargarComparativa(params);
-        cargarObrasSociales(params);
+        cargarKPIs(params, requestId);
+        recargarTemporal(requestId);      // usa obtenerParametrosFiltro() internamente
+        cargarDiaSemana(params, requestId);
+        cargarFranja(params, requestId);
+        cargarDona(params, requestId);
+        cargarSubEco(params, requestId);
+        cargarMedicos(params, requestId);
+        cargarComparativa(params, requestId);
+        cargarObrasSociales(params, requestId);
     }
 
     // ── Botones de agrupación (solo recargan el temporal) ───────────────────

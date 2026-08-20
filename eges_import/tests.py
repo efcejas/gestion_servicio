@@ -122,6 +122,27 @@ def _archivo_atendidos_xlsx():
     return contenido.getvalue()
 
 
+def _archivo_practicas_mismo_protocolo_xlsx(practicas):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Turnos'
+    ws.append([
+        'Dni', 'Historia Clinica', 'Protocolo', 'Centro', 'Fecha Turno',
+        'Hora Desde', 'Servicio', 'Práctica', 'Código Practica',
+        'Estado Turno', 'Cantidad',
+    ])
+    for practica in practicas:
+        ws.append([
+            '12345678', '12345678', 'PROTO-1', 'Sanatorio Colegiales',
+            '01/05/2026', '09:00', 'Ecografia', practica, '900137/0',
+            'Informado', 1,
+        ])
+    contenido = BytesIO()
+    wb.save(contenido)
+    contenido.seek(0)
+    return contenido.getvalue()
+
+
 class ImportacionEgesAuditoriaPacsTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username='admin', password='x')
@@ -154,6 +175,19 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(fila.tipo_turno, 'Normal')
         self.assertEqual(fila.tipo_paciente, 'Adulto')
         self.assertEqual(fila.region_informe, '-')
+
+    def test_aguja_de_biopsia_se_clasifica_como_insumo(self):
+        fila = EgesRow(practica='AGUJA DE BIOPSIA', servicio='Ecografia')
+
+        self.assertTrue(fila.clasificar_insumo())
+
+    def test_puncion_biopsia_guiada_se_conserva_como_practica(self):
+        fila = EgesRow(
+            practica='PUNCION BIOPSIA BAJO CONTROL ECOGRAFICO',
+            servicio='Ecografia',
+        )
+
+        self.assertFalse(fila.clasificar_insumo())
 
     def test_formulario_acepta_xlsx_eges_real(self):
         archivo = SimpleUploadedFile(
@@ -241,25 +275,43 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(filas['PROTO-1'].fecha_turno.isoformat(), '2026-05-01')
         self.assertEqual(filas['PROTO-1'].hora_turno.strftime('%H:%M'), '09:00')
 
-    def test_protocolo_repetido_se_rechaza_aunque_cambien_otros_datos(self):
-        contenido = _archivo_atendidos_xlsx()
+    def test_mismo_protocolo_con_tres_practicas_conserva_las_tres(self):
+        contenido = _archivo_practicas_mismo_protocolo_xlsx([
+            'ECOGRAFIA ABDOMINAL',
+            'ECOGRAFIA RENAL',
+            'ECOGRAFIA VESICAL',
+        ])
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='practicas.xlsx')
+
+        resultado = procesar_excel_eges(BytesIO(contenido), batch)
+
+        self.assertEqual(resultado['creadas'], 3)
+        self.assertEqual(EgesRow.objects.count(), 3)
+        self.assertEqual(
+            set(EgesRow.objects.values_list('practica', flat=True)),
+            {'ECOGRAFIA ABDOMINAL', 'ECOGRAFIA RENAL', 'ECOGRAFIA VESICAL'},
+        )
+
+    def test_misma_practica_con_misma_identidad_real_se_deduplica(self):
+        contenido = _archivo_practicas_mismo_protocolo_xlsx(['ECOGRAFIA ABDOMINAL'])
         primero = ImportBatch.objects.create(usuario=self.user, archivo_nombre='primero.xlsx')
         segundo = ImportBatch.objects.create(usuario=self.user, archivo_nombre='segundo.xlsx')
 
         resultado_primero = procesar_excel_eges(BytesIO(contenido), primero)
         resultado_segundo = procesar_excel_eges(BytesIO(contenido), segundo)
 
-        self.assertEqual(resultado_primero['creadas'], 3)
+        self.assertEqual(resultado_primero['creadas'], 1)
         self.assertEqual(resultado_segundo['creadas'], 0)
-        self.assertEqual(resultado_segundo['duplicadas'], 3)
-        self.assertEqual(EgesRow.objects.count(), 3)
+        self.assertEqual(resultado_segundo['duplicadas'], 1)
+        self.assertEqual(EgesRow.objects.count(), 1)
 
-    def _crear_estudio_dashboard(self, batch, protocolo, fecha, modalidad):
-        practica = 'TRANSITO DE INTESTINO' if modalidad == 'SERIE' else f'PRACTICA {protocolo}'
+    def _crear_estudio_dashboard(self, batch, protocolo, fecha, modalidad, dni=None, practica=None):
+        practica = practica or ('TRANSITO DE INTESTINO' if modalidad == 'SERIE' else f'PRACTICA {protocolo}')
         fila = EgesRow.objects.create(
             batch=batch,
             protocolo=protocolo,
             historia_clinica=protocolo,
+            dni_paciente=dni,
             fecha_turno=fecha,
             centro_atencion='Sanatorio Colegiales',
             practica=practica,
@@ -271,6 +323,59 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         fila.modalidad = modalidad
         fila.save(update_fields=['modalidad'])
         return fila
+
+    def test_kpis_separan_pacientes_practicas_y_excluyen_insumos(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='kpis.xlsx')
+
+        for numero, practica in enumerate(('ECO ABDOMEN', 'ECO RENAL', 'ECO VESICAL'), start=1):
+            self._crear_estudio_dashboard(
+                batch, f'ECO-A-{numero}', date(2026, 5, 10), 'ECO',
+                dni='12.345.678', practica=practica,
+            )
+        self._crear_estudio_dashboard(
+            batch, 'ECO-B-1', date(2026, 5, 10), 'ECO',
+            dni='23456789', practica='ECO MAMARIA',
+        )
+        EgesRow.objects.create(
+            batch=batch,
+            historia_clinica='INSUMO-1',
+            dni_paciente='99999999',
+            fecha_turno=date(2026, 5, 10),
+            centro_atencion='Sanatorio Colegiales',
+            practica='GUANTES',
+            estado_turno='Informado',
+            modalidad='ECO',
+            es_insumo=True,
+        )
+
+        data = self.client.get('/eges/datos/kpis/', {
+            'fecha_desde': '2026-05-01',
+            'fecha_hasta': '2026-05-31',
+            'modalidades[]': 'ECO',
+        }).json()
+
+        self.assertEqual(data['pacientes_atendidos'], 2)
+        self.assertEqual(data['practicas_realizadas'], 4)
+        self.assertEqual(data['practicas_por_paciente'], 2.0)
+
+    def test_kpis_respetan_modalidad_seleccionada(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='modalidades.xlsx')
+        self._crear_estudio_dashboard(batch, 'ECO-1', date(2026, 5, 10), 'ECO', dni='11111111')
+        self._crear_estudio_dashboard(batch, 'TC-1', date(2026, 5, 10), 'TC', dni='22222222')
+
+        eco = self.client.get('/eges/datos/kpis/', {'modalidades[]': 'ECO'}).json()
+        tc = self.client.get('/eges/datos/kpis/', {'modalidades[]': 'TC'}).json()
+
+        self.assertEqual(eco['pacientes_atendidos'], 1)
+        self.assertEqual(eco['practicas_realizadas'], 1)
+        self.assertEqual(tc['pacientes_atendidos'], 1)
+        self.assertEqual(tc['practicas_realizadas'], 1)
 
     def test_comparativa_respeta_modalidad_seleccionada(self):
         self.user.is_superuser = True
