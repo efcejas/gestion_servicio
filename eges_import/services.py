@@ -14,7 +14,7 @@ import unicodedata
 import openpyxl
 import xlrd
 from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, Min, Max, Q
 
 from .models import DirectorToken, EgesRow, NombreObraSocial
 
@@ -356,7 +356,7 @@ def get_base_estudios_finalizados():
         es_insumo=False,
         estado_turno__iexact='Informado',
         fecha_turno__isnull=False,
-    )
+    ).order_by()
 
 
 def get_base_rx_sin_informe():
@@ -422,26 +422,31 @@ def calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_q
         dict con claves: total_finalizados, total_candidatos, total_pendientes,
         promedio_dia, tasa_conversion, rx_sin_informe.
     """
-    total_finalizados = estudios_finalizados_qs.count()
+    resumen_finalizados = estudios_finalizados_qs.aggregate(
+        total=Count('id'),
+        fecha_min=Min('fecha_turno'),
+        fecha_max=Max('fecha_turno'),
+        pacientes_sin_dni=Count(
+            'id',
+            filter=Q(dni_paciente__isnull=True) | Q(dni_paciente=''),
+        ),
+    )
+    total_finalizados = resumen_finalizados['total']
     dnis = {
         dni_normalizado
         for dni in estudios_finalizados_qs.values_list('dni_paciente', flat=True)
         if (dni_normalizado := _normalizar_dni(dni))
     }
     pacientes_atendidos = len(dnis)
-    pacientes_sin_dni = estudios_finalizados_qs.filter(
-        dni_paciente__isnull=True,
-    ).count() + estudios_finalizados_qs.filter(dni_paciente='').count()
     total_candidatos = estudios_candidatos_qs.count()
     rx_sin_informe = sin_informe_qs.count() if sin_informe_qs is not None else 0
     # Los "Entregado Sin Informe" son estudios cerrados, no pendientes reales
     total_pendientes = max(total_candidatos - total_finalizados - rx_sin_informe, 0)
 
     # Rango de fechas efectivo
-    fechas = estudios_finalizados_qs.values_list('fecha_turno', flat=True)
-    if fechas:
-        fecha_min = min(fechas)
-        fecha_max = max(fechas)
+    fecha_min = resumen_finalizados['fecha_min']
+    fecha_max = resumen_finalizados['fecha_max']
+    if fecha_min and fecha_max:
         dias_periodo = max((fecha_max - fecha_min).days + 1, 1)
         # Dias hábiles aproximados (excluimos domingos)
         dias_habiles = sum(
@@ -459,7 +464,7 @@ def calcular_kpis(estudios_finalizados_qs, estudios_candidatos_qs, sin_informe_q
         'total_finalizados': total_finalizados,
         'practicas_realizadas': total_finalizados,
         'pacientes_atendidos': pacientes_atendidos,
-        'pacientes_sin_dni': pacientes_sin_dni,
+        'pacientes_sin_dni': resumen_finalizados['pacientes_sin_dni'],
         'practicas_por_paciente': practicas_por_paciente,
         'total_candidatos': total_candidatos,
         'total_pendientes': total_pendientes,

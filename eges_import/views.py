@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q, Avg, Max
+from django.db.models.functions import ExtractWeekDay
 from datetime import date as date_type
 from django.utils import timezone
 from datetime import datetime, time, timedelta
@@ -716,33 +717,19 @@ def dashboard_global_dia_semana_data(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     modalidades_seleccionadas = request.GET.getlist('modalidades[]')
     
-    estudios = EgesRow.objects.filter(
-        es_insumo=False,
-        estado_turno__iexact='Informado',
-        fecha_turno__isnull=False
+    estudios = _aplicar_filtros_fecha_modalidad(
+        _base_estudios_finalizados(),
+        request.GET,
     )
-    
-    if fecha_desde:
-        try:
-            estudios = estudios.filter(fecha_turno__gte=datetime.strptime(fecha_desde, '%Y-%m-%d').date())
-        except:
-            pass
-    
-    if fecha_hasta:
-        try:
-            estudios = estudios.filter(fecha_turno__lte=datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
-        except:
-            pass
-    
-    if modalidades_seleccionadas:
-        estudios = estudios.filter(modalidad__in=modalidades_seleccionadas)
+    conteos = estudios.annotate(
+        dia_semana=ExtractWeekDay('fecha_turno'),
+    ).values('dia_semana').annotate(total=Count('id'))
     
     dias_semana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
     conteo_por_dia = [0] * 7
-    
-    for estudio in estudios:
-        dia_numero = estudio.fecha_turno.weekday()
-        conteo_por_dia[dia_numero] += 1
+    for item in conteos:
+        dia_numero = (item['dia_semana'] + 5) % 7
+        conteo_por_dia[dia_numero] = item['total']
     
     return JsonResponse({
         'labels': dias_semana,
@@ -780,27 +767,10 @@ def dashboard_global_franja_horaria_data(request):
     fecha_hasta = request.GET.get('fecha_hasta', '')
     modalidades_seleccionadas = request.GET.getlist('modalidades[]')
     
-    estudios = EgesRow.objects.filter(
-        es_insumo=False,
-        estado_turno__iexact='Informado',
-        fecha_turno__isnull=False,
-        hora_turno__isnull=False
-    )
-    
-    if fecha_desde:
-        try:
-            estudios = estudios.filter(fecha_turno__gte=datetime.strptime(fecha_desde, '%Y-%m-%d').date())
-        except:
-            pass
-    
-    if fecha_hasta:
-        try:
-            estudios = estudios.filter(fecha_turno__lte=datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
-        except:
-            pass
-    
-    if modalidades_seleccionadas:
-        estudios = estudios.filter(modalidad__in=modalidades_seleccionadas)
+    estudios = _aplicar_filtros_fecha_modalidad(
+        _base_estudios_finalizados().filter(hora_turno__isnull=False),
+        request.GET,
+    ).order_by().values_list('hora_turno', flat=True)
     
     franjas = [
         '00-02', '02-04', '04-06', '06-08', '08-10', '10-12',
@@ -808,8 +778,8 @@ def dashboard_global_franja_horaria_data(request):
     ]
     conteo_por_franja = [0] * 12
     
-    for estudio in estudios:
-        hora = estudio.hora_turno.hour
+    for hora_turno in estudios:
+        hora = hora_turno.hour
         franja_idx = hora // 2
         if 0 <= franja_idx < 12:
             conteo_por_franja[franja_idx] += 1
@@ -1106,21 +1076,38 @@ def _vista_comparativa_data(request):
     fecha_desde_str = request.GET.get('fecha_desde', '')
     fecha_hasta_str = request.GET.get('fecha_hasta', '')
     hoy = date_type.today()
+    rango_manual = bool(fecha_desde_str and fecha_hasta_str)
 
-    if fecha_desde_str and fecha_hasta_str:
+    if rango_manual:
         try:
             fd = datetime.strptime(fecha_desde_str, '%Y-%m-%d').date()
             fh = datetime.strptime(fecha_hasta_str, '%Y-%m-%d').date()
         except ValueError:
+            rango_manual = False
+
+    if not rango_manual:
+        filtros_modalidad = request.GET.copy()
+        filtros_modalidad.pop('fecha_desde', None)
+        filtros_modalidad.pop('fecha_hasta', None)
+        ultima_fecha = _aplicar_filtros_fecha_modalidad(
+            _base_estudios_finalizados(),
+            filtros_modalidad,
+        ).aggregate(ultima=Max('fecha_turno'))['ultima']
+        if ultima_fecha:
+            fd = ultima_fecha.replace(day=1)
+            primer_dia_siguiente = (fd + timedelta(days=32)).replace(day=1)
+            fh = primer_dia_siguiente - timedelta(days=1)
+        else:
             fd = hoy - timedelta(days=30)
             fh = hoy
-    else:
-        fd = hoy - timedelta(days=30)
-        fh = hoy
 
-    duracion = max((fh - fd).days, 1)
-    fd_prev = fd - timedelta(days=duracion + 1)
-    fh_prev = fd - timedelta(days=1)
+    if rango_manual:
+        duracion = max((fh - fd).days, 1)
+        fd_prev = fd - timedelta(days=duracion + 1)
+        fh_prev = fd - timedelta(days=1)
+    else:
+        fh_prev = fd - timedelta(days=1)
+        fd_prev = fh_prev.replace(day=1)
 
     def kpis_para_rango(desde, hasta):
         params = request.GET.copy()
@@ -1240,6 +1227,7 @@ def _vista_comparativa_data(request):
         'anterior': anterior,
         'periodo_actual': {'desde': fd.strftime('%d/%m/%Y'), 'hasta': fh.strftime('%d/%m/%Y')},
         'periodo_anterior': {'desde': fd_prev.strftime('%d/%m/%Y'), 'hasta': fh_prev.strftime('%d/%m/%Y')},
+        'modo_periodo': 'manual' if rango_manual else 'automatico',
         'delta': {
             'total_finalizados': delta(actual['total_finalizados'], anterior['total_finalizados']),
             'promedio_dia': delta(actual['promedio_dia'], anterior['promedio_dia']),

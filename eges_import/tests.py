@@ -1,5 +1,5 @@
 from io import BytesIO
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -470,6 +470,87 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
 
         self.assertFalse(data['hay_datos_anterior'])
         self.assertEqual(data['practicas']['estado'], 'NUEVA')
+
+    def test_comparativa_automatica_usa_ultimo_mes_disponible(self):
+        self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 7, 15), 'TC', {'TOMOGRAFIA': 2})
+        self._crear_comparativa(date(2026, 6, 15), 'TC', {'TOMOGRAFIA': 1})
+
+        data = self.client.get('/eges/datos/comparativa/', {
+            'modalidades[]': 'TC',
+        }).json()
+
+        self.assertEqual(data['modo_periodo'], 'automatico')
+        self.assertEqual(data['periodo_actual'], {'desde': '01/07/2026', 'hasta': '31/07/2026'})
+        self.assertEqual(data['periodo_anterior'], {'desde': '01/06/2026', 'hasta': '30/06/2026'})
+
+    def test_comparativa_automatica_ancla_cada_modalidad_a_su_ultimo_mes(self):
+        self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 15), 'ECO', {'ECO ABDOMEN': 2})
+        self._crear_comparativa(date(2026, 4, 15), 'ECO', {'ECO ABDOMEN': 1})
+        self._crear_comparativa(date(2026, 7, 15), 'TC', {'TOMOGRAFIA': 2})
+        self._crear_comparativa(date(2026, 6, 15), 'TC', {'TOMOGRAFIA': 1})
+
+        eco = self.client.get('/eges/datos/comparativa/', {'modalidades[]': 'ECO'}).json()
+        tc = self.client.get('/eges/datos/comparativa/', {'modalidades[]': 'TC'}).json()
+
+        self.assertEqual(eco['periodo_actual']['desde'], '01/05/2026')
+        self.assertEqual(eco['periodo_actual']['hasta'], '31/05/2026')
+        self.assertEqual(tc['periodo_actual']['desde'], '01/07/2026')
+        self.assertEqual(tc['periodo_actual']['hasta'], '31/07/2026')
+
+    def test_comparativa_manual_conserva_rango_e_intervalo_anterior(self):
+        self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 10), 'ECO', {'ECO ABDOMEN': 2})
+        self._crear_comparativa(date(2026, 4, 29), 'ECO', {'ECO ABDOMEN': 1})
+
+        data = self.client.get('/eges/datos/comparativa/', {
+            'fecha_desde': '2026-05-10',
+            'fecha_hasta': '2026-05-20',
+            'modalidades[]': 'ECO',
+        }).json()
+
+        self.assertEqual(data['modo_periodo'], 'manual')
+        self.assertEqual(data['periodo_actual'], {'desde': '10/05/2026', 'hasta': '20/05/2026'})
+        self.assertEqual(data['periodo_anterior'], {'desde': '29/04/2026', 'hasta': '09/05/2026'})
+
+    def test_evolucion_no_agrega_meses_sin_datos(self):
+        self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 7, 15), 'TC', {'TOMOGRAFIA': 2})
+
+        data = self.client.get('/eges/datos/analisis-temporal/', {
+            'modalidades[]': 'TC',
+            'agrupacion': 'mes',
+        }).json()
+
+        self.assertEqual(data['labels'], ['07/2026'])
+
+    def test_dia_y_franja_conservan_conteos_tras_agregacion(self):
+        self._preparar_comparativa()
+        for indice, (fecha, hora) in enumerate([
+            (date(2026, 5, 4), time(9, 0)),   # lunes, 08-10
+            (date(2026, 5, 5), time(11, 0)),  # martes, 10-12
+            (date(2026, 5, 4), time(9, 30)),  # lunes, 08-10
+        ]):
+            EgesRow.objects.create(
+                batch=self.batch_comparativa,
+                historia_clinica=f'DIA-{indice}',
+                dni_paciente=f'DIA-{indice}',
+                fecha_turno=fecha,
+                hora_turno=hora,
+                centro_atencion='Centro test',
+                practica='ECO TEST',
+                estado_turno='Informado',
+                modalidad='ECO',
+                es_insumo=False,
+            )
+
+        filtros = {'fecha_desde': '2026-05-01', 'fecha_hasta': '2026-05-31', 'modalidades[]': 'ECO'}
+        dias = self.client.get('/eges/estadisticas/grafico-dia-semana/', filtros).json()
+        franjas = self.client.get('/eges/estadisticas/grafico-franja-horaria/', filtros).json()
+
+        self.assertEqual(dias['datasets'][0]['data'], [2, 1, 0, 0, 0, 0, 0])
+        self.assertEqual(franjas['datasets'][0]['data'][4:6], [2, 1])
 
     def test_comparativa_respeta_modalidad_seleccionada(self):
         self.user.is_superuser = True
