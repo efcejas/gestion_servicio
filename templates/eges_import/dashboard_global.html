@@ -374,22 +374,40 @@
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Comparativa período anterior</h2>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" id="comp-subtitulo">Período actual vs anterior de igual duración</p>
             </div>
-            <div class="p-4 grid grid-cols-3 gap-3">
+            <div id="comp-sin-actividad" class="hidden mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                Sin actividad en el período anterior
+            </div>
+            <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Total estudios</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-total-actual">—</p>
-                    <p class="text-xs mt-1 text-gray-400" id="comp-total-delta">cargando…</p>
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Pacientes</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-pacientes-valores">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-pacientes-delta">cargando…</p>
                 </div>
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Promedio / día</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-promedio-actual">—</p>
-                    <p class="text-xs mt-1 text-gray-400" id="comp-promedio-delta">cargando…</p>
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-practicas-valores">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-practicas-delta">cargando…</p>
                 </div>
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Conversión</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-tasa-actual">—</p>
-                    <p class="text-xs mt-1 text-gray-400" id="comp-tasa-delta">cargando…</p>
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas / paciente</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-practicas-paciente-valores">—</p>
+                    <p class="text-xs mt-1 text-gray-400" id="comp-practicas-paciente-delta">cargando…</p>
                 </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4 pb-4">
+                <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">Mayores aumentos</p>
+                    <div id="comp-aumentos" class="mt-2 space-y-2 text-xs text-gray-700 dark:text-gray-300"><span class="text-gray-400">cargando…</span></div>
+                </div>
+                <div class="rounded-lg border border-rose-100 bg-rose-50/60 p-3 dark:border-rose-800 dark:bg-rose-900/10">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-rose-800 dark:text-rose-300">Mayores disminuciones</p>
+                    <div id="comp-disminuciones" class="mt-2 space-y-2 text-xs text-gray-700 dark:text-gray-300"><span class="text-gray-400">cargando…</span></div>
+                </div>
+            </div>
+            <div id="comp-bloqueos-tc" class="hidden border-t border-gray-200 px-4 py-3 dark:border-gray-700">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Bloqueos TC</p>
+                <p class="mt-1 text-sm font-semibold text-gray-800 dark:text-gray-200" id="comp-bloqueos-valores">—</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400" id="comp-bloqueos-delta">—</p>
             </div>
         </div>
 
@@ -731,27 +749,73 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(r => r.json())
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
-                document.getElementById('comp-total-actual').textContent =
-                    Number(d.actual.total_finalizados).toLocaleString('es-AR');
-                document.getElementById('comp-promedio-actual').textContent = d.actual.promedio_dia;
-                document.getElementById('comp-tasa-actual').textContent = d.actual.tasa_conversion + '%';
+                const comparativa = d.comparativa;
+                const formatoNumero = (valor, decimales = 0) => Number(valor || 0).toLocaleString('es-AR', {
+                    minimumFractionDigits: decimales,
+                    maximumFractionDigits: decimales,
+                });
+                const flechaEstado = {
+                    AUMENTO: '▲ aumento',
+                    DISMINUCION: '▼ disminución',
+                    DESAPARECIO: '▼ desapareció',
+                    NUEVA: '▲ nueva',
+                    SIN_CAMBIOS: '— sin cambios',
+                };
 
-                function renderDelta(elId, val) {
-                    const el = document.getElementById(elId);
-                    if (val === null || val === undefined) {
-                        el.textContent = 'sin datos anteriores';
-                        el.className = 'text-xs mt-1 text-gray-400';
+                function renderMetrica(metrica, valoresId, deltaId, decimales = 0) {
+                    document.getElementById(valoresId).textContent =
+                        `${formatoNumero(metrica.actual, decimales)} vs ${formatoNumero(metrica.anterior, decimales)}`;
+                    const porcentaje = metrica.porcentaje === null
+                        ? ''
+                        : ` (${metrica.porcentaje > 0 ? '+' : ''}${formatoNumero(metrica.porcentaje, 1)}%)`;
+                    const absoluta = `${metrica.absoluta > 0 ? '+' : ''}${formatoNumero(metrica.absoluta, decimales)}`;
+                    document.getElementById(deltaId).textContent = comparativa.hay_datos_anterior
+                        ? `${flechaEstado[metrica.estado]} ${absoluta}${porcentaje}`
+                        : 'Sin actividad en el período anterior';
+                }
+
+                renderMetrica(comparativa.pacientes, 'comp-pacientes-valores', 'comp-pacientes-delta');
+                renderMetrica(comparativa.practicas, 'comp-practicas-valores', 'comp-practicas-delta');
+                renderMetrica(comparativa.practicas_por_paciente, 'comp-practicas-paciente-valores', 'comp-practicas-paciente-delta', 2);
+                document.getElementById('comp-sin-actividad').classList.toggle('hidden', comparativa.hay_datos_anterior);
+
+                function escapeHtml(valor) {
+                    return String(valor).replace(/[&<>'"]/g, caracter => ({
+                        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+                    }[caracter]));
+                }
+
+                function renderPracticas(items, elementId) {
+                    const element = document.getElementById(elementId);
+                    if (!items.length) {
+                        element.innerHTML = '<span class="text-gray-400">— sin cambios</span>';
                         return;
                     }
-                    const sign = val >= 0 ? '+' : '';
-                    el.textContent = `${sign}${val}% vs período ant.`;
-                    el.className = `text-xs mt-1 font-semibold ${
-                        val >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'
-                    }`;
+                    element.innerHTML = items.map(item => {
+                        const porcentaje = item.porcentaje === null
+                            ? ''
+                            : ` (${item.porcentaje > 0 ? '+' : ''}${formatoNumero(item.porcentaje, 1)}%)`;
+                        const detalle = item.estado === 'NUEVA'
+                            ? `0 → ${formatoNumero(item.actual)} · NUEVA / +${formatoNumero(item.absoluta)}`
+                            : item.estado === 'DESAPARECIO'
+                                ? `${formatoNumero(item.anterior)} → 0 · SIN ACTIVIDAD / ${formatoNumero(item.absoluta)}`
+                                : `${formatoNumero(item.actual)} vs ${formatoNumero(item.anterior)} · ${flechaEstado[item.estado]} ${item.absoluta > 0 ? '+' : ''}${formatoNumero(item.absoluta)}${porcentaje}`;
+                        return `<div><p class="font-semibold">${escapeHtml(item.practica)}</p><p>${detalle}</p></div>`;
+                    }).join('');
                 }
-                renderDelta('comp-total-delta', d.delta.total_finalizados);
-                renderDelta('comp-promedio-delta', d.delta.promedio_dia);
-                renderDelta('comp-tasa-delta', d.delta.tasa_conversion);
+
+                renderPracticas(comparativa.practicas_mayores_aumentos, 'comp-aumentos');
+                renderPracticas(comparativa.practicas_mayores_disminuciones, 'comp-disminuciones');
+
+                const bloqueos = comparativa.bloqueos_tc;
+                const bloqueosCard = document.getElementById('comp-bloqueos-tc');
+                bloqueosCard.classList.toggle('hidden', bloqueos === null);
+                if (bloqueos !== null) {
+                    document.getElementById('comp-bloqueos-valores').textContent =
+                        `${formatoNumero(bloqueos.actual)} vs ${formatoNumero(bloqueos.anterior)}`;
+                    document.getElementById('comp-bloqueos-delta').textContent =
+                        `${flechaEstado[bloqueos.estado]} ${bloqueos.absoluta > 0 ? '+' : ''}${formatoNumero(bloqueos.absoluta)}${bloqueos.porcentaje === null ? '' : ` (${bloqueos.porcentaje > 0 ? '+' : ''}${formatoNumero(bloqueos.porcentaje, 1)}%)`}`;
+                }
 
                 if (d.periodo_actual && d.periodo_anterior) {
                     document.getElementById('comp-subtitulo').textContent =

@@ -377,6 +377,100 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(tc['pacientes_atendidos'], 1)
         self.assertEqual(tc['practicas_realizadas'], 1)
 
+    def _crear_comparativa(self, fecha, modalidad, practicas, pacientes=1, prefijo='P'):
+        filas = []
+        indice = 0
+        for practica, cantidad in practicas.items():
+            for _ in range(cantidad):
+                dni = f'{prefijo}{indice % pacientes:03d}'
+                filas.append(EgesRow(
+                    batch=self.batch_comparativa,
+                    historia_clinica=dni,
+                    dni_paciente=dni,
+                    fecha_turno=fecha,
+                    centro_atencion='Centro test',
+                    practica=practica,
+                    estado_turno='Informado',
+                    modalidad=modalidad,
+                    es_insumo=False,
+                ))
+                indice += 1
+        EgesRow.objects.bulk_create(filas)
+
+    def _preparar_comparativa(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        self.batch_comparativa = ImportBatch.objects.create(
+            usuario=self.user,
+            archivo_nombre='comparativa-tests.xlsx',
+        )
+        return {
+            'fecha_desde': '2026-05-01',
+            'fecha_hasta': '2026-05-10',
+        }
+
+    def test_comparativa_calcula_pacientes_practicas_y_promedio(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 160}, pacientes=100, prefijo='A')
+        self._crear_comparativa(date(2026, 4, 21), 'ECO', {'ECO ABDOMEN': 100}, pacientes=80, prefijo='B')
+
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        self.assertEqual(data['pacientes']['actual'], 100)
+        self.assertEqual(data['pacientes']['anterior'], 80)
+        self.assertEqual(data['pacientes']['absoluta'], 20)
+        self.assertEqual(data['practicas']['absoluta'], 60)
+        self.assertEqual(data['practicas_por_paciente']['actual'], 1.6)
+        self.assertEqual(data['practicas_por_paciente']['anterior'], 1.25)
+
+    def test_comparativa_ordena_aumentos_y_disminuciones_por_diferencia(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 120, 'DOPPLER': 60})
+        self._crear_comparativa(date(2026, 4, 21), 'ECO', {'ECO ABDOMEN': 100, 'DOPPLER': 80})
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        aumentos = {item['practica']: item for item in data['practicas_mayores_aumentos']}
+        disminuciones = {item['practica']: item for item in data['practicas_mayores_disminuciones']}
+        self.assertEqual(aumentos['ECO ABDOMEN']['absoluta'], 20)
+        self.assertEqual(disminuciones['DOPPLER']['absoluta'], -20)
+
+    def test_comparativa_identifica_practica_nueva_sin_division_por_cero(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO NUEVA': 15})
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        nueva = next(item for item in data['practicas_mayores_aumentos'] if item['practica'] == 'ECO NUEVA')
+        self.assertEqual(nueva['estado'], 'NUEVA')
+        self.assertIsNone(nueva['porcentaje'])
+
+    def test_comparativa_identifica_practica_desaparecida(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 4, 21), 'ECO', {'ECO DESAPARECE': 20})
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        desaparecida = next(item for item in data['practicas_mayores_disminuciones'] if item['practica'] == 'ECO DESAPARECE')
+        self.assertEqual(desaparecida['estado'], 'DESAPARECIO')
+        self.assertEqual(desaparecida['absoluta'], -20)
+
+    def test_comparativa_filtro_eco_no_incluye_tc(self):
+        filtros = self._preparar_comparativa()
+        filtros['modalidades[]'] = 'ECO'
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 2})
+        self._crear_comparativa(date(2026, 5, 1), 'TC', {'TOMOGRAFIA': 20})
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        self.assertEqual(data['practicas']['actual'], 2)
+        self.assertIsNone(data['bloqueos_tc'])
+
+    def test_comparativa_informa_periodo_anterior_sin_actividad(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 2})
+        data = self.client.get('/eges/datos/comparativa/', filtros).json()['comparativa']
+
+        self.assertFalse(data['hay_datos_anterior'])
+        self.assertEqual(data['practicas']['estado'], 'NUEVA')
+
     def test_comparativa_respeta_modalidad_seleccionada(self):
         self.user.is_superuser = True
         self.user.save(update_fields=['is_superuser'])

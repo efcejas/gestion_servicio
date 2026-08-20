@@ -1101,7 +1101,7 @@ def obras_sociales_data(request):
 
 def _vista_comparativa_data(request):
     """Compara KPIs del período seleccionado vs el anterior de igual duración."""
-    from django.http import QueryDict
+    codigos_bloqueos_tc = {'900446', '900441', '900413', '341317'}
 
     fecha_desde_str = request.GET.get('fecha_desde', '')
     fecha_hasta_str = request.GET.get('fecha_hasta', '')
@@ -1136,6 +1136,96 @@ def _vista_comparativa_data(request):
     actual = kpis_para_rango(fd, fh)
     anterior = kpis_para_rango(fd_prev, fh_prev)
 
+    def contar_practicas_por_nombre(desde, hasta):
+        params = request.GET.copy()
+        params['fecha_desde'] = desde.strftime('%Y-%m-%d')
+        params['fecha_hasta'] = hasta.strftime('%Y-%m-%d')
+        filas = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), params)
+        return {
+            item['practica'] or 'Sin práctica': item['total']
+            for item in filas.values('practica').annotate(total=Count('id'))
+        }
+
+    def variacion(valor_actual, valor_anterior, decimales=0):
+        absoluta = round(valor_actual - valor_anterior, decimales)
+        if absoluta == 0:
+            estado = 'SIN_CAMBIOS'
+        elif valor_anterior == 0 and valor_actual > 0:
+            estado = 'NUEVA'
+        elif valor_actual == 0 and valor_anterior > 0:
+            estado = 'DESAPARECIO'
+        elif absoluta > 0:
+            estado = 'AUMENTO'
+        else:
+            estado = 'DISMINUCION'
+        porcentaje = None if valor_anterior == 0 else round(
+            ((valor_actual - valor_anterior) / valor_anterior) * 100,
+            1,
+        )
+        return {
+            'actual': round(valor_actual, decimales),
+            'anterior': round(valor_anterior, decimales),
+            'absoluta': absoluta,
+            'porcentaje': porcentaje,
+            'estado': estado,
+        }
+
+    practicas_actuales = contar_practicas_por_nombre(fd, fh)
+    practicas_anteriores = contar_practicas_por_nombre(fd_prev, fh_prev)
+    nombres_practicas = set(practicas_actuales) | set(practicas_anteriores)
+    cambios_practicas = []
+    for nombre in nombres_practicas:
+        cambio = variacion(
+            practicas_actuales.get(nombre, 0),
+            practicas_anteriores.get(nombre, 0),
+        )
+        cambios_practicas.append({'practica': nombre, **cambio})
+
+    aumentos = sorted(
+        [item for item in cambios_practicas if item['absoluta'] > 0],
+        key=lambda item: (-item['absoluta'], item['practica']),
+    )[:5]
+    disminuciones = sorted(
+        [item for item in cambios_practicas if item['absoluta'] < 0],
+        key=lambda item: (item['absoluta'], item['practica']),
+    )[:5]
+
+    modalidades = request.GET.getlist('modalidades[]') or request.GET.getlist('modalidades')
+    incluye_tc = not modalidades or 'TC' in modalidades
+
+    def contar_bloqueos_tc(desde, hasta):
+        params = request.GET.copy()
+        params['fecha_desde'] = desde.strftime('%Y-%m-%d')
+        params['fecha_hasta'] = hasta.strftime('%Y-%m-%d')
+        filas = _aplicar_filtros_fecha_modalidad(
+            _base_estudios_finalizados().filter(modalidad='TC'),
+            params,
+        )
+        return sum(
+            1 for codigo in filas.values_list('codigo_practica', flat=True)
+            if str(codigo or '').split('/')[0].strip() in codigos_bloqueos_tc
+        )
+
+    hay_datos_anterior = anterior['practicas_realizadas'] > 0
+    comparativa = {
+        'hay_datos_anterior': hay_datos_anterior,
+        'pacientes': variacion(
+            actual['pacientes_atendidos'], anterior['pacientes_atendidos'],
+        ),
+        'practicas': variacion(
+            actual['practicas_realizadas'], anterior['practicas_realizadas'],
+        ),
+        'practicas_por_paciente': variacion(
+            actual['practicas_por_paciente'], anterior['practicas_por_paciente'], 2,
+        ),
+        'practicas_mayores_aumentos': aumentos,
+        'practicas_mayores_disminuciones': disminuciones,
+        'bloqueos_tc': (
+            variacion(contar_bloqueos_tc(fd, fh), contar_bloqueos_tc(fd_prev, fh_prev))
+            if incluye_tc else None
+        ),
+    }
+
     def delta(a, b):
         try:
             a, b = float(a), float(b)
@@ -1155,6 +1245,7 @@ def _vista_comparativa_data(request):
             'promedio_dia': delta(actual['promedio_dia'], anterior['promedio_dia']),
             'tasa_conversion': delta(actual['tasa_conversion'], anterior['tasa_conversion']),
         },
+        'comparativa': comparativa,
     })
 
 
