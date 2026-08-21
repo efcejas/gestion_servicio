@@ -274,10 +274,12 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <!-- Page Header -->
             {% if not hide_navbar %}
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900 mb-2">{% block page_title %}{% endblock %}</h1>
-                {% block page_description %}{% endblock %}
-            </div>
+                {% block page_header %}
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900 mb-2">{% block page_title %}{% endblock %}</h1>
+                        {% block page_description %}{% endblock %}
+                    </div>
+                {% endblock %}
             {% endif %}
 
             <!-- Page Content -->

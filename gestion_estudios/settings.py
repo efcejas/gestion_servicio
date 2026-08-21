@@ -58,6 +58,14 @@ PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 # Temporalmente queda deshabilitado por defecto hasta retomar el desarrollo.
 PEDIDOS_ESTUDIOS_HABILITADO = config('PEDIDOS_ESTUDIOS_HABILITADO', default=False, cast=bool)
 
+# Rollout inicial del Portafolio: mientras esté activo, solo los superusuarios
+# pueden ver el acceso y abrir el seguimiento o el detalle de residentes.
+PORTAFOLIO_SOLO_SUPERUSER = config(
+    'PORTAFOLIO_SOLO_SUPERUSER',
+    default=True,
+    cast=bool,
+)
+
 # Flag de feature para dictado en cursor dentro de preinformes (fase 1).
 # Por defecto deshabilitado para rollout controlado.
 PREINFORMES_DICTADO_CURSOR_HABILITADO = config('PREINFORMES_DICTADO_CURSOR_HABILITADO', default=True, cast=bool)
@@ -116,6 +124,7 @@ INSTALLED_APPS = [
     'clases_residentes.apps.ClasesResidentesConfig',
     'eges_import.apps.EgesImportConfig',
     'preinformes.apps.PreinformesConfig',
+    'portafolio.apps.PortafolioConfig',
     'consultorios.apps.ConsultoriosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',  # Sistema de pedidos por email
     'ahorro_vivienda.apps.AhorroViviendaConfig',  # Tracker ahorro primera vivienda

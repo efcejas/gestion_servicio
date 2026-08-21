@@ -1,0 +1,2 @@
+# Herramientas locales de desarrollo. No instalar en produccion.
+djhtml==3.0.11

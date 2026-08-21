@@ -9,6 +9,8 @@ Grupos disponibles: Recursos · Docencia · Guardias · Gestión
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 
+from portafolio.permissions import portafolio_habilitado_para
+
 
 def _resolve(url_name):
     try:
@@ -133,6 +135,18 @@ def navbar_links(request):
                     'preinformes:dashboard_residente', active_ns='preinformes',
                     exclude_url_names=['staff', 'revision', 'banco'])
 
+    def i_mi_portafolio():
+        if not portafolio_habilitado_para(user):
+            return None
+        return item('Mi portafolio', 'fa-user-graduate',
+                    'portafolio:mi_portafolio', active_ns='portafolio')
+
+    def i_seguimiento_portafolio():
+        if not portafolio_habilitado_para(user):
+            return None
+        return item('Seguimiento de residentes', 'fa-chart-line',
+                    'portafolio:seguimiento', active_ns='portafolio')
+
     def i_banco():
         return item('Banco de Informes', 'fa-archive',
                     'preinformes:lista_banco_informes',
@@ -197,6 +211,12 @@ def navbar_links(request):
                 i_protocolos(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_mi_portafolio() if user.rol == 'medico_residente' else (
+                    i_seguimiento_portafolio()
+                    if user.is_superuser or user.rol in ('jefe_residentes', 'instructor_residentes', 'jefe_servicio')
+                    or _has_group(user, 'Administrativo - Docencia')
+                    else None
+                ),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -222,6 +242,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_seguimiento_portafolio(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -273,6 +294,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_mi_portafolio(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -296,6 +318,9 @@ def navbar_links(request):
                 i_stock(),
                 i_novedades(),
             ),
+            group('Docencia', 'fa-graduation-cap',
+                i_mi_portafolio(),
+            ),
         ] if g]
 
     elif user.rol in ('jefe_residentes', 'instructor_residentes'):
@@ -306,6 +331,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_seguimiento_portafolio(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -344,6 +370,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_seguimiento_portafolio(),
                 i_revision(),
             ),
             group('Gestión', 'fa-cogs',
@@ -385,6 +412,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_seguimiento_portafolio() if es_docencia else None,
                 item('Guía de Ateneos', 'fa-lightbulb',
                      'clases_residentes:guia_presentaciones',
                      active_url_names=['guia_presentaciones']),

@@ -4,6 +4,8 @@ Documentacion funcional de modulos, flujos y reglas de negocio.
 
 ## Incluye
 
+- [PORTAFOLIO_RESIDENTES_MVP.md](PORTAFOLIO_RESIDENTES_MVP.md) - Alcance, fuentes, permisos, cierres anuales y wireframes del Portafolio de residentes.
+- [PORTAFOLIO_RESIDENTES_AUDITORIA_2026_08_18.md](PORTAFOLIO_RESIDENTES_AUDITORIA_2026_08_18.md) - Estado implementado, criterios efectivos, privacidad, UX, pruebas y riesgos pendientes del Corte A.
 - [CONTROL_GUARDIAS.md](CONTROL_GUARDIAS.md) - Fuente funcional principal del modulo de guardias.
 - [README_PROTOCOLOS.md](README_PROTOCOLOS.md)
 - [SISTEMA_PERFILES_README.md](SISTEMA_PERFILES_README.md)

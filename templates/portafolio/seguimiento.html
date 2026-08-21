@@ -1,0 +1,89 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Seguimiento de residentes{% endblock %}
+
+{% block page_header %}
+    <section class="rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8"
+             aria-labelledby="seguimiento-title">
+        <div class="flex flex-col items-start gap-4 md:flex-row md:items-center">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/20 md:h-20 md:w-20">
+                <i class="fas fa-users text-3xl" aria-hidden="true"></i>
+            </div>
+
+            <div class="min-w-0 flex-1 md:ml-2">
+                <h1 id="seguimiento-title" class="text-2xl font-bold leading-tight md:text-3xl">
+                    Seguimiento de residentes
+                </h1>
+                <div class="mt-2 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <p class="text-sm text-white/90 md:text-base">
+                        Seleccioná un residente para consultar su actividad académica y asistencial.
+                    </p>
+                    <span class="inline-flex w-fit items-center rounded-full border border-white/30 bg-white/20 px-3 py-1 text-xs font-semibold text-white">
+                        <i class="fas fa-user-graduate mr-1.5" aria-hidden="true"></i>
+                        {{ residentes|length }} residente{{ residentes|length|pluralize:"s" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6 space-y-6">
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                 aria-labelledby="residentes-title">
+            <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                <h2 id="residentes-title" class="font-semibold text-gray-900">Residentes</h2>
+                <p class="mt-1 text-xs text-gray-500">Accedé al portafolio individual para revisar su actividad del ciclo.</p>
+            </div>
+
+            {% if residentes %}
+                <div class="overflow-x-auto">
+                    <table class="w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Residente</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Año</th>
+                                <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</th>
+                                <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 bg-white">
+                            {% for residente in residentes %}
+                                <tr class="transition-colors hover:bg-gray-50">
+                                    <td class="px-5 py-4">
+                                        <div class="flex items-center gap-3">
+                                            {% include 'components/user_avatar.html' with user_obj=residente size="sm" %}
+                                            <div>
+                                                <p class="font-medium text-gray-900">{{ residente.get_full_name|default:residente.username }}</p>
+                                                <p class="text-xs text-gray-500">{{ residente.email|default:"Sin email informado" }}</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700">{{ residente.anio_residencia|default:"—" }}</td>
+                                    <td class="whitespace-nowrap px-5 py-4">
+                                        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold {% if residente.estado_residencia == 'ACTIVO' %}bg-emerald-100 text-emerald-800{% else %}bg-gray-100 text-gray-700{% endif %}">
+                                            {{ residente.get_estado_residencia_display }}
+                                        </span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-right">
+                                        <a href="{% url 'portafolio:detalle_residente' residente.pk %}"
+                                           class="inline-flex items-center rounded-lg bg-medical-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                                            Ver portafolio
+                                            <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="px-6 py-12 text-center">
+                    <i class="fas fa-user-graduate text-3xl text-gray-300" aria-hidden="true"></i>
+                    <p class="mt-3 text-sm text-gray-600">No hay residentes con perfil completo para mostrar.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

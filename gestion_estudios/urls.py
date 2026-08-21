@@ -69,6 +69,7 @@ urlpatterns = [
     path('clases/', include('clases_residentes.urls')),
     path('eges/', include('eges_import.urls')),  # URLs para importación EGES
     path('preinformes/', include('preinformes.urls')),  # URLs para preinformes
+    path('portafolio/', include('portafolio.urls')),
     path('pedidos/', include('pedidos_estudios.urls')),  # URLs para pedidos de estudios por email
     path('vivienda/', include('ahorro_vivienda.urls')),  # Tracker ahorro primera vivienda
     path('stock/', include('control_stock.urls')),  # Control de stock con escáner + IA

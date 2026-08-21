@@ -136,6 +136,28 @@ Antes de crear markup repetido, revisar:
 - `templates/layouts/base_tailwind.html` para la estructura global.
 - `static/styles/styles.css` y `static/styles/tailwind-medical.css` para tokens y utilidades existentes.
 
+### Patrón validado para tableros del portal
+
+El Portafolio de residentes establece el patrón de referencia para tableros
+centrados que extienden `base_tailwind.html`:
+
+- usar el bloque `page_header` del layout para la cabecera específica;
+- heredar el contenedor `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8` de la base;
+- no agregar dentro de `content` otro contenedor con ancho y padding horizontal;
+- cabecera institucional con gradiente `from-medical-primary` a
+  `to-medical-secondary`, `rounded-2xl`, texto blanco y espaciado
+  `p-5 md:p-8`;
+- icono principal dentro de un círculo `bg-white/20`;
+- contexto o estado mediante badge con texto, borde y fondo translúcido;
+- indicadores homogéneos con título breve, cifra principal, ayuda e icono;
+- detalle en superficies blancas con borde gris, `rounded-xl` y encabezado
+  `bg-gray-50`;
+- listados extensos con `overflow-x-auto`, estado vacío y acción textual.
+
+Este patrón es apropiado para tableros y vistas de seguimiento. Los formularios
+y bandejas operativas pueden requerir una cabecera más compacta. Si el mismo
+markup aparece en tres o más pantallas, extraerlo a `templates/components/`.
+
 ## Proceso de evolucion
 
 1. Relevar el patron existente y su problema de UX.
