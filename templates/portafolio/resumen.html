@@ -251,15 +251,46 @@
 
             <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
-                    <h2 class="font-semibold text-gray-900">Clases por categoría</h2>
+                    <h2 class="font-semibold text-gray-900">Clases presentadas en el ciclo</h2>
+                    <p class="mt-1 text-xs text-gray-500">Detalle de la actividad docente registrada por el residente.</p>
                 </div>
-                {% if resumen.clases.por_categoria %}
+                {% if resumen.clases.items %}
                     <div class="divide-y divide-gray-100">
-                        {% for fila in resumen.clases.por_categoria %}
-                            <div class="flex items-center justify-between px-5 py-3">
-                                <span class="text-sm text-gray-700">{{ fila.categoria_display }}</span>
-                                <span class="font-semibold text-gray-900">{{ fila.cantidad }}</span>
-                            </div>
+                        {% for clase in resumen.clases.items %}
+                            <article class="flex gap-4 px-5 py-4">
+                                {% if clase.archivo_thumbnail %}
+                                    <a href="{% url 'clases_residentes:detalle' clase.pk %}"
+                                       class="h-16 w-24 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-medical-primary focus-visible:ring-offset-2">
+                                        <img src="{{ clase.archivo_thumbnail.url }}"
+                                             alt="Miniatura de {{ clase.titulo }}"
+                                             class="h-full w-full object-cover">
+                                    </a>
+                                {% endif %}
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="min-w-0">
+                                            <a href="{% url 'clases_residentes:detalle' clase.pk %}"
+                                               class="font-semibold text-gray-900 transition-colors hover:text-medical-primary focus:outline-none focus-visible:underline">
+                                                {{ clase.titulo }}
+                                            </a>
+                                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                                <span class="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                                    {{ clase.get_categoria_display }}
+                                                </span>
+                                                <span class="inline-flex items-center text-xs text-gray-500">
+                                                    <i class="fas fa-calendar-alt mr-1.5" aria-hidden="true"></i>
+                                                    {{ clase.fecha_clase|date:"d/m/Y" }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <a href="{% url 'clases_residentes:detalle' clase.pk %}"
+                                           class="inline-flex shrink-0 items-center text-sm font-medium text-medical-primary hover:underline focus:outline-none focus-visible:underline">
+                                            Ver clase
+                                            <i class="fas fa-arrow-right ml-1.5 text-xs" aria-hidden="true"></i>
+                                        </a>
+                                    </div>
+                                </div>
+                            </article>
                         {% endfor %}
                     </div>
                 {% else %}

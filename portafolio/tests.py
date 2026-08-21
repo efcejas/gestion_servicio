@@ -169,6 +169,55 @@ class PortafolioTests(TestCase):
         self.assertNotContains(response, '99888777')
         self.assertNotContains(response, '9999.99')
 
+    def test_dashboard_lista_clases_con_enlace_y_miniatura_disponible(self):
+        periodo = periodo_ciclo_lectivo()
+        clase = ClaseResidente.objects.create(
+            titulo='Clase ilustrada del portafolio',
+            categoria='patologia',
+            anios_dirigidos=['R1', 'R2'],
+            autor=self.residente,
+            fecha_clase=periodo['inicio'],
+            archivo_thumbnail='image/upload/portafolio/clase-ilustrada.jpg',
+        )
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, clase.titulo)
+        self.assertContains(response, clase.get_categoria_display())
+        self.assertContains(response, clase.fecha_clase.strftime('%d/%m/%Y'))
+        self.assertContains(
+            response,
+            reverse('clases_residentes:detalle', args=[clase.pk]),
+        )
+        self.assertContains(response, f'Miniatura de {clase.titulo}')
+
+    def test_superusuario_puede_abrir_clase_desde_el_portafolio(self):
+        clase = ClaseResidente.objects.create(
+            titulo='Clase accesible para superusuario',
+            categoria='revision',
+            anios_dirigidos=['R1'],
+            autor=self.residente,
+            fecha_clase=timezone.localdate(),
+        )
+        superusuario = CustomUser.objects.create_user(
+            username='superusuario_portafolio',
+            password='testpass123',
+            is_staff=True,
+            is_superuser=True,
+            perfil_completo=True,
+        )
+        self.client.login(username=superusuario.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('clases_residentes:detalle', args=[clase.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+
     def test_dashboard_no_confunde_residente_sin_anio_con_egresado(self):
         self.residente.anio_residencia = None
         self.residente.estado_residencia = 'ACTIVO'

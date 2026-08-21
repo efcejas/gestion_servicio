@@ -184,6 +184,10 @@ class ClaseResidente(models.Model):
         - Administrativos de Docencia pueden ver todas (solo lectura)
         - Residentes solo ven las de su año o inferiores
         """
+        # El autor y los superusuarios siempre pueden consultar la clase.
+        if usuario.is_superuser or usuario == self.autor:
+            return True
+
         # Jefes, instructores y staff pueden ver todo
         if usuario.rol in ['jefe_residentes', 'instructor_residentes', 'jefe_servicio', 'medico_staff']:
             return True

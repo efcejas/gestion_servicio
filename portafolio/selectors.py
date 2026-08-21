@@ -196,21 +196,23 @@ def resumen_estudios(residente, periodo):
 
 def resumen_clases(residente, periodo):
     fin_exclusivo = fin_datos_exclusivo(periodo)
-    clases = ClaseResidente.objects.filter(
-        autor=residente,
-        activa=True,
-        fecha_clase__gte=periodo['inicio'],
-        fecha_clase__lt=fin_exclusivo,
+    clases = list(
+        ClaseResidente.objects.filter(
+            autor=residente,
+            activa=True,
+            fecha_clase__gte=periodo['inicio'],
+            fecha_clase__lt=fin_exclusivo,
+        )
+        .only(
+            'id',
+            'titulo',
+            'categoria',
+            'fecha_clase',
+            'archivo_thumbnail',
+        )
+        .order_by('-fecha_clase', '-fecha_creacion')
     )
-    por_categoria = list(
-        clases.values('categoria')
-        .annotate(cantidad=Count('id'))
-        .order_by('-cantidad', 'categoria')
-    )
-    etiquetas = dict(ClaseResidente.CATEGORIA_CHOICES)
-    for fila in por_categoria:
-        fila['categoria_display'] = etiquetas.get(fila['categoria'], fila['categoria'])
-    return {'total': clases.count(), 'por_categoria': por_categoria}
+    return {'total': len(clases), 'items': clases}
 
 
 def totales_actividad_ciclo(residente, periodo, hoy=None):
