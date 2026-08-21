@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from django.db.models import Count, Sum
+from django.db.models import Count, Min, Q, Sum
 from django.utils import timezone
 
 from accounts.models import CustomUser
@@ -24,14 +24,8 @@ def primer_dia_habil_agosto(anio):
     return candidato
 
 
-def periodo_ciclo_lectivo(fecha_referencia=None):
-    """Construye el ciclo que contiene la fecha local indicada."""
-    referencia = fecha_referencia or timezone.localdate()
-    anio_inicio = referencia.year
-    inicio_este_anio = primer_dia_habil_agosto(anio_inicio)
-    if referencia < inicio_este_anio:
-        anio_inicio -= 1
-
+def periodo_ciclo_lectivo_por_anio(anio_inicio):
+    """Construye un ciclo a partir de su año calendario de inicio."""
     inicio = primer_dia_habil_agosto(anio_inicio)
     fin_exclusivo = primer_dia_habil_agosto(anio_inicio + 1)
     return {
@@ -41,6 +35,80 @@ def periodo_ciclo_lectivo(fecha_referencia=None):
         'fin_inclusivo': fin_exclusivo - timedelta(days=1),
         'etiqueta': f'{anio_inicio}/{str(anio_inicio + 1)[-2:]}',
     }
+
+
+def periodo_ciclo_lectivo(fecha_referencia=None):
+    """Construye el ciclo que contiene la fecha local indicada."""
+    referencia = fecha_referencia or timezone.localdate()
+    anio_inicio = referencia.year
+    inicio_este_anio = primer_dia_habil_agosto(anio_inicio)
+    if referencia < inicio_este_anio:
+        anio_inicio -= 1
+
+    return periodo_ciclo_lectivo_por_anio(anio_inicio)
+
+
+def _primera_fecha_de_actividad(residente):
+    """Busca una fecha inicial cuando el perfil no informa ingreso."""
+    fechas = [
+        AsignacionGuardia.objects.filter(residente=residente).aggregate(
+            fecha=Min('fecha')
+        )['fecha'],
+        Preinforme.objects.filter(
+            residente=residente,
+            es_registro_demo=False,
+        ).aggregate(fecha=Min('fecha_creacion'))['fecha'],
+        RegistroEstudiosPorMedico.objects.filter(
+            medico=residente,
+            anulado=False,
+        ).aggregate(fecha=Min('fecha_del_informe'))['fecha'],
+        ClaseResidente.objects.filter(
+            autor=residente,
+            activa=True,
+        ).aggregate(fecha=Min('fecha_clase'))['fecha'],
+    ]
+    normalizadas = []
+    for fecha in fechas:
+        if fecha is None:
+            continue
+        if hasattr(fecha, 'date'):
+            if timezone.is_aware(fecha):
+                fecha = timezone.localtime(fecha)
+            fecha = fecha.date()
+        normalizadas.append(fecha)
+    return min(normalizadas) if normalizadas else None
+
+
+def periodos_disponibles_residente(residente, fecha_referencia=None):
+    """Retorna, del más reciente al más antiguo, los ciclos consultables."""
+    referencia = fecha_referencia or timezone.localdate()
+    periodo_actual = periodo_ciclo_lectivo(referencia)
+    fecha_inicio = residente.fecha_ingreso_residencia
+    if fecha_inicio is None:
+        fecha_inicio = _primera_fecha_de_actividad(residente) or referencia
+
+    fecha_fin = referencia
+    if residente.estado_residencia == 'EGRESADO' and residente.fecha_egreso_residencia:
+        fecha_fin = min(residente.fecha_egreso_residencia, referencia)
+
+    anio_inicio = periodo_ciclo_lectivo(fecha_inicio)['anio_inicio']
+    anio_fin = periodo_ciclo_lectivo(fecha_fin)['anio_inicio']
+    if anio_inicio > anio_fin:
+        anio_inicio = anio_fin
+
+    periodos = []
+    for anio in range(anio_fin, anio_inicio - 1, -1):
+        periodo = periodo_ciclo_lectivo_por_anio(anio)
+        periodo['es_actual'] = anio == periodo_actual['anio_inicio']
+        periodo['estado'] = 'EN_CURSO' if periodo['es_actual'] else 'CUMPLIDO'
+        periodos.append(periodo)
+    return periodos
+
+
+def fin_datos_exclusivo(periodo, hoy=None):
+    """Limita fuentes fechadas hasta hoy sin recortar ciclos ya cumplidos."""
+    hoy = hoy or timezone.localdate()
+    return min(periodo['fin_exclusivo'], hoy + timedelta(days=1))
 
 
 def resumen_guardias(residente, periodo, hoy=None):
@@ -60,11 +128,12 @@ def resumen_guardias(residente, periodo, hoy=None):
 
 
 def resumen_preinformes(residente, periodo):
+    fin_exclusivo = fin_datos_exclusivo(periodo)
     preinformes = Preinforme.objects.filter(
         residente=residente,
         es_registro_demo=False,
         fecha_creacion__date__gte=periodo['inicio'],
-        fecha_creacion__date__lt=periodo['fin_exclusivo'],
+        fecha_creacion__date__lt=fin_exclusivo,
     )
     por_modalidad_region = list(
         preinformes.values('tipo_estudio__nombre', 'region__nombre')
@@ -80,11 +149,12 @@ def resumen_preinformes(residente, periodo):
 
 def resumen_estudios(residente, periodo):
     """Proyecta solamente datos academico-asistenciales permitidos."""
+    fin_exclusivo = fin_datos_exclusivo(periodo)
     registros = RegistroEstudiosPorMedico.objects.filter(
         medico=residente,
         anulado=False,
         fecha_del_informe__gte=periodo['inicio'],
-        fecha_del_informe__lt=periodo['fin_exclusivo'],
+        fecha_del_informe__lt=fin_exclusivo,
     )
     registros_ids = registros.values('pk')
     practicas = RegistroEstudio.objects.filter(registro_id__in=registros_ids)
@@ -125,11 +195,12 @@ def resumen_estudios(residente, periodo):
 
 
 def resumen_clases(residente, periodo):
+    fin_exclusivo = fin_datos_exclusivo(periodo)
     clases = ClaseResidente.objects.filter(
         autor=residente,
         activa=True,
         fecha_clase__gte=periodo['inicio'],
-        fecha_clase__lt=periodo['fin_exclusivo'],
+        fecha_clase__lt=fin_exclusivo,
     )
     por_categoria = list(
         clases.values('categoria')
@@ -140,6 +211,59 @@ def resumen_clases(residente, periodo):
     for fila in por_categoria:
         fila['categoria_display'] = etiquetas.get(fila['categoria'], fila['categoria'])
     return {'total': clases.count(), 'por_categoria': por_categoria}
+
+
+def totales_actividad_ciclo(residente, periodo, hoy=None):
+    """Calcula solo los totales necesarios para la trayectoria por ciclo."""
+    hoy = hoy or timezone.localdate()
+    fin_exclusivo = fin_datos_exclusivo(periodo, hoy)
+    guardias = AsignacionGuardia.objects.filter(
+        residente=residente,
+        estado__in=ESTADOS_GUARDIA_COMPUTABLES,
+        fecha__gte=periodo['inicio'],
+        fecha__lt=min(periodo['fin_exclusivo'], hoy),
+    ).count()
+
+    preinformes = Preinforme.objects.filter(
+        residente=residente,
+        es_registro_demo=False,
+        fecha_creacion__date__gte=periodo['inicio'],
+        fecha_creacion__date__lt=fin_exclusivo,
+    ).aggregate(
+        total=Count('id'),
+        finalizados=Count('id', filter=Q(estado='finalizado')),
+    )
+
+    registros = RegistroEstudiosPorMedico.objects.filter(
+        medico=residente,
+        anulado=False,
+        fecha_del_informe__gte=periodo['inicio'],
+        fecha_del_informe__lt=fin_exclusivo,
+    )
+    totales_registros = registros.aggregate(
+        total=Count('id'),
+        regiones=Sum('cantidad_regiones'),
+    )
+    practicas = RegistroEstudio.objects.filter(
+        registro__in=registros,
+    ).aggregate(total=Sum('cantidad'))['total'] or 0
+
+    clases = ClaseResidente.objects.filter(
+        autor=residente,
+        activa=True,
+        fecha_clase__gte=periodo['inicio'],
+        fecha_clase__lt=fin_exclusivo,
+    ).count()
+
+    return {
+        'preinformes': preinformes['total'] or 0,
+        'preinformes_finalizados': preinformes['finalizados'] or 0,
+        'estudios': practicas,
+        'registros_estudios': totales_registros['total'] or 0,
+        'regiones': totales_registros['regiones'] or 0,
+        'guardias': guardias,
+        'clases': clases,
+    }
 
 
 def residentes_para_seguimiento():

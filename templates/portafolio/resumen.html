@@ -33,9 +33,6 @@
                 <div class="mt-2 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <p class="text-sm text-white/90 md:text-base">
                         Seguimiento académico y asistencial
-                        <span class="mx-1 text-white/50">·</span>
-                        <i class="fas fa-calendar-alt mr-1" aria-hidden="true"></i>
-                        Ciclo lectivo {{ resumen.periodo.etiqueta }}
                     </p>
                     {% if not es_portafolio_propio %}
                         <a href="{% url 'portafolio:seguimiento' %}"
@@ -53,6 +50,63 @@
 
 {% block content %}
     <div class="mt-6 space-y-6">
+        <section class="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-start md:justify-between"
+                 aria-label="Navegación por ciclo lectivo">
+            <details class="group min-w-0 flex-1">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-medical-primary focus-visible:ring-offset-2">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-medical-primary">
+                            <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-xs font-medium text-gray-500">Período consultado</p>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <p class="font-semibold text-gray-900">Ciclo lectivo {{ resumen.periodo.etiqueta }}</p>
+                                <span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium {% if resumen.periodo.es_actual %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-blue-200 bg-blue-50 text-blue-700{% endif %}">
+                                    {% if resumen.periodo.es_actual %}En curso{% else %}Cumplido{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="inline-flex shrink-0 items-center text-sm font-medium text-medical-primary">
+                        Cambiar ciclo
+                        <i class="fas fa-chevron-down ml-2 transition-transform group-open:rotate-180"
+                           aria-hidden="true"></i>
+                    </span>
+                </summary>
+
+                <div class="mt-3 border-t border-gray-200 pt-3">
+                    <form method="get" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div class="w-full sm:w-64 sm:flex-none">
+                            <label for="ciclo" class="block text-sm font-medium text-gray-700">Seleccionar ciclo</label>
+                            <select id="ciclo"
+                                    name="ciclo"
+                                    class="mt-1 block w-full rounded-lg border-gray-300 bg-white text-sm focus:border-medical-primary focus:ring-medical-primary">
+                                {% for ciclo in ciclos_disponibles %}
+                                    <option value="{{ ciclo.anio_inicio }}"
+                                            {% if ciclo.anio_inicio == resumen.periodo.anio_inicio %}selected{% endif %}>
+                                        {{ ciclo.etiqueta }}{% if ciclo.es_actual %} · En curso{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit"
+                                class="inline-flex items-center justify-center whitespace-nowrap rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90">
+                            Ver ciclo
+                        </button>
+                    </form>
+                </div>
+            </details>
+
+            {% if not es_portafolio_propio %}
+                <a href="{% url 'portafolio:trayectoria_residente' residente.pk %}"
+                   class="inline-flex shrink-0 self-start items-center justify-center whitespace-nowrap rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-medical-primary transition-colors hover:bg-gray-100">
+                    <i class="fas fa-chart-line mr-2" aria-hidden="true"></i>
+                    Trayectoria completa
+                </a>
+            {% endif %}
+        </section>
+
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores del ciclo">
             <article class="rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white shadow-lg">
                 <div class="flex items-center justify-between">
@@ -153,7 +207,7 @@
                 </div>
                 {% if resumen.estudios.practicas_asociadas %}
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="w-full divide-y divide-gray-200">
                             <thead class="bg-white">
                                 <tr>
                                     <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Modalidad</th>

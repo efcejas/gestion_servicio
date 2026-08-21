@@ -11,6 +11,10 @@ defecto. Durante esta validación solo los superusuarios ven y pueden abrir
 `Seguimiento de residentes`; el acceso del resto de los perfiles queda oculto
 en el navbar y bloqueado en backend.
 
+El detalle permite seleccionar ciclos anteriores y ofrece una vista de
+trayectoria completa con acumulados y comparación por período. Estos datos se
+reconstruyen desde las fuentes actuales y no reemplazan el cierre anual formal.
+
 La implementación efectiva, sus criterios de conteo, permisos actuales y
 riesgos pendientes se registran en
 [PORTAFOLIO_RESIDENTES_AUDITORIA_2026_08_18.md](PORTAFOLIO_RESIDENTES_AUDITORIA_2026_08_18.md).
@@ -441,10 +445,9 @@ No incluye modelos academicos nuevos ni cierre PDF.
 
 1. Definir el alcance definitivo de `Administrativo - Docencia` sobre el
    detalle individual agregado.
-2. Definir navegación de ciclos históricos y el ciclo inicial para egresados.
-3. Definir que evaluaciones se consideran publicadas y cuales pueden entrar al
+2. Definir que evaluaciones se consideran publicadas y cuales pueden entrar al
    documento formal.
-4. Definir mas adelante si ciertos certificados requieren validacion docente o
+3. Definir mas adelante si ciertos certificados requieren validacion docente o
    una categoria documental especifica. Para el Corte B se prevé utilizar S3;
    el modelo y el flujo de carga todavía no están implementados.
 

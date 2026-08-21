@@ -8,5 +8,10 @@ app_name = 'portafolio'
 urlpatterns = [
     path('', views.mi_portafolio, name='mi_portafolio'),
     path('residentes/', views.seguimiento_residentes, name='seguimiento'),
+    path(
+        'residentes/<int:pk>/trayectoria/',
+        views.trayectoria_residente,
+        name='trayectoria_residente',
+    ),
     path('residentes/<int:pk>/', views.detalle_residente, name='detalle_residente'),
 ]

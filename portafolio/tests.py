@@ -13,7 +13,11 @@ from control_guardias.models import AsignacionGuardia, ConfiguracionTipoGuardia,
 from liquidacion.models import Estudios, RegistroEstudio, RegistroEstudiosPorMedico
 from preinformes.models import Preinforme, Region, TipoEstudio
 
-from .selectors import periodo_ciclo_lectivo
+from .selectors import (
+    fin_datos_exclusivo,
+    periodo_ciclo_lectivo,
+    periodo_ciclo_lectivo_por_anio,
+)
 from .services import construir_resumen_portafolio
 
 
@@ -221,6 +225,83 @@ class PortafolioTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    def test_docente_consulta_ciclo_anterior_y_trayectoria_acumulada(self):
+        periodo_actual = periodo_ciclo_lectivo()
+        periodo_anterior = periodo_ciclo_lectivo_por_anio(
+            periodo_actual['anio_inicio'] - 1
+        )
+        self.residente.fecha_ingreso_residencia = periodo_anterior['inicio']
+        self.residente.save(update_fields=['fecha_ingreso_residencia'])
+
+        estudio = Estudios.objects.create(
+            codigo='ECO-HIST-PORT',
+            nombre='Ecografia historica portafolio',
+            tipo='ECO',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('9999.99'),
+            precio_otras_os=Decimal('9999.99'),
+        )
+        registro_anterior = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='PACIENTE-HISTORICO',
+            apellido_paciente='PRIVADO',
+            dni_paciente='11111111',
+            fecha_del_informe=periodo_anterior['fin_inclusivo'],
+            cantidad_regiones=2,
+            monto_calculado=Decimal('9999.99'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro_anterior,
+            estudio=estudio,
+            cantidad=2,
+        )
+        registro_actual = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='PACIENTE-ACTUAL',
+            apellido_paciente='PRIVADO',
+            dni_paciente='22222222',
+            fecha_del_informe=timezone.localdate(),
+            cantidad_regiones=3,
+            monto_calculado=Decimal('9999.99'),
+        )
+        RegistroEstudio.objects.create(
+            registro=registro_actual,
+            estudio=estudio,
+            cantidad=3,
+        )
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        detalle = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk]),
+            {'ciclo': periodo_anterior['anio_inicio']},
+        )
+        trayectoria = self.client.get(
+            reverse('portafolio:trayectoria_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(detalle.status_code, 200)
+        self.assertEqual(
+            detalle.context['resumen']['periodo']['anio_inicio'],
+            periodo_anterior['anio_inicio'],
+        )
+        self.assertEqual(detalle.context['resumen']['estudios']['total_practicas'], 2)
+        self.assertEqual(trayectoria.status_code, 200)
+        self.assertEqual(trayectoria.context['trayectoria']['acumulado']['estudios'], 5)
+        self.assertEqual(len(trayectoria.context['trayectoria']['ciclos']), 2)
+        self.assertNotContains(trayectoria, 'PACIENTE-HISTORICO')
+        self.assertNotContains(trayectoria, '9999.99')
+
+    def test_ciclo_fuera_de_la_trayectoria_devuelve_404(self):
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk]),
+            {'ciclo': 1900},
+        )
+
+        self.assertEqual(response.status_code, 404)
+
 
 @override_settings(
     SECURE_SSL_REDIRECT=False,
@@ -254,9 +335,13 @@ class PortafolioRolloutTests(TestCase):
         detalle = self.client.get(
             reverse('portafolio:detalle_residente', args=[self.residente.pk])
         )
+        trayectoria = self.client.get(
+            reverse('portafolio:trayectoria_residente', args=[self.residente.pk])
+        )
 
         self.assertEqual(listado.status_code, 200)
         self.assertEqual(detalle.status_code, 200)
+        self.assertEqual(trayectoria.status_code, 200)
 
     def test_residente_e_instructor_no_pueden_acceder_durante_rollout(self):
         self.client.login(username=self.residente.username, password='testpass123')
@@ -268,10 +353,14 @@ class PortafolioRolloutTests(TestCase):
         detalle = self.client.get(
             reverse('portafolio:detalle_residente', args=[self.residente.pk])
         )
+        trayectoria = self.client.get(
+            reverse('portafolio:trayectoria_residente', args=[self.residente.pk])
+        )
 
         self.assertEqual(propio.status_code, 403)
         self.assertEqual(listado.status_code, 403)
         self.assertEqual(detalle.status_code, 403)
+        self.assertEqual(trayectoria.status_code, 403)
 
     def test_navbar_muestra_portafolio_solo_al_superuser(self):
         request_factory = RequestFactory()
@@ -316,3 +405,12 @@ class CicloLectivoTests(TestCase):
         periodo = periodo_ciclo_lectivo(date(2026, 8, 17))
 
         self.assertEqual(periodo['inicio'], date(2026, 8, 4))
+
+    def test_fuentes_fechadas_se_limitan_hasta_hoy_en_ciclo_actual(self):
+        periodo = periodo_ciclo_lectivo_por_anio(2026)
+
+        limite_actual = fin_datos_exclusivo(periodo, hoy=date(2026, 8, 17))
+        limite_cumplido = fin_datos_exclusivo(periodo, hoy=date(2027, 8, 17))
+
+        self.assertEqual(limite_actual, date(2026, 8, 18))
+        self.assertEqual(limite_cumplido, periodo['fin_exclusivo'])

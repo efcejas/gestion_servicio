@@ -4,6 +4,8 @@ Fecha: 18/08/2026
 
 Actualización de rollout: 21/08/2026
 
+Actualización de ciclos históricos: 21/08/2026
+
 Estado auditado: Corte A implementado, en validación exclusiva por superusuario
 
 ## 1. Resultado ejecutivo
@@ -24,8 +26,7 @@ El alcance disponible incluye:
 - presentación responsive coherente con el portal.
 
 No forman parte de este corte la actividad académica manual, certificados,
-validación docente, evaluaciones, selección de ciclos históricos ni el cierre
-anual formal e inmutable.
+validación docente, evaluaciones ni el cierre anual formal e inmutable.
 
 No se detectaron bloqueantes críticos para continuar la validación del tablero.
 Antes de ampliar el acceso o implementar cierres deben resolverse las brechas
@@ -53,6 +54,8 @@ recupera la matriz funcional prevista, sin cambiar URLs ni permisos base.
 | `/portafolio/` | Portafolio propio del residente o egresado con cuenta activa. |
 | `/portafolio/residentes/` | Listado docente de residentes. |
 | `/portafolio/residentes/<id>/` | Resumen longitudinal individual. |
+| `/portafolio/residentes/<id>/?ciclo=<año>` | Detalle reconstruido de un ciclo específico. |
+| `/portafolio/residentes/<id>/trayectoria/` | Acumulado y comparación entre ciclos. |
 
 ### Arquitectura
 
@@ -135,10 +138,21 @@ El período comienza el primer día de agosto que no sea sábado, domingo ni un
 feriado registrado en `control_guardias.Feriado`. Termina inmediatamente antes
 del primer día hábil de agosto siguiente.
 
-La pantalla muestra únicamente el ciclo que contiene la fecha local actual. No
-existe todavía selector de ciclo ni navegación histórica. Para 2026/27 el
-inicio calculado es el 03/08/2026 y el fin inclusivo es el 01/08/2027, salvo que
-el calendario de feriados registrado modifique esas fechas.
+El detalle permite seleccionar el ciclo mediante su año de inicio. La lista de
+períodos comienza en `fecha_ingreso_residencia`; si ese dato falta, utiliza la
+primera actividad encontrada en las cuatro fuentes y, si tampoco existe,
+presenta solamente el ciclo vigente.
+
+Para residentes activos, la trayectoria llega hasta el ciclo actual. Para
+egresados con fecha de egreso, finaliza en el ciclo que contiene esa fecha. La
+vista acumulada incluye el ciclo en curso y diferencia visualmente los períodos
+cumplidos. Para 2026/27 el inicio calculado es el 03/08/2026 y el fin inclusivo
+es el 01/08/2027, salvo que el calendario de feriados registrado modifique esas
+fechas.
+
+Los ciclos históricos se reconstruyen en tiempo real desde los módulos de
+origen. No equivalen a un cierre formal ni garantizan inmutabilidad hasta que se
+implemente el Corte C.
 
 ## 6. Contrato visual consolidado
 
@@ -164,7 +178,7 @@ independientes de las clases Tailwind.
 
 ## 7. Validación automatizada actual
 
-La suite `portafolio` contiene 13 pruebas y cubre:
+La suite `portafolio` contiene 16 pruebas y cubre:
 
 - inicio del ciclo en el primer día hábil de agosto;
 - consideración de feriados registrados;
@@ -178,6 +192,11 @@ La suite `portafolio` contiene 13 pruebas y cubre:
 - acceso de superusuario durante el rollout restringido;
 - bloqueo de residente e instructor mediante URL directa durante el rollout;
 - ocultamiento del acceso en el navbar para perfiles no habilitados.
+- selección validada de un ciclo anterior;
+- acumulado de trayectoria entre ciclos sin pacientes ni montos;
+- rechazo con `404` de períodos ajenos a la trayectoria disponible.
+- límite hasta la fecha actual para estudios, clases y otras fuentes fechadas
+  del ciclo en curso.
 
 En la actualización de rollout del 21/08/2026 se ejecutaron exitosamente:
 
@@ -194,14 +213,10 @@ python manage.py check
    limitaba a un resumen operativo, pero el código actual permite abrir el
    mismo detalle agregado que un instructor. No expone pacientes ni montos,
    aunque el alcance debe confirmarse y luego reflejarse en permiso y pruebas.
-2. **Ciclos históricos y egresados.** El portafolio siempre abre el ciclo
-   actual. Un egresado puede obtener un tablero vacío si su actividad pertenece
-   a un ciclo anterior. Se necesita definir el ciclo inicial y la navegación
-   histórica antes de declarar completo el acceso de egresados.
-3. **Servicio no apto todavía para snapshots históricos.** El parámetro
-   `fecha_referencia` limita Guardias hasta esa fecha, pero Preinformes,
-   Estudios y Clases consultan el ciclo completo. No debe reutilizarse sin
-   cambios para generar un cierre inmutable con fecha de corte.
+2. **Los ciclos reconstruidos no son cierres.** La navegación histórica y el
+   acumulado consultan los datos actuales de cada fuente. No deben presentarse
+   como documentos inmutables ni reutilizarse como sustituto del snapshot,
+   hash, PDF y fecha de corte previstos para el Corte C.
 
 ### Prioridad media para robustecer el Corte A
 
@@ -233,7 +248,7 @@ python manage.py check
 
 ## 10. Próximo paso recomendado
 
-Validar con instructor y uno o dos residentes que los cuatro conteos coincidan
-con los módulos fuente. En paralelo, cerrar las decisiones de acceso
-administrativo y ciclo histórico. Recién después conviene iniciar el modelo de
-actividad académica del Corte B.
+Validar con el superusuario que los cuatro conteos y la separación por ciclo
+coincidan con los módulos fuente. En paralelo, cerrar la decisión de acceso
+administrativo. Recién después conviene ampliar el rollout o iniciar el modelo
+de actividad académica del Corte B.

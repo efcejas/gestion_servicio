@@ -1,0 +1,151 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Trayectoria de {{ residente.get_full_name|default:residente.username }}{% endblock %}
+
+{% block page_header %}
+    <section class="rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8"
+             aria-labelledby="trayectoria-title">
+        <div class="flex flex-col items-start gap-4 md:flex-row md:items-center">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/20 md:h-20 md:w-20">
+                <i class="fas fa-chart-line text-3xl" aria-hidden="true"></i>
+            </div>
+
+            <div class="min-w-0 flex-1 md:ml-2">
+                <h1 id="trayectoria-title" class="text-2xl font-bold leading-tight md:text-3xl">
+                    Trayectoria completa
+                </h1>
+                <div class="mt-2 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <p class="text-sm text-white/90 md:text-base">
+                        {{ residente.get_full_name|default:residente.username }}
+                        <span class="mx-1 text-white/50">·</span>
+                        Actividad registrada por ciclo lectivo
+                    </p>
+                    <a href="{% url 'portafolio:detalle_residente' residente.pk %}"
+                       class="inline-flex w-auto shrink-0 self-stretch items-center justify-center rounded-xl border border-white/30 bg-white px-3 py-2.5 text-center text-sm font-medium text-medical-primary shadow-lg transition-colors hover:bg-gray-50 sm:px-4 sm:py-3 md:self-auto md:whitespace-nowrap">
+                        <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>
+                        Volver al portafolio
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6 space-y-6">
+        <section class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900"
+                 aria-label="Alcance del resumen">
+            <div class="flex items-start gap-3">
+                <i class="fas fa-info-circle mt-0.5 text-blue-600" aria-hidden="true"></i>
+                <p>
+                    Este resumen se reconstruye con los datos actuales de los módulos de origen. Los ciclos cumplidos
+                    todavía no constituyen cierres formales inmutables.
+                </p>
+            </div>
+        </section>
+
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+                 aria-label="Actividad acumulada hasta hoy">
+            <article class="rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-blue-100">Preinformes</p>
+                        <p class="mt-1 text-3xl font-bold">{{ trayectoria.acumulado.preinformes }}</p>
+                        <p class="mt-1 text-xs text-blue-100">{{ trayectoria.acumulado.preinformes_finalizados }} finalizados</p>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
+                        <i class="fas fa-file-medical text-2xl" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </article>
+
+            <article class="rounded-xl bg-gradient-to-br from-green-500 to-green-600 p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-green-100">Estudios registrados</p>
+                        <p class="mt-1 text-3xl font-bold">{{ trayectoria.acumulado.estudios }}</p>
+                        <p class="mt-1 text-xs text-green-100">
+                            {{ trayectoria.acumulado.registros_estudios }} cargas · {{ trayectoria.acumulado.regiones }} regiones
+                        </p>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
+                        <i class="fas fa-stethoscope text-2xl" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </article>
+
+            <article class="rounded-xl bg-gradient-to-br from-yellow-500 to-orange-500 p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-yellow-100">Guardias realizadas</p>
+                        <p class="mt-1 text-3xl font-bold">{{ trayectoria.acumulado.guardias }}</p>
+                        <p class="mt-1 text-xs text-yellow-100">Acumuladas hasta la fecha</p>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
+                        <i class="fas fa-shield-alt text-2xl" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </article>
+
+            <article class="rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-purple-100">Clases presentadas</p>
+                        <p class="mt-1 text-3xl font-bold">{{ trayectoria.acumulado.clases }}</p>
+                        <p class="mt-1 text-xs text-purple-100">Acumuladas por ciclo</p>
+                    </div>
+                    <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-white/20">
+                        <i class="fas fa-person-chalkboard text-2xl" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </article>
+        </section>
+
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+                 aria-labelledby="ciclos-title">
+            <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                <h2 id="ciclos-title" class="font-semibold text-gray-900">Actividad por ciclo lectivo</h2>
+                <p class="mt-1 text-xs text-gray-500">El ciclo actual refleja actividad parcial hasta hoy.</p>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full divide-y divide-gray-200">
+                    <thead class="bg-white">
+                        <tr>
+                            <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Ciclo</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Preinformes</th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Estudios</th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Guardias</th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Clases</th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white">
+                        {% for ciclo in trayectoria.ciclos %}
+                            <tr class="transition-colors hover:bg-gray-50">
+                                <td class="whitespace-nowrap px-5 py-4 font-semibold text-gray-900">{{ ciclo.periodo.etiqueta }}</td>
+                                <td class="whitespace-nowrap px-5 py-4">
+                                    <span class="inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold {% if ciclo.periodo.es_actual %}border-emerald-200 bg-emerald-50 text-emerald-700{% else %}border-blue-200 bg-blue-50 text-blue-700{% endif %}">
+                                        {% if ciclo.periodo.es_actual %}En curso{% else %}Cumplido{% endif %}
+                                    </span>
+                                </td>
+                                <td class="whitespace-nowrap px-5 py-4 text-right text-sm text-gray-700">{{ ciclo.totales.preinformes }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-right text-sm text-gray-700">{{ ciclo.totales.estudios }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-right text-sm text-gray-700">{{ ciclo.totales.guardias }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-right text-sm text-gray-700">{{ ciclo.totales.clases }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-right">
+                                    <a href="{% url 'portafolio:detalle_residente' residente.pk %}?ciclo={{ ciclo.periodo.anio_inicio }}"
+                                       class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-medical-primary transition-colors hover:bg-gray-50">
+                                        Ver detalle
+                                        <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+{% endblock %}
