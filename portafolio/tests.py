@@ -414,6 +414,26 @@ class PortafolioTests(TestCase):
         self.assertContains(listado, self.otro_residente.username)
         self.assertEqual(detalle.status_code, 200)
 
+    def test_jefe_residentes_puede_ver_seguimiento_y_detalle(self):
+        jefe_residentes = CustomUser.objects.create_user(
+            username='jefe_residentes_portafolio',
+            password='testpass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        self.client.login(
+            username=jefe_residentes.username,
+            password='testpass123',
+        )
+
+        listado = self.client.get(reverse('portafolio:seguimiento'))
+        detalle = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(listado.status_code, 200)
+        self.assertEqual(detalle.status_code, 200)
+
     def test_staff_sin_rol_docente_no_puede_ver_seguimiento(self):
         self.client.login(username=self.staff.username, password='testpass123')
 
@@ -421,7 +441,7 @@ class PortafolioTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_administrativo_docencia_puede_ver_seguimiento(self):
+    def test_administrativo_docencia_no_puede_ver_seguimiento(self):
         grupo = Group.objects.create(name='Administrativo - Docencia')
         administrativo = CustomUser.objects.create_user(
             username='administrativo_portafolio',
@@ -432,9 +452,68 @@ class PortafolioTests(TestCase):
         administrativo.groups.add(grupo)
         self.client.login(username=administrativo.username, password='testpass123')
 
+        listado = self.client.get(reverse('portafolio:seguimiento'))
+        detalle = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(listado.status_code, 403)
+        self.assertEqual(detalle.status_code, 403)
+
+    def test_jefe_servicio_sin_superusuario_no_puede_ver_seguimiento(self):
+        jefe_servicio = CustomUser.objects.create_user(
+            username='jefe_servicio_portafolio',
+            password='testpass123',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.client.login(
+            username=jefe_servicio.username,
+            password='testpass123',
+        )
+
         response = self.client.get(reverse('portafolio:seguimiento'))
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 403)
+
+    def test_navbar_expone_portafolio_solo_a_roles_de_la_etapa(self):
+        request_factory = RequestFactory()
+        jefe_residentes = CustomUser.objects.create_user(
+            username='jefe_navbar_portafolio',
+            password='testpass123',
+            rol='jefe_residentes',
+            perfil_completo=True,
+        )
+        usuarios = {
+            'residente': self.residente,
+            'instructor': self.instructor,
+            'jefe_residentes': jefe_residentes,
+            'staff': self.staff,
+        }
+        labels_por_usuario = {}
+        for nombre, usuario in usuarios.items():
+            request = request_factory.get('/')
+            request.user = usuario
+            request.resolver_match = resolve('/')
+            labels_por_usuario[nombre] = {
+                item['label']
+                for grupo in navbar_links(request)['nav_groups']
+                for item in grupo['items']
+            }
+
+        self.assertIn('Mi portafolio', labels_por_usuario['residente'])
+        self.assertIn(
+            'Seguimiento de residentes',
+            labels_por_usuario['instructor'],
+        )
+        self.assertIn(
+            'Seguimiento de residentes',
+            labels_por_usuario['jefe_residentes'],
+        )
+        self.assertNotIn(
+            'Seguimiento de residentes',
+            labels_por_usuario['staff'],
+        )
 
     def test_docente_consulta_ciclo_anterior_y_trayectoria_acumulada(self):
         periodo_actual = periodo_ciclo_lectivo()

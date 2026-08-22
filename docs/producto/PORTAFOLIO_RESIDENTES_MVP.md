@@ -1,15 +1,18 @@
 # Portafolio de residentes - alcance MVP
 
-Estado: Corte A implementado, en rollout exclusivo para superusuarios
+Estado: Corte A implementado, abierto a residentes y docentes de residencia
 
 Fecha de definición inicial: 14/08/2026
 
-Última auditoría: 18/08/2026
+Última actualización de acceso: 22/08/2026
 
-Desde el 21/08/2026, el flag `PORTAFOLIO_SOLO_SUPERUSER` está activo por
-defecto. Durante esta validación solo los superusuarios ven y pueden abrir
-`Seguimiento de residentes`; el acceso del resto de los perfiles queda oculto
-en el navbar y bloqueado en backend.
+Desde el 22/08/2026, el módulo está abierto por defecto a residentes, jefes de
+residentes e instructores. Los superusuarios conservan acceso de supervisión.
+El resto de los perfiles, incluidos staff, jefe de servicio y administrativos,
+permanece fuera de esta etapa tanto en el navbar como por URL directa.
+
+El flag `PORTAFOLIO_SOLO_SUPERUSER=True` se conserva como mecanismo de reversa
+para volver temporalmente al acceso exclusivo de superusuarios.
 
 El detalle permite seleccionar ciclos anteriores y ofrece una vista de
 trayectoria completa con acumulados y comparación por período. Estos datos se
@@ -38,8 +41,10 @@ todavia las competencias del programa UBA.
 ## 2. Decisiones confirmadas
 
 - El instructor puede ver a todos los residentes.
-- Jefe de residentes, instructor de residentes y jefe de servicio tienen vista
-  longitudinal de todos los residentes.
+- En la primera apertura, jefe de residentes e instructor de residentes tienen
+  vista longitudinal de todos los residentes.
+- El acceso de jefe de servicio, otros perfiles de staff y administrativos se
+  definirá en una etapa posterior.
 - La actividad originada en otros modulos se incorpora automaticamente y no se
   vuelve a cargar ni copiar de forma manual.
 - Liquidacion aporta solamente cantidades, modalidad y regiones. El Portafolio
@@ -71,9 +76,9 @@ Crear una aplicacion Django independiente `portafolio`, accesible en:
 Navegacion propuesta:
 
 - Residente o egresado: `Docencia > Mi portafolio`.
-- Jefe, instructor o jefe de servicio: `Docencia > Seguimiento de residentes`.
-- Administrativo del grupo `Administrativo - Docencia`: seguimiento operativo
-  de solo lectura, sin contenido clinico sensible.
+- Jefe de residentes o instructor: `Docencia > Seguimiento de residentes`.
+- Superusuario: `Docencia > Seguimiento de residentes`.
+- Staff, jefe de servicio y administrativos: sin acceso en esta etapa.
 
 La aplicacion debe funcionar como capa de agregacion. Las consultas reutilizables
 viven en `portafolio/selectors.py` y la construccion de resumenes y cierres en
@@ -443,8 +448,8 @@ No incluye modelos academicos nuevos ni cierre PDF.
 
 ## 12. Decisiones pendientes para los siguientes cortes
 
-1. Definir el alcance definitivo de `Administrativo - Docencia` sobre el
-   detalle individual agregado.
+1. Definir qué perfiles de staff y administrativos podrán acceder y con qué
+   alcance sobre el detalle individual agregado.
 2. Definir que evaluaciones se consideran publicadas y cuales pueden entrar al
    documento formal.
 3. Definir mas adelante si ciertos certificados requieren validacion docente o

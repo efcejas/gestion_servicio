@@ -58,11 +58,12 @@ PEDIDOS_SCORE_MINIMO = config('PEDIDOS_SCORE_MINIMO', default=50, cast=int)
 # Temporalmente queda deshabilitado por defecto hasta retomar el desarrollo.
 PEDIDOS_ESTUDIOS_HABILITADO = config('PEDIDOS_ESTUDIOS_HABILITADO', default=False, cast=bool)
 
-# Rollout inicial del Portafolio: mientras esté activo, solo los superusuarios
-# pueden ver el acceso y abrir el seguimiento o el detalle de residentes.
+# El Portafolio está abierto por defecto a residentes, jefes de residentes e
+# instructores. El flag permite volver temporalmente al acceso exclusivo de
+# superusuarios sin modificar la matriz funcional.
 PORTAFOLIO_SOLO_SUPERUSER = config(
     'PORTAFOLIO_SOLO_SUPERUSER',
-    default=True,
+    default=False,
     cast=bool,
 )
 

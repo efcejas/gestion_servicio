@@ -6,7 +6,9 @@ Actualización de rollout: 21/08/2026
 
 Actualización de ciclos históricos: 21/08/2026
 
-Estado auditado: Corte A implementado, en validación exclusiva por superusuario
+Actualización de acceso por roles: 22/08/2026
+
+Estado auditado: Corte A implementado, abierto a residentes y docentes de residencia
 
 ## 1. Resultado ejecutivo
 
@@ -32,18 +34,19 @@ No se detectaron bloqueantes críticos para continuar la validación del tablero
 Antes de ampliar el acceso o implementar cierres deben resolverse las brechas
 prioritarias de la sección 8.
 
-### Rollout actual en producción
+### Rollout actual
 
-El flag `PORTAFOLIO_SOLO_SUPERUSER` está activo por defecto. Mientras mantenga
-el valor `True`:
+El flag `PORTAFOLIO_SOLO_SUPERUSER` está inactivo por defecto. La apertura
+vigente habilita:
 
-- solo los superusuarios ven `Seguimiento de residentes` en el navbar;
-- solo los superusuarios pueden abrir el listado y el detalle individual;
-- residentes, docentes y administrativos reciben `403` aun con una URL directa;
-- `Mi portafolio` permanece oculto y bloqueado para residentes.
+- `Mi portafolio` para usuarios con rol `medico_residente`;
+- `Seguimiento de residentes`, detalle y trayectoria para jefes de residentes
+  e instructores;
+- seguimiento completo para superusuarios.
 
-El flag se evalúa en navegación y backend. Al establecerlo en `False` se
-recupera la matriz funcional prevista, sin cambiar URLs ni permisos base.
+Staff, jefe de servicio y administrativos permanecen ocultos y bloqueados por
+backend. El flag se conserva como reversa operativa: con valor `True`, el
+módulo vuelve a quedar disponible únicamente para superusuarios.
 
 ## 2. Inventario implementado
 
@@ -68,11 +71,7 @@ recupera la matriz funcional prevista, sin cambiar URLs ni permisos base.
 El módulo no tiene modelos ni migraciones propias en este corte. Toda la
 información se obtiene en tiempo real desde las fuentes existentes.
 
-## 3. Acceso funcional después del rollout
-
-Durante el rollout rige la restricción exclusiva para superusuarios descrita en
-la sección anterior. La siguiente matriz documenta la apertura prevista cuando
-`PORTAFOLIO_SOLO_SUPERUSER=False`:
+## 3. Acceso funcional vigente
 
 | Perfil | Propio | Listado | Detalle de otros |
 |---|---:|---:|---:|
@@ -80,9 +79,9 @@ la sección anterior. La siguiente matriz documenta la apertura prevista cuando
 | Egresado con rol `medico_residente` y cuenta activa | Sí | No | No |
 | Jefe de residentes | No | Sí | Sí |
 | Instructor de residentes | No | Sí | Sí |
-| Jefe de servicio | No | Sí | Sí |
+| Jefe de servicio | No | No | No |
 | Superusuario | No | Sí | Sí |
-| Grupo `Administrativo - Docencia` | No | Sí | Sí, actualmente |
+| Grupo `Administrativo - Docencia` | No | No | No |
 | Otros perfiles | No | No | No |
 
 Las vistas validan permisos en backend. El navbar refleja esos permisos, pero
@@ -178,7 +177,7 @@ independientes de las clases Tailwind.
 
 ## 7. Validación automatizada actual
 
-La suite `portafolio` contiene 16 pruebas y cubre:
+La suite `portafolio` contiene 25 pruebas y cubre:
 
 - inicio del ciclo en el primer día hábil de agosto;
 - consideración de feriados registrados;
@@ -187,8 +186,8 @@ La suite `portafolio` contiene 16 pruebas y cubre:
 - ausencia de datos sensibles en el HTML;
 - diferencia entre residente sin año informado y egresado;
 - bloqueo del acceso entre residentes;
-- acceso de instructor y administrativo de Docencia;
-- denegación a staff sin rol docente.
+- acceso de jefe de residentes e instructor;
+- denegación a staff, jefe de servicio y administrativos;
 - acceso de superusuario durante el rollout restringido;
 - bloqueo de residente e instructor mediante URL directa durante el rollout;
 - ocultamiento del acceso en el navbar para perfiles no habilitados.
@@ -198,7 +197,7 @@ La suite `portafolio` contiene 16 pruebas y cubre:
 - límite hasta la fecha actual para estudios, clases y otras fuentes fechadas
   del ciclo en curso.
 
-En la actualización de rollout del 21/08/2026 se ejecutaron exitosamente:
+En la actualización de acceso del 22/08/2026 se ejecutaron exitosamente:
 
 ```text
 python manage.py test portafolio
@@ -209,10 +208,9 @@ python manage.py check
 
 ### Prioridad alta antes de ampliar el alcance
 
-1. **Contrato del administrativo de Docencia.** La especificación original lo
-   limitaba a un resumen operativo, pero el código actual permite abrir el
-   mismo detalle agregado que un instructor. No expone pacientes ni montos,
-   aunque el alcance debe confirmarse y luego reflejarse en permiso y pruebas.
+1. **Contrato de staff y administrativos.** Permanecen bloqueados hasta definir
+   qué perfiles necesitan acceso y si corresponde mostrarles el mismo detalle
+   agregado que a un instructor o una vista más limitada.
 2. **Los ciclos reconstruidos no son cierres.** La navegación histórica y el
    acumulado consultan los datos actuales de cada fuente. No deben presentarse
    como documentos inmutables ni reutilizarse como sustituto del snapshot,
@@ -224,8 +222,7 @@ python manage.py check
    por una fecha asistencial diferente.
 2. Definir si el listado docente debe incluir residentes inactivos o con perfil
    incompleto, y mantener el mismo criterio en la URL de detalle.
-3. Agregar pruebas para jefe de residentes, jefe de servicio, superusuario,
-   egresado, acceso administrativo al detalle y límites exactos de cada fuente.
+3. Agregar pruebas para egresados y límites exactos de cada fuente.
 4. Incorporar búsqueda o filtro por año cuando el volumen del listado lo
    justifique. El wireframe original los contemplaba, pero el listado actual es
    deliberadamente mínimo.
@@ -242,13 +239,13 @@ python manage.py check
 
 | Corte | Estado | Alcance pendiente |
 |---|---|---|
-| A - lectura y utilidad | Implementado, en validación | Resolver hallazgos de acceso e historial; validar conteos con datos reales. |
+| A - lectura y utilidad | Implementado, apertura inicial | Validar conteos y uso real con residentes y docentes. |
 | B - gestión académica | No iniciado | Actividad manual, S3, envío, validación y observaciones. |
 | C - cierre anual | No iniciado | Snapshot, PDF, hash, unicidad, inmutabilidad y corrección auditada. |
 
 ## 10. Próximo paso recomendado
 
-Validar con el superusuario que los cuatro conteos y la separación por ciclo
-coincidan con los módulos fuente. En paralelo, cerrar la decisión de acceso
-administrativo. Recién después conviene ampliar el rollout o iniciar el modelo
-de actividad académica del Corte B.
+Validar con residentes, jefes de residentes e instructores que los conteos, la
+separación por ciclo y la navegación respondan a sus necesidades. Luego se
+podrá definir el acceso de staff y administrativos antes de ampliar nuevamente
+la matriz.
