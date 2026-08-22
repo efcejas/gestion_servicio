@@ -46,6 +46,26 @@
             const values = rows.map((row) => Number(row.cantidad) || 0);
             const maximum = Math.max(...values, 1);
 
+            const wrapLabel = (label, maximumLength) => {
+                if (label.length <= maximumLength) return label;
+
+                const words = label.split(' ');
+                const lines = [''];
+                words.forEach((word) => {
+                    const currentLine = lines[lines.length - 1];
+                    const candidate = currentLine ? `${currentLine} ${word}` : word;
+                    if (candidate.length <= maximumLength || lines.length === 2) {
+                        lines[lines.length - 1] = candidate;
+                    } else {
+                        lines.push(word);
+                    }
+                });
+                if (lines[1]?.length > maximumLength) {
+                    lines[1] = `${lines[1].slice(0, maximumLength - 1)}…`;
+                }
+                return lines.slice(0, 2);
+            };
+
             new window.Chart(canvas.getContext('2d'), {
                 type: 'bar',
                 data: {
@@ -93,7 +113,8 @@
                                 autoSkip: false,
                                 callback(value) {
                                     const label = this.getLabelForValue(value);
-                                    return label.length > 22 ? `${label.slice(0, 21)}…` : label;
+                                    const maximumLength = this.chart.width < 700 ? 24 : 42;
+                                    return wrapLabel(label, maximumLength);
                                 },
                             },
                         },
@@ -132,7 +153,7 @@
         createHorizontalChart({
             canvasId: 'portafolio-preinformes-chart',
             dataId: 'portafolio-preinformes-data',
-            labelFormatter: (row) => `${row.tipo_estudio__nombre} · ${row.region__nombre}`,
+            labelFormatter: (row) => `${row.region__nombre} · ${row.tipo_estudio__nombre}`,
             unit: 'preinformes',
             backgroundColor: 'rgba(99, 102, 241, 0.72)',
             borderColor: 'rgb(79, 70, 229)',

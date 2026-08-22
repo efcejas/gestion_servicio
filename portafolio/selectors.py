@@ -174,7 +174,7 @@ def resumen_preinformes(residente, periodo):
         'total': preinformes.count(),
         'finalizados': preinformes.filter(estado='finalizado').count(),
         'por_modalidad_region': por_modalidad_region,
-        'principales': por_modalidad_region[:8],
+        'principales': por_modalidad_region[:6],
     }
 
 
@@ -222,7 +222,7 @@ def resumen_estudios(residente, periodo):
         'total_regiones': totales['total_regiones'] or 0,
         'por_modalidad': por_modalidad,
         'practicas_asociadas': practicas_asociadas,
-        'practicas_destacadas': practicas_asociadas[:8],
+        'practicas_destacadas': practicas_asociadas[:6],
     }
 
 

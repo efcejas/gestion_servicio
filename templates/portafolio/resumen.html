@@ -310,7 +310,7 @@
             {{ resumen.estudios.por_modalidad|json_script:"portafolio-modalidades-data" }}
             {{ resumen.guardias.por_tipo|json_script:"portafolio-guardias-data" }}
 
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
                 <div class="flex items-start justify-between gap-4 border-b border-gray-200 bg-gray-50 px-5 py-4">
                     <div>
                         <h2 class="font-semibold text-gray-900">Prácticas más realizadas</h2>
@@ -322,7 +322,7 @@
                 </div>
                 {% if resumen.estudios.practicas_asociadas %}
                     <div class="px-4 py-5 sm:px-5">
-                        <div class="relative h-72">
+                        <div class="relative h-80">
                             <canvas id="portafolio-practicas-chart"
                                     role="img"
                                     aria-label="Prácticas más realizadas durante el ciclo"></canvas>
@@ -363,7 +363,7 @@
                 {% endif %}
             </section>
 
-            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-2">
                 <div class="flex items-start justify-between gap-4 border-b border-gray-200 bg-gray-50 px-5 py-4">
                     <div>
                         <h2 class="font-semibold text-gray-900">Preinformes por estudio y región</h2>
@@ -375,7 +375,7 @@
                 </div>
                 {% if resumen.preinformes.por_modalidad_region %}
                     <div class="px-4 py-5 sm:px-5">
-                        <div class="relative h-72">
+                        <div class="relative h-80">
                             <canvas id="portafolio-preinformes-chart"
                                     role="img"
                                     aria-label="Preinformes principales por estudio y región"></canvas>
