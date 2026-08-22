@@ -1,0 +1,119 @@
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof window.Chart === 'undefined') return;
+
+        const valueLabelsPlugin = {
+            id: 'portafolioValueLabels',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                ctx.save();
+                ctx.fillStyle = '#374151';
+                ctx.font = '600 12px proxima-nova, sans-serif';
+                ctx.textBaseline = 'middle';
+                chart.getDatasetMeta(0).data.forEach((bar, index) => {
+                    const value = chart.data.datasets[0].data[index];
+                    ctx.fillText(String(value), bar.x + 7, bar.y);
+                });
+                ctx.restore();
+            },
+        };
+
+        const createHorizontalChart = ({
+            canvasId,
+            dataId,
+            labelKey,
+            unit,
+            backgroundColor,
+            borderColor,
+        }) => {
+            const canvas = document.getElementById(canvasId);
+            const dataNode = document.getElementById(dataId);
+            if (!canvas || !dataNode) return;
+
+            let rows;
+            try {
+                rows = JSON.parse(dataNode.textContent);
+            } catch (error) {
+                return;
+            }
+            if (!rows.length) return;
+
+            const labels = rows.map((row) => row[labelKey] || 'Sin categoría');
+            const values = rows.map((row) => Number(row.cantidad) || 0);
+            const maximum = Math.max(...values, 1);
+
+            new window.Chart(canvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor,
+                        borderColor,
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        barThickness: 22,
+                        maxBarThickness: 28,
+                    }],
+                },
+                plugins: [valueLabelsPlugin],
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 450 },
+                    layout: { padding: { right: 24 } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => ` ${context.parsed.x} ${unit}`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            suggestedMax: Math.ceil(maximum * 1.15),
+                            ticks: {
+                                color: '#6b7280',
+                                precision: 0,
+                            },
+                            grid: { color: 'rgba(156, 163, 175, 0.16)' },
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: {
+                                color: '#374151',
+                                autoSkip: false,
+                                callback(value) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 22 ? `${label.slice(0, 21)}…` : label;
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        };
+
+        createHorizontalChart({
+            canvasId: 'portafolio-modalidades-chart',
+            dataId: 'portafolio-modalidades-data',
+            labelKey: 'modalidad_display',
+            unit: 'prácticas',
+            backgroundColor: 'rgba(16, 185, 129, 0.72)',
+            borderColor: 'rgb(5, 150, 105)',
+        });
+
+        createHorizontalChart({
+            canvasId: 'portafolio-guardias-chart',
+            dataId: 'portafolio-guardias-data',
+            labelKey: 'tipo_guardia__nombre',
+            unit: 'guardias',
+            backgroundColor: 'rgba(245, 158, 11, 0.72)',
+            borderColor: 'rgb(217, 119, 6)',
+        });
+    });
+</script>

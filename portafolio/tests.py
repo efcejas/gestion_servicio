@@ -208,6 +208,23 @@ class PortafolioTests(TestCase):
         self.assertContains(response, 'portafolio-evolucion-chart')
         self.assertContains(response, 'data-evolucion-modo="acumulada"')
 
+    def test_dashboard_renderiza_distribuciones_y_valores_exactos(self):
+        self._crear_actividad()
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'portafolio-modalidades-chart')
+        self.assertContains(response, 'portafolio-guardias-chart')
+        self.assertContains(response, 'portafolio-modalidades-data')
+        self.assertContains(response, 'portafolio-guardias-data')
+        self.assertContains(response, 'Ver valores exactos', count=2)
+        self.assertContains(response, 'Ecografía')
+        self.assertContains(response, 'Guardia nocturna portafolio')
+
     def test_resumen_liquidacion_expone_cantidades_sin_paciente_ni_montos(self):
         self._crear_actividad()
 
