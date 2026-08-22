@@ -22,6 +22,7 @@
             canvasId,
             dataId,
             labelKey,
+            labelFormatter,
             unit,
             backgroundColor,
             borderColor,
@@ -38,7 +39,10 @@
             }
             if (!rows.length) return;
 
-            const labels = rows.map((row) => row[labelKey] || 'Sin categoría');
+            const labels = rows.map((row) => {
+                if (labelFormatter) return labelFormatter(row);
+                return row[labelKey] || 'Sin categoría';
+            });
             const values = rows.map((row) => Number(row.cantidad) || 0);
             const maximum = Math.max(...values, 1);
 
@@ -114,6 +118,24 @@
             unit: 'guardias',
             backgroundColor: 'rgba(245, 158, 11, 0.72)',
             borderColor: 'rgb(217, 119, 6)',
+        });
+
+        createHorizontalChart({
+            canvasId: 'portafolio-practicas-chart',
+            dataId: 'portafolio-practicas-data',
+            labelKey: 'estudio__nombre',
+            unit: 'prácticas',
+            backgroundColor: 'rgba(59, 130, 246, 0.72)',
+            borderColor: 'rgb(37, 99, 235)',
+        });
+
+        createHorizontalChart({
+            canvasId: 'portafolio-preinformes-chart',
+            dataId: 'portafolio-preinformes-data',
+            labelFormatter: (row) => `${row.tipo_estudio__nombre} · ${row.region__nombre}`,
+            unit: 'preinformes',
+            backgroundColor: 'rgba(99, 102, 241, 0.72)',
+            borderColor: 'rgb(79, 70, 229)',
         });
     });
 </script>

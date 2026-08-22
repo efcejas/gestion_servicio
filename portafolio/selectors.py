@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 from django.db.models import Count, Min, Q, Sum
@@ -133,10 +134,25 @@ def resumen_guardias(residente, periodo, hoy=None):
         fecha__gte=periodo['inicio'],
         fecha__lt=min(periodo['fin_exclusivo'], hoy),
     )
-    por_tipo = list(
+    tipos_registrados = list(
         guardias.values('tipo_guardia__nombre')
         .annotate(cantidad=Count('id'))
         .order_by('-cantidad', 'tipo_guardia__nombre')
+    )
+    tipos_unificados = {}
+    for fila in tipos_registrados:
+        nombre = fila['tipo_guardia__nombre'] or 'Sin tipo informado'
+        nombre = re.sub(r'\s+\(\d+\)\s*$', '', nombre).strip()
+        clave = nombre.casefold()
+        if clave not in tipos_unificados:
+            tipos_unificados[clave] = {
+                'tipo_guardia__nombre': nombre,
+                'cantidad': 0,
+            }
+        tipos_unificados[clave]['cantidad'] += fila['cantidad']
+    por_tipo = sorted(
+        tipos_unificados.values(),
+        key=lambda fila: (-fila['cantidad'], fila['tipo_guardia__nombre']),
     )
     return {'total': guardias.count(), 'por_tipo': por_tipo}
 
@@ -158,6 +174,7 @@ def resumen_preinformes(residente, periodo):
         'total': preinformes.count(),
         'finalizados': preinformes.filter(estado='finalizado').count(),
         'por_modalidad_region': por_modalidad_region,
+        'principales': por_modalidad_region[:8],
     }
 
 
@@ -186,7 +203,7 @@ def resumen_estudios(residente, periodo):
     practicas_asociadas = list(
         practicas.values('estudio__tipo', 'estudio__nombre')
         .annotate(cantidad=Sum('cantidad'))
-        .order_by('estudio__tipo', '-cantidad', 'estudio__nombre')
+        .order_by('-cantidad', 'estudio__tipo', 'estudio__nombre')
     )
     for fila in practicas_asociadas:
         fila['modalidad_display'] = etiquetas_modalidad.get(
@@ -205,6 +222,7 @@ def resumen_estudios(residente, periodo):
         'total_regiones': totales['total_regiones'] or 0,
         'por_modalidad': por_modalidad,
         'practicas_asociadas': practicas_asociadas,
+        'practicas_destacadas': practicas_asociadas[:8],
     }
 
 

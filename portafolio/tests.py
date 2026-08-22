@@ -18,6 +18,7 @@ from .selectors import (
     fin_datos_exclusivo,
     periodo_ciclo_lectivo,
     periodo_ciclo_lectivo_por_anio,
+    resumen_guardias,
 )
 from .services import construir_resumen_portafolio
 
@@ -141,6 +142,44 @@ class PortafolioTests(TestCase):
 
         self.assertEqual(resumen['guardias']['total'], 1)
 
+    def test_resumen_unifica_tipos_guardia_con_sufijo_numerico(self):
+        periodo = periodo_ciclo_lectivo_por_anio(2025)
+        tipo_original = ConfiguracionTipoGuardia.objects.create(
+            nombre='Día de semana',
+            hora_inicio=time(20, 0),
+            hora_fin=time(8, 0),
+            dias_semana='L,M,X,J,V',
+            creado_por=self.instructor,
+        )
+        tipo_duplicado = ConfiguracionTipoGuardia.objects.create(
+            nombre='Día de semana (2)',
+            hora_inicio=time(20, 0),
+            hora_fin=time(8, 0),
+            dias_semana='L,M,X,J,V',
+            creado_por=self.instructor,
+        )
+        fecha_guardia = periodo['inicio'] + timedelta(days=2)
+        for tipo in (tipo_original, tipo_duplicado):
+            AsignacionGuardia.objects.create(
+                residente=self.residente,
+                tipo_guardia=tipo,
+                fecha=fecha_guardia,
+                estado='PUBLICADA',
+                creada_por=self.instructor,
+            )
+
+        resumen = resumen_guardias(
+            self.residente,
+            periodo,
+            hoy=fecha_guardia + timedelta(days=1),
+        )
+
+        self.assertEqual(resumen['total'], 2)
+        self.assertEqual(
+            resumen['por_tipo'],
+            [{'tipo_guardia__nombre': 'Día de semana', 'cantidad': 2}],
+        )
+
     def test_evolucion_mensual_distingue_mes_actual_y_meses_futuros(self):
         periodo = periodo_ciclo_lectivo_por_anio(2025)
         ClaseResidente.objects.create(
@@ -222,6 +261,11 @@ class PortafolioTests(TestCase):
         self.assertContains(response, 'portafolio-modalidades-data')
         self.assertContains(response, 'portafolio-guardias-data')
         self.assertContains(response, 'Ver valores exactos', count=2)
+        self.assertContains(response, 'portafolio-practicas-chart')
+        self.assertContains(response, 'portafolio-preinformes-chart')
+        self.assertContains(response, 'portafolio-practicas-data')
+        self.assertContains(response, 'portafolio-preinformes-data')
+        self.assertContains(response, 'Ver detalle completo', count=2)
         self.assertContains(response, 'Ecografía')
         self.assertContains(response, 'Guardia nocturna portafolio')
 
