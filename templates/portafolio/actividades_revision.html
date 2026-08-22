@@ -1,0 +1,38 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Actividades por revisar{% endblock %}
+
+{% block page_header %}
+    <section class="rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-4">
+                <div class="flex h-14 w-14 items-center justify-center rounded-full bg-white/20 md:h-20 md:w-20"><i class="fas fa-clipboard-check text-3xl" aria-hidden="true"></i></div>
+                <div><h1 class="text-2xl font-bold md:text-3xl">Actividades por revisar</h1><p class="mt-2 text-sm text-white/90">Validación de la actividad curricular enviada por residentes.</p></div>
+            </div>
+            <span class="inline-flex rounded-full border border-white/30 bg-white/20 px-3 py-1 text-xs font-semibold">{{ actividades|length }} pendiente{{ actividades|length|pluralize }}</span>
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6">
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            {% if actividades %}
+                <div class="divide-y divide-gray-100">
+                    {% for actividad in actividades %}
+                        <article class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
+                                <p class="text-xs font-medium text-gray-500">{{ actividad.residente.get_full_name|default:actividad.residente.username }} · {{ actividad.get_tipo_display }}</p>
+                                <h2 class="mt-1 font-semibold text-gray-900">{{ actividad.titulo }}</h2>
+                                <p class="mt-1 text-sm text-gray-600">{{ actividad.fecha_inicio|date:"d/m/Y" }} · {{ actividad.documentos.count }} documento{{ actividad.documentos.count|pluralize }}</p>
+                            </div>
+                            <a href="{% url 'portafolio:actividad_detalle' actividad.pk %}" class="inline-flex shrink-0 items-center justify-center rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Revisar <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i></a>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="px-6 py-12 text-center"><i class="fas fa-check-circle text-3xl text-emerald-400" aria-hidden="true"></i><p class="mt-3 text-sm text-gray-600">No hay actividades pendientes de revisión.</p></div>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

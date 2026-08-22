@@ -1,0 +1,76 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Mis actividades curriculares{% endblock %}
+
+{% block page_header %}
+    <section class="rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8"
+             aria-labelledby="actividades-title">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div class="flex items-center gap-4">
+                <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/20 md:h-20 md:w-20">
+                    <i class="fas fa-award text-3xl" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h1 id="actividades-title" class="text-2xl font-bold md:text-3xl">Mis actividades curriculares</h1>
+                    <p class="mt-2 text-sm text-white/90 md:text-base">Cursos, jornadas, trabajos y otras evidencias de tu formación.</p>
+                </div>
+            </div>
+            {% if puede_registrar %}
+                <a href="{% url 'portafolio:actividad_crear' %}"
+                   class="inline-flex items-center justify-center rounded-xl bg-white px-4 py-3 text-sm font-semibold text-medical-primary shadow-lg transition-colors hover:bg-gray-50">
+                    <i class="fas fa-plus mr-2" aria-hidden="true"></i>
+                    Registrar actividad
+                </a>
+            {% endif %}
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6 space-y-6">
+        {% if not puede_registrar %}
+            <div class="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-700">
+                Tu historial permanece disponible en modo de solo lectura.
+            </div>
+        {% endif %}
+
+        <section class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                <h2 class="font-semibold text-gray-900">Actividad registrada</h2>
+                <p class="mt-1 text-xs text-gray-500">Solo las actividades validadas integran los indicadores formales del Portafolio.</p>
+            </div>
+            {% if actividades %}
+                <div class="divide-y divide-gray-100">
+                    {% for actividad in actividades %}
+                        <article class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h3 class="font-semibold text-gray-900">{{ actividad.titulo }}</h3>
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold
+                                                 {% if actividad.estado == 'VALIDADA' %}bg-emerald-100 text-emerald-800
+                                                 {% elif actividad.estado == 'ENVIADA' %}bg-blue-100 text-blue-800
+                                                 {% elif actividad.estado == 'OBSERVADA' %}bg-amber-100 text-amber-800
+                                                 {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                        {{ actividad.get_estado_display }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-sm text-gray-600">{{ actividad.get_tipo_display }} · {{ actividad.fecha_inicio|date:"d/m/Y" }}</p>
+                                <p class="mt-1 text-xs text-gray-500">{{ actividad.documentos.count }} documento{{ actividad.documentos.count|pluralize }}</p>
+                            </div>
+                            <a href="{% url 'portafolio:actividad_detalle' actividad.pk %}"
+                               class="inline-flex shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-medical-primary hover:bg-gray-50">
+                                Ver detalle
+                                <i class="fas fa-arrow-right ml-2" aria-hidden="true"></i>
+                            </a>
+                        </article>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="px-6 py-12 text-center">
+                    <i class="fas fa-award text-3xl text-gray-300" aria-hidden="true"></i>
+                    <p class="mt-3 text-sm text-gray-600">Todavía no registraste actividades curriculares.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+{% endblock %}

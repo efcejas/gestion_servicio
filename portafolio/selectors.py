@@ -9,6 +9,8 @@ from control_guardias.models import AsignacionGuardia, Feriado
 from liquidacion.models import Estudios, RegistroEstudio, RegistroEstudiosPorMedico
 from preinformes.models import Preinforme
 
+from .models import ActividadCurricular
+
 
 ESTADOS_GUARDIA_COMPUTABLES = ('PUBLICADA', 'CUMPLIDA')
 MESES_CICLO_LECTIVO = (
@@ -80,6 +82,9 @@ def _primera_fecha_de_actividad(residente):
             autor=residente,
             activa=True,
         ).aggregate(fecha=Min('fecha_clase'))['fecha'],
+        ActividadCurricular.objects.filter(residente=residente).aggregate(
+            fecha=Min('fecha_inicio')
+        )['fecha'],
     ]
     normalizadas = []
     for fecha in fechas:
@@ -251,6 +256,22 @@ def resumen_clases(residente, periodo):
     return {'total': len(clases), 'items': clases}
 
 
+def resumen_actividades_curriculares(residente, periodo):
+    fin_exclusivo = fin_datos_exclusivo(periodo)
+    actividades = ActividadCurricular.objects.filter(
+        residente=residente,
+        fecha_inicio__gte=periodo['inicio'],
+        fecha_inicio__lt=fin_exclusivo,
+    )
+    validadas = actividades.filter(estado='VALIDADA')
+    return {
+        'total_validadas': validadas.count(),
+        'pendientes': actividades.filter(estado='ENVIADA').count(),
+        'observadas': actividades.filter(estado='OBSERVADA').count(),
+        'recientes': list(validadas.select_related('revisada_por')[:5]),
+    }
+
+
 def _indice_mes_ciclo(fecha, periodo):
     """Ubica una fecha en los doce meses visuales del ciclo agosto-julio."""
     if hasattr(fecha, 'date'):
@@ -289,6 +310,7 @@ def evolucion_actividad(residente, periodo, hoy=None):
         'preinformes': [0] * 12,
         'guardias': [0] * 12,
         'clases': [0] * 12,
+        'actividades': [0] * 12,
     }
 
     def sumar(clave, fecha, cantidad=1):
@@ -332,6 +354,15 @@ def evolucion_actividad(residente, periodo, hoy=None):
     for fecha in clases:
         sumar('clases', fecha)
 
+    actividades = ActividadCurricular.objects.filter(
+        residente=residente,
+        estado='VALIDADA',
+        fecha_inicio__gte=periodo['inicio'],
+        fecha_inicio__lt=fin_exclusivo,
+    ).values_list('fecha_inicio', flat=True)
+    for fecha in actividades:
+        sumar('actividades', fecha)
+
     mes_actual = None
     for indice in range(12):
         mes = 8 + indice
@@ -363,6 +394,7 @@ def evolucion_actividad(residente, periodo, hoy=None):
         ('preinformes', 'Preinformes', 'preinformes'),
         ('guardias', 'Guardias', 'guardias'),
         ('clases', 'Clases', 'clases'),
+        ('actividades', 'Actividad curricular', 'actividades'),
     )
     series = []
     for clave, etiqueta, unidad in configuracion:
@@ -425,6 +457,13 @@ def totales_actividad_ciclo(residente, periodo, hoy=None):
         fecha_clase__lt=fin_exclusivo,
     ).count()
 
+    actividades = ActividadCurricular.objects.filter(
+        residente=residente,
+        estado='VALIDADA',
+        fecha_inicio__gte=periodo['inicio'],
+        fecha_inicio__lt=fin_exclusivo,
+    ).count()
+
     return {
         'preinformes': preinformes['total'] or 0,
         'preinformes_finalizados': preinformes['finalizados'] or 0,
@@ -433,6 +472,7 @@ def totales_actividad_ciclo(residente, periodo, hoy=None):
         'regiones': totales_registros['regiones'] or 0,
         'guardias': guardias,
         'clases': clases,
+        'actividades': actividades,
     }
 
 

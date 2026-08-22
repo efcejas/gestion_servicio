@@ -1,7 +1,11 @@
+import hashlib
 from datetime import date, time, timedelta
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth.models import Group
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 from django.utils import timezone
@@ -13,6 +17,7 @@ from control_guardias.models import AsignacionGuardia, ConfiguracionTipoGuardia,
 from liquidacion.models import Estudios, RegistroEstudio, RegistroEstudiosPorMedico
 from preinformes.models import Preinforme, Region, TipoEstudio
 
+from .models import ActividadCurricular, DocumentoActividadCurricular
 from .selectors import (
     evolucion_actividad,
     fin_datos_exclusivo,
@@ -502,18 +507,28 @@ class PortafolioTests(TestCase):
             }
 
         self.assertIn('Mi portafolio', labels_por_usuario['residente'])
+        self.assertIn('Mis actividades', labels_por_usuario['residente'])
         self.assertIn(
             'Seguimiento de residentes',
+            labels_por_usuario['instructor'],
+        )
+        self.assertIn(
+            'Actividades por revisar',
             labels_por_usuario['instructor'],
         )
         self.assertIn(
             'Seguimiento de residentes',
             labels_por_usuario['jefe_residentes'],
         )
+        self.assertIn(
+            'Actividades por revisar',
+            labels_por_usuario['jefe_residentes'],
+        )
         self.assertNotIn(
             'Seguimiento de residentes',
             labels_por_usuario['staff'],
         )
+        self.assertNotIn('Actividades por revisar', labels_por_usuario['staff'])
 
     def test_docente_consulta_ciclo_anterior_y_trayectoria_acumulada(self):
         periodo_actual = periodo_ciclo_lectivo()
@@ -591,6 +606,251 @@ class PortafolioTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    PORTAFOLIO_SOLO_SUPERUSER=False,
+)
+class ActividadCurricularTests(TestCase):
+    def setUp(self):
+        self.residente = CustomUser.objects.create_user(
+            username='residente_actividad',
+            password='testpass123',
+            first_name='Ana',
+            last_name='Actividad',
+            rol='medico_residente',
+            perfil_completo=True,
+            anio_residencia='R2',
+            estado_residencia='ACTIVO',
+        )
+        self.otro_residente = CustomUser.objects.create_user(
+            username='otro_residente_actividad',
+            password='testpass123',
+            rol='medico_residente',
+            perfil_completo=True,
+            anio_residencia='R1',
+            estado_residencia='ACTIVO',
+        )
+        self.instructor = CustomUser.objects.create_user(
+            username='instructor_actividad',
+            password='testpass123',
+            rol='instructor_residentes',
+            perfil_completo=True,
+        )
+        self.staff = CustomUser.objects.create_user(
+            username='staff_actividad',
+            password='testpass123',
+            rol='medico_staff',
+            perfil_completo=True,
+        )
+
+    def _crear_actividad(self, estado='BORRADOR', **kwargs):
+        datos = {
+            'residente': self.residente,
+            'tipo': 'CURSO',
+            'titulo': 'Curso de imágenes abdominales',
+            'institucion': 'Institución de prueba',
+            'fecha_inicio': timezone.localdate(),
+            'estado': estado,
+        }
+        datos.update(kwargs)
+        return ActividadCurricular.objects.create(**datos)
+
+    def test_modelo_rechaza_fecha_fin_anterior_al_inicio(self):
+        actividad = self._crear_actividad(
+            fecha_inicio=date(2026, 8, 20),
+            fecha_fin=date(2026, 8, 19),
+        )
+
+        with self.assertRaises(ValidationError):
+            actividad.full_clean()
+
+    def test_residente_crea_borrador_y_lo_envia(self):
+        self.client.login(username=self.residente.username, password='testpass123')
+        response = self.client.post(
+            reverse('portafolio:actividad_crear'),
+            {
+                'tipo': 'CONGRESO_JORNADA',
+                'titulo': 'Jornada de diagnóstico por imágenes',
+                'institucion': 'UBA',
+                'fecha_inicio': timezone.localdate().isoformat(),
+                'fecha_fin': '',
+                'descripcion': 'Participación presencial.',
+                'enlace': '',
+                'accion': 'enviar',
+            },
+        )
+
+        actividad = ActividadCurricular.objects.get()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(actividad.residente, self.residente)
+        self.assertEqual(actividad.estado, 'ENVIADA')
+        self.assertIsNotNone(actividad.enviada_en)
+
+    def test_editar_borrador_precarga_fechas_en_formato_html(self):
+        actividad = self._crear_actividad(
+            fecha_inicio=date(2026, 8, 20),
+            fecha_fin=date(2026, 8, 22),
+        )
+        self.client.login(username=self.residente.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('portafolio:actividad_editar', args=[actividad.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-08-20"')
+        self.assertContains(response, 'value="2026-08-22"')
+
+    def test_carga_documento_registra_metadatos_y_hash(self):
+        self.client.login(username=self.residente.username, password='testpass123')
+        contenido = b'certificado curricular de prueba'
+        archivo = SimpleUploadedFile(
+            'certificado.pdf',
+            contenido,
+            content_type='application/pdf',
+        )
+        storage = DocumentoActividadCurricular._meta.get_field('archivo').storage
+        with patch.object(
+            storage,
+            'save',
+            return_value='portafolio/actividades/1/1/certificado.pdf',
+        ):
+            response = self.client.post(
+                reverse('portafolio:actividad_crear'),
+                {
+                    'tipo': 'CURSO',
+                    'titulo': 'Curso con certificado',
+                    'institucion': '',
+                    'fecha_inicio': timezone.localdate().isoformat(),
+                    'fecha_fin': '',
+                    'descripcion': '',
+                    'enlace': '',
+                    'documentos': archivo,
+                    'accion': 'guardar',
+                },
+            )
+
+        documento = DocumentoActividadCurricular.objects.get()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(documento.nombre_original, 'certificado.pdf')
+        self.assertEqual(documento.tipo_mime, 'application/pdf')
+        self.assertEqual(documento.tamanio_bytes, len(contenido))
+        self.assertEqual(documento.sha256, hashlib.sha256(contenido).hexdigest())
+
+    def test_instructor_valida_y_la_actividad_suma_al_resumen(self):
+        actividad = self._crear_actividad(estado='ENVIADA', enviada_en=timezone.now())
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        response = self.client.post(
+            reverse('portafolio:actividad_revisar', args=[actividad.pk]),
+            {'accion': 'VALIDAR', 'observacion': ''},
+        )
+
+        actividad.refresh_from_db()
+        resumen = construir_resumen_portafolio(self.residente)
+        dashboard = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(actividad.estado, 'VALIDADA')
+        self.assertEqual(actividad.revisada_por, self.instructor)
+        self.assertEqual(resumen['actividades']['total_validadas'], 1)
+        self.assertContains(dashboard, actividad.titulo)
+
+    def test_residente_ve_seguimiento_mientras_espera_revision(self):
+        actividad = self._crear_actividad(
+            estado='ENVIADA',
+            enviada_en=timezone.now(),
+        )
+        self.client.login(username=self.residente.username, password='testpass123')
+
+        response = self.client.get(
+            reverse('portafolio:actividad_detalle', args=[actividad.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Pendiente de revisión')
+        self.assertContains(response, 'La actividad fue enviada correctamente')
+        self.assertNotContains(response, 'Revisión docente')
+
+    def test_observar_requiere_devolucion_docente(self):
+        actividad = self._crear_actividad(estado='ENVIADA', enviada_en=timezone.now())
+        self.client.login(username=self.instructor.username, password='testpass123')
+
+        response = self.client.post(
+            reverse('portafolio:actividad_revisar', args=[actividad.pk]),
+            {'accion': 'OBSERVAR', 'observacion': ''},
+        )
+
+        actividad.refresh_from_db()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(actividad.estado, 'ENVIADA')
+        self.assertContains(
+            response,
+            'Indicá qué debe corregir o completar el residente.',
+            status_code=400,
+        )
+
+    def test_otro_residente_y_staff_no_pueden_ver_actividad(self):
+        actividad = self._crear_actividad()
+        detalle_url = reverse('portafolio:actividad_detalle', args=[actividad.pk])
+
+        self.client.login(
+            username=self.otro_residente.username,
+            password='testpass123',
+        )
+        respuesta_otro = self.client.get(detalle_url)
+        self.client.logout()
+        self.client.login(username=self.staff.username, password='testpass123')
+        respuesta_staff = self.client.get(detalle_url)
+
+        self.assertEqual(respuesta_otro.status_code, 403)
+        self.assertEqual(respuesta_staff.status_code, 403)
+
+    def test_descarga_documento_exige_propietario_o_docente(self):
+        actividad = self._crear_actividad()
+        documento = DocumentoActividadCurricular.objects.create(
+            actividad=actividad,
+            archivo='portafolio/actividades/certificado.pdf',
+            nombre_original='certificado.pdf',
+            subido_por=self.residente,
+        )
+        storage = DocumentoActividadCurricular._meta.get_field('archivo').storage
+        url = reverse(
+            'portafolio:documento_actividad_descargar',
+            args=[documento.pk],
+        )
+
+        self.client.login(username=self.residente.username, password='testpass123')
+        with patch.object(storage, 'url', return_value='https://s3.example/firmado'):
+            respuesta_propietario = self.client.get(url)
+        self.client.logout()
+        self.client.login(
+            username=self.otro_residente.username,
+            password='testpass123',
+        )
+        respuesta_otro = self.client.get(url)
+
+        self.assertRedirects(
+            respuesta_propietario,
+            'https://s3.example/firmado',
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(respuesta_otro.status_code, 403)
+
+    def test_egresado_conserva_listado_sin_poder_crear(self):
+        self.residente.estado_residencia = 'EGRESADO'
+        self.residente.save(update_fields=['estado_residencia'])
+        self.client.login(username=self.residente.username, password='testpass123')
+
+        listado = self.client.get(reverse('portafolio:actividades_propias'))
+        crear = self.client.get(reverse('portafolio:actividad_crear'))
+
+        self.assertEqual(listado.status_code, 200)
+        self.assertFalse(listado.context['puede_registrar'])
+        self.assertEqual(crear.status_code, 403)
 
 
 @override_settings(

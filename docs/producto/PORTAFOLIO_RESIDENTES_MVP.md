@@ -412,11 +412,12 @@ No incluye modelos academicos nuevos ni cierre PDF.
 
 ### Corte B - gestion academica minima
 
-- actividad academica manual;
-- certificado o evidencia opcional almacenado en S3;
-- envio, validacion y observacion;
-- bandeja docente de pendientes;
-- integrar la actividad validada al resumen.
+- actividad académica manual: implementada;
+- múltiples certificados o evidencias privadas en S3: implementado;
+- envío, validación y observación: implementado;
+- bandeja docente de pendientes: implementada;
+- integración de la actividad validada al resumen y trayectoria: implementada;
+- especialización operativa de rotaciones externas: pendiente.
 
 ### Corte C - cierre anual
 

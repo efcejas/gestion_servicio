@@ -139,13 +139,30 @@ def navbar_links(request):
         if not portafolio_habilitado_para(user):
             return None
         return item('Mi portafolio', 'fa-user-graduate',
-                    'portafolio:mi_portafolio', active_ns='portafolio')
+                    'portafolio:mi_portafolio', active_url_names=['mi_portafolio'])
+
+    def i_mis_actividades():
+        if not portafolio_habilitado_para(user):
+            return None
+        return item('Mis actividades', 'fa-award',
+                    'portafolio:actividades_propias',
+                    active_url_names=['actividades_propias', 'actividad_crear',
+                                      'actividad_editar', 'actividad_detalle'])
 
     def i_seguimiento_portafolio():
         if not portafolio_habilitado_para(user):
             return None
         return item('Seguimiento de residentes', 'fa-chart-line',
-                    'portafolio:seguimiento', active_ns='portafolio')
+                    'portafolio:seguimiento',
+                    active_url_names=['seguimiento', 'detalle_residente',
+                                      'trayectoria_residente'])
+
+    def i_revision_actividades():
+        if not portafolio_habilitado_para(user):
+            return None
+        return item('Actividades por revisar', 'fa-clipboard-check',
+                    'portafolio:actividades_revision',
+                    active_url_names=['actividades_revision', 'actividad_detalle'])
 
     def i_banco():
         return item('Banco de Informes', 'fa-archive',
@@ -217,6 +234,10 @@ def navbar_links(request):
                     or _has_group(user, 'Administrativo - Docencia')
                     else None
                 ),
+                i_mis_actividades() if user.rol == 'medico_residente' else None,
+                i_revision_actividades()
+                if user.is_superuser or user.rol in ('jefe_residentes', 'instructor_residentes')
+                else None,
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -243,6 +264,7 @@ def navbar_links(request):
             ),
             group('Docencia', 'fa-graduation-cap',
                 i_seguimiento_portafolio(),
+                i_revision_actividades(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -295,6 +317,7 @@ def navbar_links(request):
             ),
             group('Docencia', 'fa-graduation-cap',
                 i_mi_portafolio(),
+                i_mis_actividades(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),
@@ -320,6 +343,7 @@ def navbar_links(request):
             ),
             group('Docencia', 'fa-graduation-cap',
                 i_mi_portafolio(),
+                i_mis_actividades(),
             ),
         ] if g]
 
@@ -332,6 +356,7 @@ def navbar_links(request):
             ),
             group('Docencia', 'fa-graduation-cap',
                 i_seguimiento_portafolio(),
+                i_revision_actividades(),
                 i_clases(),
                 i_guia(),
                 i_preinformes(),

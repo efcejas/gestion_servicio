@@ -8,6 +8,8 @@ Actualización de ciclos históricos: 21/08/2026
 
 Actualización de acceso por roles: 22/08/2026
 
+Implementación de actividad curricular: 22/08/2026
+
 Estado auditado: Corte A implementado, abierto a residentes y docentes de residencia
 
 ## 1. Resultado ejecutivo
@@ -27,8 +29,10 @@ El alcance disponible incluye:
 - navegación integrada al grupo `Docencia`;
 - presentación responsive coherente con el portal.
 
-No forman parte de este corte la actividad académica manual, certificados,
-validación docente, evaluaciones ni el cierre anual formal e inmutable.
+La actividad académica manual, las evidencias privadas y la validación docente
+ya forman parte del módulo. No forman parte de este corte las evaluaciones, la
+integración operativa de rotaciones con Guardias ni el cierre anual formal e
+inmutable.
 
 No se detectaron bloqueantes críticos para continuar la validación del tablero.
 Antes de ampliar el acceso o implementar cierres deben resolverse las brechas
@@ -63,13 +67,16 @@ módulo vuelve a quedar disponible únicamente para superusuarios.
 ### Arquitectura
 
 - `portafolio/selectors.py`: período académico y consultas agregadas.
-- `portafolio/services.py`: composición del resumen de una persona.
+- `portafolio/models.py`: actividad curricular y evidencias privadas.
+- `portafolio/forms.py`: carga y revisión de actividad curricular.
+- `portafolio/services.py`: composición del resumen y transiciones del flujo.
 - `portafolio/views.py`: autorización y renderizado.
 - `templates/portafolio/`: resumen individual y seguimiento docente.
 - `accounts/context_processors.py`: acceso desde el navbar según rol o grupo.
 
-El módulo no tiene modelos ni migraciones propias en este corte. Toda la
-información se obtiene en tiempo real desde las fuentes existentes.
+El módulo agrega modelos propios únicamente para actividades curriculares y sus
+documentos. La actividad automática continúa obteniéndose en tiempo real desde
+las fuentes existentes.
 
 ## 3. Acceso funcional vigente
 
@@ -177,7 +184,7 @@ independientes de las clases Tailwind.
 
 ## 7. Validación automatizada actual
 
-La suite `portafolio` contiene 25 pruebas y cubre:
+La suite `portafolio` contiene 33 pruebas y cubre:
 
 - inicio del ciclo en el primer día hábil de agosto;
 - consideración de feriados registrados;
@@ -196,6 +203,10 @@ La suite `portafolio` contiene 25 pruebas y cubre:
 - rechazo con `404` de períodos ajenos a la trayectoria disponible.
 - límite hasta la fecha actual para estudios, clases y otras fuentes fechadas
   del ciclo en curso.
+- creación, envío, observación y validación de actividad curricular;
+- metadatos y hash de evidencias;
+- descarga autorizada y bloqueo entre residentes;
+- inclusión exclusiva de actividades validadas en el resumen.
 
 En la actualización de acceso del 22/08/2026 se ejecutaron exitosamente:
 
@@ -240,7 +251,7 @@ python manage.py check
 | Corte | Estado | Alcance pendiente |
 |---|---|---|
 | A - lectura y utilidad | Implementado, apertura inicial | Validar conteos y uso real con residentes y docentes. |
-| B - gestión académica | No iniciado | Actividad manual, S3, envío, validación y observaciones. |
+| B - gestión académica | Etapa 1 implementada | Especializar rotaciones e integrar su impacto opcional con Guardias. |
 | C - cierre anual | No iniciado | Snapshot, PDF, hash, unicidad, inmutabilidad y corrección auditada. |
 
 ## 10. Próximo paso recomendado

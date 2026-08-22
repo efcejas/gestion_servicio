@@ -1,0 +1,185 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}{% if actividad %}Editar actividad{% else %}Registrar actividad{% endif %}{% endblock %}
+
+{% block page_header %}
+    <section class="rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h1 class="text-2xl font-bold md:text-3xl">{% if actividad %}Editar actividad{% else %}Registrar actividad curricular{% endif %}</h1>
+                <p class="mt-2 text-sm text-white/90">Guardá un borrador o envialo directamente para revisión docente.</p>
+            </div>
+            <a href="{% if actividad %}{% url 'portafolio:actividad_detalle' actividad.pk %}{% else %}{% url 'portafolio:actividades_propias' %}{% endif %}"
+               class="inline-flex items-center justify-center rounded-xl border border-white/30 bg-white px-4 py-3 text-sm font-semibold text-medical-primary shadow-lg hover:bg-gray-50">
+                <i class="fas fa-arrow-left mr-2" aria-hidden="true"></i>Volver
+            </a>
+        </div>
+    </section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-6" novalidate>
+            {% csrf_token %}
+            <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+                {% if form.non_field_errors %}
+                    <div class="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                    {% for field in form %}
+                        <div class="{% if field.name == 'descripcion' or field.name == 'documentos' %}md:col-span-2{% endif %}">
+                            {% if field.name == 'documentos' %}
+                                <label class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                                <div id="actividad-documentos-dropzone"
+                                     class="mt-1 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 transition-colors hover:border-blue-300 hover:bg-blue-50">
+                                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="flex min-w-0 items-center gap-3">
+                                            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-medical-primary">
+                                                <i class="fas fa-cloud-upload-alt text-lg" aria-hidden="true"></i>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-gray-900">Arrastrá tus certificados o evidencias</p>
+                                                <p id="actividad-documentos-resumen" class="mt-1 text-xs text-gray-600" aria-live="polite">Todavía no seleccionaste archivos.</p>
+                                            </div>
+                                        </div>
+                                        <label for="{{ field.id_for_label }}"
+                                               class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90">
+                                            <i class="fas fa-folder-open mr-2" aria-hidden="true"></i>
+                                            Elegir archivos
+                                        </label>
+                                    </div>
+                                    {{ field }}
+                                    <ul id="actividad-documentos-lista" class="mt-4 hidden space-y-2 border-t border-blue-100 pt-4"></ul>
+                                </div>
+                            {% else %}
+                                <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-gray-700">{{ field.label }}</label>
+                                {{ field }}
+                            {% endif %}
+                            {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
+                            {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                {% if actividad.documentos.exists %}
+                    <div class="mt-6 border-t border-gray-200 pt-5">
+                        <h2 class="text-sm font-semibold text-gray-900">Documentos ya adjuntados</h2>
+                        <ul class="mt-3 space-y-2">
+                            {% for documento in actividad.documentos.all %}
+                                <li class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                                    <span class="truncate text-gray-700">{{ documento.nombre_original }}</span>
+                                    <span class="ml-3 shrink-0 text-xs text-gray-500">{{ documento.tamanio_bytes|filesizeformat }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </section>
+
+            <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button type="submit" name="accion" value="guardar"
+                        class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-medical-primary hover:bg-gray-50">
+                    Guardar borrador
+                </button>
+                <button type="submit" name="accion" value="enviar"
+                        class="inline-flex items-center justify-center rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90">
+                    <i class="fas fa-paper-plane mr-2" aria-hidden="true"></i>Enviar para revisión
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const input = document.getElementById('id_documentos');
+            const dropzone = document.getElementById('actividad-documentos-dropzone');
+            const summary = document.getElementById('actividad-documentos-resumen');
+            const list = document.getElementById('actividad-documentos-lista');
+            if (!input || !dropzone || !summary || !list) return;
+
+            const formatSize = (bytes) => {
+                if (bytes < 1024) return `${bytes} B`;
+                if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+            };
+
+            const renderFiles = (files) => {
+                const selected = Array.from(files || []);
+                list.replaceChildren();
+                if (!selected.length) {
+                    summary.textContent = 'Todavía no seleccionaste archivos.';
+                    list.classList.add('hidden');
+                    return;
+                }
+
+                summary.textContent = `${selected.length} archivo${selected.length === 1 ? '' : 's'} listo${selected.length === 1 ? '' : 's'} para cargar.`;
+                selected.forEach((file, fileIndex) => {
+                    const item = document.createElement('li');
+                    item.className = 'flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2 text-xs shadow-sm';
+
+                    const fileInfo = document.createElement('div');
+                    fileInfo.className = 'flex min-w-0 items-center gap-2';
+
+                    const fileIcon = document.createElement('i');
+                    fileIcon.className = 'fas fa-file-alt shrink-0 text-blue-500';
+                    fileIcon.setAttribute('aria-hidden', 'true');
+
+                    const name = document.createElement('span');
+                    name.className = 'truncate font-medium text-gray-700';
+                    name.textContent = file.name;
+
+                    const size = document.createElement('span');
+                    size.className = 'shrink-0 text-gray-500';
+                    size.textContent = formatSize(file.size);
+
+                    const removeButton = document.createElement('button');
+                    removeButton.type = 'button';
+                    removeButton.className = 'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500';
+                    removeButton.setAttribute('aria-label', `Quitar ${file.name}`);
+                    removeButton.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+                    removeButton.addEventListener('click', () => {
+                        const remainingFiles = Array.from(input.files).filter((_, index) => index !== fileIndex);
+                        const transfer = new DataTransfer();
+                        remainingFiles.forEach((remainingFile) => transfer.items.add(remainingFile));
+                        input.files = transfer.files;
+                        renderFiles(input.files);
+                    });
+
+                    const actions = document.createElement('div');
+                    actions.className = 'flex shrink-0 items-center gap-2';
+                    actions.append(size, removeButton);
+
+                    fileInfo.append(fileIcon, name);
+                    item.append(fileInfo, actions);
+                    list.appendChild(item);
+                });
+                list.classList.remove('hidden');
+            };
+
+            input.addEventListener('change', () => renderFiles(input.files));
+
+            ['dragenter', 'dragover'].forEach((eventName) => {
+                dropzone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    dropzone.classList.add('border-blue-400', 'bg-blue-50', 'ring-2', 'ring-blue-200');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach((eventName) => {
+                dropzone.addEventListener(eventName, (event) => {
+                    event.preventDefault();
+                    dropzone.classList.remove('border-blue-400', 'bg-blue-50', 'ring-2', 'ring-blue-200');
+                });
+            });
+
+            dropzone.addEventListener('drop', (event) => {
+                if (!event.dataTransfer?.files?.length) return;
+                input.files = event.dataTransfer.files;
+                renderFiles(input.files);
+            });
+        });
+    </script>
+{% endblock %}
