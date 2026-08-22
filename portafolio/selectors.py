@@ -11,6 +11,20 @@ from preinformes.models import Preinforme
 
 
 ESTADOS_GUARDIA_COMPUTABLES = ('PUBLICADA', 'CUMPLIDA')
+MESES_CICLO_LECTIVO = (
+    'Ago',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dic',
+    'Ene',
+    'Feb',
+    'Mar',
+    'Abr',
+    'May',
+    'Jun',
+    'Jul',
+)
 
 
 def primer_dia_habil_agosto(anio):
@@ -213,6 +227,138 @@ def resumen_clases(residente, periodo):
         .order_by('-fecha_clase', '-fecha_creacion')
     )
     return {'total': len(clases), 'items': clases}
+
+
+def _indice_mes_ciclo(fecha, periodo):
+    """Ubica una fecha en los doce meses visuales del ciclo agosto-julio."""
+    if hasattr(fecha, 'date'):
+        if timezone.is_aware(fecha):
+            fecha = timezone.localtime(fecha)
+        fecha = fecha.date()
+    if fecha < periodo['inicio'] or fecha >= periodo['fin_exclusivo']:
+        return None
+
+    anio_inicio = periodo['anio_inicio']
+    if fecha.year == anio_inicio + 1 and fecha.month == 8:
+        # Los primeros días de agosto pueden pertenecer al cierre del ciclo.
+        return 11
+    indice = (fecha.year - anio_inicio) * 12 + fecha.month - 8
+    return indice if 0 <= indice < 12 else None
+
+
+def _serie_acumulada(valores):
+    acumulado = 0
+    resultado = []
+    for valor in valores:
+        if valor is None:
+            resultado.append(None)
+            continue
+        acumulado += valor
+        resultado.append(acumulado)
+    return resultado
+
+
+def evolucion_actividad(residente, periodo, hoy=None):
+    """Construye series mensuales sin exponer información clínica sensible."""
+    hoy = hoy or timezone.localdate()
+    fin_exclusivo = fin_datos_exclusivo(periodo, hoy)
+    valores = {
+        'estudios': [0] * 12,
+        'preinformes': [0] * 12,
+        'guardias': [0] * 12,
+        'clases': [0] * 12,
+    }
+
+    def sumar(clave, fecha, cantidad=1):
+        indice = _indice_mes_ciclo(fecha, periodo)
+        if indice is not None:
+            valores[clave][indice] += cantidad or 0
+
+    practicas = RegistroEstudio.objects.filter(
+        registro__medico=residente,
+        registro__anulado=False,
+        registro__fecha_del_informe__gte=periodo['inicio'],
+        registro__fecha_del_informe__lt=fin_exclusivo,
+    ).values_list('registro__fecha_del_informe', 'cantidad')
+    for fecha, cantidad in practicas:
+        sumar('estudios', fecha, cantidad)
+
+    preinformes = Preinforme.objects.filter(
+        residente=residente,
+        es_registro_demo=False,
+        fecha_creacion__date__gte=periodo['inicio'],
+        fecha_creacion__date__lt=fin_exclusivo,
+    ).values_list('fecha_creacion', flat=True)
+    for fecha in preinformes:
+        sumar('preinformes', fecha)
+
+    guardias = AsignacionGuardia.objects.filter(
+        residente=residente,
+        estado__in=ESTADOS_GUARDIA_COMPUTABLES,
+        fecha__gte=periodo['inicio'],
+        fecha__lt=min(periodo['fin_exclusivo'], hoy),
+    ).values_list('fecha', flat=True)
+    for fecha in guardias:
+        sumar('guardias', fecha)
+
+    clases = ClaseResidente.objects.filter(
+        autor=residente,
+        activa=True,
+        fecha_clase__gte=periodo['inicio'],
+        fecha_clase__lt=fin_exclusivo,
+    ).values_list('fecha_clase', flat=True)
+    for fecha in clases:
+        sumar('clases', fecha)
+
+    mes_actual = None
+    for indice in range(12):
+        mes = 8 + indice
+        anio = periodo['anio_inicio']
+        if mes > 12:
+            mes -= 12
+            anio += 1
+        inicio_mes = date(anio, mes, 1)
+        if indice == 0:
+            inicio_mes = periodo['inicio']
+        if indice == 11:
+            fin_mes = periodo['fin_exclusivo']
+        else:
+            mes_siguiente = mes + 1
+            anio_siguiente = anio
+            if mes_siguiente == 13:
+                mes_siguiente = 1
+                anio_siguiente += 1
+            fin_mes = date(anio_siguiente, mes_siguiente, 1)
+
+        if inicio_mes <= hoy < fin_mes:
+            mes_actual = indice
+        if inicio_mes > hoy:
+            for serie in valores.values():
+                serie[indice] = None
+
+    configuracion = (
+        ('estudios', 'Estudios', 'prácticas'),
+        ('preinformes', 'Preinformes', 'preinformes'),
+        ('guardias', 'Guardias', 'guardias'),
+        ('clases', 'Clases', 'clases'),
+    )
+    series = []
+    for clave, etiqueta, unidad in configuracion:
+        series.append(
+            {
+                'clave': clave,
+                'etiqueta': etiqueta,
+                'unidad': unidad,
+                'mensual': valores[clave],
+                'acumulada': _serie_acumulada(valores[clave]),
+            }
+        )
+
+    return {
+        'etiquetas': list(MESES_CICLO_LECTIVO),
+        'series': series,
+        'mes_actual': mes_actual,
+    }
 
 
 def totales_actividad_ciclo(residente, periodo, hoy=None):

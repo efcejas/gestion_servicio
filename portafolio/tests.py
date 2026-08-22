@@ -14,6 +14,7 @@ from liquidacion.models import Estudios, RegistroEstudio, RegistroEstudiosPorMed
 from preinformes.models import Preinforme, Region, TipoEstudio
 
 from .selectors import (
+    evolucion_actividad,
     fin_datos_exclusivo,
     periodo_ciclo_lectivo,
     periodo_ciclo_lectivo_por_anio,
@@ -139,6 +140,73 @@ class PortafolioTests(TestCase):
         resumen = construir_resumen_portafolio(self.residente)
 
         self.assertEqual(resumen['guardias']['total'], 1)
+
+    def test_evolucion_mensual_distingue_mes_actual_y_meses_futuros(self):
+        periodo = periodo_ciclo_lectivo_por_anio(2025)
+        ClaseResidente.objects.create(
+            titulo='Clase de agosto',
+            categoria='tc',
+            anios_dirigidos=['R1'],
+            autor=self.residente,
+            fecha_clase=date(2025, 8, 5),
+        )
+        ClaseResidente.objects.create(
+            titulo='Clase de octubre',
+            categoria='rm',
+            anios_dirigidos=['R2'],
+            autor=self.residente,
+            fecha_clase=date(2025, 10, 10),
+        )
+
+        evolucion = evolucion_actividad(
+            self.residente,
+            periodo,
+            hoy=date(2025, 10, 15),
+        )
+        clases = next(
+            serie for serie in evolucion['series'] if serie['clave'] == 'clases'
+        )
+
+        self.assertEqual(evolucion['mes_actual'], 2)
+        self.assertEqual(clases['mensual'][:3], [1, 0, 1])
+        self.assertEqual(clases['acumulada'][:3], [1, 1, 2])
+        self.assertTrue(all(valor is None for valor in clases['mensual'][3:]))
+        self.assertTrue(all(valor is None for valor in clases['acumulada'][3:]))
+
+    def test_evolucion_coincide_con_totales_y_se_renderiza(self):
+        self._crear_actividad()
+        resumen = construir_resumen_portafolio(self.residente)
+        series = {
+            serie['clave']: serie for serie in resumen['evolucion']['series']
+        }
+
+        def total_registrado(clave):
+            return sum(
+                valor
+                for valor in series[clave]['mensual']
+                if valor is not None
+            )
+
+        self.assertEqual(
+            total_registrado('estudios'),
+            resumen['estudios']['total_practicas'],
+        )
+        self.assertEqual(
+            total_registrado('preinformes'),
+            resumen['preinformes']['total'],
+        )
+        self.assertEqual(total_registrado('guardias'), resumen['guardias']['total'])
+        self.assertEqual(total_registrado('clases'), resumen['clases']['total'])
+
+        self.client.login(username=self.instructor.username, password='testpass123')
+        response = self.client.get(
+            reverse('portafolio:detalle_residente', args=[self.residente.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Evolución de la actividad')
+        self.assertContains(response, 'portafolio-evolucion-chart')
+        self.assertContains(response, 'data-evolucion-modo="acumulada"')
 
     def test_resumen_liquidacion_expone_cantidades_sin_paciente_ni_montos(self):
         self._crear_actividad()

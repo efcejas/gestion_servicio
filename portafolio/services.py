@@ -1,4 +1,5 @@
 from .selectors import (
+    evolucion_actividad,
     periodo_ciclo_lectivo,
     periodos_disponibles_residente,
     resumen_clases,
@@ -17,6 +18,11 @@ def construir_resumen_portafolio(residente, fecha_referencia=None, periodo=None)
         'preinformes': resumen_preinformes(residente, periodo),
         'estudios': resumen_estudios(residente, periodo),
         'clases': resumen_clases(residente, periodo),
+        'evolucion': evolucion_actividad(
+            residente,
+            periodo,
+            hoy=fecha_referencia,
+        ),
     }
 
 

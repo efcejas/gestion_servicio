@@ -1,0 +1,180 @@
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const dataNode = document.getElementById('portafolio-evolucion-data');
+        const canvas = document.getElementById('portafolio-evolucion-chart');
+        const errorNode = document.getElementById('portafolio-evolucion-error');
+        const summaryNode = document.getElementById('portafolio-evolucion-resumen');
+        const contextNode = document.getElementById('portafolio-evolucion-contexto');
+
+        if (!dataNode || !canvas) return;
+
+        let payload;
+        try {
+            payload = JSON.parse(dataNode.textContent);
+        } catch (error) {
+            errorNode?.classList.remove('hidden');
+            return;
+        }
+
+        const seriesByKey = Object.fromEntries(
+            payload.series.map((series) => [series.clave, series]),
+        );
+        let activeMetric = payload.series[0]?.clave;
+        let activeMode = 'mensual';
+        let chart;
+
+        const setButtonState = (buttons, activeValue, dataKey) => {
+            buttons.forEach((button) => {
+                const isActive = button.dataset[dataKey] === activeValue;
+                button.setAttribute('aria-pressed', String(isActive));
+                button.classList.toggle('bg-medical-primary', isActive);
+                button.classList.toggle('text-white', isActive);
+                button.classList.toggle('text-gray-600', !isActive);
+                button.classList.toggle('hover:bg-gray-100', !isActive);
+            });
+        };
+
+        const renderTextSummary = (series) => {
+            const monthlyValues = series.mensual
+                .map((value, index) => ({ value, index }))
+                .filter((item) => Number.isFinite(item.value));
+            const total = monthlyValues.reduce((sum, item) => sum + item.value, 0);
+            const maximum = monthlyValues.reduce(
+                (current, item) => (item.value > current.value ? item : current),
+                { value: 0, index: 0 },
+            );
+
+            if (total === 0) {
+                summaryNode.textContent = `No hay registros de ${series.etiqueta.toLowerCase()} en este ciclo.`;
+            } else {
+                summaryNode.textContent = `${total} ${series.unidad} en el ciclo · Mayor actividad: ${payload.etiquetas[maximum.index]} (${maximum.value})`;
+            }
+
+            const hasFutureMonths = series.mensual.some((value) => value === null);
+            if (payload.mes_actual !== null) {
+                contextNode.textContent = `${payload.etiquetas[payload.mes_actual]} está en curso${hasFutureMonths ? ' · Los meses futuros no se grafican' : ''}.`;
+            } else {
+                contextNode.textContent = 'Ciclo lectivo cumplido.';
+            }
+        };
+
+        const updateChart = () => {
+            const series = seriesByKey[activeMetric];
+            if (!series) return;
+
+            const values = series[activeMode];
+            const modeLabel = activeMode === 'mensual' ? 'mensual' : 'acumulada';
+            const pointRadii = values.map((value, index) => {
+                if (value === null) return 0;
+                return index === payload.mes_actual ? 5 : 3;
+            });
+
+            chart.data.datasets[0].label = `${series.etiqueta} · ${modeLabel}`;
+            chart.data.datasets[0].data = values;
+            chart.data.datasets[0].pointRadius = pointRadii;
+            chart.options.scales.y.title.text = series.unidad;
+            canvas.setAttribute(
+                'aria-label',
+                `Evolución ${modeLabel} de ${series.etiqueta.toLowerCase()} durante el ciclo`,
+            );
+            chart.update();
+            renderTextSummary(series);
+        };
+
+        if (!activeMetric || typeof window.Chart === 'undefined') {
+            errorNode?.classList.remove('hidden');
+            return;
+        }
+
+        const rootStyles = getComputedStyle(document.documentElement);
+        const primaryColor = rootStyles.getPropertyValue('--medical-primary').trim() || '#164569';
+        const context = canvas.getContext('2d');
+        const fillGradient = context.createLinearGradient(0, 0, 0, canvas.parentElement.clientHeight);
+        fillGradient.addColorStop(0, 'rgba(22, 69, 105, 0.22)');
+        fillGradient.addColorStop(1, 'rgba(22, 69, 105, 0.02)');
+
+        chart = new window.Chart(context, {
+            type: 'line',
+            data: {
+                labels: payload.etiquetas,
+                datasets: [{
+                    data: [],
+                    borderColor: primaryColor,
+                    backgroundColor: fillGradient,
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.25,
+                    pointBackgroundColor: primaryColor,
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointHoverRadius: 6,
+                    spanGaps: false,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const series = seriesByKey[activeMetric];
+                                return ` ${context.parsed.y} ${series.unidad}`;
+                            },
+                            afterTitle: (items) => {
+                                if (items[0]?.dataIndex === payload.mes_actual) return 'Mes en curso';
+                                return '';
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#6b7280' },
+                    },
+                    y: {
+                        beginAtZero: true,
+                        suggestedMax: 4,
+                        ticks: {
+                            color: '#6b7280',
+                            precision: 0,
+                        },
+                        grid: { color: 'rgba(156, 163, 175, 0.18)' },
+                        title: {
+                            display: true,
+                            text: '',
+                            color: '#6b7280',
+                        },
+                    },
+                },
+            },
+        });
+
+        const metricButtons = document.querySelectorAll('[data-evolucion-metrica]');
+        const modeButtons = document.querySelectorAll('[data-evolucion-modo]');
+
+        metricButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeMetric = button.dataset.evolucionMetrica;
+                setButtonState(metricButtons, activeMetric, 'evolucionMetrica');
+                updateChart();
+            });
+        });
+
+        modeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeMode = button.dataset.evolucionModo;
+                setButtonState(modeButtons, activeMode, 'evolucionModo');
+                updateChart();
+            });
+        });
+
+        updateChart();
+    });
+</script>
