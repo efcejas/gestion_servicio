@@ -142,7 +142,7 @@ class PortafolioTests(TestCase):
 
         self.assertEqual(resumen['guardias']['total'], 1)
 
-    def test_resumen_unifica_tipos_guardia_con_sufijo_numerico(self):
+    def test_resumen_clasifica_guardias_segun_fecha_y_unifica_slots(self):
         periodo = periodo_ciclo_lectivo_por_anio(2025)
         tipo_original = ConfiguracionTipoGuardia.objects.create(
             nombre='Día de semana',
@@ -158,26 +158,58 @@ class PortafolioTests(TestCase):
             dias_semana='L,M,X,J,V',
             creado_por=self.instructor,
         )
-        fecha_guardia = periodo['inicio'] + timedelta(days=2)
+        fecha_habil = periodo['inicio']
         for tipo in (tipo_original, tipo_duplicado):
             AsignacionGuardia.objects.create(
                 residente=self.residente,
                 tipo_guardia=tipo,
-                fecha=fecha_guardia,
+                fecha=fecha_habil,
                 estado='PUBLICADA',
                 creada_por=self.instructor,
             )
 
+        fecha_fin_semana = fecha_habil + timedelta(days=1)
+        while fecha_fin_semana.weekday() < 5:
+            fecha_fin_semana += timedelta(days=1)
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=tipo_original,
+            fecha=fecha_fin_semana,
+            estado='PUBLICADA',
+            creada_por=self.instructor,
+        )
+
+        fecha_feriado = fecha_fin_semana + timedelta(days=1)
+        while fecha_feriado.weekday() >= 5:
+            fecha_feriado += timedelta(days=1)
+        Feriado.objects.create(
+            fecha=fecha_feriado,
+            descripcion='Feriado para portafolio',
+        )
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=tipo_duplicado,
+            fecha=fecha_feriado,
+            estado='PUBLICADA',
+            creada_por=self.instructor,
+        )
+
         resumen = resumen_guardias(
             self.residente,
             periodo,
-            hoy=fecha_guardia + timedelta(days=1),
+            hoy=fecha_feriado + timedelta(days=1),
         )
 
-        self.assertEqual(resumen['total'], 2)
+        self.assertEqual(resumen['total'], 4)
         self.assertEqual(
             resumen['por_tipo'],
-            [{'tipo_guardia__nombre': 'Día de semana', 'cantidad': 2}],
+            [
+                {'tipo_guardia__nombre': 'Lunes a viernes', 'cantidad': 2},
+                {
+                    'tipo_guardia__nombre': 'Sábados, domingos y feriados',
+                    'cantidad': 2,
+                },
+            ],
         )
 
     def test_evolucion_mensual_distingue_mes_actual_y_meses_futuros(self):
@@ -267,7 +299,8 @@ class PortafolioTests(TestCase):
         self.assertContains(response, 'portafolio-preinformes-data')
         self.assertContains(response, 'Ver detalle completo', count=2)
         self.assertContains(response, 'Ecografía')
-        self.assertContains(response, 'Guardia nocturna portafolio')
+        self.assertContains(response, 'Lunes a viernes')
+        self.assertContains(response, 'Sábados, domingos y feriados')
 
     def test_resumen_liquidacion_expone_cantidades_sin_paciente_ni_montos(self):
         self._crear_actividad()

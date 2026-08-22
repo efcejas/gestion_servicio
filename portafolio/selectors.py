@@ -1,4 +1,3 @@
-import re
 from datetime import date, timedelta
 
 from django.db.models import Count, Min, Q, Sum
@@ -128,33 +127,38 @@ def fin_datos_exclusivo(periodo, hoy=None):
 
 def resumen_guardias(residente, periodo, hoy=None):
     hoy = hoy or timezone.localdate()
-    guardias = AsignacionGuardia.objects.filter(
-        residente=residente,
-        estado__in=ESTADOS_GUARDIA_COMPUTABLES,
-        fecha__gte=periodo['inicio'],
-        fecha__lt=min(periodo['fin_exclusivo'], hoy),
+    guardias = list(
+        AsignacionGuardia.objects.filter(
+            residente=residente,
+            estado__in=ESTADOS_GUARDIA_COMPUTABLES,
+            fecha__gte=periodo['inicio'],
+            fecha__lt=min(periodo['fin_exclusivo'], hoy),
+        ).values_list('fecha', 'es_feriado')
     )
-    tipos_registrados = list(
-        guardias.values('tipo_guardia__nombre')
-        .annotate(cantidad=Count('id'))
-        .order_by('-cantidad', 'tipo_guardia__nombre')
+    if not guardias:
+        return {'total': 0, 'por_tipo': []}
+
+    fechas_feriado = set(
+        Feriado.objects.filter(
+            fecha__gte=periodo['inicio'],
+            fecha__lt=min(periodo['fin_exclusivo'], hoy),
+        ).values_list('fecha', flat=True)
     )
-    tipos_unificados = {}
-    for fila in tipos_registrados:
-        nombre = fila['tipo_guardia__nombre'] or 'Sin tipo informado'
-        nombre = re.sub(r'\s+\(\d+\)\s*$', '', nombre).strip()
-        clave = nombre.casefold()
-        if clave not in tipos_unificados:
-            tipos_unificados[clave] = {
-                'tipo_guardia__nombre': nombre,
-                'cantidad': 0,
-            }
-        tipos_unificados[clave]['cantidad'] += fila['cantidad']
-    por_tipo = sorted(
-        tipos_unificados.values(),
-        key=lambda fila: (-fila['cantidad'], fila['tipo_guardia__nombre']),
-    )
-    return {'total': guardias.count(), 'por_tipo': por_tipo}
+    cantidades = {
+        'Lunes a viernes': 0,
+        'Sábados, domingos y feriados': 0,
+    }
+    for fecha, marcada_feriado in guardias:
+        if fecha.weekday() >= 5 or marcada_feriado or fecha in fechas_feriado:
+            cantidades['Sábados, domingos y feriados'] += 1
+        else:
+            cantidades['Lunes a viernes'] += 1
+
+    por_tipo = [
+        {'tipo_guardia__nombre': nombre, 'cantidad': cantidad}
+        for nombre, cantidad in cantidades.items()
+    ]
+    return {'total': len(guardias), 'por_tipo': por_tipo}
 
 
 def resumen_preinformes(residente, periodo):
