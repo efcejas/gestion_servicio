@@ -261,7 +261,11 @@ class GenerarDistribucionForm(forms.Form):
         required=False,
         widget=forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
         label='Aplicar guardias condicionales por año',
-        help_text='R1: Viernes, Domingos y Feriados · R2: Sábados · R3/R4: Lunes a Jueves',
+        help_text=(
+            'Regla habitual: R1 viernes, domingos y feriados; R2 sábados; '
+            'R3/R4 lunes a jueves. De agosto a octubre: R1 y R2 los '
+            'viernes/domingos, y R3 los sábados.'
+        ),
     )
 
     def __init__(self, *args, **kwargs):
