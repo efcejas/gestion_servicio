@@ -138,11 +138,6 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         )
 
     advertencias = []
-    if restricciones_anio and _es_periodo_transicion_ingreso(primer_dia):
-        advertencias.append(
-            "Período transitorio agosto–octubre: R1 y R2 en viernes y "
-            "domingos; R3 en sábados."
-        )
 
     # ------------------------------------------------------------------
     # 2. Cuotas por año de residencia
@@ -328,19 +323,11 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             slots_sin_cubrir.append({'fecha': fecha, 'tipo': tipo.nombre})
             continue
 
-        # Restricciones por año. Entre agosto y octubre se aplica la
-        # transición de ingreso: R1 + R2 en V/D y
-        # R3 en sábados. Fuera de ese período rige el esquema habitual.
+        # Restricciones por año (opcional): R1→V/D/Feriados, R2→S, R3/R4→L-J
         if restricciones_anio:
-            anios_en_fecha = anio_por_fecha[fecha]
             candidatos_restringidos = [
                 r for r in candidatos
-                if _anio_puede_cubrir_slot(
-                    r.anio_residencia,
-                    fecha,
-                    es_feriado_slot,
-                    anios_en_fecha=anios_en_fecha,
-                )
+                if _anio_puede_cubrir_slot(r.anio_residencia, weekday, es_feriado_slot)
             ]
             if candidatos_restringidos:
                 candidatos = candidatos_restringidos
@@ -867,41 +854,16 @@ def _elegir_candidato_priorizado(candidatos, prioridad):
     return random.choice(grupo_empate)
 
 
-def _es_periodo_transicion_ingreso(fecha):
-    """La adaptación de los nuevos R1 rige de agosto a octubre inclusive."""
-    return fecha.month in (8, 9, 10)
-
-
-def _anio_puede_cubrir_slot(
-    anio_residencia,
-    fecha,
-    es_feriado,
-    anios_en_fecha=None,
-):
+def _anio_puede_cubrir_slot(anio_residencia, weekday, es_feriado):
     """
     Restricciones opcionales por año de residencia:
-      Agosto–octubre:
-        - Viernes/Domingos: primero R1 y luego R2.
-        - Sábados: R3.
-      Resto del año:
-        - R1 → Viernes, Domingos o feriados.
-        - R2 → Sábados no feriados.
-        - R3/R4 → Lunes–Jueves no feriados.
+      R1  → solo Viernes (4), Domingos (6), o cualquier Feriado
+      R2  → solo Sábados no feriado (5)
+      R3/R4 → solo Lunes–Jueves no feriado (0–3)
       Otros → sin restricción (True)
+
+    weekday: int 0=Lunes … 6=Domingo (fecha.weekday())
     """
-    weekday = fecha.weekday()
-    anios_en_fecha = set(anios_en_fecha or [])
-
-    if _es_periodo_transicion_ingreso(fecha):
-        if weekday in (4, 6):
-            if 'R1' in anios_en_fecha:
-                return anio_residencia == 'R2'
-            if 'R2' in anios_en_fecha:
-                return anio_residencia == 'R1'
-            return anio_residencia == 'R1'
-        if weekday == 5:
-            return anio_residencia == 'R3'
-
     if anio_residencia == 'R1':
         return weekday in (4, 6) or es_feriado
     if anio_residencia == 'R2':
