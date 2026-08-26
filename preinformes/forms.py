@@ -209,7 +209,14 @@ class PreinformeForm(forms.ModelForm):
 
     def clean_informe_html(self):
         contenido = self.cleaned_data.get('informe_html', '')
-        return prepare_editor_html_content(contenido)
+        sistema_destino = (
+            self.cleaned_data.get('sistema_destino')
+            or getattr(self.instance, 'sistema_destino', None)
+        )
+        return prepare_editor_html_content(
+            contenido,
+            preserve_blank_paragraphs=sistema_destino == 'netterm',
+        )
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -361,6 +368,7 @@ class RevisionPreinformeForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         preinforme = kwargs.pop('preinforme', None)
         super().__init__(*args, **kwargs)
+        self.preinforme = preinforme or getattr(self.instance, 'preinforme', None)
 
         # Setear spellcheck solo si el destino es EGES
         sistema_destino = None
@@ -389,7 +397,12 @@ class RevisionPreinformeForm(forms.ModelForm):
 
     def clean_informe_final_html(self):
         contenido = self.cleaned_data.get('informe_final_html', '')
-        return prepare_editor_html_content(contenido)
+        return prepare_editor_html_content(
+            contenido,
+            preserve_blank_paragraphs=(
+                getattr(self.preinforme, 'sistema_destino', None) == 'netterm'
+            ),
+        )
 
 
 class PlantillaPreinformeForm(forms.ModelForm):

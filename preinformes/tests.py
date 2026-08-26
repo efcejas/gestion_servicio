@@ -1038,6 +1038,19 @@ class NormalizeHTMLContentSoftTest(TestCase):
         self.assertNotIn('&nbsp;', result)
         self.assertNotIn('<p></p>', result)
         self.assertNotIn('<p> </p>', result)
+
+    def test_preserva_parrafos_vacios_para_exportacion_netterm(self):
+        """NetTerm necesita conservar los espacios verticales intencionales."""
+        from preinformes.models import prepare_editor_html_content
+
+        html_input = '<p>TITULO</p><p>&nbsp;</p><p>CUERPO</p>'
+
+        result = prepare_editor_html_content(
+            html_input,
+            preserve_blank_paragraphs=True,
+        )
+
+        self.assertIn('<p>\xa0</p>', result)
     
     def test_caso5_texto_plano_con_saltos(self):
         """
@@ -1776,6 +1789,80 @@ class CopiarInformeFinalSmokeTest(TestCase):
         self.assertIn('Hallazgo 0000', texto)
         self.assertIn('Hallazgo 1499', texto)
         self.assertEqual(texto.count('Hallazgo'), 1500)
+
+    def test_copiar_netterm_preserva_separadores_y_linea_vacia(self):
+        """NetTerm representa espacios intencionales y <hr> como guiones."""
+        p = Preinforme.objects.create(
+            residente=self.residente,
+            numero_estudio='2026-CP004',
+            tipo_estudio=self.tipo_estudio,
+            region=self.region,
+            apellido_paciente='Formato',
+            nombre_paciente='NetTerm',
+            informe_html=(
+                '<p>TITULO</p><p>&nbsp;</p><hr>'
+                '<p>CUERPO</p><p>------</p>'
+            ),
+            sistema_destino='netterm',
+        )
+        self.client.login(username='res_copiar', password='pass123')
+
+        response = self.client.get(self._url(p.pk))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json()['informe_texto'],
+            'TITULO\n\n------\nCUERPO\n------',
+        )
+
+    def test_formulario_revision_netterm_conserva_linea_vacia(self):
+        """El guardado definitivo no elimina el espacio antes de copiar."""
+        from preinformes.forms import RevisionPreinformeForm
+
+        p = self._crear_preinforme(sistema='netterm')
+        revision = RevisionPreinforme.objects.create(
+            preinforme=p,
+            revisor=self.revisor,
+        )
+        form = RevisionPreinformeForm(
+            {
+                'informe_final_html': '<p>TITULO</p><p>&nbsp;</p><p>CUERPO</p>',
+                'comentarios_generales': '',
+                'puntuacion': '',
+            },
+            instance=revision,
+            preinforme=p,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIn('<p>\xa0</p>', form.cleaned_data['informe_final_html'])
+
+    def test_formulario_residente_netterm_conserva_linea_vacia(self):
+        """La creación del residente conserva el espacio destinado a NetTerm."""
+        from preinformes.forms import PreinformeForm
+
+        form = PreinformeForm(
+            {
+                'numero_estudio': '2026-CP005',
+                'tipo_estudio': self.tipo_estudio.pk,
+                'region': self.region.pk,
+                'sistema_destino': 'netterm',
+                'plantilla_utilizada': '',
+                'revisor': '',
+                'asignacion_compartida': '',
+                'apellido_paciente': 'Formato',
+                'nombre_paciente': 'NetTerm',
+                'dni_paciente': '',
+                'edad_paciente': '',
+                'sexo_paciente': '',
+                'contexto_clinico': '',
+                'informe_html': '<p>TITULO</p><p>&nbsp;</p><p>CUERPO</p>',
+            },
+            user=self.residente,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIn('<p>\xa0</p>', form.cleaned_data['informe_html'])
 
 
 class CargarPlantillasSmokeTest(TestCase):

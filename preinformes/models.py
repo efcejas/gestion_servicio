@@ -143,7 +143,11 @@ def normalize_html_content(content):
     return content
 
 
-def normalize_html_content_soft(content: str, br_threshold: int = 3) -> str:
+def normalize_html_content_soft(
+    content: str,
+    br_threshold: int = 3,
+    preserve_blank_paragraphs: bool = False,
+) -> str:
     """
     Versión "soft" de normalización HTML que RESPETA la estructura original del usuario.
     
@@ -204,6 +208,9 @@ def normalize_html_content_soft(content: str, br_threshold: int = 3) -> str:
     # Paso 2: Si tiene 2+ <p>, asumir que está bien estructurado
     # Solo limpiar párrafos vacíos y devolver
     if p_count >= 2:
+        if preserve_blank_paragraphs:
+            return content.strip()
+
         # Eliminar <p> vacíos: <p>&nbsp;</p>, <p> </p>, <p><br></p>, <p></p>
         cleaned = re.sub(
             r'<p(?:\s[^>]*)?>(\s|&nbsp;|<br\s*/?>)*</p>',
@@ -267,21 +274,30 @@ def normalize_html_content_soft(content: str, br_threshold: int = 3) -> str:
     
     # Paso 5: Si tiene < br_threshold <br>, PRESERVAR estructura original
     # Solo eliminar párrafos vacíos obvios
-    cleaned = re.sub(
-        r'<p(?:\s[^>]*)?>(\s|&nbsp;)*</p>',
-        '',
-        content,
-        flags=re.IGNORECASE
-    )
+    if preserve_blank_paragraphs:
+        cleaned = content
+    else:
+        cleaned = re.sub(
+            r'<p(?:\s[^>]*)?>(\s|&nbsp;)*</p>',
+            '',
+            content,
+            flags=re.IGNORECASE
+        )
     
     return cleaned.strip()
 
 
-def prepare_editor_html_content(content: str) -> str:
+def prepare_editor_html_content(
+    content: str,
+    preserve_blank_paragraphs: bool = False,
+) -> str:
     """Limpia y normaliza HTML para usarlo como formato canónico del editor."""
     content = sanitize_center_alignment(content or '')
     content = strip_background_styles(content)
-    return normalize_html_content_soft(content)
+    return normalize_html_content_soft(
+        content,
+        preserve_blank_paragraphs=preserve_blank_paragraphs,
+    )
 
 
 def strip_html_tags(text):

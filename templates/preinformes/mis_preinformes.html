@@ -449,4 +449,15 @@ function mostrarNotificacion(mensaje, tipo) {
 }
 </script>
 
+<script src="{% static 'js/preinformes_copy.js' %}"></script>
+<script>
+// Unifica esta bandeja con el copiado compartido usado por revisión y banco.
+window.copiarInformeFinal = function(preinformeId) {
+    return window.PreinformesCopy.copyFinalReport({
+        preinformeId: preinformeId,
+        notify: mostrarNotificacion,
+    });
+};
+</script>
+
 {% endblock %}

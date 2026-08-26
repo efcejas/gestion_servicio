@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'styles/preinformes_dictado_flotante.css' %}">
+<link rel="stylesheet" href="{% static 'styles/preinformes_netterm_editor.css' %}">
 <!-- Preload CKEditor para carga más rápida -->
 <link rel="preconnect" href="https://cdn.ckeditor.com">
 <link rel="dns-prefetch" href="https://cdn.ckeditor.com">
@@ -416,7 +417,13 @@
 
 <script src="{% static 'js/preinformes_copy.js' %}"></script>
 <script src="{% static 'js/preinformes_dictado_flotante.js' %}"></script>
+<script src="{% static 'js/preinformes_netterm_editor.js' %}"></script>
 <script>
+window.PreinformesNettermEditor.bind({
+    editorId: 'id_informe_final_html',
+    fixedSystem: '{{ preinforme.sistema_destino }}',
+});
+
 // === SISTEMA DE AUTOGUARDADO REVISOR (localStorage + servidor) ===
 (function() {
     const PREINFORME_PK = {{ preinforme.pk }};

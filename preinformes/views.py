@@ -556,16 +556,30 @@ def _generar_evaluacion_ia_final_revision(revision):
         logger.warning("No se pudo generar evaluacion IA final para revision %s: %s", revision.pk, exc)
 
 
-def _normalizar_html_editor(content):
+def _normalizar_html_editor(content, preserve_blank_paragraphs=False):
     """Aplica una normalización HTML suave para usar una base consistente en editor/exportación."""
-    return prepare_editor_html_content(content)
+    return prepare_editor_html_content(
+        content,
+        preserve_blank_paragraphs=preserve_blank_paragraphs,
+    )
 
 
-def _html_a_texto_plano_exportacion(html_content, ascii_only=False):
+def _html_a_texto_plano_exportacion(
+    html_content,
+    ascii_only=False,
+    horizontal_rule=None,
+):
     """Convierte HTML a texto plano preservando saltos de línea clínicamente útiles."""
     from django.utils.html import strip_tags
 
     texto_con_saltos = html_content or ''
+    if horizontal_rule:
+        texto_con_saltos = re.sub(
+            r'<hr\b[^>]*>',
+            f'{horizontal_rule}\n',
+            texto_con_saltos,
+            flags=re.IGNORECASE,
+        )
     texto_con_saltos = texto_con_saltos.replace('</p>', '\n').replace('</P>', '\n')
     texto_con_saltos = re.sub(r'<br\s*/?>', '\n', texto_con_saltos, flags=re.IGNORECASE)
     texto_con_saltos = texto_con_saltos.replace('</div>', '\n').replace('</DIV>', '\n')
@@ -574,6 +588,11 @@ def _html_a_texto_plano_exportacion(html_content, ascii_only=False):
 
     informe_texto = strip_tags(texto_con_saltos)
     informe_texto = html.unescape(informe_texto)
+    informe_texto = informe_texto.replace('\r\n', '\n').replace('\r', '\n')
+    informe_texto = '\n'.join(
+        '' if not linea.strip() else linea.rstrip()
+        for linea in informe_texto.split('\n')
+    )
 
     if ascii_only:
         informe_texto = unicodedata.normalize('NFKD', informe_texto).encode('ascii', 'ignore').decode('ascii')
@@ -588,16 +607,24 @@ def _construir_payload_exportacion(html_content, sistema_destino):
     """Construye la representación final para copiar según sistema destino."""
     from bs4 import BeautifulSoup
 
-    html_normalizado = _normalizar_html_editor(html_content)
-
     if sistema_destino == 'netterm':
-        informe_texto = _html_a_texto_plano_exportacion(html_normalizado, ascii_only=True)
+        html_normalizado = _normalizar_html_editor(
+            html_content,
+            preserve_blank_paragraphs=True,
+        )
+        informe_texto = _html_a_texto_plano_exportacion(
+            html_normalizado,
+            ascii_only=True,
+            horizontal_rule='------',
+        )
         return {
             'informe_html': html_normalizado,
             'informe_texto': informe_texto,
             'informe_final': informe_texto,
             'sistema_destino': sistema_destino,
         }
+
+    html_normalizado = _normalizar_html_editor(html_content)
 
     soup = BeautifulSoup(html_normalizado, 'html.parser')
 

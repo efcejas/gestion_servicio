@@ -1,0 +1,29 @@
+/* Vista fiel al texto plano que recibirá NetTerm. */
+.ck-editor__editable.preinformes-netterm-plain,
+.ck-content.preinformes-netterm-plain,
+.preinformes-netterm-plain-container .ck-editor__editable,
+.preinformes-netterm-plain-container .ck-content {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace !important;
+    line-height: 1.35 !important;
+}
+
+.ck-editor__editable.preinformes-netterm-plain p,
+.ck-content.preinformes-netterm-plain p,
+.preinformes-netterm-plain-container .ck-editor__editable p,
+.preinformes-netterm-plain-container .ck-content p {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.35 !important;
+}
+
+.preinformes-netterm-hint {
+    margin-top: 0.5rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.5rem;
+    background: #eff6ff;
+    padding: 0.5rem 0.75rem;
+    color: #1e40af;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+}

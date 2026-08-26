@@ -5,6 +5,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'styles/preinformes_dictado_flotante.css' %}">
+<link rel="stylesheet" href="{% static 'styles/preinformes_netterm_editor.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -590,7 +591,13 @@
 </div>
 
 <script src="{% static 'js/preinformes_dictado_flotante.js' %}"></script>
+<script src="{% static 'js/preinformes_netterm_editor.js' %}"></script>
 <script>
+window.PreinformesNettermEditor.bind({
+    editorId: 'id_informe_html',
+    systemFieldId: 'id_sistema_destino',
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const DICTADO_CURSOR_HABILITADO = {{ dictado_cursor_habilitado|yesno:'true,false' }};
     const TRANSCRIBIR_URL = '{% url "dictado_informes:transcribir_whisper" %}';
