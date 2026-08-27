@@ -128,6 +128,35 @@ Derrame articular leve."""
         kwargs = self.ai.llm_client.chat.completions.create.call_args.kwargs
         self.assertEqual(kwargs['response_format'], {'type': 'json_object'})
 
+    def test_edicion_por_voz_recibe_relacion_anatomica_relevante(self):
+        respuesta = MagicMock()
+        respuesta.choices[0].message.content = '''{
+            "operaciones": [{
+                "tipo": "reemplazar",
+                "original": "Desgarro del LCA.",
+                "nuevo": "Desgarro completo del LCA."
+            }],
+            "resumen_cambios": ["Se completo la descripcion."]
+        }'''
+        self.ai.llm_enabled = True
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-4.1-mini'
+        self.ai.llm_fallback_model = None
+        self.ai.llm_reasoning_effort = None
+
+        self.ai.edit_medical_report(
+            'HALLAZGOS\nDesgarro del LCA.\nLigamento cruzado posterior conservado.',
+            'Cambia el desgarro del LCA a completo.',
+        )
+
+        mensajes = self.ai.llm_client.chat.completions.create.call_args.kwargs['messages']
+        prompt_usuario = mensajes[1]['content']
+        self.assertIn(
+            'Ligamentos cruzados incluye: Ligamento cruzado anterior, Ligamento cruzado posterior.',
+            prompt_usuario,
+        )
+
     def test_edicion_localizada_rechaza_fragmento_ambiguo(self):
         informe = 'Derrame leve.\nDerrame leve.'
 

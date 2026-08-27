@@ -2,7 +2,7 @@
 
 Fecha inicial: 2026-07-09
 
-Ultima actualizacion: 2026-07-11
+Ultima actualizacion: 2026-08-27
 
 Este documento resume el bloque de mejoras implementadas para evolucionar el dictado inteligente desde un generador con plantillas hacia un agente asistido por voz, manteniendo fallback seguro al flujo de plantilla estructurada.
 
@@ -551,6 +551,127 @@ El asistente de desarrollo no tiene acceso automatico a produccion. Estos datos
 deben compartirse mediante una exportacion anonimizada, una consulta de resumen
 o un panel administrativo. La traza no almacena el dictado ni el informe.
 
+## Evaluacion y memoria versionada
+
+Se agrego una capa de aprendizaje observable que convive con
+`CorreccionAprendizaje`, `FeedbackCalidadDictado` y `TrazaAgenteDictado`.
+
+Modelos nuevos:
+
+- `EventoAprendizajeDictado`: registra decisiones no clinicas como plantilla
+  confirmada, correccion por voz aplicada o deshecha, feedback y correccion manual;
+- `PreferenciaAprendidaDictado`: consolida patrones por usuario, categoria y
+  contexto, conservando version, evidencia, confianza y estado.
+
+La bitacora nueva no copia dictados, instrucciones ni informes. Solo guarda
+codigos de plantilla, contexto anatomico normalizado, tipos de operacion y
+metricas agregadas.
+
+Politica inicial para seleccion de plantilla:
+
+1. Una eleccion confirmada crea evidencia para la combinacion exacta de region,
+   modalidad y lateralidad.
+2. La memoria nace como `candidata`.
+3. Se activa con al menos tres confirmaciones y 75% de consistencia.
+4. Una preferencia activa prioriza esa plantilla cuando el selector vuelve a
+   pedir confirmacion humana; no reemplaza una seleccion automatica de alta
+   confianza ni elimina el modal de confirmacion.
+5. Si el patron ganador cambia, la preferencia anterior queda como
+   `reemplazada` y se crea una version nueva.
+
+Las correcciones de terminologia, orden, estructura y conclusion quedan por ahora
+como evidencia categorizada. No se convierten automaticamente en reglas de texto
+hasta contar con volumen suficiente y validacion contra falsos aprendizajes.
+
+El dashboard `/dictado_informes/metricas/` muestra:
+
+- selecciones de plantilla confirmadas y coincidencia con la sugerencia;
+- correcciones por voz y porcentaje deshecho;
+- memoria activa y candidata;
+- selecciones corregidas por el usuario;
+- historial reciente de preferencias con version y evidencia.
+
+Desde el admin se pueden auditar los eventos y desactivar una preferencia sin
+borrar su historial.
+
+### Panel personal y aislamiento por plantilla
+
+Se agrego `/dictado_informes/mi-memoria/` para usuarios habilitados del modulo.
+El panel permite:
+
+- ver preferencias activas, candidatas y pausadas;
+- revisar evidencia agregada de terminologia, orden y otras categorias;
+- consultar versiones reemplazadas;
+- pausar o reactivar una preferencia fuerte propia.
+
+Una pausa manual prevalece sobre la consolidacion automatica: nueva evidencia
+actualiza los contadores, pero no reactiva la regla sin intervencion del usuario.
+El usuario no puede modificar memoria ajena ni borrar el historial.
+
+`CorreccionAprendizaje` ahora registra tambien:
+
+- `modo_dictado`;
+- `tipo_plantilla`;
+- `region`;
+- `modalidad`;
+- `lateralidad`.
+
+Los ejemplos, preferencias de terminologia y ejemplos de estilo usados por el
+LLM se filtran por `tipo_plantilla`. Las correcciones historicas sin contexto no
+se inyectan en una plantilla especifica, evitando mezclar estilos entre regiones.
+La clave de cache de generacion incluye tambien la plantilla y se invalida al
+guardar una correccion contextualizada.
+
+Los umbrales se pueden calibrar sin desplegar codigo:
+
+```env
+DICTADO_MEMORIA_CONFIRMACIONES_MINIMAS=3
+DICTADO_MEMORIA_CONFIANZA_MINIMA=0.75
+```
+
+## Ontologia anatomica explicita
+
+La relacion entre conjuntos y subestructuras dejo de depender de listas
+repetidas dentro de los guardrails. La fuente unica inicial vive en:
+
+```text
+dictado_informes/anatomy_ontology.py
+```
+
+Conjuntos incluidos en la primera version:
+
+- meniscos: interno/medial y externo/lateral;
+- ligamentos cruzados: anterior/LCA y posterior/LCP;
+- manguito rotador: supraespinoso, infraespinoso, subescapular y redondo menor;
+- parenquima cerebral: sustancia gris y sustancia blanca, con disparadores
+  lobares para lesiones focales.
+
+Cada grupo define region, sinonimos, componentes, orden y frase residual. La
+ontologia se usa para:
+
+- reemplazar una normalidad del conjunto cuando un componente esta patologico;
+- describir el componente restante o generar una frase `Resto de...`;
+- insertar esa normalidad residual inmediatamente debajo del hallazgo relacionado;
+- aportar al LLM solo las relaciones anatomicas relevantes para el dictado y la plantilla;
+- dar el mismo contexto anatomico a la correccion por voz;
+- reutilizar sinonimos estructurales en el detector de posibles invenciones.
+
+La deteccion exige patologia y anatomia dentro del mismo segmento. Una mencion
+normal de una estructura no se interpreta como afectacion. Las lineas que hablan
+de un unico componente tampoco se confunden con una normalidad de todo el grupo.
+
+Tests especificos:
+
+```text
+dictado_informes/tests/test_anatomy_ontology.py
+```
+
+Migracion:
+
+```text
+dictado_informes/migrations/0022_correccionaprendizaje_lateralidad_and_more.py
+```
+
 ## Frontend
 
 Archivo principal:
@@ -592,6 +713,8 @@ dictado_informes/tests/test_ai_guardrails.py
 dictado_informes/tests/test_apis.py
 dictado_informes/tests/test_aprendizaje.py
 dictado_informes/tests/test_piloto_dictado.py
+dictado_informes/tests/test_aprendizaje_estructurado.py
+dictado_informes/tests/test_anatomy_ontology.py
 ```
 
 Casos cubiertos:
@@ -611,6 +734,9 @@ Casos cubiertos:
 - no duplicar lineas normales equivalentes;
 - aprendizaje de reordenamiento de lineas;
 - preferencias aprendidas por usuario.
+- activacion conservadora y versionado de memoria de seleccion;
+- registro no clinico de correcciones por voz, deshacer y feedback;
+- panel de metricas y priorizacion de memoria dentro de la confirmacion humana.
 
 Suites verificadas durante el desarrollo:
 
@@ -621,7 +747,7 @@ python manage.py test dictado_informes.tests.test_template_importer dictado_info
 Ultima verificacion reportada:
 
 ```text
-94 tests OK
+115 tests focalizados OK (ontologia, aprendizaje, APIs, guardrails y piloto de dictado).
 ```
 
 Migraciones:
@@ -706,12 +832,10 @@ El aprendizaje conserva el comportamiento previo: si la correccion por voz cambi
 ## Pendientes recomendados
 
 1. Calibrar el puntaje minimo del selector hibrido con trazas de produccion.
-2. Crear UI para ver "memoria fuerte" activa por usuario.
-3. Permitir desactivar una regla aprendida desde el admin o panel del usuario.
-4. Registrar explicitamente `tipo_plantilla` y `modo_dictado` en `CorreccionAprendizaje`.
-5. Agregar una tabla dedicada para reglas aprendidas versionadas si el aprendizaje crece.
-6. Sumar regiones adicionales segun casuistica real: pelvis, abdomen, torax, cuello, pie.
-7. Convertir `agente con confirmacion` en flujo real: propuesta, diferencias, aceptar/rechazar.
+2. Calibrar el umbral de activacion de memoria con decisiones reales.
+3. Promover terminologia y orden a reglas estructuradas solo despues de evaluarlas offline.
+4. Sumar regiones adicionales segun casuistica real: pelvis, abdomen, torax, cuello, pie.
+5. Convertir `agente con confirmacion` en flujo real: propuesta, diferencias, aceptar/rechazar.
 
 ## Guia rapida de debug
 

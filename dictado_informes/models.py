@@ -905,6 +905,11 @@ class CorreccionAprendizaje(models.Model):
         blank=True,
         verbose_name="Tipo de Estudio"
     )
+    modo_dictado = models.CharField(max_length=20, blank=True)
+    tipo_plantilla = models.CharField(max_length=50, blank=True)
+    region = models.CharField(max_length=30, blank=True)
+    modalidad = models.CharField(max_length=20, blank=True)
+    lateralidad = models.CharField(max_length=20, blank=True)
     fecha_creacion = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Fecha de corrección"
@@ -1289,7 +1294,7 @@ class CorreccionAprendizaje(models.Model):
         if self.usuario:
             # Importar aquí para evitar circular import
             from .ai_services import AIService
-            AIService.invalidar_cache_usuario(self.usuario)
+            AIService.invalidar_cache_usuario(self.usuario, tipo_plantilla=self.tipo_plantilla)
             logger.info(f"🗑️ Caché invalidado para usuario {self.usuario.id} tras nueva corrección")
 
     @staticmethod
@@ -1388,7 +1393,7 @@ class CorreccionAprendizaje(models.Model):
         return tiene_estructura and tiene_longitud
     
     @staticmethod
-    def obtener_ejemplos_aprendizaje(usuario=None, limite=10):
+    def obtener_ejemplos_aprendizaje(usuario=None, limite=10, tipo_plantilla=''):
         """
         Obtiene ejemplos de correcciones priorizados por importancia
         🚀 MEJORADO: Usa scores semánticos para priorizar
@@ -1403,7 +1408,11 @@ class CorreccionAprendizaje(models.Model):
         from django.core.cache import cache
         
         # 🚀 CACHÉ: Verificar si ya tenemos esto en caché
-        cache_key = f'aprendizaje_ejemplos_v3_{usuario.id if usuario else "global"}_{limite}'
+        plantilla_cache = tipo_plantilla or 'sin_plantilla'
+        cache_key = (
+            f'aprendizaje_ejemplos_v4_{usuario.id if usuario else "global"}_'
+            f'{limite}_{plantilla_cache}'
+        )
         cached_ejemplos = cache.get(cache_key)
         if cached_ejemplos:
             return cached_ejemplos
@@ -1412,6 +1421,8 @@ class CorreccionAprendizaje(models.Model):
         
         if usuario:
             query = query.filter(usuario=usuario)
+        if tipo_plantilla:
+            query = query.filter(tipo_plantilla=tipo_plantilla)
         
         # Traer más correcciones para poder filtrar las mejores
         correcciones = query.only('cambios_detectados', 'texto_ia', 'texto_final').order_by('-fecha_creacion')[:limite * 4]
@@ -1517,7 +1528,7 @@ class CorreccionAprendizaje(models.Model):
         return resultado
     
     @staticmethod
-    def obtener_preferencias_aprendidas(usuario=None, limite=8):
+    def obtener_preferencias_aprendidas(usuario=None, limite=8, tipo_plantilla=''):
         """
         Extrae reglas compactas desde correcciones previas:
         - ubicacion de lineas movidas por el usuario
@@ -1525,7 +1536,11 @@ class CorreccionAprendizaje(models.Model):
         """
         from django.core.cache import cache
 
-        cache_key = f'preferencias_aprendidas_v1_{usuario.id if usuario else "global"}_{limite}'
+        plantilla_cache = tipo_plantilla or 'sin_plantilla'
+        cache_key = (
+            f'preferencias_aprendidas_v2_{usuario.id if usuario else "global"}_'
+            f'{limite}_{plantilla_cache}'
+        )
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -1533,6 +1548,8 @@ class CorreccionAprendizaje(models.Model):
         query = CorreccionAprendizaje.objects.all()
         if usuario:
             query = query.filter(usuario=usuario)
+        if tipo_plantilla:
+            query = query.filter(tipo_plantilla=tipo_plantilla)
 
         correcciones = query.only(
             'cambios_detectados', 'texto_ia', 'texto_final'
@@ -1574,7 +1591,7 @@ class CorreccionAprendizaje(models.Model):
         return resultado
 
     @staticmethod
-    def obtener_ejemplos_estilo_completo(usuario=None, limite=3):
+    def obtener_ejemplos_estilo_completo(usuario=None, limite=3, tipo_plantilla=''):
         """
         Obtiene ejemplos COMPLETOS de informes del usuario para aprender su estilo
         No solo cambios, sino cómo escribe informes completos
@@ -1588,7 +1605,11 @@ class CorreccionAprendizaje(models.Model):
         """
         from django.core.cache import cache
         
-        cache_key = f'estilo_completo_{usuario.id if usuario else "global"}_{limite}'
+        plantilla_cache = tipo_plantilla or 'sin_plantilla'
+        cache_key = (
+            f'estilo_completo_v2_{usuario.id if usuario else "global"}_'
+            f'{limite}_{plantilla_cache}'
+        )
         cached = cache.get(cache_key)
         if cached:
             return cached
@@ -1597,6 +1618,8 @@ class CorreccionAprendizaje(models.Model):
         
         if usuario:
             query = query.filter(usuario=usuario)
+        if tipo_plantilla:
+            query = query.filter(tipo_plantilla=tipo_plantilla)
         
         # Traer los más recientes con texto completo
         correcciones = query.only('texto_final', 'texto_ia', 'cambios_detectados').order_by('-fecha_creacion')[:limite * 3]
@@ -1636,6 +1659,7 @@ class FeedbackCalidadDictado(models.Model):
     class ModoDictado(models.TextChoices):
         FIEL = 'FIEL', 'Fiel al Dictado'
         ESTRUCTURADO = 'ESTRUCTURADO', 'Plantilla Estructurada'
+        AGENTE = 'AGENTE', 'Agente de informe'
 
     usuario = models.ForeignKey(
         User,
@@ -1687,6 +1711,135 @@ class FeedbackCalidadDictado(models.Model):
 
     def __str__(self):
         return f"{self.get_estado_feedback_display()} - {self.usuario} - {self.fecha:%d/%m %H:%M}"
+
+
+class EventoAprendizajeDictado(models.Model):
+    """Bitacora no clinica de las decisiones que pueden mejorar el dictado."""
+
+    class TipoEvento(models.TextChoices):
+        PLANTILLA_CONFIRMADA = 'plantilla_confirmada', 'Plantilla confirmada'
+        CORRECCION_VOZ_APLICADA = 'correccion_voz_aplicada', 'Correccion por voz aplicada'
+        CORRECCION_VOZ_DESHECHA = 'correccion_voz_deshecha', 'Correccion por voz deshecha'
+        INFORME_ACEPTADO = 'informe_aceptado', 'Informe aceptado'
+        INFORME_CORREGIDO = 'informe_corregido', 'Informe que requirio correccion'
+        APRENDIZAJE_CONFIRMADO = 'aprendizaje_confirmado', 'Correccion manual guardada'
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='eventos_aprendizaje_dictado',
+    )
+    fecha = models.DateTimeField(auto_now_add=True, db_index=True)
+    tipo_evento = models.CharField(max_length=40, choices=TipoEvento.choices)
+    modo_dictado = models.CharField(max_length=20, blank=True)
+    tipo_estudio = models.CharField(max_length=3, choices=TipoEstudio.choices, blank=True)
+    region = models.CharField(max_length=30, blank=True)
+    modalidad = models.CharField(max_length=20, blank=True)
+    lateralidad = models.CharField(max_length=20, blank=True)
+    plantilla_propuesta_codigo = models.CharField(max_length=50, blank=True)
+    plantilla_confirmada_codigo = models.CharField(max_length=50, blank=True)
+    tipo_operacion = models.CharField(max_length=50, blank=True)
+    traza = models.ForeignKey(
+        TrazaAgenteDictado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='eventos_aprendizaje',
+    )
+    correccion = models.ForeignKey(
+        CorreccionAprendizaje,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='eventos_aprendizaje',
+    )
+    feedback = models.ForeignKey(
+        FeedbackCalidadDictado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='eventos_aprendizaje',
+    )
+    metadatos = models.JSONField(default=dict, blank=True)
+    revertido = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-fecha']
+        indexes = [
+            models.Index(fields=['usuario', 'tipo_evento', '-fecha']),
+            models.Index(fields=['region', 'modalidad', '-fecha']),
+            models.Index(fields=['plantilla_confirmada_codigo', '-fecha']),
+        ]
+        verbose_name = 'Evento de aprendizaje de dictado'
+        verbose_name_plural = 'Eventos de aprendizaje de dictado'
+
+    def __str__(self):
+        return f'{self.get_tipo_evento_display()} - {self.usuario} - {self.fecha:%d/%m %H:%M}'
+
+
+class PreferenciaAprendidaDictado(models.Model):
+    """Memoria estructurada, versionada y reversible derivada de evidencia repetida."""
+
+    class Categoria(models.TextChoices):
+        SELECCION_PLANTILLA = 'seleccion_plantilla', 'Seleccion de plantilla'
+        TERMINOLOGIA = 'terminologia', 'Terminologia'
+        ORDEN = 'orden', 'Orden de hallazgos'
+        ESTRUCTURA = 'estructura', 'Estructura del informe'
+        CONCLUSION = 'conclusion', 'Conclusion'
+
+    class Estado(models.TextChoices):
+        CANDIDATA = 'candidata', 'Candidata'
+        ACTIVA = 'activa', 'Activa'
+        INACTIVA = 'inactiva', 'Inactiva'
+        REEMPLAZADA = 'reemplazada', 'Reemplazada'
+
+    class Origen(models.TextChoices):
+        AUTOMATICO = 'automatico', 'Automatico'
+        MANUAL = 'manual', 'Manual'
+
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='preferencias_aprendidas_dictado',
+    )
+    categoria = models.CharField(max_length=30, choices=Categoria.choices)
+    clave = models.CharField(max_length=180)
+    valor = models.JSONField(default=dict)
+    version = models.PositiveIntegerField(default=1)
+    estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.CANDIDATA)
+    vigente = models.BooleanField(default=True)
+    cantidad_evidencia = models.PositiveIntegerField(default=0)
+    confirmaciones = models.PositiveIntegerField(default=0)
+    rechazos = models.PositiveIntegerField(default=0)
+    confianza = models.FloatField(default=0.0)
+    origen = models.CharField(max_length=20, choices=Origen.choices, default=Origen.AUTOMATICO)
+    reemplaza_a = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='versiones_siguientes',
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-fecha_modificacion']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['usuario', 'categoria', 'clave', 'version'],
+                name='uniq_preferencia_dictado_version',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['usuario', 'categoria', 'vigente']),
+            models.Index(fields=['estado', '-fecha_modificacion']),
+        ]
+        verbose_name = 'Preferencia aprendida de dictado'
+        verbose_name_plural = 'Preferencias aprendidas de dictado'
+
+    def __str__(self):
+        return f'{self.get_categoria_display()} v{self.version} - {self.usuario}'
 
 # ========================================
 # 🚀 FASE 4: SISTEMA DE MONITOREO

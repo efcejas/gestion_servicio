@@ -14,6 +14,8 @@ urlpatterns = [
     
     # Dictado Rápido (nueva funcionalidad simplificada)
     path('dictado-rapido/', views.DictadoRapidoView.as_view(), name='dictado_rapido'),
+    path('mi-memoria/', views.MemoriaAprendizajeView.as_view(), name='memoria_aprendizaje'),
+    path('mi-memoria/<int:pk>/estado/', views.actualizar_estado_memoria, name='actualizar_estado_memoria'),
     
     # Informes
     path('informes/', views.InformeListView.as_view(), name='informe_list'),
@@ -52,6 +54,7 @@ urlpatterns = [
     path('api/transcribir-whisper/', views.transcribir_audio_whisper, name='transcribir_whisper'),
     path('api/mejorar-texto/', views.mejorar_texto_ia, name='mejorar_texto'),
     path('api/corregir-borrador/', views.corregir_borrador_ia, name='corregir_borrador'),
+    path('api/deshacer-correccion/', views.deshacer_evento_correccion, name='deshacer_correccion'),
     path('api/guardar-aprendizaje/', views.guardar_correccion_aprendizaje, name='guardar_aprendizaje'),
     path('api/feedback-calidad/', views.registrar_feedback_calidad, name='feedback_calidad'),
     path('api/info-aprendizaje/', views.info_aprendizaje, name='info_aprendizaje'),

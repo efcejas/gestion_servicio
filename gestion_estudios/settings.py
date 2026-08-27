@@ -600,6 +600,16 @@ DICTADO_SELECTOR_CONFIRMACION_ACTIVA = config(
     default=True,
     cast=bool,
 )
+DICTADO_MEMORIA_CONFIRMACIONES_MINIMAS = config(
+    'DICTADO_MEMORIA_CONFIRMACIONES_MINIMAS',
+    default=3,
+    cast=int,
+)
+DICTADO_MEMORIA_CONFIANZA_MINIMA = config(
+    'DICTADO_MEMORIA_CONFIANZA_MINIMA',
+    default=0.75,
+    cast=float,
+)
 
 # Modelo de redaccion de informes. Volver a gpt-4.1-mini permite rollback sin codigo.
 OPENAI_LLM_MODEL = config('OPENAI_LLM_MODEL', default='gpt-5.6-terra')

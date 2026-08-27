@@ -10,6 +10,8 @@ from .models import (
     CorreccionAprendizaje,
     FeedbackCalidadDictado,
     TrazaAgenteDictado,
+    EventoAprendizajeDictado,
+    PreferenciaAprendidaDictado,
 )
 
 
@@ -48,6 +50,50 @@ class TrazaAgenteDictadoAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EventoAprendizajeDictado)
+class EventoAprendizajeDictadoAdmin(admin.ModelAdmin):
+    list_display = [
+        'fecha', 'usuario', 'tipo_evento', 'region', 'lateralidad',
+        'plantilla_propuesta_codigo', 'plantilla_confirmada_codigo', 'revertido',
+    ]
+    list_filter = ['tipo_evento', 'revertido', 'region', 'modalidad', 'fecha']
+    search_fields = [
+        'usuario__username', 'plantilla_propuesta_codigo',
+        'plantilla_confirmada_codigo',
+    ]
+    readonly_fields = [field.name for field in EventoAprendizajeDictado._meta.fields]
+    date_hierarchy = 'fecha'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PreferenciaAprendidaDictado)
+class PreferenciaAprendidaDictadoAdmin(admin.ModelAdmin):
+    list_display = [
+        'usuario', 'categoria', 'clave', 'codigo_plantilla', 'version',
+        'estado', 'vigente', 'confirmaciones', 'cantidad_evidencia', 'confianza',
+    ]
+    list_filter = ['categoria', 'estado', 'vigente', 'origen', 'fecha_modificacion']
+    search_fields = ['usuario__username', 'clave']
+    readonly_fields = [
+        'usuario', 'categoria', 'clave', 'valor', 'version', 'cantidad_evidencia',
+        'confirmaciones', 'rechazos', 'confianza', 'origen', 'reemplaza_a',
+        'fecha_creacion', 'fecha_modificacion',
+    ]
+    date_hierarchy = 'fecha_modificacion'
+
+    @admin.display(description='Plantilla')
+    def codigo_plantilla(self, obj):
+        return obj.valor.get('codigo_plantilla', '-')
+
+    def has_add_permission(self, request):
         return False
 
 
@@ -244,10 +290,13 @@ class TerminoMedicoAdmin(admin.ModelAdmin):
 class CorreccionAprendizajeAdmin(admin.ModelAdmin):
     """Admin para ver y analizar correcciones del usuario"""
     list_display = [
-        'id', 'usuario', 'tipo_estudio', 'preview_cambios', 
+        'id', 'usuario', 'tipo_estudio', 'modo_dictado', 'tipo_plantilla', 'preview_cambios',
         'cantidad_cambios', 'fue_aplicada', 'fecha_creacion'
     ]
-    list_filter = ['fue_aplicada', 'tipo_estudio', 'fecha_creacion', 'usuario']
+    list_filter = [
+        'fue_aplicada', 'tipo_estudio', 'modo_dictado', 'tipo_plantilla',
+        'region', 'lateralidad', 'fecha_creacion', 'usuario',
+    ]
     search_fields = ['texto_original', 'texto_ia', 'texto_final']
     readonly_fields = [
         'fecha_creacion', 'cambios_detectados', 
@@ -263,7 +312,11 @@ class CorreccionAprendizajeAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información General', {
-            'fields': ('usuario', 'tipo_estudio', 'fecha_creacion', 'fue_aplicada', 'votos_utilidad')
+            'fields': (
+                'usuario', 'tipo_estudio', 'modo_dictado', 'tipo_plantilla',
+                'region', 'modalidad', 'lateralidad', 'fecha_creacion',
+                'fue_aplicada', 'votos_utilidad',
+            )
         }),
         ('Textos (Preview)', {
             'fields': ('texto_original_preview', 'texto_ia_preview', 'texto_final_preview'),

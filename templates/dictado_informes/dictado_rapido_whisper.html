@@ -363,6 +363,9 @@
                     <strong>🧠 Aprendizaje Activo:</strong> <span id="aprendizajeTexto">Cargando...</span>
                 </p>
             </div>
+            <a href="{% url 'dictado_informes:memoria_aprendizaje' %}" class="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-green-200 hover:text-white">
+                <i class="fas fa-sliders-h"></i> Ver mi memoria
+            </a>
         </div>
 
         <!-- Panel Derecho: Resultado -->
@@ -636,7 +639,10 @@ let audioChunksCorreccion = [];
 let grabandoCorreccion = false;
 let fragmentoCorreccionSeleccionado = '';
 let htmlAntesUltimaCorreccion = '';
+let eventoUltimaCorreccionId = null;
 let descartarAudioCorreccion = false;
+let tipoPlantillaUsadaGlobal = '';
+let contextoClinicoGlobal = {};
 let resolverSeleccionPlantillaPendiente = null;
 
 function escapeHtml(text) {
@@ -1017,6 +1023,8 @@ async function aplicarCorreccionBorrador() {
                 texto_actual: textoActual,
                 instruccion,
                 fragmento_objetivo: fragmentoCorreccionSeleccionado,
+                modo_dictado: document.querySelector('input[name="modoIA"]:checked')?.value || '',
+                tipo_plantilla: tipoPlantillaUsadaGlobal,
             }),
         });
         const data = await response.json();
@@ -1028,6 +1036,7 @@ async function aplicarCorreccionBorrador() {
         }
 
         htmlAntesUltimaCorreccion = htmlActual;
+        eventoUltimaCorreccionId = data.evento_aprendizaje_id || null;
         setTextoMejoradoContenido(data.texto_editado);
         document.getElementById('btnDeshacerCorreccion')?.classList.remove('hidden');
         const resumen = (data.resumen_cambios || []).join(' ');
@@ -1053,16 +1062,29 @@ function cancelarCorreccionVoz() {
     actualizarBotonCorreccion();
 }
 
-function deshacerUltimaCorreccion() {
+async function deshacerUltimaCorreccion() {
     if (!htmlAntesUltimaCorreccion) return;
     setTextoMejoradoContenido(htmlAntesUltimaCorreccion);
     htmlAntesUltimaCorreccion = '';
     document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
+    if (eventoUltimaCorreccionId) {
+        try {
+            await fetch('{% url "dictado_informes:deshacer_correccion" %}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                body: JSON.stringify({evento_id: eventoUltimaCorreccionId}),
+            });
+        } catch (error) {
+            console.warn('No se pudo registrar que la correccion fue deshecha.', error);
+        }
+    }
+    eventoUltimaCorreccionId = null;
     mostrarToast('Corrección deshecha', 'info');
 }
 
 function reiniciarEstadoCorreccion() {
     htmlAntesUltimaCorreccion = '';
+    eventoUltimaCorreccionId = null;
     fragmentoCorreccionSeleccionado = '';
     document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
     document.getElementById('panelCorreccionVoz')?.classList.add('hidden');
@@ -1109,9 +1131,11 @@ function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
 
             const detalle = document.createElement('span');
             detalle.className = 'block text-xs text-gray-400 mt-0.5';
-            detalle.textContent = candidato.consenso_selectores
-                ? 'Coincidencia entre ambos selectores'
-                : (candidato.recomendada ? 'Mejor candidata disponible' : 'Candidata alternativa');
+            detalle.textContent = candidato.desde_preferencia_aprendida
+                ? 'Preferencia aprendida de tus elecciones anteriores'
+                : candidato.consenso_selectores
+                    ? 'Coincidencia entre ambos selectores'
+                    : (candidato.recomendada ? 'Mejor candidata disponible' : 'Candidata alternativa');
             texto.appendChild(detalle);
 
             const accion = document.createElement('span');
@@ -1601,6 +1625,8 @@ async function procesarAudio() {
             requiereConfirmacionIA = !!dataMejora.requiere_confirmacion;
             motivoConfirmacionIA = dataMejora.motivo_confianza || '';
             terminosSospechososIA = dataMejora.terminos_sospechosos || [];
+            tipoPlantillaUsadaGlobal = dataMejora.tipo_plantilla_usada || '';
+            contextoClinicoGlobal = dataMejora.contexto_clinico || {};
 
             // Mostrar resumen de guardrails / agente si aplica
             const guardrails = dataMejora.guardrails_aplicados || [];
@@ -1742,7 +1768,7 @@ async function registrarFeedbackCalidad(estadoFeedback) {
                 texto_final: textoFinal,
                 modo_dictado: modoIA,
                 tipo_estudio: '',
-                tipo_plantilla: modoIA === 'ESTRUCTURADO' ? tipoPlantilla : ''
+                tipo_plantilla: tipoPlantillaUsadaGlobal || (modoIA === 'ESTRUCTURADO' ? tipoPlantilla : '')
             })
         });
 
@@ -1787,7 +1813,10 @@ async function guardarAprendizajeAutomatico() {
                 texto_original: textoOriginalGlobal,
                 texto_ia: textoIAGlobal,
                 texto_final: textoFinal,
-                tipo_estudio: modoIA === 'FIEL' ? 'OTR' : '',
+                tipo_estudio: contextoClinicoGlobal.modalidad || (modoIA === 'FIEL' ? 'OTR' : ''),
+                modo_dictado: modoIA,
+                tipo_plantilla: tipoPlantillaUsadaGlobal,
+                contexto_clinico: contextoClinicoGlobal,
                 auto_guardado: true  // Flag para indicar guardado automático
             })
         });
