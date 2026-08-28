@@ -709,8 +709,14 @@ Reglas:
             return valor.strip().lower() in {'true', '1', 'si', 'sí', 'yes'}
         return bool(valor)
 
-    def edit_medical_report(self, texto_actual, instruccion, fragmento_objetivo=''):
-        """Aplica una instruccion puntual mediante operaciones exactas sobre el borrador."""
+    def edit_medical_report(
+        self,
+        texto_actual,
+        instruccion,
+        fragmento_objetivo='',
+        contexto_conversacion=None,
+    ):
+        """Aplica una instruccion conversacional mediante operaciones exactas."""
         if not self.llm_enabled:
             raise ValueError('IA no configurada para corregir el informe.')
 
@@ -724,10 +730,12 @@ Reglas:
         if len(texto_actual) > 50000 or len(instruccion) > 2000:
             raise ValueError('La solicitud de correccion es demasiado extensa.')
 
+        contexto_limpio = self._limpiar_contexto_conversacion(contexto_conversacion)
         payload = json.dumps({
             'informe_actual': texto_actual,
             'instruccion': instruccion,
             'fragmento_seleccionado': fragmento_objetivo[:5000],
+            'contexto_conversacion': contexto_limpio,
         }, ensure_ascii=False)
         ontologia_relevante = resumen_ontologia_relevante(
             texto_actual,
@@ -751,7 +759,10 @@ Devuelve UNICAMENTE JSON valido con esta forma:
       "referencia": "texto exacto existente solo para insertar o mover"
     }}
   ],
-  "resumen_cambios": ["descripcion breve"]
+  "resumen_cambios": ["descripcion breve"],
+  "requiere_confirmacion": false,
+  "motivo_confirmacion": "",
+  "pregunta_aclaracion": ""
 }}
 
 REGLAS OBLIGATORIAS:
@@ -765,10 +776,14 @@ REGLAS OBLIGATORIAS:
 - Usa fragmentos copiados de forma EXACTA del informe en original y referencia.
 - Si una frase aparece mas de una vez, incluye el encabezado o una linea vecina en original y nuevo para volverla unica.
 - Si hay texto seleccionado, priorizalo como objetivo de la instruccion.
+- Usa contexto_conversacion para resolver referencias como "eso", "esa linea" o "el hallazgo anterior".
+- El contexto describe acciones previas, pero el unico documento editable es informe_actual.
+- Solo los estados aplicada y rehecha siguen vigentes; ignora como hechos actuales las acciones deshechas o descartadas.
 - Para mover, original debe ser la linea completa y referencia la linea de destino.
 - Para cambiar varias apariciones, devuelve una operacion exacta por cada linea afectada.
 - No uses markdown. No devuelvas el informe completo.
-- Si la instruccion es ambigua o no puede localizarse, devuelve operaciones vacias y explica el motivo en resumen_cambios."""
+- Marca requiere_confirmacion si la orden implica varias estructuras, una seccion completa o un cambio potencialmente amplio.
+- Si la instruccion es ambigua o no puede localizarse, devuelve operaciones vacias y formula una pregunta breve en pregunta_aclaracion."""
 
         response, modelo_usado = self._crear_chat_completion_openai(
             messages=[
@@ -788,23 +803,103 @@ REGLAS OBLIGATORIAS:
         contenido = response.choices[0].message.content.strip()
         data = self._extraer_json_respuesta(contenido)
         operaciones = data.get('operaciones') if isinstance(data, dict) else None
+        pregunta_aclaracion = str(data.get('pregunta_aclaracion') or '').strip()
+        if not operaciones and pregunta_aclaracion:
+            return {
+                'texto_editado': texto_actual,
+                'operaciones_aplicadas': [],
+                'resumen_cambios': [],
+                'requiere_aclaracion': True,
+                'pregunta_aclaracion': pregunta_aclaracion[:300],
+                'requiere_confirmacion': False,
+                'model_used': modelo_usado,
+            }
         texto_editado, aplicadas = self._aplicar_operaciones_edicion(
             texto_actual,
             operaciones,
             instruccion=instruccion,
+            permitir_cambio_amplio=True,
         )
         resumen = data.get('resumen_cambios') if isinstance(data, dict) else []
         if not isinstance(resumen, list):
             resumen = [str(resumen)] if resumen else []
 
+        requiere_confirmacion = (
+            self._json_bool(data.get('requiere_confirmacion'))
+            or self._es_cambio_amplio(texto_actual, texto_editado, aplicadas)
+        )
+        motivo_confirmacion = str(data.get('motivo_confirmacion') or '').strip()
+        if requiere_confirmacion and not motivo_confirmacion:
+            motivo_confirmacion = 'La instruccion modifica varias partes del informe.'
+
         return {
             'texto_editado': texto_editado,
             'operaciones_aplicadas': aplicadas,
             'resumen_cambios': [str(item).strip() for item in resumen[:5] if str(item).strip()],
+            'requiere_confirmacion': requiere_confirmacion,
+            'motivo_confirmacion': motivo_confirmacion[:300],
+            'requiere_aclaracion': False,
             'model_used': modelo_usado,
         }
 
-    def _aplicar_operaciones_edicion(self, texto_actual, operaciones, instruccion=''):
+    def confirmar_edicion_informe(self, texto_actual, instruccion, operaciones):
+        """Aplica una propuesta previamente presentada usando los mismos guardrails."""
+        texto_editado, aplicadas = self._aplicar_operaciones_edicion(
+            texto_actual,
+            operaciones,
+            instruccion=instruccion,
+            permitir_cambio_amplio=True,
+        )
+        return {
+            'texto_editado': texto_editado,
+            'operaciones_aplicadas': aplicadas,
+            'resumen_cambios': ['Cambio amplio confirmado por el usuario.'],
+            'requiere_confirmacion': False,
+            'requiere_aclaracion': False,
+            'model_used': 'propuesta_confirmada',
+        }
+
+    @staticmethod
+    def _limpiar_contexto_conversacion(contexto):
+        if not isinstance(contexto, list):
+            return []
+
+        limpio = []
+        for item in contexto[-5:]:
+            if not isinstance(item, dict):
+                continue
+            operaciones = []
+            for operacion in (item.get('operaciones') or [])[:4]:
+                if not isinstance(operacion, dict):
+                    continue
+                operaciones.append({
+                    'tipo': str(operacion.get('tipo') or '')[:30],
+                    'original': str(operacion.get('original') or '')[:500],
+                    'nuevo': str(operacion.get('nuevo') or '')[:500],
+                    'referencia': str(operacion.get('referencia') or '')[:500],
+                })
+            limpio.append({
+                'instruccion': str(item.get('instruccion') or '')[:500],
+                'resumen': str(item.get('resumen') or '')[:500],
+                'operaciones': operaciones,
+                'estado': str(item.get('estado') or 'aplicada')[:30],
+            })
+        return limpio
+
+    @staticmethod
+    def _es_cambio_amplio(texto_antes, texto_despues, operaciones):
+        if len(operaciones or []) >= 4:
+            return True
+        similitud = difflib.SequenceMatcher(None, texto_antes, texto_despues).ratio()
+        return similitud < 0.82
+
+    def _aplicar_operaciones_edicion(
+        self,
+        texto_actual,
+        operaciones,
+        instruccion='',
+        permitir_cambio_amplio=False,
+    ):
         tipos_validos = {
             'reemplazar', 'eliminar', 'insertar_antes', 'insertar_despues',
             'mover_antes', 'mover_despues', 'agregar_al_final',
@@ -893,7 +988,11 @@ REGLAS OBLIGATORIAS:
         resultado = re.sub(r'\n{3,}', '\n\n', resultado).strip()
         if resultado == texto_base:
             raise ValueError('La correccion no produjo cambios en el informe.')
-        if texto_base.count('\n') >= 4 and difflib.SequenceMatcher(None, texto_base, resultado).ratio() < 0.55:
+        if (
+            not permitir_cambio_amplio
+            and texto_base.count('\n') >= 4
+            and difflib.SequenceMatcher(None, texto_base, resultado).ratio() < 0.55
+        ):
             raise ValueError('La correccion fue rechazada porque modificaba demasiado contenido.')
         return resultado, aplicadas
 

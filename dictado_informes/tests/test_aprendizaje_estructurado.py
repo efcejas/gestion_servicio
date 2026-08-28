@@ -177,6 +177,19 @@ class TestEventosAprendizajeAPI(TestCase):
             tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_DESHECHA,
         ).exists())
 
+        redo = self.client.post(
+            reverse('dictado_informes:deshacer_correccion'),
+            data=json.dumps({'evento_id': evento_id, 'accion': 'rehacer'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(redo.status_code, 200)
+        evento.refresh_from_db()
+        self.assertFalse(evento.revertido)
+        self.assertTrue(EventoAprendizajeDictado.objects.filter(
+            tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_REHECHA,
+        ).exists())
+
     def test_feedback_crea_evento_sin_copiar_el_informe(self):
         response = self.client.post(
             reverse('dictado_informes:feedback_calidad'),

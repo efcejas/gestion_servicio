@@ -1837,40 +1837,59 @@ def corregir_borrador_ia(request):
         texto_actual = data.get('texto_actual', '')
         instruccion = data.get('instruccion', '')
         fragmento_objetivo = data.get('fragmento_objetivo', '')
+        contexto_conversacion = data.get('contexto_conversacion', [])
         if not str(texto_actual).strip():
             return JsonResponse({'error': 'No se recibio el informe actual'}, status=400)
         if not str(instruccion).strip():
             return JsonResponse({'error': 'No se recibio una instruccion de correccion'}, status=400)
-        resultado = ai_service.edit_medical_report(
-            texto_actual=texto_actual,
-            instruccion=instruccion,
-            fragmento_objetivo=fragmento_objetivo,
+        if data.get('confirmar_propuesta'):
+            resultado = ai_service.confirmar_edicion_informe(
+                texto_actual=texto_actual,
+                instruccion=instruccion,
+                operaciones=data.get('operaciones_propuestas'),
+            )
+        else:
+            argumentos_edicion = {
+                'texto_actual': texto_actual,
+                'instruccion': instruccion,
+                'fragmento_objetivo': fragmento_objetivo,
+            }
+            if contexto_conversacion:
+                argumentos_edicion['contexto_conversacion'] = contexto_conversacion
+            resultado = ai_service.edit_medical_report(**argumentos_edicion)
+
+        requiere_revision = bool(
+            resultado.get('requiere_confirmacion')
+            or resultado.get('requiere_aclaracion')
         )
         evento_aprendizaje_id = None
         try:
             operaciones = resultado.get('operaciones_aplicadas') or []
-            tipos_operacion = sorted({
-                str(operacion.get('tipo') or '').strip()
-                for operacion in operaciones
-                if isinstance(operacion, dict) and operacion.get('tipo')
-            })
-            evento = registrar_evento_aprendizaje(
-                usuario=request.user,
-                tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
-                modo_dictado=str(data.get('modo_dictado') or '')[:20],
-                plantilla_confirmada_codigo=str(data.get('tipo_plantilla') or '')[:50],
-                tipo_operacion=','.join(tipos_operacion)[:50],
-                metadatos={
-                    'cantidad_operaciones': len(operaciones),
-                    'tipos_operacion': tipos_operacion,
-                    'uso_fragmento_objetivo': bool(str(fragmento_objetivo).strip()),
-                },
-            )
-            evento_aprendizaje_id = evento.pk
+            if operaciones and not requiere_revision:
+                tipos_operacion = sorted({
+                    str(operacion.get('tipo') or '').strip()
+                    for operacion in operaciones
+                    if isinstance(operacion, dict) and operacion.get('tipo')
+                })
+                evento = registrar_evento_aprendizaje(
+                    usuario=request.user,
+                    tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
+                    modo_dictado=str(data.get('modo_dictado') or '')[:20],
+                    plantilla_confirmada_codigo=str(data.get('tipo_plantilla') or '')[:50],
+                    tipo_operacion=','.join(tipos_operacion)[:50],
+                    metadatos={
+                        'cantidad_operaciones': len(operaciones),
+                        'tipos_operacion': tipos_operacion,
+                        'uso_fragmento_objetivo': bool(str(fragmento_objetivo).strip()),
+                        'confirmacion_explicita': bool(data.get('confirmar_propuesta')),
+                    },
+                )
+                evento_aprendizaje_id = evento.pk
         except Exception:
             logger.exception('No se pudo registrar el evento de correccion por voz')
         return JsonResponse({
             'success': True,
+            'aplicada': not requiere_revision,
             'evento_aprendizaje_id': evento_aprendizaje_id,
             **resultado,
         })
@@ -1888,13 +1907,16 @@ def corregir_borrador_ia(request):
 
 @require_POST
 def deshacer_evento_correccion(request):
-    """Marca una correccion por voz como revertida sin almacenar el informe."""
+    """Registra deshacer o rehacer sin almacenar el contenido del informe."""
     if not user_can_access_dictado_module(request.user):
         return JsonResponse({'error': 'No autorizado'}, status=403)
 
     try:
         data = json.loads(request.body)
         evento_id = data.get('evento_id')
+        accion = str(data.get('accion') or 'deshacer').strip().lower()
+        if accion not in {'deshacer', 'rehacer'}:
+            return JsonResponse({'error': 'Accion invalida'}, status=400)
         evento = EventoAprendizajeDictado.objects.filter(
             pk=evento_id,
             usuario=request.user,
@@ -1902,20 +1924,25 @@ def deshacer_evento_correccion(request):
         ).first()
         if not evento:
             return JsonResponse({'error': 'Evento de correccion no encontrado'}, status=404)
-        if evento.revertido:
-            return JsonResponse({'success': True, 'ya_revertido': True})
+        estado_objetivo = accion == 'deshacer'
+        if evento.revertido == estado_objetivo:
+            return JsonResponse({'success': True, 'sin_cambios': True})
 
-        evento.revertido = True
+        evento.revertido = estado_objetivo
         evento.save(update_fields=['revertido'])
         registrar_evento_aprendizaje(
             usuario=request.user,
-            tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_DESHECHA,
+            tipo_evento=(
+                EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_DESHECHA
+                if accion == 'deshacer'
+                else EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_REHECHA
+            ),
             modo_dictado=evento.modo_dictado,
             plantilla_confirmada_codigo=evento.plantilla_confirmada_codigo,
             tipo_operacion=evento.tipo_operacion,
-            metadatos={'evento_origen_id': evento.pk},
+            metadatos={'evento_origen_id': evento.pk, 'accion': accion},
         )
-        return JsonResponse({'success': True, 'ya_revertido': False})
+        return JsonResponse({'success': True, 'sin_cambios': False})
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Datos invalidos en la solicitud'}, status=400)
     except Exception:

@@ -747,7 +747,7 @@ python manage.py test dictado_informes.tests.test_template_importer dictado_info
 Ultima verificacion reportada:
 
 ```text
-115 tests focalizados OK (ontologia, aprendizaje, APIs, guardrails y piloto de dictado).
+119 tests focalizados OK (ontologia, aprendizaje, APIs, guardrails y piloto de dictado).
 ```
 
 Migraciones:
@@ -813,6 +813,46 @@ Guardrails del servidor:
 
 El aprendizaje conserva el comportamiento previo: si la correccion por voz cambia el informe, al copiar se puede confirmar el guardado usando el texto clinico normal del editor.
 
+### Sesion clinica continua
+
+La correccion del borrador ahora mantiene una sesion temporal en el navegador:
+
+- conserva las acciones aplicadas y deshechas mientras se trabaja sobre el informe;
+- permite multiples niveles de deshacer y rehacer;
+- reconoce por voz `deshace lo ultimo` y `rehace` como comandos de sesion;
+- envia al editor IA las ultimas cinco acciones para resolver referencias como
+  `eso`, `esa linea` o `el hallazgo anterior`;
+- reinicia la sesion cuando se genera o recupera otro informe.
+
+Cada accion conserva en memoria del navegador el texto anterior y posterior. El
+contenido clinico de esas versiones no se persiste en la base de datos. La
+bitacora del servidor mantiene solo metadatos no clinicos y registra por separado
+aplicar, deshacer y rehacer.
+
+Cuando la IA no puede localizar un objetivo unico, devuelve una pregunta de
+aclaracion y no modifica el editor. La respuesta del usuario puede aprovechar la
+pregunta y las acciones recientes como contexto de la siguiente orden.
+
+Cuando una propuesta contiene cuatro o mas operaciones, modifica una proporcion
+relevante del informe o el modelo la clasifica como amplia, se muestra una vista
+de confirmacion. La propuesta:
+
+- se aplica primero contra los guardrails exactos del servidor;
+- no modifica el editor ni genera aprendizaje hasta ser confirmada;
+- al confirmarse vuelve a validarse sin una segunda llamada al LLM;
+- se descarta si el borrador cambio mientras estaba pendiente.
+
+La confirmacion no habilita reescrituras completas: cada operacion debe seguir
+apuntando a fragmentos exactos y unicos del borrador.
+
+Migracion asociada:
+
+```text
+dictado_informes/migrations/0023_alter_eventoaprendizajedictado_tipo_evento.py
+```
+
+Agrega el evento no clinico `correccion_voz_rehecha`.
+
 ## Commits relevantes
 
 ```text
@@ -826,7 +866,7 @@ El aprendizaje conserva el comportamiento previo: si la correccion por voz cambi
 - La cobertura explicita de regiones aun debe ampliarse segun la casuistica real.
 - Las plantillas con titulos muy genericos pueden competir peor que plantillas especificas.
 - El aprendizaje de orden usa similitud textual; si el usuario reescribe completamente una linea movida, puede no detectarla como la misma linea.
-- El modo `agente con confirmacion` esta modelado pero todavia no tiene una UI conversacional completa de aceptar/rechazar cambios por paso.
+- La sesion conversacional vive en memoria del navegador; al recargar la pagina se reinicia de forma intencional para no persistir contenido clinico.
 - La opcion `Estructurar con IA` depende de API LLM; si falla, usa fallback local.
 
 ## Pendientes recomendados
@@ -835,7 +875,7 @@ El aprendizaje conserva el comportamiento previo: si la correccion por voz cambi
 2. Calibrar el umbral de activacion de memoria con decisiones reales.
 3. Promover terminologia y orden a reglas estructuradas solo despues de evaluarlas offline.
 4. Sumar regiones adicionales segun casuistica real: pelvis, abdomen, torax, cuello, pie.
-5. Convertir `agente con confirmacion` en flujo real: propuesta, diferencias, aceptar/rechazar.
+5. Evaluar una vista de diferencias linea por linea si la casuistica muestra que el resumen de propuestas amplias no alcanza.
 
 ## Guia rapida de debug
 

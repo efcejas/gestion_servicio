@@ -157,6 +157,86 @@ Derrame articular leve."""
             prompt_usuario,
         )
 
+    def test_edicion_conversacional_incluye_acciones_previas(self):
+        respuesta = MagicMock()
+        respuesta.choices[0].message.content = '''{
+            "operaciones": [{
+                "tipo": "insertar_despues",
+                "nuevo": "Derrame articular moderado.",
+                "referencia": "CONCLUSIÓN"
+            }],
+            "resumen_cambios": ["Se agregó el hallazgo previo a la conclusión."]
+        }'''
+        self.ai.llm_enabled = True
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-4.1-mini'
+        self.ai.llm_fallback_model = None
+        self.ai.llm_reasoning_effort = None
+
+        self.ai.edit_medical_report(
+            'HALLAZGOS\nDerrame articular moderado.\nCONCLUSIÓN',
+            'Agregalo a la conclusión.',
+            contexto_conversacion=[{
+                'instruccion': 'Cambiá el derrame a moderado.',
+                'resumen': 'Se modificó la cuantía del derrame.',
+                'operaciones': [{
+                    'tipo': 'reemplazar',
+                    'original': 'Derrame articular leve.',
+                    'nuevo': 'Derrame articular moderado.',
+                }],
+            }],
+        )
+
+        mensajes = self.ai.llm_client.chat.completions.create.call_args.kwargs['messages']
+        self.assertIn('Derrame articular moderado.', mensajes[1]['content'])
+        self.assertIn('Agregalo a la conclusión.', mensajes[1]['content'])
+
+    def test_edicion_amplia_requiere_confirmacion(self):
+        informe = 'HALLAZGOS\nA.\nB.\nC.\nD.'
+        respuesta = MagicMock()
+        respuesta.choices[0].message.content = '''{
+            "operaciones": [
+                {"tipo": "reemplazar", "original": "A.", "nuevo": "A corregida."},
+                {"tipo": "reemplazar", "original": "B.", "nuevo": "B corregida."},
+                {"tipo": "reemplazar", "original": "C.", "nuevo": "C corregida."},
+                {"tipo": "reemplazar", "original": "D.", "nuevo": "D corregida."}
+            ],
+            "resumen_cambios": ["Se corrigieron cuatro hallazgos."]
+        }'''
+        self.ai.llm_enabled = True
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-4.1-mini'
+        self.ai.llm_fallback_model = None
+        self.ai.llm_reasoning_effort = None
+
+        resultado = self.ai.edit_medical_report(informe, 'Corregí los cuatro hallazgos.')
+
+        self.assertTrue(resultado['requiere_confirmacion'])
+        self.assertEqual(len(resultado['operaciones_aplicadas']), 4)
+
+    def test_edicion_ambigua_devuelve_pregunta_sin_modificar(self):
+        respuesta = MagicMock()
+        respuesta.choices[0].message.content = '''{
+            "operaciones": [],
+            "pregunta_aclaracion": "¿A cuál de los dos meniscos te referís?"
+        }'''
+        self.ai.llm_enabled = True
+        self.ai.llm_client = MagicMock()
+        self.ai.llm_client.chat.completions.create.return_value = respuesta
+        self.ai.llm_model = 'gpt-4.1-mini'
+        self.ai.llm_fallback_model = None
+        self.ai.llm_reasoning_effort = None
+
+        resultado = self.ai.edit_medical_report(
+            'HALLAZGOS\nMenisco interno normal.\nMenisco externo normal.',
+            'Cambiá el menisco.',
+        )
+
+        self.assertTrue(resultado['requiere_aclaracion'])
+        self.assertEqual(resultado['operaciones_aplicadas'], [])
+
     def test_edicion_localizada_rechaza_fragmento_ambiguo(self):
         informe = 'Derrame leve.\nDerrame leve.'
 

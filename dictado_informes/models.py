@@ -1720,6 +1720,7 @@ class EventoAprendizajeDictado(models.Model):
         PLANTILLA_CONFIRMADA = 'plantilla_confirmada', 'Plantilla confirmada'
         CORRECCION_VOZ_APLICADA = 'correccion_voz_aplicada', 'Correccion por voz aplicada'
         CORRECCION_VOZ_DESHECHA = 'correccion_voz_deshecha', 'Correccion por voz deshecha'
+        CORRECCION_VOZ_REHECHA = 'correccion_voz_rehecha', 'Correccion por voz rehecha'
         INFORME_ACEPTADO = 'informe_aceptado', 'Informe aceptado'
         INFORME_CORREGIDO = 'informe_corregido', 'Informe que requirio correccion'
         APRENDIZAJE_CONFIRMADO = 'aprendizaje_confirmado', 'Correccion manual guardada'
