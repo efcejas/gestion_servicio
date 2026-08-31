@@ -1,0 +1,25 @@
+{% extends 'layouts/base_with_sidebar.html' %}
+
+{% block title %}Carga manual {{ nombre_mes }} {{ anio }}{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 sm:px-6 lg:px-10 py-4 space-y-6">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div><h1 class="text-2xl font-bold text-white">Carga manual: {{ nombre_mes }} {{ anio }}</h1><p class="text-sm text-gray-400 mt-1">Agregá cada cobertura al borrador y completá las cuotas antes de publicar.</p></div>
+        <div class="flex gap-2"><a href="{% url 'control_guardias:distribucion' %}" class="px-4 py-2 border border-gray-600 rounded-lg text-gray-300">Volver</a>{% if asignaciones %}<a href="{% url 'control_guardias:distribucion_borrador' mes anio %}" class="px-4 py-2 border border-indigo-700 rounded-lg text-indigo-300">Revisar borrador</a>{% endif %}</div>
+    </div>
+    {% if messages %}{% for message in messages %}<div class="px-4 py-3 rounded-lg border text-sm {% if message.tags == 'error' %}bg-red-950 border-red-800 text-red-300{% elif message.tags == 'warning' %}bg-yellow-950 border-yellow-800 text-yellow-300{% else %}bg-green-950 border-green-800 text-green-300{% endif %}">{{ message }}</div>{% endfor %}{% endif %}
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-6 items-start">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-5">
+            <h2 class="font-semibold text-white mb-4"><i class="fas fa-calendar-plus text-indigo-400 mr-2"></i>Nueva asignación</h2>
+            <form method="post" class="space-y-4">{% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">{% for field in form %}<div class="{% if field.name == 'motivo_excepcion' %}md:col-span-2{% endif %}"><label class="block text-sm font-medium text-gray-300 mb-1">{{ field.label }}</label>{{ field }}{% if field.errors %}<p class="text-xs text-red-400 mt-1">{{ field.errors|join:', ' }}</p>{% endif %}</div>{% endfor %}</div>
+                <div class="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg p-3">Agosto–octubre: un R1 requiere acompañante; viernes/domingo requieren R2 y admiten R3 solo como excepción; el sábado tiene un único R3.</div>
+                <button type="submit" class="w-full px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg"><i class="fas fa-plus mr-2"></i>Agregar al borrador</button>
+            </form>
+        </div>
+        <aside class="bg-gray-900 border border-gray-700 rounded-xl p-4 xl:sticky xl:top-24"><h3 class="font-semibold text-white mb-3">Cumplimiento</h3><div class="flex justify-between text-sm mb-3"><span class="text-gray-400">Total</span><span class="font-semibold text-white">{{ metricas.total_asignaciones }}/{{ metricas.total_objetivo }}</span></div><div class="space-y-2 max-h-96 overflow-y-auto">{% for r in metricas.por_residente %}<div class="flex justify-between gap-3 text-sm border-t border-gray-700 pt-2"><span class="text-gray-300 truncate">{{ r.nombre }} <small class="text-gray-500">{{ r.anio_residencia }}</small></span><span class="font-semibold {% if r.cumplida %}text-green-400{% else %}text-yellow-400{% endif %}">{{ r.total }}/{{ r.objetivo }}</span></div>{% endfor %}</div></aside>
+    </div>
+    <div class="bg-gray-900 border border-gray-700 rounded-xl overflow-hidden"><div class="px-5 py-3 bg-gray-800 border-b border-gray-700"><h2 class="font-semibold text-white">Asignaciones cargadas</h2></div>{% if asignaciones %}<div class="overflow-x-auto"><table class="w-full text-sm text-gray-300"><thead class="text-left text-gray-500"><tr><th class="px-4 py-2">Fecha</th><th class="px-4 py-2">Slot</th><th class="px-4 py-2">Residente</th><th class="px-4 py-2">Año</th></tr></thead><tbody class="divide-y divide-gray-700">{% for a in asignaciones %}<tr><td class="px-4 py-2">{{ a.fecha|date:'d/m/Y' }}</td><td class="px-4 py-2">{{ a.tipo_guardia.nombre }}</td><td class="px-4 py-2 font-medium text-white">{{ a.residente.get_full_name }}</td><td class="px-4 py-2">{{ a.residente.anio_residencia }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="p-6 text-center text-gray-500">Todavía no hay asignaciones. Podés comenzar el borrador desde esta pantalla.</p>{% endif %}</div>
+</div>
+{% endblock %}

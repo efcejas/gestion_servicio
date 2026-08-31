@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, ListView, TemplateView, UpdateView
 
 from .forms import (
+    AsignacionManualMensualForm,
     ConfiguracionTipoGuardiaForm,
     CuotaMensualGuardiaForm,
         AjustePenalizacionForm,
@@ -59,6 +60,7 @@ from .services import (
     cancelar_borrador,
     cancelar_cambio,
     cancelar_slot_vacante,
+    crear_asignacion_manual,
     eliminar_guardia_excepcion,
     generar_distribucion,
     mover_guardia_borrador,
@@ -864,12 +866,91 @@ class BorradorView(JefeInstructorMixin, TemplateView):
         return context
 
 
+class DistribucionManualView(JefeInstructorMixin, TemplateView):
+    """Carga una planificación mensual asignación por asignación."""
+
+    def get_template_names(self):
+        if self.request.user.is_superuser:
+            return ['control_guardias/distribucion_manual.html']
+        return ['control_guardias/portal/distribucion_manual.html']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        mes = self.kwargs['mes']
+        anio = self.kwargs['anio']
+        context['mes'] = mes
+        context['anio'] = anio
+        context['nombre_mes'] = _nombre_mes_view(mes)
+        context['form'] = kwargs.get('form') or AsignacionManualMensualForm(
+            mes=mes,
+            anio=anio,
+        )
+        context['asignaciones'] = (
+            AsignacionGuardia.objects.filter(
+                fecha__year=anio,
+                fecha__month=mes,
+                estado='BORRADOR',
+            )
+            .select_related('residente', 'tipo_guardia')
+            .order_by('fecha', 'tipo_guardia__nombre')
+        )
+        context['metricas'] = obtener_metricas_mes(mes, anio)
+        return context
+
+    def post(self, request, mes, anio):
+        form = AsignacionManualMensualForm(
+            request.POST,
+            mes=mes,
+            anio=anio,
+        )
+        if not form.is_valid():
+            return self.render_to_response(self.get_context_data(form=form))
+
+        try:
+            crear_asignacion_manual(
+                mes=mes,
+                anio=anio,
+                fecha=form.cleaned_data['fecha'],
+                tipo_guardia=form.cleaned_data['tipo_guardia'],
+                residente=form.cleaned_data['residente'],
+                usuario=request.user,
+                forzar=form.cleaned_data.get('forzar', False),
+                motivo_excepcion=form.cleaned_data.get('motivo_excepcion', ''),
+            )
+        except MovimientoBorradorError as exc:
+            for violacion in exc.detalles.get('violaciones', []):
+                messages.warning(request, violacion)
+            messages.warning(
+                request,
+                'Marcá "Confirmar como excepción", indicá el motivo y volvé a guardar.',
+            )
+            return self.render_to_response(self.get_context_data(form=form))
+        except DistribucionError as exc:
+            messages.error(request, str(exc))
+            return self.render_to_response(self.get_context_data(form=form))
+
+        messages.success(request, 'Asignación manual agregada al borrador.')
+        return redirect(
+            'control_guardias:distribucion_manual',
+            mes=mes,
+            anio=anio,
+        )
+
+
 class PublicarBorradorView(JefeInstructorMixin, TemplateView):
     """POST: Publica todas las asignaciones BORRADOR del mes/año."""
     template_name = None  # solo POST
 
     def post(self, request, mes, anio):
-        count = publicar_borrador(mes, anio)
+        try:
+            count = publicar_borrador(mes, anio)
+        except DistribucionError as exc:
+            messages.error(request, str(exc))
+            return redirect(
+                'control_guardias:distribucion_borrador',
+                mes=mes,
+                anio=anio,
+            )
         if count:
             messages.success(request, f"{count} guardia(s) publicada(s) correctamente.")
         else:

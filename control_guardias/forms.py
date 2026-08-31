@@ -1,3 +1,5 @@
+import calendar
+
 from django import forms
 
 from .models import (
@@ -260,8 +262,11 @@ class GenerarDistribucionForm(forms.Form):
     restricciones_anio = forms.BooleanField(
         required=False,
         widget=forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
-        label='Aplicar guardias condicionales por año',
-        help_text='R1: Viernes, Domingos y Feriados · R2: Sábados · R3/R4: Lunes a Jueves',
+        label='Aplicar regla transitoria del inicio de ciclo',
+        help_text=(
+            'Disponible de agosto a octubre: R1 siempre acompañado; '
+            'viernes y domingos con R2 (R3 solo como excepción), y un único R3 los sábados.'
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -270,6 +275,70 @@ class GenerarDistribucionForm(forms.Form):
         hoy = datetime.date.today()
         self.fields['mes'].initial = hoy.month
         self.fields['anio'].initial = hoy.year
+
+
+class AsignacionManualMensualForm(forms.Form):
+    fecha = forms.DateField(
+        widget=forms.DateInput(attrs={'class': INPUT_CLASS, 'type': 'date'}),
+        label='Fecha',
+    )
+    tipo_guardia = forms.ModelChoiceField(
+        queryset=ConfiguracionTipoGuardia.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT_CLASS}),
+        label='Slot / tipo de guardia',
+    )
+    residente = forms.ModelChoiceField(
+        queryset=AsignacionGuardia._meta.get_field('residente').remote_field.model.objects.none(),
+        widget=forms.Select(attrs={'class': INPUT_CLASS}),
+        label='Residente',
+    )
+    forzar = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': CHECKBOX_CLASS}),
+        label='Confirmar como excepción',
+    )
+    motivo_excepcion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            'class': INPUT_CLASS,
+            'rows': 2,
+            'placeholder': 'Motivo requerido cuando se confirma una excepción',
+        }),
+        label='Motivo de la excepción',
+    )
+
+    def __init__(self, *args, mes, anio, **kwargs):
+        super().__init__(*args, **kwargs)
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+        self.mes = mes
+        self.anio = anio
+        self.fields['tipo_guardia'].queryset = ConfiguracionTipoGuardia.objects.filter(
+            activo=True,
+        )
+        self.fields['residente'].queryset = User.objects.filter(
+            rol='medico_residente',
+            estado_residencia='ACTIVO',
+            perfil_completo=True,
+            is_active=True,
+        ).order_by('last_name', 'first_name')
+        self.fields['fecha'].widget.attrs.update({
+            'min': f'{anio:04d}-{mes:02d}-01',
+            'max': f'{anio:04d}-{mes:02d}-{calendar.monthrange(anio, mes)[1]:02d}',
+        })
+
+    def clean_fecha(self):
+        fecha = self.cleaned_data['fecha']
+        if (fecha.month, fecha.year) != (self.mes, self.anio):
+            raise forms.ValidationError('La fecha debe pertenecer al mes seleccionado.')
+        return fecha
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('forzar') and not (cleaned.get('motivo_excepcion') or '').strip():
+            self.add_error('motivo_excepcion', 'Indicá el motivo de la excepción.')
+        return cleaned
 
 
 class RotacionExternaForm(forms.ModelForm):

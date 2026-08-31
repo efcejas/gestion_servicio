@@ -55,6 +55,41 @@ class MovimientoBorradorError(DistribucionError):
         self.detalles = detalles or {}
 
 
+def _residentes_elegibles():
+    """QuerySet base compartido por generacion y validacion de cuotas."""
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    return User.objects.filter(
+        rol='medico_residente',
+        estado_residencia='ACTIVO',
+        perfil_completo=True,
+        is_active=True,
+    )
+
+
+def _objetivos_cuota(mes, anio, residentes):
+    """Objetivo exacto mensual por residente, incluidos los ajustes del periodo."""
+    cuotas = {
+        cuota.anio_residencia: cuota.guardias_efectivas
+        for cuota in CuotaMensualGuardia.objects.all()
+    }
+    ajustes = defaultdict(int)
+    for residente_id, cantidad in AjusteCuotaGuardia.objects.filter(
+        mes=mes,
+        anio=anio,
+    ).values_list('residente_id', 'cantidad'):
+        ajustes[residente_id] += cantidad
+
+    return {
+        residente.pk: max(
+            0,
+            cuotas.get(residente.anio_residencia, 0) + ajustes[residente.pk],
+        )
+        for residente in residentes
+    }
+
+
 def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borradores=False, restricciones_anio=False):
     """
     Genera asignaciones en estado BORRADOR para el periodo mes/año indicado.
@@ -82,9 +117,6 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     Lanza:
         DistribucionError si hay condiciones que impiden la ejecución.
     """
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-
     # ------------------------------------------------------------------
     # 1. Validaciones previas
     # ------------------------------------------------------------------
@@ -96,12 +128,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         raise DistribucionError("No hay tipos de guardia activos seleccionados.")
 
     residentes = list(
-        User.objects.filter(
-            rol='medico_residente',
-            estado_residencia='ACTIVO',
-            perfil_completo=True,
-            is_active=True,
-        ).order_by('last_name', 'first_name')
+        _residentes_elegibles().order_by('last_name', 'first_name')
     )
     if not residentes:
         raise DistribucionError("No hay residentes activos con perfil completo para asignar.")
@@ -109,6 +136,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     primer_dia = date(anio, mes, 1)
     ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
     hoy = timezone.localdate()
+    regla_transitoria = restricciones_anio and mes in (8, 9, 10)
 
     if ultimo_dia < hoy:
         raise DistribucionError(
@@ -152,10 +180,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
                 f"No hay cuota configurada para {anio_res}. Esos residentes recibirán 0 guardias."
             )
 
-    cuota_disponible = {
-        r.pk: cuotas.get(r.anio_residencia, 0)
-        for r in residentes
-    }
+    cuota_disponible = _objetivos_cuota(mes, anio, residentes)
 
     # Aplicar ajustes de cuota del mes (CARRYOVER y PENALIZACION)
     ajustes = AjusteCuotaGuardia.objects.filter(mes=mes, anio=anio).select_related('residente')
@@ -165,11 +190,12 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     for r in residentes:
         extra = ajustes_por_residente.get(r.pk, 0)
         if extra:
-            cuota_disponible[r.pk] += extra
             tipo_ajuste = 'Traslado' if extra > 0 else 'ajuste'
             advertencias.append(
                 f"{r.get_full_name()}: cuota aumentada +{extra} por {tipo_ajuste} ({_nombre_mes(mes)} {anio})."
             )
+
+    cuota_objetivo = cuota_disponible.copy()
 
     # ------------------------------------------------------------------
     # 3. Feriados del período
@@ -205,6 +231,35 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             "No hay slots a cubrir: ningún tipo de guardia aplica a las fechas del período."
         )
 
+    if regla_transitoria:
+        # Durante la transición el sábado tiene una sola cobertura, aunque se
+        # hayan seleccionado dos tipos SADOFE para duplicar los domingos.
+        sabados_vistos = set()
+        slots_transitorios = []
+        for slot in slots:
+            fecha = slot[0]
+            if fecha.weekday() == 5:
+                if fecha in sabados_vistos:
+                    continue
+                sabados_vistos.add(fecha)
+            slots_transitorios.append(slot)
+        slots = slots_transitorios
+
+    total_objetivo = sum(cuota_objetivo.values())
+    if len(slots) < total_objetivo:
+        faltan_slots = total_objetivo - len(slots)
+        advertencias.append(
+            f"La configuracion genera {len(slots)} slot(s), pero las cuotas obligatorias "
+            f"requieren {total_objetivo}. Faltan al menos {faltan_slots} slot(s); "
+            "el borrador no podra publicarse hasta completar o corregir la planificacion."
+        )
+    if len(slots) > total_objetivo:
+        advertencias.append(
+            f"La configuracion genera {len(slots)} slot(s) para {total_objetivo} "
+            f"guardia(s) obligatorias. Hasta {len(slots) - total_objetivo} slot(s) "
+            "pueden quedar vacios si todas las cuotas se cumplen."
+        )
+
     # Reordenar slots por "ronda de cobertura" con fechas aleatorizadas dentro de cada ronda:
     # Ronda 1 → 1er slot de cada fecha (garantiza que todos los días queden cubiertos primero)
     # Ronda 2 → 2do slot de la misma fecha (doble cobertura solo si queda cuota)
@@ -221,7 +276,16 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     for ronda in sorted(slots_por_ronda):
         # Intercalar semanas evita consumir toda la cuota mensual en un bloque
         # del mes antes de haber considerado fechas de las demás semanas.
-        slots.extend(_intercalar_slots_por_semana(slots_por_ronda[ronda]))
+        slots_ronda = _intercalar_slots_por_semana(slots_por_ronda[ronda])
+        if regla_transitoria:
+            # Reservar primero las coberturas críticas. Así R2 y R3 no agotan
+            # su cuota en días comunes antes de viernes, domingos y sábados.
+            slots_ronda = (
+                [slot for slot in slots_ronda if slot[0].weekday() in (4, 6)]
+                + [slot for slot in slots_ronda if slot[0].weekday() == 5]
+                + [slot for slot in slots_ronda if slot[0].weekday() in (0, 1, 2, 3)]
+            )
+        slots.extend(slots_ronda)
 
     # ------------------------------------------------------------------
     # 5. Contadores históricos de feriados (para trato equitativo)
@@ -303,6 +367,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
     asignaciones_a_crear = []
     slots_sin_cubrir = []
     slots_fallback_anio = 0   # contador de slots cubiertos fuera de restricción de año
+    excepciones_transitorias = []
 
     for fecha, tipo, es_feriado_slot in slots:
         weekday = fecha.weekday()  # 0=Lunes … 6=Domingo
@@ -323,8 +388,85 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
             slots_sin_cubrir.append({'fecha': fecha, 'tipo': tipo.nombre})
             continue
 
-        # Restricciones por año (opcional): R1→V/D/Feriados, R2→S, R3/R4→L-J
-        if restricciones_anio:
+        if regla_transitoria:
+            anios_en_fecha = anio_por_fecha[fecha]
+            if weekday in (4, 6):
+                if not anios_en_fecha:
+                    candidatos_r2 = [r for r in candidatos if r.anio_residencia == 'R2']
+                    if candidatos_r2:
+                        candidatos = candidatos_r2
+                    else:
+                        candidatos_r3 = [r for r in candidatos if r.anio_residencia == 'R3']
+                        if candidatos_r3:
+                            candidatos = candidatos_r3
+                            excepciones_transitorias.append(
+                                f"{fecha:%d/%m/%Y}: R3 cubre viernes/domingo por falta de R2 disponible."
+                            )
+                        else:
+                            slots_sin_cubrir.append({
+                                'fecha': fecha,
+                                'tipo': tipo.nombre,
+                                'motivo': 'Sin R2 ni R3 disponible para la cobertura principal.',
+                            })
+                            continue
+                elif 'R2' in anios_en_fecha:
+                    candidatos = [r for r in candidatos if r.anio_residencia == 'R1']
+                    if not candidatos:
+                        slots_sin_cubrir.append({
+                            'fecha': fecha,
+                            'tipo': tipo.nombre,
+                            'motivo': 'Sin R1 disponible para acompañar al R2.',
+                        })
+                        continue
+                else:
+                    # Si la cobertura principal excepcional es R3, nunca se
+                    # agrega un R1: la regla exige presencia específica de R2.
+                    slots_sin_cubrir.append({
+                        'fecha': fecha,
+                        'tipo': tipo.nombre,
+                        'motivo': 'Cobertura principal excepcional con R3; no corresponde agregar R1.',
+                    })
+                    continue
+            elif weekday == 5:
+                candidatos = [r for r in candidatos if r.anio_residencia == 'R3']
+                if not candidatos:
+                    slots_sin_cubrir.append({
+                        'fecha': fecha,
+                        'tipo': tipo.nombre,
+                        'motivo': 'Sin R3 disponible para el sábado.',
+                    })
+                    continue
+            else:
+                if not anios_en_fecha:
+                    candidatos = [
+                        r for r in candidatos
+                        if r.anio_residencia in ('R2', 'R3', 'R4')
+                    ]
+                    if not candidatos:
+                        slots_sin_cubrir.append({
+                            'fecha': fecha,
+                            'tipo': tipo.nombre,
+                            'motivo': 'Sin R2/R3/R4 disponible para iniciar la cobertura.',
+                        })
+                        continue
+                else:
+                    candidatos_r1 = [r for r in candidatos if r.anio_residencia == 'R1']
+                    if candidatos_r1:
+                        candidatos = candidatos_r1
+                    else:
+                        candidatos = [
+                            r for r in candidatos
+                            if r.anio_residencia in ('R2', 'R3', 'R4')
+                        ]
+                        if not candidatos:
+                            slots_sin_cubrir.append({
+                                'fecha': fecha,
+                                'tipo': tipo.nombre,
+                                'motivo': 'Sin residente disponible para la segunda cobertura.',
+                            })
+                            continue
+        # Restricciones históricas por año fuera del perfil transitorio.
+        elif restricciones_anio:
             candidatos_restringidos = [
                 r for r in candidatos
                 if _anio_puede_cubrir_slot(r.anio_residencia, weekday, es_feriado_slot)
@@ -339,7 +481,7 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         #   Si todos los candidatos son del año ya asignado, el slot queda sin cubrir.
         # - Sin restricciones_anio: preferencia suave (prefiere otro año si hay, si no usa todos).
         anios_en_fecha = anio_por_fecha[fecha]
-        if anios_en_fecha:
+        if anios_en_fecha and not regla_transitoria:
             candidatos_otros_anios = [
                 r for r in candidatos
                 if r.anio_residencia not in anios_en_fecha
@@ -426,15 +568,48 @@ def generar_distribucion(mes, anio, tipos_guardia, creado_por, reemplazar_borrad
         for r in residentes
     }
 
+    cumplimiento_cuotas = []
+    residentes_incompletos = []
+    for residente in residentes:
+        asignadas = guardias_en_borrador[residente.pk]
+        objetivo = cuota_objetivo[residente.pk]
+        faltantes = max(0, objetivo - asignadas)
+        cumplimiento_cuotas.append({
+            'residente_id': residente.pk,
+            'nombre': residente.get_full_name() or residente.username,
+            'anio_residencia': residente.anio_residencia or '-',
+            'asignadas': asignadas,
+            'objetivo': objetivo,
+            'faltantes': faltantes,
+            'cumplida': asignadas == objetivo,
+        })
+        if faltantes:
+            residentes_incompletos.append(
+                f"{residente.get_full_name() or residente.username}: "
+                f"{asignadas}/{objetivo} (faltan {faltantes})"
+            )
+
+    if residentes_incompletos:
+        advertencias.append(
+            "Cuotas obligatorias incompletas: " + "; ".join(residentes_incompletos) + "."
+        )
+
+    advertencias.extend(excepciones_transitorias)
+
     if slots_sin_cubrir:
         advertencias.append(
-            f"{len(slots_sin_cubrir)} slot(s) quedaron sin cubrir por insuficiencia de cuota."
+            f"{len(slots_sin_cubrir)} slot(s) quedaron sin cubrir por cuota, ausencia, "
+            "descanso o restricciones de compatibilidad."
         )
 
     return {
         'asignaciones_creadas': len(asignaciones_a_crear),
         'slots_sin_cubrir': slots_sin_cubrir,
         'metricas': metricas,
+        'cumplimiento_cuotas': cumplimiento_cuotas,
+        'cuotas_cumplidas': not residentes_incompletos,
+        'total_slots': len(slots),
+        'total_objetivo': total_objetivo,
         'advertencias': advertencias,
     }
 
@@ -456,6 +631,19 @@ def publicar_borrador(mes, anio):
             estado='BORRADOR',
         ).select_related('residente')
     )
+    if borradores:
+        cumplimiento = obtener_metricas_mes(mes, anio)
+        if not cumplimiento['cuotas_cumplidas']:
+            pendientes = [
+                f"{fila['nombre']} ({fila['total']}/{fila['objetivo']})"
+                for fila in cumplimiento['por_residente']
+                if not fila['cumplida']
+            ]
+            raise DistribucionError(
+                "No se puede publicar: las cuotas obligatorias no estan completas. "
+                + "; ".join(pendientes)
+                + "."
+            )
     count = AsignacionGuardia.objects.filter(
         fecha__gte=primer_dia,
         fecha__lte=ultimo_dia,
@@ -499,6 +687,137 @@ def cancelar_borrador(mes, anio):
     ).delete()
 
     return count or 0
+
+
+def crear_asignacion_manual(
+    *,
+    mes,
+    anio,
+    fecha,
+    tipo_guardia,
+    residente,
+    usuario,
+    forzar=False,
+    motivo_excepcion='',
+):
+    """Agrega una asignación a un borrador mensual con validación operativa."""
+    if (fecha.month, fecha.year) != (mes, anio):
+        raise DistribucionError("La fecha debe pertenecer al mes de la planificación.")
+    if not tipo_guardia.activo:
+        raise DistribucionError("El tipo de guardia seleccionado no está activo.")
+    if not _residentes_elegibles().filter(pk=residente.pk).exists():
+        raise DistribucionError("El residente no está activo o no es elegible para guardias.")
+
+    primer_dia = date(anio, mes, 1)
+    ultimo_dia = date(anio, mes, calendar.monthrange(anio, mes)[1])
+    if AsignacionGuardia.objects.filter(
+        fecha__range=(primer_dia, ultimo_dia),
+    ).exclude(estado='BORRADOR').exists():
+        raise DistribucionError("El mes ya tiene guardias publicadas y no puede editarse como borrador.")
+
+    es_feriado = Feriado.objects.filter(fecha=fecha).exists()
+    dias_aplicables = {
+        DIA_SEMANA_MAP[codigo]
+        for codigo in tipo_guardia.dias_semana.split(',')
+        if codigo in DIA_SEMANA_MAP
+    }
+    if es_feriado:
+        if not tipo_guardia.aplica_feriados:
+            raise DistribucionError("El tipo de guardia no está configurado para feriados.")
+    elif fecha.weekday() not in dias_aplicables:
+        raise DistribucionError("El tipo de guardia no corresponde al día seleccionado.")
+
+    if AsignacionGuardia.objects.filter(
+        fecha=fecha,
+        tipo_guardia=tipo_guardia,
+        estado='BORRADOR',
+    ).exists():
+        raise DistribucionError("Ese slot ya tiene un residente asignado.")
+
+    residentes = list(_residentes_elegibles())
+    objetivos = _objetivos_cuota(mes, anio, residentes)
+    asignadas = AsignacionGuardia.objects.filter(
+        residente=residente,
+        fecha__range=(primer_dia, ultimo_dia),
+        estado='BORRADOR',
+    ).count()
+    objetivo = objetivos.get(residente.pk, 0)
+    if asignadas >= objetivo:
+        raise DistribucionError(
+            f"{residente.get_full_name() or residente.username} ya alcanzó su cuota "
+            f"obligatoria de {objetivo}."
+        )
+
+    asignaciones_fecha = list(
+        AsignacionGuardia.objects.filter(
+            fecha=fecha,
+            estado='BORRADOR',
+        ).select_related('residente')
+    )
+    anios_fecha = {guardia.residente.anio_residencia for guardia in asignaciones_fecha}
+    regla_transitoria = mes in (8, 9, 10)
+    weekday = fecha.weekday()
+    violaciones = []
+
+    if AsignacionGuardia.objects.filter(
+        residente=residente,
+        fecha=fecha,
+        estado='BORRADOR',
+    ).exists():
+        raise DistribucionError("El residente ya tiene otra guardia ese día.")
+    if AsignacionGuardia.objects.filter(
+        residente=residente,
+        fecha__in=[fecha - timedelta(days=1), fecha + timedelta(days=1)],
+        estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+    ).exists():
+        violaciones.append("El residente quedaría con guardias en días consecutivos.")
+    if AusenciaResidente.objects.filter(
+        residente=residente,
+        estado='PENDIENTE',
+        fecha_inicio__lte=fecha,
+        fecha_fin__gte=fecha,
+    ).exists():
+        violaciones.append("El residente tiene una ausencia pendiente para esa fecha.")
+
+    if regla_transitoria:
+        if weekday == 5:
+            if asignaciones_fecha:
+                raise DistribucionError("Durante la transición el sábado tiene un único puesto.")
+            if residente.anio_residencia != 'R3':
+                raise DistribucionError("Durante la transición el sábado corresponde a un R3.")
+        elif weekday in (4, 6):
+            if residente.anio_residencia == 'R1' and 'R2' not in anios_fecha:
+                raise DistribucionError("Un R1 solo puede agregarse si ya hay un R2 en esa fecha.")
+            if residente.anio_residencia == 'R3' and not anios_fecha:
+                violaciones.append("R3 cubrirá viernes/domingo por falta de R2.")
+            elif residente.anio_residencia not in ('R1', 'R2'):
+                raise DistribucionError("Viernes y domingos corresponden a R2 o a R1 acompañado por R2.")
+        elif residente.anio_residencia == 'R1' and not anios_fecha.intersection({'R2', 'R3', 'R4'}):
+            raise DistribucionError("Un R1 debe estar acompañado por un residente superior.")
+
+    if violaciones and not forzar:
+        raise MovimientoBorradorError(
+            "La asignación necesita confirmación excepcional.",
+            codigo='REQUIERE_EXCEPCION',
+            permite_excepcion=True,
+            detalles={'violaciones': violaciones},
+        )
+    if violaciones and not motivo_excepcion.strip():
+        raise DistribucionError("Indicá el motivo de la excepción para continuar.")
+
+    notas = f"Carga manual por {usuario.get_full_name() or usuario.username}."
+    if violaciones:
+        notas += f" Excepción: {motivo_excepcion.strip()} ({'; '.join(violaciones)})"
+
+    return AsignacionGuardia.objects.create(
+        residente=residente,
+        tipo_guardia=tipo_guardia,
+        fecha=fecha,
+        estado='BORRADOR',
+        es_feriado=es_feriado,
+        creada_por=usuario,
+        notas=notas,
+    )
 
 
 def _violaciones_movimiento_borrador(guardia, nueva_fecha, excluir_ids=None):
@@ -755,7 +1074,13 @@ def obtener_metricas_mes(mes, anio):
         .select_related('residente')
     )
 
+    residentes = list(
+        _residentes_elegibles().order_by('last_name', 'first_name')
+    )
+    objetivos = _objetivos_cuota(mes, anio, residentes)
     conteo = defaultdict(lambda: {'total': 0, 'feriados': 0, 'residente': None})
+    for residente in residentes:
+        conteo[residente.pk]['residente'] = residente
     for a in asignaciones:
         pk = a.residente_id
         conteo[pk]['total'] += 1
@@ -770,6 +1095,16 @@ def obtener_metricas_mes(mes, anio):
                 'anio_residencia': v['residente'].anio_residencia or '—',
                 'total': v['total'],
                 'feriados': v['feriados'],
+                'objetivo': objetivos.get(v['residente'].pk, 0),
+                'faltantes': max(
+                    0,
+                    objetivos.get(v['residente'].pk, 0) - v['total'],
+                ),
+                'exceso': max(
+                    0,
+                    v['total'] - objetivos.get(v['residente'].pk, 0),
+                ),
+                'cumplida': v['total'] == objetivos.get(v['residente'].pk, 0),
             }
             for v in conteo.values()
         ],
@@ -778,11 +1113,18 @@ def obtener_metricas_mes(mes, anio):
 
     totales = [r['total'] for r in por_residente]
     desviacion = _desviacion_std(totales) if totales else 0.0
+    total_objetivo = sum(r['objetivo'] for r in por_residente)
+    total_faltantes = sum(r['faltantes'] for r in por_residente)
+    total_excesos = sum(r['exceso'] for r in por_residente)
 
     return {
         'por_residente': por_residente,
         'desviacion_std': round(desviacion, 2),
         'total_asignaciones': sum(totales),
+        'total_objetivo': total_objetivo,
+        'total_faltantes': total_faltantes,
+        'total_excesos': total_excesos,
+        'cuotas_cumplidas': total_faltantes == 0 and total_excesos == 0,
     }
 
 

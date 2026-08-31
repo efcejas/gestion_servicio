@@ -295,7 +295,9 @@ class CuotaMensualUpdateTest(TestCase):
 
 from .services import (
     DistribucionError,
+    MovimientoBorradorError,
     cancelar_borrador,
+    crear_asignacion_manual,
     generar_distribucion,
     obtener_metricas_mes,
     publicar_borrador,
@@ -367,6 +369,109 @@ class ServicioDistribucionTest(TestCase):
         self.assertLessEqual(
             AsignacionGuardia.objects.filter(residente=self.r3, estado='BORRADOR').count(), 2
         )
+
+    def test_distribucion_reporta_cuotas_obligatorias_cumplidas(self):
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        resultado = generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+
+        self.assertTrue(resultado['cuotas_cumplidas'])
+        self.assertEqual(resultado['total_objetivo'], 7)
+        self.assertTrue(
+            all(fila['asignadas'] == fila['objetivo'] for fila in resultado['cumplimiento_cuotas'])
+        )
+
+    def test_distribucion_advierte_si_hay_menos_slots_que_cuotas_obligatorias(self):
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        tipo_domingo = ConfiguracionTipoGuardia.objects.create(
+            nombre='Solo domingos',
+            hora_inicio=datetime.time(8, 0),
+            hora_fin=datetime.time(20, 0),
+            dias_semana='D',
+            creado_por=self.jefe,
+        )
+
+        resultado = generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=CTG.objects.filter(pk=tipo_domingo.pk),
+            creado_por=self.jefe,
+        )
+
+        self.assertFalse(resultado['cuotas_cumplidas'])
+        self.assertTrue(
+            any('cuotas obligatorias' in aviso for aviso in resultado['advertencias'])
+        )
+
+    def test_distribucion_excluye_residente_egresado(self):
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        self.r1.estado_residencia = 'EGRESADO'
+        self.r1.save(update_fields=['estado_residencia'])
+
+        generar_distribucion(
+            mes=self.test_month,
+            anio=self.test_year,
+            tipos_guardia=CTG.objects.filter(pk=self.tipo.pk),
+            creado_por=self.jefe,
+        )
+
+        self.assertFalse(
+            AsignacionGuardia.objects.filter(residente=self.r1).exists()
+        )
+
+    def test_transicion_genera_r2_con_r1_viernes_domingo_y_un_r3_sabado(self):
+        from .models import ConfiguracionTipoGuardia as CTG
+
+        anio = timezone.localdate().year + 1
+        tipos = [
+            ConfiguracionTipoGuardia.objects.create(
+                nombre='Semana transición A', hora_inicio=datetime.time(17, 0),
+                hora_fin=datetime.time(8, 0), dias_semana='L,M,X,J,V', creado_por=self.jefe,
+            ),
+            ConfiguracionTipoGuardia.objects.create(
+                nombre='Semana transición B', hora_inicio=datetime.time(17, 0),
+                hora_fin=datetime.time(8, 0), dias_semana='L,M,X,J,V', creado_por=self.jefe,
+            ),
+            ConfiguracionTipoGuardia.objects.create(
+                nombre='Fin de semana A', hora_inicio=datetime.time(8, 0),
+                hora_fin=datetime.time(8, 0), dias_semana='S,D', creado_por=self.jefe,
+            ),
+            ConfiguracionTipoGuardia.objects.create(
+                nombre='Domingo refuerzo', hora_inicio=datetime.time(8, 0),
+                hora_fin=datetime.time(8, 0), dias_semana='D', creado_por=self.jefe,
+            ),
+        ]
+        CuotaMensualGuardia.objects.all().update(guardias_por_mes=10)
+
+        generar_distribucion(
+            mes=9,
+            anio=anio,
+            tipos_guardia=CTG.objects.filter(pk__in=[tipo.pk for tipo in tipos]),
+            creado_por=self.jefe,
+            restricciones_anio=True,
+        )
+
+        por_fecha = {}
+        for guardia in AsignacionGuardia.objects.filter(
+            fecha__year=anio,
+            fecha__month=9,
+            estado='BORRADOR',
+        ).select_related('residente'):
+            por_fecha.setdefault(guardia.fecha, []).append(guardia.residente.anio_residencia)
+
+        for fecha, anios in por_fecha.items():
+            if fecha.weekday() == 5:
+                self.assertEqual(anios, ['R3'])
+            if fecha.weekday() in (4, 6) and 'R1' in anios:
+                self.assertIn('R2', anios)
+
 
     def test_distribucion_sin_dias_consecutivos(self):
         """Ningún residente tiene guardias en dos días consecutivos."""
@@ -698,6 +803,64 @@ class ServicioDistribucionTest(TestCase):
         }
 
         self.assertEqual(_score_cercania(self.r1.pk, self._fecha(6), fechas_ocupadas), 1)
+
+
+class ServicioAsignacionManualTest(TestCase):
+    def setUp(self):
+        self.jefe = crear_jefe('jefe_manual')
+        self.r1 = crear_residente('r1_manual', 'R1')
+        self.r2 = crear_residente('r2_manual', 'R2')
+        self.r3 = crear_residente('r3_manual', 'R3')
+        for anio in ('R1', 'R2', 'R3'):
+            CuotaMensualGuardia.objects.create(anio_residencia=anio, guardias_por_mes=4)
+        self.tipo_a = ConfiguracionTipoGuardia.objects.create(
+            nombre='Manual A', hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(8, 0),
+            dias_semana='V,S,D', creado_por=self.jefe,
+        )
+        self.tipo_b = ConfiguracionTipoGuardia.objects.create(
+            nombre='Manual B', hora_inicio=datetime.time(8, 0), hora_fin=datetime.time(8, 0),
+            dias_semana='V,S,D', creado_por=self.jefe,
+        )
+        self.viernes = datetime.date(2027, 9, 3)
+        self.sabado = datetime.date(2027, 9, 4)
+
+    def _crear(self, residente, fecha, tipo, **kwargs):
+        return crear_asignacion_manual(
+            mes=9, anio=2027, fecha=fecha, tipo_guardia=tipo,
+            residente=residente, usuario=self.jefe, **kwargs,
+        )
+
+    def test_r1_no_puede_cargarse_solo_viernes(self):
+        with self.assertRaisesMessage(DistribucionError, 'ya hay un R2'):
+            self._crear(self.r1, self.viernes, self.tipo_a)
+
+    def test_r2_y_luego_r1_forman_cobertura_valida(self):
+        self._crear(self.r2, self.viernes, self.tipo_a)
+        self._crear(self.r1, self.viernes, self.tipo_b)
+
+        self.assertSetEqual(
+            set(AsignacionGuardia.objects.values_list('residente__anio_residencia', flat=True)),
+            {'R1', 'R2'},
+        )
+
+    def test_r3_viernes_requiere_excepcion_con_motivo(self):
+        with self.assertRaises(MovimientoBorradorError):
+            self._crear(self.r3, self.viernes, self.tipo_a)
+
+        guardia = self._crear(
+            self.r3,
+            self.viernes,
+            self.tipo_a,
+            forzar=True,
+            motivo_excepcion='R2 ausentes',
+        )
+        self.assertIn('R2 ausentes', guardia.notas)
+
+    def test_sabado_admite_un_unico_r3(self):
+        self._crear(self.r3, self.sabado, self.tipo_a)
+
+        with self.assertRaisesMessage(DistribucionError, 'único puesto'):
+            self._crear(self.r2, self.sabado, self.tipo_b)
 
 
 # ---------------------------------------------------------------------------
@@ -1179,6 +1342,10 @@ class ServicioPublicarCancelarTest(TestCase):
     def setUp(self):
         self.jefe = crear_jefe()
         self.residente = crear_residente()
+        CuotaMensualGuardia.objects.create(
+            anio_residencia='R1',
+            guardias_por_mes=3,
+        )
         self.tipo = ConfiguracionTipoGuardia.objects.create(
             nombre='Guardia test',
             hora_inicio=datetime.time(20, 0),
@@ -1200,6 +1367,19 @@ class ServicioPublicarCancelarTest(TestCase):
         self.assertEqual(count, 3)
         self.assertEqual(AsignacionGuardia.objects.filter(estado='PUBLICADA').count(), 3)
         self.assertEqual(AsignacionGuardia.objects.filter(estado='BORRADOR').count(), 0)
+
+    def test_publicar_borrador_bloquea_cuota_obligatoria_incompleta(self):
+        CuotaMensualGuardia.objects.filter(anio_residencia='R1').update(
+            guardias_por_mes=4,
+        )
+
+        with self.assertRaisesMessage(DistribucionError, 'cuotas obligatorias'):
+            publicar_borrador(5, 2026)
+
+        self.assertEqual(
+            AsignacionGuardia.objects.filter(estado='BORRADOR').count(),
+            3,
+        )
 
     def test_cancelar_borrador_elimina_asignaciones(self):
         count = cancelar_borrador(5, 2026)
@@ -1255,6 +1435,10 @@ class DistribucionViewTest(TestCase):
     def setUp(self):
         self.jefe = crear_jefe()
         self.residente = crear_residente()
+        CuotaMensualGuardia.objects.create(
+            anio_residencia='R1',
+            guardias_por_mes=1,
+        )
         self.url = reverse('control_guardias:distribucion')
 
     def test_residente_no_puede_acceder(self):
@@ -1267,6 +1451,32 @@ class DistribucionViewTest(TestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Generar distribución')
+
+    def test_jefe_puede_iniciar_distribucion_manual_vacia(self):
+        self.client.force_login(self.jefe)
+
+        response = self.client.get(
+            reverse(
+                'control_guardias:distribucion_manual',
+                kwargs={'mes': 9, 'anio': 2027},
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Carga manual')
+        self.assertEqual(list(response.context['asignaciones']), [])
+
+    def test_residente_no_puede_acceder_distribucion_manual(self):
+        self.client.force_login(self.residente)
+
+        response = self.client.get(
+            reverse(
+                'control_guardias:distribucion_manual',
+                kwargs={'mes': 9, 'anio': 2027},
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_publicar_borrador_redirige_a_calendario_del_mes_publicado(self):
         self.client.login(username='jefe1', password='testpass123')

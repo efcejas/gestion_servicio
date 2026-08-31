@@ -13,6 +13,7 @@ from .views import (
     CuotaMensualFormView,
         PenalizacionCuotaCreateView,
     DistribucionView,
+    DistribucionManualView,
     EliminarGuardiaExcepcionView,
     FeriadoCreateView,
     FeriadoDeleteView,
@@ -71,6 +72,11 @@ urlpatterns = [
 
     # -- Distribución automática (Fase 3) --
     path('configuracion/distribucion/', DistribucionView.as_view(), name='distribucion'),
+    path(
+        'configuracion/distribucion/manual/<int:mes>/<int:anio>/',
+        DistribucionManualView.as_view(),
+        name='distribucion_manual',
+    ),
     path('configuracion/distribucion/<int:mes>/<int:anio>/', BorradorView.as_view(), name='distribucion_borrador'),
     path('configuracion/distribucion/<int:mes>/<int:anio>/publicar/', PublicarBorradorView.as_view(), name='distribucion_publicar'),
     path('configuracion/distribucion/<int:mes>/<int:anio>/cancelar/', CancelarBorradorView.as_view(), name='distribucion_cancelar'),

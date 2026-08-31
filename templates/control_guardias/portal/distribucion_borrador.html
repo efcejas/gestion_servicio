@@ -29,6 +29,7 @@
                     <i class="fas fa-trash mr-2"></i>Cancelar borrador
                 </button>
             </form>
+            {% if metricas.cuotas_cumplidas %}
             <form method="post" action="{% url 'control_guardias:distribucion_publicar' mes anio %}"
                   onsubmit="return confirm('¿Publicar {{ asignaciones.count }} guardia(s)? Los residentes las verán de inmediato.')">
                 {% csrf_token %}
@@ -37,6 +38,13 @@
                     <i class="fas fa-check mr-2"></i>Publicar todo
                 </button>
             </form>
+            {% else %}
+            <button type="button" disabled
+                    title="Completa las cuotas obligatorias antes de publicar"
+                    class="inline-flex items-center px-4 py-2 bg-gray-200 text-gray-500 text-sm font-medium rounded-lg cursor-not-allowed">
+                <i class="fas fa-lock mr-2"></i>Cuotas incompletas
+            </button>
+            {% endif %}
             {% endif %}
         </div>
     </div>
@@ -125,6 +133,16 @@
                         <span class="text-gray-900 font-semibold">{{ metricas.total_asignaciones }}</span>
                     </div>
                     <div class="flex justify-between">
+                        <span class="text-gray-500">Objetivo obligatorio</span>
+                        <span class="text-gray-900 font-semibold">{{ metricas.total_objetivo }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Guardias pendientes</span>
+                        <span class="font-semibold {% if metricas.total_faltantes %}text-red-600{% else %}text-green-600{% endif %}">
+                            {{ metricas.total_faltantes }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
                         <span class="text-gray-500">Desvío estándar</span>
                         <span class="font-semibold {% if metricas.desviacion_std < 1 %}text-green-600{% elif metricas.desviacion_std < 2 %}text-yellow-600{% else %}text-red-600{% endif %}">
                             {{ metricas.desviacion_std }}
@@ -149,7 +167,14 @@
                             <p class="text-xs text-gray-400">{{ r.anio_residencia }}</p>
                         </div>
                         <div class="text-right ml-2 shrink-0">
-                            <span class="text-sm font-semibold text-blue-600">{{ r.total }}</span>
+                            <span class="text-sm font-semibold {% if r.cumplida %}text-green-600{% else %}text-yellow-600{% endif %}">
+                                {{ r.total }}/{{ r.objetivo }}
+                            </span>
+                            {% if r.faltantes %}
+                            <span class="block text-xs text-red-600">Faltan {{ r.faltantes }}</span>
+                            {% elif r.exceso %}
+                            <span class="block text-xs text-red-600">Excede {{ r.exceso }}</span>
+                            {% endif %}
                             {% if r.feriados > 0 %}
                             <span class="text-xs text-yellow-600 ml-1">({{ r.feriados }} fer.)</span>
                             {% endif %}
