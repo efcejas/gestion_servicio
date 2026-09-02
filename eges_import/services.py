@@ -389,6 +389,8 @@ def aplicar_filtros_fecha_modalidad(qs, request_params):
     fecha_hasta = request_params.get('fecha_hasta', '')
     # Acepta tanto ?modalidades[]=TC&modalidades[]=RM como ?modalidades=TC,RM
     mods = request_params.getlist('modalidades[]') or request_params.getlist('modalidades')
+    # Compatibilidad con enlaces antiguos del portal del director.
+    mods = ['SERIE' if str(mod).upper() == 'SER' else mod for mod in mods]
 
     if fecha_desde:
         try:

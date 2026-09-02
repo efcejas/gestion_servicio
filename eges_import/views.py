@@ -1065,6 +1065,43 @@ def obras_sociales_data(request):
     return _vista_obras_sociales_data(request)
 
 
+def _vista_practicas_data(request):
+    """Ranking de prácticas para detectar rápidamente aumentos de demanda."""
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    datos = (estudios.exclude(Q(practica__isnull=True) | Q(practica=''))
+             .values('practica').annotate(total=Count('id')).order_by('-total')[:15])
+    return JsonResponse({'labels': [d['practica'] for d in datos],
+                        'datasets': [{'label': 'Estudios', 'data': [d['total'] for d in datos],
+                                      'backgroundColor': 'rgba(22, 69, 105, .75)'}]})
+
+
+def practicas_data(request):
+    return _vista_practicas_data(request)
+
+
+def _vista_obras_sociales_evolucion(request):
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    filas = estudios.exclude(Q(obra_social__isnull=True) | Q(obra_social='')).values('fecha_turno', 'obra_social')
+    conteo = {}
+    totales = {}
+    for fila in filas:
+        mes = fila['fecha_turno'].strftime('%Y-%m')
+        os_name = fila['obra_social']
+        conteo[(mes, os_name)] = conteo.get((mes, os_name), 0) + 1
+        totales[os_name] = totales.get(os_name, 0) + 1
+    nombres = [n for n, _ in sorted(totales.items(), key=lambda x: -x[1])[:8]]
+    meses = sorted({m for m, _ in conteo})
+    lookup = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
+    return JsonResponse({'labels': meses, 'datasets': [
+        {'label': lookup.get(nombre, nombre), 'data': [conteo.get((mes, nombre), 0) for mes in meses]}
+        for nombre in nombres
+    ]})
+
+
+def obras_sociales_evolucion_data(request):
+    return _vista_obras_sociales_evolucion(request)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: Comparativa período actual vs anterior
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1383,6 +1420,18 @@ def portal_director_obras_sociales(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
     return _vista_obras_sociales_data(request)
+
+
+def portal_director_practicas(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_practicas_data(request)
+
+
+def portal_director_obras_sociales_evolucion(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_obras_sociales_evolucion(request)
 
 
 def portal_director_comparativa(request, token):
