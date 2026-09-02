@@ -76,7 +76,8 @@
                         <button data-mod="DX"  class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">DX</button>
                         <button data-mod="MAM" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">MAM</button>
                         <button data-mod="ECO"   class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">ECO</button>
-                        <button data-mod="SER" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">SER</button>
+                        <button data-mod="SERIE" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">SERIE</button>
+                        <button data-mod="OTROS" class="btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">OTROS</button>
                     </div>
                 </div>
 
@@ -577,6 +578,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Botones de modalidad — multi-selección con toggle
     const CLASE_ON  = 'btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white font-medium';
     const CLASE_OFF = 'btn-modalidad px-3 py-1.5 text-xs rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    const COLORES_MODALIDAD = {
+        TC: '#2563eb', RM: '#9333ea', RX: '#16a34a', ECO: '#d97706',
+        DX: '#ea580c', MAM: '#db2777', SERIE: '#0d9488', OTROS: '#6b7280'
+    };
 
     function syncModalidadUI() {
         document.querySelectorAll('.btn-modalidad').forEach(b => {
@@ -584,8 +589,14 @@ document.addEventListener('DOMContentLoaded', function () {
             if (mod === '') {
                 // botón "Todas": activo sólo si no hay ninguna seleccionada
                 b.className = estado.modalidades.size === 0 ? CLASE_ON : CLASE_OFF;
+                b.style.backgroundColor = '';
+                b.style.borderColor = '';
             } else {
-                b.className = estado.modalidades.has(mod) ? CLASE_ON : CLASE_OFF;
+                const activo = estado.modalidades.has(mod);
+                b.className = activo ? CLASE_ON : CLASE_OFF;
+                b.style.backgroundColor = activo ? COLORES_MODALIDAD[mod] : '';
+                b.style.borderColor = activo ? COLORES_MODALIDAD[mod] : '';
+                b.style.color = activo ? '#fff' : '';
             }
         });
     }
