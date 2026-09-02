@@ -1121,10 +1121,13 @@ def _vista_practica_evolucion(request):
             mes = fila['fecha_turno'].strftime('%Y-%m')
             resultado[mes] = resultado.get(mes, 0) + fila['total']
         return resultado
-    punc = por_mes(punciones); bloq = por_mes(bloqueos)
-    meses = sorted(set(punc) | set(bloq))
+    punc_tc = por_mes(punciones.filter(modalidad='TC'))
+    punc_eco = por_mes(punciones.filter(modalidad='ECO'))
+    bloq = por_mes(bloqueos.filter(modalidad='TC'))
+    meses = sorted(set(punc_tc) | set(punc_eco) | set(bloq))
     return JsonResponse({'labels': meses, 'datasets': [
-        {'label': 'Punciones', 'data': [punc.get(m, 0) for m in meses], 'borderColor': '#dc2626', 'backgroundColor': 'rgba(220,38,38,.15)', 'fill': True, 'tension': .25},
+        {'label': 'Punciones · Tomografía', 'data': [punc_tc.get(m, 0) for m in meses], 'borderColor': '#dc2626', 'backgroundColor': 'rgba(220,38,38,.12)', 'fill': True, 'tension': .25},
+        {'label': 'Punciones · Ecografía', 'data': [punc_eco.get(m, 0) for m in meses], 'borderColor': '#d97706', 'backgroundColor': 'rgba(217,119,6,.12)', 'fill': True, 'tension': .25},
         {'label': 'Bloqueos TC', 'data': [bloq.get(m, 0) for m in meses], 'borderColor': '#7c3aed', 'backgroundColor': 'rgba(124,58,237,.12)', 'fill': True, 'tension': .25},
     ]})
 
