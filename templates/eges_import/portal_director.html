@@ -158,8 +158,9 @@
                     <button id="tipo-barras" onclick="cambiarTipoTemporal('bar')" class="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium">Barras</button>
                 </div>
             </div>
-            <div class="p-5" style="height: 360px;">
+            <div class="relative p-5" style="height: 360px;">
                 <canvas id="grafico-temporal"></canvas>
+                <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
             </div>
         </div>
 
@@ -172,8 +173,9 @@
                     <h2 class="text-sm font-semibold text-gray-800">Distribución por modalidad</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Participación porcentual</p>
                 </div>
-                <div class="p-4" style="height: 260px;">
+                <div class="relative p-4" style="height: 260px;">
                     <canvas id="grafico-dona"></canvas>
+                    <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
                 </div>
             </div>
 
@@ -183,8 +185,9 @@
                     <h2 class="text-sm font-semibold text-gray-800">Desglose Ecografías</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Sub-tipos del período</p>
                 </div>
-                <div class="p-4" style="height: 260px;">
+                <div class="relative p-4" style="height: 260px;">
                     <canvas id="grafico-eco"></canvas>
+                    <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
                 </div>
             </div>
 
@@ -194,8 +197,9 @@
                     <h2 class="text-sm font-semibold text-gray-800">Franja horaria</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Distribución de la demanda</p>
                 </div>
-                <div class="p-4" style="height: 260px;">
+                <div class="relative p-4" style="height: 260px;">
                     <canvas id="grafico-franja"></canvas>
+                    <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
                 </div>
             </div>
         </div>
@@ -212,8 +216,9 @@
                     <button onclick="cambiarTipoMedico('horizontalBar')" class="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium" id="tipo-medico-horiz">Horizontales</button>
                 </div>
             </div>
-            <div class="p-5" style="height: 380px;">
+            <div class="relative p-5" style="height: 380px;">
                 <canvas id="grafico-medicos"></canvas>
+                <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
             </div>
         </div>
 
@@ -251,8 +256,9 @@
                     <h2 class="text-base font-semibold text-gray-800">Top Obras Sociales</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Por volumen de estudios finalizados</p>
                 </div>
-                <div class="p-4" style="height: 280px;">
+                <div class="relative p-4" style="height: 280px;">
                     <canvas id="grafico-obras-sociales"></canvas>
+                    <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
                 </div>
             </div>
         </div>
@@ -263,7 +269,7 @@
                     <h2 class="text-base font-semibold text-gray-800">Prácticas con mayor volumen</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Incluye punción y permite detectar cambios de demanda</p>
                 </div>
-                <div class="p-4" style="height: 320px;"><canvas id="grafico-practicas"></canvas></div>
+                <div class="relative p-4" style="height: 320px;"><canvas id="grafico-practicas"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
             </div>
             <div class="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-5 py-4 border-b border-gray-100">
@@ -281,7 +287,7 @@
                     </div>
                     <datalist id="opciones-obras-sociales"></datalist>
                 </div>
-                <div class="p-4" style="height: 320px;"><canvas id="grafico-obras-sociales-evolucion"></canvas></div>
+                <div class="relative p-4" style="height: 320px;"><canvas id="grafico-obras-sociales-evolucion"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
             </div>
         </div>
 
@@ -290,7 +296,7 @@
                 <h2 class="text-base font-semibold text-gray-800">Evolución de punciones</h2>
                 <p class="text-xs text-gray-500 mt-0.5">Caudal mensual de prácticas cuyo nombre contiene “punc”</p>
             </div>
-            <div class="p-4" style="height: 280px;"><canvas id="grafico-punciones"></canvas></div>
+            <div class="relative p-4" style="height: 280px;"><canvas id="grafico-punciones"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
         </div>
 
     </main>
@@ -345,6 +351,24 @@ function buildParams(extra = {}) {
 function destroyAndCreate(key, canvas, config) {
     if (charts[key]) charts[key].destroy();
     charts[key] = new Chart(document.getElementById(canvas).getContext('2d'), config);
+    setChartLoading(canvas, false);
+}
+
+function setChartLoading(canvas, isLoading) {
+    const loader = document.getElementById(canvas).parentElement.querySelector('.chart-loading');
+    loader.classList.toggle('hidden', !isLoading);
+}
+
+async function cargarDatosGrafico(canvas, url) {
+    setChartLoading(canvas, true);
+    try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`No se pudieron cargar los datos (${response.status})`);
+        return await response.json();
+    } catch (error) {
+        setChartLoading(canvas, false);
+        throw error;
+    }
 }
 
 function formatNum(n) {
@@ -371,8 +395,7 @@ async function cargarKPIs() {
 // Gráfico temporal
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarTemporal() {
-    const r = await fetch(`${BASE}/analisis-temporal/?${buildParams({ agrupacion: estado.agrupacion })}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-temporal', `${BASE}/analisis-temporal/?${buildParams({ agrupacion: estado.agrupacion })}`);
 
     destroyAndCreate('temporal', 'grafico-temporal', {
         type: tipoTemporal,
@@ -406,8 +429,7 @@ function cambiarTipoTemporal(tipo) {
 // Dona — distribución por modalidad
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarDona() {
-    const r = await fetch(`${BASE}/distribucion/?${buildParams()}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-dona', `${BASE}/distribucion/?${buildParams()}`);
 
     destroyAndCreate('dona', 'grafico-dona', {
         type: 'doughnut',
@@ -426,8 +448,7 @@ async function cargarDona() {
 // Sub-modalidades ECO
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarEco() {
-    const r = await fetch(`${BASE}/eco/?${buildParams()}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-eco', `${BASE}/eco/?${buildParams()}`);
 
     destroyAndCreate('eco', 'grafico-eco', {
         type: 'bar',
@@ -451,8 +472,7 @@ async function cargarEco() {
 // Franja horaria
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarFranja() {
-    const r = await fetch(`${BASE}/franja-horaria/?${buildParams()}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-franja', `${BASE}/franja-horaria/?${buildParams()}`);
 
     destroyAndCreate('franja', 'grafico-franja', {
         type: 'bar',
@@ -472,8 +492,7 @@ async function cargarFranja() {
 // Productividad por médico
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarMedicos() {
-    const r = await fetch(`${BASE}/medicos/?${buildParams({ agrupacion: estado.agrupacion })}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-medicos', `${BASE}/medicos/?${buildParams({ agrupacion: estado.agrupacion })}`);
 
     const isHoriz = tipoMedicos === 'horizontalBar';
 
@@ -543,8 +562,7 @@ async function cargarComparativa() {
 // Obras Sociales
 // ─────────────────────────────────────────────────────────────────────────────
 async function cargarObrasSociales() {
-    const r = await fetch(`${BASE}/obras-sociales/?${buildParams()}`);
-    const d = await r.json();
+    const d = await cargarDatosGrafico('grafico-obras-sociales', `${BASE}/obras-sociales/?${buildParams()}`);
 
     destroyAndCreate('obrasSociales', 'grafico-obras-sociales', {
         type: 'bar',
@@ -565,13 +583,13 @@ async function cargarObrasSociales() {
 }
 
 async function cargarPracticas() {
-    const d = await (await fetch(`${BASE}/practicas/?${buildParams()}`)).json();
+    const d = await cargarDatosGrafico('grafico-practicas', `${BASE}/practicas/?${buildParams()}`);
     destroyAndCreate('practicas', 'grafico-practicas', {type:'bar', data:{labels:d.labels,datasets:d.datasets}, options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{precision:0}},y:{ticks:{font:{size:10}}}}}});
 }
 
 async function cargarObrasSocialesEvolucion() {
     const p = buildParams(); const extra = [...estado.obrasSociales].map(v => `obras_sociales%5B%5D=${encodeURIComponent(v)}`).join('&');
-    const d = await (await fetch(`${BASE}/obras-sociales/evolucion/?${p}${extra ? '&'+extra : ''}`)).json();
+    const d = await cargarDatosGrafico('grafico-obras-sociales-evolucion', `${BASE}/obras-sociales/evolucion/?${p}${extra ? '&'+extra : ''}`);
     const principal = document.getElementById('obra-social-principal');
     const comparacion = document.getElementById('obra-social-comparacion');
     const listaOpciones = document.getElementById('opciones-obras-sociales');
@@ -607,7 +625,7 @@ async function cargarObrasSocialesEvolucion() {
 }
 
 async function cargarPunciones() {
-    const d = await (await fetch(`${BASE}/practicas/evolucion/?${buildParams()}`)).json();
+    const d = await cargarDatosGrafico('grafico-punciones', `${BASE}/practicas/evolucion/?${buildParams()}`);
     destroyAndCreate('punciones', 'grafico-punciones', {type:'line', data:{labels:d.labels,datasets:d.datasets}, options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 
