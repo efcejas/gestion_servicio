@@ -1080,7 +1080,12 @@ def practicas_data(request):
 
 
 def _vista_obras_sociales_evolucion(request):
-    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    opciones_qs = base.exclude(Q(obra_social__isnull=True) | Q(obra_social='')).values_list('obra_social', flat=True).distinct()
+    estudios = base
+    obras_seleccionadas = request.GET.getlist('obras_sociales[]') or request.GET.getlist('obras_sociales')
+    if obras_seleccionadas:
+        estudios = estudios.filter(obra_social__in=obras_seleccionadas)
     filas = estudios.exclude(Q(obra_social__isnull=True) | Q(obra_social='')).values('fecha_turno', 'obra_social')
     conteo = {}
     totales = {}
@@ -1092,7 +1097,8 @@ def _vista_obras_sociales_evolucion(request):
     nombres = [n for n, _ in sorted(totales.items(), key=lambda x: -x[1])[:8]]
     meses = sorted({m for m, _ in conteo})
     lookup = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
-    return JsonResponse({'labels': meses, 'datasets': [
+    opciones = sorted(opciones_qs)
+    return JsonResponse({'labels': meses, 'opciones': [{'codigo': n, 'nombre': lookup.get(n, n)} for n in opciones], 'datasets': [
         {'label': lookup.get(nombre, nombre), 'data': [conteo.get((mes, nombre), 0) for mes in meses]}
         for nombre in nombres
     ]})
@@ -1100,6 +1106,23 @@ def _vista_obras_sociales_evolucion(request):
 
 def obras_sociales_evolucion_data(request):
     return _vista_obras_sociales_evolucion(request)
+
+
+def _vista_practica_evolucion(request):
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    termino = request.GET.get('practica', 'punc')
+    estudios = estudios.filter(practica__icontains=termino)
+    filas = estudios.values('fecha_turno').annotate(total=Count('id')).order_by('fecha_turno')
+    por_mes = {}
+    for fila in filas:
+        mes = fila['fecha_turno'].strftime('%Y-%m')
+        por_mes[mes] = por_mes.get(mes, 0) + fila['total']
+    meses = sorted(por_mes)
+    return JsonResponse({'labels': meses, 'datasets': [{'label': f'Prácticas: {termino}', 'data': [por_mes[m] for m in meses], 'borderColor': '#dc2626', 'backgroundColor': 'rgba(220,38,38,.15)', 'fill': True, 'tension': .25}]})
+
+
+def practica_evolucion_data(request):
+    return _vista_practica_evolucion(request)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1432,6 +1455,12 @@ def portal_director_obras_sociales_evolucion(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
     return _vista_obras_sociales_evolucion(request)
+
+
+def portal_director_practica_evolucion(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_practica_evolucion(request)
 
 
 def portal_director_comparativa(request, token):
