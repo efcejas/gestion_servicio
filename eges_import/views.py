@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
-from django.db.models import Count, Q, Avg, Max
+from django.db.models import Count, Q, Avg, Max, Min
 from django.db.models.functions import ExtractWeekDay
 from django.db.models.functions import Coalesce
 from datetime import date as date_type
@@ -1098,7 +1098,14 @@ def _vista_obras_sociales_evolucion(request):
         conteo[(mes, os_name)] = conteo.get((mes, os_name), 0) + 1
         totales[os_name] = totales.get(os_name, 0) + 1
     nombres = [n for n, _ in sorted(totales.items(), key=lambda x: -x[1])[:8]]
-    meses = sorted({m for m, _ in conteo})
+    rango = base.aggregate(fecha_min=Min('fecha_turno'), fecha_max=Max('fecha_turno'))
+    meses = []
+    if rango['fecha_min'] and rango['fecha_max']:
+        mes_actual = rango['fecha_min'].replace(day=1)
+        ultimo_mes = rango['fecha_max'].replace(day=1)
+        while mes_actual <= ultimo_mes:
+            meses.append(mes_actual.strftime('%Y-%m'))
+            mes_actual = (mes_actual + timedelta(days=32)).replace(day=1)
     lookup = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
     opciones = sorted(opciones_qs)
     return JsonResponse({'labels': meses, 'opciones': [{'codigo': n, 'nombre': lookup.get(n, n)} for n in opciones], 'datasets': [

@@ -525,6 +525,33 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
 
         self.assertEqual(data['labels'], ['07/2026'])
 
+    def test_evolucion_obras_sociales_mantiene_rango_y_meses_sin_actividad(self):
+        self._preparar_comparativa()
+        for fecha, obra_social in (
+            (date(2026, 1, 15), 'COBERTURA A'),
+            (date(2026, 3, 15), 'COBERTURA A'),
+            (date(2026, 2, 15), 'COBERTURA B'),
+        ):
+            EgesRow.objects.create(
+                batch=self.batch_comparativa,
+                historia_clinica=f'{obra_social}-{fecha}',
+                fecha_turno=fecha,
+                centro_atencion='Centro test',
+                practica='ECO TEST',
+                obra_social=obra_social,
+                estado_turno='Informado',
+                modalidad='ECO',
+                es_insumo=False,
+            )
+
+        data = self.client.get('/eges/datos/obras-sociales/evolucion/', {
+            'obras_sociales[]': ['COBERTURA A', 'COBERTURA B'],
+        }).json()
+
+        self.assertEqual(data['labels'], ['2026-01', '2026-02', '2026-03'])
+        self.assertEqual(data['datasets'][0]['data'], [1, 0, 1])
+        self.assertEqual(data['datasets'][1]['data'], [0, 1, 0])
+
     def test_dia_y_franja_conservan_conteos_tras_agregacion(self):
         self._preparar_comparativa()
         for indice, (fecha, hora) in enumerate([
