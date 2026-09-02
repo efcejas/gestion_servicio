@@ -269,7 +269,7 @@
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h2 class="text-base font-semibold text-gray-800">Evolución por obra social</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Tendencia mensual de las principales coberturas</p>
-                    <select id="selector-obras-sociales" multiple class="mt-2 w-full rounded-lg border border-gray-300 px-2 py-1 text-xs" size="3" aria-label="Obras sociales a visualizar"></select>
+                    <div id="selector-obras-sociales" class="mt-2 flex max-h-16 flex-wrap gap-1 overflow-y-auto" aria-label="Obras sociales a visualizar"></div>
                 </div>
                 <div class="p-4" style="height: 320px;"><canvas id="grafico-obras-sociales-evolucion"></canvas></div>
             </div>
@@ -561,7 +561,12 @@ async function cargarObrasSocialesEvolucion() {
     const p = buildParams(); const extra = [...estado.obrasSociales].map(v => `obras_sociales%5B%5D=${encodeURIComponent(v)}`).join('&');
     const d = await (await fetch(`${BASE}/obras-sociales/evolucion/?${p}${extra ? '&'+extra : ''}`)).json();
     const selector = document.getElementById('selector-obras-sociales');
-    if (!selector.options.length) d.opciones.forEach(o => selector.add(new Option(o.nombre, o.codigo)));
+    if (!selector.children.length) d.opciones.forEach(o => {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.codigo = o.codigo; b.textContent = o.nombre;
+        b.className = 'rounded-full border border-gray-300 bg-gray-50 px-2 py-1 text-[10px] text-gray-700 hover:bg-blue-50';
+        b.addEventListener('click', () => { b.classList.toggle('bg-blue-600'); b.classList.toggle('text-white'); b.classList.toggle('border-blue-600'); if (estado.obrasSociales.has(o.codigo)) estado.obrasSociales.delete(o.codigo); else estado.obrasSociales.add(o.codigo); cargarObrasSocialesEvolucion(); });
+        selector.appendChild(b);
+    });
     destroyAndCreate('obrasSocialesEvolucion', 'grafico-obras-sociales-evolucion', {type:'line', data:{labels:d.labels,datasets:d.datasets}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 
@@ -709,10 +714,6 @@ document.addEventListener('DOMContentLoaded', function () {
         cargarTodo();
     });
 
-    document.getElementById('selector-obras-sociales').addEventListener('change', function () {
-        estado.obrasSociales = new Set([...this.selectedOptions].map(o => o.value));
-        cargarObrasSocialesEvolucion();
-    });
 
     // Actualizar href PDF también al cambiar modalidad
     document.querySelectorAll('.btn-modalidad').forEach(btn => {

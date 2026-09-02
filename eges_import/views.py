@@ -1081,7 +1081,9 @@ def practicas_data(request):
 
 def _vista_obras_sociales_evolucion(request):
     base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
-    opciones_qs = base.exclude(Q(obra_social__isnull=True) | Q(obra_social='')).values_list('obra_social', flat=True).distinct()
+    opciones_qs = (_base_estudios_finalizados()
+                   .exclude(Q(obra_social__isnull=True) | Q(obra_social=''))
+                   .values_list('obra_social', flat=True).distinct())
     estudios = base
     obras_seleccionadas = request.GET.getlist('obras_sociales[]') or request.GET.getlist('obras_sociales')
     if obras_seleccionadas:
@@ -1111,14 +1113,20 @@ def obras_sociales_evolucion_data(request):
 def _vista_practica_evolucion(request):
     estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
     termino = request.GET.get('practica', 'punc')
-    estudios = estudios.filter(practica__icontains=termino)
-    filas = estudios.values('fecha_turno').annotate(total=Count('id')).order_by('fecha_turno')
-    por_mes = {}
-    for fila in filas:
-        mes = fila['fecha_turno'].strftime('%Y-%m')
-        por_mes[mes] = por_mes.get(mes, 0) + fila['total']
-    meses = sorted(por_mes)
-    return JsonResponse({'labels': meses, 'datasets': [{'label': f'Prácticas: {termino}', 'data': [por_mes[m] for m in meses], 'borderColor': '#dc2626', 'backgroundColor': 'rgba(220,38,38,.15)', 'fill': True, 'tension': .25}]})
+    punciones = estudios.filter(practica__icontains=termino)
+    bloqueos = estudios.filter(codigo_practica__regex=r'^(900446|900441|900413|341317)(/|$)')
+    def por_mes(qs):
+        resultado = {}
+        for fila in qs.values('fecha_turno').annotate(total=Count('id')).order_by('fecha_turno'):
+            mes = fila['fecha_turno'].strftime('%Y-%m')
+            resultado[mes] = resultado.get(mes, 0) + fila['total']
+        return resultado
+    punc = por_mes(punciones); bloq = por_mes(bloqueos)
+    meses = sorted(set(punc) | set(bloq))
+    return JsonResponse({'labels': meses, 'datasets': [
+        {'label': 'Punciones', 'data': [punc.get(m, 0) for m in meses], 'borderColor': '#dc2626', 'backgroundColor': 'rgba(220,38,38,.15)', 'fill': True, 'tension': .25},
+        {'label': 'Bloqueos TC', 'data': [bloq.get(m, 0) for m in meses], 'borderColor': '#7c3aed', 'backgroundColor': 'rgba(124,58,237,.12)', 'fill': True, 'tension': .25},
+    ]})
 
 
 def practica_evolucion_data(request):
