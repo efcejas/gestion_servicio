@@ -241,7 +241,9 @@ def procesar_excel_eges(archivo, batch):
             )
             codigo_os = _texto(_celda(row, idx_codigo_os)) or None
             nombre_os = _texto(_celda(row, idx_nombre_os)) or None
-            obra_social = _texto(_celda(row, idx_obra_social)) or None
+            # Algunos reportes EGES informan la cobertura solo como código o
+            # nombre OS; conservar un valor visible evita perderla en reportes.
+            obra_social = (_texto(_celda(row, idx_obra_social)) or nombre_os or codigo_os or None)
 
             if nombre_os:
                 clave_os = codigo_os or obra_social

@@ -4,6 +4,7 @@ from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
 from django.db.models import Count, Q, Avg, Max
 from django.db.models.functions import ExtractWeekDay
+from django.db.models.functions import Coalesce
 from datetime import date as date_type
 from django.utils import timezone
 from datetime import datetime, time, timedelta
@@ -1037,15 +1038,15 @@ def _vista_obras_sociales_data(request):
     estudios = _base_estudios_finalizados()
     estudios = _aplicar_filtros_fecha_modalidad(estudios, request.GET)
     datos = (
-        estudios
-        .exclude(Q(obra_social__isnull=True) | Q(obra_social=''))
-        .values('obra_social')
+        estudios.annotate(os_key=Coalesce('obra_social', 'codigo_obra_social'))
+        .exclude(Q(os_key__isnull=True) | Q(os_key=''))
+        .values('os_key')
         .annotate(total=Count('id'))
         .order_by('-total')[:top_n]
     )
     # Lookup código → nombre (en memoria, tabla pequeña)
     lookup_nombres = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
-    labels = [lookup_nombres.get(d['obra_social'], d['obra_social']) for d in datos]
+    labels = [lookup_nombres.get(d['os_key'], d['os_key']) for d in datos]
     valores = [d['total'] for d in datos]
     return JsonResponse({
         'labels': labels,
@@ -1081,19 +1082,19 @@ def practicas_data(request):
 
 def _vista_obras_sociales_evolucion(request):
     base = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
-    opciones_qs = (_base_estudios_finalizados()
-                   .exclude(Q(obra_social__isnull=True) | Q(obra_social=''))
-                   .values_list('obra_social', flat=True).distinct())
+    opciones_qs = (_base_estudios_finalizados().annotate(os_key=Coalesce('obra_social', 'codigo_obra_social'))
+                   .exclude(Q(os_key__isnull=True) | Q(os_key='')).values_list('os_key', flat=True).distinct())
     estudios = base
     obras_seleccionadas = request.GET.getlist('obras_sociales[]') or request.GET.getlist('obras_sociales')
     if obras_seleccionadas:
         estudios = estudios.filter(obra_social__in=obras_seleccionadas)
-    filas = estudios.exclude(Q(obra_social__isnull=True) | Q(obra_social='')).values('fecha_turno', 'obra_social')
+    filas = (estudios.annotate(os_key=Coalesce('obra_social', 'codigo_obra_social'))
+             .exclude(Q(os_key__isnull=True) | Q(os_key='')).values('fecha_turno', 'os_key'))
     conteo = {}
     totales = {}
     for fila in filas:
         mes = fila['fecha_turno'].strftime('%Y-%m')
-        os_name = fila['obra_social']
+        os_name = fila['os_key']
         conteo[(mes, os_name)] = conteo.get((mes, os_name), 0) + 1
         totales[os_name] = totales.get(os_name, 0) + 1
     nombres = [n for n, _ in sorted(totales.items(), key=lambda x: -x[1])[:8]]
