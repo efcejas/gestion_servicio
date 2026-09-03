@@ -4,6 +4,30 @@ Fecha inicial: 2026-07-09
 
 Ultima actualizacion: 2026-08-27
 
+## Estado operativo (2026-09-03)
+
+El modulo se restauro funcionalmente a la version estable `5d1baf4e`
+(`Agrega correccion por voz y confirmacion de plantilla`). Las capacidades
+incorporadas despues de ese commit se retiraron del flujo operativo porque
+provocaron regresiones. Este documento queda como registro de diseno y backlog,
+no como descripcion de funcionalidad activa.
+
+Las migraciones posteriores `0021` a `0023` se conservan por compatibilidad de
+base de datos, pero sus modelos no participan del flujo restaurado.
+
+### Backlog para reintroduccion gradual
+
+1. Validar primero, en entorno de prueba, la plantilla institucional y el modo
+  agente con confirmacion humana obligatoria.
+2. Incorporar la ontologia anatomica y los guardrails por region con una matriz
+  clinica de casos reales antes de habilitarlos a usuarios.
+3. Probar memoria y aprendizaje por usuario en modo observacion, con opt-in,
+  retencion definida y sin contenido clinico en logs.
+4. Agregar conversacion clinica continua solo despues de validar correccion por
+  voz, deshacer/rehacer, limites de audio y pruebas de navegador.
+5. Activar cada fase mediante una configuracion reversible y con tests focales
+  de regresion clinica y permisos.
+
 Este documento resume el bloque de mejoras implementadas para evolucionar el dictado inteligente desde un generador con plantillas hacia un agente asistido por voz, manteniendo fallback seguro al flujo de plantilla estructurada.
 
 ## Objetivo

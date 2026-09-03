@@ -9,14 +9,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.db.models import Avg, Max, Min, Count, Q
 from datetime import timedelta
-from .models import (
-    EventoAprendizajeDictado,
-    FeedbackCalidadDictado,
-    MetricaDictado,
-    PlantillaEstructurada,
-    PreferenciaAprendidaDictado,
-    TipoEstudio,
-)
+from .models import MetricaDictado, TipoEstudio, FeedbackCalidadDictado, PlantillaEstructurada
 import logging
 import json
 
@@ -68,67 +61,6 @@ def dashboard_metricas(request):
     feedback_resumen['tasa_correcto_primer_intento'] = (
         round((correctos / total_feedback) * 100, 2) if total_feedback > 0 else 0.0
     )
-
-    # Aprendizaje observable: solo decisiones estructuradas, sin texto clinico.
-    eventos_qs = EventoAprendizajeDictado.objects.filter(
-        fecha__gte=fecha_desde,
-        fecha__lte=fecha_hasta,
-    )
-    selecciones = list(eventos_qs.filter(
-        tipo_evento=EventoAprendizajeDictado.TipoEvento.PLANTILLA_CONFIRMADA,
-    ).values(
-        'plantilla_propuesta_codigo',
-        'plantilla_confirmada_codigo',
-        'region',
-        'modalidad',
-        'lateralidad',
-        'usuario__username',
-        'fecha',
-    ))
-    selecciones_evaluables = [
-        seleccion for seleccion in selecciones
-        if seleccion['plantilla_propuesta_codigo']
-    ]
-    selecciones_coincidentes = sum(
-        1 for seleccion in selecciones_evaluables
-        if seleccion['plantilla_propuesta_codigo'] == seleccion['plantilla_confirmada_codigo']
-    )
-    total_selecciones = len(selecciones)
-    correcciones_voz = eventos_qs.filter(
-        tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
-    )
-    total_correcciones_voz = correcciones_voz.count()
-    correcciones_desechas = correcciones_voz.filter(revertido=True).count()
-    aprendizaje_resumen = {
-        'eventos': eventos_qs.count(),
-        'selecciones_confirmadas': total_selecciones,
-        'precision_sugerencia': (
-            round((selecciones_coincidentes / len(selecciones_evaluables)) * 100, 2)
-            if selecciones_evaluables else 0.0
-        ),
-        'correcciones_voz': total_correcciones_voz,
-        'correcciones_desechas': correcciones_desechas,
-        'tasa_deshacer_correccion': (
-            round((correcciones_desechas / total_correcciones_voz) * 100, 2)
-            if total_correcciones_voz else 0.0
-        ),
-        'correcciones_manuales': eventos_qs.filter(
-            tipo_evento=EventoAprendizajeDictado.TipoEvento.APRENDIZAJE_CONFIRMADO,
-        ).count(),
-    }
-    preferencias_vigentes = PreferenciaAprendidaDictado.objects.filter(vigente=True)
-    aprendizaje_resumen['preferencias_activas'] = preferencias_vigentes.filter(
-        estado=PreferenciaAprendidaDictado.Estado.ACTIVA,
-    ).count()
-    aprendizaje_resumen['preferencias_candidatas'] = preferencias_vigentes.filter(
-        estado=PreferenciaAprendidaDictado.Estado.CANDIDATA,
-    ).count()
-    preferencias_recientes = preferencias_vigentes.select_related('usuario')[:10]
-    selecciones_corregidas = [
-        seleccion for seleccion in selecciones
-        if seleccion['plantilla_propuesta_codigo']
-        and seleccion['plantilla_propuesta_codigo'] != seleccion['plantilla_confirmada_codigo']
-    ][:10]
 
     plantillas_con_mas_correccion = list(
         feedback_qs.filter(tipo_plantilla__gt='')
@@ -280,9 +212,6 @@ def dashboard_metricas(request):
     contexto = {
         'stats': stats,
         'feedback_resumen': feedback_resumen,
-        'aprendizaje_resumen': aprendizaje_resumen,
-        'preferencias_recientes': preferencias_recientes,
-        'selecciones_corregidas': selecciones_corregidas,
         'plantillas_con_mas_correccion': plantillas_con_mas_correccion,
         'recomendaciones_plantilla': recomendaciones_plantilla,
         'umbral_alerta_correccion': UMBRAL_ALERTA_CORRECCION,

@@ -13,11 +13,7 @@ from unittest.mock import patch, MagicMock
 import json
 import base64
 
-from dictado_informes.models import (
-    EventoAprendizajeDictado,
-    PlantillaEstructurada,
-    TrazaAgenteDictado,
-)
+from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
 from dictado_informes.views import (
     construir_candidatos_confirmacion_plantilla,
     debe_confirmar_plantilla_agente,
@@ -470,27 +466,6 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['frase_lateralidad'], 'ambas caderas')
         self.assertEqual(contexto['indicacion_clinica'], 'Coxalgia bilateral.')
 
-    def test_extrae_contexto_clinico_ambas_rodillas(self):
-        contexto = extraer_contexto_clinico_dictado(
-            'Resonancia magnetica bilateral de rodillas por gonalgia izquierda.'
-        )
-
-        self.assertEqual(contexto['region'], 'RODILLA')
-        self.assertEqual(contexto['lateralidad'], 'BILATERAL')
-        self.assertEqual(contexto['titulo_lateralidad'], 'AMBAS RODILLAS')
-        self.assertEqual(contexto['frase_lateralidad'], 'ambas rodillas')
-        self.assertEqual(contexto['indicacion_clinica'], 'Gonalgia izquierda.')
-
-    def test_componentes_anatomicos_en_plural_no_vuelven_bilateral_el_estudio(self):
-        contexto = extraer_contexto_clinico_dictado(
-            'Paciente con gonalgia izquierda. Ambos meniscos muestran cambios difusos '
-            'y el derrame predomina en ambos retinaculos patelofemorales.'
-        )
-
-        self.assertEqual(contexto['region'], 'RODILLA')
-        self.assertEqual(contexto['lateralidad'], 'IZQUIERDA')
-        self.assertEqual(contexto['titulo_lateralidad'], 'IZQUIERDA')
-
     def test_region_explicita_prevalece_sobre_indicacion_clinica(self):
         contexto = extraer_contexto_clinico_dictado(
             'Paciente con gonalgia derecha. Es una resonancia de ambas caderas.'
@@ -893,51 +868,6 @@ class TestAPICorreccionBorrador(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('ambiguo', response.json()['error'])
-
-    @patch('dictado_informes.ai_services.AIService.edit_medical_report')
-    def test_propuesta_amplia_no_se_registra_hasta_confirmarla(self, mock_edit):
-        operaciones = [{
-            'tipo': 'reemplazar',
-            'original': 'Hallazgo original.',
-            'nuevo': 'Hallazgo corregido.',
-        }]
-        mock_edit.return_value = {
-            'texto_editado': 'HALLAZGOS\nHallazgo corregido.',
-            'operaciones_aplicadas': operaciones,
-            'resumen_cambios': ['Cambio amplio.'],
-            'requiere_confirmacion': True,
-        }
-
-        propuesta = self.client.post(
-            '/dictado_informes/api/corregir-borrador/',
-            data=json.dumps({
-                'texto_actual': 'HALLAZGOS\nHallazgo original.',
-                'instruccion': 'Modificá toda la descripción.',
-            }),
-            content_type='application/json',
-        )
-
-        self.assertEqual(propuesta.status_code, 200)
-        self.assertFalse(propuesta.json()['aplicada'])
-        self.assertFalse(EventoAprendizajeDictado.objects.exists())
-
-        confirmacion = self.client.post(
-            '/dictado_informes/api/corregir-borrador/',
-            data=json.dumps({
-                'texto_actual': 'HALLAZGOS\nHallazgo original.',
-                'instruccion': 'Modificá toda la descripción.',
-                'confirmar_propuesta': True,
-                'operaciones_propuestas': operaciones,
-            }),
-            content_type='application/json',
-        )
-
-        self.assertEqual(confirmacion.status_code, 200)
-        self.assertTrue(confirmacion.json()['aplicada'])
-        evento = EventoAprendizajeDictado.objects.get(
-            tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
-        )
-        self.assertTrue(evento.metadatos['confirmacion_explicita'])
 
     def test_requiere_usuario_autorizado(self):
         self.client.logout()

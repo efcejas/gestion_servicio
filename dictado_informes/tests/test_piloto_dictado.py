@@ -88,9 +88,6 @@ class DictadoPilotoAccessTests(TestCase):
         self.assertContains(response, 'id="btnCorregirVoz"')
         self.assertContains(response, 'id="instruccionCorreccion"')
         self.assertContains(response, 'id="btnDeshacerCorreccion"')
-        self.assertContains(response, 'id="btnRehacerCorreccion"')
-        self.assertContains(response, 'id="panelConfirmarCorreccion"')
-        self.assertContains(response, 'contexto_conversacion')
         self.assertContains(response, reverse('dictado_informes:corregir_borrador'))
 
     def test_dictado_rapido_ofrece_confirmacion_de_plantilla_ambigua(self):

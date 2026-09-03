@@ -15,14 +15,7 @@ from django.core.files.base import ContentFile
 from .models import (
     Informe, PlantillaInforme, AudioTranscripcion, TipoEstudio, 
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
-    PlantillaEstructurada, FeedbackCalidadDictado, TrazaAgenteDictado,
-    EventoAprendizajeDictado, PreferenciaAprendidaDictado,
-)
-from .learning_services import (
-    MIN_CONFIRMACIONES_PLANTILLA,
-    MIN_CONFIANZA_PLANTILLA,
-    obtener_preferencia_activa_seleccion,
-    registrar_evento_aprendizaje,
+    PlantillaEstructurada, FeedbackCalidadDictado, TrazaAgenteDictado
 )
 from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
 from .ai_services import ai_service
@@ -200,15 +193,7 @@ def extraer_contexto_clinico_dictado(texto):
 
     lateralidad = None
     lado_tecnica = None
-    regiones_pares = (
-        'ambas rodillas', 'ambos hombros', 'ambos codos', 'ambas manos',
-        'ambas munecas', 'ambos tobillos', 'ambas caderas',
-    )
-    bilateral_explicita = (
-        'bilateral' in tokens
-        or any(frase in texto_norm for frase in regiones_pares)
-    )
-    if bilateral_explicita:
+    if 'bilateral' in tokens or 'ambas' in tokens or 'ambos' in tokens:
         lateralidad = 'BILATERAL'
         lado_tecnica = 'bilateral'
     elif {'derecha', 'derecho'} & tokens:
@@ -285,17 +270,9 @@ def extraer_contexto_clinico_dictado(texto):
 
     titulo_lateralidad = ''
     frase_lateralidad = ''
-    regiones_bilaterales = {
-        'RODILLA': ('AMBAS RODILLAS', 'ambas rodillas'),
-        'HOMBRO': ('AMBOS HOMBROS', 'ambos hombros'),
-        'CODO': ('AMBOS CODOS', 'ambos codos'),
-        'MANO': ('AMBAS MANOS', 'ambas manos'),
-        'MUNECA': ('AMBAS MUÑECAS', 'ambas muñecas'),
-        'TOBILLO': ('AMBOS TOBILLOS', 'ambos tobillos'),
-        'CADERA': ('AMBAS CADERAS', 'ambas caderas'),
-    }
-    if lateralidad == 'BILATERAL' and region in regiones_bilaterales:
-        titulo_lateralidad, frase_lateralidad = regiones_bilaterales[region]
+    if lateralidad == 'BILATERAL' and region == 'CADERA':
+        titulo_lateralidad = 'AMBAS CADERAS'
+        frase_lateralidad = 'ambas caderas'
     elif lateralidad in {'DERECHA', 'IZQUIERDA'}:
         titulo_lateralidad = lateralidad
         frase_lateralidad = lateralidad.lower()
@@ -579,45 +556,6 @@ def construir_candidatos_confirmacion_plantilla(plantilla_legacy, plantilla_hibr
     return ordenados[:limite]
 
 
-def priorizar_preferencia_aprendida(candidatos, contexto, usuario, limite=3):
-    """Prioriza memoria fuerte solo dentro del flujo humano de confirmacion."""
-    contexto = contexto or {}
-    preferencia = obtener_preferencia_activa_seleccion(
-        usuario=usuario,
-        region=contexto.get('region'),
-        modalidad=contexto.get('modalidad'),
-        lateralidad=contexto.get('lateralidad'),
-    )
-    if not preferencia:
-        return candidatos, ''
-
-    codigo = str(preferencia.valor.get('codigo_plantilla') or '').strip()
-    plantilla = PlantillaEstructurada.visibles_para_usuario(
-        usuario,
-        solo_activas=True,
-    ).filter(codigo=codigo).first()
-    if not plantilla:
-        return candidatos, ''
-
-    candidatos = [dict(candidato) for candidato in (candidatos or [])]
-    preferida = next((c for c in candidatos if c.get('codigo') == codigo), None)
-    candidatos = [c for c in candidatos if c.get('codigo') != codigo]
-    if not preferida:
-        preferida = {
-            'codigo': codigo,
-            'nombre': plantilla.nombre,
-            'fuentes': ['memoria_usuario'],
-            'consenso_selectores': False,
-        }
-    preferida['desde_preferencia_aprendida'] = True
-    candidatos.insert(0, preferida)
-    candidatos = candidatos[:limite]
-    for posicion, candidato in enumerate(candidatos, 1):
-        candidato['posicion'] = posicion
-        candidato['recomendada'] = posicion == 1
-    return candidatos, codigo
-
-
 def debe_confirmar_plantilla_agente(
     plantilla_elegida,
     origen_seleccion,
@@ -669,7 +607,7 @@ def _registrar_traza_agente(
         ).filter(codigo=codigo).first()
 
     try:
-        return TrazaAgenteDictado.objects.create(
+        TrazaAgenteDictado.objects.create(
             usuario=request.user if request.user.is_authenticated else None,
             huella_entrada=hashlib.sha256((texto or '').encode('utf-8')).hexdigest(),
             longitud_entrada=len(texto or ''),
@@ -707,7 +645,6 @@ def _registrar_traza_agente(
         )
     except Exception:
         logger.exception('No se pudo registrar la traza del agente')
-        return None
 
 
 def _calcular_metricas_edicion(texto_ia, texto_final):
@@ -836,81 +773,6 @@ class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateVi
         context['plantillas_total_visibles'] = len(plantillas_visibles)
         context['dictado_agente_habilitado'] = getattr(settings, 'DICTADO_AGENTE_HABILITADO', True)
         return context
-
-
-class MemoriaAprendizajeView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateView):
-    """Panel personal, no clinico, para auditar y pausar memoria aprendida."""
-
-    template_name = 'dictado_informes/memoria_aprendizaje.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        preferencias = PreferenciaAprendidaDictado.objects.filter(
-            usuario=self.request.user,
-        ).order_by('-vigente', '-fecha_modificacion')
-        vigentes = list(preferencias.filter(vigente=True))
-        context['preferencias_vigentes'] = vigentes
-        context['historial_preferencias'] = preferencias.filter(vigente=False)[:20]
-        context['total_activas'] = sum(
-            1 for preferencia in vigentes
-            if preferencia.estado == PreferenciaAprendidaDictado.Estado.ACTIVA
-        )
-        context['total_candidatas'] = sum(
-            1 for preferencia in vigentes
-            if preferencia.estado == PreferenciaAprendidaDictado.Estado.CANDIDATA
-        )
-        context['total_pausadas'] = sum(
-            1 for preferencia in vigentes
-            if preferencia.estado == PreferenciaAprendidaDictado.Estado.INACTIVA
-        )
-
-        categorias = {}
-        eventos = EventoAprendizajeDictado.objects.filter(
-            usuario=self.request.user,
-            tipo_evento=EventoAprendizajeDictado.TipoEvento.APRENDIZAJE_CONFIRMADO,
-        ).only('metadatos')[:100]
-        for evento in eventos:
-            for categoria, cantidad in (evento.metadatos.get('categorias') or {}).items():
-                categorias[categoria] = categorias.get(categoria, 0) + int(cantidad or 0)
-        context['categorias_evidencia'] = sorted(
-            categorias.items(),
-            key=lambda item: (-item[1], item[0]),
-        )[:10]
-        return context
-
-
-@require_POST
-def actualizar_estado_memoria(request, pk):
-    """Pausa o restaura una preferencia propia sin eliminar sus versiones."""
-    if not user_can_access_dictado_module(request.user):
-        return JsonResponse({'error': 'No autorizado'}, status=403)
-
-    preferencia = get_object_or_404(
-        PreferenciaAprendidaDictado,
-        pk=pk,
-        usuario=request.user,
-        vigente=True,
-    )
-    accion = str(request.POST.get('accion') or '').strip()
-    if accion == 'desactivar':
-        preferencia.estado = PreferenciaAprendidaDictado.Estado.INACTIVA
-        preferencia.save(update_fields=['estado', 'fecha_modificacion'])
-        messages.success(request, 'La preferencia quedó pausada. El historial se conserva.')
-    elif accion == 'reactivar':
-        puede_reactivar = (
-            preferencia.categoria == PreferenciaAprendidaDictado.Categoria.SELECCION_PLANTILLA
-            and preferencia.confirmaciones >= MIN_CONFIRMACIONES_PLANTILLA
-            and preferencia.confianza >= MIN_CONFIANZA_PLANTILLA
-        )
-        if not puede_reactivar:
-            messages.warning(request, 'La preferencia todavía no reúne evidencia suficiente para activarse.')
-        else:
-            preferencia.estado = PreferenciaAprendidaDictado.Estado.ACTIVA
-            preferencia.save(update_fields=['estado', 'fecha_modificacion'])
-            messages.success(request, 'La preferencia volvió a estar activa.')
-    else:
-        messages.error(request, 'Acción de memoria inválida.')
-    return redirect('dictado_informes:memoria_aprendizaje')
 
 
 class DemoPresentacionIAView(TemplateView):
@@ -1567,7 +1429,6 @@ def mejorar_texto_ia(request):
         plantilla_legacy = None
         plantilla_sombra = None
         origen_seleccion = ''
-        preferencia_aprendida_codigo = ''
         
         if not texto or texto.strip() == '':
             logger.warning("⚠️ mejorar_texto_ia: No se recibió texto válido")
@@ -1613,11 +1474,6 @@ def mejorar_texto_ia(request):
                 plantilla_legacy,
                 plantilla_sombra,
             )
-            candidatos_confirmacion, preferencia_aprendida_codigo = priorizar_preferencia_aprendida(
-                candidatos_confirmacion,
-                contexto_seleccion,
-                request.user,
-            )
 
             if codigo_confirmado:
                 plantilla_confirmada = PlantillaEstructurada.visibles_para_usuario(
@@ -1659,7 +1515,6 @@ def mejorar_texto_ia(request):
                     ),
                     'selector_origen': 'pendiente_usuario',
                     'contexto_clinico': contexto_seleccion,
-                    'preferencia_aprendida_codigo': preferencia_aprendida_codigo,
                 })
 
             if plantilla_sugerida:
@@ -1738,9 +1593,8 @@ def mejorar_texto_ia(request):
         except Exception as metric_error:
             logger.error(f"Error registrando métrica: {metric_error}")
         
-        evento_aprendizaje_id = None
         if modo == 'AGENTE':
-            traza_agente = _registrar_traza_agente(
+            _registrar_traza_agente(
                 request=request,
                 texto=texto_procesado,
                 plantilla_sugerida=plantilla_legacy,
@@ -1751,30 +1605,6 @@ def mejorar_texto_ia(request):
                 origen_seleccion=origen_seleccion,
                 duracion_ms=tiempo_total_ms,
             )
-            if origen_seleccion == 'usuario_confirmada':
-                try:
-                    propuesta = (candidatos_confirmacion or [{}])[0].get('codigo', '')
-                    evento = registrar_evento_aprendizaje(
-                        usuario=request.user,
-                        tipo_evento=EventoAprendizajeDictado.TipoEvento.PLANTILLA_CONFIRMADA,
-                        modo_dictado='AGENTE',
-                        tipo_estudio=tipo_estudio if tipo_estudio in dict(TipoEstudio.choices) else '',
-                        region=(contexto_clinico or {}).get('region') or '',
-                        modalidad=(contexto_clinico or {}).get('modalidad') or '',
-                        lateralidad=(contexto_clinico or {}).get('lateralidad') or '',
-                        plantilla_propuesta_codigo=propuesta,
-                        plantilla_confirmada_codigo=tipo_plantilla,
-                        traza=traza_agente,
-                        metadatos={
-                            'coincide_propuesta': propuesta == tipo_plantilla,
-                            'confianza_selector': (
-                                (plantilla_legacy or {}).get('confianza_selector') or ''
-                            ),
-                        },
-                    )
-                    evento_aprendizaje_id = evento.pk
-                except Exception:
-                    logger.exception('No se pudo registrar la confirmacion de plantilla')
 
         return JsonResponse({
             'success': True,
@@ -1794,8 +1624,6 @@ def mejorar_texto_ia(request):
             'tipo_plantilla_usada': tipo_plantilla,
             'selector_origen': origen_seleccion,
             'contexto_clinico': contexto_clinico,
-            'evento_aprendizaje_id': evento_aprendizaje_id,
-            'preferencia_aprendida_codigo': preferencia_aprendida_codigo,
         })
     
     except json.JSONDecodeError as e:
@@ -1853,60 +1681,17 @@ def corregir_borrador_ia(request):
         texto_actual = data.get('texto_actual', '')
         instruccion = data.get('instruccion', '')
         fragmento_objetivo = data.get('fragmento_objetivo', '')
-        contexto_conversacion = data.get('contexto_conversacion', [])
         if not str(texto_actual).strip():
             return JsonResponse({'error': 'No se recibio el informe actual'}, status=400)
         if not str(instruccion).strip():
             return JsonResponse({'error': 'No se recibio una instruccion de correccion'}, status=400)
-        if data.get('confirmar_propuesta'):
-            resultado = ai_service.confirmar_edicion_informe(
-                texto_actual=texto_actual,
-                instruccion=instruccion,
-                operaciones=data.get('operaciones_propuestas'),
-            )
-        else:
-            argumentos_edicion = {
-                'texto_actual': texto_actual,
-                'instruccion': instruccion,
-                'fragmento_objetivo': fragmento_objetivo,
-            }
-            if contexto_conversacion:
-                argumentos_edicion['contexto_conversacion'] = contexto_conversacion
-            resultado = ai_service.edit_medical_report(**argumentos_edicion)
-
-        requiere_revision = bool(
-            resultado.get('requiere_confirmacion')
-            or resultado.get('requiere_aclaracion')
+        resultado = ai_service.edit_medical_report(
+            texto_actual=texto_actual,
+            instruccion=instruccion,
+            fragmento_objetivo=fragmento_objetivo,
         )
-        evento_aprendizaje_id = None
-        try:
-            operaciones = resultado.get('operaciones_aplicadas') or []
-            if operaciones and not requiere_revision:
-                tipos_operacion = sorted({
-                    str(operacion.get('tipo') or '').strip()
-                    for operacion in operaciones
-                    if isinstance(operacion, dict) and operacion.get('tipo')
-                })
-                evento = registrar_evento_aprendizaje(
-                    usuario=request.user,
-                    tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
-                    modo_dictado=str(data.get('modo_dictado') or '')[:20],
-                    plantilla_confirmada_codigo=str(data.get('tipo_plantilla') or '')[:50],
-                    tipo_operacion=','.join(tipos_operacion)[:50],
-                    metadatos={
-                        'cantidad_operaciones': len(operaciones),
-                        'tipos_operacion': tipos_operacion,
-                        'uso_fragmento_objetivo': bool(str(fragmento_objetivo).strip()),
-                        'confirmacion_explicita': bool(data.get('confirmar_propuesta')),
-                    },
-                )
-                evento_aprendizaje_id = evento.pk
-        except Exception:
-            logger.exception('No se pudo registrar el evento de correccion por voz')
         return JsonResponse({
             'success': True,
-            'aplicada': not requiere_revision,
-            'evento_aprendizaje_id': evento_aprendizaje_id,
             **resultado,
         })
     except json.JSONDecodeError:
@@ -1919,51 +1704,6 @@ def corregir_borrador_ia(request):
         return JsonResponse({
             'error': 'No se pudo aplicar la correccion. El informe no fue modificado.'
         }, status=500)
-
-
-@require_POST
-def deshacer_evento_correccion(request):
-    """Registra deshacer o rehacer sin almacenar el contenido del informe."""
-    if not user_can_access_dictado_module(request.user):
-        return JsonResponse({'error': 'No autorizado'}, status=403)
-
-    try:
-        data = json.loads(request.body)
-        evento_id = data.get('evento_id')
-        accion = str(data.get('accion') or 'deshacer').strip().lower()
-        if accion not in {'deshacer', 'rehacer'}:
-            return JsonResponse({'error': 'Accion invalida'}, status=400)
-        evento = EventoAprendizajeDictado.objects.filter(
-            pk=evento_id,
-            usuario=request.user,
-            tipo_evento=EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_APLICADA,
-        ).first()
-        if not evento:
-            return JsonResponse({'error': 'Evento de correccion no encontrado'}, status=404)
-        estado_objetivo = accion == 'deshacer'
-        if evento.revertido == estado_objetivo:
-            return JsonResponse({'success': True, 'sin_cambios': True})
-
-        evento.revertido = estado_objetivo
-        evento.save(update_fields=['revertido'])
-        registrar_evento_aprendizaje(
-            usuario=request.user,
-            tipo_evento=(
-                EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_DESHECHA
-                if accion == 'deshacer'
-                else EventoAprendizajeDictado.TipoEvento.CORRECCION_VOZ_REHECHA
-            ),
-            modo_dictado=evento.modo_dictado,
-            plantilla_confirmada_codigo=evento.plantilla_confirmada_codigo,
-            tipo_operacion=evento.tipo_operacion,
-            metadatos={'evento_origen_id': evento.pk, 'accion': accion},
-        )
-        return JsonResponse({'success': True, 'sin_cambios': False})
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Datos invalidos en la solicitud'}, status=400)
-    except Exception:
-        logger.exception('No se pudo marcar la correccion por voz como deshecha')
-        return JsonResponse({'error': 'No se pudo registrar la accion'}, status=500)
 
 
 
@@ -2075,11 +1815,6 @@ def guardar_correccion_aprendizaje(request):
         texto_ia = data.get('texto_ia', '')              # Texto mejorado por IA
         texto_final = data.get('texto_final', '')        # Texto editado por usuario
         tipo_estudio = data.get('tipo_estudio', '')
-        modo_dictado = str(data.get('modo_dictado') or '')[:20]
-        tipo_plantilla = str(data.get('tipo_plantilla') or '')[:50]
-        contexto_clinico = data.get('contexto_clinico') or {}
-        if not isinstance(contexto_clinico, dict):
-            contexto_clinico = {}
         
         if not texto_original or not texto_ia or not texto_final:
             return JsonResponse({'error': 'Faltan textos requeridos'}, status=400)
@@ -2098,12 +1833,7 @@ def guardar_correccion_aprendizaje(request):
             texto_ia=texto_ia,
             texto_final=texto_final,
             usuario=request.user,
-            tipo_estudio=tipo_estudio if tipo_estudio in dict(TipoEstudio.choices) else '',
-            modo_dictado=modo_dictado,
-            tipo_plantilla=tipo_plantilla,
-            region=str(contexto_clinico.get('region') or '')[:30],
-            modalidad=str(contexto_clinico.get('modalidad') or '')[:20],
-            lateralidad=str(contexto_clinico.get('lateralidad') or '')[:20],
+            tipo_estudio=tipo_estudio if tipo_estudio in dict(TipoEstudio.choices) else ''
         )
 
         apta_para_prompt = CorreccionAprendizaje.es_apta_para_prompt(correccion)
@@ -2120,30 +1850,6 @@ def guardar_correccion_aprendizaje(request):
                 "✅ Corrección guardada en historial, pero no se usará automáticamente "
                 "porque parece una edición atípica."
             )
-
-        try:
-            categorias = {}
-            for cambio in correccion.cambios_detectados or []:
-                categoria = str(cambio.get('categoria') or cambio.get('tipo') or 'otro')[:40]
-                categorias[categoria] = categorias.get(categoria, 0) + 1
-            registrar_evento_aprendizaje(
-                usuario=request.user,
-                tipo_evento=EventoAprendizajeDictado.TipoEvento.APRENDIZAJE_CONFIRMADO,
-                tipo_estudio=correccion.tipo_estudio,
-                modo_dictado=correccion.modo_dictado,
-                region=correccion.region,
-                modalidad=correccion.modalidad,
-                lateralidad=correccion.lateralidad,
-                plantilla_confirmada_codigo=correccion.tipo_plantilla,
-                correccion=correccion,
-                metadatos={
-                    'cantidad_cambios': len(correccion.cambios_detectados or []),
-                    'categorias': categorias,
-                    'apta_para_prompt': apta_para_prompt,
-                },
-            )
-        except Exception:
-            logger.exception('No se pudo registrar la correccion en la bitacora de aprendizaje')
         
         return JsonResponse({
             'success': True,
@@ -2199,27 +1905,6 @@ def registrar_feedback_calidad(request):
             tipo_plantilla=(tipo_plantilla or '')[:50],
             **metricas,
         )
-
-        try:
-            tipo_evento = (
-                EventoAprendizajeDictado.TipoEvento.INFORME_ACEPTADO
-                if estado_feedback == FeedbackCalidadDictado.EstadoFeedback.CORRECTO
-                else EventoAprendizajeDictado.TipoEvento.INFORME_CORREGIDO
-            )
-            registrar_evento_aprendizaje(
-                usuario=request.user,
-                tipo_evento=tipo_evento,
-                modo_dictado=modo_dictado,
-                tipo_estudio=tipo_estudio,
-                plantilla_confirmada_codigo=(tipo_plantilla or '')[:50],
-                feedback=feedback,
-                metadatos={
-                    'porcentaje_edicion': feedback.porcentaje_edicion,
-                    'tuvo_edicion': feedback.tuvo_edicion,
-                },
-            )
-        except Exception:
-            logger.exception('No se pudo registrar el feedback en la bitacora de aprendizaje')
 
         return JsonResponse({
             'success': True,

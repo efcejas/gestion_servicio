@@ -114,7 +114,7 @@
                     Modo de IA
                 </label>
                 <div class="space-y-2">
-                    <label data-modo-ia-label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
+                    <label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-purple-500 cursor-pointer hover:bg-gray-750 transition-colors">
                         <input type="radio" name="modoIA" value="FIEL" checked 
                                class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
                         <div class="ml-3">
@@ -123,7 +123,7 @@
                         </div>
                     </label>
                     {% if dictado_agente_habilitado %}
-                    <label data-modo-ia-label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
+                    <label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
                         <input type="radio" name="modoIA" value="AGENTE"
                                class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
                         <div class="ml-3">
@@ -132,7 +132,7 @@
                         </div>
                     </label>
                     {% endif %}
-                    <label data-modo-ia-label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
+                    <label class="flex items-center p-3 bg-gray-800 rounded-lg border-2 border-gray-700 cursor-pointer hover:bg-gray-750 transition-colors">
                         <input type="radio" name="modoIA" value="ESTRUCTURADO" 
                                class="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-600">
                         <div class="ml-3">
@@ -363,9 +363,6 @@
                     <strong>🧠 Aprendizaje Activo:</strong> <span id="aprendizajeTexto">Cargando...</span>
                 </p>
             </div>
-            <a href="{% url 'dictado_informes:memoria_aprendizaje' %}" class="inline-flex items-center gap-1 mt-3 text-xs font-semibold text-green-200 hover:text-white">
-                <i class="fas fa-sliders-h"></i> Ver mi memoria
-            </a>
         </div>
 
         <!-- Panel Derecho: Resultado -->
@@ -422,16 +419,6 @@
                             <i class="fas fa-undo mr-1"></i>
                             Deshacer corrección
                         </button>
-                        <button id="btnRehacerCorreccion" type="button"
-                                class="hidden bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors">
-                            <i class="fas fa-redo mr-1"></i>
-                            Rehacer
-                        </button>
-                    </div>
-
-                    <div id="resumenSesionCorreccion" class="hidden mt-2 border border-gray-600 rounded-lg px-3 py-2">
-                        <p class="text-xs font-semibold text-gray-300">Historial de esta sesión</p>
-                        <ul id="listaSesionCorreccion" class="mt-1 space-y-1 text-xs text-gray-400"></ul>
                     </div>
 
                     <div id="panelCorreccionVoz" class="hidden mt-2 bg-indigo-950/50 border border-indigo-700 rounded-lg p-3">
@@ -453,21 +440,6 @@
                                 Cancelar
                             </button>
                             <span id="estadoCorreccionVoz" class="text-xs text-indigo-200"></span>
-                        </div>
-                        <div id="panelConfirmarCorreccion" class="hidden mt-3 border border-amber-500/70 bg-amber-950/40 rounded-lg p-3">
-                            <p class="text-sm font-semibold text-amber-200">Revisá este cambio amplio antes de aplicarlo</p>
-                            <p id="motivoConfirmarCorreccion" class="mt-1 text-xs text-amber-100"></p>
-                            <ul id="detalleConfirmarCorreccion" class="mt-2 list-disc list-inside text-xs text-amber-100"></ul>
-                            <div class="mt-3 flex flex-wrap gap-2">
-                                <button id="btnConfirmarPropuestaCorreccion" type="button"
-                                        class="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-lg text-sm font-semibold">
-                                    Confirmar cambios
-                                </button>
-                                <button id="btnDescartarPropuestaCorreccion" type="button"
-                                        class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg text-sm">
-                                    Descartar
-                                </button>
-                            </div>
                         </div>
                     </div>
                     
@@ -663,13 +635,8 @@ let mediaRecorderCorreccion = null;
 let audioChunksCorreccion = [];
 let grabandoCorreccion = false;
 let fragmentoCorreccionSeleccionado = '';
-let historialCorrecciones = [];
-let correccionesRehechas = [];
-let contextoConversacionCorreccion = [];
-let propuestaCorreccionPendiente = null;
+let htmlAntesUltimaCorreccion = '';
 let descartarAudioCorreccion = false;
-let tipoPlantillaUsadaGlobal = '';
-let contextoClinicoGlobal = {};
 let resolverSeleccionPlantillaPendiente = null;
 
 function escapeHtml(text) {
@@ -1038,17 +1005,6 @@ async function aplicarCorreccionBorrador() {
         mostrarToast('Revisá o escribí la instrucción de corrección', 'info');
         return;
     }
-    const comandoSesion = detectarComandoSesionCorreccion(instruccion);
-    if (comandoSesion === 'deshacer') {
-        await deshacerUltimaCorreccion();
-        document.getElementById('instruccionCorreccion').value = '';
-        return;
-    }
-    if (comandoSesion === 'rehacer') {
-        await rehacerUltimaCorreccion();
-        document.getElementById('instruccionCorreccion').value = '';
-        return;
-    }
 
     boton.disabled = true;
     boton.classList.add('opacity-60');
@@ -1061,9 +1017,6 @@ async function aplicarCorreccionBorrador() {
                 texto_actual: textoActual,
                 instruccion,
                 fragmento_objetivo: fragmentoCorreccionSeleccionado,
-                contexto_conversacion: contextoConversacionCorreccion.slice(-5),
-                modo_dictado: document.querySelector('input[name="modoIA"]:checked')?.value || '',
-                tipo_plantilla: tipoPlantillaUsadaGlobal,
             }),
         });
         const data = await response.json();
@@ -1074,27 +1027,9 @@ async function aplicarCorreccionBorrador() {
             throw new Error('El informe cambió mientras se procesaba. Volvé a aplicar la instrucción.');
         }
 
-        if (data.requiere_aclaracion) {
-            const pregunta = data.pregunta_aclaracion || 'Necesito una referencia más precisa.';
-            contextoConversacionCorreccion.push({
-                instruccion,
-                resumen: pregunta,
-                operaciones: [],
-                estado: 'requiere_aclaracion',
-            });
-            contextoConversacionCorreccion = contextoConversacionCorreccion.slice(-10);
-            if (estado) estado.textContent = pregunta;
-            mostrarToast('La corrección necesita una aclaración', 'info');
-            return;
-        }
-        if (data.requiere_confirmacion) {
-            propuestaCorreccionPendiente = {data, instruccion, textoActual, htmlActual};
-            mostrarPropuestaCorreccion(data);
-            if (estado) estado.textContent = 'La propuesta está lista para revisar.';
-            return;
-        }
-
-        completarCorreccionAplicada(data, {instruccion, textoActual, htmlActual});
+        htmlAntesUltimaCorreccion = htmlActual;
+        setTextoMejoradoContenido(data.texto_editado);
+        document.getElementById('btnDeshacerCorreccion')?.classList.remove('hidden');
         const resumen = (data.resumen_cambios || []).join(' ');
         if (estado) estado.textContent = resumen || 'Corrección aplicada.';
         mostrarToast('Corrección aplicada al borrador', 'success');
@@ -1108,120 +1043,6 @@ async function aplicarCorreccionBorrador() {
     }
 }
 
-function detectarComandoSesionCorreccion(instruccion) {
-    const normalizada = (instruccion || '')
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .trim();
-    if (/^(deshace|deshacer|volver atras|volve atras)( lo ultimo)?[.!]?$/i.test(normalizada)) {
-        return 'deshacer';
-    }
-    if (/^(rehace|rehacer|repeti el cambio)( lo ultimo)?[.!]?$/i.test(normalizada)) {
-        return 'rehacer';
-    }
-    return '';
-}
-
-function mostrarPropuestaCorreccion(data) {
-    const panel = document.getElementById('panelConfirmarCorreccion');
-    const motivo = document.getElementById('motivoConfirmarCorreccion');
-    const detalle = document.getElementById('detalleConfirmarCorreccion');
-    if (motivo) motivo.textContent = data.motivo_confirmacion || 'La propuesta modifica varias partes del informe.';
-    if (detalle) {
-        const resumenes = data.resumen_cambios?.length
-            ? data.resumen_cambios
-            : [`${(data.operaciones_aplicadas || []).length} cambios propuestos`];
-        detalle.innerHTML = resumenes.map(item => `<li>${escapeHtml(item)}</li>`).join('');
-    }
-    panel?.classList.remove('hidden');
-}
-
-function ocultarPropuestaCorreccion() {
-    propuestaCorreccionPendiente = null;
-    document.getElementById('panelConfirmarCorreccion')?.classList.add('hidden');
-}
-
-function completarCorreccionAplicada(data, base, resumenAlternativo = null) {
-    setTextoMejoradoContenido(data.texto_editado);
-    const resumen = resumenAlternativo || (data.resumen_cambios || []).join(' ') || 'Corrección aplicada.';
-    const accion = {
-        instruccion: base.instruccion,
-        resumen,
-        operaciones: data.operaciones_aplicadas || [],
-        htmlAntes: base.htmlActual,
-        textoAntes: base.textoActual,
-        htmlDespues: getTextoMejoradoHtml(),
-        textoDespues: getTextoMejoradoTextoPlano(),
-        eventoId: data.evento_aprendizaje_id || null,
-    };
-    historialCorrecciones.push(accion);
-    correccionesRehechas = [];
-    contextoConversacionCorreccion.push({
-        instruccion: accion.instruccion,
-        resumen: accion.resumen,
-        operaciones: accion.operaciones,
-        estado: 'aplicada',
-    });
-    contextoConversacionCorreccion = contextoConversacionCorreccion.slice(-10);
-    fragmentoCorreccionSeleccionado = '';
-    ocultarPropuestaCorreccion();
-    actualizarEstadoSesionCorreccion();
-}
-
-async function confirmarPropuestaCorreccion() {
-    const propuesta = propuestaCorreccionPendiente;
-    if (!propuesta) return;
-    if (getTextoMejoradoTextoPlano() !== propuesta.textoActual) {
-        ocultarPropuestaCorreccion();
-        mostrarToast('El informe cambió. Volvé a solicitar la corrección.', 'info');
-        return;
-    }
-
-    const boton = document.getElementById('btnConfirmarPropuestaCorreccion');
-    boton.disabled = true;
-    try {
-        const response = await fetch('{% url "dictado_informes:corregir_borrador" %}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({
-                texto_actual: propuesta.textoActual,
-                instruccion: propuesta.instruccion,
-                confirmar_propuesta: true,
-                operaciones_propuestas: propuesta.data.operaciones_aplicadas,
-                modo_dictado: document.querySelector('input[name="modoIA"]:checked')?.value || '',
-                tipo_plantilla: tipoPlantillaUsadaGlobal,
-            }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'No se pudo confirmar la propuesta.');
-        }
-        const resumenOriginal = (propuesta.data.resumen_cambios || []).join(' ');
-        completarCorreccionAplicada(data, propuesta, resumenOriginal);
-        document.getElementById('estadoCorreccionVoz').textContent = resumenOriginal || 'Corrección confirmada.';
-        mostrarToast('Cambios confirmados', 'success');
-    } catch (error) {
-        mostrarToast(error.message, 'error');
-    } finally {
-        boton.disabled = false;
-    }
-}
-
-function descartarPropuestaCorreccion() {
-    if (propuestaCorreccionPendiente) {
-        contextoConversacionCorreccion.push({
-            instruccion: propuestaCorreccionPendiente.instruccion,
-            resumen: 'Propuesta descartada por el usuario.',
-            operaciones: propuestaCorreccionPendiente.data.operaciones_aplicadas || [],
-            estado: 'descartada',
-        });
-        contextoConversacionCorreccion = contextoConversacionCorreccion.slice(-10);
-    }
-    ocultarPropuestaCorreccion();
-    document.getElementById('estadoCorreccionVoz').textContent = 'La propuesta fue descartada.';
-}
-
 function cancelarCorreccionVoz() {
     if (grabandoCorreccion) {
         descartarAudioCorreccion = true;
@@ -1229,89 +1050,21 @@ function cancelarCorreccionVoz() {
     }
     document.getElementById('panelCorreccionVoz')?.classList.add('hidden');
     document.getElementById('estadoCorreccionVoz').textContent = '';
-    ocultarPropuestaCorreccion();
     actualizarBotonCorreccion();
 }
 
-async function notificarCambioEstadoCorreccion(accion, tipo) {
-    if (!accion.eventoId) return;
-    try {
-        await fetch('{% url "dictado_informes:deshacer_correccion" %}', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
-            body: JSON.stringify({evento_id: accion.eventoId, accion: tipo}),
-        });
-    } catch (error) {
-        console.warn(`No se pudo registrar la acción ${tipo}.`, error);
-    }
-}
-
-function actualizarEstadoSesionCorreccion() {
-    document.getElementById('btnDeshacerCorreccion')?.classList.toggle('hidden', !historialCorrecciones.length);
-    document.getElementById('btnRehacerCorreccion')?.classList.toggle('hidden', !correccionesRehechas.length);
-    const panel = document.getElementById('resumenSesionCorreccion');
-    const lista = document.getElementById('listaSesionCorreccion');
-    panel?.classList.toggle('hidden', !historialCorrecciones.length && !correccionesRehechas.length);
-    if (!lista) return;
-    const aplicadas = historialCorrecciones.slice(-4).map(item => ({...item, estado: 'Aplicada'}));
-    const deshechas = correccionesRehechas.slice(-2).map(item => ({...item, estado: 'Deshecha'}));
-    lista.innerHTML = [...aplicadas, ...deshechas].map(item => (
-        `<li><span class="text-gray-300">${item.estado}:</span> ${escapeHtml(item.resumen)}</li>`
-    )).join('');
-}
-
-async function deshacerUltimaCorreccion() {
-    const accion = historialCorrecciones[historialCorrecciones.length - 1];
-    if (!accion) return;
-    if (getTextoMejoradoTextoPlano() !== accion.textoDespues) {
-        mostrarToast('Hay cambios manuales posteriores; no se deshizo automáticamente.', 'info');
-        return;
-    }
-    historialCorrecciones.pop();
-    setTextoMejoradoContenido(accion.htmlAntes);
-    correccionesRehechas.push(accion);
-    contextoConversacionCorreccion.push({
-        instruccion: accion.instruccion,
-        resumen: accion.resumen,
-        operaciones: accion.operaciones,
-        estado: 'deshecha',
-    });
-    contextoConversacionCorreccion = contextoConversacionCorreccion.slice(-10);
-    actualizarEstadoSesionCorreccion();
-    await notificarCambioEstadoCorreccion(accion, 'deshacer');
+function deshacerUltimaCorreccion() {
+    if (!htmlAntesUltimaCorreccion) return;
+    setTextoMejoradoContenido(htmlAntesUltimaCorreccion);
+    htmlAntesUltimaCorreccion = '';
+    document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
     mostrarToast('Corrección deshecha', 'info');
 }
 
-async function rehacerUltimaCorreccion() {
-    const accion = correccionesRehechas[correccionesRehechas.length - 1];
-    if (!accion) return;
-    if (getTextoMejoradoTextoPlano() !== accion.textoAntes) {
-        mostrarToast('El informe cambió; no se pudo rehacer automáticamente.', 'info');
-        return;
-    }
-    correccionesRehechas.pop();
-    setTextoMejoradoContenido(accion.htmlDespues);
-    historialCorrecciones.push(accion);
-    contextoConversacionCorreccion.push({
-        instruccion: accion.instruccion,
-        resumen: accion.resumen,
-        operaciones: accion.operaciones,
-        estado: 'rehecha',
-    });
-    contextoConversacionCorreccion = contextoConversacionCorreccion.slice(-10);
-    actualizarEstadoSesionCorreccion();
-    await notificarCambioEstadoCorreccion(accion, 'rehacer');
-    mostrarToast('Corrección rehecha', 'success');
-}
-
 function reiniciarEstadoCorreccion() {
-    historialCorrecciones = [];
-    correccionesRehechas = [];
-    contextoConversacionCorreccion = [];
-    propuestaCorreccionPendiente = null;
+    htmlAntesUltimaCorreccion = '';
     fragmentoCorreccionSeleccionado = '';
-    actualizarEstadoSesionCorreccion();
-    ocultarPropuestaCorreccion();
+    document.getElementById('btnDeshacerCorreccion')?.classList.add('hidden');
     document.getElementById('panelCorreccionVoz')?.classList.add('hidden');
     const instruccion = document.getElementById('instruccionCorreccion');
     if (instruccion) instruccion.value = '';
@@ -1356,11 +1109,9 @@ function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
 
             const detalle = document.createElement('span');
             detalle.className = 'block text-xs text-gray-400 mt-0.5';
-            detalle.textContent = candidato.desde_preferencia_aprendida
-                ? 'Preferencia aprendida de tus elecciones anteriores'
-                : candidato.consenso_selectores
-                    ? 'Coincidencia entre ambos selectores'
-                    : (candidato.recomendada ? 'Mejor candidata disponible' : 'Candidata alternativa');
+            detalle.textContent = candidato.consenso_selectores
+                ? 'Coincidencia entre ambos selectores'
+                : (candidato.recomendada ? 'Mejor candidata disponible' : 'Candidata alternativa');
             texto.appendChild(detalle);
 
             const accion = document.createElement('span');
@@ -1475,16 +1226,6 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dictadoOpcionesAvanzadasAbierto', abrir ? 'true' : 'false');
     });
 
-    // Resalta el borde de la opcion de "Modo de IA" actualmente seleccionada
-    const actualizarEstiloModoIA = () => {
-        modoRadios.forEach(radio => {
-            const label = radio.closest('[data-modo-ia-label]');
-            if (!label) return;
-            label.classList.toggle('border-purple-500', radio.checked);
-            label.classList.toggle('border-gray-700', !radio.checked);
-        });
-    };
-
     modoRadios.forEach(radio => {
         radio.addEventListener('change', () => {
             if (radio.value === 'ESTRUCTURADO' && radio.checked) {
@@ -1492,24 +1233,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 selectorPlantilla.classList.add('hidden');
             }
-            actualizarEstiloModoIA();
-            if (radio.checked) {
-                localStorage.setItem('dictadoModoIA', radio.value);
-            }
         });
     });
-
-    // Restaura el modo de IA elegido en una sesion previa
-    const modoIAGuardado = localStorage.getItem('dictadoModoIA');
-    const radioGuardado = modoIAGuardado
-        ? Array.from(modoRadios).find(radio => radio.value === modoIAGuardado)
-        : null;
-    if (radioGuardado) {
-        radioGuardado.checked = true;
-        radioGuardado.dispatchEvent(new Event('change'));
-    } else {
-        actualizarEstiloModoIA();
-    }
 });
 
 async function cargarInfoAprendizaje() {
@@ -1876,8 +1601,6 @@ async function procesarAudio() {
             requiereConfirmacionIA = !!dataMejora.requiere_confirmacion;
             motivoConfirmacionIA = dataMejora.motivo_confianza || '';
             terminosSospechososIA = dataMejora.terminos_sospechosos || [];
-            tipoPlantillaUsadaGlobal = dataMejora.tipo_plantilla_usada || '';
-            contextoClinicoGlobal = dataMejora.contexto_clinico || {};
 
             // Mostrar resumen de guardrails / agente si aplica
             const guardrails = dataMejora.guardrails_aplicados || [];
@@ -2019,7 +1742,7 @@ async function registrarFeedbackCalidad(estadoFeedback) {
                 texto_final: textoFinal,
                 modo_dictado: modoIA,
                 tipo_estudio: '',
-                tipo_plantilla: tipoPlantillaUsadaGlobal || (modoIA === 'ESTRUCTURADO' ? tipoPlantilla : '')
+                tipo_plantilla: modoIA === 'ESTRUCTURADO' ? tipoPlantilla : ''
             })
         });
 
@@ -2048,7 +1771,7 @@ async function guardarAprendizajeAutomatico() {
     // Solo guardar si hay texto válido (mínimo 20 caracteres)
     if (!textoFinal || textoFinal.trim().length < 20) {
         console.log('📝 Texto muy corto para aprendizaje automático (mín: 20 chars)');
-        return { success: true, guardado: false, apta_para_prompt: false };
+        return;
     }
     
     try {
@@ -2064,28 +1787,21 @@ async function guardarAprendizajeAutomatico() {
                 texto_original: textoOriginalGlobal,
                 texto_ia: textoIAGlobal,
                 texto_final: textoFinal,
-                tipo_estudio: contextoClinicoGlobal.modalidad || (modoIA === 'FIEL' ? 'OTR' : ''),
-                modo_dictado: modoIA,
-                tipo_plantilla: tipoPlantillaUsadaGlobal,
-                contexto_clinico: contextoClinicoGlobal,
+                tipo_estudio: modoIA === 'FIEL' ? 'OTR' : '',
                 auto_guardado: true  // Flag para indicar guardado automático
             })
         });
         
         const data = await response.json();
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'No se pudo guardar el aprendizaje');
-        }
         
         if (data.success && data.guardado) {
             console.log('✅ Aprendizaje guardado automáticamente:', data.message);
             // Recargar contador silenciosamente
             cargarInfoAprendizaje();
         }
-        return data;
     } catch (error) {
         console.error('⚠️ Error al guardar aprendizaje automático:', error);
-        throw error;
+        // No mostrar error al usuario para no interrumpir el flujo
     }
 }
 
@@ -2189,12 +1905,8 @@ async function copiarTexto(modoCopia = 'rich') {
         if (huboCambios) {
             const confirmarAprendizaje = confirm('¿Querés guardar esta corrección para aprendizaje?');
             if (confirmarAprendizaje) {
-                const aprendizaje = await guardarAprendizajeAutomatico();
-                if (aprendizaje.guardado && aprendizaje.apta_para_prompt) {
-                    mostrarToast('✅ Corrección guardada y activa para próximos informes', 'success');
-                } else if (aprendizaje.guardado) {
-                    mostrarToast('Corrección guardada en historial, pero no aplicada automáticamente', 'info');
-                }
+                await guardarAprendizajeAutomatico();
+                mostrarToast('✅ Copiado y aprendizaje guardado', 'success');
             }
         }
     } catch (error) {
@@ -2215,9 +1927,6 @@ document.getElementById('btnCorregirVoz')?.addEventListener('click', () => {
 document.getElementById('btnAplicarCorreccion')?.addEventListener('click', aplicarCorreccionBorrador);
 document.getElementById('btnCancelarCorreccion')?.addEventListener('click', cancelarCorreccionVoz);
 document.getElementById('btnDeshacerCorreccion')?.addEventListener('click', deshacerUltimaCorreccion);
-document.getElementById('btnRehacerCorreccion')?.addEventListener('click', rehacerUltimaCorreccion);
-document.getElementById('btnConfirmarPropuestaCorreccion')?.addEventListener('click', confirmarPropuestaCorreccion);
-document.getElementById('btnDescartarPropuestaCorreccion')?.addEventListener('click', descartarPropuestaCorreccion);
 document.getElementById('btnFeedbackCorrecto')?.addEventListener('click', () => registrarFeedbackCalidad('correcto'));
 document.getElementById('btnFeedbackCorreccion')?.addEventListener('click', () => registrarFeedbackCalidad('correccion'));
 

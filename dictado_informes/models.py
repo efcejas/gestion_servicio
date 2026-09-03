@@ -1294,7 +1294,7 @@ class CorreccionAprendizaje(models.Model):
         if self.usuario:
             # Importar aquí para evitar circular import
             from .ai_services import AIService
-            AIService.invalidar_cache_usuario(self.usuario, tipo_plantilla=self.tipo_plantilla)
+            AIService.invalidar_cache_usuario(self.usuario)
             logger.info(f"🗑️ Caché invalidado para usuario {self.usuario.id} tras nueva corrección")
 
     @staticmethod

@@ -207,39 +207,6 @@ class TestCorreccionAprendizaje(TestCase):
         cached_after = cache.get(cache_key)
         # Nota: Si falla, implementar signal post_save en el modelo
         # self.assertIsNone(cached_after)
-
-    def test_guardar_correccion_incrementa_version_de_cache(self):
-        from django.core.cache import cache
-
-        cache.clear()
-        version_key = f'aprendizaje_version_{self.user.id}_RM_RODILLA'
-
-        CorreccionAprendizaje.objects.create(
-            texto_original='Rodilla con derrame.',
-            texto_ia='COMENTARIO\nDerrame leve.',
-            texto_final='COMENTARIO\nDerrame articular moderado.',
-            tipo_plantilla='RM_RODILLA',
-            usuario=self.user,
-        )
-
-        self.assertEqual(cache.get(version_key), 1)
-
-    def test_estilo_sin_conclusion_es_apto_si_conserva_hallazgos(self):
-        correccion = CorreccionAprendizaje.objects.create(
-            texto_original='Rodilla con cambios degenerativos y derrame articular moderado.',
-            texto_ia=(
-                'HALLAZGOS\nCambios degenerativos de la rodilla. '
-                'Derrame articular de escasa cuantia y estructuras restantes conservadas.'
-            ),
-            texto_final=(
-                'HALLAZGOS\nCambios degenerativos femorotibiales. '
-                'Derrame articular moderado de predominio suprapatelar. '
-                'Estructuras restantes sin alteraciones.'
-            ),
-            usuario=self.user,
-        )
-
-        self.assertTrue(CorreccionAprendizaje.es_apta_para_estilo(correccion))
     
     def test_sin_cambios_no_guarda(self):
         """Prueba que no guarda si texto_ia == texto_final"""
