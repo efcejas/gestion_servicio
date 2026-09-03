@@ -2048,7 +2048,7 @@ async function guardarAprendizajeAutomatico() {
     // Solo guardar si hay texto válido (mínimo 20 caracteres)
     if (!textoFinal || textoFinal.trim().length < 20) {
         console.log('📝 Texto muy corto para aprendizaje automático (mín: 20 chars)');
-        return;
+        return { success: true, guardado: false, apta_para_prompt: false };
     }
     
     try {
@@ -2073,15 +2073,19 @@ async function guardarAprendizajeAutomatico() {
         });
         
         const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'No se pudo guardar el aprendizaje');
+        }
         
         if (data.success && data.guardado) {
             console.log('✅ Aprendizaje guardado automáticamente:', data.message);
             // Recargar contador silenciosamente
             cargarInfoAprendizaje();
         }
+        return data;
     } catch (error) {
         console.error('⚠️ Error al guardar aprendizaje automático:', error);
-        // No mostrar error al usuario para no interrumpir el flujo
+        throw error;
     }
 }
 
@@ -2185,8 +2189,12 @@ async function copiarTexto(modoCopia = 'rich') {
         if (huboCambios) {
             const confirmarAprendizaje = confirm('¿Querés guardar esta corrección para aprendizaje?');
             if (confirmarAprendizaje) {
-                await guardarAprendizajeAutomatico();
-                mostrarToast('✅ Copiado y aprendizaje guardado', 'success');
+                const aprendizaje = await guardarAprendizajeAutomatico();
+                if (aprendizaje.guardado && aprendizaje.apta_para_prompt) {
+                    mostrarToast('✅ Corrección guardada y activa para próximos informes', 'success');
+                } else if (aprendizaje.guardado) {
+                    mostrarToast('Corrección guardada en historial, pero no aplicada automáticamente', 'info');
+                }
             }
         }
     } catch (error) {

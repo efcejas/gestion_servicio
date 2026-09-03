@@ -46,6 +46,17 @@ class TestOntologiaAnatomica(SimpleTestCase):
 
         self.assertEqual(residual, 'Menisco externo de altura y señal conservadas.')
 
+    def test_patologia_meniscal_en_plural_no_infiere_componente_normal(self):
+        residual = construir_linea_residual(
+            'Meniscos de altura y señal normales.',
+            (
+                'Meniscos con cambios degenerativos hialinos difusos, de predominio '
+                'en el cuerno posterior del menisco interno.'
+            ),
+        )
+
+        self.assertIsNone(residual)
+
     def test_manguito_usa_frase_residual_para_varios_componentes_restantes(self):
         residual = construir_linea_residual(
             'Tendones del manguito rotador sin alteraciones.',

@@ -1076,6 +1076,12 @@ REGLAS OBLIGATORIAS:
             cache_key = None  # Deshabilitar caché en modo conversacional
             logger.info("🤖 Modo conversacional activo - caché deshabilitado")
         else:
+            usuario_id = usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo'
+            plantilla_cache = str(contexto.get('tipo_plantilla') or 'sin_plantilla')
+            aprendizaje_version = cache.get(
+                f'aprendizaje_version_{usuario_id}_{plantilla_cache}',
+                0,
+            )
             cache_key_parts = [
                 'encabezados_v2',
                 self.llm_model or '',
@@ -1084,7 +1090,8 @@ REGLAS OBLIGATORIAS:
                 tipo_estudio,
                 modo,
                 str(contexto.get('tipo_plantilla') or ''),
-                str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo')
+                str(usuario_id),
+                str(aprendizaje_version),
             ]
             cache_key_str = '|'.join(cache_key_parts)
             cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
@@ -1360,12 +1367,14 @@ PASO 2.2 — COHERENCIA DE PÁRRAFOS:
 Si varias frases describen el mismo proceso patológico, integrarlas en una sola línea o párrafo.
 Ejemplo: artrosis o rizartrosis + edema óseo + sinovitis + cambios inflamatorios adyacentes forman un único párrafo.
 No fragmentar en una línea distinta cada manifestación asociada. Mantener separadas las patologías independientes y las líneas de normalidad.
+Si condromalacia grado IV, lesión osteocondral y edema óseo subcondral afectan la misma superficie articular, describir el complejo una sola vez, sin una oración redundante posterior.
 
 PASO 3 — REGLAS DE ORO:
   ✅ Nunca eliminar una línea sin reemplazarla o justificarlo
   - La GUIA DE ESTILO DEL RADIOLOGO tiene prioridad sobre las lineas normales de la plantilla cuando indica como resolver una contradiccion.
   - La numeracion [1], [2], [3] es solo para razonar internamente: NO debe aparecer en el informe final.
   - Si una subestructura esta patologica y la plantilla tiene una linea normal del conjunto que la incluye, NO repitas ambas. Reemplaza la linea normal por una frase residual: "Resto de...", "No se visualizan otras..." o "El resto de ... sin alteraciones".
+  - Si el dictado menciona el conjunto patologico en plural (por ejemplo "meniscos con cambios degenerativos"), NO agregues como normal ninguno de sus componentes. Solo crea una linea residual cuando el dictado limita explicitamente la patologia a un componente singular.
   ✅ Si una línea habla de dos estructuras (ej: "bursas y tendón") y solo una fue mencionada, reescribir la línea dejando normal la no menciona
   ✅ Si una línea de la plantilla niega varios hallazgos en conjunto (ej: "No se identifican X ni Y") y el dictado confirma UNO de ellos, reescribir la línea conservando solo la negación del hallazgo NO confirmado. Si el dictado confirma TODOS los hallazgos negados en esa línea, eliminarla por completo y reemplazarla por el hallazgo positivo. Ej: dictado dice 'imagen nodular' → plantilla dice 'No se identifican nódulos ni áreas de consolidación' → reescribir como 'No se identifican áreas de consolidación parenquimatosa.'
   ✅ Si aparece una estructura patológica nueva no contemplada en plantilla, crear su línea e insertarla cerca de su estructura relacionada
@@ -1784,6 +1793,9 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
         
         # Invalidar ejemplos de aprendizaje y estilo
         plantilla_cache = tipo_plantilla or 'sin_plantilla'
+        version_key = f'aprendizaje_version_{usuario_id}_{plantilla_cache}'
+        version_actual = cache.get(version_key, 0)
+        cache.set(version_key, int(version_actual or 0) + 1, timeout=None)
         cache_keys = [
             f'ejemplos_aprendizaje_{usuario_id}_{plantilla_cache}',
             f'ejemplos_estilo_{usuario_id}_{plantilla_cache}',
@@ -2207,36 +2219,59 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
         if not contexto_clinico:
             return texto_mejorado, False
 
-        if contexto_clinico.get('region') != 'CADERA':
+        region = contexto_clinico.get('region')
+        lateralidad = contexto_clinico.get('lateralidad')
+        if not region or lateralidad not in {'BILATERAL', 'DERECHA', 'IZQUIERDA'}:
             return texto_mejorado, False
-        if contexto_clinico.get('lateralidad') != 'BILATERAL':
+
+        nombres = {
+            'RODILLA': ('RODILLA', 'RODILLAS', 'la rodilla'),
+            'HOMBRO': ('HOMBRO', 'HOMBROS', 'el hombro'),
+            'CODO': ('CODO', 'CODOS', 'el codo'),
+            'MANO': ('MANO', 'MANOS', 'la mano'),
+            'MUNECA': ('MUÑECA', 'MUÑECAS', 'la muñeca'),
+            'TOBILLO': ('TOBILLO', 'TOBILLOS', 'el tobillo'),
+            'CADERA': ('CADERA', 'CADERAS', 'la cadera'),
+        }
+        if region not in nombres:
             return texto_mejorado, False
+
+        singular, plural, frase_singular = nombres[region]
+        if lateralidad == 'BILATERAL':
+            titulo_esperado = contexto_clinico.get('titulo_lateralidad') or f'AMBAS {plural}'
+            frase_esperada = contexto_clinico.get('frase_lateralidad') or f'ambas {plural.lower()}'
+        else:
+            titulo_esperado = f'{singular} {lateralidad}'
+            frase_esperada = f'{frase_singular} {lateralidad.lower()}'
 
         lineas = (texto_mejorado or '').splitlines()
         cambio = False
-        for idx, linea in enumerate(lineas):
-            if not linea.strip():
-                continue
+        idx_titulo = next((i for i, linea in enumerate(lineas) if linea.strip()), None)
+        patron_region = rf'\b(?:AMBAS?\s+)?{re.escape(singular)}S?(?:\s+(?:DERECHA|IZQUIERDA|BILATERAL(?:ES)?))?\b'
+        if idx_titulo is not None and re.search(patron_region, lineas[idx_titulo], flags=re.I):
+            nueva = re.sub(patron_region, titulo_esperado, lineas[idx_titulo], flags=re.I)
+            nueva = re.sub(r'\s*\[<DERECHA/IZQUIERDA>\]\s*', ' ', nueva, flags=re.I).strip()
+            if nueva != lineas[idx_titulo]:
+                lineas[idx_titulo] = nueva
+                cambio = True
 
-            normalizada = self._normalizar_texto_simple(linea)
-            if 'rm de cadera' in normalizada or 'resonancia magnetica de cadera' in normalizada:
-                nueva = re.sub(
-                    r'\bRM\s+DE\s+CADERAS?\b.*',
-                    'RM DE AMBAS CADERAS',
-                    linea,
-                    flags=re.I,
-                )
-                nueva = re.sub(
-                    r'\bRESONANCIA\s+MAGNETICA\s+DE\s+CADERAS?\b.*',
-                    'RESONANCIA MAGNETICA DE AMBAS CADERAS',
-                    nueva,
-                    flags=re.I,
-                )
-                nueva = re.sub(r'\s*\[<DERECHA/IZQUIERDA>\]\s*', ' ', nueva, flags=re.I).strip()
-                if nueva != linea:
+        idx_tecnica = self._buscar_indice_header(lineas, {'TECNICA', 'TÉCNICA'})
+        if idx_tecnica is not None:
+            idx_fin = self._buscar_siguiente_header(
+                lineas,
+                idx_tecnica + 1,
+                {'COMENTARIO', 'HALLAZGOS', 'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'},
+            ) or len(lineas)
+            patron_tecnica = rf'\b(?:la|el)?\s*{re.escape(singular.lower())}s?(?:\s+(?:derecha|izquierda|bilateral(?:es)?))?\b'
+            for idx in range(idx_tecnica + 1, idx_fin):
+                if not re.search(patron_tecnica, lineas[idx], flags=re.I):
+                    continue
+                nueva = re.sub(patron_tecnica, frase_esperada, lineas[idx], flags=re.I)
+                if lateralidad == 'BILATERAL':
+                    nueva = re.sub(r'\bSe exploró\s+(ambas|ambos)\b', r'Se exploraron \1', nueva, flags=re.I)
+                if nueva != lineas[idx]:
                     lineas[idx] = nueva
                     cambio = True
-            break
 
         return '\n'.join(lineas).strip(), cambio
 
@@ -2423,10 +2458,58 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 consolidado = True
                 j += 1
 
+            actual, deduplicado = self._deduplicar_oraciones_semanticas(actual)
+            consolidado = consolidado or deduplicado
+
             nuevas.append(actual)
             i = j
 
         return nuevas, consolidado
+
+    def _deduplicar_oraciones_semanticas(self, texto):
+        """Elimina cierres breves que repiten un hallazgo ya descripto con más detalle."""
+        oraciones = [
+            parte.strip()
+            for parte in re.findall(r'[^.!?]+(?:[.!?]+|$)', texto or '')
+            if parte.strip()
+        ]
+        if len(oraciones) < 2:
+            return texto, False
+
+        stopwords = {
+            'asociado', 'asociada', 'asociados', 'asociadas', 'con', 'del', 'desde',
+            'ella', 'entre', 'hacia', 'hasta', 'para', 'pero', 'sobre', 'tras', 'una',
+            'uno', 'unos', 'unas', 'este', 'esta', 'estos', 'estas', 'articular',
+        }
+
+        def conceptos(oracion):
+            normalizada = self._normalizar_texto_simple(oracion)
+            return {
+                token for token in re.findall(r'[a-z0-9]+', normalizada)
+                if len(token) >= 4 and token not in stopwords
+            }
+
+        conservadas = []
+        conceptos_conservados = []
+        cambio = False
+        for oracion in oraciones:
+            actuales = conceptos(oracion)
+            redundante = False
+            if len(actuales) >= 4:
+                for previos in conceptos_conservados:
+                    comunes = actuales & previos
+                    cobertura = len(comunes) / len(actuales)
+                    if len(comunes) >= 4 and cobertura >= 0.6 and len(actuales) <= len(previos):
+                        redundante = True
+                        break
+
+            if redundante:
+                cambio = True
+                continue
+            conservadas.append(oracion)
+            conceptos_conservados.append(actuales)
+
+        return ' '.join(conservadas).strip(), cambio
 
     def _normalizar_texto_simple(self, texto):
         texto = unicodedata.normalize('NFKD', texto or '')

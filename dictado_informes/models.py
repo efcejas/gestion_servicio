@@ -1388,9 +1388,9 @@ class CorreccionAprendizaje(models.Model):
             return False
 
         texto = (correccion.texto_final or '').upper()
-        tiene_estructura = 'COMENTARIO' in texto and 'CONCLUSI' in texto
+        tiene_hallazgos = 'COMENTARIO' in texto or 'HALLAZGOS' in texto
         tiene_longitud = len((correccion.texto_final or '').strip()) >= 80
-        return tiene_estructura and tiene_longitud
+        return tiene_hallazgos and tiene_longitud
     
     @staticmethod
     def obtener_ejemplos_aprendizaje(usuario=None, limite=10, tipo_plantilla=''):

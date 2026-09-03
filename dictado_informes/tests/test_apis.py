@@ -470,6 +470,17 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['frase_lateralidad'], 'ambas caderas')
         self.assertEqual(contexto['indicacion_clinica'], 'Coxalgia bilateral.')
 
+    def test_extrae_contexto_clinico_ambas_rodillas(self):
+        contexto = extraer_contexto_clinico_dictado(
+            'Resonancia magnetica bilateral de rodillas por gonalgia izquierda.'
+        )
+
+        self.assertEqual(contexto['region'], 'RODILLA')
+        self.assertEqual(contexto['lateralidad'], 'BILATERAL')
+        self.assertEqual(contexto['titulo_lateralidad'], 'AMBAS RODILLAS')
+        self.assertEqual(contexto['frase_lateralidad'], 'ambas rodillas')
+        self.assertEqual(contexto['indicacion_clinica'], 'Gonalgia izquierda.')
+
     def test_region_explicita_prevalece_sobre_indicacion_clinica(self):
         contexto = extraer_contexto_clinico_dictado(
             'Paciente con gonalgia derecha. Es una resonancia de ambas caderas.'

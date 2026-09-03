@@ -178,9 +178,22 @@ def contexto_patologico_del_grupo(grupo, contexto):
     )
 
 
+def conjunto_completo_afectado(grupo, contexto):
+    """Detecta cuando el dictado patologico alcanza al grupo en plural."""
+    segmentos = [normalizar_anatomia(s) for s in re.split(r'[.\n;]+', str(contexto or ''))]
+    return any(
+        any(_contiene_alias(segmento, alias) for alias in grupo.aliases)
+        and any(_contiene_alias(segmento, patologia) for patologia in PATOLOGIA_ALIASES)
+        for segmento in segmentos
+    )
+
+
 def construir_linea_residual(linea_base, contexto):
     grupo = grupo_para_linea(linea_base, exigir_conjunto=True)
     if not grupo:
+        return None
+
+    if conjunto_completo_afectado(grupo, contexto):
         return None
 
     afectados = componentes_afectados(grupo, contexto)
@@ -229,6 +242,10 @@ def resumen_ontologia_relevante(*textos):
     lineas.append(
         'Si un componente esta patologico, no conservar una normalidad contradictoria del conjunto; '
         'describir los componentes restantes inmediatamente debajo del hallazgo.'
+    )
+    lineas.append(
+        'Si el dictado atribuye patologia al grupo en plural, considerar afectados todos sus '
+        'componentes y no agregar normalidades residuales individuales.'
     )
     return '\n'.join(lineas)
 

@@ -55,6 +55,23 @@ class AIGuardrailsTests(TestCase):
         self.assertFalse(consolidado)
         self.assertEqual(resultado, lineas)
 
+    def test_deduplica_complejo_osteocondral_repetido(self):
+        parrafo = (
+            'Rotula de implantacion alta, con pinzamiento patelofemoral externo y '
+            'lesiones osteocondrales de la faceta rotuliana externa y troclea femoral '
+            'lateral, asociadas a edema oseo subcondral y condromalacia grado IV. '
+            'Derrame articular de predominio suprapatelar. '
+            'Lesiones osteocondrales patelofemorales con edema oseo subcondral asociado.'
+        )
+
+        resultado, deduplicado = self.ai._deduplicar_oraciones_semanticas(parrafo)
+
+        self.assertTrue(deduplicado)
+        self.assertEqual(resultado.count('Lesiones osteocondrales'), 0)
+        self.assertEqual(resultado.lower().count('lesiones osteocondrales'), 1)
+        self.assertIn('condromalacia grado IV', resultado)
+        self.assertIn('Derrame articular', resultado)
+
     def test_terra_usa_parametros_de_modelo_de_razonamiento(self):
         respuesta = MagicMock()
         self.ai.llm_client = MagicMock()
@@ -541,6 +558,45 @@ Se exploraron ambas caderas.
 
         self.assertTrue(aplicado)
         self.assertIn('RM DE AMBAS CADERAS', texto_final)
+
+    def test_guardrail_lateralidad_ambas_rodillas_normaliza_titulo_y_tecnica(self):
+        texto_final, aplicado = self.ai._aplicar_guardrail_lateralidad_contexto(
+            """RM DE RODILLA BILATERAL
+
+INFORMACIÓN CLÍNICA
+Gonalgia izquierda.
+TÉCNICA
+Se exploró la rodilla bilateral con secuencias multiplanares.
+COMENTARIO
+Meniscos con cambios degenerativos.
+""",
+            {
+                'lateralidad': 'BILATERAL',
+                'region': 'RODILLA',
+                'titulo_lateralidad': 'AMBAS RODILLAS',
+                'frase_lateralidad': 'ambas rodillas',
+            },
+        )
+
+        self.assertTrue(aplicado)
+        self.assertIn('RM DE AMBAS RODILLAS', texto_final)
+        self.assertIn('Se exploraron ambas rodillas', texto_final)
+        self.assertIn('Gonalgia izquierda.', texto_final)
+        self.assertNotIn('rodilla bilateral', texto_final.lower())
+
+    def test_guardrail_corrige_lateralidad_unilateral_contradictoria(self):
+        texto_final, aplicado = self.ai._aplicar_guardrail_lateralidad_contexto(
+            """RM DE RODILLA DERECHA
+
+TÉCNICA
+Se exploró la rodilla derecha.
+""",
+            {'lateralidad': 'IZQUIERDA', 'region': 'RODILLA'},
+        )
+
+        self.assertTrue(aplicado)
+        self.assertIn('RM DE RODILLA IZQUIERDA', texto_final)
+        self.assertIn('Se exploró la rodilla izquierda.', texto_final)
 
     def test_plantilla_columna_incompatible_con_contexto_mano(self):
         plantilla = {

@@ -277,9 +277,17 @@ def extraer_contexto_clinico_dictado(texto):
 
     titulo_lateralidad = ''
     frase_lateralidad = ''
-    if lateralidad == 'BILATERAL' and region == 'CADERA':
-        titulo_lateralidad = 'AMBAS CADERAS'
-        frase_lateralidad = 'ambas caderas'
+    regiones_bilaterales = {
+        'RODILLA': ('AMBAS RODILLAS', 'ambas rodillas'),
+        'HOMBRO': ('AMBOS HOMBROS', 'ambos hombros'),
+        'CODO': ('AMBOS CODOS', 'ambos codos'),
+        'MANO': ('AMBAS MANOS', 'ambas manos'),
+        'MUNECA': ('AMBAS MUÑECAS', 'ambas muñecas'),
+        'TOBILLO': ('AMBOS TOBILLOS', 'ambos tobillos'),
+        'CADERA': ('AMBAS CADERAS', 'ambas caderas'),
+    }
+    if lateralidad == 'BILATERAL' and region in regiones_bilaterales:
+        titulo_lateralidad, frase_lateralidad = regiones_bilaterales[region]
     elif lateralidad in {'DERECHA', 'IZQUIERDA'}:
         titulo_lateralidad = lateralidad
         frase_lateralidad = lateralidad.lower()
