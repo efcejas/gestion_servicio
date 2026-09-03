@@ -200,7 +200,15 @@ def extraer_contexto_clinico_dictado(texto):
 
     lateralidad = None
     lado_tecnica = None
-    if 'bilateral' in tokens or 'ambas' in tokens or 'ambos' in tokens:
+    regiones_pares = (
+        'ambas rodillas', 'ambos hombros', 'ambos codos', 'ambas manos',
+        'ambas munecas', 'ambos tobillos', 'ambas caderas',
+    )
+    bilateral_explicita = (
+        'bilateral' in tokens
+        or any(frase in texto_norm for frase in regiones_pares)
+    )
+    if bilateral_explicita:
         lateralidad = 'BILATERAL'
         lado_tecnica = 'bilateral'
     elif {'derecha', 'derecho'} & tokens:

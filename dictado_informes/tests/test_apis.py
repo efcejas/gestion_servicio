@@ -481,6 +481,16 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['frase_lateralidad'], 'ambas rodillas')
         self.assertEqual(contexto['indicacion_clinica'], 'Gonalgia izquierda.')
 
+    def test_componentes_anatomicos_en_plural_no_vuelven_bilateral_el_estudio(self):
+        contexto = extraer_contexto_clinico_dictado(
+            'Paciente con gonalgia izquierda. Ambos meniscos muestran cambios difusos '
+            'y el derrame predomina en ambos retinaculos patelofemorales.'
+        )
+
+        self.assertEqual(contexto['region'], 'RODILLA')
+        self.assertEqual(contexto['lateralidad'], 'IZQUIERDA')
+        self.assertEqual(contexto['titulo_lateralidad'], 'IZQUIERDA')
+
     def test_region_explicita_prevalece_sobre_indicacion_clinica(self):
         contexto = extraer_contexto_clinico_dictado(
             'Paciente con gonalgia derecha. Es una resonancia de ambas caderas.'

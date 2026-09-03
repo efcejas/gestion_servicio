@@ -2247,7 +2247,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
         lineas = (texto_mejorado or '').splitlines()
         cambio = False
         idx_titulo = next((i for i, linea in enumerate(lineas) if linea.strip()), None)
-        patron_region = rf'\b(?:AMBAS?\s+)?{re.escape(singular)}S?(?:\s+(?:DERECHA|IZQUIERDA|BILATERAL(?:ES)?))?\b'
+        patron_region = rf'\b(?:(?:AMBAS|AMBOS)\s+)?{re.escape(singular)}S?(?:\s+(?:DERECHA|IZQUIERDA|BILATERAL(?:ES)?))?\b'
         if idx_titulo is not None and re.search(patron_region, lineas[idx_titulo], flags=re.I):
             nueva = re.sub(patron_region, titulo_esperado, lineas[idx_titulo], flags=re.I)
             nueva = re.sub(r'\s*\[<DERECHA/IZQUIERDA>\]\s*', ' ', nueva, flags=re.I).strip()
@@ -2262,7 +2262,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 idx_tecnica + 1,
                 {'COMENTARIO', 'HALLAZGOS', 'CONCLUSION', 'CONCLUSIÓN', 'IMPRESION', 'IMPRESIÓN'},
             ) or len(lineas)
-            patron_tecnica = rf'\b(?:la|el)?\s*{re.escape(singular.lower())}s?(?:\s+(?:derecha|izquierda|bilateral(?:es)?))?\b'
+            patron_tecnica = rf'\b(?:(?:la|el|ambas|ambos)\s+)?{re.escape(singular.lower())}s?(?:\s+(?:derecha|izquierda|bilateral(?:es)?))?\b'
             for idx in range(idx_tecnica + 1, idx_fin):
                 if not re.search(patron_tecnica, lineas[idx], flags=re.I):
                     continue

@@ -584,6 +584,25 @@ Meniscos con cambios degenerativos.
         self.assertIn('Gonalgia izquierda.', texto_final)
         self.assertNotIn('rodilla bilateral', texto_final.lower())
 
+    def test_guardrail_bilateral_es_idempotente(self):
+        texto_final, aplicado = self.ai._aplicar_guardrail_lateralidad_contexto(
+            """RM DE AMBAS RODILLAS
+
+TÉCNICA
+Se exploraron ambas rodillas con secuencias multiplanares.
+""",
+            {
+                'lateralidad': 'BILATERAL',
+                'region': 'RODILLA',
+                'titulo_lateralidad': 'AMBAS RODILLAS',
+                'frase_lateralidad': 'ambas rodillas',
+            },
+        )
+
+        self.assertFalse(aplicado)
+        self.assertEqual(texto_final.count('ambas rodillas'), 1)
+        self.assertNotIn('ambasambas', texto_final.lower())
+
     def test_guardrail_corrige_lateralidad_unilateral_contradictoria(self):
         texto_final, aplicado = self.ai._aplicar_guardrail_lateralidad_contexto(
             """RM DE RODILLA DERECHA
