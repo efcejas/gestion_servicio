@@ -1087,7 +1087,7 @@ def _vista_obras_sociales_evolucion(request):
     estudios = base
     obras_seleccionadas = request.GET.getlist('obras_sociales[]') or request.GET.getlist('obras_sociales')
     if obras_seleccionadas:
-        estudios = estudios.filter(obra_social__in=obras_seleccionadas)
+        estudios = estudios.filter(Q(obra_social__in=obras_seleccionadas) | Q(codigo_obra_social__in=obras_seleccionadas))
     filas = (estudios.annotate(os_key=Coalesce('obra_social', 'codigo_obra_social'))
              .exclude(Q(os_key__isnull=True) | Q(os_key='')).values('fecha_turno', 'os_key'))
     conteo = {}
