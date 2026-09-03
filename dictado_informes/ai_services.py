@@ -1168,8 +1168,9 @@ CONCLUSIÓN
 
 IMPORTANTE: 
 - Títulos en MAYÚSCULAS, sin asteriscos ni markdown
-- CADA hallazgo en su propia línea con SALTO DE LÍNEA después
-- NO escribir todos los hallazgos en un solo párrafo
+- Usar una línea por proceso patológico o grupo anatómico coherente
+- Integrar en el mismo párrafo la lesión principal y sus manifestaciones asociadas
+- Mantener en líneas separadas los hallazgos independientes y las estructuras normales
 - SIN viñetas ni guiones
 - NO modifiques contenido pre-existente de la plantilla
 - Si la Técnica ya está completa, devuélvela SIN CAMBIOS
@@ -1318,7 +1319,7 @@ TECNICA
 {plantilla_actual['seccion_tecnica']}
 
 COMENTARIO
-[Una linea por estructura. Cada oracion termina con punto y salto de linea. NO todo en un parrafo.]
+[Una linea por proceso patologico o grupo anatomico coherente. Integrar en el mismo parrafo la lesion principal y sus manifestaciones asociadas. Separar solo hallazgos independientes y estructuras normales.]
 
 CONCLUSION
 [Solo hallazgos patologicos dictados. Texto corrido narrativo, breve. No mencionar estructuras normales ni "resto sin alteraciones".]"""
@@ -1354,6 +1355,11 @@ Si el hallazgo nuevo no existe en la plantilla base, ubicarlo así:
     2) Si afecta una estructura relacionada con una línea existente, colocarlo inmediatamente después de esa línea
     3) Si no hay ancla clara, insertarlo antes de las líneas de cierre global (por ejemplo "No se visualizan lesiones óseas" o "No se observa aumento del líquido articular")
     4) Evitar agrupar todos los hallazgos nuevos al final del COMENTARIO
+
+PASO 2.2 — COHERENCIA DE PÁRRAFOS:
+Si varias frases describen el mismo proceso patológico, integrarlas en una sola línea o párrafo.
+Ejemplo: artrosis o rizartrosis + edema óseo + sinovitis + cambios inflamatorios adyacentes forman un único párrafo.
+No fragmentar en una línea distinta cada manifestación asociada. Mantener separadas las patologías independientes y las líneas de normalidad.
 
 PASO 3 — REGLAS DE ORO:
   ✅ Nunca eliminar una línea sin reemplazarla o justificarlo
@@ -1485,7 +1491,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 if modo == 'FIEL':
                     system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
                 else:
-                    system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+                    system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Usa una línea por proceso patológico o grupo anatómico coherente; integra la lesión principal y sus manifestaciones asociadas en el mismo párrafo. Separa solo hallazgos independientes y estructuras normales. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
             
             # 🎯 Temperature dinámico según modo
             if modo == 'FIEL':
@@ -1591,7 +1597,7 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                     if modo == 'FIEL':
                         system_message = "Eres un corrector ortográfico médico. Tu ÚNICA función es corregir ortografía, acentos y mayúsculas sin modificar el contenido ni la estructura del texto. NO agregues, elimines o reorganices información. NO crees plantillas ni secciones."
                     else:
-                        system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Escribe cada hallazgo en su propia línea con salto después, nunca todo junto en un párrafo. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
+                        system_message = "Eres un médico radiólogo experto especializado en redacción de informes médicos profesionales. IMPORTANTE: 1) Usa una línea por proceso patológico o grupo anatómico coherente; integra la lesión principal y sus manifestaciones asociadas en el mismo párrafo. Separa solo hallazgos independientes y estructuras normales. 2) Usa texto plano sin markdown. 3) CONSERVA todas las líneas normales de la plantilla para estructuras que NO fueron mencionadas en el dictado. Solo reemplaza lo que fue dictado explícitamente."
                     
                     response = self.groq_fallback.chat.completions.create(
                         model='llama-3.3-70b-versatile',
@@ -1899,10 +1905,10 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
                 lineas_formato.append(contenido or '[Mantener tecnica de la plantilla si existe.]')
             elif tipo == 'hallazgos':
                 if lineas_base:
-                    lineas_formato.append('[Una linea por estructura. Conservar o reemplazar las lineas base segun el dictado. No incluir numeros, indices ni corchetes.]')
+                    lineas_formato.append('[Una linea por proceso patologico o grupo anatomico coherente. Integrar lesion principal y manifestaciones asociadas. Conservar o reemplazar las lineas base segun el dictado. No incluir numeros, indices ni corchetes.]')
                     lineas_formato.extend(lineas_base)
                 else:
-                    lineas_formato.append('[Completar con hallazgos dictados, una linea por estructura.]')
+                    lineas_formato.append('[Completar con hallazgos dictados, una linea por proceso patologico o grupo anatomico coherente.]')
             elif tipo == 'conclusion':
                 lineas_formato.append(contenido or '[Sintesis de hallazgos patologicos, solo si la plantilla incluye esta seccion.]')
             else:
@@ -2321,7 +2327,8 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             'lesion', 'lesión', 'edema', 'desgarro', 'ruptura', 'rotura', 'fractura',
             'contusion', 'contusión', 'derrame', 'sinovitis', 'bursitis', 'quiste',
             'tendinopatia', 'tendinopatía', 'tenosinovitis', 'condropatia', 'condropatía',
-            'osteocondral', 'flogosis', 'elongacion', 'elongación'
+            'osteocondral', 'flogosis', 'elongacion', 'elongación', 'artrosis',
+            'rizartrosis', 'degenerativo', 'degenerativa', 'pinzamiento'
         }
         conectores = {
             'adyacente', 'asociado', 'asociada', 'asociados', 'asociadas', 'concomitante',
@@ -2333,6 +2340,15 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
         }
 
         dictado_norm = self._normalizar_texto_simple(texto_original)
+
+        procesos_articulares = {
+            'artrosis', 'rizartrosis', 'condropatia', 'degenerativ',
+            'pinzamiento articular', 'osteocondral',
+        }
+        manifestaciones_reactivas = {
+            'edema oseo', 'sinovitis', 'derrame articular', 'flogosis',
+            'edema inflamatorio', 'tejidos blandos adyacentes',
+        }
 
         def contiene_patologia(linea):
             lnorm = self._normalizar_texto_simple(linea)
@@ -2371,15 +2387,29 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             tiene_conector = any(c in n2 for c in conectores)
             tiene_huella_dictado = (n1 in dictado_norm and n2 in dictado_norm)
 
-            return comparte_anatomia or (tiene_conector and (comparte_anatomia or tiene_huella_dictado))
+            proceso_1 = any(p in n1 for p in procesos_articulares)
+            proceso_2 = any(p in n2 for p in procesos_articulares)
+            reaccion_1 = any(p in n1 for p in manifestaciones_reactivas)
+            reaccion_2 = any(p in n2 for p in manifestaciones_reactivas)
+            mismo_proceso_articular = (proceso_1 and reaccion_2) or (proceso_2 and reaccion_1)
+            continuidad_reactiva = reaccion_1 and reaccion_2 and any(
+                enlace in dictado_norm
+                for enlace in ('se acompana', 'asociad', 'adyacente', 'con edema', 'y leve sinovitis')
+            )
+
+            return (
+                comparte_anatomia
+                or mismo_proceso_articular
+                or continuidad_reactiva
+                or (tiene_conector and (comparte_anatomia or tiene_huella_dictado))
+            )
 
         def fusionar(l1, l2):
-            base = (l1 or '').strip().rstrip('.')
-            extra = (l2 or '').strip().rstrip('.')
-            extra_lower = extra[:1].lower() + extra[1:] if extra else extra
-            if re.match(r'^(edema|derrame|sinovitis|bursitis|tenosinovitis|flogosis)\b', extra_lower, re.IGNORECASE):
-                return f"{base}, con {extra_lower}."
-            return f"{base}, {extra_lower}."
+            base = (l1 or '').strip()
+            extra = (l2 or '').strip()
+            if base and not base.endswith('.'):
+                base += '.'
+            return f"{base} {extra}".strip()
 
         nuevas = []
         i = 0
@@ -2387,15 +2417,14 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
 
         while i < len(comentario_lineas):
             actual = comentario_lineas[i].strip()
-            if i + 1 < len(comentario_lineas) and linea_relacionada(actual, comentario_lineas[i + 1]):
-                unificada = fusionar(actual, comentario_lineas[i + 1])
-                nuevas.append(unificada)
+            j = i + 1
+            while j < len(comentario_lineas) and linea_relacionada(actual, comentario_lineas[j]):
+                actual = fusionar(actual, comentario_lineas[j])
                 consolidado = True
-                i += 2
-                continue
+                j += 1
 
             nuevas.append(actual)
-            i += 1
+            i = j
 
         return nuevas, consolidado
 

@@ -11,6 +11,50 @@ class AIGuardrailsTests(TestCase):
     def setUp(self):
         self.ai = AIService()
 
+    def test_consolida_manifestaciones_del_mismo_proceso_articular(self):
+        texto_original = (
+            'Paciente con dolor en la base del pulgar. Presenta moderada rizartrosis '
+            'con edema oseo en los extremos articulares y leve sinovitis. Se acompana '
+            'de flogosis en los tejidos blandos adyacentes.'
+        )
+        lineas = [
+            'Moderada rizartrosis, con edema oseo subcondral en los extremos articulares.',
+            'Leve sinovitis de la articulacion trapeciometacarpiana.',
+            'Edema inflamatorio de los tejidos blandos adyacentes.',
+            'Desgarro del ligamento escafolunar.',
+            'No se observan lesiones oseas.',
+        ]
+
+        resultado, consolidado = self.ai._consolidar_hallazgos_relacionados(
+            lineas,
+            texto_original,
+        )
+
+        self.assertTrue(consolidado)
+        self.assertEqual(len(resultado), 3)
+        self.assertEqual(
+            resultado[0],
+            'Moderada rizartrosis, con edema oseo subcondral en los extremos articulares. '
+            'Leve sinovitis de la articulacion trapeciometacarpiana. '
+            'Edema inflamatorio de los tejidos blandos adyacentes.',
+        )
+        self.assertEqual(resultado[1], 'Desgarro del ligamento escafolunar.')
+        self.assertEqual(resultado[2], 'No se observan lesiones oseas.')
+
+    def test_no_consolida_patologias_independientes(self):
+        lineas = [
+            'Desgarro del ligamento cruzado anterior.',
+            'Lesion osteocondral del condilo femoral interno.',
+        ]
+
+        resultado, consolidado = self.ai._consolidar_hallazgos_relacionados(
+            lineas,
+            'Desgarro del ligamento cruzado anterior y lesion osteocondral condilea.',
+        )
+
+        self.assertFalse(consolidado)
+        self.assertEqual(resultado, lineas)
+
     def test_terra_usa_parametros_de_modelo_de_razonamiento(self):
         respuesta = MagicMock()
         self.ai.llm_client = MagicMock()
