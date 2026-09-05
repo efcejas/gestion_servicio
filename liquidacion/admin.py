@@ -1,6 +1,7 @@
 from django.contrib import admin, messages
 
 from .models import (
+    JornadaContractual,
     Estudios,
     GrupoTarifario,
     GuardiaPasiva,
@@ -24,6 +25,22 @@ from .models import (
     TarifaGrupoTarifario,
 )
 from .services_auditoria import evaluar_gate_consistencia_sesion
+
+
+@admin.register(JornadaContractual)
+class JornadaContractualAdmin(admin.ModelAdmin):
+    list_display = ('profesional', 'vigencia_desde', 'vigencia_hasta', 'creado_por', 'fecha_creacion')
+    list_filter = ('profesional',)
+    readonly_fields = tuple(field.name for field in JornadaContractual._meta.fields)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 # [ELIMINADO - 16 de febrero 2026]
 # Import de RegistroProcedimientosIntervensionismo eliminado

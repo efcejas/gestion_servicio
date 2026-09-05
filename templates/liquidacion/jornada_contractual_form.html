@@ -1,0 +1,33 @@
+{% extends 'layouts/base_portal_liquidacion.html' %}
+{% block title %}Nueva jornada contractual{% endblock %}
+{% block content %}
+{% include 'liquidacion/_jornadas_estilos.html' %}
+<div class="jornadas max-w-7xl mx-auto px-4 py-4">
+    <a class="boton" href="{% url 'liquidacion:jornadas_contractuales' %}"><i class="fas fa-arrow-left" aria-hidden="true"></i> Jornadas contractuales</a>
+    <header><h1>Nueva jornada contractual</h1></header>
+    <form method="post">
+        {% csrf_token %}{{ form.non_field_errors }}
+        <div class="datos"><div>{{ form.profesional.label_tag }}{{ form.profesional }}{{ form.profesional.errors }}</div><div>{{ form.vigencia_desde.label_tag }}{{ form.vigencia_desde }}{{ form.vigencia_desde.errors }}</div></div>
+        {% for dia in form.dias %}
+        <div class="dia-form"><strong>{{ dia.nombre }}</strong><div><label for="{{ dia.estado.id_for_label }}">Jornada</label>{{ dia.estado }}{{ dia.estado.errors }}</div>
+            {% for tramo in dia.tramos %}<div class="jornada-tramo"><p class="meta">Tramo {{ forloop.counter }}{% if forloop.last %} (opcional){% endif %}</p><div class="tramo"><div>{{ tramo.desde.label_tag }}{{ tramo.desde }}{{ tramo.desde.errors }}</div><div>{{ tramo.hasta.label_tag }}{{ tramo.hasta }}{{ tramo.hasta.errors }}</div></div></div>{% endfor %}
+        </div>{% endfor %}
+        <div>{{ form.observacion.label_tag }}{{ form.observacion }}{{ form.observacion.errors }}</div>
+        <div class="acciones"><a class="boton" href="{% url 'liquidacion:jornadas_contractuales' %}">Cancelar</a><button class="boton principal" type="submit"><i class="fas fa-save" aria-hidden="true"></i> Guardar jornada</button></div>
+    </form>
+</div>
+<script>
+document.querySelectorAll('.dia-form').forEach(function (dia) {
+    const estado = dia.querySelector('select');
+    function actualizar() {
+        dia.querySelectorAll('.jornada-tramo').forEach(function (tramo) {
+            const ocultar = estado.value === 'sin' && !tramo.querySelector('.errorlist');
+            tramo.hidden = ocultar;
+            tramo.querySelectorAll('input').forEach(function (input) { input.disabled = ocultar; });
+        });
+    }
+    estado.addEventListener('change', actualizar);
+    actualizar();
+});
+</script>
+{% endblock %}

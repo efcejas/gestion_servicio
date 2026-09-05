@@ -1,4 +1,5 @@
 from django.urls import path
+from .views_jornadas import JornadasContractualesView, JornadaContractualCreateView
 from .views import (
     EstudiosCreateView,
     EstudiosListView,
@@ -57,6 +58,8 @@ from .views import (
 app_name = 'liquidacion'
 
 urlpatterns = [
+    path('jornadas-contractuales/', JornadasContractualesView.as_view(), name='jornadas_contractuales'),
+    path('jornadas-contractuales/nueva/', JornadaContractualCreateView.as_view(), name='jornada_contractual_nueva'),
 
     # ===== PORTAL ADMINISTRATIVO (Sin Login) =====
     path('portal/', PortalLiquidacionInicioView.as_view(), name='portal_inicio'),

@@ -4,7 +4,7 @@ applyTo: "liquidacion/**/*.py"
 
 # Instrucciones para liquidacion
 
-> Ultima actualizacion: 02/08/2026
+> Ultima actualizacion: 05/09/2026
 
 ## Prioridad del modulo
 
@@ -59,6 +59,19 @@ applyTo: "liquidacion/**/*.py"
 - En create, el checkbox puede recordar el ultimo valor en `request.session` solo para jefe/instructor.
 - En update, manda el valor propio del registro; la sesion no debe pisarlo.
 - `signals.py` debe respetar el override y no volver a clasificar como INTRA.
+
+## Jornadas contractuales y EGES-J
+
+- `JornadaContractual` configura la jornada historica de `jefe_residentes` e `instructor_residentes`.
+- La primera vigencia operativa es `2026-08-01`; no inferir jornadas por similitud de nombres.
+- Una nueva version cierra la anterior el dia previo a su inicio y conserva autor, fecha y observacion.
+- Crear o modificar una jornada no cambia registros, montos, sesiones, snapshots ni revisiones EGES existentes.
+- La jornada no se aplica todavia al cruce EGES de forma automatica. Su integracion requiere una accion explicita de reanalisis.
+- El futuro reanalisis debe limitarse inicialmente a agosto de 2026 en adelante y a cruces pendientes/sin revision, conservando decisiones `VALIDADO`, `DESCARTADO` y correcciones previas.
+- El reanalisis debe mostrar jornada usada, horario EGES, resultado anterior, resultado nuevo y motivo; debe dejar trazabilidad de usuario y version/control.
+- Para ECO general, una practica fuera de la jornada puede justificar `EXTRA` cuando corresponda al override Extra Residencia; una practica dentro de jornada no debe justificarse como extra sin revision.
+- Doppler de jefe/instructor sigue liquidandose al 100% incluso dentro de jornada. No usarlo para justificar otras practicas de un registro mixto.
+- EGES-J es validacion operativa: no modifica `monto_calculado`, `horario`, estudios o paciente y no ejecuta recalculos masivos.
 
 ## Revision horaria B2/B3
 
@@ -189,6 +202,8 @@ applyTo: "liquidacion/**/*.py"
 - Cambio RRHH D1: `python manage.py test liquidacion.tests_preparacion_rrhh --verbosity=1`.
 - Cambio checklist E1: `python manage.py test liquidacion.tests_checklist_cierre --verbosity=1`.
 - Cambio cruce/validacion EGES: `python manage.py test liquidacion.tests_cruce_eges --verbosity=1`.
+- Cambio jornadas contractuales: `python manage.py test liquidacion.tests_jornadas_contractuales --verbosity=1`.
+- Integracion jornada-EGES: ejecutar `liquidacion.tests_jornadas_contractuales` y `liquidacion.tests_cruce_eges`; agregar pruebas focales de reanalisis, preservacion de decisiones previas y separacion ECO/Doppler.
 - Cambio validacion DNI de practica: `python manage.py test liquidacion.tests.ClasificacionHorarioResidenciaProxyTest --verbosity=1`.
 - Cambio de transicion `CERRADA -> FACTURADA`: agregar/ejecutar test focal en `liquidacion.tests_auditoria_2026_05_11.SesionContableWorkflowPermissionsTest`.
 - Si se toca modelo: `python manage.py makemigrations --check --dry-run`.

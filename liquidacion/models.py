@@ -11,6 +11,44 @@ ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA = {
 }
 
 
+class JornadaContractual(models.Model):
+    """Version confirmada de la semana laboral; no modifica liquidaciones."""
+
+    profesional = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                    related_name='jornadas_contractuales')
+    vigencia_desde = models.DateField()
+    vigencia_hasta = models.DateField(null=True, blank=True)
+    semana = models.JSONField()
+    observacion = models.TextField()
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                  related_name='jornadas_contractuales_creadas')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    cerrado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                   null=True, blank=True, related_name='jornadas_contractuales_cerradas')
+    fecha_cierre = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['profesional_id', '-vigencia_desde']
+        permissions = [('gestionar_jornadas_contractuales', 'Puede gestionar jornadas contractuales')]
+        constraints = [
+            models.UniqueConstraint(fields=['profesional', 'vigencia_desde'], name='jornada_profesional_desde_unica'),
+            models.CheckConstraint(condition=models.Q(vigencia_hasta__isnull=True) |
+                                   models.Q(vigencia_hasta__gte=models.F('vigencia_desde')),
+                                   name='jornada_vigencia_valida'),
+        ]
+
+    def clean(self):
+        from .services_jornadas import validar_semana
+        validar_semana(self.semana)
+        if self.profesional_id and self.profesional.rol not in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA:
+            raise ValidationError({'profesional': 'Selecciona un jefe o instructor de residentes.'})
+        if self.vigencia_desde and self.vigencia_hasta and self.vigencia_hasta < self.vigencia_desde:
+            raise ValidationError({'vigencia_hasta': 'La fecha final no puede preceder al inicio.'})
+
+    def __str__(self):
+        return f'{self.profesional} - desde {self.vigencia_desde}'
+
+
 class GrupoTarifario(models.Model):
     """Grupo de facturación para desacoplar catálogo clínico de reglas de precio."""
 

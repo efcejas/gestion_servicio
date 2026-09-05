@@ -5,7 +5,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 
 # Skill: Liquidacion Operativa
 
-> Ultima actualizacion: 02/08/2026
+> Ultima actualizacion: 05/09/2026
 
 ## Checklist rapida
 
@@ -15,6 +15,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Si el cambio toca facturacion, verificar requisito RRHH: con practicas de residencia requiere preparacion `PREPARADO`; sin residencia es `No requerido`.
 - Si el cambio toca bloqueantes de cierre, distinguir navegacion/inspeccion de correccion real.
 - Si el cambio toca EGES, distinguir validacion operativa de correccion economica.
+- Si el cambio toca jornadas contractuales, distinguir carga/versionado historico de reanalisis EGES explicito.
 - Mantener la logica economica fuera de templates.
 - Usar servicios existentes antes de crear nuevas reglas.
 - Evitar recalculos masivos.
@@ -31,6 +32,7 @@ description: "Skill para cambios focales en liquidacion: calculo, reglas residen
 - Checklist E1 y acciones E2: `liquidacion/services_cierre.py`, `liquidacion/services_auditoria.py`, `liquidacion/views.py`.
 - Auditoria ECO/PACS E3/E4: `RevisionAuditoriaEcoRegistro`, `CorreccionPacsRegistro`, `AuditoriaEcoSesionView`, `AuditoriaEcoRegistroCorregirView`.
 - Cruce EGES: `liquidacion/services_eges.py`, `RevisionCruceEgesRegistro`, `eges_import/models.py`, `templates/liquidacion/cruce_eges_liquidacion_preview.html`.
+- Jornadas contractuales: `JornadaContractual`, `liquidacion/services_jornadas.py`, `liquidacion/views_jornadas.py`, `templates/liquidacion/jornadas_contractuales.html` y `liquidacion/tests_jornadas_contractuales.py`.
 - Vistas B2/B3/D1/sesiones: `liquidacion/views.py`.
 - Clasificacion automatica y override: `liquidacion/signals.py`.
 
@@ -118,6 +120,23 @@ Reglas rapidas:
 - Agrupa multiples filas EGES del mismo turno.
 - `VALIDADO` y `DESCARTADO` limpian la alerta operativa; `REQUIERE_CORRECCION` la mantiene pendiente.
 - No modifica `RegistroEstudiosPorMedico`, `monto_calculado`, `horario`, paciente ni estudios.
+
+### Jornadas contractuales / EGES-J
+
+```bash
+python manage.py test liquidacion.tests_jornadas_contractuales --verbosity=1
+python manage.py test liquidacion.tests_cruce_eges --verbosity=1
+python manage.py makemigrations --check --dry-run
+```
+
+Reglas rapidas:
+
+- La configuracion comienza con vigencia `2026-08-01` y solo aplica a jefes/instructores.
+- Crear una jornada no cambia cruces previos ni recalcula montos.
+- El reanalisis futuro debe ser accion explicita, acotado a pendientes/sin revision y con comparacion anterior/nueva.
+- ECO general puede justificarse como `EXTRA` fuera de la jornada cuando corresponda al override.
+- Doppler de jefe/instructor mantiene 100% aun dentro de jornada; no usarlo para resolver otras practicas del mismo registro.
+- Validar el resultado del reanalisis sigue siendo una decision EGES, no una correccion economica.
 
 ### DNI de practica
 

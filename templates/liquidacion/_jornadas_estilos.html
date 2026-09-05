@@ -1,0 +1,29 @@
+<style>
+    .jornadas { --primary: #164569; --border: #d1d5db; color: #0f172a; }
+    .jornadas *, .jornadas *::before, .jornadas *::after { box-sizing:border-box; }
+    .jornadas [hidden] { display:none; }
+    .jornadas header, .jornadas .acciones { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin:16px 0; }
+    .jornadas h1 { font-size:24px; font-weight:700; }
+    .jornadas h2 { font-size:18px; font-weight:600; }
+    .jornadas .boton { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:8px 14px; border:1px solid var(--border); border-radius:6px; background:white; color:var(--primary); font-weight:600; }
+    .jornadas .principal { background:var(--primary); color:white; border-color:var(--primary); }
+    .jornadas .boton:hover { filter:brightness(.95); }
+    .jornadas :focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+    .jornadas section { padding:20px 0; border-top:1px solid var(--border); }
+    .jornadas .datos { display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1fr); gap:16px; margin:16px 0; }
+    .jornadas .datos > div, .jornadas .dia-form > div { min-width:0; }
+    .jornadas label { display:block; font-size:14px; margin-bottom:4px; }
+    .jornadas input, .jornadas select, .jornadas textarea { width:100%; min-width:0; min-height:40px; padding:8px; border:1px solid var(--border); border-radius:6px; background:white; color:inherit; }
+    .jornadas .semana { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:12px; padding:12px 0; }
+    .jornadas .semana > div { min-width:0; }
+    .jornadas .semana strong { display:block; margin-bottom:6px; }
+    .jornadas .dia-form { display:grid; grid-template-columns:100px 160px minmax(0,1fr) minmax(0,1fr); gap:12px; align-items:start; border-top:1px solid var(--border); padding:12px 0; }
+    .jornadas .tramo { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .jornadas .tramo > div { min-width:0; }
+    .jornadas .errorlist { color:#b91c1c; font-size:14px; margin:6px 0; }
+    .jornadas details { margin-top:12px; }
+    .jornadas summary { cursor:pointer; color:var(--primary); font-weight:600; }
+    .jornadas .meta { font-size:14px; color:#475569; margin:8px 0; overflow-wrap:anywhere; }
+    @media(max-width:900px) { .jornadas .semana { grid-template-columns:repeat(3,minmax(0,1fr)); } .jornadas .dia-form { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media(max-width:540px) { .jornadas .datos { grid-template-columns:minmax(0,1fr); } .jornadas .semana { grid-template-columns:repeat(2,minmax(0,1fr)); } .jornadas .dia-form { grid-template-columns:minmax(0,1fr); } .jornadas .acciones .boton { width:100%; } }
+</style>

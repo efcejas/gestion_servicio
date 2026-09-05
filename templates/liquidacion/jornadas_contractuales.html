@@ -1,0 +1,27 @@
+{% extends 'layouts/base_portal_liquidacion.html' %}
+{% block title %}Jornadas contractuales{% endblock %}
+{% block content %}
+{% include 'liquidacion/_jornadas_estilos.html' %}
+<div class="jornadas max-w-7xl mx-auto px-4 py-4">
+    <a class="boton" href="{% if es_administrativo %}{% url 'liquidacion:sesiones_list' %}{% else %}{% url 'liquidacion:registroestudios_list' %}{% endif %}"><i class="fas fa-arrow-left" aria-hidden="true"></i> Volver</a>
+    <header><h1>Jornadas contractuales</h1>{% if puede_gestionar %}<a class="boton principal" href="{% url 'liquidacion:jornada_contractual_nueva' %}"><i class="fas fa-plus" aria-hidden="true"></i> Nueva jornada</a>{% endif %}</header>
+    {% for dato in profesionales_data %}
+    <section>
+        <div class="acciones"><h2>{{ dato.profesional.get_full_name|default:dato.profesional.username }}</h2>
+            {% if puede_gestionar %}<a class="boton" href="{% url 'liquidacion:jornada_contractual_nueva' %}?profesional={{ dato.profesional.pk }}"><i class="fas fa-calendar-plus" aria-hidden="true"></i> {% if dato.versiones %}Nueva version{% else %}Configurar{% endif %}</a>{% endif %}
+        </div>
+        <p class="meta">{{ dato.profesional.get_rol_display }} · {{ dato.profesional.username }}</p>
+        {% for version in dato.versiones %}
+        {% if not forloop.first %}<details><summary>Version desde {{ version.jornada.vigencia_desde|date:'d/m/Y' }}</summary>{% endif %}
+        <p class="meta">{% if forloop.first %}Ultima version registrada · {% endif %}Desde {{ version.jornada.vigencia_desde|date:'d/m/Y' }} hasta {{ version.jornada.vigencia_hasta|date:'d/m/Y'|default:'sin fecha de fin' }}</p>
+        <div class="semana">
+            {% for dia in version.dias %}<div><strong>{{ dia.nombre }}</strong>{% for inicio, fin in dia.tramos %}<p>{{ inicio }} – {{ fin }}</p>{% empty %}<p>Sin jornada</p>{% endfor %}</div>{% endfor %}
+        </div>
+        <p class="meta">{{ version.jornada.observacion }}</p>
+        <p class="meta">Registrada por {{ version.jornada.creado_por }} · {{ version.jornada.fecha_creacion|date:'d/m/Y H:i' }}{% if version.jornada.cerrado_por %} · Vigencia cerrada por {{ version.jornada.cerrado_por }} el {{ version.jornada.fecha_cierre|date:'d/m/Y H:i' }}{% endif %}</p>
+        {% if not forloop.first %}</details>{% endif %}
+        {% empty %}<p>Sin jornada configurada.</p>{% endfor %}
+    </section>
+    {% empty %}<p>No hay profesionales para mostrar.</p>{% endfor %}
+</div>
+{% endblock %}
