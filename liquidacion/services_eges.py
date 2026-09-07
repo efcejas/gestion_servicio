@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.utils.dateparse import parse_date
 
+from control_guardias.models import Feriado
 from eges_import.models import EgesRow
 
 from .models import (
@@ -99,7 +100,7 @@ def _medico_coincide(fila, medico):
 
 
 def _practicas_liquidacion(registro):
-    relaciones = registro.registroestudio_set.select_related('estudio').all()
+    relaciones = registro.registroestudio_set.all()
     practicas = []
     for rel in relaciones:
         if rel.estudio.tipo not in TIPOS_LIQUIDACION_ECO:
@@ -185,7 +186,7 @@ def _agrupar_por_turno_eges(filas):
     return list(grupos.values())
 
 
-def horario_esperado_por_eges(fila_eges):
+def horario_esperado_por_eges(fila_eges, fechas_feriado=None):
     """
     Reglas de auditoría alineadas a liquidación:
     - sábados, domingos y feriados no aplican INTRA;
@@ -199,7 +200,12 @@ def horario_esperado_por_eges(fila_eges):
     if fila_eges.fecha_turno.weekday() >= 5:
         return 'EXTRA', 'Sábado/domingo no aplica INTRA.'
 
-    if es_fecha_feriado_liquidacion(fila_eges.fecha_turno):
+    es_feriado = (
+        fila_eges.fecha_turno in fechas_feriado
+        if fechas_feriado is not None
+        else es_fecha_feriado_liquidacion(fila_eges.fecha_turno)
+    )
+    if es_feriado:
         return 'EXTRA', 'Feriado no aplica INTRA.'
 
     inicio = fila_eges.hora_turno
@@ -293,14 +299,18 @@ def _resolver_horario_grupo(registro, representante, matches_practicas, usar_jor
     }
 
 
-def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=False, jornada=None):
+def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=False, jornada=None,
+                      fechas_feriado=None):
     practicas = _practicas_liquidacion(registro)
     candidatos = _buscar_candidatos_eges(registro, batch, indice_candidatos=indice_candidatos)
     evaluados = []
 
     for fila in candidatos:
         medico_ok, rol_medico_eges = _medico_coincide(fila, registro.medico)
-        horario_esperado, motivo_horario = horario_esperado_por_eges(fila)
+        horario_esperado, motivo_horario = horario_esperado_por_eges(
+            fila,
+            fechas_feriado=fechas_feriado,
+        )
         horario_ok = horario_esperado == registro.horario
 
         puntaje = 0
@@ -558,6 +568,17 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
     registros = list(registros)
 
     indice_candidatos = _indexar_candidatos_eges(batch, registros)
+    fechas_candidatas = {
+        fila.fecha_turno
+        for candidatos in indice_candidatos.values()
+        for fila in candidatos
+        if fila.fecha_turno
+    }
+    fechas_feriado = set(
+        Feriado.objects
+        .filter(fecha__in=fechas_candidatas)
+        .values_list('fecha', flat=True)
+    ) if fechas_candidatas else set()
     jornadas_vigentes = _indexar_jornadas_vigentes(registros) if usar_jornadas else {}
     resultados = [
         _evaluar_registro(
@@ -566,6 +587,7 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
             indice_candidatos=indice_candidatos,
             usar_jornadas=usar_jornadas,
             jornada=jornadas_vigentes.get(registro.pk),
+            fechas_feriado=fechas_feriado,
         )
         for registro in registros
     ]

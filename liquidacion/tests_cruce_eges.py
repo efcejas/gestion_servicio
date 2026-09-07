@@ -2,7 +2,9 @@ from datetime import date, time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from eges_import.models import EgesRow, ImportBatch
@@ -203,6 +205,36 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         resultado = preview['resultados'][0]
         self.assertEqual(resultado['mejor_match']['horario_esperado'], 'EXTRA')
         self.assertIn('EGES sugiere EXTRA; liquidación figura INTRA.', resultado['motivos'])
+
+    def test_preview_precarga_feriados_y_estudios_sin_consultas_por_registro(self):
+        fecha_feriado = date(2026, 5, 11)
+        Feriado.objects.create(fecha=fecha_feriado, descripcion='Feriado test')
+        for indice in range(3):
+            dni = f'1234567{indice}'
+            self._registro(horario='EXTRA', fecha=fecha_feriado, dni=dni)
+            self._eges_row(
+                time(10, 0),
+                time(10, 15),
+                fecha=fecha_feriado,
+                dni=dni,
+            )
+
+        with CaptureQueriesContext(connection) as consultas:
+            preview = construir_preview_cruce_liquidacion_eges(self.sesion, self.batch)
+
+        sql = [consulta['sql'].lower() for consulta in consultas.captured_queries]
+        consultas_feriados = [
+            consulta for consulta in sql
+            if 'from "control_guardias_feriado"' in consulta
+        ]
+        tabla_relaciones = RegistroEstudio._meta.db_table.lower()
+        consultas_relaciones = [
+            consulta for consulta in sql
+            if f'from "{tabla_relaciones}"' in consulta
+        ]
+        self.assertEqual(preview['resumen']['total'], 3)
+        self.assertEqual(len(consultas_feriados), 1)
+        self.assertEqual(len(consultas_relaciones), 1)
 
     def test_detecta_practica_eges_mismo_turno_no_cargada_en_liquidacion(self):
         self._registro(horario='INTRA', estudios=[self.estudio])
