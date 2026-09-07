@@ -12,10 +12,19 @@ from eges_import.models import EgesRow
 from .models import (
     ControlEgesSesion,
     CorreccionPacsRegistro,
+    JornadaContractual,
+    ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
     ResultadoControlEgesRegistro,
     RevisionCruceEgesRegistro,
 )
 from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
+from .services_jornadas import (
+    ESTADO_DENTRO_JORNADA,
+    ESTADO_FUERA_JORNADA,
+    ESTADO_JORNADA_MANUAL,
+    ESTADO_JORNADA_SIN_CONFIGURACION,
+    evaluar_horario_en_jornada,
+)
 
 
 HORA_INTRA_DESDE = time(8, 0)
@@ -26,6 +35,8 @@ SINONIMOS_PRACTICAS_ECO = {
     'abdominal': {'abdomen', 'eco_abdominal'},
     'eco_abdominal': {'abdomen', 'abdominal'},
 }
+MOTOR_HORARIO_GENERAL = 'GENERAL_V1'
+MOTOR_HORARIO_JORNADA = 'JORNADA_V1'
 
 
 def _normalizar_texto(valor):
@@ -220,7 +231,69 @@ def _buscar_candidatos_eges(registro, batch, indice_candidatos=None):
     return list(qs.order_by('hora_turno', 'practica'))
 
 
-def _evaluar_registro(registro, batch, indice_candidatos=None):
+def _resolver_horario_grupo(registro, representante, matches_practicas, usar_jornadas, jornada):
+    if not usar_jornadas:
+        return {
+            'horario_esperado': representante['horario_esperado'],
+            'motivo_horario': representante['motivo_horario'],
+            'horario_ok': representante['horario_ok'],
+            'evaluacion_jornada': None,
+        }
+
+    tipos_con_match = {
+        match['liquidacion']['relacion'].estudio.tipo
+        for match in matches_practicas
+    }
+    if (
+        registro.medico.rol in ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA
+        and 'ECO' not in tipos_con_match
+        and tipos_con_match.intersection({'DOP', 'ECOCAR'})
+    ):
+        return {
+            'horario_esperado': 'NO_APLICA',
+            'motivo_horario': (
+                'Doppler/ECOCAR de jefe o instructor: la jornada contractual no define descuento.'
+            ),
+            'horario_ok': True,
+            'evaluacion_jornada': {
+                'estado': 'NO_APLICA',
+                'motivo': 'La jornada no se usa para Doppler/ECOCAR.',
+                'jornada_id': jornada.pk if jornada else None,
+            },
+        }
+
+    if not registro.liquidar_como_extra_residencia:
+        return {
+            'horario_esperado': representante['horario_esperado'],
+            'motivo_horario': representante['motivo_horario'],
+            'horario_ok': representante['horario_ok'],
+            'evaluacion_jornada': None,
+        }
+
+    fila = representante['fila_eges']
+    evaluacion = evaluar_horario_en_jornada(
+        profesional=registro.medico,
+        fecha=fila.fecha_turno,
+        hora_inicio=fila.hora_turno,
+        hora_fin=fila.hora_hasta,
+        jornada=jornada,
+    )
+    esperado_por_estado = {
+        ESTADO_DENTRO_JORNADA: 'INTRA',
+        ESTADO_FUERA_JORNADA: 'EXTRA',
+        ESTADO_JORNADA_MANUAL: 'MANUAL',
+        ESTADO_JORNADA_SIN_CONFIGURACION: 'MANUAL',
+    }
+    esperado = esperado_por_estado.get(evaluacion['estado'], 'MANUAL')
+    return {
+        'horario_esperado': esperado,
+        'motivo_horario': evaluacion['motivo'],
+        'horario_ok': esperado != 'MANUAL' and esperado == registro.horario,
+        'evaluacion_jornada': evaluacion,
+    }
+
+
+def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=False, jornada=None):
     practicas = _practicas_liquidacion(registro)
     candidatos = _buscar_candidatos_eges(registro, batch, indice_candidatos=indice_candidatos)
     evaluados = []
@@ -272,10 +345,17 @@ def _evaluar_registro(registro, batch, indice_candidatos=None):
             match for match in matches_grupo
             if not match['medico_ok']
         ]
+        horario_grupo = _resolver_horario_grupo(
+            registro,
+            representante,
+            matches_grupo,
+            usar_jornadas,
+            jornada,
+        )
 
         puntaje = 0
         puntaje += 4 if grupo_medico_ok else 0
-        puntaje += 2 if representante['horario_ok'] else 0
+        puntaje += 2 if horario_grupo['horario_ok'] else 0
         puntaje += 3 * len(matches_grupo)
         puntaje -= 2 * len(liquidacion_sin_match_grupo)
         puntaje -= len(eges_sin_liquidacion_grupo)
@@ -292,6 +372,7 @@ def _evaluar_registro(registro, batch, indice_candidatos=None):
             'liquidacion_sin_match': liquidacion_sin_match_grupo,
             'eges_sin_liquidacion': eges_sin_liquidacion_grupo,
             'practicas_otro_profesional': practicas_otro_profesional,
+            **horario_grupo,
             'puntaje': puntaje,
         })
 
@@ -351,6 +432,8 @@ def _evaluar_registro(registro, batch, indice_candidatos=None):
         'candidatos_count': len(candidatos),
         'candidatos_eges': evaluados,
         'otros_candidatos': evaluados[1:4],
+        'motor_horario': MOTOR_HORARIO_JORNADA if usar_jornadas else MOTOR_HORARIO_GENERAL,
+        'evaluacion_jornada': mejor.get('evaluacion_jornada') if mejor else None,
     }
 
 
@@ -419,6 +502,40 @@ def _indexar_candidatos_eges(batch, registros):
     return indice
 
 
+def _indexar_jornadas_vigentes(registros):
+    profesionales = {
+        registro.medico_id
+        for registro in registros
+        if registro.liquidar_como_extra_residencia
+    }
+    fechas = [registro.fecha_del_informe for registro in registros if registro.fecha_del_informe]
+    if not profesionales or not fechas:
+        return {}
+
+    jornadas = list(
+        JornadaContractual.objects
+        .filter(profesional_id__in=profesionales, vigencia_desde__lte=max(fechas))
+        .filter(Q(vigencia_hasta__isnull=True) | Q(vigencia_hasta__gte=min(fechas)))
+        .order_by('profesional_id', '-vigencia_desde')
+    )
+    por_profesional = defaultdict(list)
+    for jornada in jornadas:
+        por_profesional[jornada.profesional_id].append(jornada)
+
+    indice = {}
+    for registro in registros:
+        fecha = registro.fecha_del_informe
+        indice[registro.pk] = next(
+            (
+                jornada for jornada in por_profesional.get(registro.medico_id, [])
+                if jornada.vigencia_desde <= fecha
+                and (jornada.vigencia_hasta is None or jornada.vigencia_hasta >= fecha)
+            ),
+            None,
+        ) if fecha else None
+    return indice
+
+
 def _queryset_registros_cruce_eges(sesion):
     return (
         sesion.practicas
@@ -434,14 +551,22 @@ def _queryset_registros_cruce_eges(sesion):
     )
 
 
-def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None):
+def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None,
+                                              usar_jornadas=False):
     registros = _queryset_registros_cruce_eges(sesion)
     registros = _aplicar_filtros_base_registros(registros, filtros=filtros, registro_ids=registro_ids)
     registros = list(registros)
 
     indice_candidatos = _indexar_candidatos_eges(batch, registros)
+    jornadas_vigentes = _indexar_jornadas_vigentes(registros) if usar_jornadas else {}
     resultados = [
-        _evaluar_registro(registro, batch, indice_candidatos=indice_candidatos)
+        _evaluar_registro(
+            registro,
+            batch,
+            indice_candidatos=indice_candidatos,
+            usar_jornadas=usar_jornadas,
+            jornada=jornadas_vigentes.get(registro.pk),
+        )
         for registro in registros
     ]
     registro_ids = [resultado['registro'].pk for resultado in resultados]
@@ -493,6 +618,8 @@ def serializar_resultado_control_eges(item):
     """Snapshot estable del diagnostico EGES, sin referencias ORM."""
     return {
         'estado_cruce': item['estado'],
+        'motor_horario': item.get('motor_horario', MOTOR_HORARIO_GENERAL),
+        'evaluacion_jornada': item.get('evaluacion_jornada'),
         'motivos': item['motivos'],
         'practicas_liquidacion': item['practicas_liquidacion'],
         'matches_practicas': [
@@ -523,9 +650,13 @@ def serializar_resultado_control_eges(item):
 
 
 @transaction.atomic
-def procesar_control_eges_sesion(sesion, batch, usuario):
+def procesar_control_eges_sesion(sesion, batch, usuario, usar_jornadas=False):
     """Calcula una vez el control completo y persiste una nueva version auditable."""
-    preview = construir_preview_cruce_liquidacion_eges(sesion, batch)
+    preview = construir_preview_cruce_liquidacion_eges(
+        sesion,
+        batch,
+        usar_jornadas=usar_jornadas,
+    )
     resumen = preview['resumen']
     type(sesion).objects.select_for_update().get(pk=sesion.pk)
     ultima_version = (
@@ -549,17 +680,115 @@ def procesar_control_eges_sesion(sesion, batch, usuario):
         'advertencia': ResultadoControlEgesRegistro.ESTADO_ADVERTENCIA,
         'manual': ResultadoControlEgesRegistro.ESTADO_MANUAL,
     }
-    ResultadoControlEgesRegistro.objects.bulk_create([
-        ResultadoControlEgesRegistro(
+    resultados_previos = {}
+    ids_revisados = set()
+    if usar_jornadas:
+        control_previo = (
+            ControlEgesSesion.objects
+            .filter(sesion_contable=sesion, batch_eges=batch)
+            .exclude(pk=control.pk)
+            .order_by('-version')
+            .first()
+        )
+        if control_previo:
+            resultados_previos = {
+                resultado.registro_id: resultado
+                for resultado in control_previo.resultados.all()
+            }
+        ids_revisados = set(
+            RevisionCruceEgesRegistro.objects
+            .filter(
+                sesion_contable=sesion,
+                batch_eges=batch,
+                registro_id__in=[item['registro'].pk for item in preview['resultados']],
+            )
+            .values_list('registro_id', flat=True)
+        )
+
+    resultados_nuevos = []
+    for item in preview['resultados']:
+        registro_id = item['registro'].pk
+        previo = resultados_previos.get(registro_id)
+        if usar_jornadas and registro_id in ids_revisados and previo:
+            snapshot = dict(previo.snapshot_json or {})
+            snapshot['control_motor_horario'] = MOTOR_HORARIO_JORNADA
+            snapshot['preservado_por_revision_previa'] = True
+            resultados_nuevos.append(ResultadoControlEgesRegistro(
+                control=control,
+                registro=item['registro'],
+                estado=previo.estado,
+                motivos_json=previo.motivos_json,
+                snapshot_json=snapshot,
+            ))
+            continue
+
+        snapshot = serializar_resultado_control_eges(item)
+        snapshot['control_motor_horario'] = (
+            MOTOR_HORARIO_JORNADA if usar_jornadas else MOTOR_HORARIO_GENERAL
+        )
+        resultados_nuevos.append(ResultadoControlEgesRegistro(
             control=control,
             registro=item['registro'],
             estado=estado_por_cruce[item['estado']],
             motivos_json=item['motivos'],
-            snapshot_json=serializar_resultado_control_eges(item),
-        )
-        for item in preview['resultados']
-    ])
+            snapshot_json=snapshot,
+        ))
+    ResultadoControlEgesRegistro.objects.bulk_create(resultados_nuevos)
+
+    if usar_jornadas:
+        conteos = defaultdict(int)
+        for resultado in resultados_nuevos:
+            conteos[resultado.estado] += 1
+        control.total_ok = conteos[ResultadoControlEgesRegistro.ESTADO_OK]
+        control.total_advertencias = conteos[ResultadoControlEgesRegistro.ESTADO_ADVERTENCIA]
+        control.total_manuales = conteos[ResultadoControlEgesRegistro.ESTADO_MANUAL]
+        control.save(update_fields=['total_ok', 'total_advertencias', 'total_manuales'])
     return control
+
+
+def ultimo_control_usa_jornadas(sesion, batch):
+    control = (
+        ControlEgesSesion.objects
+        .filter(sesion_contable=sesion, batch_eges=batch)
+        .order_by('-version')
+        .first()
+    )
+    if not control:
+        return False, None
+    snapshot = control.resultados.values_list('snapshot_json', flat=True).first() or {}
+    motor = snapshot.get('control_motor_horario') or snapshot.get('motor_horario')
+    return motor == MOTOR_HORARIO_JORNADA, control
+
+
+def adjuntar_comparacion_reanalisis_jornadas(preview, sesion, batch, control_actual):
+    if not control_actual:
+        return preview
+    control_previo = (
+        ControlEgesSesion.objects
+        .filter(sesion_contable=sesion, batch_eges=batch, version__lt=control_actual.version)
+        .order_by('-version')
+        .first()
+    )
+    if not control_previo:
+        return preview
+
+    anteriores = {
+        resultado.registro_id: resultado
+        for resultado in control_previo.resultados.all()
+    }
+    for item in preview['resultados']:
+        anterior = anteriores.get(item['registro'].pk)
+        if not anterior:
+            continue
+        item['comparacion_jornada'] = {
+            'version_anterior': control_previo.version,
+            'estado_anterior': anterior.estado.lower(),
+            'motivos_anteriores': anterior.motivos_json,
+            'estado_nuevo': item['estado'],
+            'cambio': anterior.estado.lower() != item['estado'],
+            'preservado_por_revision': bool(item.get('revision_cruce_eges')),
+        }
+    return preview
 
 
 def resumir_control_eges_sesion(sesion):

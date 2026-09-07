@@ -35,6 +35,7 @@ from .views import (
     AuditoriaEcoCorreccionPacsBulkView,
     CruceEgesLiquidacionPreviewView,
     CruceEgesProcesarControlView,
+    CruceEgesReanalizarJornadasView,
     CruceEgesBulkValidarOkView,
     CruceEgesBulkValidarSeleccionView,
     CruceEgesRegistroResolverView,
@@ -134,6 +135,11 @@ urlpatterns = [
         'sesiones/<int:pk>/cruce-eges/procesar/',
         CruceEgesProcesarControlView.as_view(),
         name='cruce_eges_procesar_control',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/reanalizar-jornadas/',
+        CruceEgesReanalizarJornadasView.as_view(),
+        name='cruce_eges_reanalizar_jornadas',
     ),
     path(
         'sesiones/<int:pk>/cruce-eges/<int:registro_pk>/resolver/',

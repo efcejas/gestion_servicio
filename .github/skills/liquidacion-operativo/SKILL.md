@@ -133,7 +133,7 @@ Reglas rapidas:
 
 - La configuracion comienza con vigencia `2026-08-01` y solo aplica a jefes/instructores.
 - Crear una jornada no cambia cruces previos ni recalcula montos.
-- El reanalisis futuro debe ser accion explicita, acotado a pendientes/sin revision y con comparacion anterior/nueva.
+- El reanalisis es una accion explicita que crea una version de control, preserva revisiones previas y muestra comparacion anterior/nueva.
 - ECO general puede justificarse como `EXTRA` fuera de la jornada cuando corresponda al override.
 - Doppler de jefe/instructor mantiene 100% aun dentro de jornada; no usarlo para resolver otras practicas del mismo registro.
 - Validar el resultado del reanalisis sigue siendo una decision EGES, no una correccion economica.

@@ -66,9 +66,9 @@ applyTo: "liquidacion/**/*.py"
 - La primera vigencia operativa es `2026-08-01`; no inferir jornadas por similitud de nombres.
 - Una nueva version cierra la anterior el dia previo a su inicio y conserva autor, fecha y observacion.
 - Crear o modificar una jornada no cambia registros, montos, sesiones, snapshots ni revisiones EGES existentes.
-- La jornada no se aplica todavia al cruce EGES de forma automatica. Su integracion requiere una accion explicita de reanalisis.
-- El futuro reanalisis debe limitarse inicialmente a agosto de 2026 en adelante y a cruces pendientes/sin revision, conservando decisiones `VALIDADO`, `DESCARTADO` y correcciones previas.
-- El reanalisis debe mostrar jornada usada, horario EGES, resultado anterior, resultado nuevo y motivo; debe dejar trazabilidad de usuario y version/control.
+- Crear la jornada no cambia el cruce EGES. Su aplicacion requiere la accion explicita `Reanalizar con jornadas`.
+- El reanalisis se habilita desde agosto de 2026, crea una nueva version de `ControlEgesSesion` y conserva decisiones y resultados revisados previamente.
+- El preview debe mostrar jornada usada, horario EGES, resultado anterior, resultado nuevo y motivo; la version del control deja trazabilidad de usuario y fecha.
 - Para ECO general, una practica fuera de la jornada puede justificar `EXTRA` cuando corresponda al override Extra Residencia; una practica dentro de jornada no debe justificarse como extra sin revision.
 - Doppler de jefe/instructor sigue liquidandose al 100% incluso dentro de jornada. No usarlo para justificar otras practicas de un registro mixto.
 - EGES-J es validacion operativa: no modifica `monto_calculado`, `horario`, estudios o paciente y no ejecuta recalculos masivos.

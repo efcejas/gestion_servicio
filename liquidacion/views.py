@@ -93,11 +93,14 @@ from .services_rrhh import (
 )
 from .services_cierre import construir_checklist_cierre_sesion
 from .services_eges import (
+    adjuntar_comparacion_reanalisis_jornadas,
     construir_preview_cruce_liquidacion_eges,
+    ultimo_control_usa_jornadas,
     procesar_control_eges_sesion,
     resumir_control_eges_sesion,
     serializar_resultado_control_eges,
 )
+from .services_jornadas import INICIO_JORNADAS
 from eges_import.models import ImportBatch
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -1402,9 +1405,24 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
         batches = ImportBatch.objects.all().order_by('-fecha_importacion')
         batch = None
         preview = None
+        usar_jornadas = False
+        control_jornadas = None
         if batch_id:
             batch = get_object_or_404(ImportBatch, pk=batch_id)
-            preview = construir_preview_cruce_liquidacion_eges(self.sesion, batch, filtros=self.request.GET)
+            usar_jornadas, control_jornadas = ultimo_control_usa_jornadas(self.sesion, batch)
+            preview = construir_preview_cruce_liquidacion_eges(
+                self.sesion,
+                batch,
+                filtros=self.request.GET,
+                usar_jornadas=usar_jornadas,
+            )
+            if usar_jornadas:
+                adjuntar_comparacion_reanalisis_jornadas(
+                    preview,
+                    self.sesion,
+                    batch,
+                    control_jornadas,
+                )
             preview['profesionales'] = _opciones_profesionales_cruce_eges(preview['resultados'])
             preview['resultados_original_total'] = len(preview['resultados'])
             resultados_filtrados = _filtrar_resultados_cruce_eges(preview['resultados'], self.request.GET)
@@ -1419,14 +1437,22 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             'batches': batches,
             'batch_seleccionado': batch,
             'preview': preview,
+            'usar_jornadas': usar_jornadas,
+            'control_jornadas': control_jornadas,
             'control_eges': resumir_control_eges_sesion(self.sesion),
             'puede_validacion_masiva_eges': (
                 _puede_accion_masiva_revision_horaria(self.request.user)
                 and self.sesion.estado not in {'FACTURADA', 'PAGADA'}
             ),
+            'puede_reanalizar_jornadas': (
+                _puede_acceder_panel_administrativo(self.request.user)
+                and self.sesion.estado in {'REVISION', 'CERRADA'}
+                and date(self.sesion.año, self.sesion.mes, 1) >= INICIO_JORNADAS
+            ),
             'filtros_cruce': {
                 'profesional': self.request.GET.get('profesional', ''),
                 'estado_cruce': self.request.GET.get('estado_cruce', ''),
+                'estado_jornada': self.request.GET.get('estado_jornada', ''),
                 'estado_revision': self.request.GET.get('estado_revision', ''),
                 'fecha_desde': self.request.GET.get('fecha_desde', ''),
                 'fecha_hasta': self.request.GET.get('fecha_hasta', ''),
@@ -1475,6 +1501,46 @@ class CruceEgesProcesarControlView(LoginRequiredMixin, UserPassesTestMixin, View
         return redirect(redirect_url)
 
 
+class CruceEgesReanalizarJornadasView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Crea una nueva version del control usando jornadas, sin tocar liquidaciones."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para reanalizar el control EGES.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+        if sesion.estado not in {'REVISION', 'CERRADA'}:
+            messages.error(request, 'El reanalisis esta disponible en sesiones en revision o cerradas.')
+            return redirect(redirect_url)
+        if date(sesion.año, sesion.mes, 1) < INICIO_JORNADAS:
+            messages.error(request, 'Las jornadas contractuales se aplican desde agosto de 2026.')
+            return redirect(redirect_url)
+
+        control = procesar_control_eges_sesion(
+            sesion,
+            batch,
+            request.user,
+            usar_jornadas=True,
+        )
+        messages.success(
+            request,
+            (
+                f'Control EGES v{control.version} reanalizado con jornadas contractuales. '
+                'Las revisiones previas fueron preservadas y no se modificaron montos.'
+            ),
+        )
+        return redirect(redirect_url)
+
+
 def _snapshot_cruce_eges_item(item):
     return serializar_resultado_control_eges(item)
 
@@ -1517,6 +1583,7 @@ def _parse_fecha_cruce_eges(valor):
 def _filtrar_resultados_cruce_eges(resultados, params):
     profesional = (params.get('profesional') or '').strip()
     estado_cruce = (params.get('estado_cruce') or '').strip()
+    estado_jornada = (params.get('estado_jornada') or '').strip()
     estado_revision = (params.get('estado_revision') or '').strip()
     fecha_desde = _parse_fecha_cruce_eges((params.get('fecha_desde') or '').strip())
     fecha_hasta = _parse_fecha_cruce_eges((params.get('fecha_hasta') or '').strip())
@@ -1529,6 +1596,9 @@ def _filtrar_resultados_cruce_eges(resultados, params):
         if profesional and str(registro.medico_id) != profesional:
             continue
         if estado_cruce and item['estado'] != estado_cruce:
+            continue
+        evaluacion_jornada = item.get('evaluacion_jornada') or {}
+        if estado_jornada and evaluacion_jornada.get('estado') != estado_jornada:
             continue
         if fecha_desde and registro.fecha_del_informe < fecha_desde:
             continue
@@ -1590,7 +1660,13 @@ class CruceEgesBulkValidarOkView(LoginRequiredMixin, UserPassesTestMixin, View):
             reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
             + f'?batch={batch.pk}'
         )
-        preview = construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=request.POST)
+        usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
+        preview = construir_preview_cruce_liquidacion_eges(
+            sesion,
+            batch,
+            filtros=request.POST,
+            usar_jornadas=usar_jornadas,
+        )
         visibles = _filtrar_resultados_cruce_eges(preview['resultados'], request.POST)
         visibles = _paginar_resultados_cruce_eges(visibles, request.POST)['resultados']
         creadas = []
@@ -1669,10 +1745,12 @@ class CruceEgesBulkValidarSeleccionView(LoginRequiredMixin, UserPassesTestMixin,
                 .values_list('registro_id', flat=True)
             )
             ids_pendientes = ids_validos - ids_revisados
+            usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
             preview = construir_preview_cruce_liquidacion_eges(
                 sesion,
                 batch,
                 registro_ids=ids_pendientes,
+                usar_jornadas=usar_jornadas,
             )
             for item in preview['resultados']:
                 if item['estado'] not in {'advertencia', 'manual'}:
@@ -1732,10 +1810,12 @@ class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, Vie
             messages.error(request, 'Debes indicar accion y observacion para resolver el cruce EGES.')
             return redirect(redirect_url)
 
+        usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
         preview = construir_preview_cruce_liquidacion_eges(
             sesion,
             batch,
             registro_ids=[registro.pk],
+            usar_jornadas=usar_jornadas,
         )
         item = next(
             (resultado for resultado in preview['resultados'] if resultado['registro'].pk == registro.pk),
