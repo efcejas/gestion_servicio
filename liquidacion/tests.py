@@ -414,7 +414,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_horario_intra_descuento_50_porciento_COBER(self):
         """
-        Residente + DOP + INTRA: DOP no recibe descuento (100%).
+        Residente + DOP + INTRA: DOP recibe descuento (50%).
         """
         from decimal import Decimal
         
@@ -433,13 +433,13 @@ class CalculoMontosTest(TestCase):
         # Recalcular monto
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: $8.500 (COBER) × 1 región = $8.500
-        esperado = Decimal('8500.00')
+        # Esperado: $8.500 (COBER) × 1 región × 0.5 = $4.250
+        esperado = Decimal('4250.00')
         
         self.assertEqual(
             monto_calculado, 
             esperado,
-            f"❌ FALLA: Residente + DOP + INTRA debe cobrar $8.500 (sin descuento), pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + DOP + INTRA debe cobrar $4.250, pero cobra ${monto_calculado}"
         )
 
     def test_precio_para_os_prefiere_tarifa_vigente_del_grupo(self):
@@ -484,7 +484,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_horario_intra_descuento_50_porciento_OTRAS_OS(self):
         """
-        Residente + DOP + INTRA con OTRAS OS: DOP no recibe descuento (100%).
+        Residente + DOP + INTRA con OTRAS OS: DOP recibe descuento (50%).
         """
         from decimal import Decimal
         
@@ -502,13 +502,13 @@ class CalculoMontosTest(TestCase):
         
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: $10.000 (OTRAS_OS) × 1 región = $10.000
-        esperado = Decimal('10000.00')
+        # Esperado: $10.000 (OTRAS_OS) × 1 región × 0.5 = $5.000
+        esperado = Decimal('5000.00')
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente + DOP + INTRA con OTRAS OS debe cobrar $10.000, pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + DOP + INTRA con OTRAS OS debe cobrar $5.000, pero cobra ${monto_calculado}"
         )
     
     def test_jefe_residentes_dop_intra_sin_descuento(self):
@@ -600,7 +600,7 @@ class CalculoMontosTest(TestCase):
     
     def test_residente_multiples_regiones_intra(self):
         """
-        Residente + DOP múltiple + INTRA: DOP no recibe descuento.
+        Residente + DOP múltiple + INTRA: cada DOP recibe descuento.
         """
         from decimal import Decimal
         
@@ -618,13 +618,13 @@ class CalculoMontosTest(TestCase):
         
         monto_calculado = registro.calcular_monto()
         
-        # Esperado: ($8.500 + $8.500) = $17.000
-        esperado = Decimal('17000.00')
+        # Esperado: ($8.500 + $8.500) × 0.5 = $8.500
+        esperado = Decimal('8500.00')
         
         self.assertEqual(
             monto_calculado,
             esperado,
-            f"❌ FALLA: Residente + 2 DOP + INTRA debe cobrar $17.000, pero cobra ${monto_calculado}"
+            f"❌ FALLA: Residente + 2 DOP + INTRA debe cobrar $8.500, pero cobra ${monto_calculado}"
         )
 
     def test_calcular_monto_sin_grupo_usa_precios_legados(self):
@@ -1142,20 +1142,20 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         self.RegistroEstudio.objects.create(registro=reg, estudio=estudio, cantidad=1, contexto='SERVICIO')
         return reg
 
-    def test_jefe_eco_intra_aplica_50_porciento(self):
-        """Jefe residente + ECO + INTRA: monto = 4000 * 0.5 = 2000."""
+    def test_jefe_eco_intra_no_aplica_descuento(self):
+        """Jefe residente + ECO + INTRA: monto = 4000 sin descuento."""
         reg = self._crear_registro(self.jefe, self.estudio_eco, horario='INTRA')
-        self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('4000.00'))
 
     def test_jefe_dop_intra_no_aplica_factor(self):
         """Jefe residente + DOP + INTRA: monto = 6000 (sin descuento)."""
         reg = self._crear_registro(self.jefe, self.estudio_dop, horario='INTRA')
         self.assertEqual(reg.calcular_monto(), Decimal('6000.00'))
 
-    def test_instructor_eco_intra_aplica_50_porciento(self):
-        """Instructor residente + ECO + INTRA: monto = 4000 * 0.5 = 2000."""
+    def test_instructor_eco_intra_no_aplica_descuento(self):
+        """Instructor residente + ECO + INTRA: monto = 4000 sin descuento."""
         reg = self._crear_registro(self.instructor, self.estudio_eco, horario='INTRA')
-        self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('4000.00'))
 
     def test_instructor_dop_intra_no_aplica_factor(self):
         """Instructor residente + DOP + INTRA: monto = 6000 (sin descuento)."""
@@ -1167,10 +1167,10 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         reg = self._crear_registro(self.residente, self.estudio_eco, horario='INTRA')
         self.assertEqual(reg.calcular_monto(), Decimal('2000.00'))
 
-    def test_residente_dop_intra_no_aplica_factor(self):
-        """Residente + DOP + INTRA: monto = 6000 (sin descuento)."""
+    def test_residente_dop_intra_aplica_factor(self):
+        """Residente + DOP + INTRA: monto = 6000 * 0.5 = 3000."""
         reg = self._crear_registro(self.residente, self.estudio_dop, horario='INTRA')
-        self.assertEqual(reg.calcular_monto(), Decimal('6000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('3000.00'))
 
     def test_jefe_eco_extra_sin_descuento(self):
         """Jefe residente + ECO + EXTRA: monto = 4000 (EXTRA nunca descuenta)."""
@@ -1180,7 +1180,7 @@ class FactorIntraRolTipoEstudioTest(TestCase):
     def test_jefe_mix_eco_dop_intra_aplica_solo_a_eco(self):
         """
         Jefe + registro mixto (ECO 4000 + DOP 6000) + INTRA:
-        monto = (4000 * 0.5) + 6000 = 2000 + 6000 = 8000.
+        monto = 4000 + 6000 = 10000, sin descuento.
         """
         reg = RegistroEstudiosPorMedico.objects.create(
             medico=self.jefe,
@@ -1192,10 +1192,10 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         )
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
-        self.assertEqual(reg.calcular_monto(), Decimal('8000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('10000.00'))
 
-    def test_residente_mix_eco_dop_intra_aplica_solo_a_eco(self):
-        """Residente + (ECO 4000 + DOP 6000) + INTRA => 2000 + 6000 = 8000."""
+    def test_residente_mix_eco_dop_intra_aplica_a_ambos(self):
+        """Residente + (ECO 4000 + DOP 6000) + INTRA => 2000 + 3000 = 5000."""
         reg = RegistroEstudiosPorMedico.objects.create(
             medico=self.residente,
             tipo_obra_social='COBER',
@@ -1206,7 +1206,7 @@ class FactorIntraRolTipoEstudioTest(TestCase):
         )
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_eco, cantidad=1, contexto='SERVICIO')
         self.RegistroEstudio.objects.create(registro=reg, estudio=self.estudio_dop, cantidad=1, contexto='SERVICIO')
-        self.assertEqual(reg.calcular_monto(), Decimal('8000.00'))
+        self.assertEqual(reg.calcular_monto(), Decimal('5000.00'))
 
 
 class ClasificacionHorarioResidenciaProxyTest(TestCase):
@@ -1387,7 +1387,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'EXTRA')
 
-    def test_integracion_create_post_m2m_dop_only_queda_na(self):
+    def test_integracion_create_post_m2m_dop_residente_clasifica_intra(self):
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.residente,
             nombre_paciente='Ana',
@@ -1406,7 +1406,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
             contexto='SERVICIO',
         )
         registro.refresh_from_db()
-        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.horario, 'INTRA')
 
     def test_integracion_update_post_m2m_aplica_clasificacion(self):
         registro = RegistroEstudiosPorMedico.objects.create(
@@ -1428,7 +1428,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         )
 
         registro.refresh_from_db()
-        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.horario, 'INTRA')
 
         # Simula edición: cambia M2M a ECO y dispara reclasificación post-M2M.
         registro.registroestudio_set.all().delete()
@@ -1650,7 +1650,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         registro.refresh_from_db()
 
         self.assertEqual(registro.horario, 'INTRA')
-        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
 
     def test_doppler_jefe_con_flag_queda_extra(self):
         registro = RegistroEstudiosPorMedico.objects.create(
@@ -1889,7 +1889,7 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
 
         self.assertFalse(registro.liquidar_como_extra_residencia)
         self.assertEqual(registro.horario, 'INTRA')
-        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
 
     def test_form_no_expone_horario(self):
         form = PracticaForm(user=self.residente)

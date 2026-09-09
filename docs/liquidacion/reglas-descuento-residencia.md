@@ -2,13 +2,13 @@
 
 Documento vigente del flujo de descuento INTRA residencia, cierre operativo de liquidacion de residencia y validacion administrativa ECO/EGES/PACS.
 
-Ultima actualizacion: agosto 2026.
+Ultima actualizacion: septiembre 2026.
 
 ## Problema resuelto
 
 La modalidad clinica del estudio no alcanza para decidir si corresponde descuento de residencia.
 
-El caso principal es Doppler: algunos estudios Doppler hechos por `medico_residente` deben descontar 50% cuando el registro esta en horario `INTRA`, pero otros Doppler no deben descontar. Antes, el comportamiento legado solo descontaba ECO general real y dejaba DOP/ECOCAR al 100%.
+El caso principal es Doppler: los estudios Doppler hechos por `medico_residente` descuentan 50% cuando el registro esta en horario `INTRA`. Una regla explicita por estudio o grupo puede denegar esa aplicacion. ECOCAR no descuenta por fallback.
 
 Jefes de residentes e instructores no aplican descuento INTRA. Su actividad docente/asistencial se liquida al 100%; si necesitan marcar una carga asistencial fuera del rol docente, usan el override **liquidar como Extra Residencia**.
 
@@ -53,7 +53,8 @@ Precedencia:
 Fallback legado:
 
 - ECO general real aplica.
-- DOP/ECOCAR no aplica.
+- Doppler aplica para `medico_residente`.
+- ECOCAR no aplica.
 - Roles no residencia no aplican.
 
 Roles para descuento INTRA:
@@ -82,13 +83,7 @@ Esto mantiene el calculo economico alineado con la fecha del informe y evita que
 
 ## Doppler
 
-Un Doppler solo descuenta si existe regla activa vigente por estudio o por grupo tarifario que lo permita para `medico_residente`.
-
-Si no hay regla:
-
-- `fuente = fallback_legado`
-- `aplica = False`
-- el Doppler queda al 100%
+Un Doppler de `medico_residente` con horario `INTRA` descuenta al 50% por fallback, aun sin regla activa. Una regla vigente por estudio tiene prioridad sobre una regla por grupo y puede desactivar el descuento para una practica concreta. En `EXTRA`, `NA`, feriados y fines de semana liquida al 100%.
 
 ## Solicitudes de revision de horario
 
@@ -179,7 +174,7 @@ Mensajes esperados:
 
 - Si la diferencia es cero: `El recalculo no cambiaria el monto actual.`
 - Si el horario aplicado no es `INTRA`: `No aplica descuento porque el horario aplicado no es INTRA.`
-- Si el estudio es Doppler y no hay regla activa aplicable: `No existe regla activa aplicable para este estudio en la fecha del informe.`
+- Si una regla vigente de Doppler deniega el descuento: el diagnostico muestra esa regla como fuente de la decision.
 
 La simulacion es solo lectura:
 

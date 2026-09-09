@@ -153,11 +153,16 @@ def estudio_aplica_descuento_residencia(estudio, rol, fecha=None):
     if regla_grupo:
         return _resultado_desde_regla(regla_grupo, rol, fuente='grupo')
 
-    aplica_fallback = es_eco_general_real_estudio(estudio)
+    es_doppler = (getattr(estudio, 'tipo', '') or '').upper() == 'DOP'
+    aplica_fallback = es_eco_general_real_estudio(estudio) or es_doppler
     return _resultado_descuento_residencia(
         aplica=aplica_fallback,
         fuente='fallback_legado',
-        motivo='Fallback legado ECO general real.' if aplica_fallback else 'Fallback legado sin descuento.',
+        motivo=(
+            'Fallback residencia ECO general/Doppler.'
+            if aplica_fallback
+            else 'Fallback legado sin descuento.'
+        ),
     )
 
 
@@ -178,6 +183,7 @@ def clasificar_horario_residencia_por_proxy(
     fecha_registro,
     tiene_eco_general,
     fecha_practica=None,
+    tiene_doppler=False,
 ):
     """
     Clasifica horario INTRA/EXTRA para residencia usando fecha_registro como proxy.
@@ -187,7 +193,10 @@ def clasificar_horario_residencia_por_proxy(
     """
     if rol not in ROLES_RESIDENCIA:
         return None
-    if not tiene_eco_general:
+    practica_clasificable = tiene_eco_general or (
+        rol == 'medico_residente' and tiene_doppler
+    )
+    if not practica_clasificable:
         return None
     if not fecha_registro:
         return None

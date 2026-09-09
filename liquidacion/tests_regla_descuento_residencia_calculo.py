@@ -118,11 +118,11 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
 
         self.assertEqual(registro.calcular_monto(), Decimal('100.00'))
 
-    def test_dop_residente_intra_sin_regla_no_descuenta(self):
+    def test_dop_residente_intra_sin_regla_descuenta(self):
         registro = self._registro()
         self._agregar_estudio(registro, self.estudio_dop)
 
-        self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
+        self.assertEqual(registro.calcular_monto(), Decimal('100.000'))
 
     def test_dop_residente_intra_con_regla_activa_descuenta(self):
         ReglaDescuentoResidencia.objects.create(
@@ -238,7 +238,7 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
 
         self.assertEqual(registro.calcular_monto(), Decimal('100.000'))
 
-    def test_regla_fuera_de_vigencia_por_fecha_del_informe_no_aplica(self):
+    def test_dop_con_regla_futura_usa_fallback_residente_vigente(self):
         ReglaDescuentoResidencia.objects.create(
             estudio=self.estudio_dop,
             aplica_medico_residente=True,
@@ -247,7 +247,7 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
         registro = self._registro(fecha_informe=self.fecha_informe)
         self._agregar_estudio(registro, self.estudio_dop)
 
-        self.assertEqual(registro.calcular_monto(), Decimal('200.00'))
+        self.assertEqual(registro.calcular_monto(), Decimal('100.000'))
 
     def test_mixto_eco_fallback_y_dop_con_regla_descuentan_ambos(self):
         ReglaDescuentoResidencia.objects.create(
@@ -261,12 +261,12 @@ class ReglaDescuentoResidenciaCalculoMontoTest(TestCase):
 
         self.assertEqual(registro.calcular_monto(), Decimal('150.000'))
 
-    def test_mixto_eco_fallback_y_dop_sin_regla_descuenta_solo_eco(self):
+    def test_mixto_eco_y_dop_sin_regla_descuentan_ambos(self):
         registro = self._registro()
         self._agregar_estudio(registro, self.estudio_eco)
         self._agregar_estudio(registro, self.estudio_dop)
 
-        self.assertEqual(registro.calcular_monto(), Decimal('250.000'))
+        self.assertEqual(registro.calcular_monto(), Decimal('150.000'))
 
     def test_staff_no_descuenta_aunque_exista_regla(self):
         ReglaDescuentoResidencia.objects.create(

@@ -35,9 +35,11 @@ applyTo: "liquidacion/**/*.py"
   - el servicio de reglas devuelve `aplica=True`.
 - Fallback legado sin regla explicita:
   - ECO general real descuenta;
-  - DOP/ECOCAR no descuenta;
+  - Doppler de `medico_residente` descuenta;
+  - ECOCAR no descuenta;
   - roles no residencia no descuentan.
-- Doppler solo descuenta con regla activa explicita por estudio o grupo tarifario para el rol correspondiente.
+- Doppler de `medico_residente` con `INTRA` descuenta al 50%, incluso sin regla explicita.
+- Una regla activa por estudio o grupo puede denegar explicitamente el descuento Doppler.
 - `jefe_residentes` e `instructor_residentes` no aplican descuento INTRA, aunque existan flags historicos en reglas.
 - `EXTRA` y `NA` liquidan al 100%.
 - Bonus urgencia RM: respetar regla existente de remoto + paciente internado + ventana temporal definida.

@@ -76,19 +76,26 @@ def recalcular_cantidad_regiones_cuando_estudio_cambia(sender, instance, created
             es_eco_general_real_estudio(rel.estudio)
             for rel in relaciones
         )
-        if tiene_eco_general:
+        tiene_doppler = any(
+            (rel.estudio.tipo or '').upper() == 'DOP'
+            for rel in relaciones
+        )
+        if tiene_eco_general or (
+            registro.medico.rol == 'medico_residente' and tiene_doppler
+        ):
             if registro.horario in [None, '', 'NA']:
                 nuevo_horario = clasificar_horario_residencia_por_proxy(
                     rol=registro.medico.rol,
                     fecha_registro=registro.fecha_registro,
-                    tiene_eco_general=True,
+                    tiene_eco_general=tiene_eco_general,
                     fecha_practica=registro.fecha_del_informe,
+                    tiene_doppler=tiene_doppler,
                 )
                 horario_objetivo = nuevo_horario or 'NA'
             else:
                 horario_objetivo = registro.horario
         else:
-            # Sin ECO general real, residencia no debe conservar INTRA/EXTRA.
+            # Sin ECO general ni Doppler clasificable, residencia queda sin horario.
             horario_objetivo = 'NA'
 
         if registro.horario != horario_objetivo:

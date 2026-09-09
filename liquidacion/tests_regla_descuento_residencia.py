@@ -210,10 +210,10 @@ class ReglaDescuentoResidenciaServiceTest(TestCase):
             self.fecha,
         )
 
-        self.assertFalse(resultado['aplica'])
+        self.assertTrue(resultado['aplica'])
         self.assertEqual(resultado['fuente'], 'fallback_legado')
 
-    def test_fallback_legado_eco_general_aplica_y_dop_ecocar_no_aplican(self):
+    def test_fallback_residente_aplica_eco_general_y_dop_pero_no_ecocar(self):
         resultado_eco = estudio_aplica_descuento_residencia(
             self.estudio_eco,
             'medico_residente',
@@ -231,6 +231,6 @@ class ReglaDescuentoResidenciaServiceTest(TestCase):
         )
 
         self.assertTrue(resultado_eco['aplica'])
-        self.assertFalse(resultado_dop['aplica'])
+        self.assertTrue(resultado_dop['aplica'])
         self.assertFalse(resultado_ecocar['aplica'])
         self.assertEqual(resultado_eco['fuente'], 'fallback_legado')

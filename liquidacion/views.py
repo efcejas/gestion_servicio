@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField
+from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField, prefetch_related_objects
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
@@ -1545,26 +1545,28 @@ def _snapshot_cruce_eges_item(item):
     return serializar_resultado_control_eges(item)
 
 
-def _cerrar_revision_eges_por_correccion(sesion, registro, correccion, user):
-    ultima_revision = (
-        RevisionCruceEgesRegistro.objects
-        .filter(sesion_contable=sesion, registro=registro)
-        .order_by('-fecha_revision')
-        .first()
-    )
+def _cerrar_revision_eges_por_correccion(sesion, registro, correccion, user, batch=None, revision=None):
+    if revision is None:
+        revisiones = RevisionCruceEgesRegistro.objects.filter(
+            sesion_contable=sesion,
+            registro=registro,
+        )
+        if batch:
+            revisiones = revisiones.filter(batch_eges=batch)
+        revision = revisiones.order_by('-fecha_revision').first()
     if (
-        not ultima_revision
-        or ultima_revision.estado != RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+        not revision
+        or revision.estado != RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
     ):
         return None
 
     return RevisionCruceEgesRegistro.objects.create(
         sesion_contable=sesion,
         registro=registro,
-        batch_eges=ultima_revision.batch_eges,
+        batch_eges=batch or revision.batch_eges,
         estado=RevisionCruceEgesRegistro.ESTADO_VALIDADO,
-        motivos_json=ultima_revision.motivos_json,
-        snapshot_json=ultima_revision.snapshot_json,
+        motivos_json=revision.motivos_json,
+        snapshot_json=revision.snapshot_json,
         observacion=(
             f'Correccion economica #{correccion.pk} aplicada. '
             'Revision EGES cerrada automaticamente.'
@@ -1778,6 +1780,194 @@ class CruceEgesBulkValidarSeleccionView(LoginRequiredMixin, UserPassesTestMixin,
             )
         else:
             messages.warning(request, f'No se validaron cruces EGES. Omitidos: {omitidos}.')
+        return redirect(redirect_url)
+
+
+class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Aplica horario EGES y recalcula Doppler NA de residentes seleccionados."""
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(
+            self.request,
+            'Solo superusuarios o jefatura de servicio pueden corregir Doppler en forma masiva.',
+        )
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        redirect_url = request.POST.get('next') or (
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
+            + f'?batch={batch.pk}'
+        )
+        if sesion.estado not in {'ABIERTA', 'REVISION'}:
+            messages.error(
+                request,
+                'Para aplicar correcciones economicas la sesion debe estar ABIERTA o EN REVISION.',
+            )
+            return redirect(redirect_url)
+
+        registro_ids = request.POST.getlist('registros')
+        form = RevisionCruceEgesBulkValidarForm(
+            request.POST,
+            registro_choices=[(pk, pk) for pk in registro_ids],
+        )
+        if not form.is_valid():
+            messages.error(
+                request,
+                'Selecciona entre 1 y 100 registros e indica una observacion para corregir.',
+            )
+            return redirect(redirect_url)
+
+        seleccionados = [int(pk) for pk in form.cleaned_data['registros']]
+        observacion = form.cleaned_data['observacion']
+        usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
+        preview = construir_preview_cruce_liquidacion_eges(
+            sesion,
+            batch,
+            registro_ids=seleccionados,
+            usar_jornadas=usar_jornadas,
+        )
+        candidatos = {}
+        for item in preview['resultados']:
+            revision = item.get('revision_cruce_eges')
+            mejor_match = item.get('mejor_match') or {}
+            horario_eges = mejor_match.get('horario_esperado')
+            if (
+                revision
+                and revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+                and horario_eges in {'INTRA', 'EXTRA'}
+                and mejor_match.get('medico_ok')
+                and item.get('matches_practicas')
+            ):
+                fila_eges = mejor_match.get('fila_eges')
+                candidatos[item['registro'].pk] = {
+                    'horario': horario_eges,
+                    'hora_eges': getattr(fila_eges, 'hora_turno', None),
+                    'revision': revision,
+                }
+
+        aplicados = 0
+        with transaction.atomic():
+            registros = list(
+                RegistroEstudiosPorMedico.objects
+                .select_for_update()
+                .filter(
+                    pk__in=candidatos,
+                    sesion_contable=sesion,
+                    anulado=False,
+                    medico__rol='medico_residente',
+                    horario='NA',
+                )
+                .order_by('pk')
+            )
+            prefetch_related_objects(
+                registros,
+                'medico',
+                'registroestudio_set__estudio__grupo_tarifario',
+            )
+            revisiones_bloqueadas = (
+                RevisionCruceEgesRegistro.objects
+                .select_for_update()
+                .filter(
+                    sesion_contable=sesion,
+                    batch_eges=batch,
+                    registro_id__in=[registro.pk for registro in registros],
+                )
+                .order_by('registro_id', '-fecha_revision')
+            )
+            revisiones_actuales = {}
+            for revision in revisiones_bloqueadas:
+                revisiones_actuales.setdefault(revision.registro_id, revision)
+
+            for registro in registros:
+                revision = revisiones_actuales.get(registro.pk)
+                if (
+                    not revision
+                    or revision.estado != RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+                ):
+                    continue
+                relaciones = list(registro.registroestudio_set.all())
+                if not relaciones or any(
+                    (rel.estudio.tipo or '').upper() != 'DOP'
+                    for rel in relaciones
+                ):
+                    continue
+
+                datos = candidatos[registro.pk]
+                monto_anterior = registro.monto_calculado or Decimal('0.00')
+                horario_anterior = registro.horario
+                registro.horario = datos['horario']
+                monto_nuevo = registro.calcular_monto()
+                hora_texto = (
+                    datos['hora_eges'].strftime('%H:%M')
+                    if datos['hora_eges']
+                    else 'sin hora'
+                )
+                motivo = (
+                    'Correccion automatica de Doppler de residente segun cruce EGES. '
+                    f'Horario: {horario_anterior} -> {registro.horario}. '
+                    f'Hora EGES: {hora_texto}. '
+                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                )
+                registro.monto_calculado = monto_nuevo
+                registro.modificado_por = request.user
+                registro.fecha_modificacion = now()
+                registro.motivo_modificacion = motivo
+                registro.save(update_fields=[
+                    'horario',
+                    'monto_calculado',
+                    'modificado_por',
+                    'fecha_modificacion',
+                    'motivo_modificacion',
+                ])
+                correccion = CorreccionPacsRegistro.objects.create(
+                    sesion_contable=sesion,
+                    registro=registro,
+                    tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+                    horario_anterior=horario_anterior,
+                    horario_nuevo=registro.horario,
+                    monto_anterior=monto_anterior,
+                    monto_nuevo=monto_nuevo,
+                    observacion=motivo,
+                    corregido_por=request.user,
+                )
+                _cerrar_revision_eges_por_correccion(
+                    sesion,
+                    registro,
+                    correccion,
+                    request.user,
+                    batch=batch,
+                    revision=revision,
+                )
+                RevisionAuditoriaEcoRegistro.objects.create(
+                    sesion_contable=sesion,
+                    registro=registro,
+                    estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                    motivos_json=datos['revision'].motivos_json,
+                    observacion=(
+                        f'Correccion Doppler desde EGES aplicada. '
+                        f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                    ),
+                    revisado_por=request.user,
+                )
+                aplicados += 1
+
+        omitidos = len(seleccionados) - aplicados
+        if aplicados:
+            messages.success(
+                request,
+                f'Se corrigieron y recalcularon {aplicados} Doppler de residentes. Omitidos: {omitidos}.',
+            )
+        else:
+            messages.warning(
+                request,
+                'No se aplicaron correcciones. Solo se admiten Doppler NA de residentes, '
+                'marcados para correccion y con coincidencia EGES confiable.',
+            )
         return redirect(redirect_url)
 
 
@@ -2942,12 +3132,17 @@ class RegistroEstudiosPorMedicoCreateView(LoginRequiredMixin, SuccessMessageMixi
                 es_eco_general_real_estudio(est)
                 for est in estudios_seleccionados
             )
-            if tiene_eco_general:
+            tiene_doppler = any(
+                (est.tipo or '').upper() == 'DOP'
+                for est in estudios_seleccionados
+            )
+            if tiene_eco_general or (user.rol == 'medico_residente' and tiene_doppler):
                 nuevo_horario = clasificar_horario_residencia_por_proxy(
                     rol=user.rol,
                     fecha_registro=self.object.fecha_registro,
-                    tiene_eco_general=True,
+                    tiene_eco_general=tiene_eco_general,
                     fecha_practica=self.object.fecha_del_informe,
+                    tiene_doppler=tiene_doppler,
                 )
                 self.object.horario = nuevo_horario or 'NA'
             else:
@@ -3999,12 +4194,17 @@ class RegistroEstudiosPorMedicoUpdateView(LoginRequiredMixin, UpdateView):
                 es_eco_general_real_estudio(est)
                 for est in estudios_seleccionados
             )
-            if tiene_eco_general:
+            tiene_doppler = any(
+                (est.tipo or '').upper() == 'DOP'
+                for est in estudios_seleccionados
+            )
+            if tiene_eco_general or (user.rol == 'medico_residente' and tiene_doppler):
                 nuevo_horario = clasificar_horario_residencia_por_proxy(
                     rol=user.rol,
                     fecha_registro=self.object.fecha_registro,
-                    tiene_eco_general=True,
+                    tiene_eco_general=tiene_eco_general,
                     fecha_practica=self.object.fecha_del_informe,
+                    tiene_doppler=tiene_doppler,
                 )
                 self.object.horario = nuevo_horario or 'NA'
             else:
@@ -4562,12 +4762,16 @@ class CargaMasivaView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                         )
                         if medico.rol in ROLES_RESIDENCIA:
                             tiene_eco_general = es_eco_general_real_estudio(estudio)
-                            if tiene_eco_general:
+                            tiene_doppler = (estudio.tipo or '').upper() == 'DOP'
+                            if tiene_eco_general or (
+                                medico.rol == 'medico_residente' and tiene_doppler
+                            ):
                                 nuevo_horario = clasificar_horario_residencia_por_proxy(
                                     rol=medico.rol,
                                     fecha_registro=registro.fecha_registro,
-                                    tiene_eco_general=True,
+                                    tiene_eco_general=tiene_eco_general,
                                     fecha_practica=registro.fecha_del_informe,
+                                    tiene_doppler=tiene_doppler,
                                 )
                                 registro.horario = nuevo_horario or 'NA'
                             else:

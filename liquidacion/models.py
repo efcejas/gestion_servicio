@@ -1036,9 +1036,9 @@ class RegistroEstudiosPorMedico(models.Model):
 
         Reglas de factor horario INTRA (50%):
           - medico_residente:
-            aplica a estudios elegibles por ReglaDescuentoResidencia.
-            Sin regla explicita conserva fallback legado: ECO general real si;
-            Doppler (DOP), ECOCAR y otros no.
+                        aplica a ECO general real y Doppler; una ReglaDescuentoResidencia
+                        vigente puede definir una excepcion por estudio o grupo.
+                        ECOCAR y otros no aplican por fallback.
           - jefe_residentes / instructor_residentes: sin descuento INTRA.
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
