@@ -1784,7 +1784,7 @@ class CruceEgesBulkValidarSeleccionView(LoginRequiredMixin, UserPassesTestMixin,
 
 
 class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, View):
-    """Aplica horario EGES y recalcula Doppler NA de residentes seleccionados."""
+    """Recalcula Doppler de residentes elegibles usando el cruce EGES."""
 
     def test_func(self):
         return _puede_accion_masiva_revision_horaria(self.request.user)
@@ -1810,36 +1810,26 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
             )
             return redirect(redirect_url)
 
-        registro_ids = request.POST.getlist('registros')
-        form = RevisionCruceEgesBulkValidarForm(
-            request.POST,
-            registro_choices=[(pk, pk) for pk in registro_ids],
-        )
-        if not form.is_valid():
+        observacion = (request.POST.get('observacion') or '').strip()
+        if not observacion or len(observacion) > 1000:
             messages.error(
                 request,
-                'Selecciona entre 1 y 100 registros e indica una observacion para corregir.',
+                'Indica una observacion de hasta 1000 caracteres para el recálculo masivo.',
             )
             return redirect(redirect_url)
 
-        seleccionados = [int(pk) for pk in form.cleaned_data['registros']]
-        observacion = form.cleaned_data['observacion']
         usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
         preview = construir_preview_cruce_liquidacion_eges(
             sesion,
             batch,
-            registro_ids=seleccionados,
             usar_jornadas=usar_jornadas,
         )
         candidatos = {}
         for item in preview['resultados']:
-            revision = item.get('revision_cruce_eges')
             mejor_match = item.get('mejor_match') or {}
             horario_eges = mejor_match.get('horario_esperado')
             if (
-                revision
-                and revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
-                and horario_eges in {'INTRA', 'EXTRA'}
+                horario_eges in {'INTRA', 'EXTRA'}
                 and mejor_match.get('medico_ok')
                 and item.get('matches_practicas')
             ):
@@ -1847,7 +1837,6 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
                 candidatos[item['registro'].pk] = {
                     'horario': horario_eges,
                     'hora_eges': getattr(fila_eges, 'hora_turno', None),
-                    'revision': revision,
                 }
 
         aplicados = 0
@@ -1860,7 +1849,6 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
                     sesion_contable=sesion,
                     anulado=False,
                     medico__rol='medico_residente',
-                    horario='NA',
                 )
                 .order_by('pk')
             )
@@ -1885,11 +1873,6 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
 
             for registro in registros:
                 revision = revisiones_actuales.get(registro.pk)
-                if (
-                    not revision
-                    or revision.estado != RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
-                ):
-                    continue
                 relaciones = list(registro.registroestudio_set.all())
                 if not relaciones or any(
                     (rel.estudio.tipo or '').upper() != 'DOP'
@@ -1902,6 +1885,8 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
                 horario_anterior = registro.horario
                 registro.horario = datos['horario']
                 monto_nuevo = registro.calcular_monto()
+                if horario_anterior == registro.horario and monto_anterior == monto_nuevo:
+                    continue
                 hora_texto = (
                     datos['hora_eges'].strftime('%H:%M')
                     if datos['hora_eges']
@@ -1947,7 +1932,7 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
                     sesion_contable=sesion,
                     registro=registro,
                     estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
-                    motivos_json=datos['revision'].motivos_json,
+                    motivos_json=revision.motivos_json if revision else [],
                     observacion=(
                         f'Correccion Doppler desde EGES aplicada. '
                         f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
@@ -1956,17 +1941,15 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
                 )
                 aplicados += 1
 
-        omitidos = len(seleccionados) - aplicados
         if aplicados:
             messages.success(
                 request,
-                f'Se corrigieron y recalcularon {aplicados} Doppler de residentes. Omitidos: {omitidos}.',
+                f'Se corrigieron y recalcularon {aplicados} Doppler de residentes.',
             )
         else:
             messages.warning(
                 request,
-                'No se aplicaron correcciones. Solo se admiten Doppler NA de residentes, '
-                'marcados para correccion y con coincidencia EGES confiable.',
+                'No hubo Doppler de residentes con diferencia de horario o monto y coincidencia EGES confiable.',
             )
         return redirect(redirect_url)
 

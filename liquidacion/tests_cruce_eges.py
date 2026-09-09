@@ -525,7 +525,7 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         revision.refresh_from_db()
         self.assertEqual(revision.estado, RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION)
 
-    def test_corregir_doppler_residente_na_aplica_horario_eges_y_recalcula(self):
+    def test_corregir_doppler_residente_na_recalcula_sin_revision_previa(self):
         registro = self._registro(horario='NA', estudios=[self.estudio_dop])
         RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
             horario='NA',
@@ -537,23 +537,12 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             practica='ECODOPPLER VENOSO MM INFERIORES',
             codigo_practica='900048/0',
         )
-        RevisionCruceEgesRegistro.objects.create(
-            sesion_contable=self.sesion,
-            registro=registro,
-            batch_eges=self.batch,
-            estado=RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION,
-            motivos_json=['EGES sugiere INTRA; liquidacion figura NA.'],
-            snapshot_json={},
-            observacion='Corregir horario segun EGES.',
-            revisado_por=self.jefe,
-        )
         self.client.force_login(self.jefe)
 
         response = self.client.post(
             reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
             {
                 'batch': self.batch.pk,
-                'registros': [registro.pk],
                 'observacion': 'Doppler verificado contra EGES.',
             },
         )
@@ -567,13 +556,39 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(correccion.horario_nuevo, 'INTRA')
         self.assertEqual(correccion.monto_anterior, Decimal('200.00'))
         self.assertEqual(correccion.monto_nuevo, Decimal('100.00'))
-        ultima_revision = (
-            RevisionCruceEgesRegistro.objects
-            .filter(registro=registro, batch_eges=self.batch)
-            .order_by('-fecha_revision')
-            .first()
+        self.assertFalse(RevisionCruceEgesRegistro.objects.filter(registro=registro).exists())
+
+    def test_corregir_doppler_recalcula_monto_historico_intra_sin_seleccion(self):
+        registro = self._registro(horario='INTRA', estudios=[self.estudio_dop], dni='98765432')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            monto_calculado=Decimal('200.00'),
         )
-        self.assertEqual(ultima_revision.estado, RevisionCruceEgesRegistro.ESTADO_VALIDADO)
+        self._eges_row(
+            time(10, 0),
+            time(10, 15),
+            dni='98765432',
+            practica='ECODOPPLER VENOSO MM INFERIORES',
+            codigo_practica='900048/0',
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
+            {
+                'batch': self.batch.pk,
+                'observacion': 'Aplicar descuento Doppler INTRA vigente.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('100.00'))
+        correccion = CorreccionPacsRegistro.objects.get(registro=registro)
+        self.assertEqual(correccion.horario_anterior, 'INTRA')
+        self.assertEqual(correccion.horario_nuevo, 'INTRA')
+        self.assertEqual(correccion.monto_anterior, Decimal('200.00'))
+        self.assertEqual(correccion.monto_nuevo, Decimal('100.00'))
 
     def test_administrativo_no_puede_validar_seleccion_masiva(self):
         registro = self._registro(horario='INTRA')

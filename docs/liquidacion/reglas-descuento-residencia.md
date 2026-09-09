@@ -85,6 +85,12 @@ Esto mantiene el calculo economico alineado con la fecha del informe y evita que
 
 Un Doppler de `medico_residente` con horario `INTRA` descuenta al 50% por fallback, aun sin regla activa. Una regla vigente por estudio tiene prioridad sobre una regla por grupo y puede desactivar el descuento para una practica concreta. En `EXTRA`, `NA`, feriados y fines de semana liquida al 100%.
 
+### Regularizacion masiva desde EGES
+
+En el cruce EGES, la accion **Corregir Doppler y recalcular** busca todos los registros del periodo que sean exclusivamente Doppler de `medico_residente`, tengan coincidencia EGES confiable de medico y practica, y presenten diferencia de horario o monto. No requiere marcar previamente cada caso como `REQUIERE_CORRECCION`.
+
+La accion solo opera en sesiones `ABIERTA` o `REVISION`. Para cada cambio guarda `CorreccionPacsRegistro` con horario, monto anterior/nuevo, hora EGES, usuario y observacion. Las revisiones `VALIDADO` y `DESCARTADO` existentes no se modifican; una `REQUIERE_CORRECCION` del mismo batch se cierra cuando la correccion se aplica.
+
 ## Solicitudes de revision de horario
 
 ### B2 - Aplicacion economica

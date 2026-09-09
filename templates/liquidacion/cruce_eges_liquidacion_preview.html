@@ -250,14 +250,15 @@
                 {% if sesion.estado == 'ABIERTA' or sesion.estado == 'REVISION' %}
                 <button type="submit"
                         formaction="{% url 'liquidacion:cruce_eges_corregir_doppler' sesion.pk %}"
+                    onclick="return window.confirm('Se recalcularán todos los Doppler elegibles de residentes en este período según EGES. ¿Continuar?');"
                         class="h-9 rounded-lg bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700">
                     Corregir Doppler y recalcular
                 </button>
                 {% endif %}
             </div>
             <p class="mt-2 text-xs text-emerald-800">
-                Validar no modifica montos. Corregir Doppler solo toma residentes con horario NA,
-                revision pendiente y coincidencia EGES confiable; asigna INTRA/EXTRA y recalcula automaticamente.
+                Validar no modifica montos. Corregir Doppler busca todo el período: solo toma residentes con
+                Doppler, diferencia de horario o monto y coincidencia EGES confiable; asigna INTRA/EXTRA y recalcula.
             </p>
         </form>
         {% endif %}

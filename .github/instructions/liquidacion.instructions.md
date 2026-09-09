@@ -74,6 +74,8 @@ applyTo: "liquidacion/**/*.py"
 - Para ECO general, una practica fuera de la jornada puede justificar `EXTRA` cuando corresponda al override Extra Residencia; una practica dentro de jornada no debe justificarse como extra sin revision.
 - Doppler de jefe/instructor sigue liquidandose al 100% incluso dentro de jornada. No usarlo para justificar otras practicas de un registro mixto.
 - EGES-J es validacion operativa: no modifica `monto_calculado`, `horario`, estudios o paciente y no ejecuta recalculos masivos.
+- Excepcion aprobada: `CruceEgesBulkCorregirDopplerView` puede regularizar masivamente Doppler exclusivos de `medico_residente` con coincidencia EGES confiable, solo en `ABIERTA` o `REVISION`, dejando `CorreccionPacsRegistro` por cada cambio.
+- La regularizacion Doppler no requiere una revision `REQUIERE_CORRECCION` previa; conserva `VALIDADO` y `DESCARTADO`, y solo cierra una revision `REQUIERE_CORRECCION` del mismo batch tras aplicar la correccion.
 
 ## Revision horaria B2/B3
 
