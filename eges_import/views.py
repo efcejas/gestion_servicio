@@ -1144,6 +1144,83 @@ def practica_evolucion_data(request):
     return _vista_practica_evolucion(request)
 
 
+def _vista_doppler_ecocardio(request):
+    """Resume evolución y responsables informantes de Doppler y Ecocardiograma."""
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET).filter(
+        modalidad='ECO',
+        sub_modalidad__in=['DOPPLER', 'ECOCARDIO'],
+    )
+
+    def conteo_mensual(sub_modalidad):
+        totales = {}
+        for fila in estudios.filter(sub_modalidad=sub_modalidad).values('fecha_turno').annotate(
+            total=Count('id'),
+        ).order_by('fecha_turno'):
+            mes = fila['fecha_turno'].strftime('%Y-%m')
+            totales[mes] = totales.get(mes, 0) + fila['total']
+        return totales
+
+    doppler = conteo_mensual('DOPPLER')
+    ecocardio = conteo_mensual('ECOCARDIO')
+    meses = sorted(set(doppler) | set(ecocardio))
+
+    responsables = estudios.exclude(
+        Q(medico_informante__isnull=True) | Q(medico_informante=''),
+    )
+    ranking = list(
+        responsables.values('medico_informante', 'sub_modalidad').annotate(
+            total=Count('id'),
+        )
+    )
+    totales_por_medico = {}
+    for item in ranking:
+        medico = item['medico_informante']
+        totales_por_medico[medico] = totales_por_medico.get(medico, 0) + item['total']
+    medicos = [nombre for nombre, _ in sorted(
+        totales_por_medico.items(), key=lambda item: (-item[1], item[0]),
+    )[:10]]
+    por_medico = {(item['medico_informante'], item['sub_modalidad']): item['total'] for item in ranking}
+
+    return JsonResponse({
+        'evolucion': {
+            'labels': meses,
+            'datasets': [
+                {
+                    'label': 'Doppler / Dúplex',
+                    'data': [doppler.get(mes, 0) for mes in meses],
+                    'borderColor': '#0f766e',
+                    'backgroundColor': 'rgba(15, 118, 110, .12)',
+                    'fill': True,
+                    'tension': .25,
+                },
+                {
+                    'label': 'Ecocardiograma',
+                    'data': [ecocardio.get(mes, 0) for mes in meses],
+                    'borderColor': '#b45309',
+                    'backgroundColor': 'rgba(180, 83, 9, .12)',
+                    'fill': True,
+                    'tension': .25,
+                },
+            ],
+        },
+        'responsables': {
+            'labels': medicos,
+            'datasets': [
+                {
+                    'label': 'Doppler / Dúplex',
+                    'data': [por_medico.get((medico, 'DOPPLER'), 0) for medico in medicos],
+                    'backgroundColor': 'rgba(15, 118, 110, .75)',
+                },
+                {
+                    'label': 'Ecocardiograma',
+                    'data': [por_medico.get((medico, 'ECOCARDIO'), 0) for medico in medicos],
+                    'backgroundColor': 'rgba(180, 83, 9, .75)',
+                },
+            ],
+        },
+    })
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: Comparativa período actual vs anterior
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1280,6 +1357,9 @@ def _vista_comparativa_data(request):
         ),
         'practicas': variacion(
             actual['practicas_realizadas'], anterior['practicas_realizadas'],
+        ),
+        'promedio_dia': variacion(
+            actual['promedio_dia'], anterior['promedio_dia'], 2,
         ),
         'practicas_por_paciente': variacion(
             actual['practicas_por_paciente'], anterior['practicas_por_paciente'], 2,
@@ -1480,6 +1560,12 @@ def portal_director_practica_evolucion(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
     return _vista_practica_evolucion(request)
+
+
+def portal_director_doppler_ecocardio(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_doppler_ecocardio(request)
 
 
 def portal_director_comparativa(request, token):

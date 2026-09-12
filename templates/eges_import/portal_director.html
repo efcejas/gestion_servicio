@@ -31,10 +31,10 @@
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <main class="max-w-7xl mx-auto grid grid-cols-1 px-4 sm:px-6 lg:grid-cols-2 lg:gap-x-4 lg:px-8 py-6">
 
         <!-- ── FILTROS ─────────────────────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 space-y-3">
+        <div class="order-1 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 p-4 space-y-3 lg:col-span-2">
 
             <!-- Fila 1: Período rápido + Fechas personalizadas -->
             <div class="flex flex-wrap gap-4 items-end">
@@ -115,7 +115,7 @@
         </div>
 
         <!-- ── KPIs ────────────────────────────────────────────────────────────── -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="kpis-container">
+        <div class="order-2 grid grid-cols-2 gap-4 mb-6 lg:col-span-2 lg:grid-cols-4" id="kpis-container">
             <!-- se pueblan via JS -->
             <div class="kpi-card bg-white rounded-xl shadow-sm border border-gray-200 p-4">
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Finalizados</p>
@@ -139,15 +139,15 @@
             </div>
         </div>
         <!-- RX sin informe: se muestra solo si > 0 -->
-        <div id="kpi-rx-sin-informe-card" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3">
+        <div id="kpi-rx-sin-informe-card" class="order-2 hidden mb-4 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 flex items-center gap-3 lg:col-span-2">
             <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
             </svg>
             <p class="text-sm text-amber-700">RX entregados <strong>sin informe</strong>: <span id="kpi-rx-sin-informe" class="font-bold">0</span> estudio(s) — estudios cerrados sin reporte médico.</p>
         </div>
 
-        <!-- ── GRÁAFICO TEMPORAL ──────────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+        <!-- GRAFICO TEMPORAL -->
+        <div class="order-4 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
             <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-gray-800">Evolución temporal por modalidad</h2>
@@ -164,8 +164,8 @@
             </div>
         </div>
 
-        <!-- ── FILA DE 3 GRÁFICOS ─────────────────────────────────────────────── -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+        <!-- FILA DE 3 GRAFICOS -->
+        <div class="order-7 grid grid-cols-1 gap-4 mb-6 lg:col-span-2 lg:grid-cols-3">
 
             <!-- Distribución por modalidad (dona) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -205,15 +205,15 @@
         </div>
 
         <!-- ── PRODUCTIVIDAD POR MÉDICO ────────────────────────────────────────── -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-            <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <div class="order-6 mb-6 bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-gray-800">Productividad por médico</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Top 10 según estudios finalizados en el período — desglose por modalidad</p>
                 </div>
-                <div class="flex gap-1">
-                    <button onclick="cambiarTipoMedico('bar')" class="px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium" id="tipo-medico-bar">Barras</button>
-                    <button onclick="cambiarTipoMedico('horizontalBar')" class="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium" id="tipo-medico-horiz">Horizontales</button>
+                <div class="grid w-full grid-cols-2 gap-1 sm:w-auto">
+                    <button onclick="cambiarTipoMedico('bar')" class="w-full px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium" id="tipo-medico-bar">Barras</button>
+                    <button onclick="cambiarTipoMedico('horizontalBar')" class="w-full px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium" id="tipo-medico-horiz">Horizontales</button>
                 </div>
             </div>
             <div class="relative p-5" style="height: 380px;">
@@ -223,35 +223,39 @@
         </div>
 
         <!-- ── COMPARATIVA PERÍODO ANTERIOR + OBRAS SOCIALES ──────────────────── -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-
+        <div class="order-3 w-full mb-6 bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
             <!-- Comparativa -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h2 class="text-base font-semibold text-gray-800">Comparativa período anterior</h2>
                     <p class="text-xs text-gray-500 mt-0.5" id="comp-subtitulo">Período actual vs anterior de igual duración</p>
                 </div>
-                <div class="p-5 grid grid-cols-3 gap-3">
+                <div class="p-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div class="text-center p-3 bg-gray-50 rounded-lg">
-                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Total estudios</p>
-                        <p class="text-2xl font-bold text-gray-900" id="comp-total-actual">—</p>
-                        <p class="text-xs mt-1 text-gray-400" id="comp-total-delta">cargando…</p>
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pacientes atendidos</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-pacientes-valores">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-pacientes-delta">cargando…</p>
                     </div>
                     <div class="text-center p-3 bg-gray-50 rounded-lg">
-                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Promedio / día</p>
-                        <p class="text-2xl font-bold text-gray-900" id="comp-promedio-actual">—</p>
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prácticas realizadas</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-practicas-valores">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-practicas-delta">cargando…</p>
+                    </div>
+                    <div class="text-center p-3 bg-gray-50 rounded-lg">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Promedio por día</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-promedio-valores">—</p>
                         <p class="text-xs mt-1 text-gray-400" id="comp-promedio-delta">cargando…</p>
                     </div>
                     <div class="text-center p-3 bg-gray-50 rounded-lg">
-                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Conversión</p>
-                        <p class="text-2xl font-bold text-gray-900" id="comp-tasa-actual">—</p>
-                        <p class="text-xs mt-1 text-gray-400" id="comp-tasa-delta">cargando…</p>
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Prácticas por paciente</p>
+                        <p class="text-2xl font-bold text-gray-900" id="comp-practicas-paciente-valores">—</p>
+                        <p class="text-xs mt-1 text-gray-400" id="comp-practicas-paciente-delta">cargando…</p>
                     </div>
                 </div>
-            </div>
+        </div>
 
+        <div class="contents">
             <!-- Obras Sociales -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="order-8 mb-6 bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h2 class="text-base font-semibold text-gray-800">Top Obras Sociales</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Por volumen de estudios finalizados</p>
@@ -263,15 +267,15 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div class="contents">
+            <div class="order-6 mb-6 bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h2 class="text-base font-semibold text-gray-800">Prácticas con mayor volumen</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Incluye punción y permite detectar cambios de demanda</p>
                 </div>
                 <div class="relative p-4" style="height: 320px;"><canvas id="grafico-practicas"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+            <div class="order-8 mb-6 bg-white rounded-xl shadow-sm border border-gray-200">
                 <div class="px-5 py-4 border-b border-gray-100">
                     <h2 class="text-base font-semibold text-gray-800">Evolución por obra social</h2>
                     <p class="text-xs text-gray-500 mt-0.5">Compare dos coberturas a lo largo del tiempo</p>
@@ -290,12 +294,29 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
+        <div class="order-10 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-2">
             <div class="px-5 py-4 border-b border-gray-100">
                 <h2 class="text-base font-semibold text-gray-800">Evolución de punciones</h2>
                 <p class="text-xs text-gray-500 mt-0.5">Caudal mensual de prácticas cuyo nombre contiene “punc”</p>
             </div>
             <div class="relative p-4" style="height: 280px;"><canvas id="grafico-punciones"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
+        </div>
+
+        <div class="order-9 grid grid-cols-1 gap-4 mb-6 lg:col-span-2 lg:grid-cols-2">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-base font-semibold text-gray-800">Evolución Doppler y ecocardiograma</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Estudios finalizados por mes: permite detectar aumentos o disminuciones.</p>
+                </div>
+                <div class="relative p-4" style="height: 300px;"><canvas id="grafico-doppler-ecocardio"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+                <div class="px-5 py-4 border-b border-gray-100">
+                    <h2 class="text-base font-semibold text-gray-800">Responsables informantes</h2>
+                    <p class="text-xs text-gray-500 mt-0.5">Según el médico informado por EGES; no reemplaza la auditoría de liquidación.</p>
+                </div>
+                <div class="relative p-4" style="height: 300px;"><canvas id="grafico-responsables-doppler"></canvas><div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div></div>
+            </div>
         </div>
 
     </main>
@@ -330,6 +351,8 @@ let charts = {
     obrasSocialesEvolucion: null,
     punciones: null,
     obrasSociales: null,
+    dopplerEcocardio: null,
+    responsablesDoppler: null,
 };
 let tipoTemporal = 'line';
 let tipoMedicos = 'bar';
@@ -530,26 +553,40 @@ function cambiarTipoMedico(tipo) {
 async function cargarComparativa() {
     const r = await fetch(`${BASE}/comparativa/?${buildParams()}`);
     const d = await r.json();
+    const comparativa = d.comparativa;
+    const formatoNumero = (valor, decimales = 0) => Number(valor || 0).toLocaleString('es-AR', {
+        minimumFractionDigits: decimales,
+        maximumFractionDigits: decimales,
+    });
+    const etiquetaEstado = {
+        AUMENTO: '▲ aumento',
+        DISMINUCION: '▼ disminución',
+        DESAPARECIO: '▼ sin actividad',
+        NUEVA: '▲ nueva',
+        SIN_CAMBIOS: '— sin cambios',
+    };
 
-    document.getElementById('comp-total-actual').textContent =
-        Number(d.actual.total_finalizados).toLocaleString('es-AR');
-    document.getElementById('comp-promedio-actual').textContent = d.actual.promedio_dia;
-    document.getElementById('comp-tasa-actual').textContent = d.actual.tasa_conversion + '%';
-
-    function renderDelta(elId, val) {
-        const el = document.getElementById(elId);
-        if (val === null || val === undefined) {
-            el.textContent = 'sin datos anteriores';
-            el.className = 'text-xs mt-1 text-gray-400';
+    function renderMetrica(metrica, valoresId, deltaId, decimales = 0) {
+        document.getElementById(valoresId).textContent =
+            `${formatoNumero(metrica.actual, decimales)} vs ${formatoNumero(metrica.anterior, decimales)}`;
+        const delta = document.getElementById(deltaId);
+        if (!comparativa.hay_datos_anterior) {
+            delta.textContent = 'sin actividad anterior';
+            delta.className = 'text-xs mt-1 text-gray-400';
             return;
         }
-        const sign = val >= 0 ? '+' : '';
-        el.textContent = `${sign}${val}% vs período ant.`;
-        el.className = `text-xs mt-1 font-semibold ${val >= 0 ? 'text-green-600' : 'text-red-500'}`;
+        const porcentaje = metrica.porcentaje === null
+            ? ''
+            : ` (${metrica.porcentaje > 0 ? '+' : ''}${formatoNumero(metrica.porcentaje, 1)}%)`;
+        const absoluta = `${metrica.absoluta > 0 ? '+' : ''}${formatoNumero(metrica.absoluta, decimales)}`;
+        delta.textContent = `${etiquetaEstado[metrica.estado]} ${absoluta}${porcentaje}`;
+        delta.className = `text-xs mt-1 font-semibold ${metrica.absoluta > 0 ? 'text-green-600' : metrica.absoluta < 0 ? 'text-red-500' : 'text-gray-500'}`;
     }
-    renderDelta('comp-total-delta', d.delta.total_finalizados);
-    renderDelta('comp-promedio-delta', d.delta.promedio_dia);
-    renderDelta('comp-tasa-delta', d.delta.tasa_conversion);
+
+    renderMetrica(comparativa.pacientes, 'comp-pacientes-valores', 'comp-pacientes-delta');
+    renderMetrica(comparativa.practicas, 'comp-practicas-valores', 'comp-practicas-delta');
+    renderMetrica(comparativa.promedio_dia, 'comp-promedio-valores', 'comp-promedio-delta', 2);
+    renderMetrica(comparativa.practicas_por_paciente, 'comp-practicas-paciente-valores', 'comp-practicas-paciente-delta', 2);
 
     if (d.periodo_actual && d.periodo_anterior) {
         document.getElementById('comp-subtitulo').textContent =
@@ -612,6 +649,12 @@ async function cargarPunciones() {
     destroyAndCreate('punciones', 'grafico-punciones', {type:'line', data:{labels:d.labels,datasets:d.datasets}, options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 
+async function cargarDopplerEcocardio() {
+    const d = await cargarDatosGrafico('grafico-doppler-ecocardio', `${BASE}/doppler-ecocardio/?${buildParams()}`);
+    destroyAndCreate('dopplerEcocardio', 'grafico-doppler-ecocardio', {type:'line', data:d.evolucion, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
+    destroyAndCreate('responsablesDoppler', 'grafico-responsables-doppler', {type:'bar', data:d.responsables, options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0}},y:{stacked:true,ticks:{font:{size:10}}}}}});
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Lógica de botones de período
 // ─────────────────────────────────────────────────────────────────────────────
@@ -649,6 +692,7 @@ function cargarTodo() {
         cargarPracticas(),
         cargarObrasSocialesEvolucion(),
         cargarPunciones(),
+        cargarDopplerEcocardio(),
     ]).catch(err => console.error('Error al cargar datos:', err));
 }
 

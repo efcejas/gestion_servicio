@@ -7,7 +7,7 @@ from django.test import TestCase
 from openpyxl import Workbook
 
 from .forms import ImportarEGESForm
-from .models import EgesRow, ImportBatch
+from .models import DirectorToken, EgesRow, ImportBatch
 from .services import calcular_sha256_archivo, procesar_excel_eges
 
 
@@ -421,6 +421,8 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(data['pacientes']['anterior'], 80)
         self.assertEqual(data['pacientes']['absoluta'], 20)
         self.assertEqual(data['practicas']['absoluta'], 60)
+        self.assertEqual(data['promedio_dia']['actual'], 160)
+        self.assertEqual(data['promedio_dia']['anterior'], 100)
         self.assertEqual(data['practicas_por_paciente']['actual'], 1.6)
         self.assertEqual(data['practicas_por_paciente']['anterior'], 1.25)
 
@@ -624,6 +626,38 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
 
         self.assertIn('Seriografía', [dataset['label'] for dataset in temporal['datasets']])
         self.assertIn('Seriografía', [dataset['label'] for dataset in productividad['datasets']])
+
+    def test_portal_director_separa_doppler_ecocardio_y_responsables(self):
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='doppler-ecocardio.xlsx')
+        doppler_mayo = self._crear_estudio_dashboard(
+            batch, 'DOP-MAYO', date(2026, 5, 10), 'ECO', practica='DOPPLER CAROTIDEO',
+        )
+        doppler_junio = self._crear_estudio_dashboard(
+            batch, 'DOP-JUNIO', date(2026, 6, 10), 'ECO', practica='DOPPLER VENOSO',
+        )
+        ecocardio_junio = self._crear_estudio_dashboard(
+            batch, 'ECOCAR-JUNIO', date(2026, 6, 11), 'ECO', practica='ECODOPPLER CARDIACO',
+        )
+        for fila, sub_modalidad, medico in (
+            (doppler_mayo, 'DOPPLER', 'DRA DOPPLER'),
+            (doppler_junio, 'DOPPLER', 'DRA DOPPLER'),
+            (ecocardio_junio, 'ECOCARDIO', 'DR CARDIO'),
+        ):
+            fila.sub_modalidad = sub_modalidad
+            fila.medico_informante = medico
+            fila.save(update_fields=['sub_modalidad', 'medico_informante'])
+
+        token = DirectorToken.objects.create(nombre_etiqueta='Test Doppler')
+        response = self.client.get(f'/eges/director/{token.token}/doppler-ecocardio/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['evolucion']['labels'], ['2026-05', '2026-06'])
+        self.assertEqual(data['evolucion']['datasets'][0]['data'], [1, 1])
+        self.assertEqual(data['evolucion']['datasets'][1]['data'], [0, 1])
+        self.assertEqual(data['responsables']['labels'], ['DRA DOPPLER', 'DR CARDIO'])
+        self.assertEqual(data['responsables']['datasets'][0]['data'], [2, 0])
+        self.assertEqual(data['responsables']['datasets'][1]['data'], [0, 1])
 
     def test_dashboard_advierte_lote_con_posible_tope_eges(self):
         self.user.is_superuser = True
