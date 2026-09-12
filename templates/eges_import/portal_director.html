@@ -276,7 +276,9 @@
                 </div>
         </div>
 
-        <section class="order-3 mb-6 w-full border border-blue-200 bg-blue-50/50 p-5 lg:col-span-2" aria-labelledby="hallazgos-titulo">
+        <!-- Sección pausada temporalmente para el portal del director. Se conserva
+             el markup y la carga para reactivarla sin perder el trabajo. -->
+        <section hidden class="order-3 mb-6 w-full border border-blue-200 bg-blue-50/50 p-5 lg:col-span-2" aria-labelledby="hallazgos-titulo">
             <div>
                 <h2 class="text-base font-semibold text-gray-800" id="hallazgos-titulo">Hallazgos del período</h2>
                 <p class="mt-0.5 text-xs text-gray-600" id="hallazgos-subtitulo">Analizando variaciones relevantes.</p>
@@ -771,7 +773,6 @@ function cargarTodo() {
         cargarFranja(),
         cargarMedicos(),
         cargarComparativa(),
-        cargarHallazgos(),
         cargarObrasSociales(),
         cargarPracticas(),
         cargarObrasSocialesEvolucion(),
