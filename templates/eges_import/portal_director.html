@@ -276,6 +276,16 @@
                 </div>
         </div>
 
+        <section class="order-3 mb-6 w-full border border-blue-200 bg-blue-50/50 p-5 lg:col-span-2" aria-labelledby="hallazgos-titulo">
+            <div>
+                <h2 class="text-base font-semibold text-gray-800" id="hallazgos-titulo">Hallazgos del período</h2>
+                <p class="mt-0.5 text-xs text-gray-600" id="hallazgos-subtitulo">Analizando variaciones relevantes.</p>
+            </div>
+            <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3" id="hallazgos-lista" aria-live="polite">
+                <p class="text-sm text-gray-500">Cargando hallazgos.</p>
+            </div>
+        </section>
+
         <div class="contents">
             <!-- Obras Sociales -->
             <div class="order-8 mb-6 bg-white rounded-xl shadow-sm border border-gray-200">
@@ -373,6 +383,7 @@ let charts = {
     practicas: null,
     obrasSocialesEvolucion: null,
     punciones: null,
+    guardias: null,
     obrasSociales: null,
     dopplerEcocardio: null,
     responsablesDoppler: null,
@@ -383,7 +394,6 @@ let opcionesObrasSociales = new Map();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
-    guardias: null,
 // ─────────────────────────────────────────────────────────────────────────────
 function buildParams(extra = {}) {
     const p = new URLSearchParams();
@@ -460,16 +470,6 @@ async function cargarTemporal() {
     });
 }
 
-function cambiarTipoTemporal(tipo) {
-    tipoTemporal = tipo;
-    document.getElementById('tipo-lineas').className = tipo === 'line'
-        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
-        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
-    document.getElementById('tipo-barras').className = tipo === 'bar'
-        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
-        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
-    cargarTemporal();
-}
 async function cargarGuardias() {
     const datos = await cargarDatosGrafico('grafico-guardias', `${BASE}/guardias/?${buildParams()}`);
     document.getElementById('guardia-total').textContent = formatNum(datos.total_guardia);
@@ -486,6 +486,16 @@ async function cargarGuardias() {
     });
 }
 
+function cambiarTipoTemporal(tipo) {
+    tipoTemporal = tipo;
+    document.getElementById('tipo-lineas').className = tipo === 'line'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    document.getElementById('tipo-barras').className = tipo === 'bar'
+        ? 'px-3 py-1.5 text-xs rounded bg-blue-600 text-white font-medium'
+        : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+    cargarTemporal();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dona — distribución por modalidad
@@ -634,6 +644,38 @@ async function cargarComparativa() {
     }
 }
 
+async function cargarHallazgos() {
+    const respuesta = await fetch(`${BASE}/hallazgos/?${buildParams()}`);
+    if (!respuesta.ok) throw new Error(`No se pudieron cargar los hallazgos (${respuesta.status})`);
+    const datos = await respuesta.json();
+    const lista = document.getElementById('hallazgos-lista');
+    lista.replaceChildren();
+    document.getElementById('hallazgos-subtitulo').textContent = datos.periodo_actual && datos.periodo_anterior
+        ? `${datos.periodo_actual.desde}–${datos.periodo_actual.hasta} frente a ${datos.periodo_anterior.desde}–${datos.periodo_anterior.hasta}.`
+        : 'Variaciones relevantes frente al período anterior.';
+
+    const estilos = {
+        alerta: 'border-amber-200 bg-white',
+        positivo: 'border-emerald-200 bg-white',
+        neutral: 'border-gray-200 bg-white',
+    };
+    datos.hallazgos.forEach(hallazgo => {
+        const tarjeta = document.createElement('article');
+        tarjeta.className = `border p-4 ${estilos[hallazgo.tipo] || estilos.neutral}`;
+        const titulo = document.createElement('h3');
+        titulo.className = 'text-sm font-semibold text-gray-800';
+        titulo.textContent = hallazgo.titulo;
+        const evidencia = document.createElement('p');
+        evidencia.className = 'mt-2 text-xs text-gray-600';
+        evidencia.textContent = hallazgo.evidencia;
+        const accion = document.createElement('p');
+        accion.className = 'mt-3 text-xs font-medium text-gray-700';
+        accion.textContent = `Siguiente revisión: ${hallazgo.accion}`;
+        tarjeta.append(titulo, evidencia, accion);
+        lista.append(tarjeta);
+    });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Obras Sociales
 // ─────────────────────────────────────────────────────────────────────────────
@@ -723,11 +765,13 @@ function cargarTodo() {
     Promise.all([
         cargarKPIs(),
         cargarTemporal(),
+        cargarGuardias(),
         cargarDona(),
         cargarEco(),
         cargarFranja(),
         cargarMedicos(),
         cargarComparativa(),
+        cargarHallazgos(),
         cargarObrasSociales(),
         cargarPracticas(),
         cargarObrasSocialesEvolucion(),
@@ -765,7 +809,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const mod = b.dataset.mod;
             if (mod === '') {
                 // botón "Todas": activo sólo si no hay ninguna seleccionada
-        cargarGuardias(),
                 b.className = estado.modalidades.size === 0 ? CLASE_ON : CLASE_OFF;
                 b.style.backgroundColor = '';
                 b.style.borderColor = '';

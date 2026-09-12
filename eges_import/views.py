@@ -1260,7 +1260,7 @@ def _vista_demanda_guardia(request):
 # Endpoint: Comparativa período actual vs anterior
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _vista_comparativa_data(request):
+def _datos_comparativa(request):
     """Compara KPIs del período seleccionado vs el anterior de igual duración."""
     codigos_bloqueos_tc = {'900446', '900441', '900413', '341317'}
 
@@ -1416,7 +1416,7 @@ def _vista_comparativa_data(request):
             return None
         return round(((a - b) / b) * 100, 1)
 
-    return JsonResponse({
+    return {
         'actual': actual,
         'anterior': anterior,
         'periodo_actual': {'desde': fd.strftime('%d/%m/%Y'), 'hasta': fh.strftime('%d/%m/%Y')},
@@ -1428,6 +1428,88 @@ def _vista_comparativa_data(request):
             'tasa_conversion': delta(actual['tasa_conversion'], anterior['tasa_conversion']),
         },
         'comparativa': comparativa,
+    }
+
+
+def _vista_comparativa_data(request):
+    """Compara KPIs del período seleccionado vs el anterior de igual duración."""
+    return JsonResponse(_datos_comparativa(request))
+
+
+def _vista_hallazgos_director(request):
+    """Genera señales de gestión explicables; no atribuye causas como hechos."""
+    datos = _datos_comparativa(request)
+    comparativa = datos['comparativa']
+    hallazgos = []
+
+    def formato_numero(valor, decimales=0):
+        return f'{valor:,.{decimales}f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+    def agregar_cambio(metrica, nombre, unidad, accion, decimales=0):
+        porcentaje = metrica['porcentaje']
+        if porcentaje is None or abs(porcentaje) < 10:
+            return
+        direccion = 'aumentó' if metrica['absoluta'] > 0 else 'disminuyó'
+        signo = '+' if porcentaje > 0 else ''
+        hallazgos.append({
+            'tipo': 'positivo' if metrica['absoluta'] > 0 else 'alerta',
+            'titulo': f'{nombre} {direccion} {signo}{formato_numero(porcentaje, 1)}%',
+            'evidencia': (
+                f"{formato_numero(metrica['actual'], decimales)} vs "
+                f"{formato_numero(metrica['anterior'], decimales)} {unidad} "
+                'en períodos comparables.'
+            ),
+            'accion': accion,
+        })
+
+    practicas = comparativa['practicas']
+    pacientes = comparativa['pacientes']
+    if practicas['porcentaje'] is not None and abs(practicas['porcentaje']) >= 10:
+        accion = (
+            'Revisar si cambió la complejidad de las prácticas, la oferta de agenda o las autorizaciones.'
+            if practicas['absoluta'] < 0 and pacientes['absoluta'] >= 0
+            else 'Revisar agenda disponible, cancelaciones, derivaciones y cobertura para confirmar dónde se concentra el cambio.'
+        )
+        agregar_cambio(practicas, 'Prácticas realizadas', 'prácticas', accion)
+
+    agregar_cambio(
+        comparativa['practicas_por_paciente'],
+        'Prácticas por paciente',
+        'prácticas por paciente',
+        'Revisar la composición de prácticas y si los pacientes requirieron menos o más estudios por atención.',
+        decimales=2,
+    )
+
+    cambios_practicas = (
+        comparativa['practicas_mayores_disminuciones']
+        if practicas['absoluta'] < 0
+        else comparativa['practicas_mayores_aumentos']
+    )
+    if cambios_practicas:
+        practica = cambios_practicas[0]
+        signo = '+' if practica['absoluta'] > 0 else ''
+        hallazgos.append({
+            'tipo': 'positivo' if practica['absoluta'] > 0 else 'alerta',
+            'titulo': f"{practica['practica']}: {signo}{practica['absoluta']:,} prácticas".replace(',', '.'),
+            'evidencia': (
+                f"{practica['actual']:,} vs {practica['anterior']:,}; "
+                f"{practica['estado'].replace('_', ' ').lower()}."
+            ).replace(',', '.'),
+            'accion': 'Contrastar agenda, derivaciones, autorizaciones y disponibilidad de responsables para esta práctica.',
+        })
+
+    if not hallazgos:
+        hallazgos.append({
+            'tipo': 'neutral',
+            'titulo': 'Sin variaciones relevantes en el período',
+            'evidencia': 'No se detectaron cambios iguales o mayores al 10% en las métricas principales.',
+            'accion': 'Mantener seguimiento mensual y revisar los gráficos de tendencia para detectar cambios graduales.',
+        })
+
+    return JsonResponse({
+        'periodo_actual': datos['periodo_actual'],
+        'periodo_anterior': datos['periodo_anterior'],
+        'hallazgos': hallazgos[:3],
     })
 
 
@@ -1613,6 +1695,12 @@ def portal_director_comparativa(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
     return _vista_comparativa_data(request)
+
+
+def portal_director_hallazgos(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_hallazgos_director(request)
 
 
 def portal_director_exportar_excel(request, token):

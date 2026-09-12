@@ -426,6 +426,20 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(data['practicas_por_paciente']['actual'], 1.6)
         self.assertEqual(data['practicas_por_paciente']['anterior'], 1.25)
 
+    def test_hallazgos_director_informa_cambios_relevantes_y_acciones(self):
+        filtros = self._preparar_comparativa()
+        self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 160}, pacientes=100, prefijo='A')
+        self._crear_comparativa(date(2026, 4, 21), 'ECO', {'ECO ABDOMEN': 100}, pacientes=80, prefijo='B')
+        token = DirectorToken.objects.create(nombre_etiqueta='Test hallazgos')
+
+        response = self.client.get(f'/eges/director/{token.token}/hallazgos/', filtros)
+
+        self.assertEqual(response.status_code, 200)
+        hallazgos = response.json()['hallazgos']
+        self.assertLessEqual(len(hallazgos), 3)
+        self.assertTrue(any('Prácticas realizadas aumentó +60,0%' in item['titulo'] for item in hallazgos))
+        self.assertTrue(all(item['evidencia'] and item['accion'] for item in hallazgos))
+
     def test_comparativa_ordena_aumentos_y_disminuciones_por_diferencia(self):
         filtros = self._preparar_comparativa()
         self._crear_comparativa(date(2026, 5, 1), 'ECO', {'ECO ABDOMEN': 120, 'DOPPLER': 60})
@@ -659,20 +673,6 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(data['responsables']['datasets'][0]['data'], [2, 0])
         self.assertEqual(data['responsables']['datasets'][1]['data'], [0, 1])
 
-    def test_dashboard_advierte_lote_con_posible_tope_eges(self):
-        self.user.is_superuser = True
-        self.user.save(update_fields=['is_superuser'])
-        self.client.force_login(self.user)
-        ImportBatch.objects.create(
-            usuario=self.user,
-            archivo_nombre='Atendidos-mayo-ECO.xls',
-            total_filas=1000,
-        )
-
-        response = self.client.get('/eges/estadisticas/')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['lotes_posible_tope'], 1)
     def test_portal_director_guardias_cuenta_solo_guardias_por_modalidad(self):
         batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='guardias.xlsx')
         guardia_eco = self._crear_estudio_dashboard(batch, 'GUARDIA-ECO', date(2026, 5, 10), 'ECO')
@@ -698,4 +698,18 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(data['datasets'][0]['data'], [0, 1])
         self.assertEqual(data['datasets'][1]['data'], [1, 0])
 
+    def test_dashboard_advierte_lote_con_posible_tope_eges(self):
+        self.user.is_superuser = True
+        self.user.save(update_fields=['is_superuser'])
+        self.client.force_login(self.user)
+        ImportBatch.objects.create(
+            usuario=self.user,
+            archivo_nombre='Atendidos-mayo-ECO.xls',
+            total_filas=1000,
+        )
+
+        response = self.client.get('/eges/estadisticas/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['lotes_posible_tope'], 1)
         self.assertContains(response, 'podrían haber alcanzado el límite')
