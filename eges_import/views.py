@@ -1603,6 +1603,12 @@ def portal_director_doppler_ecocardio(request, token):
     return _vista_doppler_ecocardio(request)
 
 
+def portal_director_guardias(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_demanda_guardia(request)
+
+
 def portal_director_comparativa(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
@@ -1685,12 +1691,6 @@ def _exportar_pdf(request):
         'TC': '#3b82f6', 'RM': '#9333ea', 'RX': '#22c55e',
         'DX': '#f97316', 'MAM': '#ec4899', 'ECO': '#eab308',
         'SERIE': '#14b8a6', 'OTROS': '#6b7280',
-def portal_director_guardias(request, token):
-    if not _verificar_token(token):
-        return HttpResponseForbidden()
-    return _vista_demanda_guardia(request)
-
-
     }
 
     # ── Estilos ReportLab ─────────────────────────────────────────────────────
