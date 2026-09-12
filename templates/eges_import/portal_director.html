@@ -164,8 +164,31 @@
             </div>
         </div>
 
+        <section class="order-5 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-2" aria-labelledby="guardias-titulo">
+            <div class="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-base font-semibold text-gray-800" id="guardias-titulo">Demanda de guardia</h2>
+                    <p class="mt-0.5 text-xs text-gray-500">Estudios finalizados clasificados como guardia, desglosados por modalidad.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-right">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Estudios</p>
+                        <p class="text-xl font-bold text-gray-900" id="guardia-total">—</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">De la demanda</p>
+                        <p class="text-xl font-bold text-medical-primary" id="guardia-porcentaje">—</p>
+                    </div>
+                </div>
+            </div>
+            <div class="relative p-5" style="height: 320px;">
+                <canvas id="grafico-guardias"></canvas>
+                <div class="chart-loading absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/90 text-xs font-medium text-gray-500" aria-live="polite"><svg class="h-6 w-6 animate-spin text-medical-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3"></circle><path class="opacity-75" fill="currentColor" d="M12 3a9 9 0 019 9h-3a6 6 0 00-6-6V3z"></path></svg><span>Cargando datos</span></div>
+            </div>
+        </section>
+
         <!-- FILA DE 3 GRAFICOS -->
-        <div class="order-7 grid grid-cols-1 gap-4 mb-6 lg:col-span-2 lg:grid-cols-3">
+        <div class="order-8 grid grid-cols-1 gap-4 mb-6 lg:col-span-2 lg:grid-cols-3">
 
             <!-- Distribución por modalidad (dona) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -360,6 +383,7 @@ let opcionesObrasSociales = new Map();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
+    guardias: null,
 // ─────────────────────────────────────────────────────────────────────────────
 function buildParams(extra = {}) {
     const p = new URLSearchParams();
@@ -446,6 +470,22 @@ function cambiarTipoTemporal(tipo) {
         : 'px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
     cargarTemporal();
 }
+async function cargarGuardias() {
+    const datos = await cargarDatosGrafico('grafico-guardias', `${BASE}/guardias/?${buildParams()}`);
+    document.getElementById('guardia-total').textContent = formatNum(datos.total_guardia);
+    document.getElementById('guardia-porcentaje').textContent = `${Number(datos.porcentaje_sobre_total).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
+    destroyAndCreate('guardias', 'grafico-guardias', {
+        type: 'line',
+        data: { labels: datos.labels, datasets: datos.datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
+    });
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dona — distribución por modalidad
@@ -725,6 +765,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const mod = b.dataset.mod;
             if (mod === '') {
                 // botón "Todas": activo sólo si no hay ninguna seleccionada
+        cargarGuardias(),
                 b.className = estado.modalidades.size === 0 ? CLASE_ON : CLASE_OFF;
                 b.style.backgroundColor = '';
                 b.style.borderColor = '';

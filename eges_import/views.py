@@ -1221,6 +1221,41 @@ def _vista_doppler_ecocardio(request):
     })
 
 
+def _vista_demanda_guardia(request):
+    """Resume la demanda de guardia finalizada sin alterar la operación de guardias."""
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    guardias = estudios.filter(tipo_atencion__iexact='Guardia')
+    totales = {}
+    modalidades_presentes = set()
+    for fila in guardias.values('fecha_turno', 'modalidad').annotate(total=Count('id')).order_by('fecha_turno'):
+        mes = fila['fecha_turno'].strftime('%Y-%m')
+        modalidad = fila['modalidad']
+        totales[(mes, modalidad)] = totales.get((mes, modalidad), 0) + fila['total']
+        modalidades_presentes.add(modalidad)
+
+    meses = sorted({mes for mes, _ in totales})
+    modalidades = [modalidad for modalidad in COLORES_MODALIDAD if modalidad in modalidades_presentes]
+    total_guardia = guardias.count()
+    total_estudios = estudios.count()
+
+    return JsonResponse({
+        'total_guardia': total_guardia,
+        'porcentaje_sobre_total': round(total_guardia / total_estudios * 100, 1) if total_estudios else 0,
+        'labels': meses,
+        'datasets': [
+            {
+                'label': dict(EgesRow.MODALIDAD_CHOICES).get(modalidad, modalidad),
+                'data': [totales.get((mes, modalidad), 0) for mes in meses],
+                'borderColor': COLORES_MODALIDAD[modalidad]['border'],
+                'backgroundColor': COLORES_MODALIDAD[modalidad]['bg'],
+                'fill': False,
+                'tension': .25,
+            }
+            for modalidad in modalidades
+        ],
+    })
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: Comparativa período actual vs anterior
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1650,6 +1685,12 @@ def _exportar_pdf(request):
         'TC': '#3b82f6', 'RM': '#9333ea', 'RX': '#22c55e',
         'DX': '#f97316', 'MAM': '#ec4899', 'ECO': '#eab308',
         'SERIE': '#14b8a6', 'OTROS': '#6b7280',
+def portal_director_guardias(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_demanda_guardia(request)
+
+
     }
 
     # ── Estilos ReportLab ─────────────────────────────────────────────────────

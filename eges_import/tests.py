@@ -673,4 +673,29 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['lotes_posible_tope'], 1)
+    def test_portal_director_guardias_cuenta_solo_guardias_por_modalidad(self):
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre='guardias.xlsx')
+        guardia_eco = self._crear_estudio_dashboard(batch, 'GUARDIA-ECO', date(2026, 5, 10), 'ECO')
+        guardia_tc = self._crear_estudio_dashboard(batch, 'GUARDIA-TC', date(2026, 6, 10), 'TC')
+        ambulatorio = self._crear_estudio_dashboard(batch, 'AMB-ECO', date(2026, 6, 11), 'ECO')
+        for fila, tipo_atencion in (
+            (guardia_eco, 'Guardia'),
+            (guardia_tc, 'Guardia'),
+            (ambulatorio, 'Ambulatorio'),
+        ):
+            fila.tipo_atencion = tipo_atencion
+            fila.save(update_fields=['tipo_atencion'])
+
+        token = DirectorToken.objects.create(nombre_etiqueta='Test guardias')
+        response = self.client.get(f'/eges/director/{token.token}/guardias/')
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['total_guardia'], 2)
+        self.assertEqual(data['porcentaje_sobre_total'], 66.7)
+        self.assertEqual(data['labels'], ['2026-05', '2026-06'])
+        self.assertEqual([item['label'] for item in data['datasets']], ['Tomografía Computada', 'Ecografía'])
+        self.assertEqual(data['datasets'][0]['data'], [0, 1])
+        self.assertEqual(data['datasets'][1]['data'], [1, 0])
+
         self.assertContains(response, 'podrían haber alcanzado el límite')
