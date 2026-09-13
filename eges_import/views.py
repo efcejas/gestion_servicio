@@ -1262,7 +1262,8 @@ def _vista_dia_semana_director(request):
     valores = [0] * 7
     for item in conteos:
         valores[(item['dia_semana'] + 5) % 7] = item['total']
-    return JsonResponse({'labels': ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'], 'datasets': [{'label': 'Estudios finalizados', 'data': valores, 'backgroundColor': 'rgba(22,69,105,.75)'}]})
+    colores = ['#2563eb', '#16a34a', '#d97706', '#9333ea', '#dc2626', '#64748b', '#db2777']
+    return JsonResponse({'labels': ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'], 'datasets': [{'label': 'Estudios finalizados', 'data': valores, 'backgroundColor': colores, 'borderColor': colores, 'borderWidth': 1, 'borderRadius': 5}]})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
