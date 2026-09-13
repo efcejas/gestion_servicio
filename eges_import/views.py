@@ -1071,9 +1071,12 @@ def _vista_practicas_data(request):
     estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
     datos = (estudios.exclude(Q(practica__isnull=True) | Q(practica=''))
              .values('practica').annotate(total=Count('id')).order_by('-total')[:15])
+    colores = ['#2563eb', '#0ea5e9', '#14b8a6', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#a855f7', '#6366f1', '#64748b', '#475569', '#334155']
     return JsonResponse({'labels': [d['practica'] for d in datos],
                         'datasets': [{'label': 'Estudios', 'data': [d['total'] for d in datos],
-                                      'backgroundColor': 'rgba(22, 69, 105, .75)'}]})
+                                      'backgroundColor': colores[:len(datos)],
+                                      'borderColor': colores[:len(datos)], 'borderWidth': 1,
+                                      'borderRadius': 4}]})
 
 
 def practicas_data(request):
