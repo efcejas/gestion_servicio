@@ -48,6 +48,7 @@ urlpatterns = [
     path('director/<str:token>/practicas/evolucion/', views.portal_director_practica_evolucion, name='portal_director_practica_evolucion'),
     path('director/<str:token>/doppler-ecocardio/', views.portal_director_doppler_ecocardio, name='portal_director_doppler_ecocardio'),
     path('director/<str:token>/guardias/', views.portal_director_guardias, name='portal_director_guardias'),
+    path('director/<str:token>/dia-semana/', views.portal_director_dia_semana, name='portal_director_dia_semana'),
     path('director/<str:token>/comparativa/', views.portal_director_comparativa, name='portal_director_comparativa'),
     path('director/<str:token>/hallazgos/', views.portal_director_hallazgos, name='portal_director_hallazgos'),
     path('director/<str:token>/exportar-excel/', views.portal_director_exportar_excel, name='portal_director_exportar_excel'),

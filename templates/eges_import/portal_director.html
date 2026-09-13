@@ -187,6 +187,11 @@
             </div>
         </section>
 
+        <section class="order-5 mb-6 bg-white rounded-xl shadow-sm border border-gray-200 lg:col-span-2" aria-labelledby="dia-semana-titulo">
+            <div class="border-b border-gray-100 px-5 py-4"><h2 class="text-base font-semibold text-gray-800" id="dia-semana-titulo">Distribución por día de semana</h2><p class="mt-0.5 text-xs text-gray-500">Todas las modalidades seleccionadas</p></div>
+            <div class="relative p-5" style="height: 280px;"><canvas id="grafico-dia-semana"></canvas><div class="chart-loading absolute inset-0 flex items-center justify-center bg-white/90 text-xs text-gray-500">Cargando datos</div></div>
+        </section>
+
         <!-- FILA DE 3 GRAFICOS -->
         <div class="order-8 grid grid-cols-1 gap-4 mb-6 lg:col-span-2 lg:grid-cols-3">
 
@@ -386,6 +391,7 @@ let charts = {
     obrasSocialesEvolucion: null,
     punciones: null,
     guardias: null,
+    diaSemana: null,
     obrasSociales: null,
     dopplerEcocardio: null,
     responsablesDoppler: null,
@@ -486,6 +492,11 @@ async function cargarGuardias() {
             scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
         },
     });
+}
+
+async function cargarDiaSemana() {
+    const d = await cargarDatosGrafico('grafico-dia-semana', `${BASE}/dia-semana/?${buildParams()}`);
+    destroyAndCreate('diaSemana', 'grafico-dia-semana', {type:'bar', data:{labels:d.labels,datasets:d.datasets}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}});
 }
 
 function cambiarTipoTemporal(tipo) {
@@ -768,6 +779,7 @@ function cargarTodo() {
         cargarKPIs(),
         cargarTemporal(),
         cargarGuardias(),
+        cargarDiaSemana(),
         cargarDona(),
         cargarEco(),
         cargarFranja(),

@@ -1223,7 +1223,7 @@ def _vista_doppler_ecocardio(request):
 
 def _vista_demanda_guardia(request):
     """Resume la demanda de guardia finalizada sin alterar la operación de guardias."""
-    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados().filter(modalidad__in=['TC', 'ECO']), request.GET)
     guardias = estudios.filter(tipo_atencion__iexact='Guardia')
     totales = {}
     modalidades_presentes = set()
@@ -1254,6 +1254,15 @@ def _vista_demanda_guardia(request):
             for modalidad in modalidades
         ],
     })
+
+
+def _vista_dia_semana_director(request):
+    estudios = _aplicar_filtros_fecha_modalidad(_base_estudios_finalizados(), request.GET)
+    conteos = estudios.annotate(dia_semana=ExtractWeekDay('fecha_turno')).values('dia_semana').annotate(total=Count('id'))
+    valores = [0] * 7
+    for item in conteos:
+        valores[(item['dia_semana'] + 5) % 7] = item['total']
+    return JsonResponse({'labels': ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'], 'datasets': [{'label': 'Estudios finalizados', 'data': valores, 'backgroundColor': 'rgba(22,69,105,.75)'}]})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1689,6 +1698,12 @@ def portal_director_guardias(request, token):
     if not _verificar_token(token):
         return HttpResponseForbidden()
     return _vista_demanda_guardia(request)
+
+
+def portal_director_dia_semana(request, token):
+    if not _verificar_token(token):
+        return HttpResponseForbidden()
+    return _vista_dia_semana_director(request)
 
 
 def portal_director_comparativa(request, token):
