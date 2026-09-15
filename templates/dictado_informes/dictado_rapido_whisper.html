@@ -1502,7 +1502,8 @@ async function procesarAudio() {
             
             const dataTranscripcion = await responseTranscripcion.json();
             const t2 = Date.now();
-            console.log(`⏱️ Transcripción completada en ${t2-t1}ms`);
+            const motorUsado = dataTranscripcion.provider ? `${dataTranscripcion.provider} (${dataTranscripcion.model || ''})` : 'Whisper';
+            console.log(`⏱️ Transcripción completada en ${t2-t1}ms [Motor: ${motorUsado}]`);
             
             if (!dataTranscripcion.success) {
                 throw new Error(dataTranscripcion.error || 'Error en transcripción');
