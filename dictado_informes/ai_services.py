@@ -23,13 +23,42 @@ class AIService:
         groq_key = config('GROQ_API_KEY', default=None)
         openai_key = config('OPENAI_API_KEY', default=None)
         
-        # Cliente OpenAI para STT (Whisper)
-        if openai_key:
-            self.stt_client = OpenAI(api_key=openai_key)
+        # Clientes para STT (Whisper) con soporte Multi-Proveedor y Fallback
+        # Proveedores soportados: 'groq' (whisper-large-v3-turbo) y 'openai' (whisper-1)
+        self.stt_openai_client = OpenAI(api_key=openai_key) if openai_key else None
+        self.stt_groq_client = OpenAI(
+            api_key=groq_key,
+            base_url="https://api.groq.com/openai/v1"
+        ) if groq_key else None
+
+        # Prioridad por defecto: Groq (Whisper v3 Turbo, más rápido y fiel) si está disponible, sino OpenAI
+        proveedor_stt_default = 'groq' if groq_key else ('openai' if openai_key else None)
+        self.stt_provider = getattr(settings, 'STT_PROVIDER', config('STT_PROVIDER', default=proveedor_stt_default))
+        self.stt_groq_model = getattr(settings, 'GROQ_STT_MODEL', config('GROQ_STT_MODEL', default='whisper-large-v3-turbo'))
+        self.stt_openai_model = getattr(settings, 'OPENAI_STT_MODEL', config('OPENAI_STT_MODEL', default='whisper-1'))
+
+        # Cliente activo principal para STT
+        if self.stt_provider == 'groq' and self.stt_groq_client:
+            self.stt_client = self.stt_groq_client
+            self.stt_model = self.stt_groq_model
             self.stt_enabled = True
-            logger.info("✅ OpenAI Whisper configurado para transcripción")
+            logger.info("✅ Groq Whisper (%s) configurado como STT principal", self.stt_model)
+        elif self.stt_openai_client:
+            self.stt_client = self.stt_openai_client
+            self.stt_model = self.stt_openai_model
+            self.stt_provider = 'openai'
+            self.stt_enabled = True
+            logger.info("✅ OpenAI Whisper (%s) configurado como STT principal", self.stt_model)
+        elif self.stt_groq_client:
+            self.stt_client = self.stt_groq_client
+            self.stt_model = self.stt_groq_model
+            self.stt_provider = 'groq'
+            self.stt_enabled = True
+            logger.info("✅ Groq Whisper (%s) configurado como STT principal", self.stt_model)
         else:
             self.stt_client = None
+            self.stt_model = None
+            self.stt_provider = None
             self.stt_enabled = False
         
         # 🎯 PRIORIDAD: OpenAI GPT-4o-mini para LLM (mejor calidad médica)
@@ -375,19 +404,20 @@ class AIService:
     
     def transcribe_audio(self, audio_file):
         """
-        Transcribe audio usando Whisper de OpenAI
+        Transcribe audio usando Whisper (Groq whisper-large-v3-turbo o OpenAI whisper-1)
+        con fallback automático si el proveedor principal falla.
         
         Args:
             audio_file: Archivo de audio (ContentFile o FileField)
         
         Returns:
-            dict: {'text': str, 'confidence': float}
+            dict: {'text': str, 'confidence': float, 'provider': str, 'duration': float, ...}
         """
         if not self.stt_enabled:
             return {
                 'text': '',
                 'confidence': 0.0,
-                'error': '⚠️ Necesitas configurar OPENAI_API_KEY en el .env para usar Whisper. Crea una cuenta en https://platform.openai.com (incluye $5 gratis)'
+                'error': '⚠️ Necesitas configurar GROQ_API_KEY o OPENAI_API_KEY en el .env para usar transcripción Whisper.'
             }
         
         try:
@@ -440,41 +470,65 @@ class AIService:
             
             logger.info(f"🎵 Detected audio format: {file_extension}")
             
-            # Crear una tupla con el formato esperado por OpenAI
-            file_tuple = (f"audio.{file_extension}", audio_content, mime_type)
-            
             # Prompt optimizado para Whisper (más corto = menos latencia)
             prompt_whisper = (
                 "Informe radiológico. Terminología médica. "
                 "Pausas: breve=coma, media=punto, larga=salto. "
                 "Separar estructuras anatómicas."
             )
-            
-            # Transcribir con OpenAI Whisper
-            transcript = self.stt_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=file_tuple,
-                language="es",  # Español
-                prompt=prompt_whisper,  # Contexto para mejorar precisión
-                temperature=0.6,  # Optimizado: balance entre precisión y velocidad (reducido de 0.8)
-                response_format="verbose_json"
-            )
-            
-            logger.info(f"✅ Whisper transcripción exitosa: {len(transcript.text)} caracteres")
-            
-            result = {
-                'text': transcript.text,
-                'confidence': 0.95,
-                'duration': getattr(transcript, 'duration', None),
-                'provider': 'openai',
-                'from_cache': False
-            }
-            
-            # 🚀 GUARDAR EN CACHÉ (1 hora de expiración)
-            cache.set(cache_key, result, timeout=3600)
-            logger.info(f"💾 Transcripción guardada en caché (hash: {audio_hash[:8]}...)")
-            
-            return result
+
+            # Intentos de transcripción: primero proveedor preferido, luego fallback
+            intentos = []
+            if self.stt_provider == 'groq' and self.stt_groq_client:
+                intentos.append(('groq', self.stt_groq_client, self.stt_groq_model))
+                if self.stt_openai_client:
+                    intentos.append(('openai', self.stt_openai_client, self.stt_openai_model))
+            else:
+                if self.stt_openai_client:
+                    intentos.append(('openai', self.stt_openai_client, self.stt_openai_model))
+                if self.stt_groq_client:
+                    intentos.append(('groq', self.stt_groq_client, self.stt_groq_model))
+
+            ultimo_error = None
+            for prov_name, client, model_name in intentos:
+                try:
+                    logger.info("🎤 Intentando transcripción STT con %s (%s)...", prov_name, model_name)
+                    # Crear tupla con el formato esperado por la API (nombre_archivo, bytes, mime)
+                    file_tuple = (f"audio.{file_extension}", audio_content, mime_type)
+                    
+                    transcript = client.audio.transcriptions.create(
+                        model=model_name,
+                        file=file_tuple,
+                        language="es",
+                        prompt=prompt_whisper,
+                        temperature=0.3 if prov_name == 'groq' else 0.6,
+                        response_format="verbose_json"
+                    )
+                    
+                    transcript_text = getattr(transcript, 'text', '') if hasattr(transcript, 'text') else str(transcript)
+                    logger.info("✅ Whisper (%s - %s) transcripción exitosa: %d caracteres", prov_name, model_name, len(transcript_text))
+                    
+                    result = {
+                        'text': transcript_text,
+                        'confidence': 0.95,
+                        'duration': getattr(transcript, 'duration', None),
+                        'provider': prov_name,
+                        'model': model_name,
+                        'from_cache': False
+                    }
+                    
+                    # 🚀 GUARDAR EN CACHÉ (1 hora de expiración)
+                    cache.set(cache_key, result, timeout=3600)
+                    logger.info(f"💾 Transcripción guardada en caché (hash: {audio_hash[:8]}...)")
+                    return result
+
+                except Exception as e:
+                    ultimo_error = e
+                    logger.warning("⚠️ Falló transcripción STT con %s (%s): %s", prov_name, model_name, str(e))
+                    continue
+
+            # Si todos los intentos fallaron
+            raise ultimo_error if ultimo_error else Exception("No se pudo contactar con ningún proveedor de transcripción.")
         
         except Exception as e:
             error_msg = str(e)
@@ -483,9 +537,9 @@ class AIService:
             
             # Mensaje específico según el error
             if 'model_not_found' in error_msg or '404' in error_msg:
-                error_msg = "⚠️ Tu API key de OpenAI no tiene acceso a Whisper o está inválida. Verifica en https://platform.openai.com"
+                error_msg = "⚠️ La API key configurada no tiene acceso al modelo Whisper o está inválida."
             elif 'insufficient_quota' in error_msg:
-                error_msg = "⚠️ Se agotaron los créditos gratuitos de OpenAI. Agrega créditos en https://platform.openai.com/account/billing"
+                error_msg = "⚠️ Se agotaron los créditos en el proveedor de transcripción. Verifica tu saldo/billing."
             
             return {
                 'text': '',

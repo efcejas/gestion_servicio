@@ -1349,6 +1349,9 @@ def transcribir_audio_whisper(request):
         
         # 📊 FASE 4: Registrar métrica
         tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
+        proveedor_usado = transcripcion_result.get('provider', 'whisper')
+        modelo_usado = transcripcion_result.get('model', '')
+        api_identificador = f"{proveedor_usado}:{modelo_usado}" if modelo_usado else proveedor_usado
         
         metrica = MetricaDictado.objects.create(
             usuario=request.user,
@@ -1358,11 +1361,11 @@ def transcribir_audio_whisper(request):
             duracion_audio_segundos=transcripcion_result.get('duration'),
             tamanio_audio_kb=len(audio_data) // 1024,
             longitud_transcripcion=len(texto_procesado),
-            api_transcripcion='whisper',
+            api_transcripcion=api_identificador[:50],
             tuvo_errores=False
         )
         
-        logger.info(f"📊 Métrica registrada: {tiempo_total_ms}ms (transcripción: {tiempo_transcripcion_ms}ms)")
+        logger.info(f"📊 Métrica registrada ({api_identificador}): {tiempo_total_ms}ms (transcripción: {tiempo_transcripcion_ms}ms)")
         
         return JsonResponse({
             'success': True,
@@ -1371,6 +1374,8 @@ def transcribir_audio_whisper(request):
             'correcciones': correcciones,  # 🆕 Incluir correcciones del diccionario médico
             'confianza': transcripcion_result.get('confidence', 0.95),
             'duracion': transcripcion_result.get('duration'),
+            'provider': proveedor_usado,
+            'model': modelo_usado,
             'from_cache': transcripcion_result.get('from_cache', False)
         })
     
