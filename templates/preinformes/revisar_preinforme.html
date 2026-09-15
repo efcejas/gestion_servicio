@@ -747,13 +747,21 @@ window.PreinformesNettermEditor.bind({
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
             try {
+                const contextoEstudio = {
+                    tipo_estudio: '{{ preinforme.tipo_estudio.nombre|default:""|escapejs }}',
+                    region: '{{ preinforme.region.nombre|default:""|escapejs }}',
+                    plantilla: '{{ preinforme.plantilla_utilizada.nombre|default:""|escapejs }}'
+                };
                 const response = await fetch(TRANSCRIBIR_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
-                    body: JSON.stringify({ audio: reader.result })
+                    body: JSON.stringify({
+                        audio: reader.result,
+                        contexto: contextoEstudio
+                    })
                 });
 
                 const data = await response.json();

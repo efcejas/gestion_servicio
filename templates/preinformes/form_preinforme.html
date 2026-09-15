@@ -945,6 +945,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function obtenerContextoActualDictado() {
+        const tipoEl = document.getElementById('id_tipo_estudio');
+        const regionEl = document.getElementById('id_region');
+        const plantillaEl = document.getElementById('id_plantilla') || document.getElementById('id_plantilla_utilizada');
+
+        const tipoTexto = tipoEl && tipoEl.selectedIndex >= 0 ? (tipoEl.options[tipoEl.selectedIndex]?.text || '') : '';
+        const regionTexto = regionEl && regionEl.selectedIndex >= 0 ? (regionEl.options[regionEl.selectedIndex]?.text || '') : '';
+        const plantillaTexto = plantillaEl && plantillaEl.selectedIndex >= 0 ? (plantillaEl.options[plantillaEl.selectedIndex]?.text || '') : '';
+
+        const contexto = {};
+        if (tipoTexto && !tipoTexto.includes('---') && !tipoTexto.toLowerCase().includes('selecciona')) {
+            contexto.tipo_estudio = tipoTexto.trim();
+        }
+        if (regionTexto && !regionTexto.includes('---') && !regionTexto.toLowerCase().includes('selecciona')) {
+            contexto.region = regionTexto.trim();
+        }
+        if (plantillaTexto && !plantillaTexto.includes('---') && !plantillaTexto.toLowerCase().includes('sin plantilla')) {
+            contexto.plantilla = plantillaTexto.trim();
+        }
+        return contexto;
+    }
+
     async function procesarDictadoGrabado() {
         if (!dictadoChunks.length) {
             setDictadoStatus('No se detectó audio para transcribir.', true);
@@ -965,13 +987,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             const audioBase64 = await blobToDataURL(audioBlob);
+            const contextoEstudio = obtenerContextoActualDictado();
             const response = await fetch(TRANSCRIBIR_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                 },
-                body: JSON.stringify({ audio: audioBase64 })
+                body: JSON.stringify({
+                    audio: audioBase64,
+                    contexto: contextoEstudio
+                })
             });
 
             const data = await response.json();

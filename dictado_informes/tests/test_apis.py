@@ -67,6 +67,40 @@ class TestAPIsTranscripcion(TestCase):
         self.assertTrue(data['success'])
         self.assertIn('texto_transcrito', data)
         self.assertEqual(data['confianza'], 0.95)
+
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcribir_whisper_con_contexto(self, mock_transcribe):
+        """Prueba que el contexto opcional se pasa correctamente al AIService"""
+        mock_transcribe.return_value = {
+            'text': 'Meniscos conservados',
+            'confidence': 0.95,
+            'provider': 'groq',
+            'model': 'whisper-large-v3-turbo',
+        }
+        
+        audio_fake = base64.b64encode(b'fake audio data' * 100).decode()
+        contexto = {
+            'tipo_estudio': 'Resonancia Magnética',
+            'region': 'Rodilla',
+            'plantilla': 'RM Rodilla estándar'
+        }
+        
+        response = self.client.post(
+            '/dictado_informes/api/transcribir-whisper/',
+            data=json.dumps({
+                'audio': f'data:audio/webm;base64,{audio_fake}',
+                'contexto': contexto
+            }),
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['texto_transcrito'], 'Meniscos conservados')
+        mock_transcribe.assert_called_once()
+        _, kwargs = mock_transcribe.call_args
+        self.assertEqual(kwargs.get('contexto'), contexto)
     
     @patch('dictado_informes.ai_services.AIService.transcribe_audio')
     def test_transcribir_whisper_con_comandos_voz(self, mock_transcribe):

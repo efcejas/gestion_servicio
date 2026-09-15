@@ -402,13 +402,71 @@ class AIService:
         
         return info
     
-    def transcribe_audio(self, audio_file):
+    def _construir_prompt_whisper(self, contexto=None):
+        """
+        Construye un prompt de contexto para guiar a Whisper STT hacia la terminología
+        médica y anatómica adecuada, reduciendo errores de transcripción fonética.
+        Whisper acepta un prompt de hasta ~224 tokens para condicionar la decodificación.
+        """
+        base_prompt = (
+            "Informe radiológico. Terminología médica anatómica. "
+            "Pausas: breve=coma, media=punto, larga=salto. "
+            "Separar estructuras anatómicas."
+        )
+        if not contexto:
+            return base_prompt
+
+        if isinstance(contexto, str):
+            contexto_texto = contexto.strip()
+            if not contexto_texto:
+                return base_prompt
+            return f"Informe radiológico. {contexto_texto[:180]}. Terminología médica. Pausas: breve=coma, media=punto."
+
+        if isinstance(contexto, dict):
+            partes = []
+            tipo = str(contexto.get('tipo_estudio') or '').strip()
+            region = str(contexto.get('region') or '').strip()
+            plantilla = str(contexto.get('plantilla') or '').strip()
+            estructuras = contexto.get('estructuras')
+
+            if tipo and region:
+                partes.append(f"Estudio: {tipo} de {region}")
+            elif tipo:
+                partes.append(f"Estudio: {tipo}")
+            elif region:
+                partes.append(f"Región: {region}")
+
+            if plantilla and plantilla != region:
+                partes.append(f"Plantilla: {plantilla[:60]}")
+
+            if isinstance(estructuras, list) and estructuras:
+                est_str = ", ".join(str(e).strip() for e in estructuras[:8] if str(e).strip())
+                if est_str:
+                    partes.append(f"Estructuras: {est_str}")
+            elif isinstance(estructuras, str) and estructuras.strip():
+                partes.append(f"Estructuras: {estructuras.strip()[:100]}")
+
+            if not partes:
+                return base_prompt
+
+            info_contexto = ". ".join(partes)
+            prompt_final = (
+                f"Informe radiológico. {info_contexto}. "
+                "Terminología médica anatómica precisa. "
+                "Pausas: breve=coma, media=punto, larga=salto."
+            )
+            return prompt_final[:350]
+
+        return base_prompt
+
+    def transcribe_audio(self, audio_file, contexto=None):
         """
         Transcribe audio usando Whisper (Groq whisper-large-v3-turbo o OpenAI whisper-1)
-        con fallback automático si el proveedor principal falla.
+        con fallback automático si el proveedor principal falla y prompt contextual.
         
         Args:
             audio_file: Archivo de audio (ContentFile o FileField)
+            contexto: (Opcional) Dict o str con tipo_estudio, region, plantilla o estructuras
         
         Returns:
             dict: {'text': str, 'confidence': float, 'provider': str, 'duration': float, ...}
@@ -440,8 +498,9 @@ class AIService:
                     'error': 'Archivo de audio demasiado pequeño o inválido'
                 }
             
-            # 🚀 CACHÉ: Verificar si ya transcribimos este audio
-            audio_hash = hashlib.md5(audio_content).hexdigest()
+            # 🚀 CACHÉ: Verificar si ya transcribimos este audio con este contexto
+            contexto_hash_str = json.dumps(contexto, sort_keys=True) if isinstance(contexto, dict) else str(contexto or '')
+            audio_hash = hashlib.md5(audio_content + contexto_hash_str.encode('utf-8')).hexdigest()
             cache_key = f'whisper_transcription_{audio_hash}'
             cached_result = cache.get(cache_key)
             
@@ -470,12 +529,8 @@ class AIService:
             
             logger.info(f"🎵 Detected audio format: {file_extension}")
             
-            # Prompt optimizado para Whisper (más corto = menos latencia)
-            prompt_whisper = (
-                "Informe radiológico. Terminología médica. "
-                "Pausas: breve=coma, media=punto, larga=salto. "
-                "Separar estructuras anatómicas."
-            )
+            # Prompt optimizado para Whisper con enriquecimiento contextual anatómico
+            prompt_whisper = self._construir_prompt_whisper(contexto)
 
             # Intentos de transcripción: primero proveedor preferido, luego fallback
             intentos = []
@@ -505,13 +560,22 @@ class AIService:
                         response_format="verbose_json"
                     )
                     
-                    transcript_text = getattr(transcript, 'text', '') if hasattr(transcript, 'text') else str(transcript)
-                    logger.info("✅ Whisper (%s - %s) transcripción exitosa: %d caracteres", prov_name, model_name, len(transcript_text))
+                    if hasattr(transcript, 'text'):
+                        transcript_text = transcript.text
+                        transcript_duration = getattr(transcript, 'duration', None)
+                    elif isinstance(transcript, dict):
+                        transcript_text = transcript.get('text', '')
+                        transcript_duration = transcript.get('duration')
+                    else:
+                        transcript_text = str(transcript)
+                        transcript_duration = None
+
+                    logger.info("✅ Whisper (%s - %s) transcripción exitosa: %d caracteres", prov_name, model_name, len(transcript_text or ''))
                     
                     result = {
-                        'text': transcript_text,
+                        'text': transcript_text or '',
                         'confidence': 0.95,
-                        'duration': getattr(transcript, 'duration', None),
+                        'duration': transcript_duration,
                         'provider': prov_name,
                         'model': model_name,
                         'from_cache': False

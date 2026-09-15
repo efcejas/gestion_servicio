@@ -1282,11 +1282,12 @@ def transcribir_audio_whisper(request):
     try:
         data = json.loads(request.body)
         audio_base64 = data.get('audio')
+        contexto = data.get('contexto')
         
         if not audio_base64:
             return JsonResponse({'error': 'No se recibió audio'}, status=400)
         
-        logger.info("🎤 Transcribiendo audio con Whisper...")
+        logger.info("🎤 Transcribiendo audio con Whisper (contexto: %s)...", contexto or "ninguno")
         
         # Decodificar audio base64
         try:
@@ -1311,8 +1312,8 @@ def transcribir_audio_whisper(request):
         # 📊 FASE 4: Medir tiempo de transcripción
         tiempo_transcripcion_inicio = time.time()
         
-        # Transcribir con Whisper
-        transcripcion_result = ai_service.transcribe_audio(audio_file)
+        # Transcribir con Whisper (con contexto anatómico/estudio si fue provisto)
+        transcripcion_result = ai_service.transcribe_audio(audio_file, contexto=contexto)
         
         # 📊 FASE 4: Calcular tiempo de transcripción
         tiempo_transcripcion_ms = int((time.time() - tiempo_transcripcion_inicio) * 1000)
@@ -1347,25 +1348,27 @@ def transcribir_audio_whisper(request):
         logger.info(f"✅ Transcripción Whisper: {texto_transcrito[:100]}...")
         logger.info(f"✅ Texto procesado final: {texto_procesado[:100]}...")
         
-        # 📊 FASE 4: Registrar métrica
+        # 📊 FASE 4: Registrar métrica (con try/except para no fallar el dictado si falla la métrica)
         tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
         proveedor_usado = transcripcion_result.get('provider', 'whisper')
         modelo_usado = transcripcion_result.get('model', '')
-        api_identificador = f"{proveedor_usado}:{modelo_usado}" if modelo_usado else proveedor_usado
+        api_db = 'groq_whisper' if proveedor_usado == 'groq' else 'whisper'
         
-        metrica = MetricaDictado.objects.create(
-            usuario=request.user,
-            tiempo_transcripcion_ms=tiempo_transcripcion_ms,
-            tiempo_total_ms=tiempo_total_ms,
-            transcripcion_from_cache=transcripcion_result.get('from_cache', False),
-            duracion_audio_segundos=transcripcion_result.get('duration'),
-            tamanio_audio_kb=len(audio_data) // 1024,
-            longitud_transcripcion=len(texto_procesado),
-            api_transcripcion=api_identificador[:50],
-            tuvo_errores=False
-        )
-        
-        logger.info(f"📊 Métrica registrada ({api_identificador}): {tiempo_total_ms}ms (transcripción: {tiempo_transcripcion_ms}ms)")
+        try:
+            metrica = MetricaDictado.objects.create(
+                usuario=request.user,
+                tiempo_transcripcion_ms=tiempo_transcripcion_ms,
+                tiempo_total_ms=tiempo_total_ms,
+                transcripcion_from_cache=transcripcion_result.get('from_cache', False),
+                duracion_audio_segundos=transcripcion_result.get('duration'),
+                tamanio_audio_kb=len(audio_data) // 1024,
+                longitud_transcripcion=len(texto_procesado),
+                api_transcripcion=api_db,
+                tuvo_errores=False
+            )
+            logger.info(f"📊 Métrica registrada ({api_db} - {modelo_usado}): {tiempo_total_ms}ms (transcripción: {tiempo_transcripcion_ms}ms)")
+        except Exception as metric_err:
+            logger.warning(f"⚠️ No se pudo registrar la métrica de dictado (no crítico): {metric_err}")
         
         return JsonResponse({
             'success': True,
