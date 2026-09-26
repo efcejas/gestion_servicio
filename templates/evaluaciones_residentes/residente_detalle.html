@@ -1,0 +1,42 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}{{ examen.titulo }}{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <a href="{% url 'evaluaciones_residentes:mis_evaluaciones' %}" class="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white"><i class="fas fa-arrow-left text-xs"></i>Mis evaluaciones</a>
+    <h1 class="mt-4 text-2xl font-bold md:text-3xl">{{ examen.titulo }}</h1>
+    <p class="mt-2 text-sm text-white/80">Ciclo lectivo {{ examen.ciclo_lectivo }} · {{ asignacion.anio_residencia_al_asignar }}</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6 space-y-6">
+    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+        <h2 class="text-lg font-bold text-gray-900">Antes de comenzar</h2>
+        {% if examen.descripcion %}<p class="mt-3 text-sm leading-relaxed text-gray-700">{{ examen.descripcion }}</p>{% endif %}
+        {% if examen.instrucciones %}<div class="mt-4 rounded-lg bg-gray-50 p-4 text-sm text-gray-700"><p class="font-semibold text-gray-900">Instrucciones</p><p class="mt-1 whitespace-pre-line">{{ examen.instrucciones }}</p></div>{% endif %}
+        <dl class="mt-5 grid gap-4 border-t border-gray-100 pt-5 sm:grid-cols-3"><div><dt class="text-xs uppercase text-gray-500">Preguntas</dt><dd class="mt-1 text-lg font-bold text-gray-900">{{ examen.preguntas.count }}</dd></div><div><dt class="text-xs uppercase text-gray-500">Puntaje máximo</dt><dd class="mt-1 text-lg font-bold text-gray-900">{{ examen.puntaje_maximo }}</dd></div><div><dt class="text-xs uppercase text-gray-500">Vencimiento</dt><dd class="mt-1 text-lg font-bold text-gray-900">{{ examen.fecha_vencimiento|date:'d/m/Y H:i' }}</dd></div></dl>
+    </section>
+    {% if intento and intento.estado == 'ANULADO' %}
+    <div class="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-900"><i class="fas fa-ban mr-2"></i>Este intento fue anulado por el equipo docente. El motivo y una eventual recuperación deben gestionarse con la jefatura.</div>
+    {% elif intento and intento.resultado_publicado_en %}
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900"><i class="fas fa-check-circle mr-2"></i>Tu resultado ya está disponible para consulta.</div>
+    <div class="flex justify-end"><a href="{% url 'evaluaciones_residentes:resultado_residente' examen.pk %}" class="inline-flex items-center gap-2 rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-medical-primary/90"><i class="fas fa-chart-bar text-xs" aria-hidden="true"></i>Ver resultado</a></div>
+    {% elif intento and intento.estado == 'PENDIENTE_CORRECCION' %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"><i class="fas fa-hourglass-half mr-2"></i>Entregaste tu evaluación. El resultado estará disponible cuando finalice la corrección docente.</div>
+    {% elif intento and intento.estado == 'CORREGIDO' %}
+    <div class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900"><i class="fas fa-info-circle mr-2"></i>Tu evaluación fue corregida. El resultado todavía no fue publicado.</div>
+    {% elif examen.estado == 'CERRADO' %}
+    <div class="rounded-xl border border-gray-200 bg-gray-50 px-5 py-4 text-sm text-gray-700"><i class="fas fa-lock mr-2"></i>La evaluación ya cerró y no acepta nuevos intentos ni cambios.</div>
+    {% elif examen.estado_operativo == 'Programado' %}
+    <div class="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900"><i class="fas fa-clock mr-2"></i>La evaluación está programada. El docente la habilitará al iniciar el examen.</div>
+    {% elif intento and intento.estado == 'INICIADO' %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"><i class="fas fa-info-circle mr-2"></i>Tenés un intento en curso. Podés retomarlo hasta el vencimiento.</div>
+    <div class="flex justify-end"><a href="{% url 'evaluaciones_residentes:intento_residente' intento.pk %}" class="inline-flex items-center gap-2 rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-medical-primary/90"><i class="fas fa-play text-xs" aria-hidden="true"></i>Retomar evaluación</a></div>
+    {% else %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"><i class="fas fa-info-circle mr-2"></i>Tenés un único intento. Las respuestas se guardarán mientras avanzás y la entrega final será confirmada antes de enviarse.</div>
+    <div class="flex justify-end"><form method="post" action="{% url 'evaluaciones_residentes:iniciar_residente' examen.pk %}">{% csrf_token %}<button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-medical-primary/90"><i class="fas fa-play text-xs" aria-hidden="true"></i>Iniciar evaluación</button></form></div>
+    {% endif %}
+</div>
+{% endblock %}

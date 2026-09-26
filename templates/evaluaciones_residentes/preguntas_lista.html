@@ -1,0 +1,73 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Preguntas - {{ examen.titulo }}{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+            <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg" aria-hidden="true"><i class="fas fa-list-ol"></i></span>
+                <span class="inline-flex items-center rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white/95">Editor docente</span>
+            </div>
+            <h1 class="text-2xl font-bold md:text-3xl">Preguntas de la evaluación</h1>
+            <p class="mt-2 text-sm text-white/80 md:text-base">{{ examen.titulo }}</p>
+        </div>
+        <a href="{% url 'evaluaciones_residentes:editar' examen.pk %}" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary shadow-sm hover:bg-gray-50"><i class="fas fa-sliders-h text-xs" aria-hidden="true"></i><span>Datos generales</span></a>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6">
+    {% include 'components/evaluaciones_residentes_steps.html' with active_step='preguntas' %}
+    <div class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Preguntas</p><p class="mt-1 text-2xl font-bold text-gray-900">{{ preguntas|length }}</p></div>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Puntaje máximo</p><p class="mt-1 text-2xl font-bold text-gray-900">{{ examen.puntaje_maximo }}</p></div>
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-amber-800">Estado</p><p class="mt-1 text-2xl font-bold text-amber-900">Borrador</p></div>
+    </div>
+
+    <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 mt-5 shadow-sm flex items-center justify-between">
+        <div><h2 class="text-lg font-bold text-gray-900">Banco de preguntas</h2><p class="mt-1 text-sm text-gray-500">Revisá el contenido antes de publicar la evaluación.</p></div>
+        <a href="{% url 'evaluaciones_residentes:crear_pregunta' examen.pk %}" class="inline-flex items-center gap-2 rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90"><i class="fas fa-plus text-xs" aria-hidden="true"></i>Agregar pregunta</a>
+    </div>
+
+    <div class="mt-4 space-y-4">
+        {% for pregunta in preguntas %}
+        <article class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 bg-gray-50 px-5 py-4">
+                <div class="flex min-w-0 items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-medical-primary text-sm font-bold text-white">{{ pregunta.orden }}</span>
+                    <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">{{ pregunta.get_tipo_display }}</span><span class="text-xs font-semibold text-gray-500">{{ pregunta.puntaje }} puntos</span></div>
+                        <h3 class="mt-2 text-base font-semibold text-gray-900">{{ pregunta.texto }}</h3>
+                    </div>
+                </div>
+                <a href="{% url 'evaluaciones_residentes:editar_pregunta' examen.pk pregunta.pk %}" class="inline-flex items-center gap-2 rounded-lg border border-medical-primary/30 px-3 py-2 text-xs font-semibold text-medical-primary hover:bg-medical-primary hover:text-white"><i class="fas fa-pen text-[0.65rem]" aria-hidden="true"></i>Editar</a>
+            </div>
+            <div class="grid gap-5 p-5 lg:grid-cols-2">
+                <div>
+                    {% if pregunta.opciones.all %}
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Opciones</p>
+                    <ul class="space-y-2 text-sm text-gray-700">
+                        {% for opcion in pregunta.opciones.all %}
+                        <li class="flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"><span><span class="mr-2 text-xs font-semibold text-gray-400">{{ opcion.orden }}</span>{{ opcion.texto }}</span>{% if opcion.es_correcta %}<span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><i class="fas fa-check-circle" aria-hidden="true"></i>Correcta</span>{% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    {% elif pregunta.tipo == 'DESARROLLO' %}
+                    <div class="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800"><i class="fas fa-align-left mr-2" aria-hidden="true"></i>Respuesta libre con corrección manual.</div>
+                    {% endif %}
+                </div>
+                {% if pregunta.imagen or pregunta.imagenes.all %}
+                <div><p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Imágenes</p><div class="grid grid-cols-3 gap-2">{% if pregunta.imagen %}<img src="{{ pregunta.imagen.url }}" alt="Imagen de la pregunta" class="h-20 w-full rounded-lg object-cover">{% endif %}{% for imagen in pregunta.imagenes.all %}<img src="{{ imagen.archivo.url }}" alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" class="h-20 w-full rounded-lg object-cover">{% endfor %}</div></div>
+                {% endif %}
+            </div>
+        </article>
+        {% empty %}
+        <div class="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-500">Agregá la primera pregunta.</div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-8 flex flex-wrap justify-end gap-3"><a href="{% url 'evaluaciones_residentes:revision' examen.pk %}" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary hover:bg-gray-50"><i class="fas fa-clipboard-check text-xs" aria-hidden="true"></i>Revisar y publicar</a></div>
+</div>
+{% endblock %}

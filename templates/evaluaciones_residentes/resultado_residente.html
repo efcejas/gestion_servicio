@@ -1,0 +1,32 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Resultado · {{ examen.titulo }}{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <a href="{% url 'evaluaciones_residentes:detalle_residente' examen.pk %}" class="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white"><i class="fas fa-arrow-left text-xs"></i>Volver a la evaluación</a>
+    <h1 class="mt-4 text-2xl font-bold md:text-3xl">Resultado de la evaluación</h1>
+    <p class="mt-2 text-sm text-white/80">{{ examen.titulo }}</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6 space-y-6">
+    <section class="grid gap-4 sm:grid-cols-3">
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Nota final</p><p class="mt-1 text-3xl font-bold text-emerald-900">{{ intento.nota_final }} <span class="text-base font-semibold">/ 10</span></p></div>
+        <div class="rounded-xl border border-blue-200 bg-blue-50 p-5"><p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Porcentaje</p><p class="mt-1 text-3xl font-bold text-blue-900">{{ intento.porcentaje }}%</p></div>
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Puntaje</p><p class="mt-1 text-3xl font-bold text-gray-900">{{ intento.puntaje_obtenido }} <span class="text-base font-semibold">/ {{ examen.puntaje_maximo }}</span></p></div>
+    </section>
+
+    <section class="rounded-xl border border-gray-200 bg-white shadow-sm"><div class="border-b border-gray-100 px-5 py-4"><h2 class="font-bold text-gray-900">Revisión de respuestas</h2><p class="mt-1 text-sm text-gray-500">Resultado publicado el {{ intento.resultado_publicado_en|date:'d/m/Y H:i' }}.</p></div><div class="divide-y divide-gray-100">
+        {% for fila in filas %}
+        <article class="p-5 md:p-6"><div class="flex flex-wrap items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Pregunta {{ fila.respuesta.pregunta.orden }} · {{ fila.respuesta.pregunta.get_tipo_display }}</p><h3 class="mt-2 font-semibold leading-relaxed text-gray-900">{{ fila.respuesta.pregunta.texto }}</h3></div><span class="rounded-full {% if fila.respuesta.es_correcta %}bg-emerald-100 text-emerald-800{% else %}bg-red-100 text-red-800{% endif %} px-2.5 py-1 text-xs font-semibold">{% if fila.respuesta.es_correcta %}Correcta{% else %}Para revisar{% endif %} · {{ fila.respuesta.puntaje_obtenido }} pts</span></div>
+            {% if fila.respuesta.pregunta.imagen or fila.respuesta.pregunta.imagenes.all %}<div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{% if fila.respuesta.pregunta.imagen %}<button type="button" class="js-abrir-imagen group flex w-full items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-2 text-left focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2" style="height: 13rem;" data-imagen-url="{{ fila.respuesta.pregunta.imagen.url }}" data-imagen-alt="Imagen de la pregunta" aria-label="Ampliar imagen de la pregunta"><img src="{{ fila.respuesta.pregunta.imagen.url }}" alt="Imagen de la pregunta" class="rounded-md object-contain transition group-hover:opacity-80" style="max-width: 100%; max-height: 100%;"></button>{% endif %}{% for imagen in fila.respuesta.pregunta.imagenes.all %}<button type="button" class="js-abrir-imagen group flex w-full items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-2 text-left focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2" style="height: 13rem;" data-imagen-url="{{ imagen.archivo.url }}" data-imagen-alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" aria-label="Ampliar imagen de la pregunta"><img src="{{ imagen.archivo.url }}" alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" class="rounded-md object-contain transition group-hover:opacity-80" style="max-width: 100%; max-height: 100%;"></button>{% endfor %}</div><p class="mt-2 text-xs text-gray-500"><i class="fas fa-search-plus mr-1" aria-hidden="true"></i>Seleccioná una imagen para ampliarla.</p>{% endif %}
+            {% if fila.respuesta.texto_desarrollo %}<div class="mt-4 rounded-lg bg-gray-50 p-4 text-sm leading-relaxed text-gray-700 whitespace-pre-line">{{ fila.respuesta.texto_desarrollo }}</div>{% else %}<div class="mt-4 space-y-2">{% for opcion in fila.opciones %}<div class="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm {% if opcion.pk in fila.seleccionadas and opcion.es_correcta %}border-emerald-200 bg-emerald-50 text-emerald-900{% elif opcion.pk in fila.seleccionadas %}border-red-200 bg-red-50 text-red-900{% elif opcion.es_correcta %}border-emerald-200 bg-emerald-50 text-emerald-900{% else %}border-gray-200 text-gray-600{% endif %}"><i class="fas {% if opcion.es_correcta %}fa-check{% elif opcion.pk in fila.seleccionadas %}fa-times{% else %}fa-minus{% endif %} w-4 text-center text-xs"></i>{{ opcion.texto }}</div>{% endfor %}</div>{% endif %}
+            {% if fila.respuesta.comentario_docente %}<div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900"><p class="font-semibold">Comentario docente</p><p class="mt-1 whitespace-pre-line">{{ fila.respuesta.comentario_docente }}</p></div>{% endif %}
+        </article>
+        {% empty %}<p class="p-6 text-sm text-gray-500">No hay respuestas registradas.</p>{% endfor %}
+    </div></section>
+</div>
+{% include 'components/evaluaciones_residentes_image_viewer.html' %}
+{% endblock %}

@@ -1,0 +1,435 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}{{ modo }} pregunta{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+            <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg" aria-hidden="true">
+                    <i class="fas fa-question-circle"></i>
+                </span>
+                <span class="inline-flex items-center rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white/95">Editor docente</span>
+            </div>
+            <h1 class="text-2xl font-bold md:text-3xl">{{ modo }} pregunta</h1>
+            <p class="mt-2 text-sm text-white/80 md:text-base">{{ examen.titulo }}</p>
+        </div>
+        <a href="{% url 'evaluaciones_residentes:preguntas' examen.pk %}" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-medical-primary">
+            <i class="fas fa-arrow-left text-xs" aria-hidden="true"></i>
+            <span>Volver a preguntas</span>
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6">
+    <form method="post" enctype="multipart/form-data" class="space-y-6" novalidate>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6">
+            <div class="mb-5 border-b border-gray-100 pb-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-medical-primary">Paso 1</p>
+                <h2 class="mt-1 text-lg font-bold text-gray-900">Consigna</h2>
+                <p class="mt-1 text-sm text-gray-500">Definí el tipo de respuesta y el puntaje de esta pregunta.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {% for field in form %}
+                <div class="{% if field.name == 'texto' or field.name == 'imagenes' %}md:col-span-2{% endif %}">
+                    <label for="{{ field.id_for_label }}" class="mb-1 block text-sm font-semibold text-gray-700">{{ field.label }}</label>
+                    {% if field.name == 'imagenes' %}
+                    <div id="imagenes-dropzone" class="mt-1 rounded-xl border-2 border-dashed border-blue-200 bg-blue-50/50 p-5 transition hover:border-blue-300 hover:bg-blue-50">
+                        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="flex min-w-0 items-center gap-3">
+                                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-medical-primary"><i class="fas fa-images text-lg" aria-hidden="true"></i></span>
+                                <div class="min-w-0"><p class="text-sm font-semibold text-gray-900">Cargá imágenes clínicas</p><p id="imagenes-resumen" class="mt-1 text-xs text-gray-600" aria-live="polite">Podés seleccionar una o varias.</p></div>
+                            </div>
+                            <label for="{{ field.id_for_label }}" class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"><i class="fas fa-folder-open mr-2" aria-hidden="true"></i>Elegir imágenes</label>
+                        </div>
+                        {{ field }}
+                        <div id="imagenes-nuevas" class="mt-4 hidden grid grid-cols-2 gap-3 border-t border-blue-100 pt-4 sm:grid-cols-3 lg:grid-cols-5"></div>
+                    </div>
+                    {% else %}{{ field }}{% endif %}
+                    {% if field.help_text %}<p class="mt-1 text-xs text-gray-500">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p class="mt-1 text-xs text-red-600">{{ error }}</p>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            {% if pregunta %}
+            <div class="mt-6 border-t border-gray-100 pt-5">
+                <h3 class="text-sm font-semibold text-gray-900">Imágenes guardadas</h3>
+                {% if pregunta.imagenes.all %}
+                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                    {% for imagen in pregunta.imagenes.all %}
+                    <article class="imagen-guardada group relative overflow-hidden rounded-lg border border-gray-200 bg-gray-50" data-imagen-guardada data-imagen-id="{{ imagen.pk }}">
+                        <img src="{{ imagen.archivo.url }}" alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" class="h-28 w-full object-cover">
+                        <div class="flex items-center justify-between gap-2 px-2 py-2 text-xs text-gray-600">
+                            <span class="imagen-orden-label truncate">Imagen {{ imagen.orden }}</span>
+                            <div class="flex items-center gap-0.5">
+                                <button type="button" class="mover-imagen-guardada h-7 w-7 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30" data-direccion="-1" title="Mover antes" aria-label="Mover imagen antes"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+                                <button type="button" class="mover-imagen-guardada h-7 w-7 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30" data-direccion="1" title="Mover después" aria-label="Mover imagen después"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+                            </div>
+                            <button type="button" class="eliminar-imagen-guardada inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-red-500 hover:bg-red-50" title="Quitar imagen" aria-label="Quitar imagen">
+                                <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                            </button>
+                            <input type="checkbox" name="eliminar_imagen" value="{{ imagen.pk }}" class="sr-only">
+                            <input type="hidden" name="orden_imagen_{{ imagen.pk }}" value="{{ imagen.orden }}" class="orden-imagen-guardada">
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}<p class="mt-2 text-xs text-gray-500">Todavía no hay imágenes guardadas.</p>{% endif %}
+            </div>
+            {% endif %}
+        </section>
+
+        <div id="desarrollo-help" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800" aria-live="polite">
+            <i class="fas fa-align-left mr-2" aria-hidden="true"></i>
+            Esta pregunta queda preparada para una respuesta libre del residente. No se mostrarán opciones de respuesta.
+        </div>
+
+        <section id="opciones-section" class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm md:p-6" data-tipo-pregunta="{{ form.tipo.id_for_label }}">
+            <div class="mb-5 border-b border-gray-100 pb-4">
+                <p class="text-xs font-semibold uppercase tracking-wide text-medical-primary">Paso 2</p>
+                <h2 class="mt-1 text-lg font-bold text-gray-900">Opciones de respuesta</h2>
+                <p id="opciones-help" class="mt-1 text-sm text-gray-500" aria-live="polite">Para preguntas cerradas, agregá al menos dos opciones y marcá las respuestas correctas.</p>
+            </div>
+            {{ formset.management_form }}
+            {% if formset.non_form_errors %}<div class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{{ formset.non_form_errors }}</div>{% endif %}
+            <div id="opciones-list" class="space-y-3">
+                {% for opcion_form in formset %}
+                <div class="opcion-row flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:flex-row md:items-center" data-opcion-row data-guardada="{% if opcion_form.instance.pk %}true{% else %}false{% endif %}">
+                    {% for hidden in opcion_form.hidden_fields %}{{ hidden }}{% endfor %}
+                    <div class="min-w-0 flex-1">
+                        <label for="{{ opcion_form.texto.id_for_label }}" class="sr-only">Texto de la opción</label>
+                        {{ opcion_form.texto }}
+                        {% for error in opcion_form.texto.errors %}<p class="mt-1 text-sm text-red-600">{{ error }}</p>{% endfor %}
+                    </div>
+                    <div class="flex items-center gap-2 md:w-28">
+                        <label for="{{ opcion_form.orden.id_for_label }}" class="shrink-0 text-xs font-semibold text-gray-600">Orden</label>
+                        {{ opcion_form.orden }}
+                    </div>
+                    <label class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-800">{{ opcion_form.es_correcta }} Correcta</label>
+                    {% if opcion_form.DELETE %}
+                    <button type="button" class="eliminar-opcion inline-flex shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white p-2 text-red-600 hover:bg-red-50" title="Quitar opción" aria-label="Quitar opción">
+                        <i class="fas fa-trash-alt" aria-hidden="true"></i>
+                    </button>
+                    <span class="hidden">{{ opcion_form.DELETE }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            <template id="opcion-empty-form">
+                {% for hidden in formset.empty_form.hidden_fields %}{{ hidden }}{% endfor %}
+                <div class="min-w-0 flex-1">
+                    <label class="sr-only">Texto de la opción</label>
+                    {{ formset.empty_form.texto }}
+                </div>
+                <div class="flex items-center gap-2 md:w-28">
+                    <label class="shrink-0 text-xs font-semibold text-gray-600">Orden</label>
+                    {{ formset.empty_form.orden }}
+                </div>
+                <label class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-800">{{ formset.empty_form.es_correcta }} Correcta</label>
+                <button type="button" class="eliminar-opcion inline-flex shrink-0 items-center justify-center rounded-lg border border-red-200 bg-white p-2 text-red-600 hover:bg-red-50" title="Quitar opción" aria-label="Quitar opción"><i class="fas fa-trash-alt" aria-hidden="true"></i></button>
+                <span class="hidden">{{ formset.empty_form.DELETE }}</span>
+            </template>
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4">
+                <p class="text-xs text-gray-500">Agregá las opciones necesarias y marcá la respuesta correcta.</p>
+                <button id="agregar-opcion" type="button" class="inline-flex items-center gap-2 rounded-lg border border-medical-primary/30 px-4 py-2 text-sm font-semibold text-medical-primary hover:bg-blue-50">
+                    <i class="fas fa-plus text-xs" aria-hidden="true"></i>Agregar opción
+                </button>
+            </div>
+        </section>
+
+        <div class="flex flex-row gap-3 items-end justify-end">
+            <a href="{% url 'evaluaciones_residentes:preguntas' examen.pk %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-medical-primary hover:bg-gray-50">Cancelar</a>
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2">
+                <i class="fas fa-save text-xs" aria-hidden="true"></i>
+                Guardar pregunta
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (() => {
+        const imagenesInput = document.getElementById('{{ form.imagenes.id_for_label }}');
+        const imagenesDropzone = document.getElementById('imagenes-dropzone');
+        const imagenesResumen = document.getElementById('imagenes-resumen');
+        const imagenesNuevas = document.getElementById('imagenes-nuevas');
+        if (imagenesInput && imagenesDropzone && imagenesResumen && imagenesNuevas) {
+            const acumulador = new DataTransfer();
+
+            const sincronizarInput = () => {
+                imagenesInput.files = acumulador.files;
+            };
+
+            const renderImages = () => {
+                const archivos = Array.from(acumulador.files || []);
+                imagenesNuevas.replaceChildren();
+                imagenesResumen.textContent = archivos.length ? `${archivos.length} imagen${archivos.length === 1 ? '' : 'es'} lista${archivos.length === 1 ? '' : 's'} para guardar.` : 'Podés seleccionar una o varias.';
+                imagenesNuevas.classList.toggle('hidden', !archivos.length);
+                archivos.forEach((archivo, indice) => {
+                    const item = document.createElement('article');
+                    item.className = 'overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm';
+                    const preview = document.createElement('img');
+                    preview.className = 'h-28 w-full object-cover';
+                    preview.alt = `Vista previa ${indice + 1}: ${archivo.name}`;
+                    preview.src = URL.createObjectURL(archivo);
+                    preview.onload = () => URL.revokeObjectURL(preview.src);
+                    const info = document.createElement('div');
+                    info.className = 'p-2';
+                    info.innerHTML = `<p class="truncate text-xs font-semibold text-gray-700">${archivo.name}</p>`;
+                    const acciones = document.createElement('div');
+                    acciones.className = 'mt-2 flex items-center justify-between gap-1';
+                    const ordenAcciones = document.createElement('div');
+                    ordenAcciones.className = 'flex items-center gap-0.5';
+                    const mover = (direccion) => {
+                        const orden = Array.from(acumulador.files);
+                        const destino = indice + direccion;
+                        if (destino < 0 || destino >= orden.length) return;
+                        [orden[indice], orden[destino]] = [orden[destino], orden[indice]];
+                        const transfer = new DataTransfer();
+                        orden.forEach((file) => transfer.items.add(file));
+                        while (acumulador.items.length) acumulador.items.remove(0);
+                        Array.from(transfer.files).forEach((file) => acumulador.items.add(file));
+                        sincronizarInput();
+                        renderImages();
+                    };
+                    const botonArriba = document.createElement('button');
+                    botonArriba.type = 'button';
+                    botonArriba.className = 'h-7 w-7 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30';
+                    botonArriba.innerHTML = '<i class="fas fa-chevron-left" aria-hidden="true"></i>';
+                    botonArriba.title = 'Mover antes';
+                    botonArriba.disabled = indice === 0;
+                    botonArriba.addEventListener('click', () => mover(-1));
+                    const botonAbajo = document.createElement('button');
+                    botonAbajo.type = 'button';
+                    botonAbajo.className = 'h-7 w-7 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30';
+                    botonAbajo.innerHTML = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
+                    botonAbajo.title = 'Mover después';
+                    botonAbajo.disabled = indice === archivos.length - 1;
+                    botonAbajo.addEventListener('click', () => mover(1));
+                    const quitar = document.createElement('button');
+                    quitar.type = 'button';
+                    quitar.className = 'h-7 w-7 rounded text-red-500 hover:bg-red-50';
+                    quitar.setAttribute('aria-label', `Quitar ${archivo.name}`);
+                    quitar.title = 'Quitar imagen';
+                    quitar.innerHTML = '<i class="fas fa-trash-alt" aria-hidden="true"></i>';
+                    quitar.addEventListener('click', () => {
+                        acumulador.items.remove(indice);
+                        sincronizarInput();
+                        renderImages();
+                    });
+                    ordenAcciones.append(botonArriba, botonAbajo);
+                    acciones.append(ordenAcciones, quitar);
+                    info.appendChild(acciones);
+                    item.append(preview, info);
+                    imagenesNuevas.appendChild(item);
+                });
+            };
+            imagenesInput.addEventListener('change', () => {
+                Array.from(imagenesInput.files || []).forEach((archivo) => acumulador.items.add(archivo));
+                sincronizarInput();
+                renderImages();
+            });
+            ['dragenter', 'dragover'].forEach((evento) => imagenesDropzone.addEventListener(evento, (event) => { event.preventDefault(); imagenesDropzone.classList.add('border-blue-400', 'bg-blue-50'); }));
+            ['dragleave', 'drop'].forEach((evento) => imagenesDropzone.addEventListener(evento, (event) => { event.preventDefault(); imagenesDropzone.classList.remove('border-blue-400', 'bg-blue-50'); }));
+            imagenesDropzone.addEventListener('drop', (event) => {
+                if (!event.dataTransfer?.files?.length) return;
+                Array.from(event.dataTransfer.files).forEach((archivo) => acumulador.items.add(archivo));
+                sincronizarInput();
+                renderImages();
+            });
+        }
+
+        document.querySelectorAll('[data-imagen-guardada]').forEach((imagen) => {
+            const quitar = imagen.querySelector('.eliminar-imagen-guardada');
+            const checkbox = imagen.querySelector('input[name="eliminar_imagen"]');
+            quitar?.addEventListener('click', () => {
+                if (!checkbox) return;
+                checkbox.checked = true;
+                imagen.classList.add('hidden');
+            });
+        });
+
+        const obtenerGaleriaGuardada = () => Array.from(document.querySelectorAll('[data-imagen-guardada]'));
+        const actualizarOrdenGaleria = () => {
+            const galeriaGuardada = obtenerGaleriaGuardada();
+            const visibles = galeriaGuardada.filter((imagen) => !imagen.classList.contains('hidden'));
+            visibles.forEach((imagen, indice) => {
+                const orden = indice + 1;
+                imagen.querySelector('.imagen-orden-label').textContent = `Imagen ${orden}`;
+                imagen.querySelector('.orden-imagen-guardada').value = orden;
+                imagen.querySelectorAll('.mover-imagen-guardada').forEach((boton) => {
+                    boton.disabled = (boton.dataset.direccion === '-1' && indice === 0) || (boton.dataset.direccion === '1' && indice === visibles.length - 1);
+                });
+            });
+        };
+        obtenerGaleriaGuardada().forEach((imagen) => {
+            imagen.querySelectorAll('.mover-imagen-guardada').forEach((boton) => {
+                boton.addEventListener('click', () => {
+                    const visibles = obtenerGaleriaGuardada().filter((item) => !item.classList.contains('hidden'));
+                    const indice = visibles.indexOf(imagen);
+                    const destino = indice + Number(boton.dataset.direccion);
+                    if (destino < 0 || destino >= visibles.length) return;
+                    const referencia = boton.dataset.direccion === '1' ? visibles[destino].nextSibling : visibles[destino];
+                    imagen.parentNode.insertBefore(imagen, referencia);
+                    actualizarOrdenGaleria();
+                });
+            });
+        });
+        actualizarOrdenGaleria();
+        const tipo = document.getElementById('{{ form.tipo.id_for_label }}');
+        const opcionesSection = document.getElementById('opciones-section');
+        const opcionesHelp = document.getElementById('opciones-help');
+        const desarrolloHelp = document.getElementById('desarrollo-help');
+        if (!tipo || !opcionesSection || !opcionesHelp) return;
+
+        const filas = () => Array.from(opcionesSection.querySelectorAll('[data-opcion-row]'));
+        const esEdicion = {% if pregunta %}true{% else %}false{% endif %};
+        const opcionesList = document.getElementById('opciones-list');
+        const emptyForm = document.getElementById('opcion-empty-form');
+        const totalForms = document.getElementById('id_opciones-TOTAL_FORMS');
+        const agregarOpcion = document.getElementById('agregar-opcion');
+        let tipoAnterior = tipo.value;
+
+        function prepararFila(row, esNueva = false) {
+            const eliminar = row.querySelector('input[name$="-DELETE"]');
+            const botonEliminar = row.querySelector('.eliminar-opcion');
+            if (eliminar) row.classList.toggle('hidden', eliminar.checked);
+            const texto = row.querySelector('[name$="-texto"]');
+            const orden = row.querySelector('input[name$="-orden"]');
+            const guardada = row.dataset.guardada === 'true';
+            if (!esNueva && esEdicion && !guardada && texto && !texto.value.trim()) {
+                row.classList.add('hidden');
+            }
+            if (orden && !orden.value && !row.classList.contains('hidden')) {
+                const visibles = filas().filter((item) => !item.classList.contains('hidden'));
+                orden.value = visibles.indexOf(row) + 1;
+            }
+            botonEliminar?.addEventListener('click', () => {
+                if (eliminar) {
+                    eliminar.checked = true;
+                    row.classList.add('hidden');
+                } else {
+                    row.remove();
+                }
+            });
+        }
+
+        opcionesSection.querySelectorAll('[data-opcion-row]').forEach((row) => prepararFila(row));
+        agregarOpcion?.addEventListener('click', () => {
+            if (!emptyForm || !totalForms || !opcionesList) return;
+            const indice = Number(totalForms.value);
+            const wrapper = document.createElement('div');
+            wrapper.className = 'opcion-row flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:flex-row md:items-center';
+            wrapper.dataset.opcionRow = '';
+            wrapper.dataset.guardada = 'false';
+            wrapper.innerHTML = emptyForm.innerHTML.replaceAll('__prefix__', indice);
+            opcionesList.appendChild(wrapper);
+            totalForms.value = indice + 1;
+            const orden = wrapper.querySelector('input[name$="-orden"]');
+            if (orden && !orden.value) orden.value = indice + 1;
+            prepararFila(wrapper, true);
+        });
+
+        function prepararVerdaderoFalso() {
+            const esVerdaderoFalso = tipo.value === 'VERDADERO_FALSO';
+            const filasActivas = filas().filter((row) => !row.classList.contains('hidden'));
+            const valores = ['Verdadero', 'Falso'];
+            filasActivas.slice(0, 2).forEach((row, indice) => {
+                const texto = row.querySelector('[name$="-texto"]');
+                const orden = row.querySelector('input[name$="-orden"]');
+                if (texto && esVerdaderoFalso) {
+                    texto.value = valores[indice];
+                    texto.readOnly = true;
+                    texto.classList.add('bg-gray-100', 'text-gray-500');
+                } else if (texto) {
+                    texto.readOnly = false;
+                    texto.classList.remove('bg-gray-100', 'text-gray-500');
+                }
+                if (orden && esVerdaderoFalso) {
+                    orden.value = indice + 1;
+                    orden.readOnly = true;
+                } else if (orden) {
+                    orden.readOnly = false;
+                }
+            });
+            filas().slice(2).forEach((row) => {
+                const eliminar = row.querySelector('input[name$="-DELETE"]');
+                if (esVerdaderoFalso && eliminar) {
+                    eliminar.checked = true;
+                    row.classList.add('hidden');
+                }
+            });
+            if (esVerdaderoFalso) {
+                let yaMarcada = false;
+                filasActivas.slice(0, 2).forEach((row) => {
+                    const correcta = row.querySelector('input[name$="-es_correcta"]');
+                    if (!correcta) return;
+                    if (correcta.checked && yaMarcada) correcta.checked = false;
+                    if (correcta.checked) yaMarcada = true;
+                });
+            }
+        }
+
+        function limpiarVerdaderoFalso() {
+            filas().forEach((row) => {
+                row.classList.remove('hidden');
+                const eliminar = row.querySelector('input[name$="-DELETE"]');
+                const texto = row.querySelector('[name$="-texto"]');
+                const orden = row.querySelector('input[name$="-orden"]');
+                const correcta = row.querySelector('input[name$="-es_correcta"]');
+                if (eliminar) eliminar.checked = false;
+                if (texto) {
+                    texto.value = '';
+                    texto.readOnly = false;
+                    texto.classList.remove('bg-gray-100', 'text-gray-500');
+                }
+                if (orden) {
+                    orden.value = '';
+                    orden.readOnly = false;
+                }
+                if (correcta) correcta.checked = false;
+            });
+        }
+
+        opcionesSection.addEventListener('change', (event) => {
+            const correcta = event.target.closest('input[name$="-es_correcta"]');
+            if (!correcta || tipo.value !== 'VERDADERO_FALSO' || !correcta.checked) return;
+            opcionesSection.querySelectorAll('input[name$="-es_correcta"]').forEach((otra) => {
+                if (otra !== correcta) otra.checked = false;
+            });
+        });
+
+        function actualizarOpciones() {
+            if (tipoAnterior === 'VERDADERO_FALSO' && tipo.value !== 'VERDADERO_FALSO') {
+                limpiarVerdaderoFalso();
+            }
+            tipoAnterior = tipo.value;
+            const esDesarrollo = tipo.value === 'DESARROLLO';
+            opcionesSection.classList.toggle('hidden', esDesarrollo);
+            desarrolloHelp?.classList.toggle('hidden', !esDesarrollo);
+            opcionesSection.setAttribute('aria-hidden', String(esDesarrollo));
+            opcionesHelp.textContent = esDesarrollo
+                ? 'Las respuestas desarrolladas se corrigen manualmente y no tienen opciones.'
+                : tipo.value === 'OPCION_MULTIPLE'
+                    ? 'Marcá una o más respuestas correctas. El puntaje se obtiene solo con el conjunto completo.'
+                    : tipo.value === 'VERDADERO_FALSO'
+                        ? 'La pregunta debe tener exactamente una respuesta correcta.'
+                        : 'Agregá al menos dos opciones y marcá exactamente una respuesta correcta.';
+
+            filas().forEach((fila) => { fila.setAttribute('aria-hidden', String(esDesarrollo)); });
+            if (agregarOpcion) agregarOpcion.disabled = esDesarrollo || tipo.value === 'VERDADERO_FALSO';
+            prepararVerdaderoFalso();
+        }
+
+        tipo.addEventListener('change', actualizarOpciones);
+        actualizarOpciones();
+    })();
+</script>
+{% endblock %}

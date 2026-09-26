@@ -1,0 +1,83 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Revisar {{ examen.titulo }}{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <div class="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+            <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg" aria-hidden="true"><i class="fas fa-clipboard-check"></i></span>
+                <span class="inline-flex items-center rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white/95">Última revisión</span>
+            </div>
+            <h1 class="text-2xl font-bold md:text-3xl">Revisar evaluación</h1>
+            <p class="mt-2 text-sm text-white/80 md:text-base">{{ examen.titulo }}</p>
+        </div>
+        <a href="{% url 'evaluaciones_residentes:preguntas' examen.pk %}" class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary shadow-sm hover:bg-gray-50"><i class="fas fa-arrow-left text-xs" aria-hidden="true"></i>Seguir editando</a>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6">
+    {% include 'components/evaluaciones_residentes_steps.html' with active_step='revision' %}
+    <div class="grid gap-3 sm:grid-cols-3">
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Preguntas</p><p class="mt-1 text-2xl font-bold text-gray-900">{{ preguntas|length }}</p></div>
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Puntaje máximo</p><p class="mt-1 text-2xl font-bold text-gray-900">{{ examen.puntaje_maximo }}</p></div>
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wide text-amber-800">Estado</p><p class="mt-1 text-2xl font-bold text-amber-900">Borrador</p></div>
+    </div>
+
+    <div class="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900">
+        <div class="flex items-start gap-3"><i class="fas fa-lock mt-0.5 text-blue-700" aria-hidden="true"></i><div><p class="font-semibold">Publicar congela esta evaluación</p><p class="mt-1 text-blue-800">Después de publicar no podrás modificar preguntas, opciones, imágenes ni puntajes.</p></div></div>
+    </div>
+
+    <div class="mt-4 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
+        <i class="fas fa-eye text-medical-primary" aria-hidden="true"></i>
+        <span><strong class="text-gray-900">Vista previa del residente.</strong> La estructura muestra cómo se verá el examen al responderlo.</span>
+        <span class="ml-auto hidden text-xs text-gray-500 sm:inline">Las respuestas correctas solo aparecen en esta revisión docente.</span>
+    </div>
+
+    <div class="mt-6 space-y-4">
+        {% for pregunta in preguntas %}
+        <article class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            {% if pregunta.imagen or pregunta.imagenes.all %}
+            <div class="border-b border-gray-100 bg-gray-50 p-4 sm:p-5">
+                <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Imagen clínica</p>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {% if pregunta.imagen %}<button type="button" class="js-abrir-imagen group rounded-lg bg-white p-1 text-left focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2" data-imagen-url="{{ pregunta.imagen.url }}" data-imagen-alt="Imagen de la pregunta" aria-label="Ampliar imagen de la pregunta"><img src="{{ pregunta.imagen.url }}" alt="Imagen de la pregunta" class="max-h-80 w-full rounded-lg object-contain transition group-hover:opacity-80"></button>{% endif %}
+                    {% for imagen in pregunta.imagenes.all %}<button type="button" class="js-abrir-imagen group rounded-lg bg-white p-1 text-left focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2" data-imagen-url="{{ imagen.archivo.url }}" data-imagen-alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" aria-label="Ampliar imagen de la pregunta"><img src="{{ imagen.archivo.url }}" alt="{{ imagen.texto_alternativo|default:'Imagen de la pregunta' }}" class="max-h-80 w-full rounded-lg object-contain transition group-hover:opacity-80"></button>{% endfor %}
+                </div>
+                <p class="mt-3 text-xs text-gray-500"><i class="fas fa-search-plus mr-1" aria-hidden="true"></i>Seleccioná una imagen para ampliarla.</p>
+            </div>
+            {% endif %}
+            <div class="p-5 sm:p-6">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-medical-primary text-sm font-bold text-white">{{ pregunta.orden }}</span>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2"><span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">{{ pregunta.get_tipo_display }}</span><span class="text-xs font-semibold text-gray-500">{{ pregunta.puntaje }} puntos</span></div>
+                        <h2 class="mt-3 text-lg font-semibold leading-relaxed text-gray-900">{{ pregunta.texto }}</h2>
+                    </div>
+                </div>
+                <div class="mt-5">
+                    {% if pregunta.opciones.all %}
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Opciones que verá el residente</p>
+                    <ul class="space-y-2 text-sm text-gray-700">{% for opcion in pregunta.opciones.all %}<li class="flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-4 py-3"><span><span class="mr-2 text-xs font-semibold text-gray-400">{{ opcion.orden }}.</span>{{ opcion.texto }}</span>{% if opcion.es_correcta %}<span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800"><i class="fas fa-check-circle" aria-hidden="true"></i>Correcta</span>{% endif %}</li>{% endfor %}</ul>
+                    {% elif pregunta.tipo == 'DESARROLLO' %}<div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-600"><i class="fas fa-align-left mr-2 text-medical-primary" aria-hidden="true"></i>El residente verá un campo de texto para desarrollar su respuesta.</div>{% endif %}
+                </div>
+            </div>
+        </article>
+        {% empty %}
+        <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800"><i class="fas fa-exclamation-triangle mr-2" aria-hidden="true"></i>Agregá al menos una pregunta antes de publicar.</div>
+        {% endfor %}
+    </div>
+
+    <div class="flex flex-row gap-3 mt-6 items-end justify-end">
+        <a href="{% url 'evaluaciones_residentes:preguntas' examen.pk %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-medical-primary hover:bg-gray-50">Seguir editando</a>
+        <form method="post" action="{% url 'evaluaciones_residentes:publicar' examen.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-medical-primary px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-90 sm:w-auto"><i class="fas fa-lock text-xs" aria-hidden="true"></i>Publicar y congelar</button>
+        </form>
+    </div>
+</div>
+{% include 'components/evaluaciones_residentes_image_viewer.html' %}
+{% endblock %}

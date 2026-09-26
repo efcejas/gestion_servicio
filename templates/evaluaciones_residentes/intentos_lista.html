@@ -1,0 +1,65 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Intentos · {{ examen.titulo }}{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <a href="{% url 'evaluaciones_residentes:lista' %}" class="inline-flex items-center gap-2 text-sm font-semibold text-white/90 hover:text-white"><i class="fas fa-arrow-left text-xs"></i>Evaluaciones</a>
+    <h1 class="mt-4 text-2xl font-bold md:text-3xl">Entregas de la evaluación</h1>
+    <p class="mt-2 text-sm text-white/80">{{ examen.titulo }}</p>
+</section>
+{% endblock %}
+
+{% block content %}
+<div class="mt-6 grid gap-3 sm:grid-cols-3">
+    <div class="rounded-xl border border-gray-200 bg-white px-4 py-4 shadow-sm"><div class="flex items-center justify-between gap-3"><p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Entregados</p><i class="fas fa-inbox text-gray-400" aria-hidden="true"></i></div><p class="mt-1 text-2xl font-bold text-gray-900">{{ total_entregados }}</p><p class="mt-1 text-xs text-gray-500">Intentos cerrados por residentes</p></div>
+    <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm"><div class="flex items-center justify-between gap-3"><p class="text-xs font-semibold uppercase tracking-wide text-emerald-800">Corregidos</p><i class="fas fa-check-circle text-emerald-600" aria-hidden="true"></i></div><p class="mt-1 text-2xl font-bold text-emerald-900">{{ corregidos }}</p><p class="mt-1 text-xs text-emerald-800">Listos para publicar o ya publicados</p></div>
+    <div class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 shadow-sm"><div class="flex items-center justify-between gap-3"><p class="text-xs font-semibold uppercase tracking-wide text-blue-800">Avance de corrección</p><span class="text-sm font-bold text-blue-900">{{ porcentaje_corregidos }}%</span></div><div class="mt-3 h-2.5 overflow-hidden rounded-full bg-blue-100" role="progressbar" aria-label="Avance de corrección" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ porcentaje_corregidos }}"><div class="h-full rounded-full bg-blue-600 transition-all" style="width: {{ porcentaje_corregidos }}%"></div></div><p class="mt-2 text-xs text-blue-800">{{ corregidos }} de {{ total_entregados }} entregas corregidas</p></div>
+</div>
+<form method="get" class="mt-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm md:p-5">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
+        <div class="min-w-0 flex-1">
+            <label for="filtro-residente" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Buscar residente</label>
+            <input id="filtro-residente" name="q" value="{{ filtros.q }}" type="search" class="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:border-medical-primary focus:outline-none focus:ring-2 focus:ring-medical-primary" placeholder="Nombre, apellido o usuario">
+        </div>
+        <div class="lg:w-56">
+            <label for="filtro-estado" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</label>
+            <select id="filtro-estado" name="estado" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-medical-primary focus:outline-none focus:ring-2 focus:ring-medical-primary">
+                <option value="">Todos los estados</option>
+                {% for valor, etiqueta in estados %}<option value="{{ valor }}"{% if filtros.estado == valor %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="lg:w-44">
+            <label for="filtro-anio" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">Año</label>
+            <select id="filtro-anio" name="anio" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-medical-primary focus:outline-none focus:ring-2 focus:ring-medical-primary">
+                <option value="">Todos</option>
+                {% for valor, etiqueta in anios %}<option value="{{ valor }}"{% if filtros.anio == valor %} selected{% endif %}>{{ etiqueta }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-medical-primary px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"><i class="fas fa-filter text-xs" aria-hidden="true"></i>Filtrar</button>
+            <a href="{% url 'evaluaciones_residentes:intentos' examen.pk %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary hover:bg-gray-50">Limpiar</a>
+        </div>
+    </div>
+</form>
+<div class="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div class="border-b border-gray-100 px-5 py-4"><h2 class="font-bold text-gray-900">Seguimiento de residentes</h2><p class="mt-1 text-sm text-gray-500">Revisá entregas y respuestas pendientes de corrección.</p></div>
+    <p class="border-b border-gray-100 bg-gray-50 px-5 py-2 text-xs text-gray-500 sm:hidden"><i class="fas fa-arrows-alt-h mr-1" aria-hidden="true"></i>Deslizá horizontalmente para ver todas las columnas.</p>
+    <div class="overflow-x-auto">
+        <table class="w-full min-w-[54rem] divide-y divide-gray-200 text-sm">
+            <thead class="bg-gray-50"><tr><th class="px-5 py-3 text-left font-semibold text-gray-700">Residente</th><th class="px-5 py-3 text-left font-semibold text-gray-700">Estado</th><th class="px-5 py-3 text-left font-semibold text-gray-700">Entrega</th><th class="px-5 py-3 text-right font-semibold text-gray-700">Resultado</th><th class="px-5 py-3 text-right font-semibold text-gray-700">Acción</th></tr></thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for intento in intentos %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-5 py-4"><p class="font-semibold text-gray-900">{{ intento.residente.get_full_name|default:intento.residente.username }}</p><p class="mt-1 text-xs text-gray-500">{{ intento.residente.anio_residencia|default:'Sin año' }} · {{ intento.residente.username }}</p></td>
+                    <td class="px-5 py-4">{% if intento.estado == 'CORREGIDO' %}<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800"><i class="fas fa-check text-[0.6rem]" aria-hidden="true"></i>Corregido</span>{% elif intento.estado == 'PENDIENTE_CORRECCION' %}<span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800"><i class="fas fa-clock text-[0.6rem]" aria-hidden="true"></i>Pendiente de corrección</span>{% elif intento.estado == 'ANULADO' %}<span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-800"><i class="fas fa-ban text-[0.6rem]" aria-hidden="true"></i>Anulado</span>{% elif intento.estado == 'INICIADO' %}<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"><i class="fas fa-pen text-[0.6rem]" aria-hidden="true"></i>En curso</span>{% else %}<span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">{{ intento.get_estado_display }}</span>{% endif %}</td>
+                    <td class="px-5 py-4 text-gray-600">{% if intento.entregado_en %}{{ intento.entregado_en|date:'d/m/Y H:i' }}{% else %}Sin entregar{% endif %}</td>
+                    <td class="px-5 py-4 text-right">{% if intento.resultado_publicado_en %}<div class="font-bold text-emerald-700">{{ intento.nota_final }}/10</div><div class="mt-0.5 text-xs text-gray-500">{{ intento.porcentaje }}% publicado</div>{% elif intento.nota_final != None %}<div class="font-semibold text-amber-700">{{ intento.nota_final }}/10</div><div class="mt-0.5 text-xs text-amber-700">Resultado oculto</div>{% else %}<span class="text-gray-500">Sin nota</span>{% endif %}</td>
+                    <td class="px-5 py-4 text-right"><a href="{% url 'evaluaciones_residentes:revisar_intento' intento.pk %}" class="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-700 hover:bg-blue-50 hover:text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"><i class="fas fa-search text-[0.65rem]" aria-hidden="true"></i><span>Revisar</span></a></td>
+                </tr>
+                {% empty %}<tr><td colspan="5" class="px-5 py-12 text-center"><div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-400"><i class="fas fa-inbox" aria-hidden="true"></i></div><p class="mt-3 font-semibold text-gray-700">No hay intentos para mostrar</p><p class="mt-1 text-sm text-gray-500">Probá cambiar los filtros o esperá a que un residente entregue la evaluación.</p></td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

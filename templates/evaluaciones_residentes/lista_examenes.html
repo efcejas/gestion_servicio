@@ -1,0 +1,169 @@
+{% extends 'layouts/base_tailwind.html' %}
+
+{% block title %}Evaluaciones de residentes{% endblock %}
+
+{% block page_header %}
+<section class="overflow-hidden rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 text-white shadow-lg md:p-8">
+    <div class="flex flex-wrap items-end justify-between gap-5">
+        <div class="min-w-0">
+            <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/20 text-lg" aria-hidden="true">
+                    <i class="fas fa-clipboard-check"></i>
+                </span>
+                <span class="inline-flex items-center rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white/95">
+                    Docencia
+                </span>
+            </div>
+            <h1 class="text-2xl font-bold md:text-3xl">Evaluaciones de residentes</h1>
+            <p class="mt-2 max-w-2xl text-sm text-white/80 md:text-base">Bandeja de creación, revisión y publicación.</p>
+        </div>
+        <a href="{% url 'evaluaciones_residentes:crear' %}" class="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-medical-primary">
+            <i class="fas fa-plus text-xs" aria-hidden="true"></i>
+            <span>Nueva evaluación</span>
+        </a>
+    </div>
+</section>
+{% endblock %}
+
+{% block content %}
+    <div class="mt-6 grid gap-3 sm:grid-cols-4">
+        <div class="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Total</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900">{{ resumen.total }}</p>
+        </div>
+        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-amber-800">Borradores</p>
+            <p class="mt-1 text-2xl font-bold text-amber-900">{{ resumen.borradores }}</p>
+        </div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-emerald-800">Publicadas</p>
+            <p class="mt-1 text-2xl font-bold text-emerald-900">{{ resumen.publicadas }}</p>
+        </div>
+        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-600">Cerradas</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900">{{ resumen.cerradas }}</p>
+        </div>
+    </div>
+
+    <div class="mt-6 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[42rem] divide-y divide-gray-200 text-sm">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="w-[48%] px-5 py-3 text-left font-semibold text-gray-700">Evaluación</th>
+                        <th class="w-[18%] px-5 py-3 text-left font-semibold text-gray-700">Estado</th>
+                        <th class="w-[16%] px-5 py-3 text-center font-semibold text-gray-700">Preguntas</th>
+                        <th class="w-[18%] px-5 py-3 text-right font-semibold text-gray-700">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for examen in examenes %}
+                    <tr class="transition hover:bg-gray-50">
+                        <td class="px-5 py-4">
+                            <p class="font-semibold text-gray-900">{{ examen.titulo }}</p>
+                            <p class="text-xs text-gray-500">Creado por {{ examen.creador.get_full_name|default:examen.creador.username }}</p>
+                        </td>
+                        <td class="px-5 py-4">
+                            {% if examen.estado == 'BORRADOR' %}
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>{{ examen.get_estado_display }}</span>
+                            {% elif examen.estado == 'PUBLICADO' %}
+                            {% if examen.estado_operativo == 'Programado' %}
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800"><span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>{{ examen.estado_operativo }}</span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{{ examen.estado_operativo }}</span>
+                            {% endif %}
+                            {% else %}
+                            <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">{{ examen.get_estado_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-4 text-center font-semibold text-gray-700">{{ examen.preguntas.count }}</td>
+                        <td class="px-5 py-4 text-right">
+                            {% if examen.estado == 'BORRADOR' %}
+                            <a class="inline-flex items-center gap-2 rounded-lg border border-medical-primary/30 px-3 py-2 text-xs font-semibold text-medical-primary transition hover:bg-medical-primary hover:text-medical-secondary focus:outline-none focus:ring-2 focus:ring-medical-primary focus:ring-offset-2" href="{% url 'evaluaciones_residentes:editar' examen.pk %}">
+                                <i class="fas fa-pen text-[0.65rem]" aria-hidden="true"></i>
+                                <span>Editar</span>
+                            </a>
+                            <form method="post" action="{% url 'evaluaciones_residentes:eliminar' examen.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="button" class="js-abrir-eliminar ml-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50" title="Eliminar borrador" aria-label="Eliminar borrador" data-titulo="{{ examen.titulo|escapejs }}"><i class="fas fa-trash-alt text-xs" aria-hidden="true"></i></button>
+                            </form>
+                            {% else %}
+                            {% if examen.estado == 'PUBLICADO' and examen.modo_inicio == 'MANUAL' and not examen.iniciado_en %}
+                            <form method="post" action="{% url 'evaluaciones_residentes:iniciar_examen' examen.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="mr-2 inline-flex whitespace-nowrap items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-2"><i class="fas fa-play text-[0.65rem]" aria-hidden="true"></i><span>Iniciar examen</span></button>
+                            </form>
+                            {% elif examen.estado == 'PUBLICADO' and examen.estado_operativo == 'En curso' %}
+                            <form method="post" action="{% url 'evaluaciones_residentes:finalizar' examen.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="mr-2 inline-flex whitespace-nowrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"><i class="fas fa-stop text-[0.65rem]" aria-hidden="true"></i><span>Finalizar</span></button>
+                            </form>
+                            {% endif %}
+                            <a class="inline-flex whitespace-nowrap items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-medical-primary transition hover:border-blue-800 hover:bg-blue-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-800 focus:ring-offset-2" href="{% url 'evaluaciones_residentes:intentos' examen.pk %}">
+                                <i class="fas fa-users text-[0.65rem]" aria-hidden="true"></i>
+                                <span>Ver entregas</span>
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="px-5 py-12 text-center text-gray-500">Todavía no hay evaluaciones.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="modal-eliminar-borrador" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/50 px-4" role="dialog" aria-modal="true" aria-labelledby="modal-eliminar-titulo">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div class="flex items-center gap-4">
+            <div class="min-w-0">
+                <div class="flex items-center gap-4">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600" aria-hidden="true"><i class="fas fa-trash-alt"></i></span>
+                    <h2 id="modal-eliminar-titulo" class="text-lg font-bold text-gray-900">Eliminar borrador</h2>
+                </div>
+                <p class="mt-2 text-sm text-gray-600">Vas a eliminar <strong id="modal-eliminar-nombre" class="text-gray-900"></strong>.</p>
+                <p class="mt-2 text-sm text-red-700">También se eliminarán sus preguntas e imágenes. Esta acción no se puede deshacer.</p>
+            </div>
+        </div>
+        <div class="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row sm:justify-end">
+            <button id="cancelar-eliminar-borrador" type="button" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary hover:bg-gray-50">Cancelar</button>
+            <button id="confirmar-eliminar-borrador" type="button" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"><i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>Eliminar borrador</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    (() => {
+        const modal = document.getElementById('modal-eliminar-borrador');
+        const nombre = document.getElementById('modal-eliminar-nombre');
+        const cancelar = document.getElementById('cancelar-eliminar-borrador');
+        const confirmar = document.getElementById('confirmar-eliminar-borrador');
+        let formularioActivo = null;
+        if (!modal || !nombre || !cancelar || !confirmar) return;
+
+        const cerrar = () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            formularioActivo = null;
+        };
+
+        document.querySelectorAll('.js-abrir-eliminar').forEach((boton) => {
+            boton.addEventListener('click', () => {
+                formularioActivo = boton.closest('form');
+                nombre.textContent = boton.dataset.titulo || 'este borrador';
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                cancelar.focus();
+            });
+        });
+        cancelar.addEventListener('click', cerrar);
+        confirmar.addEventListener('click', () => formularioActivo?.submit());
+        modal.addEventListener('click', (event) => { if (event.target === modal) cerrar(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !modal.classList.contains('hidden')) cerrar(); });
+    })();
+</script>
+{% endblock %}

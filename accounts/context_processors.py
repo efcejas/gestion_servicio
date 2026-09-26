@@ -164,6 +164,23 @@ def navbar_links(request):
                     'portafolio:actividades_revision',
                     active_url_names=['actividades_revision', 'actividad_detalle'])
 
+    def i_mis_evaluaciones():
+        if user.rol != 'medico_residente' or not user.es_residente_activo():
+            return None
+        return item('Mis evaluaciones', 'fa-file-signature',
+                    'evaluaciones_residentes:mis_evaluaciones',
+                    active_ns='evaluaciones_residentes')
+
+    def i_evaluaciones_docencia():
+        if not (
+            user.is_superuser
+            or user.rol in ('instructor_residentes', 'jefe_residentes', 'jefe_servicio')
+        ):
+            return None
+        return item('Evaluaciones de residentes', 'fa-file-signature',
+                    'evaluaciones_residentes:lista',
+                    active_ns='evaluaciones_residentes')
+
     def i_banco():
         return item('Banco de Informes', 'fa-archive',
                     'preinformes:lista_banco_informes',
@@ -263,6 +280,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_evaluaciones_docencia(),
                 i_seguimiento_portafolio(),
                 i_revision_actividades(),
                 i_clases(),
@@ -316,6 +334,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_mis_evaluaciones(),
                 i_mi_portafolio(),
                 i_mis_actividades(),
                 i_clases(),
@@ -355,6 +374,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_evaluaciones_docencia(),
                 i_seguimiento_portafolio(),
                 i_revision_actividades(),
                 i_clases(),
@@ -395,6 +415,7 @@ def navbar_links(request):
                 i_novedades(),
             ),
             group('Docencia', 'fa-graduation-cap',
+                i_evaluaciones_docencia(),
                 i_seguimiento_portafolio(),
                 i_revision(),
             ),

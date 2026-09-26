@@ -1,0 +1,152 @@
+<div id="visor-imagen-pregunta" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-950/70 p-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="visor-imagen-titulo">
+    <div class="relative flex w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl" style="width: min(86vh, calc(100vw - 3rem)); max-width: calc(100vw - 3rem); max-height: calc(100vh - 3rem);">
+        <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <div>
+                <h2 id="visor-imagen-titulo" class="text-sm font-bold text-gray-900">Imagen ampliada</h2>
+                <p class="text-xs text-gray-500">Usá el zoom para revisar detalles sin salir de la evaluación.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="alejar-visor-imagen" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-medical-primary" aria-label="Alejar imagen"><i class="fas fa-search-minus text-xs" aria-hidden="true"></i></button>
+                <button id="restablecer-visor-imagen" type="button" class="inline-flex h-9 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-xs font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-medical-primary">100%</button>
+                <button id="acercar-visor-imagen" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-medical-primary" aria-label="Acercar imagen"><i class="fas fa-search-plus text-xs" aria-hidden="true"></i></button>
+                <button id="mover-visor-imagen" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-medical-primary" aria-label="Mover imagen"><i class="fas fa-hand-paper text-xs" aria-hidden="true"></i></button>
+                <button id="cerrar-visor-imagen" type="button" class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gray-900 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-medical-primary" aria-label="Cerrar imagen ampliada"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+        </div>
+        <div id="visor-imagen-marco" class="flex min-h-[22rem] items-center justify-center overflow-hidden bg-gray-100 p-4" style="height: min(76vh, calc(100vh - 8rem));">
+            <img id="visor-imagen-contenido" src="" alt="" class="select-none rounded-lg object-contain shadow-lg transition-transform duration-150" style="max-width: 100%; max-height: 100%;" draggable="false">
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const visor = document.getElementById('visor-imagen-pregunta');
+        const imagen = document.getElementById('visor-imagen-contenido');
+        const cerrar = document.getElementById('cerrar-visor-imagen');
+        const acercar = document.getElementById('acercar-visor-imagen');
+        const alejar = document.getElementById('alejar-visor-imagen');
+        const restablecer = document.getElementById('restablecer-visor-imagen');
+        const mover = document.getElementById('mover-visor-imagen');
+        const marco = document.getElementById('visor-imagen-marco');
+        const botones = document.querySelectorAll('.js-abrir-imagen');
+        if (!visor || !imagen || !cerrar || !acercar || !alejar || !restablecer || !mover || !botones.length) return;
+
+        let zoom = 1;
+        const ZOOM_MAXIMO_ABSOLUTO = 2.6;
+        let zoomMaximo = ZOOM_MAXIMO_ABSOLUTO;
+        let panActivo = false;
+        let arrastrando = false;
+        let inicioX = 0;
+        let inicioY = 0;
+        let panX = 0;
+        let panY = 0;
+        let panInicioX = 0;
+        let panInicioY = 0;
+        const calcularZoomMaximo = () => {
+            const marcoRect = marco?.getBoundingClientRect();
+            const anchoBase = imagen.offsetWidth;
+            const altoBase = imagen.offsetHeight;
+            if (!marcoRect || !anchoBase || !altoBase) return ZOOM_MAXIMO_ABSOLUTO;
+
+            const anchoDisponible = Math.min(marcoRect.width - 32, window.innerWidth * 0.82);
+            const altoDisponible = Math.min(marcoRect.height - 32, window.innerHeight * 0.68);
+            const limitePorAncho = anchoDisponible / anchoBase;
+            const limitePorAlto = altoDisponible / altoBase;
+            const limiteUtil = Math.max(limitePorAncho, limitePorAlto);
+            return Math.max(1.4, Math.min(ZOOM_MAXIMO_ABSOLUTO, Number((limiteUtil * 1.6).toFixed(2))));
+        };
+
+        const aplicarZoom = () => {
+            if (zoom <= 1) {
+                panX = 0;
+                panY = 0;
+                panActivo = false;
+            }
+            imagen.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+            restablecer.textContent = `${Math.round(zoom * 100)}%`;
+            alejar.disabled = zoom <= 1;
+            acercar.disabled = zoom >= zoomMaximo;
+            mover.disabled = zoom <= 1;
+            alejar.classList.toggle('opacity-40', alejar.disabled);
+            acercar.classList.toggle('opacity-40', acercar.disabled);
+            mover.classList.toggle('opacity-40', mover.disabled);
+            mover.classList.toggle('bg-blue-50', panActivo && !mover.disabled);
+            mover.classList.toggle('text-blue-800', panActivo && !mover.disabled);
+            marco.style.cursor = panActivo && !mover.disabled ? (arrastrando ? 'grabbing' : 'grab') : '';
+        };
+
+        const cambiarZoom = (delta) => {
+            zoom = Math.min(zoomMaximo, Math.max(1, Number((zoom + delta).toFixed(2))));
+            aplicarZoom();
+        };
+
+        const cerrarVisor = () => {
+            visor.classList.add('hidden');
+            visor.classList.remove('flex');
+            imagen.src = '';
+            zoom = 1;
+            panX = 0;
+            panY = 0;
+            panActivo = false;
+            arrastrando = false;
+            aplicarZoom();
+            document.body.classList.remove('overflow-hidden');
+        };
+
+        botones.forEach((boton) => boton.addEventListener('click', () => {
+            imagen.src = boton.dataset.imagenUrl;
+            imagen.alt = boton.dataset.imagenAlt || 'Imagen ampliada de la pregunta';
+            zoom = 1;
+            panX = 0;
+            panY = 0;
+            panActivo = false;
+            arrastrando = false;
+            visor.classList.remove('hidden');
+            visor.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+            requestAnimationFrame(() => {
+                zoomMaximo = calcularZoomMaximo();
+                aplicarZoom();
+            });
+            cerrar.focus();
+        }));
+        acercar.addEventListener('click', () => cambiarZoom(0.25));
+        alejar.addEventListener('click', () => cambiarZoom(-0.25));
+        restablecer.addEventListener('click', () => { zoom = 1; panX = 0; panY = 0; aplicarZoom(); });
+        mover.addEventListener('click', () => { if (zoom > 1) { panActivo = !panActivo; aplicarZoom(); } });
+        marco.addEventListener('pointerdown', (event) => {
+            if (!panActivo || zoom <= 1) return;
+            arrastrando = true;
+            inicioX = event.clientX;
+            inicioY = event.clientY;
+            panInicioX = panX;
+            panInicioY = panY;
+            marco.setPointerCapture(event.pointerId);
+            aplicarZoom();
+        });
+        marco.addEventListener('pointermove', (event) => {
+            if (!arrastrando) return;
+            panX = panInicioX + event.clientX - inicioX;
+            panY = panInicioY + event.clientY - inicioY;
+            aplicarZoom();
+        });
+        const terminarArrastre = (event) => {
+            if (!arrastrando) return;
+            arrastrando = false;
+            if (marco.hasPointerCapture(event.pointerId)) marco.releasePointerCapture(event.pointerId);
+            aplicarZoom();
+        };
+        marco.addEventListener('pointerup', terminarArrastre);
+        marco.addEventListener('pointercancel', terminarArrastre);
+        cerrar.addEventListener('click', cerrarVisor);
+        window.addEventListener('resize', () => {
+            if (visor.classList.contains('hidden')) return;
+            zoomMaximo = calcularZoomMaximo();
+            zoom = Math.min(zoom, zoomMaximo);
+            aplicarZoom();
+        });
+        visor.addEventListener('click', (event) => { if (event.target === visor) cerrarVisor(); });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !visor.classList.contains('hidden')) cerrarVisor(); });
+    })();
+</script>
