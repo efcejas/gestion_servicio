@@ -125,6 +125,7 @@ INSTALLED_APPS = [
     'clases_residentes.apps.ClasesResidentesConfig',
     'eges_import.apps.EgesImportConfig',
     'preinformes.apps.PreinformesConfig',
+    'evaluaciones_residentes.apps.EvaluacionesResidentesConfig',
     'portafolio.apps.PortafolioConfig',
     'consultorios.apps.ConsultoriosConfig',
     'pedidos_estudios.apps.PedidosEstudiosConfig',  # Sistema de pedidos por email

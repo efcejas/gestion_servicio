@@ -67,6 +67,7 @@ urlpatterns = [
     path('equipos/', include('equipos.urls')),  # URLs para equipos
     path('consultorios/', include('consultorios.urls')),  # URLs para gestión de consultorios
     path('clases/', include('clases_residentes.urls')),
+    path('evaluaciones/', include('evaluaciones_residentes.urls')),
     path('eges/', include('eges_import.urls')),  # URLs para importación EGES
     path('preinformes/', include('preinformes.urls')),  # URLs para preinformes
     path('portafolio/', include('portafolio.urls')),
