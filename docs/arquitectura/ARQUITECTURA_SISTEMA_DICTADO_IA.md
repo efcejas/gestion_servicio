@@ -1,5 +1,58 @@
 # 🏗️ ARQUITECTURA DEL SISTEMA - DICTADO INTELIGENTE CON IA
 
+## Actualización: STT multi-proveedor y dictado contextual
+
+El pipeline de Speech-to-Text admite Groq y OpenAI mediante una interfaz común
+compatible con la API de OpenAI. Si ambas claves están configuradas, Groq es el
+proveedor predeterminado; `STT_PROVIDER` permite cambiar la prioridad. Ante una
+excepción del proveedor principal, el servicio intenta automáticamente el otro
+proveedor configurado.
+
+| Proveedor | Modelo predeterminado | Rol | Temperatura |
+|---|---|---|---|
+| Groq | `whisper-large-v3-turbo` | Primario cuando existe `GROQ_API_KEY` | `0.3` |
+| OpenAI | `whisper-1` | Fallback; primario si Groq no está disponible o se selecciona OpenAI | `0.6` |
+
+La selección y los clientes se inicializan en `AIService.__init__()`. El método
+`AIService.transcribe_audio(audio_file, contexto=None)` construye la secuencia de
+intentos y devuelve, además del texto, `provider`, `model`, `duration` y
+`from_cache`. Esos metadatos permiten mostrar el motor efectivo en la consola del
+Dictado Rápido, incluso cuando se utilizó el fallback.
+
+### Contexto anatómico y clínico
+
+`AIService._construir_prompt_whisper(contexto)` transforma el contexto opcional
+en un prompt breve de decodificación. Acepta un texto libre o un diccionario con:
+
+- `tipo_estudio`: modalidad o tipo de estudio;
+- `region`: región anatómica;
+- `plantilla`: nombre o código de la plantilla activa;
+- `estructuras`: texto o lista opcional de estructuras anatómicas.
+
+El frontend de Dictado Rápido y los formularios de creación y revisión de
+Preinformes envían el contexto disponible al endpoint
+`POST /dictado_informes/api/transcribir-whisper/`. El endpoint lo entrega al
+servicio. La clave de caché se calcula con el contenido binario del audio y la
+serialización ordenada del contexto, por lo que un mismo audio procesado bajo
+contextos diferentes no comparte transcripción.
+
+### Persistencia de métricas y compatibilidad con PostgreSQL
+
+`MetricaDictado.api_transcripcion` conserva los identificadores admitidos por el
+modelo: `groq_whisper` para Groq y `whisper` para OpenAI. No se almacena en ese
+campo la cadena descriptiva del modelo, evitando superar su `max_length=20` en
+PostgreSQL. La creación de la métrica está aislada con `try/except`: un problema
+de observabilidad se registra como advertencia, pero no invalida una
+transcripción clínica exitosa.
+
+### Cobertura automatizada
+
+`dictado_informes/tests/test_apis.py` incluye
+`test_transcribir_whisper_con_contexto`, que comprueba que el endpoint acepta el
+payload contextual y lo reenvía a `AIService.transcribe_audio()`.
+
+---
+
 ## 📐 DIAGRAMA DE FLUJO PRINCIPAL
 
 ```
@@ -465,9 +518,16 @@
 ### **Variables de Entorno Requeridas**
 ```bash
 # .env
-OPENAI_API_KEY=sk-...          # Para Whisper (transcripción) + GPT-4o-mini (LLM)
-GROQ_API_KEY=gsk_...           # OPCIONAL: Fallback gratuito para LLM
+GROQ_API_KEY=gsk_...                         # Groq STT y fallback LLM
+OPENAI_API_KEY=sk-...                        # OpenAI STT y LLM
+STT_PROVIDER=groq                            # Opcional: groq u openai
+GROQ_STT_MODEL=whisper-large-v3-turbo        # Opcional
+OPENAI_STT_MODEL=whisper-1                   # Opcional
 ```
+
+Debe existir al menos una clave para habilitar STT. Si existen ambas y no se
+define `STT_PROVIDER`, se prioriza Groq. Si el proveedor elegido no tiene cliente
+configurado, la inicialización selecciona el proveedor disponible.
 
 ### **Configuración de Proveedores**
 
@@ -480,10 +540,10 @@ GROQ_API_KEY=gsk_...           # OPCIONAL: Fallback gratuito para LLM
 #    - Gratis (14,400 req/día)
 #    - Si OpenAI falla o no está configurado
 
-# Transcripción:
-# - OpenAI Whisper (ÚNICO)
-#   - Mejor precisión médica
-#   - Incluye $5 gratis al crear cuenta
+# Transcripción STT:
+# 1. Groq whisper-large-v3-turbo (predeterminado si hay GROQ_API_KEY)
+# 2. OpenAI whisper-1 (fallback automático si hay OPENAI_API_KEY)
+# La prioridad se puede invertir con STT_PROVIDER=openai.
 ```
 
 ### **Dependencias Python**
