@@ -3,7 +3,7 @@
 Estado: MVP funcional listo para piloto controlado; mejoras operativas posteriores pendientes
 
 Fecha de definición: 13/09/2026
-Última actualización: 21/09/2026
+Última actualización: 27/09/2026
 
 ## Estado actual de implementación
 
@@ -46,6 +46,7 @@ Fecha de definición: 13/09/2026
 - Asignación exclusiva por todos, por uno o varios años, o por residentes específicos.
 - Ciclo lectivo explícito y congelación histórica del destinatario al publicar.
 - Permisos iniciales para instructores, jefaturas y superusuarios.
+- Enlaces del navbar dinámico para residentes activos, docentes y jefaturas.
 - Cabecera visual del módulo alineada con la guía UX institucional.
 - Suite completa de 60 tests pasando.
 
@@ -497,6 +498,29 @@ La app está montada bajo `/evaluaciones/` y actualmente expone:
 
 La interfaz usa `layouts/base_tailwind.html` y el patrón de cabecera institucional
 definido en `docs/ux/guia-estilo.md`.
+
+### Acceso desde el navbar
+
+- Residentes activos (`medico_residente`): grupo `Docencia` → `Mis evaluaciones`
+  (`/evaluaciones/mis-evaluaciones/`).
+- Instructores, jefes de residentes, jefes de servicio y superusuarios: grupo
+  `Docencia` → `Evaluaciones de residentes` (`/evaluaciones/`).
+- Los demás roles no reciben estos enlaces. Las vistas mantienen además su
+  autorización backend; ocultar el enlace no sustituye los permisos.
+
+### Estado del despliegue de accesos
+
+El código del módulo y el navbar está publicado en GitHub en la rama
+`feature/liquidacion-copilot-specialization`. El commit del módulo es
+`313f7cfb`; el registro de `EvaluacionesResidentesConfig` en `INSTALLED_APPS` y
+el montaje de `/evaluaciones/` se agregaron en el commit `1b8a56b7`.
+
+El push a GitHub está confirmado. La presencia de los enlaces en producción aún
+depende de que el despliegue incluya el commit `1b8a56b7`; no se confirmó desde
+esta sesión que Heroku lo haya recibido. Antes de abrir el acceso, verificar la
+rama/commit desplegado, aplicar las migraciones `evaluaciones_residentes` hasta
+la última versión, y probar el navbar con una cuenta de residente activo y otra
+con rol docente autorizado.
 
 ## 15. Navegación docente implementada
 

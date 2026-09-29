@@ -158,6 +158,36 @@ Este patrón es apropiado para tableros y vistas de seguimiento. Los formularios
 y bandejas operativas pueden requerir una cabecera más compacta. Si el mismo
 markup aparece en tres o más pantallas, extraerlo a `templates/components/`.
 
+### Patrón validado para evaluaciones de residentes
+
+El módulo de evaluaciones adopta el lenguaje visual institucional, con ajustes
+para formularios docentes:
+
+- usar el contenedor `max-w-7xl` provisto por `layouts/base_tailwind.html`;
+- no agregar un segundo contenedor horizontal dentro de `content`;
+- iniciar las pantallas principales con una cabecera en tarjeta usando
+   `from-medical-primary` a `to-medical-secondary`, `rounded-2xl`, texto blanco,
+   icono translúcido y badge de contexto;
+- mantener el contenido operativo fuera de la cabecera, en superficies blancas
+   con `rounded-xl`, borde gris y sombra leve;
+- dividir formularios largos en secciones numeradas por pasos, con título,
+   descripción breve y separación mediante borde inferior;
+- preferir grillas disponibles en el CSS compilado, especialmente
+   `grid-cols-1 md:grid-cols-2`, evitando clases arbitrarias no compiladas;
+- mantener labels visibles, ayuda breve y errores junto al campo;
+- en mobile, volver a una columna y apilar las acciones;
+- usar radios tipo tarjeta para decisiones excluyentes y mostrar solo los campos
+   correspondientes a la opción elegida;
+- para selecciones múltiples de residentes, preferir Select2 con búsqueda,
+   selección múltiple y etiquetas con nombre y año de residencia;
+- limpiar y deshabilitar los campos de modos no activos para evitar envíos
+   ambiguos;
+- reservar `medical-primary` para acciones principales y usar botones secundarios
+   blancos con borde y texto institucional.
+
+Este patrón se validó inicialmente en la bandeja docente y en
+`evaluaciones/crear/`. Las siguientes pantallas del módulo deben conservarlo.
+
 ## Proceso de evolucion
 
 1. Relevar el patron existente y su problema de UX.

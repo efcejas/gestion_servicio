@@ -56,7 +56,7 @@ class CustomUser(AbstractUser):
         max_length=10,
         blank=True,
         null=True,
-        help_text='Año de residencia calculado automáticamente (R1, R2, R3, R4, R5)'
+        help_text='Año de residencia calculado automáticamente (R1, R2, R3, R4)'
     )
     ESTADO_RESIDENCIA_CHOICES = [
         ('ACTIVO', 'En curso'),
