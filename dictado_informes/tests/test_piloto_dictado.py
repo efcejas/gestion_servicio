@@ -79,6 +79,17 @@ class DictadoPilotoAccessTests(TestCase):
         self.assertContains(response, 'Copiar para NetTerm')
         self.assertContains(response, "copiarTexto('netterm')")
 
+    def test_dictado_rapido_conserva_borrador_si_falla_ia(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertContains(response, 'setTextoMejoradoContenido(textoTranscrito);')
+        self.assertNotContains(response, "console.log('Texto transcrito (Whisper):', textoTranscrito)")
+        self.assertContains(response, 'id="btnReintentarMejora"')
+        self.assertContains(response, 'Reintentar mejora')
+        self.assertContains(response, 'reintentarMejoraPendiente')
+
     def test_dictado_rapido_ofrece_correccion_por_voz_y_deshacer(self):
         self.client.force_login(self.piloto)
 

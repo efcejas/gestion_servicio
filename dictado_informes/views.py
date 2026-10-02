@@ -1287,7 +1287,7 @@ def transcribir_audio_whisper(request):
         if not audio_base64:
             return JsonResponse({'error': 'No se recibió audio'}, status=400)
         
-        logger.info("🎤 Transcribiendo audio con Whisper (contexto: %s)...", contexto or "ninguno")
+        logger.info("Transcribiendo audio con Whisper (contexto presente: %s)", bool(contexto))
         
         # Decodificar audio base64
         try:
@@ -1341,12 +1341,9 @@ def transcribir_audio_whisper(request):
             }, status=400)
         
         if correcciones:
-            logger.info(f"✅ Texto procesado: {len(correcciones)} correcciones aplicadas")
-            for i, corr in enumerate(correcciones[:5], 1):  # Mostrar max 5 en log
-                logger.info(f"   {i}. {corr['de']} → {corr['a']}")
+            logger.info("Texto procesado: %d correcciones aplicadas", len(correcciones))
         
-        logger.info(f"✅ Transcripción Whisper: {texto_transcrito[:100]}...")
-        logger.info(f"✅ Texto procesado final: {texto_procesado[:100]}...")
+        logger.info("Transcripción Whisper procesada: %d caracteres", len(texto_procesado))
         
         # 📊 FASE 4: Registrar métrica (con try/except para no fallar el dictado si falla la métrica)
         tiempo_total_ms = int((time.time() - tiempo_inicio) * 1000)
@@ -1574,6 +1571,12 @@ def mejorar_texto_ia(request):
             contexto,
             usuario=request.user if request.user.is_authenticated else None
         )
+
+        if result.get('error'):
+            return JsonResponse({
+                'success': False,
+                'error': 'No se pudo mejorar el texto. El borrador no fue modificado.',
+            }, status=502)
         
         # 📊 FASE 4: Calcular tiempo de mejora
         tiempo_mejora_ms = int((time.time() - tiempo_mejora_inicio) * 1000)
@@ -1796,6 +1799,9 @@ class TerminoMedicoDeleteView(LoginRequiredMixin, SuperuserRequiredMixin, Delete
 @require_POST
 def toggle_termino_activo(request, pk):
     """Toggle estado activo/inactivo de un término"""
+    if not request.user.is_authenticated or not request.user.is_superuser:
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
     termino = get_object_or_404(TerminoMedico, pk=pk)
     termino.activo = not termino.activo
     termino.save()

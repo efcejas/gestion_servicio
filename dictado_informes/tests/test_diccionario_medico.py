@@ -7,7 +7,9 @@ Fecha: 2026-03-08
 Cobertura esperada: ~80% del código de TerminoMedico
 """
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 from dictado_informes.models import TerminoMedico, CategoriaTerminoMedico
 
 
@@ -133,6 +135,40 @@ class TestTerminoMedico(TestCase):
 
 class TestTerminoMedicoAdmin(TestCase):
     """Tests para funcionalidad administrativa"""
+
+    def test_usuario_comun_no_puede_activar_termino(self):
+        usuario = get_user_model().objects.create_user(
+            username='medico', password='test123', perfil_completo=True,
+        )
+        termino = TerminoMedico.objects.create(
+            termino_incorrecto='termino viejo',
+            termino_correcto='termino nuevo',
+            activo=False,
+        )
+        self.client.force_login(usuario)
+
+        respuesta = self.client.post(reverse('dictado_informes:termino_toggle', args=[termino.pk]))
+
+        self.assertEqual(respuesta.status_code, 403)
+        termino.refresh_from_db()
+        self.assertFalse(termino.activo)
+
+    def test_superusuario_puede_activar_termino(self):
+        usuario = get_user_model().objects.create_superuser(
+            username='admin_diccionario', password='test123', perfil_completo=True,
+        )
+        termino = TerminoMedico.objects.create(
+            termino_incorrecto='termino viejo',
+            termino_correcto='termino nuevo',
+            activo=False,
+        )
+        self.client.force_login(usuario)
+
+        respuesta = self.client.post(reverse('dictado_informes:termino_toggle', args=[termino.pk]))
+
+        self.assertEqual(respuesta.status_code, 200)
+        termino.refresh_from_db()
+        self.assertTrue(termino.activo)
     
     def test_str_representation(self):
         """Prueba representación en string"""

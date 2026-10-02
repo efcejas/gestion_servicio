@@ -69,6 +69,21 @@ class TestAPIsTranscripcion(TestCase):
         self.assertEqual(data['confianza'], 0.95)
 
     @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcripcion_no_se_escribe_en_logs(self, mock_transcribe):
+        mock_transcribe.return_value = {'text': 'Hallazgo privado centinela'}
+        audio_fake = base64.b64encode(b'fake audio data' * 100).decode()
+
+        with self.assertLogs('dictado_informes.views', level='INFO') as registros:
+            response = self.client.post(
+                '/dictado_informes/api/transcribir-whisper/',
+                data=json.dumps({'audio': f'data:audio/webm;base64,{audio_fake}'}),
+                content_type='application/json',
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('Hallazgo privado centinela', '\n'.join(registros.output))
+
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
     def test_transcribir_whisper_con_contexto(self, mock_transcribe):
         """Prueba que el contexto opcional se pasa correctamente al AIService"""
         mock_transcribe.return_value = {
@@ -223,6 +238,22 @@ class TestAPIsMejora(TestCase):
         
         self.assertTrue(data['success'])
         self.assertEqual(data['texto_mejorado'], 'Texto mejorado por IA')
+
+    @patch('dictado_informes.ai_services.AIService.improve_medical_text')
+    def test_mejorar_texto_informa_fallo_del_proveedor(self, mock_improve):
+        mock_improve.return_value = {
+            'texto_mejorado': 'Borrador original',
+            'error': 'Proveedor no disponible',
+        }
+
+        response = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({'texto_original': 'Borrador original', 'modo': 'FIEL'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertFalse(response.json()['success'])
 
     @override_settings(DICTADO_SELECTOR_CONFIRMACION_ACTIVA=False)
     @patch('dictado_informes.ai_services.AIService.improve_medical_text')

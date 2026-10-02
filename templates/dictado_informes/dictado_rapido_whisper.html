@@ -402,7 +402,7 @@
                 </div>
 
                 <div>
-                    <label class="text-sm font-semibold text-gray-300 mb-2 block">
+                    <label id="labelTextoMejorado" class="text-sm font-semibold text-gray-300 mb-2 block">
                         ✨ Texto Mejorado por IA:
                     </label>
                     <textarea id="textoMejorado"
@@ -419,6 +419,18 @@
                             <i class="fas fa-undo mr-1"></i>
                             Deshacer corrección
                         </button>
+                    </div>
+
+                    <div id="avisoReintentoMejora" class="hidden mt-3 rounded-lg border border-amber-700 bg-amber-950/40 p-3" role="status" aria-live="polite">
+                        <p class="text-sm text-amber-100">No se pudo mejorar el borrador. La transcripción se conserva; podés editarla o reintentar la mejora.</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2">
+                            <button id="btnReintentarMejora" type="button"
+                                    class="inline-flex items-center rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-500 disabled:cursor-wait disabled:opacity-60">
+                                <i class="fas fa-rotate-right mr-2" aria-hidden="true"></i>
+                                Reintentar mejora
+                            </button>
+                            <span id="estadoReintentoMejora" class="text-xs text-amber-200" aria-live="polite"></span>
+                        </div>
                     </div>
 
                     <div id="panelCorreccionVoz" class="hidden mt-2 bg-indigo-950/50 border border-indigo-700 rounded-lg p-3">
@@ -638,6 +650,8 @@ let fragmentoCorreccionSeleccionado = '';
 let htmlAntesUltimaCorreccion = '';
 let descartarAudioCorreccion = false;
 let resolverSeleccionPlantillaPendiente = null;
+let payloadMejoraPendiente = null;
+let reintentoMejoraEnCurso = false;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -768,6 +782,121 @@ function getTextoMejoradoHtml() {
 
 function getTextoMejoradoTextoPlano() {
     return htmlATextoPlano(getTextoMejoradoHtml());
+}
+
+async function solicitarMejoraIA(payload) {
+    const response = await fetch('{% url "dictado_informes:mejorar_texto" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Error en mejora IA');
+    }
+    return data;
+}
+
+async function solicitarMejoraConConfirmacionPlantilla(payload, actualizarEstado) {
+    let data = await solicitarMejoraIA(payload);
+    if (!data.requiere_seleccion_plantilla) {
+        return data;
+    }
+
+    actualizarEstado('Elegí una plantilla para continuar');
+    const codigoElegido = await solicitarSeleccionPlantilla(
+        data.candidatos_plantilla || [],
+        data.contexto_clinico || {},
+        data.confianza_selector || 'baja',
+    );
+    if (!codigoElegido) {
+        const error = new Error('Selección de plantilla cancelada.');
+        error.seleccionPlantillaCancelada = true;
+        throw error;
+    }
+
+    payload.plantilla_confirmada_codigo = codigoElegido;
+    actualizarEstado('Generando informe con la plantilla elegida...');
+    return solicitarMejoraIA(payload);
+}
+
+async function reintentarMejoraPendiente() {
+    if (!payloadMejoraPendiente || reintentoMejoraEnCurso) {
+        return;
+    }
+
+    const boton = document.getElementById('btnReintentarMejora');
+    const estado = document.getElementById('estadoReintentoMejora');
+    if (!boton || !estado) {
+        return;
+    }
+
+    const textoActual = getTextoMejoradoTextoPlano().trim();
+    const payload = {
+        ...payloadMejoraPendiente,
+        texto_original: textoActual || payloadMejoraPendiente.texto_original,
+    };
+    reintentoMejoraEnCurso = true;
+    boton.disabled = true;
+    estado.textContent = 'Reintentando sin volver a transcribir el audio...';
+
+    try {
+        const resultado = await solicitarMejoraConConfirmacionPlantilla(
+            payload,
+            mensaje => { estado.textContent = mensaje; },
+        );
+        const textoMejorado = resultado.texto_mejorado || payload.texto_original;
+        setTextoMejoradoContenido(textoMejorado);
+        document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
+        textoOriginalGlobal = payload.texto_original;
+        textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(textoMejorado));
+        requiereConfirmacionIA = !!resultado.requiere_confirmacion;
+        motivoConfirmacionIA = resultado.motivo_confianza || '';
+        terminosSospechososIA = resultado.terminos_sospechosos || [];
+
+        const guardrails = resultado.guardrails_aplicados || [];
+        const resumen = document.getElementById('guardrailsResumen');
+        const resumenTexto = document.getElementById('guardrailsTexto');
+        if (guardrails.length && resumen && resumenTexto) {
+            resumenTexto.textContent = `Guardrails: se aplicaron ${guardrails.length} controles de estructura.`;
+            resumen.classList.remove('hidden');
+        } else if (resumen) {
+            resumen.classList.add('hidden');
+        }
+
+        payloadMejoraPendiente = null;
+        document.getElementById('avisoReintentoMejora').classList.add('hidden');
+        reiniciarEstadoCorreccion();
+        guardarEnHistorial(textoOriginalGlobal, getTextoMejoradoTextoPlano());
+
+        const panelFeedback = document.getElementById('panelFeedbackCalidad');
+        const estadoFeedback = document.getElementById('feedbackCalidadEstado');
+        feedbackCalidadEnviado = false;
+        if (panelFeedback) panelFeedback.classList.remove('hidden');
+        if (estadoFeedback) {
+            estadoFeedback.classList.add('hidden');
+            estadoFeedback.textContent = '';
+        }
+
+        estadoGrabacion.textContent = 'Mejora completada. Revisá el borrador antes de copiar.';
+        estadoGrabacion.classList.remove('text-red-400', 'text-blue-400');
+        estadoGrabacion.classList.add('text-green-400');
+        mostrarToast('Mejora completada. El borrador sigue editable.', 'success');
+    } catch (error) {
+        if (error.seleccionPlantillaCancelada) {
+            estado.textContent = 'Selección cancelada. El borrador se conserva.';
+            return;
+        }
+        payloadMejoraPendiente = { ...payload };
+        estado.textContent = 'No se completó la mejora. El borrador se conserva.';
+        mostrarToast(error.message || 'No se pudo mejorar el borrador.', 'error');
+    } finally {
+        reintentoMejoraEnCurso = false;
+        boton.disabled = false;
+    }
 }
 
 async function copiarAlPortapapeles(html, textoPlano, modo = 'rich') {
@@ -1470,6 +1599,10 @@ async function procesarAudio() {
         estadoGrabacion.classList.add('text-red-400');
         return;
     }
+
+    payloadMejoraPendiente = null;
+    document.getElementById('avisoReintentoMejora')?.classList.add('hidden');
+    document.getElementById('estadoReintentoMejora').textContent = '';
     
     // Convertir a base64
     const reader = new FileReader();
@@ -1515,18 +1648,11 @@ async function procesarAudio() {
             }
             const fromCache = dataTranscripcion.from_cache;
             
-            // 🔍 LOGGING DETALLADO: Mostrar texto procesado y correcciones
-            console.group('📝 Procesamiento de texto');
-            console.log('Texto transcrito (Whisper):', textoTranscrito);
             if (dataTranscripcion.correcciones && dataTranscripcion.correcciones.length > 0) {
                 console.log(`✅ Diccionario médico: ${dataTranscripcion.correcciones.length} correcciones aplicadas`);
-                dataTranscripcion.correcciones.forEach((c, i) => {
-                    console.log(`  ${i+1}. "${c.de}" → "${c.a}"`);
-                });
             } else {
                 console.log('ℹ️ Diccionario médico: Sin correcciones aplicadas');
             }
-            console.groupEnd();
             
             if (fromCache) {
                 console.log('⚡ Transcripción recuperada del caché');
@@ -1548,6 +1674,7 @@ async function procesarAudio() {
             procesandoDiv.classList.add('hidden');
             document.getElementById('contenedorResultado').classList.remove('hidden');
             document.getElementById('textoTranscrito').textContent = textoTranscrito;
+            document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
             setTextoMejoradoContenido('⏳ Mejorando con IA...');
             estadoGrabacion.textContent = '🤖 Mejorando texto con IA...';
             estadoGrabacion.classList.remove('text-red-400');
@@ -1566,38 +1693,24 @@ async function procesarAudio() {
                 tipo_plantilla: tipoPlantilla,
             };
             const ejecutarMejora = async () => {
-                const response = await fetch('{% url "dictado_informes:mejorar_texto" %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify(payloadMejora),
-                });
-                const data = await response.json();
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Error en mejora IA');
+                try {
+                    return await solicitarMejoraConConfirmacionPlantilla(
+                        payloadMejora,
+                        mensaje => { estadoGrabacion.textContent = mensaje; },
+                    );
+                } catch (error) {
+                    if (!error.seleccionPlantillaCancelada) {
+                        setTextoMejoradoContenido(textoTranscrito);
+                        document.getElementById('labelTextoMejorado').textContent = 'Borrador editable (transcripción):';
+                        payloadMejoraPendiente = { ...payloadMejora };
+                        document.getElementById('estadoReintentoMejora').textContent = '';
+                        document.getElementById('avisoReintentoMejora').classList.remove('hidden');
+                    }
+                    throw error;
                 }
-                return data;
             };
 
             let dataMejora = await ejecutarMejora();
-            if (dataMejora.requiere_seleccion_plantilla) {
-                estadoGrabacion.textContent = 'Elegí una plantilla para continuar';
-                const codigoElegido = await solicitarSeleccionPlantilla(
-                    dataMejora.candidatos_plantilla || [],
-                    dataMejora.contexto_clinico || {},
-                    dataMejora.confianza_selector || 'baja',
-                );
-                if (!codigoElegido) {
-                    const errorCancelacion = new Error('Selección de plantilla cancelada.');
-                    errorCancelacion.seleccionPlantillaCancelada = true;
-                    throw errorCancelacion;
-                }
-                payloadMejora.plantilla_confirmada_codigo = codigoElegido;
-                estadoGrabacion.textContent = 'Generando informe con la plantilla elegida...';
-                dataMejora = await ejecutarMejora();
-            }
 
             const t4 = Date.now();
             console.log(`⏱️ Mejora IA completada en ${t4-t3}ms`);
@@ -1626,6 +1739,9 @@ async function procesarAudio() {
                 guardrailsResumen.classList.add('hidden');
             }
             setTextoMejoradoContenido(dataMejora.texto_mejorado);
+            document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
+            payloadMejoraPendiente = null;
+            document.getElementById('avisoReintentoMejora').classList.add('hidden');
             reiniciarEstadoCorreccion();
             
             // Guardar texto IA para aprendizaje
@@ -1922,6 +2038,7 @@ async function copiarTexto(modoCopia = 'rich') {
 document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
 document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
 document.getElementById('btnCopiarNetterm')?.addEventListener('click', () => copiarTexto('netterm'));
+document.getElementById('btnReintentarMejora')?.addEventListener('click', reintentarMejoraPendiente);
 document.getElementById('btnCorregirVoz')?.addEventListener('click', () => {
     if (grabandoCorreccion) {
         detenerGrabacionCorreccion();
