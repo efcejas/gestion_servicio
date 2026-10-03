@@ -167,6 +167,14 @@ def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
         cantidades_revision_manual = any(
             item['requiere_revision_manual'] for item in dopplers
         )
+        cantidad_practicas_declarada = sum(
+            item['cantidad_declarada'] for item in dopplers
+        )
+        cantidad_practicas_esperada = (
+            None
+            if cantidades_revision_manual
+            else sum(item['cantidad_esperada'] for item in dopplers)
+        )
         diferencia_cantidad = sum(
             item['cantidad_declarada'] - item['cantidad_esperada']
             for item in dopplers
@@ -181,6 +189,8 @@ def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
             'rol': registro.medico.rol,
             'paciente': f'{registro.apellido_paciente}, {registro.nombre_paciente}',
             'dni': registro.dni_paciente,
+            'cantidad_practicas_declarada': cantidad_practicas_declarada,
+            'cantidad_practicas_esperada': cantidad_practicas_esperada,
             'cantidad_regiones_declarada': registro.cantidad_regiones,
             'cantidad_regiones_esperada': max(
                 registro.cantidad_regiones + regiones_ajuste,

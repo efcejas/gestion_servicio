@@ -349,3 +349,42 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         self.assertContains(response, 'Posible duplicado')
         self.assertContains(response, f'#{primero.pk}')
         self.assertContains(response, f'#{segundo.pk}')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_pantalla_agrupa_art_y_venoso_en_un_registro_con_totales_separados(self):
+        registro = self._crear_registro()
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.venoso,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            cantidad_regiones=4,
+            monto_calculado=Decimal('48400.00'),
+        )
+        jefe = User.objects.create_user(
+            username='jefatura_auditoria_doppler_agrupada',
+            first_name='Jefe',
+            last_name='Servicio',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.client.force_login(jefe)
+
+        response = self.client.get(reverse('liquidacion:auditoria_doppler_mmii'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'Registro #{registro.pk}', count=1)
+        self.assertContains(response, '4 declaradas')
+        self.assertContains(response, '2 según regla')
+        self.assertContains(response, '4 → 2')
+        self.assertContains(response, 'Ecodoppler arterial MM inferiores')
+        self.assertContains(response, 'Doppler venoso de miembros inferiores')
+        self.assertContains(response, 'Cantidad declarada: <strong>2</strong>', count=2)
