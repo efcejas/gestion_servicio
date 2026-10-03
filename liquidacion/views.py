@@ -9,6 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField, prefetch_related_objects
+from django.utils.dateparse import parse_date
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, HttpResponseRedirect
 from django.contrib.auth import get_user_model
@@ -51,6 +52,7 @@ from .grupo_tarifario_mapping import (
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import (
     evaluar_gate_consistencia_sesion,
+    auditar_cantidad_doppler_mmii,
     auditar_residentes_eco_por_sesion,
     resumir_pendientes_auditoria_eco,
 )
@@ -1379,6 +1381,83 @@ class AuditoriaEcoSesionView(LoginRequiredMixin, UserPassesTestMixin, TemplateVi
             ],
             'motivos_disponibles': motivos_disponibles,
             'current_path': self.request.get_full_path(),
+        })
+        return context
+
+
+class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Preview informativo de cantidades Doppler de miembros inferiores."""
+
+    template_name = 'liquidacion/auditoria_doppler_mmii.html'
+    fecha_desde_default = date(2026, 6, 1)
+    fecha_hasta_default = date(2026, 9, 30)
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para revisar la auditoria Doppler.')
+        return redirect('home')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        fecha_desde = parse_date(self.request.GET.get('fecha_desde', '')) or self.fecha_desde_default
+        fecha_hasta = parse_date(self.request.GET.get('fecha_hasta', '')) or self.fecha_hasta_default
+        error_fechas = ''
+        if fecha_desde > fecha_hasta:
+            error_fechas = 'La fecha inicial no puede ser posterior a la fecha final.'
+            fecha_desde = self.fecha_desde_default
+            fecha_hasta = self.fecha_hasta_default
+
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+        )
+        profesionales = {}
+        for item in auditoria['resultados']:
+            profesionales[item['medico_id']] = item['medico']
+
+        profesional_id = (self.request.GET.get('profesional') or '').strip()
+        resultados = auditoria['resultados']
+        if profesional_id:
+            resultados = [
+                item for item in resultados
+                if str(item['medico_id']) == profesional_id
+            ]
+
+        solo_diferencias = self.request.GET.get('solo_diferencias', '1') != '0'
+        if solo_diferencias:
+            resultados = [
+                item for item in resultados
+                if item['diferencia_cantidad'] != 0 or item['requiere_revision_manual']
+            ]
+
+        for item in resultados:
+            item['tratamiento_economico_display'] = (
+                'Informativo · sin débito'
+                if item['tratamiento_economico'] == 'INFORMATIVO_SIN_DEBITO'
+                else 'Impacto potencial · revisar'
+            )
+            for estudio in item['estudios']:
+                estudio['registros_duplicado_display'] = ', '.join(
+                    f'#{registro_id}'
+                    for registro_id in estudio['otros_registros_posible_duplicado']
+                )
+
+        pagina = Paginator(resultados, 100).get_page(self.request.GET.get('page'))
+        context.update({
+            'auditoria': auditoria,
+            'resultados': pagina,
+            'profesionales': [
+                {'id': medico_id, 'nombre': nombre}
+                for medico_id, nombre in sorted(profesionales.items(), key=lambda item: item[1])
+            ],
+            'profesional_actual': profesional_id,
+            'solo_diferencias': solo_diferencias,
+            'fecha_desde': fecha_desde.isoformat(),
+            'fecha_hasta': fecha_hasta.isoformat(),
+            'error_fechas': error_fechas,
+            'total_filtrado': len(resultados),
         })
         return context
 

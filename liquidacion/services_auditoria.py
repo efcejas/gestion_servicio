@@ -1,9 +1,15 @@
 from decimal import Decimal
 from collections import defaultdict
+import re
+import unicodedata
 
 from django.utils import timezone
 
-from .models import GrupoTarifario, RevisionCruceEgesRegistro
+from .models import (
+    GrupoTarifario,
+    RegistroEstudiosPorMedico,
+    RevisionCruceEgesRegistro,
+)
 from control_guardias.models import Feriado
 
 
@@ -39,6 +45,192 @@ AUDIT_MAX_ECO_DIA_ROJA = 20
 AUDIT_HORA_NOCTURNA_DESDE = 22
 AUDIT_HORA_NOCTURNA_HASTA = 6
 AUDIT_HORA_POST_17 = 17
+
+
+def _normalizar_texto_doppler(valor):
+    texto = ''.join(
+        caracter
+        for caracter in unicodedata.normalize('NFKD', str(valor or '').upper())
+        if not unicodedata.combining(caracter)
+    )
+    return re.sub(r'[^A-Z0-9]+', ' ', texto).strip()
+
+
+def _clasificar_doppler_mmii(estudio):
+    nombre = _normalizar_texto_doppler(estudio.nombre)
+    codigo = _normalizar_texto_doppler(estudio.codigo)
+    grupo = getattr(estudio, 'grupo_tarifario', None)
+    modalidad_grupo = (getattr(grupo, 'modalidad', '') or '').upper()
+    texto = f'{nombre} {codigo}'
+
+    es_doppler = (
+        (estudio.tipo or '').upper() == 'DOP'
+        or modalidad_grupo == 'DOP'
+        or 'DOPPLER' in texto
+        or 'ECODOPPLER' in texto
+    )
+    es_mmii = bool(re.search(r'\bMMII\b|MIEMBROS INFERIORES', texto))
+    if not es_doppler or not es_mmii:
+        return None
+
+    es_arterial = 'ARTERIAL' in nombre
+    es_venoso = 'VENOSO' in nombre or 'VENOSA' in nombre
+    if es_arterial and es_venoso:
+        return {'tipo': 'ARTERIAL_Y_VENOSO_MMII', 'cantidad_esperada': 2}
+    if es_arterial:
+        return {'tipo': 'ARTERIAL_MMII', 'cantidad_esperada': 1}
+    if es_venoso:
+        return {'tipo': 'VENOSO_MMII', 'cantidad_esperada': 1}
+    return {'tipo': 'DOPPLER_MMII_REVISAR', 'cantidad_esperada': None}
+
+
+def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
+    """Devuelve diferencias potenciales sin modificar registros ni montos."""
+    registros = (
+        RegistroEstudiosPorMedico.objects
+        .filter(
+            anulado=False,
+            fecha_del_informe__range=(fecha_desde, fecha_hasta),
+        )
+        .select_related('medico')
+        .prefetch_related(
+            'registroestudio_set__estudio__grupo_tarifario',
+        )
+        .order_by('fecha_del_informe', 'medico__last_name', 'medico__first_name', 'pk')
+    )
+    if medico_id:
+        registros = registros.filter(medico_id=medico_id)
+
+    resultados = []
+    posibles_duplicados = defaultdict(list)
+    estudios_por_relacion = {}
+    resultados_por_registro = {}
+    for registro in registros:
+        dopplers = []
+        regiones_ajuste = 0
+        for relacion in registro.registroestudio_set.all():
+            regla = _clasificar_doppler_mmii(relacion.estudio)
+            if not regla:
+                continue
+
+            cantidad_esperada = regla['cantidad_esperada']
+            if cantidad_esperada is None:
+                regiones_esperadas = None
+            else:
+                regiones_esperadas = (
+                    relacion.estudio.conteo_regiones_default * cantidad_esperada
+                )
+                regiones_ajuste += (
+                    relacion.estudio.conteo_regiones_default
+                    * (cantidad_esperada - relacion.cantidad)
+                )
+
+            dopplers.append({
+                'registro_estudio_id': relacion.pk,
+                'estudio_id': relacion.estudio_id,
+                'estudio': relacion.estudio.nombre,
+                'codigo_estudio': relacion.estudio.codigo or '',
+                'clasificacion': regla['tipo'],
+                'cantidad_declarada': relacion.cantidad,
+                'cantidad_esperada': cantidad_esperada,
+                'diferencia_cantidad': (
+                    relacion.cantidad - cantidad_esperada
+                    if cantidad_esperada is not None
+                    else None
+                ),
+                'regiones_declaradas': (
+                    relacion.estudio.conteo_regiones_default * relacion.cantidad
+                ),
+                'regiones_esperadas': regiones_esperadas,
+                'requiere_revision_manual': cantidad_esperada is None,
+                'posible_duplicado': False,
+                'cantidad_en_grupo_duplicado': 1,
+                'otros_registros_posible_duplicado': [],
+            })
+            estudios_por_relacion[relacion.pk] = dopplers[-1]
+            dni_normalizado = re.sub(r'\D', '', str(registro.dni_paciente or ''))
+            if dni_normalizado and cantidad_esperada is not None:
+                posibles_duplicados[(
+                    registro.medico_id,
+                    dni_normalizado,
+                    registro.fecha_del_informe,
+                    regla['tipo'],
+                )].append({
+                    'registro_id': registro.pk,
+                    'registro_estudio_id': relacion.pk,
+                    'estudio': relacion.estudio.nombre,
+                })
+
+        if not dopplers:
+            continue
+
+        cantidades_revision_manual = any(
+            item['requiere_revision_manual'] for item in dopplers
+        )
+        diferencia_cantidad = sum(
+            item['cantidad_declarada'] - item['cantidad_esperada']
+            for item in dopplers
+            if item['cantidad_esperada'] is not None
+        )
+        resultado_registro = {
+            'registro_id': registro.pk,
+            'sesion_id': registro.sesion_contable_id,
+            'fecha': registro.fecha_del_informe,
+            'medico_id': registro.medico_id,
+            'medico': registro.medico.get_full_name() or registro.medico.username,
+            'rol': registro.medico.rol,
+            'paciente': f'{registro.apellido_paciente}, {registro.nombre_paciente}',
+            'dni': registro.dni_paciente,
+            'cantidad_regiones_declarada': registro.cantidad_regiones,
+            'cantidad_regiones_esperada': max(
+                registro.cantidad_regiones + regiones_ajuste,
+                0,
+            ),
+            'monto_registrado': registro.monto_calculado,
+            'diferencia_cantidad': diferencia_cantidad,
+            'requiere_revision_manual': cantidades_revision_manual,
+            'tratamiento_economico': (
+                'INFORMATIVO_SIN_DEBITO'
+                if registro.medico.rol == 'medico_residente'
+                else 'IMPACTO_POTENCIAL_NO_APLICADO'
+            ),
+            'estudios': dopplers,
+        }
+        resultados.append(resultado_registro)
+        resultados_por_registro[registro.pk] = resultado_registro
+
+    grupos_duplicados = 0
+    for coincidencias in posibles_duplicados.values():
+        if len(coincidencias) < 2:
+            continue
+        grupos_duplicados += 1
+        ids_registro = sorted({item['registro_id'] for item in coincidencias})
+        for coincidencia in coincidencias:
+            estudio = estudios_por_relacion[coincidencia['registro_estudio_id']]
+            resultado = resultados_por_registro[coincidencia['registro_id']]
+            estudio['posible_duplicado'] = True
+            estudio['cantidad_en_grupo_duplicado'] = len(coincidencias)
+            estudio['otros_registros_posible_duplicado'] = [
+                pk for pk in ids_registro if pk != resultado['registro_id']
+            ]
+            estudio['requiere_revision_manual'] = True
+            resultado['requiere_revision_manual'] = True
+
+    return {
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'total_registros': len(resultados),
+        'total_con_diferencia': sum(
+            1 for item in resultados
+            if (
+                item['diferencia_cantidad'] != 0
+                or item['requiere_revision_manual']
+                or any(estudio.get('posible_duplicado') for estudio in item['estudios'])
+            )
+        ),
+        'grupos_posible_duplicado': grupos_duplicados,
+        'resultados': resultados,
+    }
 
 
 def _es_monto_cero(monto):
