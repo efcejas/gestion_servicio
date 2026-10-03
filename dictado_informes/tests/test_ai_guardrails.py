@@ -2,7 +2,7 @@
 Tests para guardrails de modo estructurado en AIService.
 """
 from django.test import TestCase
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from dictado_informes.ai_services import AIService
 
@@ -57,6 +57,34 @@ class AIGuardrailsTests(TestCase):
         self.assertEqual(kwargs['model'], 'gpt-4.1-mini')
         self.assertEqual(kwargs['temperature'], 0.2)
         self.assertEqual(kwargs['max_tokens'], 1200)
+
+    def test_cache_mejora_separa_contextos_de_plantilla(self):
+        self.ai.llm_enabled = True
+        claves_cache = []
+
+        def capturar_clave(clave):
+            claves_cache.append(clave)
+            return {'texto_mejorado': 'resultado previo'}
+
+        with patch('dictado_informes.ai_services.cache.get', side_effect=capturar_clave):
+            self.ai.improve_medical_text(
+                'Desgarro meniscal.',
+                'RES',
+                {'modo': 'ESTRUCTURADO', 'tipo_plantilla': 'RODILLA'},
+            )
+            self.ai.improve_medical_text(
+                'Desgarro meniscal.',
+                'RES',
+                {'modo': 'ESTRUCTURADO', 'tipo_plantilla': 'CADERA'},
+            )
+            self.ai.improve_medical_text(
+                'Desgarro meniscal.',
+                'RES',
+                {'tipo_plantilla': 'RODILLA', 'modo': 'ESTRUCTURADO'},
+            )
+
+        self.assertNotEqual(claves_cache[0], claves_cache[1])
+        self.assertEqual(claves_cache[0], claves_cache[2])
 
     def test_normaliza_acentos_solo_en_encabezados_completos(self):
         texto = """RM DE RODILLA DERECHA

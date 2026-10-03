@@ -1022,14 +1022,22 @@ REGLAS OBLIGATORIAS:
             cache_key = None  # Deshabilitar caché en modo conversacional
             logger.info("🤖 Modo conversacional activo - caché deshabilitado")
         else:
+            contexto_cache = json.dumps(
+                contexto,
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+                separators=(',', ':'),
+            )
             cache_key_parts = [
-                'encabezados_v2',
+                'encabezados_v3',
                 self.llm_model or '',
                 self.llm_reasoning_effort or '',
                 texto_original,
                 tipo_estudio,
                 modo,
-                str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo')
+                str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo'),
+                contexto_cache,
             ]
             cache_key_str = '|'.join(cache_key_parts)
             cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
