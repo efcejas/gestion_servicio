@@ -11,6 +11,7 @@ import json
 import re
 import difflib
 import unicodedata
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -1029,15 +1030,47 @@ REGLAS OBLIGATORIAS:
                 default=str,
                 separators=(',', ':'),
             )
+            plantilla_revision = 'hardcode_v1'
+            if modo != 'LIBRE':
+                from .models import PlantillaEstructurada
+
+                tipo_plantilla = contexto.get('tipo_plantilla', 'RODILLA')
+                if tipo_plantilla == 'TORAX_SG':
+                    tipo_plantilla = 'TORAX S/G'
+                try:
+                    fecha_modificacion = (
+                        PlantillaEstructurada.visibles_para_usuario(
+                            usuario, solo_activas=True,
+                        )
+                        .filter(codigo=tipo_plantilla)
+                        .values_list('fecha_modificacion', flat=True)
+                        .first()
+                    )
+                    if fecha_modificacion:
+                        plantilla_revision = fecha_modificacion.isoformat()
+                except Exception:
+                    plantilla_revision = 'db_unavailable'
+                    logger.warning(
+                        "No se pudo determinar la revisión de la plantilla; "
+                        "se usará una clave de fallback"
+                    )
+
+            usuario_id = usuario.id if usuario and hasattr(usuario, 'id') else None
+            aprendizaje_revision = (
+                cache.get(f'mejora_texto_revision_usuario_{usuario_id}', '0')
+                if usuario_id is not None else '0'
+            )
             cache_key_parts = [
-                'encabezados_v3',
+                'encabezados_v4',
                 self.llm_model or '',
                 self.llm_reasoning_effort or '',
                 texto_original,
                 tipo_estudio,
                 modo,
-                str(usuario.id if usuario and hasattr(usuario, 'id') else 'anonimo'),
+                str(usuario_id if usuario_id is not None else 'anonimo'),
                 contexto_cache,
+                plantilla_revision,
+                str(aprendizaje_revision),
             ]
             cache_key_str = '|'.join(cache_key_parts)
             cache_hash = hashlib.md5(cache_key_str.encode()).hexdigest()
@@ -1681,6 +1714,12 @@ Aplicar estas preferencias de terminologia, ubicacion y orden SOLO cuando el dic
             return
         
         usuario_id = usuario.id if hasattr(usuario, 'id') else usuario
+
+        cache.set(
+            f'mejora_texto_revision_usuario_{usuario_id}',
+            uuid.uuid4().hex,
+            timeout=None,
+        )
         
         # Invalidar ejemplos de aprendizaje y estilo
         cache_keys = [

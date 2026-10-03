@@ -2,9 +2,32 @@
 
 Fecha inicial: 2026-07-09
 
-Ultima actualizacion: 2026-08-27
+Ultima actualizacion: 2026-10-02
 
-## Estado operativo (2026-09-03)
+## Estado por rama (2026-10-02)
+
+La base estable descrita abajo se mantiene separada de las mejoras incrementales
+de la rama `mejoras-dictado-ia`; no asumir que estas ultimas estan integradas o
+desplegadas.
+
+En esa rama se incorporaron protecciones para el endpoint de firma y el cambio
+de diccionario, manejo de errores del proveedor LLM, reintento sin repetir STT,
+supresion de contenido clinico en logs, limite configurable de audio y claves de
+caché separadas por contexto. La revision de caché tambien cambia al guardar una
+plantilla o una correccion de aprendizaje.
+
+El límite de audio y la invalidación final de caché siguen pendientes de commit.
+La validación más reciente pasó 30 pruebas de `test_ai_guardrails` y 15 de
+`test_aprendizaje`; las 105 pruebas focales se ejecutaron después del límite de
+audio y antes de la última modificación de caché. El reintento se comprobó
+manualmente en navegador.
+
+El detalle técnico, los gates de validación y los próximos pasos antes de
+integrar están en
+[`OPTIMIZACIONES_DICTADO_RAPIDO.md`](OPTIMIZACIONES_DICTADO_RAPIDO.md).
+No integrar ni desplegar esta rama sin aprobación explícita.
+
+## Estado de la base estable (referencia 2026-09-03)
 
 El modulo se restauro funcionalmente a la version estable `5d1baf4e`
 (`Agrega correccion por voz y confirmacion de plantilla`). Las capacidades

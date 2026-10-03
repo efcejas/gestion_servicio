@@ -632,6 +632,7 @@ let audioChunks = [];
 let tiempoInicio;
 let intervaloTiempo;
 const DURACION_MINIMA_MS = 150; // Mínimo 0.15 segundos (Whisper requiere 0.1s mínimo)
+const MAX_AUDIO_SIZE_BYTES = {{ dictado_max_audio_size_bytes }};
 
 const btnGrabar = document.getElementById('btnGrabar');
 const iconGrabar = document.getElementById('iconGrabar');
@@ -1597,6 +1598,16 @@ async function procesarAudio() {
         estadoGrabacion.textContent = `❌ Audio muy corto (${audioBlob.size} bytes)`;
         estadoGrabacion.classList.remove('text-gray-300');
         estadoGrabacion.classList.add('text-red-400');
+        return;
+    }
+
+    if (audioBlob.size > MAX_AUDIO_SIZE_BYTES) {
+        const maximoMb = (MAX_AUDIO_SIZE_BYTES / 1_000_000).toFixed(1);
+        const mensaje = `Audio demasiado grande. El máximo permitido es ${maximoMb} MB.`;
+        estadoGrabacion.textContent = mensaje;
+        estadoGrabacion.classList.remove('text-gray-300', 'text-green-400');
+        estadoGrabacion.classList.add('text-red-400');
+        mostrarToast(mensaje, 'error');
         return;
     }
 

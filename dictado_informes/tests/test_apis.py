@@ -238,6 +238,40 @@ class TestAPIsTranscripcion(TestCase):
         data = response.json()
         self.assertFalse(data['success'])
         self.assertIn('corto', data['error'].lower())
+
+    @override_settings(DICTADO_MAX_AUDIO_SIZE_BYTES=1000)
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcribir_rechaza_audio_supera_limite(self, mock_transcribe):
+        mock_transcribe.return_value = {'text': 'Transcripción de prueba'}
+        audio_grande = base64.b64encode(b'x' * 1001).decode()
+
+        response = self.client.post(
+            '/dictado_informes/api/transcribir-whisper/',
+            data=json.dumps({'audio': f'data:audio/webm;base64,{audio_grande}'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(response.json()['success'])
+        mock_transcribe.assert_not_called()
+
+    @override_settings(DICTADO_MAX_AUDIO_SIZE_BYTES=1000)
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcribir_rechaza_cuerpo_json_excesivo_antes_de_parsear(self, mock_transcribe):
+        cuerpo_grande = json.dumps({
+            'audio': base64.b64encode(b'fake audio' * 100).decode(),
+            'contexto': {'metadata': 'x' * (66 * 1024)},
+        })
+
+        response = self.client.post(
+            '/dictado_informes/api/transcribir-whisper/',
+            data=cuerpo_grande,
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 413)
+        self.assertFalse(response.json()['success'])
+        mock_transcribe.assert_not_called()
     
     def test_transcribir_sin_audio(self):
         """Prueba error cuando no se envía audio"""

@@ -2,9 +2,12 @@
 Tests para guardrails de modo estructurado en AIService.
 """
 from django.test import TestCase
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from unittest.mock import MagicMock, patch
 
 from dictado_informes.ai_services import AIService
+from dictado_informes.models import CorreccionAprendizaje, PlantillaEstructurada
 
 
 class AIGuardrailsTests(TestCase):
@@ -85,6 +88,57 @@ class AIGuardrailsTests(TestCase):
 
         self.assertNotEqual(claves_cache[0], claves_cache[1])
         self.assertEqual(claves_cache[0], claves_cache[2])
+
+    def test_cache_mejora_cambia_al_editar_plantilla_o_aprendizaje(self):
+        usuario = get_user_model().objects.create_superuser(
+            username='cache_dictado', password='test123', email='cache@test.com',
+        )
+        plantilla = PlantillaEstructurada.objects.create(
+            codigo='CACHE_TEST',
+            nombre='Plantilla de caché',
+            titulo='RM TEST',
+            seccion_tecnica='Técnica',
+            comentarios_base=['Comentario'],
+            origen='user',
+            creada_por=usuario,
+            compartida=True,
+        )
+        self.ai.llm_enabled = True
+        claves_cache = []
+        obtener_cache_original = cache.get
+
+        def capturar_mejora_y_delegar_version(clave, *args, **kwargs):
+            if clave.startswith('mejora_texto_') and not clave.startswith(
+                'mejora_texto_revision_usuario_'
+            ):
+                claves_cache.append(clave)
+                return {'texto_mejorado': 'Resultado cacheado'}
+            return obtener_cache_original(clave, *args, **kwargs)
+
+        contexto = {'modo': 'ESTRUCTURADO', 'tipo_plantilla': plantilla.codigo}
+        with patch(
+            'dictado_informes.ai_services.cache.get',
+            side_effect=capturar_mejora_y_delegar_version,
+        ):
+            self.ai.improve_medical_text('Hallazgo de prueba', 'RES', contexto, usuario)
+            self.ai.improve_medical_text('Hallazgo de prueba', 'RES', contexto, usuario)
+
+            plantilla.titulo = 'RM TEST ACTUALIZADA'
+            plantilla.save()
+            self.ai.improve_medical_text('Hallazgo de prueba', 'RES', contexto, usuario)
+
+            CorreccionAprendizaje.objects.create(
+                texto_original='Hallazgo de prueba',
+                texto_ia='Hallazgo de prueba',
+                texto_final='Hallazgo ajustado de prueba',
+                usuario=usuario,
+            )
+            self.ai.improve_medical_text('Hallazgo de prueba', 'RES', contexto, usuario)
+
+        self.assertEqual(len(claves_cache), 4)
+        self.assertEqual(claves_cache[0], claves_cache[1])
+        self.assertNotEqual(claves_cache[0], claves_cache[2])
+        self.assertNotEqual(claves_cache[2], claves_cache[3])
 
     def test_normaliza_acentos_solo_en_encabezados_completos(self):
         texto = """RM DE RODILLA DERECHA

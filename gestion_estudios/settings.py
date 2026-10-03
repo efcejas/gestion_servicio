@@ -580,6 +580,11 @@ SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=5 
 
 # Dictado IA: permite apagar el modo agente sin rollback de codigo.
 DICTADO_AGENTE_HABILITADO = config('DICTADO_AGENTE_HABILITADO', default=True, cast=bool)
+DICTADO_MAX_AUDIO_SIZE_BYTES = config(
+    'DICTADO_MAX_AUDIO_SIZE_BYTES',
+    default=1_800_000,
+    cast=int,
+)
 # Calcula una recomendacion alternativa para medir el selector hibrido sin usarla.
 DICTADO_SELECTOR_HIBRIDO_SOMBRA = config(
     'DICTADO_SELECTOR_HIBRIDO_SOMBRA',

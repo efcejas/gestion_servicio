@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse_lazy
+from django.core.exceptions import RequestDataTooBig
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Q, Count, Avg
@@ -772,6 +773,7 @@ class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateVi
         context['plantillas_default_codigo'] = default_codigo
         context['plantillas_total_visibles'] = len(plantillas_visibles)
         context['dictado_agente_habilitado'] = getattr(settings, 'DICTADO_AGENTE_HABILITADO', True)
+        context['dictado_max_audio_size_bytes'] = settings.DICTADO_MAX_AUDIO_SIZE_BYTES
         return context
 
 
@@ -1282,22 +1284,54 @@ def transcribir_audio_whisper(request):
     error_detalle = ""
     
     try:
+        max_audio_size = settings.DICTADO_MAX_AUDIO_SIZE_BYTES
+        max_audio_size_mb = max_audio_size / 1_000_000
+        audio_size_error = (
+            f'El audio supera el tamaño máximo permitido ({max_audio_size_mb:.1f} MB).'
+        )
+        max_audio_base64_size = 4 * ((max_audio_size + 2) // 3)
+        max_audio_request_size = max_audio_base64_size + 64 * 1024
+        content_length = request.META.get('CONTENT_LENGTH')
+        if content_length:
+            try:
+                request_size = int(content_length)
+            except ValueError:
+                return JsonResponse({'error': 'Tamaño de solicitud inválido'}, status=400)
+            if request_size > max_audio_request_size:
+                return JsonResponse({
+                    'success': False,
+                    'error': audio_size_error,
+                }, status=413)
+
         data = json.loads(request.body)
         audio_base64 = data.get('audio')
         contexto = data.get('contexto')
         
         if not audio_base64:
             return JsonResponse({'error': 'No se recibió audio'}, status=400)
+
+        audio_base64_payload = audio_base64.split(',', 1)[1] if ',' in audio_base64 else audio_base64
+        if len(audio_base64_payload) > max_audio_base64_size:
+            return JsonResponse({
+                'success': False,
+                'error': audio_size_error,
+            }, status=413)
         
         logger.info("Transcribiendo audio con Whisper (contexto presente: %s)", bool(contexto))
         
         # Decodificar audio base64
         try:
-            audio_data = base64.b64decode(audio_base64.split(',')[1] if ',' in audio_base64 else audio_base64)
+            audio_data = base64.b64decode(audio_base64_payload)
             logger.info(f"Audio decodificado: {len(audio_data)} bytes")
         except Exception as e:
             logger.error(f"Error decodificando base64: {str(e)}")
             return JsonResponse({'error': 'Audio inválido'}, status=400)
+
+        if len(audio_data) > max_audio_size:
+            return JsonResponse({
+                'success': False,
+                'error': audio_size_error,
+            }, status=413)
         
         # Validar tamaño mínimo del audio
         MIN_AUDIO_SIZE = 500  # Mínimo 500 bytes (~0.1 segundos de audio WebM)
@@ -1381,6 +1415,11 @@ def transcribir_audio_whisper(request):
             'from_cache': transcripcion_result.get('from_cache', False)
         })
     
+    except RequestDataTooBig:
+        return JsonResponse({
+            'success': False,
+            'error': 'La solicitud supera el tamaño máximo permitido para dictado.',
+        }, status=413)
     except Exception as e:
         tuvo_error = True
         error_detalle = str(e)

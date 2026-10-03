@@ -79,6 +79,14 @@ class DictadoPilotoAccessTests(TestCase):
         self.assertContains(response, 'Copiar para NetTerm')
         self.assertContains(response, "copiarTexto('netterm')")
 
+    @override_settings(DICTADO_MAX_AUDIO_SIZE_BYTES=2000)
+    def test_dictado_rapido_recibe_limite_de_audio_configurado(self):
+        self.client.force_login(self.piloto)
+
+        response = self.client.get(reverse('dictado_informes:dictado_rapido'))
+
+        self.assertContains(response, 'const MAX_AUDIO_SIZE_BYTES = 2000;')
+
     def test_dictado_rapido_conserva_borrador_si_falla_ia(self):
         self.client.force_login(self.piloto)
 
