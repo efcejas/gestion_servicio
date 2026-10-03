@@ -9,11 +9,17 @@ Cobertura esperada: ~70% de las APIs
 
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from unittest.mock import patch, MagicMock
 import json
 import base64
 
-from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
+from dictado_informes.models import (
+    EstadoInforme,
+    Informe,
+    PlantillaEstructurada,
+    TrazaAgenteDictado,
+)
 from dictado_informes.views import (
     construir_candidatos_confirmacion_plantilla,
     debe_confirmar_plantilla_agente,
@@ -24,6 +30,64 @@ from dictado_informes.views import (
 )
 
 User = get_user_model()
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])
+class TestFirmaInforme(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username='admin_firma',
+            password='admin123',
+            email='firma@test.com',
+        )
+        self.client.force_login(self.user)
+        self.informe = Informe.objects.create(
+            nombre_paciente='Paciente',
+            apellido_paciente='Prueba',
+            tipo_estudio='RES',
+            hallazgos='Hallazgo de prueba',
+            conclusion='Conclusión de prueba',
+            medico=self.user,
+        )
+
+    def test_get_no_firma_informe(self):
+        response = self.client.get(
+            reverse('dictado_informes:firmar_informe', args=[self.informe.pk]),
+        )
+
+        self.assertEqual(response.status_code, 405)
+        self.informe.refresh_from_db()
+        self.assertEqual(self.informe.estado, EstadoInforme.BORRADOR)
+        self.assertIsNone(self.informe.fecha_firma)
+
+    def test_post_firma_informe(self):
+        response = self.client.post(
+            reverse('dictado_informes:firmar_informe', args=[self.informe.pk]),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('dictado_informes:informe_detail', args=[self.informe.pk]),
+        )
+        self.informe.refresh_from_db()
+        self.assertEqual(self.informe.estado, EstadoInforme.FIRMADO)
+        self.assertEqual(self.informe.medico_firma, self.user)
+        self.assertIsNotNone(self.informe.fecha_firma)
+
+    def test_post_usuario_sin_permiso_no_firma_informe(self):
+        usuario = User.objects.create_user(
+            username='medico_sin_firma', password='test123', perfil_completo=True,
+        )
+        self.client.force_login(usuario)
+
+        response = self.client.post(
+            reverse('dictado_informes:firmar_informe', args=[self.informe.pk]),
+        )
+
+        self.assertRedirects(response, reverse('home'))
+        self.informe.refresh_from_db()
+        self.assertEqual(self.informe.estado, EstadoInforme.BORRADOR)
+        self.assertIsNone(self.informe.fecha_firma)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False, ALLOWED_HOSTS=['testserver', 'localhost'])

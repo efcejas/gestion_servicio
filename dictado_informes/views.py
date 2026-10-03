@@ -1238,6 +1238,8 @@ def obtener_plantilla(request, pk):
 
 
 # Vista para firmar informe
+@login_required
+@require_POST
 def firmar_informe(request, pk):
     """Firma un informe"""
     if not request.user.is_superuser:
