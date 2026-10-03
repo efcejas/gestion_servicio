@@ -69,7 +69,7 @@ def _clasificar_doppler_mmii(estudio):
         or 'DOPPLER' in texto
         or 'ECODOPPLER' in texto
     )
-    es_mmii = bool(re.search(r'\bMMII\b|MIEMBROS INFERIORES', texto))
+    es_mmii = bool(re.search(r'\bMMII\b|\bMM\s+INFERIORES\b|MIEMBROS INFERIORES', texto))
     if not es_doppler or not es_mmii:
         return None
 

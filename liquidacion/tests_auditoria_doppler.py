@@ -39,7 +39,7 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
             activo=True,
         )
         self.arterial = Estudios.objects.create(
-            codigo='DOP-ART-MMII',
+            codigo='900046/0',
             nombre='Ecodoppler arterial MM inferiores',
             tipo='DOP',
             grupo_tarifario=self.grupo,
@@ -307,6 +307,15 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         self.assertContains(response_jefatura, 'Vista de solo lectura')
         self.assertContains(response_jefatura, 'Cantidad declarada')
         self.assertContains(response_jefatura, 'Impacto potencial')
+        self.assertContains(response_jefatura, self.medico.get_full_name())
+
+        response_filtrada = self.client.get(
+            url,
+            {'profesional': self.medico.pk},
+        )
+        self.assertEqual(response_filtrada.status_code, 200)
+        self.assertContains(response_filtrada, 'Registros candidatos:')
+        self.assertContains(response_filtrada, 'Ecodoppler arterial MM inferiores')
 
     @override_settings(SECURE_SSL_REDIRECT=False)
     def test_pantalla_muestra_posible_duplicado_y_referencias(self):
