@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
@@ -9,11 +10,17 @@ from django.urls import reverse
 from .models import (
     Estudios,
     GrupoTarifario,
+    HistorialRevisionAuditoriaDopplerMMII,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
+    RevisionAuditoriaDopplerMMII,
     SesionContable,
 )
-from .services_auditoria import auditar_cantidad_doppler_mmii
+from .services_auditoria import (
+    auditar_cantidad_doppler_mmii,
+    crear_casos_auditoria_doppler_mmii,
+    resolver_caso_auditoria_doppler_mmii,
+)
 
 
 User = get_user_model()
@@ -26,6 +33,7 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
             first_name='Angel',
             last_name='Gavilanes Ibarra',
             rol='jefe_residentes',
+            perfil_completo=True,
         )
         self.sesion = SesionContable.objects.create(
             mes=6,
@@ -304,7 +312,7 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         response_jefatura = self.client.get(url)
 
         self.assertEqual(response_jefatura.status_code, 200)
-        self.assertContains(response_jefatura, 'Vista de solo lectura')
+        self.assertContains(response_jefatura, 'Revisión sin ajustes económicos')
         self.assertContains(response_jefatura, 'Cantidad declarada')
         self.assertContains(response_jefatura, 'Impacto potencial')
         self.assertContains(response_jefatura, self.medico.get_full_name())
@@ -388,3 +396,223 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         self.assertContains(response, 'Ecodoppler arterial MM inferiores')
         self.assertContains(response, 'Doppler venoso de miembros inferiores')
         self.assertContains(response, 'Cantidad declarada: <strong>2</strong>', count=2)
+
+    def test_persistencia_es_idempotente_y_no_modifica_fuentes_economicas(self):
+        registro = self._crear_registro()
+        relacion = RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            cantidad_regiones=4,
+            monto_calculado=Decimal('48400.00'),
+        )
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 6, 30),
+        )
+
+        primera_generacion = crear_casos_auditoria_doppler_mmii(auditoria, self.medico)
+        segunda_generacion = crear_casos_auditoria_doppler_mmii(auditoria, self.medico)
+
+        self.assertEqual(primera_generacion, {'detectados': 1, 'creados': 1, 'existentes': 0})
+        self.assertEqual(segunda_generacion, {'detectados': 1, 'creados': 0, 'existentes': 1})
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.count(), 1)
+        caso = RevisionAuditoriaDopplerMMII.objects.get()
+        self.assertEqual(caso.datos_originales_json['cantidad_declarada'], 2)
+        self.assertEqual(caso.datos_originales_json['cantidad_esperada'], 1)
+        self.assertEqual(caso.datos_originales_json['monto_registrado'], '48400.00')
+
+        registro.refresh_from_db()
+        relacion.refresh_from_db()
+        self.assertEqual(registro.cantidad_regiones, 4)
+        self.assertEqual(registro.monto_calculado, Decimal('48400.00'))
+        self.assertEqual(relacion.cantidad, 2)
+
+    def test_confirmacion_exige_evidencia_y_cada_decision_agrega_historial(self):
+        registro = self._crear_registro()
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 6, 30),
+        )
+        crear_casos_auditoria_doppler_mmii(auditoria, self.medico)
+        caso = RevisionAuditoriaDopplerMMII.objects.get()
+
+        with self.assertRaises(ValidationError):
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk,
+                decision=RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+                evidencias={},
+                observacion='Sin evidencia documental',
+                usuario=self.medico,
+            )
+
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk,
+            decision=RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+            evidencias={'orden_medica_verificada': True},
+            observacion='Orden médica revisada',
+            usuario=self.medico,
+        )
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk,
+            decision=RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+            evidencias={'eges_verificado': True},
+            observacion='Se descarta tras revisión complementaria',
+            usuario=self.medico,
+        )
+
+        caso.refresh_from_db()
+        self.assertEqual(caso.estado, RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO)
+        self.assertEqual(caso.observacion, 'Se descarta tras revisión complementaria')
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 2)
+        self.assertEqual(
+            list(caso.historial.order_by('pk').values_list('estado_anterior', 'estado_nuevo')),
+            [
+                (RevisionAuditoriaDopplerMMII.ESTADO_PENDIENTE, RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO),
+                (RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO, RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO),
+            ],
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('48400.00'))
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_endpoints_persisten_casos_y_restringen_acceso_a_jefatura(self):
+        registro = self._crear_registro()
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        generar_url = reverse('liquidacion:auditoria_doppler_mmii_generar_casos')
+        datos = {
+            'fecha_desde': '2026-06-01',
+            'fecha_hasta': '2026-06-30',
+            'profesional': '',
+            'solo_diferencias': '1',
+        }
+
+        self.client.force_login(self.medico)
+        respuesta_no_autorizada = self.client.post(generar_url, datos)
+        self.assertEqual(respuesta_no_autorizada.status_code, 302)
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.count(), 0)
+
+        jefe = User.objects.create_user(
+            username='jefatura_generacion_doppler',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.client.force_login(jefe)
+        respuesta_fecha_invalida = self.client.post(generar_url, {
+            **datos,
+            'fecha_desde': '2026-02-31',
+        })
+        self.assertEqual(respuesta_fecha_invalida.status_code, 302)
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.count(), 0)
+        respuesta = self.client.post(generar_url, datos)
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.count(), 1)
+
+        caso = RevisionAuditoriaDopplerMMII.objects.get()
+        resolver_url = reverse(
+            'liquidacion:auditoria_doppler_mmii_resolver',
+            args=[caso.pk],
+        )
+        self.client.force_login(self.medico)
+        self.client.post(resolver_url, {
+            **datos,
+            'decision': RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+            'observacion': 'Intento sin permisos',
+        })
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 0)
+        self.client.force_login(jefe)
+        self.client.post(resolver_url, {
+            **datos,
+            'decision': RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+            'eges_verificado': 'on',
+            'observacion': 'EGES solo no confirma',
+        })
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 0)
+        respuesta_revision = self.client.post(resolver_url, {
+            **datos,
+            'decision': RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+            'orden_medica_verificada': 'on',
+            'observacion': 'Orden verificada en prueba',
+        })
+        self.assertEqual(respuesta_revision.status_code, 302)
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 1)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_mis_registros_solo_muestra_auditorias_del_profesional_autenticado(self):
+        registro_propio = self._crear_registro()
+        relacion_propia = RegistroEstudio.objects.create(
+            registro=registro_propio,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        otro_medico = User.objects.create_user(
+            username='otro_medico_auditoria',
+            rol='jefe_residentes',
+        )
+        otro_registro = RegistroEstudiosPorMedico.objects.create(
+            sesion_contable=self.sesion,
+            medico=otro_medico,
+            nombre_paciente='Paciente',
+            apellido_paciente='Reservado',
+            dni_paciente='12345678',
+            fecha_del_informe=date(2026, 6, 11),
+            tipo_obra_social='COBER',
+            horario='EXTRA',
+            cantidad_regiones=2,
+            monto_calculado=Decimal('24200.00'),
+        )
+        relacion_ajena = RegistroEstudio.objects.create(
+            registro=otro_registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 6, 30),
+        )
+        crear_casos_auditoria_doppler_mmii(auditoria, self.medico)
+        casos = {
+            caso.registro_estudio_id_origen: caso
+            for caso in RevisionAuditoriaDopplerMMII.objects.all()
+        }
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[relacion_propia.pk].pk,
+            decision=RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+            evidencias={},
+            observacion='OBSERVACION_PROPIA_UNICA',
+            usuario=self.medico,
+        )
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[relacion_ajena.pk].pk,
+            decision=RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+            evidencias={},
+            observacion='OBSERVACION_AJENA_NO_VISIBLE',
+            usuario=self.medico,
+        )
+
+        self.client.force_login(self.medico)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_list'),
+            {'mes': 6, 'año': 2026},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'OBSERVACION_PROPIA_UNICA')
+        self.assertNotContains(response, 'OBSERVACION_AJENA_NO_VISIBLE')
+        self.assertNotContains(response, 'Paciente Reservado')

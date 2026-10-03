@@ -37,6 +37,7 @@ from .models import (
     HistorialRecalculoTarifaRegistro,
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
+    RevisionAuditoriaDopplerMMII,
     RevisionCruceEgesRegistro,
     CorreccionPacsRegistro,
     GuardiaPasiva,
@@ -51,9 +52,12 @@ from .grupo_tarifario_mapping import (
 )
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import (
+    adjuntar_revisiones_auditoria_doppler_mmii,
     evaluar_gate_consistencia_sesion,
     auditar_cantidad_doppler_mmii,
     auditar_residentes_eco_por_sesion,
+    crear_casos_auditoria_doppler_mmii,
+    resolver_caso_auditoria_doppler_mmii,
     resumir_pendientes_auditoria_eco,
 )
 from .services import (
@@ -71,6 +75,7 @@ from .forms import (
     SolicitudRevisionHorarioBulkActionForm,
     RevisionAuditoriaEcoRegistroForm,
     RevisionAuditoriaEcoBulkForm,
+    RevisionAuditoriaDopplerMMIIForm,
     RevisionCruceEgesRegistroForm,
     RevisionCruceEgesBulkValidarForm,
     CorreccionPacsRegistroForm,
@@ -1401,9 +1406,14 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        fecha_desde = parse_date(self.request.GET.get('fecha_desde', '')) or self.fecha_desde_default
-        fecha_hasta = parse_date(self.request.GET.get('fecha_hasta', '')) or self.fecha_hasta_default
         error_fechas = ''
+        try:
+            fecha_desde = parse_date(self.request.GET.get('fecha_desde', '')) or self.fecha_desde_default
+            fecha_hasta = parse_date(self.request.GET.get('fecha_hasta', '')) or self.fecha_hasta_default
+        except ValueError:
+            error_fechas = 'Indica fechas validas para consultar la auditoria.'
+            fecha_desde = self.fecha_desde_default
+            fecha_hasta = self.fecha_hasta_default
         if fecha_desde > fecha_hasta:
             error_fechas = 'La fecha inicial no puede ser posterior a la fecha final.'
             fecha_desde = self.fecha_desde_default
@@ -1413,6 +1423,7 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
             fecha_desde=fecha_desde,
             fecha_hasta=fecha_hasta,
         )
+        adjuntar_revisiones_auditoria_doppler_mmii(auditoria)
         profesionales = {}
         for item in auditoria['resultados']:
             profesionales[item['medico_id']] = item['medico']
@@ -1458,8 +1469,104 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
             'fecha_hasta': fecha_hasta.isoformat(),
             'error_fechas': error_fechas,
             'total_filtrado': len(resultados),
+            'puede_generar_casos': _puede_acceder_panel_administrativo(self.request.user),
         })
         return context
+
+
+def _url_auditoria_doppler_con_filtros(params):
+    filtros = {
+        key: (params.get(key) or '').strip()
+        for key in ('fecha_desde', 'fecha_hasta', 'profesional', 'solo_diferencias', 'page')
+        if (params.get(key) or '').strip()
+    }
+    query = urlencode(filtros)
+    url = reverse('liquidacion:auditoria_doppler_mmii')
+    return f'{url}?{query}' if query else url
+
+
+class AuditoriaDopplerMMIIGenerarCasosView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Persiste snapshots de candidatos visibles sin cambiar prestaciones ni montos."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para generar casos de auditoria Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        redirect_url = _url_auditoria_doppler_con_filtros(request.POST)
+        try:
+            fecha_desde = parse_date(request.POST.get('fecha_desde', ''))
+            fecha_hasta = parse_date(request.POST.get('fecha_hasta', ''))
+        except ValueError:
+            messages.error(request, 'Indica un rango de fechas valido para generar los casos.')
+            return redirect(redirect_url)
+        if not fecha_desde or not fecha_hasta or fecha_desde > fecha_hasta:
+            messages.error(request, 'Indica un rango de fechas valido para generar los casos.')
+            return redirect(redirect_url)
+
+        profesional_id = (request.POST.get('profesional') or '').strip()
+        if profesional_id and not profesional_id.isdigit():
+            messages.error(request, 'El profesional seleccionado no es valido.')
+            return redirect(redirect_url)
+
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            medico_id=int(profesional_id) if profesional_id else None,
+        )
+        resumen = crear_casos_auditoria_doppler_mmii(auditoria, request.user)
+        messages.success(
+            request,
+            (
+                f"Casos candidatos: {resumen['detectados']}; nuevos: {resumen['creados']}; "
+                f"ya existentes: {resumen['existentes']}. No se modificaron prestaciones ni montos."
+            ),
+        )
+        return redirect(redirect_url)
+
+
+class AuditoriaDopplerMMIIRevisionView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """Guarda una decisión y evidencia sin aplicar correcciones económicas."""
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'No tienes permisos para revisar casos Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        redirect_url = _url_auditoria_doppler_con_filtros(request.POST)
+        caso = get_object_or_404(
+            RevisionAuditoriaDopplerMMII,
+            pk=kwargs['caso_id'],
+        )
+        form = RevisionAuditoriaDopplerMMIIForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, '; '.join(form.non_field_errors()) or 'Revisa los datos de la decision.')
+            return redirect(redirect_url)
+
+        datos = form.cleaned_data
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk,
+            decision=datos['decision'],
+            evidencias={
+                'orden_medica_verificada': datos['orden_medica_verificada'],
+                'eges_verificado': datos['eges_verificado'],
+                'visualmedical_verificado': datos['visualmedical_verificado'],
+                'netterm_verificado': datos['netterm_verificado'],
+            },
+            observacion=datos['observacion'],
+            usuario=request.user,
+        )
+        messages.success(
+            request,
+            f"Decision guardada para el caso #{caso.pk}; no se aplicaron cambios economicos.",
+        )
+        return redirect(redirect_url)
 
 
 class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -3732,6 +3839,21 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             if revision.registro_id not in ultima_revision_por_registro:
                 ultima_revision_por_registro[revision.registro_id] = revision
 
+        auditorias_doppler_por_registro = defaultdict(list)
+        auditorias_doppler = (
+            RevisionAuditoriaDopplerMMII.objects
+            .filter(
+                registro_id__in=registros_ids,
+                version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+            )
+            .select_related('revisado_por')
+            .order_by('registro_id', 'registro_estudio_id_origen')
+        )
+        for auditoria_doppler in auditorias_doppler:
+            auditorias_doppler_por_registro[auditoria_doppler.registro_id].append(
+                auditoria_doppler,
+            )
+
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
@@ -3751,6 +3873,10 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 
             revision = ultima_revision_por_registro.get(registro.id)
             registro.revision_info = revision
+            registro.auditorias_doppler_mmii = auditorias_doppler_por_registro.get(
+                registro.id,
+                [],
+            )
             registro.tiene_revision = revision is not None
             registro.revision_badge_label = ''
             registro.revision_badge_classes = ''

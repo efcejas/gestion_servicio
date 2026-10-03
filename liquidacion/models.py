@@ -1659,6 +1659,121 @@ class RevisionAuditoriaEcoRegistro(models.Model):
         return f"Revision ECO registro #{self.registro_id} - {self.estado}"
 
 
+class RevisionAuditoriaDopplerMMII(models.Model):
+    """Decision auditable sobre una linea Doppler MMII, sin impacto economico."""
+
+    ESTADO_PENDIENTE = 'PENDIENTE'
+    ESTADO_CONFIRMADO = 'CONFIRMADO'
+    ESTADO_DESCARTADO = 'DESCARTADO'
+    ESTADO_REQUIERE_EVIDENCIA = 'REQUIERE_EVIDENCIA'
+    ESTADO_CHOICES = [
+        (ESTADO_PENDIENTE, 'Pendiente de revision'),
+        (ESTADO_CONFIRMADO, 'Diferencia confirmada'),
+        (ESTADO_DESCARTADO, 'Diferencia descartada'),
+        (ESTADO_REQUIERE_EVIDENCIA, 'Requiere evidencia'),
+    ]
+
+    VERSION_REGLA_V1 = 'DOPPLER_MMII_V1'
+
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico',
+        on_delete=models.PROTECT,
+        related_name='revisiones_auditoria_doppler_mmii',
+    )
+    registro_estudio = models.ForeignKey(
+        'RegistroEstudio',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='revisiones_auditoria_doppler_mmii',
+    )
+    registro_estudio_id_origen = models.PositiveIntegerField()
+    version_regla = models.CharField(max_length=40, default=VERSION_REGLA_V1)
+    datos_originales_json = models.JSONField(default=dict)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='casos_auditoria_doppler_mmii_creados',
+    )
+    fecha_deteccion = models.DateTimeField(auto_now_add=True)
+    estado = models.CharField(
+        max_length=24,
+        choices=ESTADO_CHOICES,
+        default=ESTADO_PENDIENTE,
+    )
+    orden_medica_verificada = models.BooleanField(default=False)
+    eges_verificado = models.BooleanField(default=False)
+    visualmedical_verificado = models.BooleanField(default=False)
+    netterm_verificado = models.BooleanField(default=False)
+    observacion = models.TextField(blank=True)
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='revisiones_auditoria_doppler_mmii_realizadas',
+    )
+    fecha_revision = models.DateTimeField(null=True, blank=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Revision auditoria Doppler MMII'
+        verbose_name_plural = 'Revisiones auditoria Doppler MMII'
+        ordering = ['-fecha_deteccion']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['registro', 'registro_estudio_id_origen', 'version_regla'],
+                name='liq_audit_doppler_linea_regla_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['registro', 'estado']),
+            models.Index(fields=['estado', '-fecha_deteccion']),
+        ]
+
+    def __str__(self):
+        return f'Auditoria Doppler registro #{self.registro_id} estudio #{self.registro_estudio_id_origen}'
+
+
+class HistorialRevisionAuditoriaDopplerMMII(models.Model):
+    """Evento append-only de decision y evidencia de auditoria Doppler."""
+
+    revision = models.ForeignKey(
+        RevisionAuditoriaDopplerMMII,
+        on_delete=models.PROTECT,
+        related_name='historial',
+    )
+    estado_anterior = models.CharField(max_length=24, blank=True)
+    estado_nuevo = models.CharField(
+        max_length=24,
+        choices=RevisionAuditoriaDopplerMMII.ESTADO_CHOICES,
+    )
+    orden_medica_verificada = models.BooleanField(default=False)
+    eges_verificado = models.BooleanField(default=False)
+    visualmedical_verificado = models.BooleanField(default=False)
+    netterm_verificado = models.BooleanField(default=False)
+    observacion = models.TextField()
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='historial_auditoria_doppler_mmii_realizado',
+    )
+    fecha_revision = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Historial de revision auditoria Doppler MMII'
+        verbose_name_plural = 'Historiales de revision auditoria Doppler MMII'
+        ordering = ['-fecha_revision']
+        indexes = [
+            models.Index(fields=['revision', '-fecha_revision']),
+        ]
+
+    def __str__(self):
+        return f'Revision Doppler #{self.revision_id}: {self.estado_nuevo}'
+
+
 class RevisionCruceEgesRegistro(models.Model):
     """Resolucion administrativa del cruce EGES vs liquidacion, sin impacto economico."""
 

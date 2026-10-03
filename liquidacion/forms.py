@@ -7,6 +7,7 @@ from .models import (
     RegistroEstudiosPorMedico,
     GuardiaPasiva,
     ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
+    RevisionAuditoriaDopplerMMII,
     SesionContable,
     SolicitudRevisionHorarioRegistro,
 )
@@ -275,6 +276,41 @@ class RevisionAuditoriaEcoBulkForm(forms.Form):
     def __init__(self, *args, registro_choices=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['registros'].choices = registro_choices or []
+
+
+class RevisionAuditoriaDopplerMMIIForm(forms.Form):
+    """Decision administrativa informativa sobre un candidato Doppler MMII."""
+
+    decision = forms.ChoiceField(choices=[
+        (RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO, 'Confirmar diferencia'),
+        (RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO, 'Descartar diferencia'),
+        (RevisionAuditoriaDopplerMMII.ESTADO_REQUIERE_EVIDENCIA, 'Requiere más evidencia'),
+    ])
+    orden_medica_verificada = forms.BooleanField(required=False)
+    eges_verificado = forms.BooleanField(required=False)
+    visualmedical_verificado = forms.BooleanField(required=False)
+    netterm_verificado = forms.BooleanField(required=False)
+    observacion = forms.CharField(
+        max_length=2000,
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': 'Criterio revisado, evidencia consultada y conclusión',
+        }),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        if (
+            cleaned.get('decision') == RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO
+            and not (
+                cleaned.get('orden_medica_verificada')
+                or cleaned.get('visualmedical_verificado')
+            )
+        ):
+            raise forms.ValidationError(
+                'Para confirmar la diferencia debes verificar la orden o VisualMedical.'
+            )
+        return cleaned
 
 
 class RevisionCruceEgesRegistroForm(forms.Form):

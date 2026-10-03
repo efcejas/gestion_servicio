@@ -424,6 +424,37 @@
                                 <span>${{ registro.monto_original_correccion_pacs|floatformat:2 }} -> ${{ registro.monto_vigente_correccion_pacs|floatformat:2 }}</span>
                             </div>
                             {% endif %}
+                            {% if registro.auditorias_doppler_mmii %}
+                            <div class="mt-2 space-y-2 text-left">
+                                {% for auditoria_doppler in registro.auditorias_doppler_mmii %}
+                                {% with snapshot=auditoria_doppler.datos_originales_json %}
+                                <div class="rounded-md border border-indigo-200 bg-indigo-50 p-2 text-[11px] leading-snug text-indigo-950">
+                                    <p class="font-bold">Auditoría Doppler MMII · {{ auditoria_doppler.get_estado_display }}</p>
+                                    <p class="mt-1">{{ snapshot.estudio }}: {{ snapshot.cantidad_declarada }} registrada(s) → {{ snapshot.cantidad_esperada|default:"revisión manual" }} según regla.</p>
+                                    <p>Regiones declaradas en el registro: {{ snapshot.regiones_registro_declaradas }}. El monto original no fue modificado por esta auditoría.</p>
+                                    {% if snapshot.posible_duplicado %}
+                                    <p class="mt-1 font-semibold text-amber-800">Posible registro repetido para la misma fecha y práctica; requiere verificación de orden/VisualMedical.</p>
+                                    {% endif %}
+                                    {% if auditoria_doppler.observacion %}<p class="mt-1 whitespace-pre-line">{{ auditoria_doppler.observacion }}</p>{% endif %}
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        {% if auditoria_doppler.orden_medica_verificada %}<span class="rounded bg-white px-1.5 py-0.5">Orden verificada</span>{% endif %}
+                                        {% if auditoria_doppler.eges_verificado %}<span class="rounded bg-white px-1.5 py-0.5">EGES consultado</span>{% endif %}
+                                        {% if auditoria_doppler.visualmedical_verificado %}<span class="rounded bg-white px-1.5 py-0.5">VisualMedical verificado</span>{% endif %}
+                                        {% if auditoria_doppler.netterm_verificado %}<span class="rounded bg-white px-1.5 py-0.5">NetTerm consultado</span>{% endif %}
+                                    </div>
+                                    {% if auditoria_doppler.revisado_por %}
+                                    <p class="mt-1 text-indigo-700">Revisado por {{ auditoria_doppler.revisado_por.get_full_name|default:auditoria_doppler.revisado_por.username }} · {{ auditoria_doppler.fecha_revision|date:"d/m/Y H:i" }}</p>
+                                    {% endif %}
+                                    {% if registro.medico.rol == 'medico_residente' %}
+                                    <p class="mt-1 font-semibold">Información de auditoría; sin propuesta de débito para residentes.</p>
+                                    {% else %}
+                                    <p class="mt-1 font-semibold">Impacto potencial sujeto a revisión; no se aplicó un ajuste.</p>
+                                    {% endif %}
+                                </div>
+                                {% endwith %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
                         <td class="px-4 py-3 text-sm font-bold text-right {% if registro.anulado %}text-red-700 line-through{% else %}text-gray-900{% endif %}">${{ registro.monto_calculado|floatformat:2 }}</td>

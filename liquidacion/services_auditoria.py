@@ -3,10 +3,14 @@ from collections import defaultdict
 import re
 import unicodedata
 
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
 
 from .models import (
     GrupoTarifario,
+    HistorialRevisionAuditoriaDopplerMMII,
+    RevisionAuditoriaDopplerMMII,
     RegistroEstudiosPorMedico,
     RevisionCruceEgesRegistro,
 )
@@ -142,6 +146,7 @@ def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
                     relacion.estudio.conteo_regiones_default * relacion.cantidad
                 ),
                 'regiones_esperadas': regiones_esperadas,
+                'contexto': relacion.contexto,
                 'requiere_revision_manual': cantidad_esperada is None,
                 'posible_duplicado': False,
                 'cantidad_en_grupo_duplicado': 1,
@@ -189,6 +194,8 @@ def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
             'rol': registro.medico.rol,
             'paciente': f'{registro.apellido_paciente}, {registro.nombre_paciente}',
             'dni': registro.dni_paciente,
+            'tipo_obra_social': registro.tipo_obra_social,
+            'horario': registro.horario,
             'cantidad_practicas_declarada': cantidad_practicas_declarada,
             'cantidad_practicas_esperada': cantidad_practicas_esperada,
             'cantidad_regiones_declarada': registro.cantidad_regiones,
@@ -241,6 +248,163 @@ def auditar_cantidad_doppler_mmii(*, fecha_desde, fecha_hasta, medico_id=None):
         'grupos_posible_duplicado': grupos_duplicados,
         'resultados': resultados,
     }
+
+
+@transaction.atomic
+def crear_casos_auditoria_doppler_mmii(auditoria, usuario):
+    """Persiste candidatos una sola vez, conservando un snapshot de los datos fuente."""
+    candidatos = []
+    registro_ids = []
+    for resultado in auditoria.get('resultados', []):
+        registro_ids.append(resultado['registro_id'])
+        for estudio in resultado['estudios']:
+            requiere_revision = (
+                estudio['requiere_revision_manual']
+                or estudio['posible_duplicado']
+                or estudio['diferencia_cantidad'] not in (None, 0)
+            )
+            if not requiere_revision:
+                continue
+
+            snapshot = {
+                'regla_version': RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+                'registro_id': resultado['registro_id'],
+                'registro_estudio_id': estudio['registro_estudio_id'],
+                'profesional_id': resultado['medico_id'],
+                'profesional': resultado['medico'],
+                'rol': resultado['rol'],
+                'paciente': resultado['paciente'],
+                'dni': resultado['dni'],
+                'fecha_informe': resultado['fecha'].isoformat() if resultado['fecha'] else None,
+                'tipo_obra_social': resultado.get('tipo_obra_social'),
+                'horario': resultado.get('horario'),
+                'monto_registrado': str(resultado['monto_registrado']),
+                'regiones_registro_declaradas': resultado['cantidad_regiones_declarada'],
+                'estudio_id': estudio['estudio_id'],
+                'estudio': estudio['estudio'],
+                'codigo_estudio': estudio['codigo_estudio'],
+                'clasificacion': estudio['clasificacion'],
+                'contexto': estudio['contexto'],
+                'cantidad_declarada': estudio['cantidad_declarada'],
+                'cantidad_esperada': estudio['cantidad_esperada'],
+                'regiones_declaradas': estudio['regiones_declaradas'],
+                'regiones_esperadas': estudio['regiones_esperadas'],
+                'posible_duplicado': estudio['posible_duplicado'],
+                'otros_registros_posible_duplicado': estudio['otros_registros_posible_duplicado'],
+            }
+            candidatos.append(RevisionAuditoriaDopplerMMII(
+                registro_id=resultado['registro_id'],
+                registro_estudio_id=estudio['registro_estudio_id'],
+                registro_estudio_id_origen=estudio['registro_estudio_id'],
+                version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+                datos_originales_json=snapshot,
+                creado_por=usuario,
+            ))
+
+    if not candidatos:
+        return {'detectados': 0, 'creados': 0, 'existentes': 0}
+
+    claves_candidatas = {
+        (caso.registro_id, caso.registro_estudio_id_origen)
+        for caso in candidatos
+    }
+    casos_existentes = set(
+        RevisionAuditoriaDopplerMMII.objects
+        .filter(
+            registro_id__in=registro_ids,
+            version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+        )
+        .values_list('registro_id', 'registro_estudio_id_origen')
+    )
+    existentes = len(claves_candidatas & casos_existentes)
+    RevisionAuditoriaDopplerMMII.objects.bulk_create(candidatos, ignore_conflicts=True)
+    return {
+        'detectados': len(claves_candidatas),
+        'creados': len(claves_candidatas) - existentes,
+        'existentes': existentes,
+    }
+
+
+def adjuntar_revisiones_auditoria_doppler_mmii(auditoria):
+    """Adjunta la revision vigente a cada linea del informe."""
+    estudios = [
+        estudio
+        for resultado in auditoria.get('resultados', [])
+        for estudio in resultado['estudios']
+    ]
+    linea_ids = [estudio['registro_estudio_id'] for estudio in estudios]
+    revisiones = (
+        RevisionAuditoriaDopplerMMII.objects
+        .filter(
+            registro_estudio_id_origen__in=linea_ids,
+            version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+        )
+        .select_related('revisado_por', 'creado_por')
+        .prefetch_related('historial__revisado_por')
+        .order_by('registro_estudio_id_origen', '-fecha_actualizacion')
+    ) if linea_ids else []
+    revision_por_linea = {}
+    for revision in revisiones:
+        revision_por_linea.setdefault(revision.registro_estudio_id_origen, revision)
+
+    for estudio in estudios:
+        estudio['revision_auditoria'] = revision_por_linea.get(
+            estudio['registro_estudio_id'],
+        )
+    return auditoria
+
+
+@transaction.atomic
+def resolver_caso_auditoria_doppler_mmii(*, caso_id, decision, evidencias, observacion, usuario):
+    """Registra la decision actual y agrega un evento inmutable de historial."""
+    if decision not in {
+        RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+        RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+        RevisionAuditoriaDopplerMMII.ESTADO_REQUIERE_EVIDENCIA,
+    }:
+        raise ValidationError('La decision de auditoria no es valida.')
+    if not observacion.strip() or len(observacion.strip()) > 2000:
+        raise ValidationError('Indica una observacion de hasta 2000 caracteres.')
+    if decision == RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO and not (
+        evidencias.get('orden_medica_verificada')
+        or evidencias.get('visualmedical_verificado')
+    ):
+        raise ValidationError(
+            'Para confirmar la diferencia debes verificar la orden o VisualMedical.'
+        )
+
+    caso = RevisionAuditoriaDopplerMMII.objects.select_for_update().get(pk=caso_id)
+    HistorialRevisionAuditoriaDopplerMMII.objects.create(
+        revision=caso,
+        estado_anterior=caso.estado,
+        estado_nuevo=decision,
+        orden_medica_verificada=evidencias.get('orden_medica_verificada', False),
+        eges_verificado=evidencias.get('eges_verificado', False),
+        visualmedical_verificado=evidencias.get('visualmedical_verificado', False),
+        netterm_verificado=evidencias.get('netterm_verificado', False),
+        observacion=observacion.strip(),
+        revisado_por=usuario,
+    )
+    caso.estado = decision
+    caso.orden_medica_verificada = evidencias.get('orden_medica_verificada', False)
+    caso.eges_verificado = evidencias.get('eges_verificado', False)
+    caso.visualmedical_verificado = evidencias.get('visualmedical_verificado', False)
+    caso.netterm_verificado = evidencias.get('netterm_verificado', False)
+    caso.observacion = observacion.strip()
+    caso.revisado_por = usuario
+    caso.fecha_revision = timezone.now()
+    caso.save(update_fields=[
+        'estado',
+        'orden_medica_verificada',
+        'eges_verificado',
+        'visualmedical_verificado',
+        'netterm_verificado',
+        'observacion',
+        'revisado_por',
+        'fecha_revision',
+        'fecha_actualizacion',
+    ])
+    return caso
 
 
 def _es_monto_cero(monto):
@@ -371,17 +535,17 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                     _agregar_issue(
                         resultado,
                         TIPO_SIN_TARIFA_VIGENTE_GRUPO,
-                            (
-                                f'Registro #{registro.pk} estudio {estudio.nombre}: '
-                                f'grupo {estudio.grupo_tarifario.codigo} sin tarifa vigente para {fecha_ref}.'
-                            ),
-                            estado_destino,
-                            registro_id=registro.pk,
-                            estudio_id=estudio.pk,
-                            grupo_id=estudio.grupo_tarifario_id,
-                            grupo_codigo=estudio.grupo_tarifario.codigo,
-                            fecha=fecha_ref,
-                        )
+                        (
+                            f'Registro #{registro.pk} estudio {estudio.nombre}: '
+                            f'grupo {estudio.grupo_tarifario.codigo} sin tarifa vigente para {fecha_ref}.'
+                        ),
+                        estado_destino,
+                        registro_id=registro.pk,
+                        estudio_id=estudio.pk,
+                        grupo_id=estudio.grupo_tarifario_id,
+                        grupo_codigo=estudio.grupo_tarifario.codigo,
+                        fecha=fecha_ref,
+                    )
 
                 if contexto in {'LECHO', 'QUIROFANO'}:
                     codigo_ctx = f'{estudio.grupo_tarifario.codigo}_{contexto}'
@@ -390,17 +554,17 @@ def evaluar_gate_consistencia_sesion(sesion, estado_destino):
                         _agregar_issue(
                             resultado,
                             TIPO_CONTEXTUAL_SIN_GRUPO,
-                                (
-                                    f'Registro #{registro.pk} estudio {estudio.nombre}: '
-                                    f'contexto {contexto} sin grupo contextual {codigo_ctx}.'
-                                ),
-                                estado_destino,
-                                registro_id=registro.pk,
-                                estudio_id=estudio.pk,
-                                grupo_codigo=codigo_ctx,
-                                contexto=contexto,
-                                fecha=fecha_ref,
-                            )
+                            (
+                                f'Registro #{registro.pk} estudio {estudio.nombre}: '
+                                f'contexto {contexto} sin grupo contextual {codigo_ctx}.'
+                            ),
+                            estado_destino,
+                            registro_id=registro.pk,
+                            estudio_id=estudio.pk,
+                            grupo_codigo=codigo_ctx,
+                            contexto=contexto,
+                            fecha=fecha_ref,
+                        )
                     else:
                         tarifa_ctx = grupo_ctx.get_tarifa_vigente(fecha=fecha_ref)
                         if not tarifa_ctx:

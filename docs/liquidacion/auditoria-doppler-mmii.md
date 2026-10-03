@@ -1,6 +1,6 @@
 # Auditoria de Doppler MMII
 
-> Estado: primera etapa de lectura y deteccion de candidatos.
+> Estado: P1 de revision persistente implementada localmente; pendiente de despliegue.
 > Corte de datos de produccion: 2026-10-03.
 > No aplica correcciones ni modifica cantidades o montos.
 
@@ -83,12 +83,25 @@ Los registros candidatos a duplicado permanecen como filas independientes y mues
 - Template `templates/liquidacion/auditoria_doppler_mmii.html`, enlazado desde Sesiones Contables.
 - Regresiones en `liquidacion/tests_auditoria_doppler.py`.
 
-No existe aun enlace automatico de cada prestacion con su orden de VisualMedical ni una fuente estructurada de facturas/debitos/pagos. La pantalla no simula importes corregidos ni escribe historial de decision.
+No existe aun enlace automatico de cada prestacion con su orden de VisualMedical ni una fuente estructurada de facturas/debitos/pagos. La pantalla no simula importes corregidos.
+
+### Revision persistente P1
+
+La accion administrativa `Generar casos de revision` conserva un snapshot por registro, linea original y version de regla. Generar nuevamente no sobrescribe el snapshot ni duplica el caso. Guarda cantidad, regiones, monto historico, contexto, obra social, horario y datos de origen.
+
+Estados: `PENDIENTE`, `CONFIRMADO`, `DESCARTADO` y `REQUIERE_EVIDENCIA`. Confirmar exige orden medica o VisualMedical verificada. EGES y NetTerm son fuentes complementarias; por si solos no habilitan la confirmacion. Toda decision exige observacion y agrega un evento de historial con estado anterior/nuevo, fuentes, usuario y fecha. Los eventos previos no se reescriben desde este flujo.
+
+En `Mis registros`, cada profesional ve solo los casos asociados a sus registros: cantidad original/esperada, estado, observacion, fuentes y revisor. No se muestran referencias a registros ajenos. Residentes reciben informacion sin propuesta de debito; para otros roles se indica impacto potencial no aplicado.
+
+La persistencia de auditoria no cambia prestaciones, regiones, horario, montos ni estados contables. No modifica `calcular_monto()`, signals o B2/B3. Las migraciones nuevas `0053`, `0054` y `0055` agregan revision, historial y autor nullable para casos historicos; no se aplicaron en produccion.
+
+NetTerm no tiene importador ni cruce implementado en P1. La casilla solo registra que el auditor consulto esa fuente manualmente. Para integrarlo al cruce EGES se necesita primero una muestra anonimizada del formato exportado o del texto copiado, y definir identificadores, fechas, practicas y criterios de ambiguedad sin ajustes economicos automaticos.
 
 ## Pendientes para la siguiente etapa
 
 1. Contrastar los tres grupos de septiembre y una muestra de registros con cantidad 2 contra orden y VisualMedical.
 2. Revisar si existen otras variantes de nombre/codigo para arterial y venoso MMII en el catalogo.
-3. Definir un estado y captura de evidencia de revision (quien, cuando, fuente y conclusion), sin corregir el origen.
+3. Validar operativamente los snapshots y decisiones P1 antes del despliegue.
 4. Separar una futura diferencia monetaria estimada del monto facturado/debitado real, que no esta disponible como dato estructurado.
 5. Revisar la proteccion contra doble envio del formulario; no asumir que todos los candidatos detectados son errores del usuario.
+6. Disenar la entrada NetTerm y su integracion con los cruces existentes a partir de una muestra anonimizada.
