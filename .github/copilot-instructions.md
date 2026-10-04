@@ -93,6 +93,15 @@ Leer la fuente especifica antes de tocar cada modulo:
 {% include 'components/user_avatar.html' with user_obj=user size="sm" %}
 ```
 
+## Validacion visual en navegador
+
+- Cuando un cambio afecte una pantalla, flujo, filtro, formulario o descarga que el usuario consume desde el navegador, usar el navegador integrado para recorrer el flujo real cuando el entorno lo permita; no inferir que el render funciona solo porque pasan los tests.
+- Levantar la aplicacion local con una base aislada o datos ficticios cuando sea viable. Nunca usar datos ni credenciales productivas para una prueba visual, y no confirmar operaciones con efectos reales.
+- Comprobar el estado inicial y el resultado de la accion principal; cubrir estados vacios, errores o permisos si son parte del cambio. Para cambios responsive, revisar escritorio y movil.
+- Preferir la lectura accesible de la pagina para contenido, controles y estado; usar capturas para revisar jerarquia visual, desbordes y superposiciones.
+- Complementar la inspeccion visual con tests automatizados. Si no se puede iniciar el servidor, autenticar una cuenta de prueba o abrir el navegador, decirlo claramente y enumerar que quedo sin verificar; no afirmar que la UI fue comprobada.
+- Detener el servidor de QA temporal al terminar, salvo que el usuario pida dejarlo disponible.
+
 ## Testing
 
 - Prioridad de tests: liquidacion, permisos, guardias, validaciones de forms y flujos clinicos.

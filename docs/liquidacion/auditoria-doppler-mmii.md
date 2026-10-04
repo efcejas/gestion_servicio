@@ -1,6 +1,6 @@
 # Auditoria de Doppler MMII
 
-> Estado: revision persistente P1 publicada en rama; estimaciones y lotes P2 implementados localmente, pendientes de despliegue.
+> Estado: revision persistente, estimaciones, lotes y filtro de estado publicados en `feature/liquidacion-copilot-specialization`; migraciones pendientes de despliegue.
 > Corte de datos de produccion: 2026-10-03.
 > No aplica correcciones ni modifica cantidades o montos.
 
@@ -109,6 +109,12 @@ El lote admite hasta 200 casos pendientes o que requieren evidencia, con cantida
 
 La columna `Comparacion Doppler` aparece en auditoria, `Mis registros` y liquidacion mensual. Muestra monto original al detectar, estimado segun decisiones confirmadas y diferencia estimada; el monto vigente oficial permanece en su columna habitual. La simulacion se hace sobre el registro completo (tambien en registros mixtos), sustituyendo solo las cantidades confirmadas. Arterial y venoso en el mismo registro no duplican el importe total.
 
+### Filtro de estado
+
+La pantalla de auditoria permite filtrar por `Sin revision iniciada`, `Pendiente`, `Requiere evidencia`, `Diferencia confirmada` o `Diferencia descartada`, ademas de fecha, profesional y diferencias/manuales. `Sin revision iniciada` identifica candidatos que requieren revision y aun no tienen snapshot persistido. Los otros estados corresponden al caso guardado de cada practica.
+
+El filtro se conserva al paginar, generar snapshots o guardar una decision. El listado sigue mostrando todas las practicas Doppler del registro como contexto si al menos una coincide con el estado elegido; el texto auxiliar de la pantalla lo aclara.
+
 Una decision guarda la estimacion y sus datos de calculo tanto en el caso como en su evento de historial. Las pantallas y Excel leen esa estimacion guardada, sin recalcular a partir de cambios posteriores de aranceles. Una nueva decision puede generar otra estimacion, conservando el evento anterior.
 
 Se usa la fecha, obra social, contexto y reglas del calculo canonico. Antes de estimar, el monto original debe poder reproducirse con las tarifas historicas disponibles y todas las practicas deben tener precio positivo. Si los datos cambiaron, faltan tarifas, hay un duplicado confirmado o la cantidad es manual, se muestra `Pendiente` y su motivo, nunca cero como sustituto de un importe desconocido. Si quedan casos sin confirmar, la estimacion disponible se identifica como parcial. Los casos de P1 sin fuente completa conservan sus snapshots y se validan contra los campos originales disponibles al decidir.
@@ -139,3 +145,7 @@ NetTerm no tiene importador ni cruce implementado en P1. La casilla solo registr
 4. Definir una fase separada para aplicar ajustes autorizados y registrar facturas/debitos reales; P2 solo estima.
 5. Revisar la proteccion contra doble envio del formulario; no asumir que todos los candidatos detectados son errores del usuario.
 6. Disenar la entrada NetTerm y su integracion con los cruces existentes a partir de una muestra anonimizada.
+
+## Verificacion visual registrada
+
+En QA local con SQLite en memoria y registros ficticios se comprobo el filtro de los cinco estados en navegador: `Todos` presento cinco casos; cada estado individual presento el caso esperado. En movil el selector fue visible y la pagina no tuvo desbordamiento horizontal. Pruebas automatizadas Doppler: 31 aprobadas en la integracion del filtro. No se usaron datos productivos ni se ejecutaron migraciones en produccion.
