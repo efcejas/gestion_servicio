@@ -6,6 +6,7 @@ Las funciones retornan buffers (BytesIO) listos para ser enviados como descarga.
 """
 import io
 from datetime import datetime
+from decimal import Decimal
 
 from django.utils import timezone
 from django.db.models import Prefetch, Q
@@ -375,12 +376,20 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     """
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
+    from .services_auditoria import (
+        COLUMNAS_COMPARACION_DOPPLER_MMII,
+        adjuntar_comparacion_doppler_mmii,
+        agregar_hoja_auditoria_doppler_mmii,
+        resumir_comparacion_doppler_mmii,
+        valores_comparacion_doppler_mmii,
+    )
 
     medico_id = medico.id if medico else None
     nombre_medico = f"{medico.first_name}_{medico.last_name}" if medico else "todos_los_medicos"
 
-    registros = RegistroEstudiosPorMedico.objects.filter(anulado=False).prefetch_related(
-        Prefetch('estudio', queryset=Estudios.objects.all())
+    registros = RegistroEstudiosPorMedico.objects.filter(anulado=False).select_related('medico').prefetch_related(
+        Prefetch('estudio', queryset=Estudios.objects.all()),
+        'registroestudio_set',
     ).distinct()
 
     if medico_id:
@@ -400,14 +409,16 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     ws = wb.active
     ws.title = "Liquidación Completa"
 
-    registros = adjuntar_ultima_correccion_pacs(registros.order_by('-fecha_del_informe'))
+    registros = adjuntar_comparacion_doppler_mmii(
+        adjuntar_ultima_correccion_pacs(registros.order_by('-fecha_del_informe')),
+    )
 
     headers_practicas = [
         "Fecha", "Paciente", "DNI", "Estudios",
         "Tipo", "Regiones", "Obra Social", "Horario", "Monto", "Bonus",
         "Ajuste PACS", "Tipo ajuste PACS", "Horario anterior", "Horario nuevo",
         "Monto anterior PACS", "Monto nuevo PACS", "Hora PACS", "Observacion ajuste PACS",
-    ]
+    ] + COLUMNAS_COMPARACION_DOPPLER_MMII
     ws.append(headers_practicas)
 
     for cell in ws[1]:
@@ -444,7 +455,7 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
             float(registro.monto_vigente_correccion_pacs) if correccion else "",
             correccion.hora_pacs.strftime("%H:%M") if correccion and correccion.hora_pacs else "",
             correccion.observacion if correccion else "",
-        ])
+        ] + valores_comparacion_doppler_mmii(registro))
 
         total_regiones += registro.cantidad_regiones
         total_monto_practicas += registro.monto_calculado
@@ -505,11 +516,19 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
         cell.fill = PatternFill(start_color="FFC000", end_color="FFC000", fill_type="solid")
 
     ws.cell(row=total_general_row, column=9).number_format = '$#,##0.00'
+    resumen_doppler = resumir_comparacion_doppler_mmii(registros)
+    ws.append(['Diferencia estimada Doppler no aplicada (excluye residentes)', float(resumen_doppler['diferencia_estimada'])])
+    ws.append(['Diferencia informativa residentes (sin debito)', float(resumen_doppler['diferencia_informativa_residentes'])])
+    ws.append(['Registros con estimacion disponible', resumen_doppler['registros_estimados']])
+    ws.append(['Registros pendientes de estimacion', resumen_doppler['pendientes_estimacion']])
+    agregar_hoja_auditoria_doppler_mmii(wb, registros)
 
     for row in range(2, totales_practicas_row):
         ws.cell(row=row, column=9).number_format = '$#,##0.00'
         ws.cell(row=row, column=15).number_format = '$#,##0.00'
         ws.cell(row=row, column=16).number_format = '$#,##0.00'
+        for columna in (19, 20, 21):
+            ws.cell(row=row, column=columna).number_format = '$#,##0.00'
 
     if guardias.exists() and header_row and totales_guardias_row:
         guardias_start = header_row + 1
@@ -534,3 +553,228 @@ def generar_buffer_excel_liquidacion(medico=None, mes=None, año=None):
     wb.save(buffer)
     buffer.seek(0)
     return buffer, nombre_medico
+
+
+def generar_buffer_excel_mis_registros(*, usuario, mes, año, registros, guardias):
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    from .services_auditoria import (
+        adjuntar_comparacion_doppler_mmii,
+        resumir_comparacion_doppler_mmii,
+        valores_proyeccion_doppler_mmii,
+    )
+
+    residente = usuario.rol == 'medico_residente'
+    registros = adjuntar_comparacion_doppler_mmii(registros)
+    guardias = list(guardias)
+    resumen = resumir_comparacion_doppler_mmii(registros)
+    total_practicas = sum((registro.monto_calculado for registro in registros), Decimal('0.00'))
+    total_guardias = sum((guardia.monto for guardia in guardias), Decimal('0.00'))
+    tiene_credito = not residente and resumen['posible_credito'] > 0
+    wb = Workbook()
+    portada = wb.active
+    portada.title = 'Resumen'
+    practicas = wb.create_sheet('Practicas')
+    headers = [
+        'Fecha informe', 'Fecha carga', 'Paciente', 'DNI', 'Obra social', 'Horario',
+        'Estudios', 'Modalidades', 'Regiones', 'Monto registrado', 'Sesion contable',
+        'Estado sesion', 'Revision Doppler',
+    ]
+    if not residente:
+        headers.append('Posible debito (no aplicado)')
+        if tiene_credito:
+            headers.append('Posible credito (no aplicado)')
+        headers.append('Monto estimado si se corrige')
+    practicas.append(headers)
+    for registro in registros:
+        relaciones = list(registro.registroestudio_set.all())
+        estudios = []
+        modalidades = []
+        for relacion in relaciones:
+            cantidad = f' x{relacion.cantidad}' if relacion.cantidad > 1 else ''
+            contexto = f' ({relacion.get_contexto_display()})' if relacion.contexto else ''
+            estudios.append(f'{relacion.estudio.nombre}{contexto}{cantidad}')
+            modalidades.append(relacion.estudio.get_tipo_display())
+        comparacion = registro.comparacion_doppler
+        estado = comparacion['estado'] if comparacion else 'Sin revision Doppler'
+        if comparacion and comparacion['parcial']:
+            estado += ' (revision parcial)'
+        sesion = registro.sesion_contable
+        fila = [
+            registro.fecha_del_informe.strftime('%d/%m/%Y'),
+            timezone.localtime(registro.fecha_registro).strftime('%d/%m/%Y %H:%M'),
+            f'{registro.apellido_paciente}, {registro.nombre_paciente}', registro.dni_paciente,
+            registro.get_tipo_obra_social_display(), registro.get_horario_display(),
+            '; '.join(estudios), '; '.join(dict.fromkeys(modalidades)), registro.cantidad_regiones,
+            float(registro.monto_calculado), f'{sesion.mes}/{sesion.año}' if sesion else '',
+            sesion.get_estado_display() if sesion else '', estado,
+        ]
+        if not residente:
+            debito, credito, proyectado = valores_proyeccion_doppler_mmii(registro)
+            fila.append(debito)
+            if tiene_credito:
+                fila.append(credito)
+            fila.append(proyectado)
+        practicas.append(fila)
+    ultima_practica = practicas.max_row
+    fila_total = ultima_practica + 1
+    totales = [''] * len(headers)
+    totales[7] = 'Totales'
+    totales[8] = f'=SUM(I2:I{ultima_practica})' if registros else 0
+    totales[9] = f'=SUM(J2:J{ultima_practica})' if registros else 0
+    if not residente:
+        totales[13] = float(resumen['posible_debito'])
+        if tiene_credito:
+            totales[14] = float(resumen['posible_credito'])
+        totales[-1] = float(resumen['monto_proyectado_practicas'])
+    practicas.append(totales)
+
+    hoja_guardias = wb.create_sheet('Guardias')
+    hoja_guardias.append(['Fecha', 'Tipo', 'Monto registrado', 'Observaciones'])
+    for guardia in guardias:
+        hoja_guardias.append([
+            guardia.fecha_guardia.strftime('%d/%m/%Y'), guardia.get_tipo_guardia_display(),
+            float(guardia.monto), guardia.observaciones,
+        ])
+    hoja_guardias.append(['', 'Total guardias', float(total_guardias), ''])
+
+    revision = wb.create_sheet('Revision Doppler')
+    revision_headers = [
+        'Fecha', 'Registro', 'Paciente', 'Estudio', 'Cantidad registrada',
+        'Cantidad segun regla', 'Estado', 'Observacion', 'Revisado por', 'Fecha revision',
+    ]
+    if not residente:
+        revision_headers += ['Monto actual del registro', 'Posible debito', 'Monto estimado del registro']
+    revision_headers.append('Fuentes verificadas')
+    revision.append(revision_headers)
+    for registro in registros:
+        for indice, caso in enumerate(registro.auditorias_doppler_mmii):
+            snapshot = caso.datos_originales_json
+            fila = [
+                registro.fecha_del_informe.strftime('%d/%m/%Y'), registro.pk,
+                f'{registro.apellido_paciente}, {registro.nombre_paciente}', snapshot.get('estudio'),
+                snapshot.get('cantidad_declarada'), snapshot.get('cantidad_esperada', 'Pendiente'),
+                caso.get_estado_display(), caso.observacion,
+                (caso.revisado_por.get_full_name() or caso.revisado_por.username) if caso.revisado_por else '',
+                timezone.localtime(caso.fecha_revision).strftime('%d/%m/%Y %H:%M') if caso.fecha_revision else '',
+            ]
+            if not residente:
+                debito, credito, proyectado = valores_proyeccion_doppler_mmii(registro)
+                fila += [float(registro.monto_calculado), debito, proyectado] if indice == 0 else ['', '', '']
+            fila.append('; '.join(
+                nombre for campo, nombre in (
+                    ('orden_medica_verificada', 'Orden medica'),
+                    ('visualmedical_verificado', 'VisualMedical'),
+                    ('eges_verificado', 'EGES'), ('netterm_verificado', 'NetTerm'),
+                ) if getattr(caso, campo)
+            ))
+            revision.append(fila)
+
+    nombre = usuario.get_full_name() or usuario.username
+    meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    portada.append(['Liquidacion del periodo'])
+    portada.append([nombre])
+    portada.append([f'{meses[mes - 1]} {año} | {"Residente" if residente else usuario.get_rol_display()}'])
+    portada.append([])
+    portada.append(['Practicas · todas las modalidades', float(total_practicas), f'{len(registros)} registros'])
+    portada.append(['Guardias', float(total_guardias), f'{len(guardias)} guardias'])
+    portada.append(['TOTAL ACTUAL', float(total_practicas + total_guardias), 'Importe registrado'])
+    portada.append([])
+    if residente:
+        portada.append(['Revision Doppler', 'Informativa: no modifica tu liquidacion.'])
+        portada.append(['Registros con revision', resumen['registros_auditados']])
+        portada.append(['El detalle de cantidades y observaciones esta en la hoja Revision Doppler.'])
+    else:
+        portada.append(['POSIBLE DEBITO', float(resumen['posible_debito']), 'Aun no aplicado'])
+        if tiene_credito:
+            portada.append(['Posible credito', float(resumen['posible_credito']), 'Aun no aplicado'])
+        portada.append(['TOTAL ESTIMADO SI SE CORRIGE', float(resumen['monto_proyectado_practicas'] + total_guardias)])
+        if resumen['pendientes_economicos']:
+            portada.append([f'Estimacion parcial: {resumen["pendientes_economicos"]} registros con revision pendiente.'])
+        elif not resumen['registros_auditados']:
+            portada.append(['Sin revisiones Doppler registradas; no se proponen ajustes.'])
+        else:
+            portada.append(['Estimacion de las cantidades confirmadas. No se aplicaron ajustes.'])
+        portada.append(['Revisa la hoja Revision Doppler para conocer los casos y sus fundamentos.'])
+    portada.append([])
+    portada.append(['Incluye todos tus registros vigentes y guardias del mes, de todas las modalidades.'])
+    portada.append(['Los importes registrados no acreditan facturacion ni pago.'])
+
+    for hoja in (practicas, hoja_guardias, revision):
+        hoja.freeze_panes = 'A2'
+        ultima_fila_datos = hoja.max_row - 1 if hoja != revision else hoja.max_row
+        hoja.auto_filter.ref = f'A1:{get_column_letter(hoja.max_column)}{max(1, ultima_fila_datos)}'
+        for celda in hoja[1]:
+            celda.font = Font(bold=True, color='FFFFFF')
+            celda.fill = PatternFill('solid', fgColor='334155')
+            celda.alignment = Alignment(vertical='center', wrap_text=True)
+        hoja.row_dimensions[1].height = 32
+        for fila in hoja.iter_rows(min_row=2):
+            for celda in fila:
+                celda.alignment = Alignment(vertical='top', wrap_text=True)
+                if isinstance(celda.value, str) and celda.data_type == 'f' and not (
+                    hoja == practicas and celda.row == fila_total and celda.column in (9, 10)
+                ):
+                    celda.data_type = 's'
+        for columna in hoja.columns:
+            hoja.column_dimensions[get_column_letter(columna[0].column)].width = min(
+                max(len(str(celda.value or '')) for celda in columna) + 2, 44,
+            )
+        hoja.sheet_view.showGridLines = False
+        hoja.sheet_properties.pageSetUpPr.fitToPage = True
+        hoja.page_setup.orientation = 'landscape'
+        hoja.page_setup.paperSize = hoja.PAPERSIZE_A4
+        hoja.page_setup.fitToWidth = 1
+        hoja.page_setup.fitToHeight = 0
+        hoja.print_title_rows = '1:1'
+    for fila in practicas.iter_rows(min_row=2):
+        for celda in fila:
+            if celda.column == 10 or (not residente and celda.column >= 14):
+                celda.number_format = '$#,##0.00'
+    for fila in hoja_guardias.iter_rows(min_row=2):
+        fila[2].number_format = '$#,##0.00'
+    if not residente:
+        for fila in revision.iter_rows(min_row=2, min_col=11, max_col=13):
+            for celda in fila:
+                celda.number_format = '$#,##0.00'
+    for columna in ('B', 'K', 'L'):
+        practicas.column_dimensions[columna].hidden = True
+    for hoja, numero in ((practicas, fila_total), (hoja_guardias, hoja_guardias.max_row)):
+        for celda in hoja[numero]:
+            celda.font = Font(bold=True)
+            celda.fill = PatternFill('solid', fgColor='E2E8F0')
+
+    portada.column_dimensions['A'].width = 42
+    portada.column_dimensions['B'].width = 28
+    portada.column_dimensions['C'].width = 28
+    portada.sheet_view.showGridLines = False
+    portada.print_options.horizontalCentered = True
+    portada.print_area = f'A1:C{portada.max_row}'
+    portada.page_setup.paperSize = portada.PAPERSIZE_A4
+    portada.page_setup.fitToWidth = 1
+    portada.page_setup.fitToHeight = 1
+    portada.sheet_properties.pageSetUpPr.fitToPage = True
+    for numero in range(1, portada.max_row + 1):
+        portada.row_dimensions[numero].height = 25
+        for celda in portada[numero]:
+            celda.font = Font(name='Calibri', size=11)
+            celda.alignment = Alignment(vertical='center', wrap_text=True)
+        if numero <= 3 or (numero >= 11 and portada.cell(numero, 2).value is None):
+            portada.merge_cells(start_row=numero, start_column=1, end_row=numero, end_column=3)
+        if isinstance(portada.cell(numero, 2).value, (int, float)) and not (residente and numero == 10):
+            portada.cell(numero, 2).number_format = '$#,##0.00'
+        if numero == 1:
+            portada.cell(numero, 1).font = Font(name='Calibri', size=16, bold=True)
+            portada.row_dimensions[numero].height = 32
+        if portada.cell(numero, 1).value in {'TOTAL ACTUAL', 'POSIBLE DEBITO', 'TOTAL ESTIMADO SI SE CORRIGE'}:
+            portada.row_dimensions[numero].height = 36
+            color = 'E2E8F0' if numero == 7 else 'FEF3C7'
+            for celda in portada[numero]:
+                celda.font = Font(name='Calibri', size=12, bold=True)
+                celda.fill = PatternFill('solid', fgColor=color)
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer

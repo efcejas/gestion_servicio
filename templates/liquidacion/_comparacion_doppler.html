@@ -1,0 +1,14 @@
+{% if comparacion %}
+<div class="min-w-[210px] text-left text-xs leading-relaxed text-slate-700">
+    <p class="font-semibold">{{ comparacion.estado }}</p>
+    <dl class="mt-1">
+        <div class="flex justify-between gap-3"><dt>Original auditoría</dt><dd class="font-semibold">{% if comparacion.monto_original != None %}${{ comparacion.monto_original|floatformat:2 }}{% else %}Pendiente{% endif %}</dd></div>
+        <div class="flex justify-between gap-3"><dt>Estimado</dt><dd class="font-semibold">{% if comparacion.monto_estimado != None %}${{ comparacion.monto_estimado|floatformat:2 }}{% else %}Pendiente{% endif %}</dd></div>
+        <div class="flex justify-between gap-3"><dt>Diferencia estimada</dt><dd class="font-semibold">{% if comparacion.diferencia_estimada != None %}${{ comparacion.diferencia_estimada|floatformat:2 }}{% else %}Pendiente{% endif %}</dd></div>
+    </dl>
+    {% if comparacion.monto_estimado == None %}<p class="mt-1 text-amber-800">{{ comparacion.motivo }}</p>{% elif comparacion.parcial %}<p class="mt-1 text-amber-800">Parcial: sólo cantidades confirmadas.</p>{% endif %}
+    <p class="mt-1 font-semibold">{% if comparacion.informativo_residente %}Informativo para residentes; sin propuesta de débito.{% else %}Débito Doppler: no aplicado.{% endif %}</p>
+</div>
+{% else %}
+<span class="text-xs font-normal text-slate-400">Sin auditoría Doppler</span>
+{% endif %}

@@ -1027,7 +1027,7 @@ class RegistroEstudiosPorMedico(models.Model):
     def __str__(self):
         return f'{self.medico} - {self.fecha_registro}'
     
-    def calcular_monto(self):
+    def calcular_monto(self, *, cantidades_auditoria=None):
         """
         Calcula el monto a facturar por esta práctica.
         v3.2 - Mayo 2026: Factor INTRA diferenciado por rol y tipo de estudio.
@@ -1068,7 +1068,7 @@ class RegistroEstudiosPorMedico(models.Model):
         
         for rel in relaciones:
             estudio = rel.estudio
-            cantidad = rel.cantidad
+            cantidad = (cantidades_auditoria or {}).get(rel.pk, rel.cantidad)
 
             precio_estudio = estudio.precio_para_os(
                 self.tipo_obra_social,
@@ -1690,6 +1690,7 @@ class RevisionAuditoriaDopplerMMII(models.Model):
     registro_estudio_id_origen = models.PositiveIntegerField()
     version_regla = models.CharField(max_length=40, default=VERSION_REGLA_V1)
     datos_originales_json = models.JSONField(default=dict)
+    estimacion_json = models.JSONField(default=dict, blank=True)
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -1746,6 +1747,7 @@ class HistorialRevisionAuditoriaDopplerMMII(models.Model):
         related_name='historial',
     )
     estado_anterior = models.CharField(max_length=24, blank=True)
+    estimacion_json = models.JSONField(default=dict, blank=True)
     estado_nuevo = models.CharField(
         max_length=24,
         choices=RevisionAuditoriaDopplerMMII.ESTADO_CHOICES,

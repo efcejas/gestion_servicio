@@ -149,6 +149,7 @@
                             <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide" style="min-width: 180px;">
                                 <i class="fas fa-clipboard-check mr-1"></i>Ajuste PACS
                             </th>
+                            <th class="px-4 py-3 text-left text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Comparación Doppler</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -233,6 +234,7 @@
                                 <span class="text-slate-400">-</span>
                                 {% endif %}
                             </td>
+                            <td class="px-4 py-3 align-top">{% include 'liquidacion/_comparacion_doppler.html' with comparacion=registro.comparacion_doppler only %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -252,6 +254,13 @@
                                 </span>
                             </td>
                             <td></td>
+                            <td class="px-4 py-4 text-xs font-normal text-slate-700">
+                                {% if data.resumen_doppler.registros_auditados %}
+                                Diferencia estimada no aplicada: ${{ data.resumen_doppler.diferencia_estimada|floatformat:2 }}.
+                                {% if data.resumen_doppler.diferencia_informativa_residentes %}<span class="block">Informativa residentes (sin débito): ${{ data.resumen_doppler.diferencia_informativa_residentes|floatformat:2 }}.</span>{% endif %}
+                                <span class="block">{{ data.resumen_doppler.registros_estimados }} registros estimados; {{ data.resumen_doppler.pendientes_estimacion }} pendientes.</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     </tfoot>
                 </table>

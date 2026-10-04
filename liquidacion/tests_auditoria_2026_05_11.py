@@ -922,10 +922,10 @@ class PermisosYTrazabilidadViewTest(TestCase):
         self.assertEqual(practicas['I3'].value, '=SUM(I2:I2)')
         self.assertEqual(practicas['J3'].value, '=SUM(J2:J2)')
         resumen = workbook['Resumen']
-        self.assertEqual(resumen['A5'].value, 'Monto practicas')
-        self.assertEqual(resumen['B5'].value, '=Practicas!J3')
-        self.assertEqual(resumen['A8'].value, 'Total')
-        self.assertEqual(resumen['B8'].value, '=B5+B7')
+        self.assertEqual(resumen['A5'].value, 'Practicas · todas las modalidades')
+        self.assertIsInstance(resumen['B5'].value, (int, float))
+        self.assertEqual(resumen['A7'].value, 'TOTAL ACTUAL')
+        self.assertEqual(resumen['B7'].value, resumen['B5'].value + resumen['B6'].value)
 
     def test_bandeja_revision_horario_permite_administrativo(self):
         self.client.force_login(self.admin)

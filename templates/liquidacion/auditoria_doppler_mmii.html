@@ -12,7 +12,7 @@
 
     <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
         <p class="font-semibold">Revisión sin ajustes económicos</p>
-        <p class="mt-1">No modifica cantidades, regiones ni montos; tampoco calcula un débito. El monto mostrado es el que actualmente figura en el registro.</p>
+        <p class="mt-1">No modifica cantidades, regiones ni montos. Las estimaciones de cantidades confirmadas no son débitos aplicados; el monto vigente sigue siendo el registrado.</p>
         <p class="mt-1">Residentes: informativo, sin propuesta de débito. Jefes, instructores y otros profesionales: impacto potencial pendiente de revisión.</p>
         <p class="mt-1">Un posible duplicado comparte profesional, DNI, fecha y tipo Doppler; es un candidato para revisar contra la orden y VisualMedical, no una confirmación automática.</p>
     </div>
@@ -59,6 +59,26 @@
     </form>
     {% endif %}
 
+    <form id="doppler-lote" method="post" action="{% url 'liquidacion:auditoria_doppler_mmii_confirmar_lote' %}" class="mb-4 border-y border-slate-200 py-4">
+        {% csrf_token %}
+        <input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">
+        <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">
+        <input type="hidden" name="profesional" value="{{ profesional_actual }}">
+        <input type="hidden" name="solo_diferencias" value="{% if solo_diferencias %}1{% else %}0{% endif %}">
+        <input type="hidden" name="page" value="{{ resultados.number }}">
+        <h2 class="text-base font-semibold text-slate-900">Confirmar regla bilateral · 2 → 1 práctica</h2>
+        <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-700">
+            <label class="inline-flex items-center gap-2"><input id="doppler-seleccionar-pagina" type="checkbox" class="rounded border-slate-300"> Elegibles de esta página</label>
+            <span id="doppler-seleccion-contador" role="status" aria-live="polite">0 seleccionados</span>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" name="orden_medica_verificada" class="rounded border-slate-300"> Órdenes verificadas del lote</label>
+            <label class="inline-flex items-center gap-2"><input type="checkbox" name="visualmedical_verificado" class="rounded border-slate-300"> VisualMedical verificado del lote</label>
+        </div>
+        <label class="mt-3 block text-sm font-semibold text-slate-700">Fundamento común
+            <textarea name="observacion" required maxlength="2000" rows="2" class="mt-1 w-full rounded-md border border-slate-300 p-2 font-normal"></textarea>
+        </label>
+        <button id="doppler-confirmar-lote" type="submit" disabled class="mt-2 inline-flex items-center gap-2 rounded-md bg-indigo-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><i class="fas fa-check" aria-hidden="true"></i> Confirmar seleccionados</button>
+    </form>
+
     <div class="mb-3 flex flex-wrap items-center gap-4 text-sm text-slate-600">
         <span>Registros candidatos: <strong class="text-slate-900">{{ auditoria.total_registros }}</strong></span>
         <span>Con diferencia/manual: <strong class="text-slate-900">{{ auditoria.total_con_diferencia }}</strong></span>
@@ -66,15 +86,16 @@
     </div>
 
     <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-        <table class="w-full min-w-[1240px] table-fixed divide-y divide-slate-200 text-sm" style="width: 100%; min-width: 1240px; table-layout: fixed;">
+        <table class="w-full min-w-[1500px] table-fixed divide-y divide-slate-200 text-sm" style="width: 100%; min-width: 1500px; table-layout: fixed;">
             <colgroup>
-            <col style="width: 14%;">
-            <col style="width: 15%;">
-            <col style="width: 32%;">
             <col style="width: 11%;">
-            <col style="width: 10%;">
+            <col style="width: 12%;">
+            <col style="width: 28%;">
             <col style="width: 9%;">
-            <col style="width: 9%;">
+            <col style="width: 7%;">
+            <col style="width: 8%;">
+            <col style="width: 17%;">
+            <col style="width: 8%;">
             </colgroup>
             <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
                 <tr>
@@ -84,6 +105,7 @@
                     <th class="px-3 py-2">Prácticas totales</th>
                     <th class="px-3 py-2">Regiones · referencia</th>
                     <th class="px-3 py-2">Monto registrado</th>
+                    <th class="px-3 py-2">Comparación Doppler</th>
                     <th class="px-3 py-2">Tratamiento</th>
                 </tr>
             </thead>
@@ -121,6 +143,12 @@
                                     {% endif %}
                                     {% if estudio.revision_auditoria %}
                                     {% with caso=estudio.revision_auditoria snapshot=estudio.revision_auditoria.datos_originales_json %}
+                                    {% if estudio.permite_lote %}
+                                    <label class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-indigo-900">
+                                        <input type="checkbox" name="casos" value="{{ caso.pk }}" form="doppler-lote" data-doppler-caso class="rounded border-indigo-300">
+                                        Seleccionar caso #{{ caso.pk }} · 2 → 1
+                                    </label>
+                                    {% endif %}
                                     <div class="mt-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-xs text-indigo-950">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <span class="font-semibold">Revisión persistida: {{ caso.get_estado_display }}</span>
@@ -142,7 +170,10 @@
                                             <summary class="cursor-pointer font-semibold">Historial de decisiones ({{ caso.historial.count }})</summary>
                                             <ul class="mt-1 space-y-1">
                                                 {% for evento in caso.historial.all %}
-                                                <li>{{ evento.fecha_revision|date:"d/m/Y H:i" }} · {{ evento.get_estado_nuevo_display }} · {{ evento.revisado_por.get_full_name|default:evento.revisado_por.username }} · {{ evento.observacion }}</li>
+                                                <li>
+                                                    {{ evento.fecha_revision|date:"d/m/Y H:i" }} · {{ evento.get_estado_nuevo_display }} · {{ evento.revisado_por.get_full_name|default:evento.revisado_por.username }} · {{ evento.observacion }}
+                                                    {% if evento.estimacion_json.monto_estimado != None %}<span class="block">Estimado del registro en esta decisión: ${{ evento.estimacion_json.monto_estimado|floatformat:2 }}{% if evento.estimacion_json.parcial %} · parcial{% endif %}.</span>{% endif %}
+                                                </li>
                                                 {% endfor %}
                                             </ul>
                                         </details>
@@ -153,6 +184,7 @@
                                             <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">
                                             <input type="hidden" name="profesional" value="{{ profesional_actual }}">
                                             <input type="hidden" name="solo_diferencias" value="{% if solo_diferencias %}1{% else %}0{% endif %}">
+                                            <input type="hidden" name="page" value="{{ resultados.number }}">
                                             <label class="block font-semibold">Decisión del auditor
                                                 <select name="decision" class="mt-1 h-9 w-full rounded border border-indigo-300 bg-white px-2 text-xs">
                                                     <option value="CONFIRMADO" {% if caso.estado == 'CONFIRMADO' %}selected{% endif %}>Confirmar diferencia</option>
@@ -195,10 +227,11 @@
                             <div class="mt-1 text-slate-500">Dato del registro; no define por sí solo las prácticas pagables.</div>
                         </td>
                         <td class="break-words px-3 py-3 font-medium text-slate-900">${{ registro.monto_registrado|floatformat:2 }}</td>
+                        <td class="px-3 py-3">{% include 'liquidacion/_comparacion_doppler.html' with comparacion=registro.comparacion_doppler only %}</td>
                         <td class="break-words px-3 py-3 text-xs text-slate-700">{{ registro.tratamiento_economico_display }}</td>
                     </tr>
                 {% empty %}
-                <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No se encontraron estudios Doppler MMII para esos filtros.</td></tr>
+                <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500">No se encontraron estudios Doppler MMII para esos filtros.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -214,4 +247,30 @@
     </div>
     {% endif %}
 </div>
+<script>
+    const dopplerCasos = Array.from(document.querySelectorAll('[data-doppler-caso]'));
+    const dopplerPagina = document.getElementById('doppler-seleccionar-pagina');
+    const dopplerContador = document.getElementById('doppler-seleccion-contador');
+    const dopplerConfirmar = document.getElementById('doppler-confirmar-lote');
+    function actualizarSeleccionDoppler() {
+        const seleccionados = dopplerCasos.filter(caso => caso.checked).length;
+        dopplerContador.textContent = `${seleccionados} seleccionados`;
+        dopplerConfirmar.disabled = seleccionados === 0 || seleccionados > 200;
+        dopplerPagina.checked = dopplerCasos.length > 0 && seleccionados === dopplerCasos.length;
+        dopplerPagina.indeterminate = seleccionados > 0 && seleccionados < dopplerCasos.length;
+    }
+    dopplerPagina.disabled = dopplerCasos.length === 0;
+    dopplerPagina.addEventListener('change', () => {
+        dopplerCasos.forEach(caso => { caso.checked = dopplerPagina.checked; });
+        actualizarSeleccionDoppler();
+    });
+    dopplerCasos.forEach(caso => caso.addEventListener('change', actualizarSeleccionDoppler));
+    document.getElementById('doppler-lote').addEventListener('submit', evento => {
+        const seleccionados = dopplerCasos.filter(caso => caso.checked).length;
+        if (!window.confirm(`Confirmar ${seleccionados} casos con la evidencia y fundamento indicados, sin aplicar débitos?`)) {
+            evento.preventDefault();
+        }
+    });
+    actualizarSeleccionDoppler();
+</script>
 {% endblock %}

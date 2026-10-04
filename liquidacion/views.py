@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
 from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField, prefetch_related_objects
 from django.utils.dateparse import parse_date
 from django.db import transaction
@@ -52,6 +53,9 @@ from .grupo_tarifario_mapping import (
 )
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import (
+    adjuntar_comparacion_doppler_mmii,
+    confirmar_lote_auditoria_doppler_mmii,
+    resumir_comparacion_doppler_mmii,
     adjuntar_revisiones_auditoria_doppler_mmii,
     evaluar_gate_consistencia_sesion,
     auditar_cantidad_doppler_mmii,
@@ -76,6 +80,7 @@ from .forms import (
     RevisionAuditoriaEcoRegistroForm,
     RevisionAuditoriaEcoBulkForm,
     RevisionAuditoriaDopplerMMIIForm,
+    ConfirmacionLoteDopplerMMIIForm,
     RevisionCruceEgesRegistroForm,
     RevisionCruceEgesBulkValidarForm,
     CorreccionPacsRegistroForm,
@@ -1456,6 +1461,14 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
                 )
 
         pagina = Paginator(resultados, 100).get_page(self.request.GET.get('page'))
+        registros_comparados = adjuntar_comparacion_doppler_mmii(
+            RegistroEstudiosPorMedico.objects.filter(
+                pk__in=[item['registro_id'] for item in pagina],
+            ).select_related('medico').prefetch_related('registroestudio_set'),
+        )
+        comparaciones = {registro.pk: registro.comparacion_doppler for registro in registros_comparados}
+        for item in pagina:
+            item['comparacion_doppler'] = comparaciones.get(item['registro_id'])
         context.update({
             'auditoria': auditoria,
             'resultados': pagina,
@@ -1566,6 +1579,44 @@ class AuditoriaDopplerMMIIRevisionView(LoginRequiredMixin, UserPassesTestMixin, 
             request,
             f"Decision guardada para el caso #{caso.pk}; no se aplicaron cambios economicos.",
         )
+        return redirect(redirect_url)
+
+
+class AuditoriaDopplerMMIILoteView(AuditoriaDopplerMMIIRevisionView):
+    def post(self, request, *args, **kwargs):
+        redirect_url = _url_auditoria_doppler_con_filtros(request.POST)
+        datos_post = request.POST.copy()
+        datos_post['decision'] = RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO
+        ids = request.POST.getlist('casos')
+        if not ids or len(ids) > 200 or any(not valor.isdigit() for valor in ids):
+            messages.error(request, 'Selecciona entre 1 y 200 casos validos.')
+            return redirect(redirect_url)
+        form = ConfirmacionLoteDopplerMMIIForm(
+            datos_post,
+            caso_choices=[(str(pk), str(pk)) for pk in RevisionAuditoriaDopplerMMII.objects.filter(
+                pk__in=[int(valor) for valor in ids],
+            ).values_list('pk', flat=True)],
+        )
+        if not form.is_valid():
+            messages.error(request, '; '.join(mensaje for errores in form.errors.values() for mensaje in errores))
+            return redirect(redirect_url)
+        datos = form.cleaned_data
+        try:
+            total = confirmar_lote_auditoria_doppler_mmii(
+                caso_ids=[int(valor) for valor in datos['casos']],
+                fecha_desde=datos['fecha_desde'], fecha_hasta=datos['fecha_hasta'],
+                medico_id=datos['profesional'], usuario=request.user,
+                observacion=datos['observacion'], evidencias={
+                    nombre: datos[nombre] for nombre in (
+                        'orden_medica_verificada', 'visualmedical_verificado',
+                        'eges_verificado', 'netterm_verificado',
+                    )
+                },
+            )
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+            return redirect(redirect_url)
+        messages.success(request, f'{total} casos confirmados con historial. No se aplicaron debitos ni cambios de monto.')
         return redirect(redirect_url)
 
 
@@ -3806,7 +3857,10 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
         context['modalidades_clear_query'] = params_clear_modalidades.urlencode()
 
         # Lista unificada para tabla principal
-        registros_tabla = adjuntar_ultima_correccion_pacs(registros.distinct())
+        registros_tabla = adjuntar_comparacion_doppler_mmii(
+            adjuntar_ultima_correccion_pacs(registros.select_related('medico').distinct()),
+        )
+        context['resumen_doppler'] = resumir_comparacion_doppler_mmii(registros_tabla)
 
         # Los anulados siguen visibles, pero no integran cantidades ni montos.
         registros_vigentes = [reg for reg in registros_tabla if not reg.anulado]
@@ -3839,21 +3893,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
             if revision.registro_id not in ultima_revision_por_registro:
                 ultima_revision_por_registro[revision.registro_id] = revision
 
-        auditorias_doppler_por_registro = defaultdict(list)
-        auditorias_doppler = (
-            RevisionAuditoriaDopplerMMII.objects
-            .filter(
-                registro_id__in=registros_ids,
-                version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
-            )
-            .select_related('revisado_por')
-            .order_by('registro_id', 'registro_estudio_id_origen')
-        )
-        for auditoria_doppler in auditorias_doppler:
-            auditorias_doppler_por_registro[auditoria_doppler.registro_id].append(
-                auditoria_doppler,
-            )
-
         for registro in registros_tabla:
             registro.detalle_monto = (
                 registro.get_desglose_monto_administrativo()
@@ -3873,10 +3912,6 @@ class RegistroEstudiosPorMedicoListView(LoginRequiredMixin, TemplateView):
 
             revision = ultima_revision_por_registro.get(registro.id)
             registro.revision_info = revision
-            registro.auditorias_doppler_mmii = auditorias_doppler_por_registro.get(
-                registro.id,
-                [],
-            )
             registro.tiene_revision = revision is not None
             registro.revision_badge_label = ''
             registro.revision_badge_classes = ''
@@ -3979,7 +4014,7 @@ def _get_periodo_registros_personales(request):
     return mes, año
 
 
-def _get_registros_personales_filtrados(request):
+def _get_registros_personales_filtrados(request, *, incluir_todo_periodo=False):
     mes, año = _get_periodo_registros_personales(request)
     registros = (
         RegistroEstudiosPorMedico.objects
@@ -4003,17 +4038,17 @@ def _get_registros_personales_filtrados(request):
         if modalidad in modalidades_validas
     ]
 
-    if busqueda:
+    if busqueda and not incluir_todo_periodo:
         registros = registros.filter(
             Q(nombre_paciente__icontains=busqueda)
             | Q(apellido_paciente__icontains=busqueda)
             | Q(dni_paciente__icontains=busqueda)
         )
 
-    if filtro_rapido == 'hoy':
+    if filtro_rapido == 'hoy' and not incluir_todo_periodo:
         registros = registros.filter(fecha_registro__date=date.today())
 
-    if modalidades_seleccionadas:
+    if modalidades_seleccionadas and not incluir_todo_periodo:
         registros = registros.filter(estudio__tipo__in=modalidades_seleccionadas).distinct()
 
     if orden == 'fecha_asc':
@@ -4036,158 +4071,21 @@ def _get_registros_personales_filtrados(request):
 
 @login_required
 def exportar_excel_mis_registros(request):
-    mes, año, registros, guardias = _get_registros_personales_filtrados(request)
-    registros = list(registros)
-    guardias = list(guardias)
+    from .services import generar_buffer_excel_mis_registros
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = 'Practicas'
-    ws.append([
-        'Fecha informe',
-        'Fecha carga',
-        'Paciente',
-        'DNI',
-        'Obra social',
-        'Horario',
-        'Estudios',
-        'Modalidades',
-        'Cantidad regiones',
-        'Monto calculado',
-        'Sesion contable',
-        'Estado sesion',
-    ])
-
-    for registro in registros:
-        relaciones = list(registro.registroestudio_set.all())
-        estudios = []
-        modalidades = []
-        for rel in relaciones:
-            estudio = rel.estudio
-            cantidad = f' x{rel.cantidad}' if rel.cantidad and rel.cantidad > 1 else ''
-            contexto = f' ({rel.get_contexto_display()})' if rel.contexto else ''
-            estudios.append(f'{estudio.nombre}{contexto}{cantidad}')
-            modalidades.append(estudio.get_tipo_display())
-
-        sesion = registro.sesion_contable
-        ws.append([
-            registro.fecha_del_informe.strftime('%d/%m/%Y') if registro.fecha_del_informe else '',
-            registro.fecha_registro.strftime('%d/%m/%Y %H:%M') if registro.fecha_registro else '',
-            f'{registro.apellido_paciente}, {registro.nombre_paciente}',
-            registro.dni_paciente,
-            registro.get_tipo_obra_social_display(),
-            registro.get_horario_display(),
-            '; '.join(estudios),
-            '; '.join(dict.fromkeys(modalidades)),
-            registro.cantidad_regiones,
-            float(registro.monto_calculado or 0),
-            f'{sesion.mes}/{sesion.año}' if sesion else '',
-            sesion.get_estado_display() if sesion else '',
-        ])
-
-    primera_fila_practicas = 2
-    ultima_fila_practicas = ws.max_row
-    tiene_practicas = ultima_fila_practicas >= primera_fila_practicas
-    fila_total_practicas = ultima_fila_practicas + 1
-    ws.append([
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        '',
-        'Totales',
-        f'=SUM(I{primera_fila_practicas}:I{ultima_fila_practicas})' if tiene_practicas else 0,
-        f'=SUM(J{primera_fila_practicas}:J{ultima_fila_practicas})' if tiene_practicas else 0,
-        '',
-        '',
-    ])
-
-    ws_guardias = wb.create_sheet('Guardias')
-    ws_guardias.append(['Fecha guardia', 'Tipo', 'Monto', 'Observaciones'])
-    for guardia in guardias:
-        ws_guardias.append([
-            guardia.fecha_guardia.strftime('%d/%m/%Y') if guardia.fecha_guardia else '',
-            guardia.get_tipo_guardia_display(),
-            float(guardia.monto or 0),
-            guardia.observaciones,
-        ])
-
-    primera_fila_guardias = 2
-    ultima_fila_guardias = ws_guardias.max_row
-    tiene_guardias = ultima_fila_guardias >= primera_fila_guardias
-    fila_total_guardias = ultima_fila_guardias + 1
-    ws_guardias.append([
-        '',
-        'Totales',
-        f'=SUM(C{primera_fila_guardias}:C{ultima_fila_guardias})' if tiene_guardias else 0,
-        '',
-    ])
-
-    ws_resumen = wb.create_sheet('Resumen')
-    total_practicas = sum((registro.monto_calculado or Decimal('0.00')) for registro in registros)
-    total_guardias = sum((guardia.monto or Decimal('0.00')) for guardia in guardias)
-    ws_resumen.append(['Profesional', request.user.get_full_name() or request.user.username])
-    ws_resumen.append(['Periodo', f'{mes}/{año}'])
-    ws_resumen.append([
-        'Cantidad practicas',
-        f'=COUNTA(Practicas!C{primera_fila_practicas}:C{ultima_fila_practicas})' if tiene_practicas else 0,
-    ])
-    ws_resumen.append(['Regiones practicas', f'=Practicas!I{fila_total_practicas}'])
-    ws_resumen.append(['Monto practicas', f'=Practicas!J{fila_total_practicas}'])
-    ws_resumen.append([
-        'Cantidad guardias',
-        f'=COUNTA(Guardias!A{primera_fila_guardias}:A{ultima_fila_guardias})' if tiene_guardias else 0,
-    ])
-    ws_resumen.append(['Monto guardias', f'=Guardias!C{fila_total_guardias}'])
-    ws_resumen.append(['Total', '=B5+B7'])
-    ws_resumen.append(['Monto practicas persistido', float(total_practicas)])
-    ws_resumen.append(['Monto guardias persistido', float(total_guardias)])
-    ws_resumen.append(['Total persistido', float(total_practicas + total_guardias)])
-
-    for sheet in wb.worksheets:
-        for row in sheet.iter_rows():
-            for cell in row:
-                cell.alignment = Alignment(vertical='top', wrap_text=True)
-        for column_cells in sheet.columns:
-            column_letter = get_column_letter(column_cells[0].column)
-            sheet.column_dimensions[column_letter].width = min(
-                max(len(str(cell.value or '')) for cell in column_cells) + 2,
-                45,
-            )
-        for cell in sheet[1]:
-            cell.font = Font(bold=True)
-        if sheet.title == 'Practicas':
-            for cell in sheet[fila_total_practicas]:
-                cell.font = Font(bold=True)
-            for row in sheet.iter_rows(min_row=2, min_col=9, max_col=10):
-                for cell in row:
-                    cell.number_format = '$#,##0.00' if cell.column == 10 else '#,##0'
-        elif sheet.title == 'Guardias':
-            for cell in sheet[fila_total_guardias]:
-                cell.font = Font(bold=True)
-            for row in sheet.iter_rows(min_row=2, min_col=3, max_col=3):
-                for cell in row:
-                    cell.number_format = '$#,##0.00'
-        elif sheet.title == 'Resumen':
-            for cell in sheet['A']:
-                cell.font = Font(bold=True)
-            for row_number in [5, 7, 8, 9, 10, 11]:
-                sheet[f'B{row_number}'].number_format = '$#,##0.00'
-            for row_number in [3, 4, 6]:
-                sheet[f'B{row_number}'].number_format = '#,##0'
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
+    mes, año, registros, guardias = _get_registros_personales_filtrados(request, incluir_todo_periodo=True)
+    buffer = generar_buffer_excel_mis_registros(
+        usuario=request.user, mes=mes, año=año,
+        registros=registros.select_related('medico'), guardias=guardias,
+    )
 
     username = ''.join(char for char in request.user.username if char.isalnum() or char in ('-', '_'))
     response = HttpResponse(
         buffer.read(),
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
-    response['Content-Disposition'] = f'attachment; filename="mis_registros_{username}_{mes}_{año}.xlsx"'
+    perfil = 'residente' if request.user.rol == 'medico_residente' else 'profesional'
+    response['Content-Disposition'] = f'attachment; filename="mis_registros_{perfil}_{username}_{mes}_{año}.xlsx"'
     return response
 
 
@@ -4660,7 +4558,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                 guardias = guardias.filter(fecha_guardia__year=int(año), fecha_guardia__month=int(mes))
 
             # Agrupar registros por médico
-            for registro in registros.order_by('-fecha_del_informe'):
+            for registro in adjuntar_comparacion_doppler_mmii(registros.order_by('-fecha_del_informe')):
                 registros_por_medico[registro.medico].append(registro)
             
             # Agrupar guardias por médico
@@ -4730,6 +4628,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                 'total_guardias': total_guardias,
                 'total_monto_guardias': total_monto_guardias,
                 'total_general': total_monto + total_monto_guardias,
+                'resumen_doppler': resumir_comparacion_doppler_mmii(registros),
             })
 
         context['medico_data'] = medico_data

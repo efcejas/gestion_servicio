@@ -1,25 +1,35 @@
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
+
+from openpyxl import load_workbook
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import (
     Estudios,
     GrupoTarifario,
+    GuardiaPasiva,
     HistorialRevisionAuditoriaDopplerMMII,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
     RevisionAuditoriaDopplerMMII,
     SesionContable,
+    SolicitudRevisionHorarioRegistro,
 )
 from .services_auditoria import (
+    adjuntar_comparacion_doppler_mmii,
     auditar_cantidad_doppler_mmii,
+    confirmar_lote_auditoria_doppler_mmii,
     crear_casos_auditoria_doppler_mmii,
     resolver_caso_auditoria_doppler_mmii,
+    resumir_comparacion_doppler_mmii,
+    valores_proyeccion_doppler_mmii,
 )
 
 
@@ -397,6 +407,389 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         self.assertContains(response, 'Doppler venoso de miembros inferiores')
         self.assertContains(response, 'Cantidad declarada: <strong>2</strong>', count=2)
 
+    def test_simular_cantidad_usa_calculo_canonico_sin_escribir(self):
+        registro = self._crear_registro()
+        relacion = RegistroEstudio.objects.create(
+            registro=registro, estudio=self.arterial, cantidad=2, contexto='SERVICIO',
+        )
+        original = registro.calcular_monto()
+        estimado = registro.calcular_monto(cantidades_auditoria={relacion.pk: 1})
+        self.assertGreater(original, 0)
+        self.assertEqual(estimado, original / 2)
+        relacion.refresh_from_db()
+        registro.refresh_from_db()
+        self.assertEqual(relacion.cantidad, 2)
+        self.assertEqual(registro.monto_calculado, Decimal('48400.00'))
+
+    def _preparar_casos_economicos(self):
+        registro = self._crear_registro()
+        for estudio in (self.arterial, self.venoso):
+            RegistroEstudio.objects.create(
+                registro=registro, estudio=estudio, cantidad=2, contexto='SERVICIO',
+            )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            monto_calculado=registro.calcular_monto(), cantidad_regiones=4,
+        )
+        registro.refresh_from_db()
+        crear_casos_auditoria_doppler_mmii(auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1), fecha_hasta=date(2026, 6, 30),
+        ), self.medico)
+        return registro, list(RevisionAuditoriaDopplerMMII.objects.order_by('pk'))
+
+    def test_estimacion_total_suma_solo_confirmados_y_conserva_historial(self):
+        registro, casos = self._preparar_casos_economicos()
+        original = registro.monto_calculado
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Cantidad bilateral revisada', usuario=self.medico,
+            )
+        comparacion = adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler
+        self.assertEqual(comparacion['monto_original'], original)
+        self.assertEqual(comparacion['monto_estimado'], original / 2)
+        self.assertEqual(comparacion['diferencia_estimada'], original / 2)
+        self.assertFalse(comparacion['parcial'])
+        primer_evento = HistorialRevisionAuditoriaDopplerMMII.objects.order_by('pk').first()
+        self.assertEqual(Decimal(primer_evento.estimacion_json['monto_estimado']), original * Decimal('0.75'))
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[0].pk, decision='DESCARTADO', evidencias={},
+            observacion='Orden adicional justificada', usuario=self.medico,
+        )
+        comparacion = adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler
+        self.assertEqual(comparacion['monto_estimado'], original * Decimal('0.75'))
+        primer_evento.refresh_from_db()
+        self.assertEqual(Decimal(primer_evento.estimacion_json['monto_estimado']), original * Decimal('0.75'))
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, original)
+        self.assertEqual(list(registro.registroestudio_set.values_list('cantidad', flat=True)), [2, 2])
+
+    def test_tarifa_no_reproduce_original_deja_estimacion_pendiente(self):
+        registro, casos = self._preparar_casos_economicos()
+        Estudios.objects.filter(pk=self.arterial.pk).update(precio_cober=Decimal('100.00'))
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[0].pk, decision='CONFIRMADO',
+            evidencias={'visualmedical_verificado': True},
+            observacion='Diferencia de cantidad confirmada', usuario=self.medico,
+        )
+        comparacion = adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler
+        self.assertIsNone(comparacion['monto_estimado'])
+        self.assertIsNone(comparacion['diferencia_estimada'])
+        self.assertIn('tarifa historica', comparacion['motivo'])
+
+    def test_lote_confirma_solo_seleccionados_con_historial_y_sin_cambiar_montos(self):
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(username='auditor_lote', rol='jefe_servicio', perfil_completo=True)
+        confirmado = confirmar_lote_auditoria_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 6, 30), medico_id=self.medico.pk,
+            evidencias={'orden_medica_verificada': True},
+            observacion='Se verificaron ordenes del lote bilateral', usuario=jefe,
+        )
+        self.assertEqual(confirmado, 2)
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 2)
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.filter(estado='CONFIRMADO').count(), 2)
+        original = registro.monto_calculado
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, original)
+        with self.assertRaises(ValidationError):
+            confirmar_lote_auditoria_doppler_mmii(
+                caso_ids=[casos[0].pk], fecha_desde=date(2026, 6, 1),
+                fecha_hasta=date(2026, 6, 30), medico_id=None,
+                evidencias={'orden_medica_verificada': True}, observacion='Reenvio', usuario=jefe,
+            )
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 2)
+
+    def test_lote_rechaza_seleccion_invalida_sin_decisiones_parciales(self):
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(username='auditor_lote_invalido', rol='jefe_servicio')
+        argumentos = {
+            'caso_ids': [caso.pk for caso in casos], 'fecha_desde': date(2026, 6, 1),
+            'fecha_hasta': date(2026, 6, 30), 'medico_id': None,
+            'evidencias': {'eges_verificado': True}, 'observacion': 'Revision masiva', 'usuario': jefe,
+        }
+        with self.assertRaises(ValidationError):
+            confirmar_lote_auditoria_doppler_mmii(**argumentos)
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        argumentos['evidencias'] = {'orden_medica_verificada': True}
+        fuente = dict(casos[1].datos_originales_json)
+        fuente['posible_duplicado'] = True
+        RevisionAuditoriaDopplerMMII.objects.filter(pk=casos[1].pk).update(datos_originales_json=fuente)
+        with self.assertRaises(ValidationError):
+            confirmar_lote_auditoria_doppler_mmii(**argumentos)
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        self.assertEqual(RevisionAuditoriaDopplerMMII.objects.filter(estado='PENDIENTE').count(), 2)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_endpoint_lote_respeta_filtros_permisos_y_evidencia(self):
+        registro, casos = self._preparar_casos_economicos()
+        url = reverse('liquidacion:auditoria_doppler_mmii_confirmar_lote')
+        datos = {
+            'casos': [caso.pk for caso in casos], 'fecha_desde': '2026-06-01',
+            'fecha_hasta': '2026-06-30', 'profesional': self.medico.pk,
+            'observacion': 'Regla bilateral verificada para todos los seleccionados',
+        }
+        self.client.force_login(self.medico)
+        self.assertEqual(self.client.post(url, datos).status_code, 302)
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        jefe = User.objects.create_user(username='auditor_endpoint_lote', rol='jefe_servicio', perfil_completo=True)
+        self.client.force_login(jefe)
+        response = self.client.get(reverse('liquidacion:auditoria_doppler_mmii'))
+        self.assertContains(response, 'form="doppler-lote" data-doppler-caso', count=2)
+        self.client.post(url, datos)
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        self.client.post(url, {**datos, 'fecha_desde': '2026-02-31', 'orden_medica_verificada': 'on'})
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        self.client.post(url, {**datos, 'fecha_hasta': '2026-06-05', 'orden_medica_verificada': 'on'})
+        self.assertFalse(HistorialRevisionAuditoriaDopplerMMII.objects.exists())
+        response = self.client.post(url, {**datos, 'orden_medica_verificada': 'on'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 2)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_personal_y_administrativo_comparten_estimacion_sin_cambiar_totales(self):
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(username='auditor_excel_doppler', rol='jefe_servicio', perfil_completo=True)
+        confirmar_lote_auditoria_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 6, 30), medico_id=self.medico.pk,
+            evidencias={'visualmedical_verificado': True}, observacion='=FUNDAMENTO_LITERAL', usuario=jefe,
+        )
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:exportar_excel_mis_registros'), {'mes': 6, 'año': 2026})
+        self.assertEqual(response.status_code, 200)
+        personal = load_workbook(BytesIO(response.content))
+        self.assertEqual(personal['Practicas']['J2'].value, float(registro.monto_calculado))
+        self.assertEqual(personal['Practicas']['N2'].value, float(registro.monto_calculado / 2))
+        self.assertEqual(personal['Practicas']['O2'].value, float(registro.monto_calculado / 2))
+        self.assertEqual(personal['Resumen']['B5'].value, float(registro.monto_calculado))
+        hoja = personal['Revision Doppler']
+        self.assertEqual(hoja['H2'].value, '=FUNDAMENTO_LITERAL')
+        self.assertEqual(hoja['H2'].data_type, 's')
+        self.assertEqual(hoja['M2'].value, float(registro.monto_calculado / 2))
+        self.assertIsNone(hoja['M3'].value)
+        self.client.force_login(jefe)
+        filtros = {'medico': self.medico.pk, 'mes': 6, 'año': 2026}
+        response = self.client.get(reverse('liquidacion:exportar_excel_liquidacion'), filtros)
+        self.assertEqual(response.status_code, 200)
+        administrativo = load_workbook(BytesIO(response.content))
+        principal = administrativo['Liquidación Completa']
+        self.assertEqual(principal['I2'].value, float(registro.monto_calculado))
+        self.assertEqual(principal['T2'].value, personal['Practicas']['N2'].value)
+        self.assertEqual(principal['U2'].value, personal['Practicas']['O2'].value)
+        self.assertEqual(administrativo['Auditoria Doppler']['R2'].value, hoja['M2'].value)
+        self.sesion.estado = 'FACTURADA'
+        self.sesion.save(update_fields=['estado'])
+        response = self.client.get(reverse('liquidacion:exportar_excel_liquidacion_definitiva'), filtros)
+        definitivo = load_workbook(BytesIO(response.content))
+        self.assertEqual(definitivo['Liquidación Completa']['I2'].value, float(registro.monto_calculado))
+        response = self.client.get(reverse('liquidacion:liquidacion_mensual'), filtros)
+        self.assertContains(response, 'Comparación Doppler')
+        self.assertContains(response, 'Débito Doppler: no aplicado.')
+        self.assertEqual(response.context['medico_data'][0]['total_monto'], registro.monto_calculado)
+        self.assertEqual(response.context['medico_data'][0]['resumen_doppler']['diferencia_estimada'], registro.monto_calculado / 2)
+
+    def test_estimacion_no_se_recalcula_al_leer_y_se_oculta_si_fuentes_cambian(self):
+        registro, casos = self._preparar_casos_economicos()
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[0].pk, decision='CONFIRMADO',
+            evidencias={'orden_medica_verificada': True}, observacion='Regla confirmada', usuario=self.medico,
+        )
+        monto_guardado = adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler['monto_estimado']
+        Estudios.objects.filter(pk=self.arterial.pk).update(precio_cober=Decimal('1.00'))
+        self.assertEqual(adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler['monto_estimado'], monto_guardado)
+        RegistroEstudio.objects.filter(registro=registro, estudio=self.venoso).update(cantidad=3)
+        self.assertIsNone(adjuntar_comparacion_doppler_mmii([registro])[0].comparacion_doppler['monto_estimado'])
+
+    def test_residente_estimacion_informativa_no_se_suma_como_debito_propuesto(self):
+        self.medico.rol = 'medico_residente'
+        self.medico.save(update_fields=['rol'])
+        registro = self._crear_registro(rol='medico_residente')
+        RegistroEstudio.objects.create(registro=registro, estudio=self.arterial, cantidad=2, contexto='SERVICIO')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=registro.calcular_monto())
+        registro.refresh_from_db()
+        crear_casos_auditoria_doppler_mmii(auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1), fecha_hasta=date(2026, 6, 30),
+        ), self.medico)
+        caso = RevisionAuditoriaDopplerMMII.objects.get()
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk, decision='CONFIRMADO', evidencias={'orden_medica_verificada': True},
+            observacion='Revision informativa de residente', usuario=self.medico,
+        )
+        from .services_auditoria import resumir_comparacion_doppler_mmii
+        comparados = adjuntar_comparacion_doppler_mmii([registro])
+        self.assertTrue(comparados[0].comparacion_doppler['informativo_residente'])
+        resumen = resumir_comparacion_doppler_mmii(comparados)
+        self.assertEqual(resumen['diferencia_estimada'], Decimal('0.00'))
+        self.assertEqual(resumen['diferencia_informativa_residentes'], registro.monto_calculado / 2)
+        self.assertEqual(resumen['posible_debito'], 0)
+        self.assertEqual(resumen['monto_proyectado_practicas'], registro.monto_calculado)
+        self.assertEqual(valores_proyeccion_doppler_mmii(registro), [0, 0, float(registro.monto_calculado)])
+
+    def test_resumen_proyectado_distingue_importes_pendientes_y_disponibles(self):
+        registro, casos = self._preparar_casos_economicos()
+        adjuntar_comparacion_doppler_mmii([registro])
+        resumen = resumir_comparacion_doppler_mmii([registro])
+        self.assertEqual(resumen['pendientes_economicos'], 1)
+        self.assertEqual(valores_proyeccion_doppler_mmii(registro), ['Pendiente', 'Pendiente', 'Pendiente'])
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO', evidencias={'orden_medica_verificada': True},
+                observacion='Orden revisada', usuario=self.medico,
+            )
+        adjuntar_comparacion_doppler_mmii([registro])
+        resumen = resumir_comparacion_doppler_mmii([registro])
+        self.assertEqual(resumen['pendientes_economicos'], 0)
+        self.assertEqual(resumen['posible_debito'], registro.monto_calculado / 2)
+        self.assertEqual(resumen['monto_proyectado_practicas'], registro.monto_calculado / 2)
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='DESCARTADO', evidencias={},
+                observacion='Prestaciones justificadas', usuario=self.medico,
+            )
+        adjuntar_comparacion_doppler_mmii([registro])
+        resumen = resumir_comparacion_doppler_mmii([registro])
+        self.assertEqual(resumen['pendientes_economicos'], 0)
+        self.assertEqual(resumen['posible_debito'], 0)
+        self.assertEqual(valores_proyeccion_doppler_mmii(registro), [0, 0, float(registro.monto_calculado)])
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_personal_incluye_periodo_completo_y_resume_posible_debito(self):
+        registro, casos = self._preparar_casos_economicos()
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO', evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral revisada', usuario=self.medico,
+            )
+        for tipo, importe, dia in [('RES', Decimal('2000.00'), 12), ('ECO', Decimal('3000.00'), 13)]:
+            estudio = Estudios.objects.create(
+                nombre=f'Practica adicional {tipo}', tipo=tipo, precio_cober=importe,
+                precio_otras_os=importe, conteo_regiones=1, conteo_regiones_default=1,
+            )
+            adicional = RegistroEstudiosPorMedico.objects.create(
+                sesion_contable=self.sesion, medico=self.medico,
+                nombre_paciente='Paciente', apellido_paciente=f'Prueba{tipo}',
+                dni_paciente=f'123000{dia}', fecha_del_informe=date(2026, 6, dia),
+                tipo_obra_social='COBER', horario='EXTRA', monto_calculado=importe,
+            )
+            RegistroEstudio.objects.create(registro=adicional, estudio=estudio, cantidad=1)
+        guardia = GuardiaPasiva.objects.create(
+            sesion_contable=self.sesion, medico=self.medico, fecha_guardia=date(2026, 6, 15),
+            tipo_guardia='COBER',
+        )
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:exportar_excel_mis_registros'), {
+            'mes': 6, 'año': 2026, 'modalidad': 'DOP',
+            'busqueda': 'NINGUN_PACIENTE_COINCIDE', 'filtro_rapido': 'hoy',
+        })
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook.active.title, 'Resumen')
+        practicas = workbook['Practicas']
+        self.assertEqual(practicas.max_row, 5)
+        filas = list(practicas.iter_rows(min_row=2, max_row=4, values_only=True))
+        self.assertEqual(sum(Decimal(str(fila[9])) for fila in filas), registro.monto_calculado + Decimal('5000.00'))
+        self.assertTrue(any('Practica adicional RES' in fila[6] for fila in filas))
+        self.assertTrue(any('Practica adicional ECO' in fila[6] for fila in filas))
+        self.assertEqual(sum(Decimal(str(fila[13])) for fila in filas), registro.monto_calculado / 2)
+        self.assertEqual(sum(Decimal(str(fila[14])) for fila in filas), registro.monto_calculado / 2 + Decimal('5000.00'))
+        self.assertEqual(practicas['J5'].value, '=SUM(J2:J4)')
+        self.assertEqual(practicas['N5'].value, float(registro.monto_calculado / 2))
+        self.assertEqual(practicas['O5'].value, float(registro.monto_calculado / 2 + Decimal('5000.00')))
+        resumen = workbook['Resumen']
+        self.assertEqual(resumen['B7'].value, float(registro.monto_calculado + Decimal('5000.00') + guardia.monto))
+        self.assertEqual(resumen['B9'].value, float(registro.monto_calculado / 2))
+        self.assertEqual(resumen['B10'].value, float(registro.monto_calculado / 2 + Decimal('5000.00') + guardia.monto))
+        self.assertIn('todas las modalidades', resumen['A14'].value)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_personal_compacto_distingue_residente_y_jefe(self):
+        from .services import generar_buffer_excel_mis_registros
+
+        registro, casos = self._preparar_casos_economicos()
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO', evidencias={'orden_medica_verificada': True},
+                observacion='Regla verificada', usuario=self.medico,
+            )
+        def generar():
+            return load_workbook(generar_buffer_excel_mis_registros(
+                usuario=self.medico, mes=6, año=2026,
+                registros=RegistroEstudiosPorMedico.objects.select_related('medico', 'sesion_contable').prefetch_related('registroestudio_set__estudio'),
+                guardias=[],
+            ))
+        profesional = generar()
+        self.assertEqual(profesional.active.title, 'Resumen')
+        self.assertEqual(profesional['Resumen']['B7'].value, float(registro.monto_calculado))
+        self.assertEqual(profesional['Resumen']['B9'].value, float(registro.monto_calculado / 2))
+        self.assertEqual(profesional['Resumen']['B10'].value, float(registro.monto_calculado / 2))
+        self.assertLessEqual(profesional['Resumen'].max_row, 15)
+        self.medico.rol = 'medico_residente'
+        self.medico.save(update_fields=['rol'])
+        residente = generar()
+        textos = ' '.join(str(celda.value or '') for hoja in residente for fila in hoja for celda in fila)
+        self.assertNotIn('debito', textos.lower())
+        self.assertNotIn('total estimado', textos.lower())
+        self.assertEqual(residente['Practicas'].max_column, 13)
+        self.assertEqual(residente['Revision Doppler'].max_column, 11)
+        self.assertEqual(residente['Revision Doppler']['K1'].value, 'Fuentes verificadas')
+        self.assertEqual(residente['Revision Doppler']['K2'].value, 'Orden medica')
+        self.assertTrue(residente['Practicas'].column_dimensions['B'].hidden)
+        self.assertEqual(residente['Resumen']['B7'].value, float(registro.monto_calculado))
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_profesional_solo_muestra_credito_cuando_existe(self):
+        registro = self._crear_registro()
+        combinado = Estudios.objects.create(
+            codigo='DOP-ART-VEN-EXPORT', nombre='Doppler arterial y venoso MMII', tipo='DOP',
+            conteo_regiones=1, conteo_regiones_default=1, precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+        )
+        RegistroEstudio.objects.create(registro=registro, estudio=combinado, cantidad=1)
+        original = registro.calcular_monto()
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=original)
+        crear_casos_auditoria_doppler_mmii(auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1), fecha_hasta=date(2026, 6, 30),
+        ), self.medico)
+        caso = RevisionAuditoriaDopplerMMII.objects.get()
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk, decision='CONFIRMADO', evidencias={'orden_medica_verificada': True},
+            observacion='Dos modalidades documentadas', usuario=self.medico,
+        )
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:exportar_excel_mis_registros'), {'mes': 6, 'año': 2026})
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook['Resumen']['A10'].value, 'Posible credito')
+        self.assertEqual(workbook['Resumen']['B10'].value, float(original))
+        self.assertEqual(workbook['Resumen']['B11'].value, float(original * 2))
+        self.assertEqual(workbook['Practicas']['O1'].value, 'Posible credito (no aplicado)')
+        self.assertEqual(workbook['Practicas']['P2'].value, float(original * 2))
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, original)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_personal_sin_registros_tiene_resumen_y_totales_validos(self):
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:exportar_excel_mis_registros'), {'mes': 6, 'año': 2026})
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook.active.title, 'Resumen')
+        self.assertEqual(workbook['Resumen']['B7'].value, 0)
+        self.assertEqual(workbook['Resumen']['B9'].value, 0)
+        self.assertEqual(workbook['Resumen']['B10'].value, 0)
+        self.assertEqual(workbook['Practicas']['J2'].value, 0)
+        self.assertEqual(workbook['Practicas'].auto_filter.ref, 'A1:O1')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_excel_personal_muestra_pendientes_sin_inventar_importes(self):
+        registro, casos = self._preparar_casos_economicos()
+        self.client.force_login(self.medico)
+        response = self.client.get(reverse('liquidacion:exportar_excel_mis_registros'), {'mes': 6, 'año': 2026})
+        workbook = load_workbook(BytesIO(response.content))
+        self.assertEqual(workbook['Practicas']['N2'].value, 'Pendiente')
+        self.assertEqual(workbook['Practicas']['O2'].value, 'Pendiente')
+        self.assertIn('Estimacion parcial', workbook['Resumen']['A11'].value)
+
     def test_persistencia_es_idempotente_y_no_modifica_fuentes_economicas(self):
         registro = self._crear_registro()
         relacion = RegistroEstudio.objects.create(
@@ -550,6 +943,38 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         })
         self.assertEqual(respuesta_revision.status_code, 302)
         self.assertEqual(HistorialRevisionAuditoriaDopplerMMII.objects.count(), 1)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_mis_registros_resume_doppler_sin_indicar_sin_revision(self):
+        registro, casos = self._preparar_casos_economicos()
+        self.client.force_login(self.medico)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_list'), {'mes': 6, 'año': 2026},
+        )
+        self.assertContains(response, 'data-revision-resumen', count=1)
+        self.assertContains(response, 'data-revision-detalle', count=1)
+        self.assertContains(response, f'aria-controls="detalle-revision-{registro.pk}"', count=1)
+        self.assertContains(response, 'aria-expanded="false"', count=1)
+        self.assertContains(response, 'Auditoría Doppler MMII')
+        self.assertNotContains(response, 'Sin revisión')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_revision_horaria_y_doppler_comparten_un_detalle(self):
+        registro, casos = self._preparar_casos_economicos()
+        SolicitudRevisionHorarioRegistro.objects.create(
+            registro=registro, solicitado_por=self.medico, horario_solicitado='EXTRA',
+            fecha_hora_real_declarada=timezone.now(), motivo_solicitud='MOTIVO_HORARIO_PROPIO',
+        )
+        self.client.force_login(self.medico)
+        response = self.client.get(
+            reverse('liquidacion:registroestudios_list'), {'mes': 6, 'año': 2026},
+        )
+        self.assertContains(response, f'id="detalle-revision-{registro.pk}"', count=1)
+        self.assertContains(response, 'data-revision-detalle', count=1)
+        self.assertContains(response, 'MOTIVO_HORARIO_PROPIO')
+        self.assertContains(response, 'Revisión pendiente')
+        self.assertContains(response, 'Auditoría Doppler MMII')
+        self.assertNotContains(response, 'Sin revisión')
 
     @override_settings(SECURE_SSL_REDIRECT=False)
     def test_mis_registros_solo_muestra_auditorias_del_profesional_autenticado(self):

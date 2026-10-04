@@ -255,6 +255,12 @@ def crear_casos_auditoria_doppler_mmii(auditoria, usuario):
     """Persiste candidatos una sola vez, conservando un snapshot de los datos fuente."""
     candidatos = []
     registro_ids = []
+    fuentes = {
+        registro.pk: fuente_calculo_doppler_mmii(registro)
+        for registro in RegistroEstudiosPorMedico.objects.filter(
+            pk__in=[resultado['registro_id'] for resultado in auditoria.get('resultados', [])],
+        ).select_related('medico').prefetch_related('registroestudio_set')
+    }
     for resultado in auditoria.get('resultados', []):
         registro_ids.append(resultado['registro_id'])
         for estudio in resultado['estudios']:
@@ -267,6 +273,7 @@ def crear_casos_auditoria_doppler_mmii(auditoria, usuario):
                 continue
 
             snapshot = {
+                'fuente_calculo': fuentes[resultado['registro_id']],
                 'regla_version': RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
                 'registro_id': resultado['registro_id'],
                 'registro_estudio_id': estudio['registro_estudio_id'],
@@ -351,6 +358,12 @@ def adjuntar_revisiones_auditoria_doppler_mmii(auditoria):
         estudio['revision_auditoria'] = revision_por_linea.get(
             estudio['registro_estudio_id'],
         )
+        caso = estudio['revision_auditoria']
+        estudio['permite_lote'] = bool(
+            caso and caso_doppler_permite_lote(caso)
+            and not estudio['posible_duplicado']
+            and estudio['cantidad_declarada'] == 2 and estudio['cantidad_esperada'] == 1
+        )
     return auditoria
 
 
@@ -373,18 +386,12 @@ def resolver_caso_auditoria_doppler_mmii(*, caso_id, decision, evidencias, obser
             'Para confirmar la diferencia debes verificar la orden o VisualMedical.'
         )
 
+    registro_id = RevisionAuditoriaDopplerMMII.objects.values_list(
+        'registro_id', flat=True,
+    ).get(pk=caso_id)
+    registro = RegistroEstudiosPorMedico.objects.select_for_update().get(pk=registro_id)
     caso = RevisionAuditoriaDopplerMMII.objects.select_for_update().get(pk=caso_id)
-    HistorialRevisionAuditoriaDopplerMMII.objects.create(
-        revision=caso,
-        estado_anterior=caso.estado,
-        estado_nuevo=decision,
-        orden_medica_verificada=evidencias.get('orden_medica_verificada', False),
-        eges_verificado=evidencias.get('eges_verificado', False),
-        visualmedical_verificado=evidencias.get('visualmedical_verificado', False),
-        netterm_verificado=evidencias.get('netterm_verificado', False),
-        observacion=observacion.strip(),
-        revisado_por=usuario,
-    )
+    estado_anterior = caso.estado
     caso.estado = decision
     caso.orden_medica_verificada = evidencias.get('orden_medica_verificada', False)
     caso.eges_verificado = evidencias.get('eges_verificado', False)
@@ -404,7 +411,331 @@ def resolver_caso_auditoria_doppler_mmii(*, caso_id, decision, evidencias, obser
         'fecha_revision',
         'fecha_actualizacion',
     ])
+    caso.estimacion_json = estimar_registro_auditoria_doppler_mmii(registro)
+    caso.save(update_fields=['estimacion_json'])
+    HistorialRevisionAuditoriaDopplerMMII.objects.create(
+        revision=caso,
+        estado_anterior=estado_anterior,
+        estado_nuevo=decision,
+        estimacion_json=caso.estimacion_json,
+        orden_medica_verificada=caso.orden_medica_verificada,
+        eges_verificado=caso.eges_verificado,
+        visualmedical_verificado=caso.visualmedical_verificado,
+        netterm_verificado=caso.netterm_verificado,
+        observacion=caso.observacion,
+        revisado_por=usuario,
+    )
     return caso
+
+
+def fuente_calculo_doppler_mmii(registro):
+    return {
+        'medico_id': registro.medico_id,
+        'rol': registro.medico.rol,
+        'remoto': registro.medico.trabaja_remoto,
+        'fecha': registro.fecha_del_informe.isoformat(),
+        'horario': registro.horario,
+        'obra_social': registro.tipo_obra_social,
+        'monto': str(registro.monto_calculado),
+        'regiones': registro.cantidad_regiones,
+        'internado': registro.paciente_internado,
+        'solicitud': registro.fecha_hora_solicitud.isoformat() if registro.fecha_hora_solicitud else None,
+        'informe': registro.fecha_hora_informe.isoformat() if registro.fecha_hora_informe else None,
+        'anulado': registro.anulado,
+        'lineas': sorted([
+            [rel.pk, rel.estudio_id, rel.cantidad, rel.contexto]
+            for rel in registro.registroestudio_set.all()
+        ]),
+    }
+
+
+def estimar_registro_auditoria_doppler_mmii(registro):
+    """Simula solo cantidades confirmadas, sin escribir prestaciones ni montos."""
+    casos = list(registro.revisiones_auditoria_doppler_mmii.filter(
+        version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+    ).order_by('fecha_deteccion', 'pk'))
+    original = casos[0].datos_originales_json.get('monto_registrado') if casos else None
+    resultado = {
+        'monto_original': original,
+        'monto_estimado': None,
+        'diferencia_estimada': None,
+        'motivo': 'Sin cantidades confirmadas.',
+        'informativo_residente': registro.medico.rol == 'medico_residente',
+        'casos_confirmados': [caso.pk for caso in casos if caso.estado == 'CONFIRMADO'],
+        'parcial': any(caso.estado in {'PENDIENTE', 'REQUIERE_EVIDENCIA'} for caso in casos),
+    }
+    confirmados = [caso for caso in casos if caso.estado == 'CONFIRMADO']
+    if not confirmados:
+        return resultado
+    relaciones = {rel.pk: rel for rel in registro.registroestudio_set.select_related('estudio').all()}
+    fuente_actual = fuente_calculo_doppler_mmii(registro)
+    cantidades = {}
+    for caso in casos:
+        fuente = caso.datos_originales_json
+        relacion = relaciones.get(caso.registro_estudio_id_origen)
+        if (
+            registro.anulado
+            or (fuente.get('fuente_calculo') and fuente['fuente_calculo'] != fuente_actual)
+            or not relacion
+            or relacion.estudio_id != fuente.get('estudio_id')
+            or relacion.cantidad != fuente.get('cantidad_declarada')
+            or relacion.contexto != fuente.get('contexto')
+            or registro.fecha_del_informe.isoformat() != fuente.get('fecha_informe')
+            or registro.tipo_obra_social != fuente.get('tipo_obra_social')
+            or registro.horario != fuente.get('horario')
+            or registro.medico_id != fuente.get('profesional_id')
+            or registro.medico.rol != fuente.get('rol')
+            or str(registro.monto_calculado) != fuente.get('monto_registrado')
+        ):
+            resultado['motivo'] = 'Los datos actuales no coinciden con el snapshot; requiere revision.'
+            return resultado
+        if caso.estado != 'CONFIRMADO':
+            continue
+        esperada = fuente.get('cantidad_esperada')
+        if fuente.get('posible_duplicado') or not isinstance(esperada, int) or esperada < 1:
+            resultado['motivo'] = 'Duplicado o cantidad manual: requiere una resolucion individual de prestaciones.'
+            return resultado
+        cantidades[relacion.pk] = esperada
+
+    monto_original = Decimal(original)
+    if any(rel.estudio.precio_para_os(
+        registro.tipo_obra_social, fecha=registro.fecha_del_informe, contexto=rel.contexto,
+    ) <= 0 for rel in relaciones.values()):
+        resultado['motivo'] = 'Falta una tarifa positiva para alguna practica; estimacion pendiente.'
+        return resultado
+    base = registro.calcular_monto().quantize(Decimal('0.01'))
+    if base != monto_original or base <= 0:
+        resultado['motivo'] = 'La tarifa historica actual no reproduce el monto original; estimacion pendiente.'
+        return resultado
+    monto_estimado = registro.calcular_monto(cantidades_auditoria=cantidades).quantize(Decimal('0.01'))
+    resultado.update({
+        'monto_estimado': str(monto_estimado),
+        'diferencia_estimada': str(monto_original - monto_estimado),
+        'motivo': 'Simulacion de cantidades confirmadas; no es un debito aplicado.',
+        'cantidades_simuladas': {str(linea_id): cantidad for linea_id, cantidad in cantidades.items()},
+        'fecha_informe': registro.fecha_del_informe.isoformat(),
+        'horario': registro.horario,
+        'tipo_obra_social': registro.tipo_obra_social,
+        'fuente_calculo': fuente_actual,
+    })
+    return resultado
+
+
+def caso_doppler_permite_lote(caso):
+    fuente = caso.datos_originales_json
+    return (
+        caso.estado in {'PENDIENTE', 'REQUIERE_EVIDENCIA'}
+        and caso.version_regla == RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1
+        and not fuente.get('posible_duplicado')
+        and fuente.get('cantidad_esperada') == 1
+        and fuente.get('cantidad_declarada') == 2
+    )
+
+
+@transaction.atomic
+def confirmar_lote_auditoria_doppler_mmii(*, caso_ids, fecha_desde, fecha_hasta,
+                                         medico_id, evidencias, observacion, usuario):
+    if not usuario.is_authenticated or not (
+        usuario.is_superuser or usuario.rol in {'administrativo', 'jefe_servicio'}
+    ):
+        raise ValidationError('No tienes permisos para confirmar casos Doppler.')
+    ids = set(caso_ids)
+    if not ids or len(ids) > 200:
+        raise ValidationError('Selecciona entre 1 y 200 casos.')
+    casos_qs = RevisionAuditoriaDopplerMMII.objects.filter(
+        pk__in=ids, registro__fecha_del_informe__range=(fecha_desde, fecha_hasta),
+        registro__anulado=False,
+    )
+    if medico_id:
+        casos_qs = casos_qs.filter(registro__medico_id=medico_id)
+    registros_ids = sorted(set(casos_qs.values_list('registro_id', flat=True)))
+    list(RegistroEstudiosPorMedico.objects.select_for_update().filter(
+        pk__in=registros_ids,
+    ).order_by('pk'))
+    casos = list(RevisionAuditoriaDopplerMMII.objects.select_for_update().filter(
+        pk__in=list(casos_qs.values_list('pk', flat=True)),
+    ).order_by('registro_id', 'pk'))
+    if len(casos) != len(ids) or not all(caso_doppler_permite_lote(caso) for caso in casos):
+        raise ValidationError('La seleccion contiene casos fuera del filtro, resueltos o no elegibles.')
+    actual = auditar_cantidad_doppler_mmii(fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+    lineas_actuales = {
+        estudio['registro_estudio_id']: estudio
+        for resultado in actual['resultados'] for estudio in resultado['estudios']
+    }
+    for caso in casos:
+        linea = lineas_actuales.get(caso.registro_estudio_id_origen)
+        if not linea or linea['posible_duplicado'] or linea['cantidad_declarada'] != 2 or linea['cantidad_esperada'] != 1:
+            raise ValidationError('Un caso cambio o es posible duplicado. Revisa la seleccion antes de confirmar.')
+        registro = RegistroEstudiosPorMedico.objects.get(pk=caso.registro_id)
+        fuente = caso.datos_originales_json
+        if fuente.get('fuente_calculo') and fuente['fuente_calculo'] != fuente_calculo_doppler_mmii(registro):
+            raise ValidationError('Los datos del caso cambiaron desde la deteccion; revisalo individualmente.')
+    for caso in casos:
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk, decision='CONFIRMADO', evidencias=evidencias,
+            observacion=observacion, usuario=usuario,
+        )
+    return len(casos)
+
+
+def adjuntar_comparacion_doppler_mmii(registros):
+    """Presentacion compartida por pantallas y exportaciones, sin recalcular al leer."""
+    registros = list(registros)
+    casos_por_registro = defaultdict(list)
+    for caso in RevisionAuditoriaDopplerMMII.objects.filter(
+        registro_id__in=[registro.pk for registro in registros],
+        version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+    ).select_related('revisado_por').order_by('fecha_deteccion', 'pk'):
+        casos_por_registro[caso.registro_id].append(caso)
+    for registro in registros:
+        casos = casos_por_registro[registro.pk]
+        registro.auditorias_doppler_mmii = casos
+        registro.comparacion_doppler = None
+        if not casos:
+            continue
+        ultimo = max(casos, key=lambda caso: (caso.fecha_revision or caso.fecha_deteccion, caso.pk))
+        estimacion = dict(ultimo.estimacion_json)
+        fuente_original = casos[0].datos_originales_json.get('monto_registrado')
+        comparacion = {
+            'monto_original': Decimal(fuente_original) if fuente_original is not None else None,
+            'monto_vigente': registro.monto_calculado,
+            'monto_estimado': None,
+            'diferencia_estimada': None,
+            'motivo': estimacion.get('motivo', 'Pendiente de estimacion.'),
+            'parcial': estimacion.get('parcial', True),
+            'informativo_residente': estimacion.get('informativo_residente', registro.medico.rol == 'medico_residente'),
+            'estado': ' / '.join(dict.fromkeys(caso.get_estado_display() for caso in casos)),
+            'sin_ajustes_propuestos': all(caso.estado == 'DESCARTADO' for caso in casos),
+        }
+        ids_confirmados = sorted(caso.pk for caso in casos if caso.estado == 'CONFIRMADO')
+        if (
+            estimacion.get('monto_estimado') is not None
+            and ids_confirmados == sorted(estimacion.get('casos_confirmados', []))
+            and registro.monto_calculado == comparacion['monto_original']
+            and not registro.anulado
+            and estimacion.get('fuente_calculo') == fuente_calculo_doppler_mmii(registro)
+        ):
+            comparacion['monto_estimado'] = Decimal(estimacion['monto_estimado'])
+            comparacion['diferencia_estimada'] = Decimal(estimacion['diferencia_estimada'])
+        elif estimacion.get('monto_estimado') is not None:
+            comparacion['motivo'] = 'Los datos o decisiones actuales cambiaron; requiere revisar la estimacion.'
+        registro.comparacion_doppler = comparacion
+    return registros
+
+
+def resumir_comparacion_doppler_mmii(registros):
+    registros = list(registros)
+    comparaciones = [registro.comparacion_doppler for registro in registros if registro.comparacion_doppler]
+    disponibles = [item for item in comparaciones if item['monto_estimado'] is not None]
+    diferencias = [item['diferencia_estimada'] for item in disponibles if not item['informativo_residente']]
+    posible_debito = sum((max(diferencia, Decimal('0.00')) for diferencia in diferencias), Decimal('0.00'))
+    posible_credito = sum((max(-diferencia, Decimal('0.00')) for diferencia in diferencias), Decimal('0.00'))
+    pendientes_economicos = sum(
+        not item['informativo_residente'] and not item.get('sin_ajustes_propuestos')
+        and (item['monto_estimado'] is None or item['parcial'])
+        for item in comparaciones
+    )
+    return {
+        'registros_auditados': len(comparaciones),
+        'registros_estimados': len(disponibles),
+        'pendientes_estimacion': len(comparaciones) - len(disponibles),
+        'diferencia_estimada': sum((
+            item['diferencia_estimada'] for item in disponibles if not item['informativo_residente']
+        ), Decimal('0.00')),
+        'diferencia_informativa_residentes': sum((
+            item['diferencia_estimada'] for item in disponibles if item['informativo_residente']
+        ), Decimal('0.00')),
+        'posible_debito': posible_debito,
+        'posible_credito': posible_credito,
+        'monto_proyectado_practicas': sum((registro.monto_calculado for registro in registros), Decimal('0.00')) - posible_debito + posible_credito,
+        'pendientes_economicos': pendientes_economicos,
+    }
+
+
+def valores_proyeccion_doppler_mmii(registro):
+    comparacion = registro.comparacion_doppler
+    if not comparacion or comparacion['informativo_residente'] or comparacion.get('sin_ajustes_propuestos'):
+        return [0, 0, float(registro.monto_calculado)]
+    diferencia = comparacion['diferencia_estimada']
+    if diferencia is None:
+        return ['Pendiente', 'Pendiente', 'Pendiente']
+    return [
+        float(max(diferencia, Decimal('0.00'))),
+        float(max(-diferencia, Decimal('0.00'))),
+        float(registro.monto_calculado - diferencia),
+    ]
+
+
+COLUMNAS_COMPARACION_DOPPLER_MMII = [
+    'Monto original auditoria Doppler', 'Monto estimado auditoria Doppler',
+    'Diferencia estimada Doppler (no aplicada)', 'Estado auditoria Doppler',
+    'Alcance estimacion Doppler', 'Debito Doppler aplicado',
+]
+
+
+def valores_comparacion_doppler_mmii(registro):
+    comparacion = registro.comparacion_doppler
+    if not comparacion:
+        return ['', '', '', 'Sin auditoria', '', 'No aplicado']
+    return [
+        float(comparacion['monto_original']) if comparacion['monto_original'] is not None else 'Pendiente',
+        float(comparacion['monto_estimado']) if comparacion['monto_estimado'] is not None else 'Pendiente',
+        float(comparacion['diferencia_estimada']) if comparacion['diferencia_estimada'] is not None else 'Pendiente',
+        comparacion['estado'],
+        'Informativo sin debito (residente)' if comparacion['informativo_residente'] else (
+            'Parcial: solo cantidades confirmadas' if comparacion['parcial'] else 'Cantidades confirmadas'
+        ),
+        'No aplicado',
+    ]
+
+
+def agregar_hoja_auditoria_doppler_mmii(wb, registros):
+    from openpyxl.styles import Alignment, Font
+    from openpyxl.utils import get_column_letter
+
+    sheet = wb.create_sheet('Auditoria Doppler')
+    sheet.append([
+        'Registro', 'Caso', 'Profesional', 'Fecha informe', 'Practica',
+        'Cantidad original', 'Cantidad segun regla', 'Estado',
+        'Orden verificada', 'VisualMedical verificado', 'EGES consultado', 'NetTerm consultado',
+        'Fundamento', 'Revisor', 'Fecha revision',
+        'Monto original registro', 'Monto vigente registro', 'Monto estimado registro',
+        'Diferencia estimada registro', 'Alcance', 'Motivo estimacion',
+    ])
+    for registro in registros:
+        comparacion = registro.comparacion_doppler
+        for indice, caso in enumerate(registro.auditorias_doppler_mmii):
+            fuente = caso.datos_originales_json
+            mostrar_importe = indice == 0
+            sheet.append([
+                registro.pk, caso.pk, registro.medico.get_full_name() or registro.medico.username,
+                fuente.get('fecha_informe'), fuente.get('estudio'), fuente.get('cantidad_declarada'),
+                fuente.get('cantidad_esperada'), caso.get_estado_display(),
+                caso.orden_medica_verificada, caso.visualmedical_verificado,
+                caso.eges_verificado, caso.netterm_verificado, caso.observacion,
+                caso.revisado_por.get_full_name() or caso.revisado_por.username if caso.revisado_por else '',
+                caso.fecha_revision.isoformat() if caso.fecha_revision else '',
+                float(comparacion['monto_original']) if mostrar_importe and comparacion['monto_original'] is not None else '',
+                float(registro.monto_calculado) if mostrar_importe else '',
+                valores_comparacion_doppler_mmii(registro)[1] if mostrar_importe else '',
+                valores_comparacion_doppler_mmii(registro)[2] if mostrar_importe else '',
+                valores_comparacion_doppler_mmii(registro)[4], comparacion['motivo'],
+            ])
+    for row in sheet:
+        for cell in row:
+            if isinstance(cell.value, str):
+                cell.data_type = 's'
+            cell.alignment = Alignment(vertical='top', wrap_text=True)
+            if 16 <= cell.column <= 19:
+                cell.number_format = '$#,##0.00'
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    for column in sheet.columns:
+        sheet.column_dimensions[get_column_letter(column[0].column)].width = min(
+            max(len(str(cell.value or '')) for cell in column) + 2, 45,
+        )
+    sheet.freeze_panes = 'A2'
+    sheet.auto_filter.ref = sheet.dimensions
 
 
 def _es_monto_cero(monto):

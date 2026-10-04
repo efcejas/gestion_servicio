@@ -354,6 +354,7 @@
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Revisión</th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">Regiones</th>
                         <th scope="col" class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">Monto</th>
+                        <th scope="col" class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">Comparación Doppler</th>
                         <th scope="col" class="sticky right-0 z-20 bg-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.8)]">Acciones</th>
                     </tr>
                 </thead>
@@ -396,69 +397,37 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="sticky right-0 z-10 bg-white px-4 py-3 text-center shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
+                        <td data-revision-resumen class="px-4 py-3 text-center align-top" style="min-width: 180px;">
+                            <div class="flex flex-col items-center gap-2" style="max-width: 200px; margin: 0 auto;">
                             {% if registro.tiene_revision %}
-                            <div class="flex flex-col items-center gap-1.5">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap {{ registro.revision_badge_classes }}">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold {{ registro.revision_badge_classes }}">
                                     {{ registro.revision_badge_label }}
                                 </span>
-                                <button type="button"
-                                        class="inline-flex items-center px-2 py-0.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors text-[11px] font-semibold leading-tight"
-                                        title="Ver detalle de revisión"
-                                        onclick="toggleDetalleRevision('{{ registro.pk }}')">
-                                    Ver detalle
-                                </button>
-                            </div>
-                            {% else %}
-                            <span class="text-[11px] text-gray-400">Sin revisión</span>
                             {% endif %}
                             {% if registro.tiene_correccion_pacs %}
-                            <div class="mt-1.5 inline-flex max-w-[180px] flex-col items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] leading-tight text-blue-800">
-                                <span class="font-semibold">Ajuste PACS aplicado</span>
-                                {% if registro.correccion_pacs_info.horario_nuevo %}
-                                <span>{{ registro.correccion_pacs_info.horario_anterior|default:"-" }} -> {{ registro.correccion_pacs_info.horario_nuevo }}</span>
-                                {% endif %}
-                                {% if registro.correccion_pacs_info.hora_pacs %}
-                                <span>Hora PACS {{ registro.correccion_pacs_info.hora_pacs|time:"H:i" }}</span>
-                                {% endif %}
-                                <span>${{ registro.monto_original_correccion_pacs|floatformat:2 }} -> ${{ registro.monto_vigente_correccion_pacs|floatformat:2 }}</span>
-                            </div>
+                                <span class="rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-800">Ajuste PACS aplicado</span>
                             {% endif %}
                             {% if registro.auditorias_doppler_mmii %}
-                            <div class="mt-2 space-y-2 text-left">
-                                {% for auditoria_doppler in registro.auditorias_doppler_mmii %}
-                                {% with snapshot=auditoria_doppler.datos_originales_json %}
-                                <div class="rounded-md border border-indigo-200 bg-indigo-50 p-2 text-[11px] leading-snug text-indigo-950">
-                                    <p class="font-bold">Auditoría Doppler MMII · {{ auditoria_doppler.get_estado_display }}</p>
-                                    <p class="mt-1">{{ snapshot.estudio }}: {{ snapshot.cantidad_declarada }} registrada(s) → {{ snapshot.cantidad_esperada|default:"revisión manual" }} según regla.</p>
-                                    <p>Regiones declaradas en el registro: {{ snapshot.regiones_registro_declaradas }}. El monto original no fue modificado por esta auditoría.</p>
-                                    {% if snapshot.posible_duplicado %}
-                                    <p class="mt-1 font-semibold text-amber-800">Posible registro repetido para la misma fecha y práctica; requiere verificación de orden/VisualMedical.</p>
-                                    {% endif %}
-                                    {% if auditoria_doppler.observacion %}<p class="mt-1 whitespace-pre-line">{{ auditoria_doppler.observacion }}</p>{% endif %}
-                                    <div class="mt-1 flex flex-wrap gap-1">
-                                        {% if auditoria_doppler.orden_medica_verificada %}<span class="rounded bg-white px-1.5 py-0.5">Orden verificada</span>{% endif %}
-                                        {% if auditoria_doppler.eges_verificado %}<span class="rounded bg-white px-1.5 py-0.5">EGES consultado</span>{% endif %}
-                                        {% if auditoria_doppler.visualmedical_verificado %}<span class="rounded bg-white px-1.5 py-0.5">VisualMedical verificado</span>{% endif %}
-                                        {% if auditoria_doppler.netterm_verificado %}<span class="rounded bg-white px-1.5 py-0.5">NetTerm consultado</span>{% endif %}
-                                    </div>
-                                    {% if auditoria_doppler.revisado_por %}
-                                    <p class="mt-1 text-indigo-700">Revisado por {{ auditoria_doppler.revisado_por.get_full_name|default:auditoria_doppler.revisado_por.username }} · {{ auditoria_doppler.fecha_revision|date:"d/m/Y H:i" }}</p>
-                                    {% endif %}
-                                    {% if registro.medico.rol == 'medico_residente' %}
-                                    <p class="mt-1 font-semibold">Información de auditoría; sin propuesta de débito para residentes.</p>
-                                    {% else %}
-                                    <p class="mt-1 font-semibold">Impacto potencial sujeto a revisión; no se aplicó un ajuste.</p>
-                                    {% endif %}
-                                </div>
-                                {% endwith %}
-                                {% endfor %}
-                            </div>
+                                <span class="rounded-md border border-indigo-200 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-900">Doppler · {{ registro.comparacion_doppler.estado }}</span>
                             {% endif %}
+                            {% if registro.tiene_revision or registro.auditorias_doppler_mmii or registro.tiene_correccion_pacs %}
+                                <button type="button"
+                                        class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700"
+                                        title="Ver detalle de revisión"
+                                        aria-controls="detalle-revision-{{ registro.pk }}"
+                                        aria-expanded="false"
+                                        onclick="toggleDetalleRevision('{{ registro.pk }}', this)">
+                                    <i class="fas fa-clipboard-check" aria-hidden="true"></i> Ver detalle
+                                </button>
+                            {% else %}
+                                <span class="text-[11px] text-gray-400">Sin revisión</span>
+                            {% endif %}
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-900 font-semibold text-center">{{ registro.cantidad_regiones }}</td>
                         <td class="px-4 py-3 text-sm font-bold text-right {% if registro.anulado %}text-red-700 line-through{% else %}text-gray-900{% endif %}">${{ registro.monto_calculado|floatformat:2 }}</td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-4 py-3">{% include 'liquidacion/_comparacion_doppler.html' with comparacion=registro.comparacion_doppler only %}</td>
+                        <td class="sticky right-0 z-10 bg-white px-4 py-3 text-center shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                             <div class="flex items-center justify-center gap-2">
                                 {% if registro.anulado %}
                                 <span class="inline-flex items-center justify-center w-8 h-8 bg-red-100 text-red-700 rounded-lg" title="Registro anulado administrativamente">
@@ -491,7 +460,7 @@
                         </td>
                     </tr>
                     <tr id="detalle-registro-{{ registro.pk }}" class="hidden bg-gray-50 border-l-4 border-gray-300">
-                        <td colspan="10" class="px-4 py-3">
+                        <td colspan="11" class="px-4 py-3">
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                                 <div class="bg-white rounded border border-gray-200 px-3 py-2">
                                     <p class="text-gray-500">Obra social</p>
@@ -564,11 +533,12 @@
                             </div>
                         </td>
                     </tr>
-                    {% if registro.tiene_revision %}
-                    <tr id="detalle-revision-{{ registro.pk }}" class="hidden bg-indigo-50 border-l-4 border-indigo-300">
-                        <td colspan="10" class="px-4 py-3">
-                            <div class="bg-white rounded-md border border-indigo-200 p-3">
+                    {% if registro.tiene_revision or registro.auditorias_doppler_mmii or registro.tiene_correccion_pacs %}
+                    <tr id="detalle-revision-{{ registro.pk }}" data-revision-detalle class="hidden bg-indigo-50 border-l-4 border-indigo-300">
+                        <td colspan="11" class="px-4 py-3">
+                            <div data-revision-panel style="width: 100%; max-width: calc(100vw - 6rem);">
                                 <h4 class="text-xs font-bold text-indigo-900 mb-2 uppercase tracking-wide">Detalle de revisión (solo lectura)</h4>
+                                {% if registro.tiene_revision %}
                                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-[11px] leading-snug">
                                     <div class="rounded border border-gray-200 px-2 py-1.5 md:col-span-2 lg:col-span-3">
                                         <p class="text-gray-500">Motivo solicitud</p>
@@ -613,13 +583,49 @@
                                         </p>
                                     </div>
                                 </div>
+                                {% endif %}
+                                {% if registro.tiene_correccion_pacs %}
+                                <div class="mt-3 border-t border-blue-200 pt-3 text-xs text-blue-900">
+                                    <h5 class="font-semibold">Ajuste PACS aplicado</h5>
+                                    {% if registro.correccion_pacs_info.horario_nuevo %}<p>Horario {{ registro.correccion_pacs_info.horario_anterior|default:"-" }} → {{ registro.correccion_pacs_info.horario_nuevo }}</p>{% endif %}
+                                    {% if registro.correccion_pacs_info.hora_pacs %}<p>Hora PACS {{ registro.correccion_pacs_info.hora_pacs|time:"H:i" }}</p>{% endif %}
+                                    <p>${{ registro.monto_original_correccion_pacs|floatformat:2 }} → ${{ registro.monto_vigente_correccion_pacs|floatformat:2 }}</p>
+                                    <p class="mt-1 whitespace-pre-line break-words">{{ registro.correccion_pacs_info.observacion }}</p>
+                                </div>
+                                {% endif %}
+                                {% if registro.auditorias_doppler_mmii %}
+                                <section class="mt-3 border-t border-indigo-200 pt-3">
+                                    <h5 class="mb-2 text-sm font-semibold text-indigo-900">Auditoría Doppler MMII</h5>
+                                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    {% for auditoria_doppler in registro.auditorias_doppler_mmii %}
+                                    {% with snapshot=auditoria_doppler.datos_originales_json %}
+                                    <div class="rounded-md border border-indigo-200 bg-white p-3 text-xs leading-relaxed text-indigo-950">
+                                        <p class="font-semibold">{{ snapshot.estudio }} · {{ auditoria_doppler.get_estado_display }}</p>
+                                        <p class="mt-1">Cantidad original: {{ snapshot.cantidad_declarada }} → {% if snapshot.cantidad_esperada != None %}{{ snapshot.cantidad_esperada }} según regla{% else %}revisión manual{% endif %}.</p>
+                                        <p>Regiones originales del registro: {{ snapshot.regiones_registro_declaradas }}. Esta auditoría no aplica cambios al monto.</p>
+                                        {% if snapshot.posible_duplicado %}<p class="mt-1 font-semibold text-amber-800">Posible registro repetido; requiere verificar orden o VisualMedical.</p>{% endif %}
+                                        {% if auditoria_doppler.observacion %}<p class="mt-2 whitespace-pre-line break-words">{{ auditoria_doppler.observacion }}</p>{% endif %}
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            {% if auditoria_doppler.orden_medica_verificada %}<span>Orden verificada</span>{% endif %}
+                                            {% if auditoria_doppler.eges_verificado %}<span>EGES consultado</span>{% endif %}
+                                            {% if auditoria_doppler.visualmedical_verificado %}<span>VisualMedical verificado</span>{% endif %}
+                                            {% if auditoria_doppler.netterm_verificado %}<span>NetTerm consultado</span>{% endif %}
+                                        </div>
+                                        {% if auditoria_doppler.revisado_por %}<p class="mt-2 text-indigo-700">Revisado por {{ auditoria_doppler.revisado_por.get_full_name|default:auditoria_doppler.revisado_por.username }} · {{ auditoria_doppler.fecha_revision|date:"d/m/Y H:i" }}</p>{% endif %}
+                                    </div>
+                                    {% endwith %}
+                                    {% endfor %}
+                                    </div>
+                                    <p class="mt-2 text-xs font-semibold text-indigo-900">{% if registro.medico.rol == 'medico_residente' %}Información de auditoría; sin propuesta de débito para residentes.{% else %}Impacto potencial sujeto a revisión; no se aplicó un ajuste.{% endif %}</p>
+                                </section>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
                     {% endif %}
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="px-4 py-8 text-center text-gray-500">
+                        <td colspan="11" class="px-4 py-8 text-center text-gray-500">
                             <i class="fas fa-inbox text-4xl text-gray-300 mb-2"></i>
                             <p>No se encontraron registros para los filtros seleccionados</p>
                         </td>
@@ -631,6 +637,13 @@
                         <td colspan="7" class="px-4 py-3 text-sm text-gray-700 uppercase">Totales del período</td>
                         <td class="px-4 py-3 text-sm text-center text-gray-900">{{ total_regiones_general }}</td>
                         <td class="px-4 py-3 text-sm text-right text-gray-700">${{ total_monto_practicas|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-xs font-normal text-slate-700">
+                            {% if resumen_doppler.registros_auditados %}
+                            Diferencia estimada no aplicada: ${{ resumen_doppler.diferencia_estimada|floatformat:2 }}.
+                            {% if resumen_doppler.diferencia_informativa_residentes %}<span class="block">Informativa residentes (sin débito): ${{ resumen_doppler.diferencia_informativa_residentes|floatformat:2 }}.</span>{% endif %}
+                            <span class="block">{{ resumen_doppler.registros_estimados }} registros estimados; {{ resumen_doppler.pendientes_estimacion }} pendientes.</span>
+                            {% endif %}
+                        </td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -749,12 +762,25 @@
         detalleRow.classList.toggle('hidden');
     }
 
-    function toggleDetalleRevision(registroId) {
+    function toggleDetalleRevision(registroId, boton) {
         const detalleRow = document.getElementById('detalle-revision-' + registroId);
         if (!detalleRow) {
             return;
         }
         detalleRow.classList.toggle('hidden');
+        const abierto = !detalleRow.classList.contains('hidden');
+        if (abierto) {
+            const contenedor = detalleRow.closest('.overflow-x-auto');
+            const panel = detalleRow.querySelector('[data-revision-panel]');
+            if (contenedor && panel) {
+                panel.style.width = `${Math.max(0, contenedor.clientWidth - 32)}px`;
+                contenedor.scrollLeft = 0;
+            }
+            detalleRow.scrollIntoView({block: 'nearest', inline: 'nearest'});
+        }
+        if (boton) {
+            boton.setAttribute('aria-expanded', String(abierto));
+        }
     }
 </script>
 {% endblock %}

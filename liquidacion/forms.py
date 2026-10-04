@@ -313,6 +313,25 @@ class RevisionAuditoriaDopplerMMIIForm(forms.Form):
         return cleaned
 
 
+class ConfirmacionLoteDopplerMMIIForm(RevisionAuditoriaDopplerMMIIForm):
+    casos = forms.MultipleChoiceField()
+    fecha_desde = forms.DateField()
+    fecha_hasta = forms.DateField()
+    profesional = forms.IntegerField(required=False, min_value=1)
+
+    def __init__(self, *args, caso_choices=(), **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['casos'].choices = caso_choices
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get('fecha_desde') and datos.get('fecha_hasta') and datos['fecha_desde'] > datos['fecha_hasta']:
+            raise forms.ValidationError('El rango de fechas no es valido.')
+        if len(datos.get('casos', [])) > 200:
+            raise forms.ValidationError('Selecciona hasta 200 casos por lote.')
+        return datos
+
+
 class RevisionCruceEgesRegistroForm(forms.Form):
     """Resolucion administrativa de una advertencia EGES sin modificar liquidacion."""
 

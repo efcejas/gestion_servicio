@@ -1,6 +1,6 @@
 # Auditoria de Doppler MMII
 
-> Estado: P1 de revision persistente implementada localmente; pendiente de despliegue.
+> Estado: revision persistente P1 publicada en rama; estimaciones y lotes P2 implementados localmente, pendientes de despliegue.
 > Corte de datos de produccion: 2026-10-03.
 > No aplica correcciones ni modifica cantidades o montos.
 
@@ -83,7 +83,7 @@ Los registros candidatos a duplicado permanecen como filas independientes y mues
 - Template `templates/liquidacion/auditoria_doppler_mmii.html`, enlazado desde Sesiones Contables.
 - Regresiones en `liquidacion/tests_auditoria_doppler.py`.
 
-No existe aun enlace automatico de cada prestacion con su orden de VisualMedical ni una fuente estructurada de facturas/debitos/pagos. La pantalla no simula importes corregidos.
+No existe aun enlace automatico de cada prestacion con su orden de VisualMedical ni una fuente estructurada de facturas/debitos/pagos. La estimacion segun cantidades confirmadas no demuestra lo efectivamente facturado, debitado o pagado.
 
 ### Revision persistente P1
 
@@ -93,7 +93,41 @@ Estados: `PENDIENTE`, `CONFIRMADO`, `DESCARTADO` y `REQUIERE_EVIDENCIA`. Confirm
 
 En `Mis registros`, cada profesional ve solo los casos asociados a sus registros: cantidad original/esperada, estado, observacion, fuentes y revisor. No se muestran referencias a registros ajenos. Residentes reciben informacion sin propuesta de debito; para otros roles se indica impacto potencial no aplicado.
 
-La persistencia de auditoria no cambia prestaciones, regiones, horario, montos ni estados contables. No modifica `calcular_monto()`, signals o B2/B3. Las migraciones nuevas `0053`, `0054` y `0055` agregan revision, historial y autor nullable para casos historicos; no se aplicaron en produccion.
+La persistencia de auditoria no cambia prestaciones, regiones, horario, montos ni estados contables. P2 agrega un parametro opcional a `calcular_monto()` para simular cantidades, reutilizando sus reglas sin escribir datos; los llamados existentes mantienen su comportamiento. No cambia signals o B2/B3. Las migraciones `0053`, `0054` y `0055` agregan revision, historial y autor nullable; `0056` agrega los JSON de estimacion a revision e historial. En este trabajo no se ejecutaron migraciones en produccion.
+
+### Uso de lotes P2
+
+1. Filtrar por periodo y profesional en la auditoria Doppler y generar los casos, si no estan persistidos.
+2. Revisar las ordenes o VisualMedical del conjunto que se pretende confirmar.
+3. Marcar casos individuales o `Elegibles de esta pagina`. No selecciona otras paginas ni todo el periodo.
+4. Marcar la evidencia verificada para TODOS los seleccionados y escribir el fundamento comun.
+5. Pulsar `Confirmar seleccionados` y aceptar la confirmacion. Se agrega una decision e historial por caso, sin tocar las prestaciones ni el monto oficial.
+
+El lote admite hasta 200 casos pendientes o que requieren evidencia, con cantidad declarada 2 y esperada 1. Excluye posibles duplicados, decisiones confirmadas/descartadas y cantidades manuales. El backend revalida los filtros, los datos y la deteccion de duplicados. Si un caso no es elegible o cambio, se rechaza TODO el lote sin decisiones parciales. Un reenvio no sobreescribe decisiones ya guardadas.
+
+### Comparacion economica P2
+
+La columna `Comparacion Doppler` aparece en auditoria, `Mis registros` y liquidacion mensual. Muestra monto original al detectar, estimado segun decisiones confirmadas y diferencia estimada; el monto vigente oficial permanece en su columna habitual. La simulacion se hace sobre el registro completo (tambien en registros mixtos), sustituyendo solo las cantidades confirmadas. Arterial y venoso en el mismo registro no duplican el importe total.
+
+Una decision guarda la estimacion y sus datos de calculo tanto en el caso como en su evento de historial. Las pantallas y Excel leen esa estimacion guardada, sin recalcular a partir de cambios posteriores de aranceles. Una nueva decision puede generar otra estimacion, conservando el evento anterior.
+
+Se usa la fecha, obra social, contexto y reglas del calculo canonico. Antes de estimar, el monto original debe poder reproducirse con las tarifas historicas disponibles y todas las practicas deben tener precio positivo. Si los datos cambiaron, faltan tarifas, hay un duplicado confirmado o la cantidad es manual, se muestra `Pendiente` y su motivo, nunca cero como sustituto de un importe desconocido. Si quedan casos sin confirmar, la estimacion disponible se identifica como parcial. Los casos de P1 sin fuente completa conservan sus snapshots y se validan contra los campos originales disponibles al decidir.
+
+Los resumenes separan diferencia estimada potencial para roles generales e informacion de residentes. La diferencia de residentes NO se suma como debito propuesto. No existe aplicacion de debitos Doppler en P2; por eso se muestra `No aplicado`, no un supuesto debito real.
+
+### Excel P2
+
+Ambos Excel conservan columnas y totales oficiales, y agregan al final las mismas columnas de comparacion Doppler. Incluyen una hoja `Auditoria Doppler` con cantidades, decisiones, evidencia, fundamento, revisor y fecha. Los importes de un registro se muestran una sola vez en esa hoja aunque tenga varios casos. Los textos del auditor se exportan como texto, no como formulas.
+
+El Excel personal mantiene solo datos propios. Descarga todos los registros vigentes del mes/anio elegido, de todas las modalidades, y las guardias; ignora los filtros de modalidad, busqueda y hoy de la pantalla para evitar planillas incompletas. Los anulados siguen excluidos, como antes.
+
+El archivo personal abre en un `Resumen` compacto, preparado para imprimir en una pagina y sin totales repetidos ni filas tecnicas de persistencia. Identifica profesional, rol y periodo; muestra practicas (todas las modalidades), guardias y TOTAL ACTUAL.
+
+El contenido se adapta al rol autenticado, no a un parametro de descarga. Para `medico_residente` muestra solo la liquidacion vigente y la revision informativa de cantidades; no incluye columnas de debito, credito, diferencias monetarias o total proyectado en ninguna hoja. Para otros roles (incluidos jefe/instructor) agrega POSIBLE DEBITO y TOTAL ESTIMADO SI SE CORRIGE. Solo muestra credito cuando hay alguno. Los importes son estimaciones no aplicadas. Si faltan estimaciones o decisiones, advierte que la estimacion es parcial.
+
+En `Practicas` se conservan los registros de todas las modalidades, cantidades y montos registrados. Metadatos de carga/sesion quedan ocultos por defecto, no eliminados. Se agrega estado de revision y, solo para roles no residentes, posible debito y monto estimado por registro (credito solo cuando existe). Los importes no calculables muestran `Pendiente`, no cero. `Guardias` conserva el detalle; `Revision Doppler` muestra cantidades, observacion, fuentes verificadas y revisor, con importes de registro una sola vez y solo para no residentes. La proyeccion no afirma facturacion o debito real ni modifica montos. El Excel administrativo mantiene su formato operativo separado.
+
+El administrativo preliminar y el definitivo comparten la comparacion, pero sus totales oficiales siguen usando `monto_calculado`. El definitivo no descuenta estimaciones. Los resumenes muestran cuantos registros tienen estimacion y cuantos siguen pendientes.
 
 NetTerm no tiene importador ni cruce implementado en P1. La casilla solo registra que el auditor consulto esa fuente manualmente. Para integrarlo al cruce EGES se necesita primero una muestra anonimizada del formato exportado o del texto copiado, y definir identificadores, fechas, practicas y criterios de ambiguedad sin ajustes economicos automaticos.
 
@@ -102,6 +136,6 @@ NetTerm no tiene importador ni cruce implementado en P1. La casilla solo registr
 1. Contrastar los tres grupos de septiembre y una muestra de registros con cantidad 2 contra orden y VisualMedical.
 2. Revisar si existen otras variantes de nombre/codigo para arterial y venoso MMII en el catalogo.
 3. Validar operativamente los snapshots y decisiones P1 antes del despliegue.
-4. Separar una futura diferencia monetaria estimada del monto facturado/debitado real, que no esta disponible como dato estructurado.
+4. Definir una fase separada para aplicar ajustes autorizados y registrar facturas/debitos reales; P2 solo estima.
 5. Revisar la proteccion contra doble envio del formulario; no asumir que todos los candidatos detectados son errores del usuario.
 6. Disenar la entrada NetTerm y su integracion con los cruces existentes a partir de una muestra anonimizada.
