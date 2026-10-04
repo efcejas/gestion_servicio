@@ -336,6 +336,63 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         self.assertContains(response_filtrada, 'Ecodoppler arterial MM inferiores')
 
     @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_filtro_estado_revision_incluye_candidatos_sin_caso_y_estados_persistidos(self):
+        registro = self._crear_registro()
+        RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.arterial,
+            cantidad=2,
+            contexto='SERVICIO',
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            cantidad_regiones=2,
+            monto_calculado=Decimal('48400.00'),
+        )
+        jefe = User.objects.create_user(
+            username='jefatura_filtro_doppler',
+            first_name='Jefe',
+            last_name='Servicio',
+            rol='jefe_servicio',
+            perfil_completo=True,
+        )
+        self.client.force_login(jefe)
+        url = reverse('liquidacion:auditoria_doppler_mmii')
+
+        sin_iniciar = self.client.get(url, {'estado_revision': 'SIN_INICIAR'})
+        self.assertEqual(sin_iniciar.status_code, 200)
+        self.assertEqual(
+            [item['registro_id'] for item in sin_iniciar.context['resultados']],
+            [registro.pk],
+        )
+
+        auditoria = auditar_cantidad_doppler_mmii(
+            fecha_desde=date(2026, 6, 1),
+            fecha_hasta=date(2026, 9, 30),
+        )
+        crear_casos_auditoria_doppler_mmii(auditoria, jefe)
+        caso = RevisionAuditoriaDopplerMMII.objects.get(registro=registro)
+        pendiente = self.client.get(url, {'estado_revision': 'PENDIENTE'})
+        self.assertEqual(
+            [item['registro_id'] for item in pendiente.context['resultados']],
+            [registro.pk],
+        )
+        sin_iniciar_despues = self.client.get(url, {'estado_revision': 'SIN_INICIAR'})
+        self.assertEqual(len(sin_iniciar_despues.context['resultados']), 0)
+
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=caso.pk,
+            decision=RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+            evidencias={'orden_medica_verificada': True},
+            observacion='Orden verificada.',
+            usuario=jefe,
+        )
+        confirmado = self.client.get(url, {'estado_revision': 'CONFIRMADO'})
+        self.assertEqual(
+            [item['registro_id'] for item in confirmado.context['resultados']],
+            [registro.pk],
+        )
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
     def test_pantalla_muestra_posible_duplicado_y_referencias(self):
         primero = self._crear_registro()
         RegistroEstudio.objects.create(registro=primero, estudio=self.arterial, cantidad=1)

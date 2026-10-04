@@ -1448,6 +1448,17 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
                 if item['diferencia_cantidad'] != 0 or item['requiere_revision_manual']
             ]
 
+        estados_revision = {
+            'SIN_INICIAR',
+            RevisionAuditoriaDopplerMMII.ESTADO_PENDIENTE,
+            RevisionAuditoriaDopplerMMII.ESTADO_REQUIERE_EVIDENCIA,
+            RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO,
+            RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO,
+        }
+        estado_revision = (self.request.GET.get('estado_revision') or '').strip()
+        if estado_revision not in estados_revision:
+            estado_revision = ''
+
         for item in resultados:
             item['tratamiento_economico_display'] = (
                 'Informativo · sin débito'
@@ -1455,10 +1466,30 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
                 else 'Impacto potencial · revisar'
             )
             for estudio in item['estudios']:
+                caso = estudio['revision_auditoria']
+                if caso:
+                    estudio['estado_revision_filtro'] = caso.estado
+                elif (
+                    estudio['requiere_revision_manual']
+                    or estudio['posible_duplicado']
+                    or estudio['diferencia_cantidad'] not in (None, 0)
+                ):
+                    estudio['estado_revision_filtro'] = 'SIN_INICIAR'
+                else:
+                    estudio['estado_revision_filtro'] = ''
                 estudio['registros_duplicado_display'] = ', '.join(
                     f'#{registro_id}'
                     for registro_id in estudio['otros_registros_posible_duplicado']
                 )
+
+        if estado_revision:
+            resultados = [
+                item for item in resultados
+                if any(
+                    estudio['estado_revision_filtro'] == estado_revision
+                    for estudio in item['estudios']
+                )
+            ]
 
         pagina = Paginator(resultados, 100).get_page(self.request.GET.get('page'))
         registros_comparados = adjuntar_comparacion_doppler_mmii(
@@ -1478,6 +1509,15 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
             ],
             'profesional_actual': profesional_id,
             'solo_diferencias': solo_diferencias,
+            'estado_revision_actual': estado_revision,
+            'estados_revision': [
+                ('', 'Todos'),
+                ('SIN_INICIAR', 'Sin revisión iniciada'),
+                (RevisionAuditoriaDopplerMMII.ESTADO_PENDIENTE, 'Pendiente'),
+                (RevisionAuditoriaDopplerMMII.ESTADO_REQUIERE_EVIDENCIA, 'Requiere evidencia'),
+                (RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO, 'Diferencia confirmada'),
+                (RevisionAuditoriaDopplerMMII.ESTADO_DESCARTADO, 'Diferencia descartada'),
+            ],
             'fecha_desde': fecha_desde.isoformat(),
             'fecha_hasta': fecha_hasta.isoformat(),
             'error_fechas': error_fechas,
@@ -1490,7 +1530,10 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
 def _url_auditoria_doppler_con_filtros(params):
     filtros = {
         key: (params.get(key) or '').strip()
-        for key in ('fecha_desde', 'fecha_hasta', 'profesional', 'solo_diferencias', 'page')
+        for key in (
+            'fecha_desde', 'fecha_hasta', 'profesional', 'solo_diferencias',
+            'estado_revision', 'page',
+        )
         if (params.get(key) or '').strip()
     }
     query = urlencode(filtros)
