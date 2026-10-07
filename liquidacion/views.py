@@ -9,6 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError
+from django.core import signing
 from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField, prefetch_related_objects
 from django.utils.dateparse import parse_date
 from django.db import transaction
@@ -107,13 +108,15 @@ from .services_cierre import construir_checklist_cierre_sesion
 from .services_eges import (
     adjuntar_comparacion_reanalisis_jornadas,
     construir_preview_cruce_liquidacion_eges,
+    construir_plan_correccion_doppler_eges,
+    motivo_no_seleccionable_correccion_doppler,
     ultimo_control_usa_jornadas,
     procesar_control_eges_sesion,
     resumir_control_eges_sesion,
     serializar_resultado_control_eges,
 )
 from .services_jornadas import INICIO_JORNADAS
-from eges_import.models import ImportBatch
+from eges_import.models import EgesRow, ImportBatch
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -1711,6 +1714,11 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             preview['resultados_filtrados_total'] = paginacion['total']
             preview['page_obj'] = paginacion['page_obj']
             preview['paginator'] = paginacion['paginator']
+            for item in preview['resultados']:
+                item['doppler_correccion_seleccionable'] = (
+                    self.sesion.estado in {'ABIERTA', 'REVISION'}
+                    and not motivo_no_seleccionable_correccion_doppler(item)
+                )
 
         context.update({
             'sesion': self.sesion,
@@ -1723,6 +1731,10 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
             'puede_validacion_masiva_eges': (
                 _puede_accion_masiva_revision_horaria(self.request.user)
                 and self.sesion.estado not in {'FACTURADA', 'PAGADA'}
+            ),
+            'puede_corregir_doppler_seleccionado': (
+                _puede_accion_masiva_revision_horaria(self.request.user)
+                and self.sesion.estado in {'ABIERTA', 'REVISION'}
             ),
             'puede_reanalizar_jornadas': (
                 _puede_acceder_panel_administrativo(self.request.user)
@@ -2064,7 +2076,10 @@ class CruceEgesBulkValidarSeleccionView(LoginRequiredMixin, UserPassesTestMixin,
 
 
 class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, View):
-    """Recalcula Doppler de residentes elegibles usando el cruce EGES."""
+    """Exige seleccion explicita y preview antes de aplicar cambios Doppler."""
+
+    TOKEN_SALT = 'liquidacion.cruce_eges.correccion_doppler_preview.v1'
+    TOKEN_MAX_AGE_SECONDS = 900
 
     def test_func(self):
         return _puede_accion_masiva_revision_horaria(self.request.user)
@@ -2078,159 +2093,206 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
 
     def post(self, request, *args, **kwargs):
         sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
-        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
-        redirect_url = request.POST.get('next') or (
-            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk})
-            + f'?batch={batch.pk}'
+        redirect_url = request.POST.get('next') or reverse(
+            'liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk},
         )
-        if sesion.estado not in {'ABIERTA', 'REVISION'}:
-            messages.error(
-                request,
-                'Para aplicar correcciones economicas la sesion debe estar ABIERTA o EN REVISION.',
-            )
-            return redirect(redirect_url)
-
         observacion = (request.POST.get('observacion') or '').strip()
         if not observacion or len(observacion) > 1000:
-            messages.error(
-                request,
-                'Indica una observacion de hasta 1000 caracteres para el recálculo masivo.',
-            )
+            messages.error(request, 'Indica un motivo de hasta 1000 caracteres para la correccion.')
+            return redirect(redirect_url)
+        if request.POST.get('accion') == 'aplicar':
+            return self._aplicar_preview(request, sesion, redirect_url, observacion)
+        return self._mostrar_preview(request, sesion, redirect_url, observacion)
+
+    def _obtener_ids_seleccionados(self, request):
+        valores = request.POST.getlist('registros_doppler')
+        if not valores or len(valores) > 100 or any(not valor.isdigit() for valor in valores):
+            raise ValidationError('Selecciona entre 1 y 100 registros Doppler elegibles.')
+        ids = [int(valor) for valor in valores]
+        if len(set(ids)) != len(ids):
+            raise ValidationError('La seleccion contiene registros repetidos.')
+        return ids
+
+    def _crear_plan(self, sesion, batch, ids):
+        usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
+        return construir_plan_correccion_doppler_eges(
+            sesion, batch, ids, usar_jornadas=usar_jornadas,
+        )
+
+    def _mostrar_preview(self, request, sesion, redirect_url, observacion):
+        try:
+            if sesion.estado not in {'ABIERTA', 'REVISION'}:
+                raise ValidationError('La sesion debe estar ABIERTA o EN REVISION.')
+            ids = self._obtener_ids_seleccionados(request)
+            batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+            plan = self._crear_plan(sesion, batch, ids)
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
             return redirect(redirect_url)
 
-        usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
-        preview = construir_preview_cruce_liquidacion_eges(
-            sesion,
-            batch,
-            usar_jornadas=usar_jornadas,
-        )
-        candidatos = {}
-        for item in preview['resultados']:
-            mejor_match = item.get('mejor_match') or {}
-            horario_eges = mejor_match.get('horario_esperado')
-            if (
-                horario_eges in {'INTRA', 'EXTRA'}
-                and mejor_match.get('medico_ok')
-                and item.get('matches_practicas')
-            ):
-                fila_eges = mejor_match.get('fila_eges')
-                candidatos[item['registro'].pk] = {
-                    'horario': horario_eges,
-                    'hora_eges': getattr(fila_eges, 'hora_turno', None),
-                }
+        puede_confirmar = bool(plan['candidatos']) and not plan['excluidos']
+        token = None
+        if puede_confirmar:
+            token = signing.dumps({
+                'usuario_id': request.user.pk,
+                'sesion_id': sesion.pk,
+                'batch_id': batch.pk,
+                'observacion': observacion,
+                'snapshots': plan['snapshots'],
+            }, salt=self.TOKEN_SALT, compress=True)
+        total_anterior = sum((candidato['monto_anterior'] for candidato in plan['candidatos']), Decimal('0.00'))
+        total_nuevo = sum((candidato['monto_nuevo'] for candidato in plan['candidatos']), Decimal('0.00'))
+        diferencia_total = total_nuevo - total_anterior
+        return render(request, 'liquidacion/cruce_eges_doppler_preview.html', {
+            'sesion': sesion,
+            'batch': batch,
+            'next': redirect_url,
+            'observacion': observacion,
+            'candidatos': plan['candidatos'],
+            'excluidos': plan['excluidos'],
+            'total_anterior': total_anterior,
+            'total_nuevo': total_nuevo,
+            'diferencia_total': diferencia_total,
+            'impacto_total_label': 'Posible crédito' if diferencia_total > 0 else 'Posible débito',
+            'impacto_total_monto': abs(diferencia_total),
+            'seleccionados_count': len(plan['seleccionados']),
+            'token': token,
+            'puede_confirmar': puede_confirmar,
+        })
 
-        aplicados = 0
-        with transaction.atomic():
-            registros = list(
-                RegistroEstudiosPorMedico.objects
-                .select_for_update()
-                .filter(
-                    pk__in=candidatos,
-                    sesion_contable=sesion,
-                    anulado=False,
-                    medico__rol='medico_residente',
-                )
-                .order_by('pk')
+    def _aplicar_preview(self, request, sesion, redirect_url, observacion):
+        if request.POST.get('confirmar') != '1':
+            messages.error(request, 'Confirma expresamente la seleccion previsualizada.')
+            return redirect(redirect_url)
+        if not observacion:
+            messages.error(request, 'El motivo es obligatorio para aplicar la correccion.')
+            return redirect(redirect_url)
+        try:
+            payload = signing.loads(
+                request.POST.get('preview_token', ''),
+                salt=self.TOKEN_SALT,
+                max_age=self.TOKEN_MAX_AGE_SECONDS,
             )
-            prefetch_related_objects(
-                registros,
-                'medico',
-                'registroestudio_set__estudio__grupo_tarifario',
-            )
-            revisiones_bloqueadas = (
-                RevisionCruceEgesRegistro.objects
-                .select_for_update()
-                .filter(
-                    sesion_contable=sesion,
-                    batch_eges=batch,
-                    registro_id__in=[registro.pk for registro in registros],
-                )
-                .order_by('registro_id', '-fecha_revision')
-            )
-            revisiones_actuales = {}
-            for revision in revisiones_bloqueadas:
-                revisiones_actuales.setdefault(revision.registro_id, revision)
+        except signing.BadSignature:
+            messages.error(request, 'El preview vencio o fue alterado. Selecciona nuevamente los registros.')
+            return redirect(redirect_url)
+        if payload.get('usuario_id') != request.user.pk or payload.get('sesion_id') != sesion.pk:
+            messages.error(request, 'El preview no corresponde a tu usuario o a esta sesion.')
+            return redirect(redirect_url)
+        if observacion != payload.get('observacion'):
+            messages.error(request, 'El motivo cambio respecto del preview. Vuelve a previsualizar la seleccion.')
+            return redirect(redirect_url)
+        if str(request.POST.get('batch')) != str(payload.get('batch_id')):
+            messages.error(request, 'El batch no coincide con el preview. Vuelve a seleccionar los casos.')
+            return redirect(redirect_url)
 
-            for registro in registros:
-                revision = revisiones_actuales.get(registro.pk)
-                relaciones = list(registro.registroestudio_set.all())
-                if not relaciones or any(
-                    (rel.estudio.tipo or '').upper() != 'DOP'
-                    for rel in relaciones
-                ):
-                    continue
+        snapshots_esperados = payload.get('snapshots') or []
+        ids = [snapshot.get('registro_id') for snapshot in snapshots_esperados]
+        if not ids or len(ids) > 100 or any(not isinstance(registro_id, int) for registro_id in ids):
+            messages.error(request, 'El preview no contiene una seleccion valida.')
+            return redirect(redirect_url)
 
-                datos = candidatos[registro.pk]
-                monto_anterior = registro.monto_calculado or Decimal('0.00')
-                horario_anterior = registro.horario
-                registro.horario = datos['horario']
-                monto_nuevo = registro.calcular_monto()
-                if horario_anterior == registro.horario and monto_anterior == monto_nuevo:
-                    continue
-                hora_texto = (
-                    datos['hora_eges'].strftime('%H:%M')
-                    if datos['hora_eges']
-                    else 'sin hora'
+        try:
+            with transaction.atomic():
+                sesion = SesionContable.objects.select_for_update().get(pk=sesion.pk)
+                if sesion.estado not in {'ABIERTA', 'REVISION'}:
+                    raise ValidationError('La sesion dejo de estar ABIERTA o EN REVISION.')
+                batch = ImportBatch.objects.get(pk=payload.get('batch_id'))
+                registros_bloqueados = list(
+                    RegistroEstudiosPorMedico.objects.select_for_update()
+                    .filter(pk__in=ids, sesion_contable=sesion, anulado=False)
+                    .order_by('pk')
                 )
-                motivo = (
-                    'Correccion automatica de Doppler de residente segun cruce EGES. '
-                    f'Horario: {horario_anterior} -> {registro.horario}. '
-                    f'Hora EGES: {hora_texto}. '
-                    f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                if len(registros_bloqueados) != len(ids):
+                    raise ValidationError('Uno o mas registros cambiaron o ya no pertenecen a la sesion.')
+                prefetch_related_objects(
+                    registros_bloqueados,
+                    'medico', 'registroestudio_set__estudio__grupo_tarifario',
                 )
-                registro.monto_calculado = monto_nuevo
-                registro.modificado_por = request.user
-                registro.fecha_modificacion = now()
-                registro.motivo_modificacion = motivo
-                registro.save(update_fields=[
-                    'horario',
-                    'monto_calculado',
-                    'modificado_por',
-                    'fecha_modificacion',
-                    'motivo_modificacion',
-                ])
-                correccion = CorreccionPacsRegistro.objects.create(
-                    sesion_contable=sesion,
-                    registro=registro,
-                    tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
-                    horario_anterior=horario_anterior,
-                    horario_nuevo=registro.horario,
-                    monto_anterior=monto_anterior,
-                    monto_nuevo=monto_nuevo,
-                    observacion=motivo,
-                    corregido_por=request.user,
+                list(RegistroEstudio.objects.select_for_update().filter(
+                    registro_id__in=ids,
+                ).order_by('registro_id', 'pk'))
+                usar_jornadas, _control = ultimo_control_usa_jornadas(sesion, batch)
+                plan = construir_plan_correccion_doppler_eges(
+                    sesion, batch, ids, usar_jornadas=usar_jornadas,
                 )
-                _cerrar_revision_eges_por_correccion(
-                    sesion,
-                    registro,
-                    correccion,
-                    request.user,
-                    batch=batch,
-                    revision=revision,
+                eges_ids = [snapshot['fila_eges_id'] for snapshot in plan['snapshots']]
+                filas_bloqueadas = list(EgesRow.objects.select_for_update().filter(
+                    pk__in=eges_ids, batch=batch,
+                ).order_by('pk'))
+                if len(filas_bloqueadas) != len(set(eges_ids)):
+                    raise ValidationError('Una fila EGES del preview ya no esta disponible.')
+                revisiones_bloqueadas = list(
+                    RevisionCruceEgesRegistro.objects.select_for_update()
+                    .filter(sesion_contable=sesion, batch_eges=batch, registro_id__in=ids)
+                    .order_by('registro_id', '-fecha_revision')
                 )
-                RevisionAuditoriaEcoRegistro.objects.create(
-                    sesion_contable=sesion,
-                    registro=registro,
-                    estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
-                    motivos_json=revision.motivos_json if revision else [],
-                    observacion=(
-                        f'Correccion Doppler desde EGES aplicada. '
-                        f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
-                    ),
-                    revisado_por=request.user,
+                revisiones_actuales = {}
+                for revision in revisiones_bloqueadas:
+                    revisiones_actuales.setdefault(revision.registro_id, revision)
+                plan = construir_plan_correccion_doppler_eges(
+                    sesion, batch, ids, usar_jornadas=usar_jornadas,
                 )
-                aplicados += 1
+                if plan['excluidos'] or plan['snapshots'] != snapshots_esperados:
+                    raise ValidationError(
+                        'El registro, el match EGES o el calculo cambiaron desde el preview. No se aplico ningun cambio.'
+                    )
 
-        if aplicados:
-            messages.success(
-                request,
-                f'Se corrigieron y recalcularon {aplicados} Doppler de residentes.',
+                registros_por_id = {registro.pk: registro for registro in registros_bloqueados}
+                for candidato in plan['candidatos']:
+                    snapshot = candidato['snapshot']
+                    registro = registros_por_id[snapshot['registro_id']]
+                    revision = revisiones_actuales.get(registro.pk)
+                    horario_anterior = registro.horario
+                    monto_anterior = registro.monto_calculado or Decimal('0.00')
+                    horario_nuevo = candidato['horario_nuevo']
+                    monto_nuevo = candidato['monto_nuevo']
+                    hora_eges = candidato['fila_eges'].hora_turno
+                    hora_texto = hora_eges.strftime('%H:%M') if hora_eges else 'sin hora'
+                    motivo = (
+                        'Correccion automatica de Doppler de residente segun cruce EGES. '
+                        f'Horario: {horario_anterior} -> {horario_nuevo}. '
+                        f'Hora EGES: {hora_texto}. Monto: ${monto_anterior} -> ${monto_nuevo}. '
+                        f'{observacion}'
+                    )
+                    registro.horario = horario_nuevo
+                    registro.monto_calculado = monto_nuevo
+                    registro.modificado_por = request.user
+                    registro.fecha_modificacion = now()
+                    registro.motivo_modificacion = motivo
+                    registro.save(update_fields=[
+                        'horario', 'monto_calculado', 'modificado_por',
+                        'fecha_modificacion', 'motivo_modificacion',
+                    ])
+                    correccion = CorreccionPacsRegistro.objects.create(
+                        sesion_contable=sesion, registro=registro,
+                        tipo_correccion=CorreccionPacsRegistro.TIPO_HORARIO_RECALCULADO,
+                        horario_anterior=horario_anterior, horario_nuevo=horario_nuevo,
+                        monto_anterior=monto_anterior, monto_nuevo=monto_nuevo,
+                        observacion=motivo, corregido_por=request.user,
+                    )
+                    _cerrar_revision_eges_por_correccion(
+                        sesion, registro, correccion, request.user,
+                        batch=batch, revision=revision,
+                    )
+                    RevisionAuditoriaEcoRegistro.objects.create(
+                        sesion_contable=sesion, registro=registro,
+                        estado=RevisionAuditoriaEcoRegistro.ESTADO_VALIDADO,
+                        motivos_json=revision.motivos_json if revision else [],
+                        observacion=(
+                            f'Correccion Doppler desde EGES aplicada. '
+                            f'Monto: ${monto_anterior} -> ${monto_nuevo}. {observacion}'
+                        ),
+                        revisado_por=request.user,
+                    )
+        except (ValidationError, ImportBatch.DoesNotExist, SesionContable.DoesNotExist) as error:
+            mensaje = '; '.join(error.messages) if isinstance(error, ValidationError) else (
+                'El batch o la sesion ya no estan disponibles.'
             )
-        else:
-            messages.warning(
-                request,
-                'No hubo Doppler de residentes con diferencia de horario o monto y coincidencia EGES confiable.',
-            )
+            messages.error(request, mensaje)
+            return redirect(redirect_url)
+
+        messages.success(request, f'Se corrigieron {len(ids)} Doppler seleccionados y previsualizados.')
         return redirect(redirect_url)
 
 

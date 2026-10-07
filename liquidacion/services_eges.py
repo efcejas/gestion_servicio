@@ -1,4 +1,5 @@
 from datetime import time
+from decimal import Decimal
 import re
 import unicodedata
 from collections import OrderedDict, defaultdict
@@ -633,6 +634,134 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
         'batch': batch,
         'resumen': resumen,
         'resultados': resultados,
+    }
+
+
+def motivo_no_seleccionable_correccion_doppler(item):
+    registro = item['registro']
+    relaciones = list(registro.registroestudio_set.select_related('estudio').all())
+    mejor = item.get('mejor_match') or {}
+    if registro.anulado or registro.medico.rol != 'medico_residente':
+        return 'Solo residentes con registros activos pueden usar esta correccion.'
+    if not relaciones or any((rel.estudio.tipo or '').upper() != 'DOP' for rel in relaciones):
+        return 'El registro debe contener exclusivamente estudios Doppler.'
+    if mejor.get('horario_esperado') not in {'INTRA', 'EXTRA'}:
+        return 'EGES no determina un horario INTRA/EXTRA confiable.'
+    if not mejor.get('medico_ok') or not item.get('matches_practicas'):
+        return 'No hay coincidencia confiable de profesional y practica en EGES.'
+    return ''
+
+
+def construir_plan_correccion_doppler_eges(sesion, batch, registro_ids, usar_jornadas=False):
+    """Prepara el antes/despues de una seleccion sin persistir cambios."""
+    ids = list(dict.fromkeys(int(registro_id) for registro_id in registro_ids))
+    diagnostico = construir_preview_cruce_liquidacion_eges(
+        sesion, batch, registro_ids=ids, usar_jornadas=usar_jornadas,
+    )
+    resultados = {item['registro'].pk: item for item in diagnostico['resultados']}
+    candidatos = []
+    excluidos = []
+    snapshots = []
+    for registro_id in ids:
+        item = resultados.get(registro_id)
+        if not item:
+            excluidos.append({'registro_id': registro_id, 'motivo': 'No pertenece al periodo o a la sesion seleccionada.'})
+            continue
+        registro = item['registro']
+        motivo = motivo_no_seleccionable_correccion_doppler(item)
+        mejor = item.get('mejor_match') or {}
+        horario_objetivo = mejor.get('horario_esperado')
+        relaciones = list(registro.registroestudio_set.select_related('estudio').all())
+        if motivo:
+            excluidos.append({'registro_id': registro_id, 'motivo': motivo})
+            continue
+
+        horario_anterior = registro.horario
+        monto_anterior = registro.monto_calculado or Decimal('0.00')
+        registro.horario = horario_objetivo
+        try:
+            monto_nuevo = registro.calcular_monto()
+        finally:
+            registro.horario = horario_anterior
+        if horario_anterior == horario_objetivo and monto_anterior == monto_nuevo:
+            excluidos.append({'registro_id': registro_id, 'motivo': 'No hay diferencia de horario ni de monto para corregir.'})
+            continue
+
+        fila_eges = mejor.get('fila_eges')
+        estudios_origen = sorted([
+            [rel.pk, rel.estudio_id, rel.cantidad, rel.contexto]
+            for rel in relaciones
+        ])
+        practicas_preview = [
+            {
+                'nombre': rel.estudio.nombre,
+                'cantidad': rel.cantidad,
+                'contexto': rel.get_contexto_display() if rel.contexto else '',
+            }
+            for rel in relaciones
+        ]
+        revision = item.get('revision_cruce_eges')
+        ultima_correccion = registro.correcciones_pacs.order_by('-fecha_correccion', '-pk').values_list(
+            'pk', 'fecha_correccion',
+        ).first()
+        snapshot = {
+            'registro_id': registro.pk,
+            'medico_id': registro.medico_id,
+            'rol': registro.medico.rol,
+            'fecha': registro.fecha_del_informe.isoformat() if registro.fecha_del_informe else None,
+            'dni': registro.dni_paciente,
+            'tipo_obra_social': registro.tipo_obra_social,
+            'horario_anterior': horario_anterior,
+            'monto_anterior': str(monto_anterior),
+            'fecha_modificacion': registro.fecha_modificacion.isoformat() if registro.fecha_modificacion else None,
+            'modificado_por_id': registro.modificado_por_id,
+            'ultima_correccion_pacs': [
+                ultima_correccion[0], ultima_correccion[1].isoformat(),
+            ] if ultima_correccion else None,
+            'horario_objetivo': horario_objetivo,
+            'monto_nuevo': str(monto_nuevo),
+            'batch_id': batch.pk,
+            'fila_eges_id': fila_eges.pk,
+            'hora_eges': fila_eges.hora_turno.isoformat() if fila_eges.hora_turno else None,
+            'fila_eges_fingerprint': [
+                fila_eges.fecha_turno.isoformat() if fila_eges.fecha_turno else None,
+                fila_eges.hora_turno.isoformat() if fila_eges.hora_turno else None,
+                fila_eges.hora_hasta.isoformat() if fila_eges.hora_hasta else None,
+                fila_eges.dni_paciente, fila_eges.historia_clinica,
+                fila_eges.practica, fila_eges.codigo_practica,
+                fila_eges.medico_informante, fila_eges.medico_actuante,
+                fila_eges.tipo_atencion, str(fila_eges.cantidad), fila_eges.modalidad,
+                fila_eges.sub_modalidad, fila_eges.estado_turno, fila_eges.servicio,
+                fila_eges.obra_social, fila_eges.es_insumo,
+            ],
+            'estudios': estudios_origen,
+            'practicas_preview': practicas_preview,
+            'usar_jornadas': bool(usar_jornadas),
+            'revision_eges_id': revision.pk if revision else None,
+            'revision_eges_estado': revision.estado if revision else None,
+            'revision_eges_fecha': revision.fecha_revision.isoformat() if revision else None,
+        }
+        snapshots.append(snapshot)
+        diferencia = monto_nuevo - monto_anterior
+        candidatos.append({
+            'registro': registro,
+            'practicas': practicas_preview,
+            'item': item,
+            'fila_eges': fila_eges,
+            'horario_anterior': horario_anterior,
+            'monto_anterior': monto_anterior,
+            'horario_nuevo': horario_objetivo,
+            'monto_nuevo': monto_nuevo,
+            'diferencia': diferencia,
+            'impacto_label': 'Posible crédito' if diferencia > 0 else 'Posible débito',
+            'impacto_monto': abs(diferencia),
+            'snapshot': snapshot,
+        })
+    return {
+        'candidatos': candidatos,
+        'excluidos': excluidos,
+        'snapshots': snapshots,
+        'seleccionados': ids,
     }
 
 

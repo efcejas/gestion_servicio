@@ -87,9 +87,25 @@ Un Doppler de `medico_residente` con horario `INTRA` descuenta al 50% por fallba
 
 ### Regularizacion masiva desde EGES
 
-En el cruce EGES, la accion **Corregir Doppler y recalcular** busca todos los registros del periodo que sean exclusivamente Doppler de `medico_residente`, tengan coincidencia EGES confiable de medico y practica, y presenten diferencia de horario o monto. No requiere marcar previamente cada caso como `REQUIERE_CORRECCION`.
+En el cruce EGES, la accion **Corregir Doppler y recalcular** requiere seleccionar registros concretos elegibles de la pagina actual. Las casillas `Validar EGES` y `Doppler` son independientes: validar el cruce no autoriza una correccion economica. Solo permite registros activos exclusivamente Doppler de `medico_residente`, con coincidencia EGES confiable de medico y practica, horario INTRA/EXTRA determinado y diferencia de horario o monto. Los registros mixtos y las filas de otras paginas no se seleccionan.
 
-La accion solo opera en sesiones `ABIERTA` o `REVISION`. Para cada cambio guarda `CorreccionPacsRegistro` con horario, monto anterior/nuevo, hora EGES, usuario y observacion. Las revisiones `VALIDADO` y `DESCARTADO` existentes no se modifican; una `REQUIERE_CORRECCION` del mismo batch se cierra cuando la correccion se aplica.
+Antes de modificar datos se muestra un preview por registro con practica, horario anterior/esperado, monto actual, monto recalculado y posible debito/credito; tambien muestra el impacto agregado. El preview no escribe. Para aplicar, la jefatura debe marcar confirmacion explicita y dejar un motivo. El token firmado vence a los 15 minutos y se vincula al usuario, sesion, batch, seleccion, motivo y huellas de origen. El servidor bloquea y revalida la sesion, registros, lineas, revisiones y filas EGES; si algo cambio, vencio o la seleccion no es elegible, aborta todo el lote sin escrituras parciales.
+
+La accion solo opera en sesiones `ABIERTA` o `REVISION`, admite hasta 100 registros seleccionados y no incluye filas de otras paginas ni registros solo filtrados pero no marcados. Para cada cambio guarda `CorreccionPacsRegistro` con horario, monto anterior/nuevo, hora EGES, usuario y observacion. Las revisiones `VALIDADO` y `DESCARTADO` existentes no se modifican; una `REQUIERE_CORRECCION` del mismo batch se cierra cuando la correccion se aplica.
+
+En QA automatizado, seleccionar dos Doppler y previsualizar mostro los importes anterior/estimado por registro y el posible debito agregado; el preview no escribio. Un estudio mixto fue excluido. La confirmacion final no se acciono en la prueba visual.
+
+Validacion de interfaz: QA con SQLite en memoria y tres registros ficticios. Dos Doppler puros fueron elegibles y el mixto no mostró casilla de correccion; el botón permaneció deshabilitado sin selección. El preview de dos registros mostró total actual $400, estimado $200 y posible débito $200 no aplicado. Verificado en móvil sin desbordamiento. Se recorrió hasta el preview y no se confirmó la aplicación.
+
+### Reversion trazable de una aplicacion incorrecta
+
+`services_reversiones.revertir_correcciones_doppler_eges` permite preparar un preview y restaurar una seleccion explicita de correcciones originadas en esta accion. No recalcula: devuelve exactamente `horario_anterior` y `monto_anterior` del snapshot guardado, sin cambiar estudios o cantidades.
+
+Requiere jefatura o superusuario, motivo, sesion y autor de la aplicacion original. Solo opera en `ABIERTA` o `REVISION`. Revalida datos actuales, modificaciones, otras correcciones, recalculos y decisiones posteriores; un conflicto aborta TODO el lote. Una reversion repetida tambien se bloquea. La aplicacion bloquea sesion y registros, y registra ajustes compensatorios en `CorreccionPacsRegistro` con referencia al ID original y un UUID comun de lote. No borra ni modifica la correccion original.
+
+Las validaciones automaticas asociadas quedan reemplazadas por nuevas revisiones `REQUIERE_CORRECCION`, conservando las anteriores. Las decisiones EGES independientes posteriores bloquean la operacion salvo autorizacion explicita de sus IDs y batch; la autorizacion nunca cubre otras decisiones nuevas. La reversión del incidente del 5/10 ya fue aplicada y verificada. El boton de correccion requiere ahora seleccion explicita; la validacion EGES masiva sigue siendo una accion separada.
+
+**Reparacion verificada en produccion, 2026-10-05:** con autorizacion del autor se revirtieron las correcciones #469-#488 de la sesion #232 (septiembre 2026, `REVISION`) y se autorizaron las revisiones EGES #3215-#3221 del batch #463 para dejarlas pendientes. Lote `08f53d54-eab4-485a-9d7e-3e20a6380c14`, aplicado a las 22:05:34 hora argentina. Se crearon ajustes compensatorios #489-#508, revisiones ECO pendientes #1782-#1801 y EGES pendientes #3243-#3249. Los veinte registros se verificaron desde una nueva transaccion de solo lectura: total restaurado $240.250, diferencia restituida $35.425; todos los horarios volvieron a sus snapshots originales. Las siete validaciones EGES originales se conservaron. No se incluyen datos de pacientes en este documento.
 
 ## Solicitudes de revision de horario
 

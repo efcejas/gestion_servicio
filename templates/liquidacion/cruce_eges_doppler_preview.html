@@ -1,0 +1,117 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+
+{% block title %}Preview corrección Doppler EGES{% endblock %}
+
+{% block content %}
+<div class="max-w-full px-4 py-4 sm:px-6 lg:px-10">
+    <a href="{{ next }}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Volver al cruce EGES</a>
+    <header class="mb-4 mt-3">
+        <h1 class="text-2xl font-bold text-slate-900">Preview de corrección Doppler</h1>
+        <p class="mt-1 text-sm text-slate-600">Sesión {{ sesion }} · Batch EGES #{{ batch.pk }}</p>
+    </header>
+
+    <div class="mb-4 border-l-4 border-amber-500 bg-amber-50 p-4 text-sm text-amber-950">
+        <p class="font-semibold">Esto todavía no modificó los registros.</p>
+        <p class="mt-1">Sólo se aplicarán los casos elegibles seleccionados. Al confirmar se guardará un ajuste individual con el horario e importe anterior y nuevo.</p>
+        <p class="mt-1">El total no representa facturación ni pago acreditado.</p>
+    </div>
+
+    <section aria-label="Resumen del preview" class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase text-slate-500">Registros seleccionados</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900">{{ seleccionados_count }}</p>
+        </div>
+        <div class="border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase text-slate-500">Monto actual seleccionado</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900">${{ total_anterior|floatformat:2 }}</p>
+        </div>
+        <div class="border border-amber-300 bg-amber-50 p-4">
+            <p class="text-xs font-semibold uppercase text-amber-800">Monto tras corrección estimada</p>
+            <p class="mt-1 text-2xl font-bold text-amber-950">${{ total_nuevo|floatformat:2 }}</p>
+            <p class="mt-1 text-xs font-semibold text-amber-900">{{ impacto_total_label }}: ${{ impacto_total_monto|floatformat:2 }} · No aplicado</p>
+        </div>
+    </section>
+
+    {% if candidatos %}
+    <section class="mb-4 border border-slate-200 bg-white">
+        <h2 class="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-900">Cambios propuestos</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-[900px] w-full text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <tr>
+                        <th class="px-3 py-2">Registro / profesional</th>
+                        <th class="px-3 py-2">Prácticas Doppler</th>
+                        <th class="px-3 py-2">Horario EGES</th>
+                        <th class="px-3 py-2 text-right">Monto actual</th>
+                        <th class="px-3 py-2 text-right">Monto estimado</th>
+                        <th class="px-3 py-2 text-right">Impacto potencial</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for candidato in candidatos %}
+                    <tr class="align-top">
+                        <td class="px-3 py-3">
+                            <p class="font-semibold">#{{ candidato.registro.pk }} · {{ candidato.registro.medico.get_full_name|default:candidato.registro.medico.username }}</p>
+                            <p class="text-xs text-slate-600">{{ candidato.registro.apellido_paciente }}, {{ candidato.registro.nombre_paciente }} · {{ candidato.registro.fecha_del_informe|date:"d/m/Y" }}</p>
+                        </td>
+                        <td class="px-3 py-3">
+                            {% for practica in candidato.practicas %}
+                            <p>{{ practica.nombre }} ×{{ practica.cantidad }}{% if practica.contexto %} · {{ practica.contexto }}{% endif %}</p>
+                            {% endfor %}
+                        </td>
+                        <td class="px-3 py-3">
+                            <p class="font-semibold">{{ candidato.horario_anterior }} → {{ candidato.horario_nuevo }}</p>
+                            <p class="text-xs text-slate-600">EGES {{ candidato.fila_eges.hora_turno|time:"H:i" }} · {{ candidato.fila_eges.practica }}</p>
+                            <p class="text-xs text-slate-500">Código {{ candidato.fila_eges.codigo_practica|default:"-" }}</p>
+                        </td>
+                        <td class="px-3 py-3 text-right">${{ candidato.monto_anterior|floatformat:2 }}</td>
+                        <td class="px-3 py-3 text-right font-semibold">${{ candidato.monto_nuevo|floatformat:2 }}</td>
+                        <td class="px-3 py-3 text-right"><span class="block text-xs text-slate-500">{{ candidato.impacto_label }} · no aplicado</span><span class="font-semibold">${{ candidato.impacto_monto|floatformat:2 }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if excluidos %}
+    <section class="mb-4 border border-rose-200 bg-rose-50">
+        <h2 class="border-b border-rose-200 px-4 py-3 text-sm font-semibold text-rose-900">No elegibles · corregí la selección para continuar</h2>
+        <ul class="divide-y divide-rose-100">
+            {% for excluido in excluidos %}
+            <li class="px-4 py-3 text-sm text-rose-900">Registro #{{ excluido.registro_id }}: {{ excluido.motivo }}</li>
+            {% endfor %}
+        </ul>
+        <p class="px-4 pb-3 text-xs font-semibold text-rose-900">No se aplicará ninguna corrección mientras haya casos no elegibles en la selección.</p>
+    </section>
+    {% endif %}
+
+    {% if puede_confirmar %}
+    <form method="post" action="{% url 'liquidacion:cruce_eges_corregir_doppler' sesion.pk %}" class="border border-amber-300 bg-white p-4">
+        {% csrf_token %}
+        <input type="hidden" name="accion" value="aplicar">
+        <input type="hidden" name="batch" value="{{ batch.pk }}">
+        <input type="hidden" name="next" value="{{ next }}">
+        <input type="hidden" name="preview_token" value="{{ token }}">
+        <label class="block text-sm font-semibold text-slate-800">
+            Motivo de la corrección
+            <textarea name="observacion" required maxlength="1000" rows="3" class="mt-1 w-full rounded-md border border-slate-300 p-2 font-normal">{{ observacion }}</textarea>
+        </label>
+        <label class="mt-3 flex items-start gap-2 text-sm text-slate-800">
+            <input type="checkbox" name="confirmar" value="1" required class="mt-0.5 rounded border-slate-300">
+            <span>Confirmo aplicar exactamente estos {{ candidatos|length }} cambios. El sistema volverá a validar que los datos y el match EGES no hayan cambiado.</span>
+        </label>
+        <div class="mt-4 flex flex-wrap gap-3">
+            <button type="submit" class="rounded-md bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800">Aplicar correcciones seleccionadas</button>
+            <a href="{{ next }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
+        </div>
+    </form>
+    {% else %}
+    <div class="border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+        <p class="font-semibold">No hay una selección lista para aplicar.</p>
+        <a href="{{ next }}" class="mt-2 inline-block font-semibold text-indigo-700 hover:text-indigo-900">Volver y ajustar la selección</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

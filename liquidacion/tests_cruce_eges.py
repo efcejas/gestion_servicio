@@ -2,6 +2,7 @@ from datetime import date, time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -13,11 +14,13 @@ from control_guardias.models import Feriado
 from .models import (
     ControlEgesSesion,
     CorreccionPacsRegistro,
+    HistorialRecalculoTarifaRegistro,
     Estudios,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
     ResultadoControlEgesRegistro,
     RevisionCruceEgesRegistro,
+    RevisionAuditoriaEcoRegistro,
     SesionContable,
 )
 from .services_auditoria import resumir_pendientes_auditoria_eco
@@ -142,6 +145,30 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             modalidad=modalidad,
             sub_modalidad='ECO_ABDOMINAL',
             es_insumo=False,
+        )
+
+    def _previsualizar_correccion_doppler(self, registros, observacion='Doppler verificado contra EGES.'):
+        return self.client.post(
+            reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
+            {
+                'accion': 'previsualizar', 'batch': self.batch.pk,
+                'registros_doppler': [registro.pk for registro in registros],
+                'observacion': observacion,
+                'next': reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': self.sesion.pk})
+                + f'?batch={self.batch.pk}',
+            },
+        )
+
+    def _aplicar_correccion_doppler_previsualizada(self, response, observacion='Doppler verificado contra EGES.', **cambios):
+        datos = {
+            'accion': 'aplicar', 'confirmar': '1', 'batch': self.batch.pk,
+            'preview_token': response.context['token'], 'observacion': observacion,
+            'next': response.context['next'],
+        }
+        datos.update(cambios)
+        return self.client.post(
+            reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
+            datos,
         )
 
     def test_guardia_entre_8_y_17_valida_intra(self):
@@ -539,14 +566,17 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         )
         self.client.force_login(self.jefe)
 
-        response = self.client.post(
-            reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
-            {
-                'batch': self.batch.pk,
-                'observacion': 'Doppler verificado contra EGES.',
-            },
-        )
+        response = self._previsualizar_correccion_doppler([registro])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['candidatos']), 1)
+        self.assertEqual(response.context['candidatos'][0]['monto_anterior'], Decimal('200.00'))
+        self.assertEqual(response.context['candidatos'][0]['monto_nuevo'], Decimal('100.00'))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
 
+        response = self._aplicar_correccion_doppler_previsualizada(response)
         self.assertEqual(response.status_code, 302)
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'INTRA')
@@ -558,7 +588,323 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(correccion.monto_nuevo, Decimal('100.00'))
         self.assertFalse(RevisionCruceEgesRegistro.objects.filter(registro=registro).exists())
 
-    def test_corregir_doppler_recalcula_monto_historico_intra_sin_seleccion(self):
+    def _crear_correccion_para_reversion(self, dni='12345678', con_revision_eges=False):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop], dni=dni)
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), dni=dni, practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        if con_revision_eges:
+            RevisionCruceEgesRegistro.objects.create(
+                sesion_contable=self.sesion, registro=registro, batch_eges=self.batch,
+                estado='REQUIERE_CORRECCION', revisado_por=self.jefe,
+                observacion='Validacion previa pendiente', snapshot_json={'origen': 'prueba'},
+            )
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro], 'Aplicacion incorrecta de prueba')
+        self._aplicar_correccion_doppler_previsualizada(preview, 'Aplicacion incorrecta de prueba')
+        return registro, CorreccionPacsRegistro.objects.get(registro=registro)
+
+    def test_correccion_requiere_seleccion_explicita_y_preview_no_escribe(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        url = reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk})
+        sin_seleccion = self.client.post(url, {
+            'accion': 'previsualizar', 'batch': self.batch.pk, 'observacion': 'Sin seleccion',
+        })
+        self.assertEqual(sin_seleccion.status_code, 302)
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('200.00')))
+
+    def test_corregir_solo_aplica_los_registros_seleccionados(self):
+        primero = self._registro(horario='NA', dni='11111111', estudios=[self.estudio_dop])
+        segundo = self._registro(horario='NA', dni='22222222', estudios=[self.estudio_dop])
+        for registro in (primero, segundo):
+            RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), dni='11111111', practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self._eges_row(time(10, 0), time(10, 15), dni='22222222', practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([primero])
+        self.assertEqual([c['registro'].pk for c in preview.context['candidatos']], [primero.pk])
+        self.assertEqual(preview.context['candidatos'][0]['practicas'][0]['nombre'], self.estudio_dop.nombre)
+        self._aplicar_correccion_doppler_previsualizada(preview)
+        primero.refresh_from_db()
+        segundo.refresh_from_db()
+        self.assertEqual((primero.horario, primero.monto_calculado), ('INTRA', Decimal('100.00')))
+        self.assertEqual((segundo.horario, segundo.monto_calculado), ('NA', Decimal('200.00')))
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+
+    def test_corregir_rechaza_cambio_de_registro_entre_preview_y_confirmacion(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('180.00'))
+        response = self._aplicar_correccion_doppler_previsualizada(preview)
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('180.00')))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_corregir_rechaza_cambio_de_fila_eges_entre_preview_y_confirmacion(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        fila = self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        EgesRow.objects.filter(pk=fila.pk).update(hora_turno=time(18, 0))
+        response = self._aplicar_correccion_doppler_previsualizada(preview)
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('200.00')))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_corregir_exige_confirmacion_explicita_despues_del_preview(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        response = self._aplicar_correccion_doppler_previsualizada(preview, confirmar='')
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('200.00')))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_corregir_rechaza_motivo_modificado_despues_del_preview(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro], 'Motivo del preview')
+        response = self._aplicar_correccion_doppler_previsualizada(preview, 'Motivo cambiado')
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('200.00')))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_corregir_rechaza_preview_si_sesion_cambia_antes_de_confirmar(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        self.sesion.estado = 'CERRADA'
+        self.sesion.save(update_fields=['estado'])
+        response = self._aplicar_correccion_doppler_previsualizada(preview)
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual((registro.horario, registro.monto_calculado), ('NA', Decimal('200.00')))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_preview_mixto_muestra_exclusion_y_no_permite_aplicar(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop, self.estudio], dni='33333333')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('1200.00'))
+        self._eges_row(time(10, 0), time(10, 15), dni='33333333', practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(len(preview.context['candidatos']), 0)
+        self.assertEqual(len(preview.context['excluidos']), 1)
+        self.assertFalse(preview.context['puede_confirmar'])
+        self.assertContains(preview, 'exclusivamente estudios Doppler')
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_preview_resume_seleccion_parcial_y_sumatoria_sin_escrituras(self):
+        primero = self._registro(horario='NA', dni='44444444', estudios=[self.estudio_dop])
+        segundo = self._registro(horario='NA', dni='55555555', estudios=[self.estudio_dop])
+        for registro in (primero, segundo):
+            RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+            self._eges_row(time(10, 0), time(10, 15), dni=registro.dni_paciente, practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([segundo])
+        self.assertEqual(len(preview.context['candidatos']), 1)
+        self.assertEqual(preview.context['total_anterior'], Decimal('200.00'))
+        self.assertEqual(preview.context['total_nuevo'], Decimal('100.00'))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+        primero.refresh_from_db()
+        segundo.refresh_from_db()
+        self.assertEqual(primero.monto_calculado, Decimal('200.00'))
+        self.assertEqual(segundo.monto_calculado, Decimal('200.00'))
+
+    def test_preview_admite_monto_registrado_cero(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('0.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.context['candidatos'][0]['monto_anterior'], Decimal('0.00'))
+        self.assertEqual(preview.context['candidatos'][0]['monto_nuevo'], Decimal('100.00'))
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('0.00'))
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_usuario_sin_permiso_no_puede_generar_preview(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.admin)
+        response = self._previsualizar_correccion_doppler([registro])
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_corregir_preview_no_autoriza_otro_usuario(self):
+        registro = self._registro(horario='NA', estudios=[self.estudio_dop])
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(horario='NA', monto_calculado=Decimal('200.00'))
+        self._eges_row(time(10, 0), time(10, 15), practica='ECODOPPLER VENOSO MM INFERIORES', codigo_practica='900048/0')
+        self.client.force_login(self.jefe)
+        preview = self._previsualizar_correccion_doppler([registro])
+        self.client.force_login(self.admin)
+        response = self._aplicar_correccion_doppler_previsualizada(preview)
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(CorreccionPacsRegistro.objects.exists())
+
+    def test_reversion_preview_no_escribe_y_aplicacion_restaura_snapshot(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        argumentos = dict(correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                          autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Accion aplicada sin revisar orden')
+        preview = revertir_correcciones_doppler_eges(**argumentos)
+        self.assertEqual(preview['conflictos'], [])
+        self.assertFalse(preview['aplicado'])
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+        resultado = revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        self.assertTrue(resultado['aplicado'])
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.monto_calculado, Decimal('200.00'))
+        self.assertEqual(registro.registroestudio_set.get().cantidad, 1)
+        self.assertEqual(RevisionAuditoriaEcoRegistro.objects.filter(registro=registro).first().estado, 'REQUIERE_CORRECCION')
+        inversa = CorreccionPacsRegistro.objects.exclude(pk=origen.pk).get()
+        self.assertEqual(inversa.monto_anterior, origen.monto_nuevo)
+        self.assertEqual(inversa.monto_nuevo, origen.monto_anterior)
+        self.assertIn(f'#{origen.pk};', inversa.observacion)
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 2)
+
+    def test_reversion_bloquea_cambios_posteriores_y_sesion_cerrada(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        argumentos = dict(correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                          autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Revertir error')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('90.00'))
+        preview = revertir_correcciones_doppler_eges(**argumentos)
+        self.assertTrue(preview['conflictos'])
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+        for estado in ('CERRADA', 'FACTURADA', 'PAGADA'):
+            self.sesion.estado = estado
+            self.sesion.save(update_fields=['estado'])
+            with self.assertRaises(ValidationError):
+                revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+
+    def test_reversion_lote_conflictivo_no_modifica_el_registro_valido(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        primero, correccion_primera = self._crear_correccion_para_reversion()
+        segundo, correccion_segunda = self._crear_correccion_para_reversion(dni='98765432')
+        RegistroEstudiosPorMedico.objects.filter(pk=segundo.pk).update(monto_calculado=Decimal('90.00'))
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(
+                correccion_ids=[correccion_primera.pk, correccion_segunda.pk],
+                sesion_id=self.sesion.pk, autor_correccion_id=self.jefe.pk,
+                usuario=self.jefe, motivo='Revertir lote', aplicar=True,
+            )
+        primero.refresh_from_db()
+        self.assertEqual(primero.horario, 'INTRA')
+        self.assertEqual(primero.monto_calculado, Decimal('100.00'))
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 2)
+
+    def test_reversion_conserva_validaciones_y_agrega_revision_pendiente_eges(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion(con_revision_eges=True)
+        validacion = RevisionCruceEgesRegistro.objects.filter(registro=registro).first()
+        self.assertEqual(validacion.estado, 'VALIDADO')
+        resultado = revertir_correcciones_doppler_eges(
+            correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+            autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Error de validacion', aplicar=True,
+        )
+        self.assertEqual(len(resultado['revisiones_eges_pendientes_ids']), 1)
+        validacion.refresh_from_db()
+        self.assertEqual(validacion.estado, 'VALIDADO')
+        nueva = RevisionCruceEgesRegistro.objects.filter(registro=registro).first()
+        self.assertEqual(nueva.estado, 'REQUIERE_CORRECCION')
+        self.assertEqual(nueva.snapshot_json, validacion.snapshot_json)
+
+    def test_reversion_bloquea_recalculos_y_revisiones_posteriores(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        HistorialRecalculoTarifaRegistro.objects.create(
+            sesion_contable=self.sesion, registro=registro,
+            fecha_desde=date(2026, 5, 1), fecha_hasta=date(2026, 5, 31),
+            monto_anterior=origen.monto_nuevo, monto_nuevo=origen.monto_nuevo,
+            diferencia=0, motivo='Recalculo posterior', recalculado_por=self.jefe,
+        )
+        RevisionAuditoriaEcoRegistro.objects.create(
+            sesion_contable=self.sesion, registro=registro, estado='DESCARTADO',
+            observacion='Revision humana posterior', revisado_por=self.jefe,
+        )
+        argumentos = dict(correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                          autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Revertir')
+        preview = revertir_correcciones_doppler_eges(**argumentos)
+        motivos = preview['conflictos'][0]['motivos']
+        self.assertTrue(any('recalculo' in motivo for motivo in motivos))
+        self.assertTrue(any('ECO' in motivo for motivo in motivos))
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+
+    def test_reversion_rechaza_usuario_sin_permiso(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(
+                correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                autor_correccion_id=self.jefe.pk, usuario=self.admin, motivo='Revertir', aplicar=True,
+            )
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+
+    def test_reversion_reabre_solo_revision_posterior_autorizada(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        posterior = RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion, registro=registro, batch_eges=self.batch,
+            estado='VALIDADO', observacion='Validacion posterior independiente', revisado_por=self.jefe,
+        )
+        argumentos = dict(correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                          autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Reversion confirmada')
+        self.assertTrue(revertir_correcciones_doppler_eges(**argumentos)['conflictos'])
+        argumentos.update(revisiones_eges_a_reabrir_ids=[posterior.pk], batch_eges_autorizado_id=self.batch.pk)
+        self.assertFalse(revertir_correcciones_doppler_eges(**argumentos)['conflictos'])
+        resultado = revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        posterior.refresh_from_db()
+        self.assertEqual(posterior.estado, 'VALIDADO')
+        self.assertEqual(len(resultado['revisiones_eges_pendientes_ids']), 1)
+        self.assertEqual(RevisionCruceEgesRegistro.objects.first().estado, 'REQUIERE_CORRECCION')
+
+    def test_reversion_no_ignora_nuevas_revisiones_fuera_de_autorizacion(self):
+        from .services_reversiones import revertir_correcciones_doppler_eges
+        registro, origen = self._crear_correccion_para_reversion()
+        autorizada = RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion, registro=registro, batch_eges=self.batch,
+            estado='VALIDADO', observacion='Autorizada', revisado_por=self.jefe,
+        )
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion, registro=registro, batch_eges=self.batch,
+            estado='VALIDADO', observacion='Otra decision posterior', revisado_por=self.jefe,
+        )
+        argumentos = dict(correccion_ids=[origen.pk], sesion_id=self.sesion.pk,
+                          autor_correccion_id=self.jefe.pk, usuario=self.jefe, motivo='Reversion',
+                          revisiones_eges_a_reabrir_ids=[autorizada.pk], batch_eges_autorizado_id=self.batch.pk)
+        self.assertTrue(revertir_correcciones_doppler_eges(**argumentos)['conflictos'])
+        with self.assertRaises(ValidationError):
+            revertir_correcciones_doppler_eges(**argumentos, aplicar=True)
+        self.assertEqual(CorreccionPacsRegistro.objects.count(), 1)
+
+    def test_corregir_doppler_recalcula_monto_historico_intra_con_preview_explicit(self):
         registro = self._registro(horario='INTRA', estudios=[self.estudio_dop], dni='98765432')
         RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
             monto_calculado=Decimal('200.00'),
@@ -572,14 +918,12 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         )
         self.client.force_login(self.jefe)
 
-        response = self.client.post(
-            reverse('liquidacion:cruce_eges_corregir_doppler', kwargs={'pk': self.sesion.pk}),
-            {
-                'batch': self.batch.pk,
-                'observacion': 'Aplicar descuento Doppler INTRA vigente.',
-            },
-        )
-
+        preview = self._previsualizar_correccion_doppler([registro], 'Aplicar descuento Doppler INTRA vigente.')
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.context['candidatos'][0]['horario_anterior'], 'INTRA')
+        self.assertEqual(preview.context['candidatos'][0]['horario_nuevo'], 'INTRA')
+        self.assertEqual(preview.context['candidatos'][0]['monto_nuevo'], Decimal('100.00'))
+        response = self._aplicar_correccion_doppler_previsualizada(preview, 'Aplicar descuento Doppler INTRA vigente.')
         self.assertEqual(response.status_code, 302)
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'INTRA')

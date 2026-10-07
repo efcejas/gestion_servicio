@@ -228,7 +228,7 @@
             {% csrf_token %}
             <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="grid grid-cols-1 gap-2 lg:grid-cols-[auto_minmax(16rem,1fr)_auto_auto] lg:items-end">
+            <div class="grid grid-cols-1 gap-2 lg:grid-cols-[auto_minmax(16rem,1fr)_auto] lg:items-end">
                 <button id="seleccionar-eges-visibles"
                         type="button"
                         class="h-9 rounded-lg border border-emerald-300 bg-white px-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-100">
@@ -247,18 +247,42 @@
                         class="h-9 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800">
                     Validar seleccionadas (<span id="cantidad-eges-seleccionada">0</span>)
                 </button>
-                {% if sesion.estado == 'ABIERTA' or sesion.estado == 'REVISION' %}
-                <button type="submit"
-                        formaction="{% url 'liquidacion:cruce_eges_corregir_doppler' sesion.pk %}"
-                    onclick="return window.confirm('Se recalcularán todos los Doppler elegibles de residentes en este período según EGES. ¿Continuar?');"
-                        class="h-9 rounded-lg bg-amber-600 px-4 text-sm font-semibold text-white hover:bg-amber-700">
-                    Corregir Doppler y recalcular
-                </button>
-                {% endif %}
             </div>
             <p class="mt-2 text-xs text-emerald-800">
-                Validar no modifica montos. Corregir Doppler busca todo el período: solo toma residentes con
-                Doppler, diferencia de horario o monto y coincidencia EGES confiable; asigna INTRA/EXTRA y recalcula.
+                Validar no modifica montos. Las correcciones económicas tienen selección y preview separados.
+            </p>
+        </form>
+        {% endif %}
+        {% if puede_corregir_doppler_seleccionado %}
+        <form id="corregir-doppler-form"
+              method="post"
+              action="{% url 'liquidacion:cruce_eges_corregir_doppler' sesion.pk %}"
+              class="border-b border-amber-200 bg-amber-50 px-4 py-3">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="previsualizar">
+            <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-[auto_minmax(18rem,1fr)_auto] lg:items-end">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="seleccionar-doppler-visibles" type="button" disabled
+                            class="h-9 rounded-lg border border-amber-300 bg-white px-3 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50">
+                        Seleccionar Doppler elegibles visibles
+                    </button>
+                    <span id="cantidad-doppler-seleccionada" role="status" aria-live="polite" class="text-sm font-semibold text-amber-950">0 seleccionados</span>
+                </div>
+                <label>
+                    <span class="mb-1 block text-xs font-semibold uppercase text-amber-900">Motivo obligatorio</span>
+                    <input type="text" name="observacion" maxlength="1000" required
+                           placeholder="Motivo de la corrección seleccionada"
+                           class="h-9 w-full rounded-lg border border-amber-300 bg-white px-3 text-sm">
+                </label>
+                <button id="previsualizar-doppler" type="submit" disabled
+                        class="h-9 rounded-lg bg-amber-700 px-4 text-sm font-semibold text-white hover:bg-amber-800 disabled:opacity-50">
+                    Previsualizar seleccionados
+                </button>
+            </div>
+            <p class="mt-2 text-xs text-amber-950">
+                Sólo procesa los registros Doppler que marques en esta página. Primero verás horarios e importes antes/después; el preview no modifica datos.
             </p>
         </form>
         {% endif %}
@@ -266,8 +290,8 @@
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                     <tr>
-                        {% if puede_validacion_masiva_eges %}
-                        <th class="w-10 px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Sel.</th>
+                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado %}
+                        <th class="w-32 px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Seleccionar</th>
                         {% endif %}
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Estado</th>
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Liquidación</th>
@@ -280,16 +304,31 @@
                 <tbody class="divide-y divide-slate-100">
                     {% for item in preview.resultados %}
                     <tr class="{% if item.estado == 'ok' %}bg-emerald-50/40{% elif item.estado == 'advertencia' %}bg-amber-50/40{% else %}bg-red-50/40{% endif %}">
-                        {% if puede_validacion_masiva_eges %}
+                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado %}
                         <td class="px-3 py-3 align-top">
+                            <div class="flex flex-col gap-2">
+                            {% if puede_validacion_masiva_eges %}
                             {% if item.estado != 'ok' and not item.revision_cruce_eges or item.revision_cruce_eges.estado == 'REQUIERE_CORRECCION' %}
+                            <label class="inline-flex items-center gap-2 text-xs text-emerald-900">
                             <input type="checkbox"
                                    name="registros"
                                    value="{{ item.registro.pk }}"
                                    form="bulk-eges-form"
                                    class="checkbox-eges h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
-                                   aria-label="Seleccionar registro {{ item.registro.pk }}">
+                                aria-label="Seleccionar registro {{ item.registro.pk }} para validar EGES">
+                                <span>Validar EGES</span>
+                            </label>
                             {% endif %}
+                            {% endif %}
+                            {% if puede_corregir_doppler_seleccionado and item.doppler_correccion_seleccionable %}
+                            <label class="inline-flex items-start gap-2 text-xs font-medium text-amber-950">
+                                <input type="checkbox" name="registros_doppler" value="{{ item.registro.pk }}"
+                                    form="corregir-doppler-form" class="checkbox-doppler mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-700"
+                                    aria-label="Seleccionar Doppler de {{ item.registro.medico.get_full_name }}">
+                                <span>Doppler<br><span class="text-slate-600">{{ item.registro.horario }} → {{ item.mejor_match.horario_esperado }}</span></span>
+                            </label>
+                            {% endif %}
+                            </div>
                         </td>
                         {% endif %}
                         <td class="px-3 py-3 align-top">
@@ -574,6 +613,38 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+});
+</script>
+{% endif %}
+{% if puede_corregir_doppler_seleccionado %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = Array.from(document.querySelectorAll('.checkbox-doppler'));
+    const count = document.getElementById('cantidad-doppler-seleccionada');
+    const toggle = document.getElementById('seleccionar-doppler-visibles');
+    const submit = document.getElementById('previsualizar-doppler');
+    const updateCount = () => {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+        count.textContent = `${selected} seleccionados`;
+        submit.disabled = selected === 0;
+        toggle.disabled = checkboxes.length === 0;
+        toggle.textContent = checkboxes.length && selected === checkboxes.length
+            ? 'Quitar selección Doppler'
+            : 'Seleccionar Doppler elegibles visibles';
+    };
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateCount));
+    toggle.addEventListener('click', () => {
+        const selectAll = checkboxes.some((checkbox) => !checkbox.checked);
+        checkboxes.forEach((checkbox) => { checkbox.checked = selectAll; });
+        updateCount();
+    });
+    document.getElementById('corregir-doppler-form').addEventListener('submit', (event) => {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+        if (!selected || !window.confirm(`Previsualizar la corrección de ${selected} registros Doppler seleccionados?`)) {
+            event.preventDefault();
+        }
+    });
+    updateCount();
 });
 </script>
 {% endif %}
