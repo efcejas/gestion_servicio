@@ -284,6 +284,11 @@
             <p class="mt-2 text-xs text-amber-950">
                 Sólo procesa los registros Doppler que marques en esta página. Primero verás horarios e importes antes/después; el preview no modifica datos.
             </p>
+            {% if preview.doppler_correccion_elegibles_pagina %}
+            <p class="mt-1 text-xs font-semibold text-amber-950">Doppler elegibles en esta página: {{ preview.doppler_correccion_elegibles_pagina }}.</p>
+            {% else %}
+            <p class="mt-1 text-xs font-semibold text-amber-950">No hay Doppler elegibles en esta página. Filtra por profesional y fechas o avanza páginas; la casilla aparece junto a cada registro elegible.</p>
+            {% endif %}
         </form>
         {% endif %}
         <div class="overflow-x-auto">

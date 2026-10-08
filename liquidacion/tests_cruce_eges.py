@@ -183,6 +183,18 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(resultado['mejor_match']['horario_esperado'], 'INTRA')
         self.assertEqual(resultado['mejor_match']['rol_medico_eges'], 'actuante')
 
+    def test_cruce_explica_cuando_pagina_actual_no_tiene_casillas_doppler(self):
+        self._registro(horario='INTRA')
+        self.client.force_login(self.jefe)
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': self.sesion.pk}),
+            {'batch': self.batch.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['preview']['doppler_correccion_elegibles_pagina'], 0)
+        self.assertContains(response, 'No hay Doppler elegibles en esta página.')
+        self.assertNotContains(response, 'name="registros_doppler"')
+
     def test_medico_coincide_con_nombre_en_distinto_orden_y_apellido_extra(self):
         self.residente.first_name = 'Juan David'
         self.residente.last_name = 'Cervantes'

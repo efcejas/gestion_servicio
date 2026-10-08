@@ -1719,6 +1719,10 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
                     self.sesion.estado in {'ABIERTA', 'REVISION'}
                     and not motivo_no_seleccionable_correccion_doppler(item)
                 )
+            preview['doppler_correccion_elegibles_pagina'] = sum(
+                item['doppler_correccion_seleccionable']
+                for item in preview['resultados']
+            )
 
         context.update({
             'sesion': self.sesion,
