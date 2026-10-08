@@ -33,6 +33,10 @@ from .views import (
     AuditoriaDopplerMMIIGenerarCasosView,
     AuditoriaDopplerMMIIRevisionView,
     AuditoriaDopplerMMIILoteView,
+    AuditoriaDopplerMMIIAplicarPreviewView,
+    AuditoriaDopplerMMIIAplicarView,
+    AuditoriaDopplerMMIIRevertirPreviewView,
+    AuditoriaDopplerMMIIRevertirView,
     AuditoriaEcoRegistroResolverView,
     AuditoriaEcoBulkResolverView,
     AuditoriaEcoRegistroCorregirView,
@@ -130,6 +134,26 @@ urlpatterns = [
         'auditoria-doppler-mmii/confirmar-lote/',
         AuditoriaDopplerMMIILoteView.as_view(),
         name='auditoria_doppler_mmii_confirmar_lote',
+    ),
+    path(
+        'auditoria-doppler-mmii/aplicar-preview/',
+        AuditoriaDopplerMMIIAplicarPreviewView.as_view(),
+        name='auditoria_doppler_mmii_aplicar_preview',
+    ),
+    path(
+        'auditoria-doppler-mmii/aplicar/',
+        AuditoriaDopplerMMIIAplicarView.as_view(),
+        name='auditoria_doppler_mmii_aplicar',
+    ),
+    path(
+        'auditoria-doppler-mmii/revertir-preview/',
+        AuditoriaDopplerMMIIRevertirPreviewView.as_view(),
+        name='auditoria_doppler_mmii_revertir_preview',
+    ),
+    path(
+        'auditoria-doppler-mmii/revertir/',
+        AuditoriaDopplerMMIIRevertirView.as_view(),
+        name='auditoria_doppler_mmii_revertir',
     ),
     path(
         'sesiones/<int:pk>/auditoria-eco/<int:registro_pk>/resolver/',

@@ -85,6 +85,14 @@ Esto mantiene el calculo economico alineado con la fecha del informe y evita que
 
 Un Doppler de `medico_residente` con horario `INTRA` descuenta al 50% por fallback, aun sin regla activa. Una regla vigente por estudio tiene prioridad sobre una regla por grupo y puede desactivar el descuento para una practica concreta. En `EXTRA`, `NA`, feriados y fines de semana liquida al 100%.
 
+### Auditoria bilateral de MMII y ajuste economico
+
+La auditoria de Doppler MMII compara la declaracion original con la regla institucional de una practica por modalidad bilateral. Confirmar la evidencia (orden medica o VisualMedical) solo resuelve la auditoria: no cambia prestaciones ni montos. Residentes siguen siendo informativos y no reciben propuesta de debito.
+
+La accion economica es separada y requiere jefatura o superusuario, sesion `ABIERTA`/`REVISION`, caso confirmado con evidencia y un fundamento. `RegistroEstudio.cantidad` conserva siempre la cantidad declarada; `cantidad_liquidable` nullable guarda el valor efectivo y, si esta vacio, el calculo usa la cantidad declarada. El preview firmado dura 15 minutos y debe confirmarse expresamente. Se actualiza el monto persistido de cada registro una sola vez por lote con `RegistroEstudiosPorMedico.calcular_monto()`; no se recalculan otros registros.
+
+Cada linea aplicada deja historial append-only con lote, actor, motivo, montos y cantidades anterior/nueva. La reversión también requiere preview y confirmación, y restaura exactamente los snapshots anteriores sin recalcular ni borrar eventos. Se bloquea si el lote ya fue revertido, si una línea/monto cambió después o si la sesión ya no admite correcciones económicas.
+
 ### Regularizacion masiva desde EGES
 
 En el cruce EGES, la accion **Corregir Doppler y recalcular** requiere seleccionar registros concretos elegibles de la pagina actual. Las casillas `Validar EGES` y `Doppler` son independientes: validar el cruce no autoriza una correccion economica. Solo permite registros activos exclusivamente Doppler de `medico_residente`, con coincidencia EGES confiable de medico y practica, horario INTRA/EXTRA determinado y diferencia de horario o monto. Los registros mixtos y las filas de otras paginas no se seleccionan.

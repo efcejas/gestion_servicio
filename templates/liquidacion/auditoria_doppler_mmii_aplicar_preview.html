@@ -1,0 +1,45 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+
+{% block title %}Previsualizar ajuste Doppler{% endblock %}
+
+{% block content %}
+    <div class="max-w-5xl px-4 py-6 sm:px-6 lg:px-10">
+        <a href="{{ volver_url }}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Volver a la auditoría</a>
+        <h1 class="mt-2 text-2xl font-bold text-slate-900">Preview de ajuste económico Doppler</h1>
+        <p class="mt-1 text-sm text-slate-600">No se escribió ningún cambio. La cantidad declarada permanece intacta; se actualizará la cantidad liquidable y el monto persistido sólo al confirmar.</p>
+
+        <div class="mt-5 overflow-x-auto border-y border-slate-200">
+            <table class="w-full min-w-[720px] text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <tr><th class="px-3 py-2">Registro</th><th class="px-3 py-2">Casos / líneas</th><th class="px-3 py-2">Monto actual</th><th class="px-3 py-2">Monto tras ajuste</th><th class="px-3 py-2">Diferencia</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in plan %}
+                        <tr>
+                            <td class="px-3 py-3 font-semibold">#{{ item.registro.pk }}</td>
+                            <td class="px-3 py-3">{% for caso in item.casos %}Caso #{{ caso.pk }} · cantidad declarada {{ caso.datos_originales_json.cantidad_declarada }} → liquidable {{ caso.datos_originales_json.cantidad_esperada }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+                            <td class="px-3 py-3">${{ item.monto_anterior|floatformat:2 }}</td>
+                            <td class="px-3 py-3 font-semibold">${{ item.monto_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-3">{% if item.diferencia < 0 %}-{% endif %}${{ item.diferencia|floatformat:2|cut:"-" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-4 border-l-4 border-amber-500 bg-amber-50 p-4 text-sm text-amber-950">
+            <p class="font-semibold">Fundamento registrado</p>
+            <p class="mt-1 whitespace-pre-line">{{ motivo }}</p>
+            <p class="mt-2 text-xs">El preview vence en {{ fecha_expiracion_minutos }} minutos y sólo puede confirmarlo el usuario que lo generó.</p>
+        </div>
+
+        <div class="mt-5 flex flex-wrap gap-3">
+            <form method="post" action="{% url 'liquidacion:auditoria_doppler_mmii_aplicar' %}">
+                {% csrf_token %}
+                <input type="hidden" name="token" value="{{ token }}">
+                <button type="submit" class="rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900">Confirmar y aplicar ajuste</button>
+            </form>
+            <a href="{{ volver_url }}" class="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
+        </div>
+    </div>
+{% endblock %}

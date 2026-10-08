@@ -1,7 +1,9 @@
 from decimal import Decimal
 from collections import defaultdict
+import json
 import re
 import unicodedata
+from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -9,10 +11,13 @@ from django.utils import timezone
 
 from .models import (
     GrupoTarifario,
+    HistorialAjusteCantidadDopplerMMII,
     HistorialRevisionAuditoriaDopplerMMII,
     RevisionAuditoriaDopplerMMII,
+    RegistroEstudio,
     RegistroEstudiosPorMedico,
     RevisionCruceEgesRegistro,
+    SesionContable,
 )
 from control_guardias.models import Feriado
 
@@ -532,6 +537,365 @@ def caso_doppler_permite_lote(caso):
     )
 
 
+def _validar_caso_aplicacion_cantidad_doppler(caso, registro, relacion):
+    fuente = caso.datos_originales_json
+    errores = []
+    if caso.estado != RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO:
+        errores.append('El caso no esta confirmado.')
+    if not (caso.orden_medica_verificada or caso.visualmedical_verificado):
+        errores.append('La confirmacion no conserva orden o VisualMedical verificada.')
+    if registro.anulado or registro.medico.rol == 'medico_residente':
+        errores.append('El registro esta anulado o es informativo para residente.')
+    if (
+        not relacion or relacion.registro_id != registro.pk
+        or relacion.estudio_id != fuente.get('estudio_id')
+        or relacion.pk != caso.registro_estudio_id_origen
+        or relacion.cantidad != fuente.get('cantidad_declarada')
+        or relacion.contexto != fuente.get('contexto')
+    ):
+        errores.append('La linea o cantidad declarada cambio desde el snapshot.')
+    esperada = fuente.get('cantidad_esperada')
+    if fuente.get('posible_duplicado') or esperada != 1 or fuente.get('cantidad_declarada') != 2:
+        errores.append('El caso no es una correccion bilateral elegible 2 -> 1.')
+    if relacion and relacion.cantidad_liquidable is not None:
+        eventos = HistorialAjusteCantidadDopplerMMII.objects.filter(
+            revision=caso, registro_estudio_id_origen=relacion.pk,
+        ).order_by('-fecha_evento', '-pk')
+        ultimo = eventos.first()
+        if not ultimo or ultimo.accion != HistorialAjusteCantidadDopplerMMII.ACCION_REVERTIR:
+            errores.append('La cantidad liquidable ya tiene un ajuste activo.')
+    if fuente.get('fuente_calculo'):
+        actual = fuente_calculo_doppler_mmii(registro)
+        for campo in ('medico_id', 'rol', 'remoto', 'fecha', 'horario', 'obra_social',
+                      'regiones', 'internado', 'solicitud', 'informe', 'anulado', 'lineas'):
+            if actual[campo] != fuente['fuente_calculo'].get(campo):
+                errores.append(f'El dato fuente {campo} cambio desde la deteccion.')
+                break
+        if actual['monto'] != fuente['fuente_calculo'].get('monto'):
+            reversiones = HistorialAjusteCantidadDopplerMMII.objects.filter(
+                accion=HistorialAjusteCantidadDopplerMMII.ACCION_REVERTIR,
+                evento_origen__isnull=False,
+                evento_origen__registro_id=registro.pk,
+            ).values_list('evento_origen_id', flat=True)
+            ajuste_activo_monto_actual = HistorialAjusteCantidadDopplerMMII.objects.filter(
+                registro=registro,
+                accion=HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR,
+                monto_registro_nuevo=registro.monto_calculado,
+            ).exclude(pk__in=reversiones).exists()
+            if not ajuste_activo_monto_actual:
+                errores.append('El monto cambio desde el snapshot sin un ajuste Doppler activo que lo respalde.')
+    else:
+        # Snapshots P1 anteriores a la huella completa mantienen validacion de los campos disponibles.
+        if (
+            registro.fecha_del_informe.isoformat() != fuente.get('fecha_informe')
+            or registro.tipo_obra_social != fuente.get('tipo_obra_social')
+            or registro.horario != fuente.get('horario')
+            or registro.medico_id != fuente.get('profesional_id')
+            or registro.medico.rol != fuente.get('rol')
+            or str(registro.monto_calculado) != fuente.get('monto_registrado')
+        ):
+            errores.append('Los datos actuales ya no coinciden con el snapshot P1.')
+    if not registro.sesion_contable_id or registro.sesion_contable.estado not in {'ABIERTA', 'REVISION'}:
+        errores.append('La sesion no permite aplicar correcciones economicas.')
+    return errores
+
+
+def preparar_aplicacion_cantidad_doppler_mmii(*, caso_ids, usuario):
+    """Devuelve cantidades y montos previstos sin persistir ningun cambio."""
+    if not usuario.is_authenticated or not (
+        usuario.is_superuser or usuario.rol == 'jefe_servicio'
+    ):
+        raise ValidationError('No tienes permisos para aplicar ajustes Doppler.')
+    ids = list(dict.fromkeys(int(caso_id) for caso_id in caso_ids))
+    if not ids or len(ids) > 200 or len(ids) != len(caso_ids):
+        raise ValidationError('Selecciona entre 1 y 200 casos distintos.')
+    casos = list(RevisionAuditoriaDopplerMMII.objects.filter(
+        pk__in=ids,
+        version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
+    ).select_related('registro__medico', 'registro__sesion_contable', 'registro_estudio').order_by('registro_id', 'pk'))
+    if len(casos) != len(ids):
+        raise ValidationError('Uno o mas casos seleccionados ya no existen.')
+    por_registro = defaultdict(list)
+    errores = []
+    for caso in casos:
+        registro = caso.registro
+        relacion = caso.registro_estudio
+        errores_caso = _validar_caso_aplicacion_cantidad_doppler(caso, registro, relacion)
+        if errores_caso:
+            errores.append({'caso_id': caso.pk, 'registro_id': registro.pk, 'motivos': errores_caso})
+        else:
+            por_registro[registro.pk].append((caso, relacion))
+    if errores:
+        raise ValidationError('Seleccion no elegible: ' + json.dumps(errores, ensure_ascii=True))
+    resultado = []
+    for registros_casos in por_registro.values():
+        caso_muestra, _relacion = registros_casos[0]
+        registro = caso_muestra.registro
+        monto_actual = registro.monto_calculado or Decimal('0.00')
+        monto_canonico_actual = registro.calcular_monto().quantize(Decimal('0.01'))
+        if monto_canonico_actual != monto_actual:
+            raise ValidationError(
+                f'El monto actual del registro #{registro.pk} no coincide con el calculo canonico; requiere revision.'
+            )
+        cantidades = {
+            relacion.pk: caso.datos_originales_json['cantidad_esperada']
+            for caso, relacion in registros_casos
+        }
+        monto_nuevo = registro.calcular_monto(cantidades_auditoria=cantidades).quantize(Decimal('0.01'))
+        resultado.append({
+            'registro': registro,
+            'casos': [caso for caso, _relacion in registros_casos],
+            'monto_anterior': monto_actual,
+            'monto_nuevo': monto_nuevo,
+            'diferencia': monto_nuevo - monto_actual,
+            'cantidades': cantidades,
+        })
+    return resultado
+
+
+@transaction.atomic
+def aplicar_lote_cantidad_doppler_mmii(*, caso_ids, usuario, motivo):
+    """Aplica la cantidad liquidable confirmada, sin sobrescribir la cantidad declarada."""
+    motivo = (motivo or '').strip()
+    if not motivo or len(motivo) > 2000:
+        raise ValidationError('Indica un fundamento de hasta 2000 caracteres.')
+    plan = preparar_aplicacion_cantidad_doppler_mmii(caso_ids=caso_ids, usuario=usuario)
+    sesion_ids = sorted({item['registro'].sesion_contable_id for item in plan})
+    list(SesionContable.objects.select_for_update().filter(
+        pk__in=sesion_ids,
+    ).order_by('pk'))
+    registro_ids = sorted(item['registro'].pk for item in plan)
+    list(RegistroEstudiosPorMedico.objects.select_for_update().filter(
+        pk__in=registro_ids,
+    ).order_by('pk'))
+    caso_por_id = {caso.pk: caso for item in plan for caso in item['casos']}
+    casos_bloqueados = list(RevisionAuditoriaDopplerMMII.objects.select_for_update().filter(
+        pk__in=caso_por_id,
+    ).order_by('registro_id', 'pk'))
+    list(RegistroEstudio.objects.select_for_update().filter(
+        pk__in=[caso.registro_estudio_id for caso in casos_bloqueados],
+    ).order_by('registro_id', 'pk'))
+    if len(casos_bloqueados) != len(caso_por_id):
+        raise ValidationError('Un caso cambio mientras se preparaba la aplicacion; no se modifico ningun registro.')
+    # Volver a validar después de adquirir los locks y justo antes de escribir.
+    plan_actual = preparar_aplicacion_cantidad_doppler_mmii(caso_ids=list(caso_por_id), usuario=usuario)
+    snapshots_plan = [
+        (item['registro'].pk, str(item['monto_anterior']), str(item['monto_nuevo']), item['cantidades'])
+        for item in plan
+    ]
+    snapshots_actuales = [
+        (item['registro'].pk, str(item['monto_anterior']), str(item['monto_nuevo']), item['cantidades'])
+        for item in plan_actual
+    ]
+    if snapshots_actuales != snapshots_plan:
+        raise ValidationError('Los datos o importes cambiaron desde el preview; no se aplico ningun ajuste.')
+
+    lote_id = uuid4()
+    fecha_modificacion = timezone.now()
+    resultados = []
+    for item in plan_actual:
+        registro = item['registro']
+        monto_anterior = item['monto_anterior']
+        cantidad_por_linea = item['cantidades']
+        for caso in item['casos']:
+            relacion_id = caso.registro_estudio_id
+            relacion = RegistroEstudio.objects.get(pk=relacion_id)
+            HistorialAjusteCantidadDopplerMMII.objects.create(
+                registro=registro,
+                registro_estudio=relacion,
+                registro_estudio_id_origen=relacion_id,
+                revision=caso,
+                lote_id=lote_id,
+                accion=HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR,
+                version_regla=caso.version_regla,
+                cantidad_declarada=relacion.cantidad,
+                cantidad_liquidable_anterior=relacion.cantidad_liquidable,
+                cantidad_liquidable_nueva=cantidad_por_linea[relacion_id],
+                monto_registro_anterior=monto_anterior,
+                monto_registro_nuevo=item['monto_nuevo'],
+                motivo=motivo,
+                realizado_por=usuario,
+            )
+            RegistroEstudio.objects.filter(pk=relacion_id).update(
+                cantidad_liquidable=cantidad_por_linea[relacion_id],
+            )
+        registro.monto_calculado = item['monto_nuevo']
+        registro.modificado_por = usuario
+        registro.fecha_modificacion = fecha_modificacion
+        registro.motivo_modificacion = (
+            f'Ajuste auditado de cantidad Doppler. Lote {lote_id}. '
+            f'Monto ${monto_anterior} -> ${item["monto_nuevo"]}. {motivo}'
+        )
+        registro.save(update_fields=[
+            'monto_calculado', 'modificado_por', 'fecha_modificacion', 'motivo_modificacion',
+        ])
+        resultados.append({
+            'registro_id': registro.pk,
+            'monto_anterior': str(monto_anterior),
+            'monto_nuevo': str(item['monto_nuevo']),
+            'casos': [caso.pk for caso in item['casos']],
+        })
+        for caso in item['casos']:
+            caso.estimacion_json = {
+                **caso.estimacion_json,
+                'ajuste_cantidad_aplicado': True,
+                'lote_ajuste_cantidad': str(lote_id),
+                'cantidad_liquidable': cantidad_por_linea[caso.registro_estudio_id],
+                'monto_registro_tras_aplicar': str(item['monto_nuevo']),
+            }
+            caso.save(update_fields=['estimacion_json'])
+    return {'lote_id': str(lote_id), 'registros': resultados, 'casos_aplicados': len(caso_por_id)}
+
+
+def preparar_reversion_lote_cantidad_doppler_mmii(*, lote_id, usuario):
+    if not usuario.is_authenticated or not (usuario.is_superuser or usuario.rol == 'jefe_servicio'):
+        raise ValidationError('No tienes permisos para revertir ajustes Doppler.')
+    try:
+        lote_id = UUID(str(lote_id))
+    except (TypeError, ValueError, AttributeError):
+        raise ValidationError('El identificador del lote no es valido.')
+    eventos = list(HistorialAjusteCantidadDopplerMMII.objects.filter(
+        lote_id=lote_id,
+        accion=HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR,
+    ).select_related(
+        'registro__medico', 'registro__sesion_contable', 'registro_estudio', 'revision',
+    ).order_by('registro_id', 'registro_estudio_id_origen', 'pk'))
+    if not eventos:
+        raise ValidationError('No hay aplicaciones Doppler para ese lote.')
+    errores = []
+    eventos_por_registro = defaultdict(list)
+    for evento in eventos:
+        registro = evento.registro
+        relacion = evento.registro_estudio
+        if HistorialAjusteCantidadDopplerMMII.objects.filter(evento_origen=evento).exists():
+            errores.append(f'La linea #{evento.registro_estudio_id_origen} ya fue revertida.')
+        ultimo = HistorialAjusteCantidadDopplerMMII.objects.filter(
+            registro_estudio_id_origen=evento.registro_estudio_id_origen,
+        ).order_by('-fecha_evento', '-pk').first()
+        if ultimo != evento:
+            errores.append(f'La linea #{evento.registro_estudio_id_origen} tiene un evento posterior.')
+        if (
+            relacion.cantidad != evento.cantidad_declarada
+            or relacion.cantidad_liquidable != evento.cantidad_liquidable_nueva
+        ):
+            errores.append(f'La cantidad actual de la linea #{evento.registro_estudio_id_origen} cambio.')
+        if registro.monto_calculado != evento.monto_registro_nuevo:
+            errores.append(f'El monto actual del registro #{registro.pk} cambio.')
+        if registro.anulado or registro.medico.rol == 'medico_residente':
+            errores.append(f'El registro #{registro.pk} ya no admite este ajuste economico.')
+        if not registro.sesion_contable_id or registro.sesion_contable.estado not in {'ABIERTA', 'REVISION'}:
+            errores.append(f'La sesion del registro #{registro.pk} no permite revertir.')
+        eventos_por_registro[registro.pk].append(evento)
+    if errores:
+        raise ValidationError('No se puede revertir el lote: ' + ' '.join(errores))
+    resultado = []
+    for registro_id, eventos_registro in eventos_por_registro.items():
+        registro = eventos_registro[0].registro
+        montos_anteriores = {evento.monto_registro_anterior for evento in eventos_registro}
+        montos_nuevos = {evento.monto_registro_nuevo for evento in eventos_registro}
+        if len(montos_anteriores) != 1 or len(montos_nuevos) != 1:
+            raise ValidationError(f'El historial del registro #{registro_id} no tiene snapshots coherentes.')
+        resultado.append({
+            'registro': registro,
+            'eventos': eventos_registro,
+            'monto_actual': registro.monto_calculado,
+            'monto_restaurado': eventos_registro[0].monto_registro_anterior,
+        })
+    return resultado
+
+
+@transaction.atomic
+def revertir_lote_cantidad_doppler_mmii(*, lote_id, usuario, motivo):
+    motivo = (motivo or '').strip()
+    if not motivo or len(motivo) > 2000:
+        raise ValidationError('Indica un fundamento de hasta 2000 caracteres.')
+    plan = preparar_reversion_lote_cantidad_doppler_mmii(lote_id=lote_id, usuario=usuario)
+    evento_ids = [evento.pk for item in plan for evento in item['eventos']]
+    sesion_ids = sorted({item['registro'].sesion_contable_id for item in plan})
+    list(SesionContable.objects.select_for_update().filter(
+        pk__in=sesion_ids,
+    ).order_by('pk'))
+    registro_ids = sorted(item['registro'].pk for item in plan)
+    list(RegistroEstudiosPorMedico.objects.select_for_update().filter(
+        pk__in=registro_ids,
+    ).order_by('pk'))
+    list(HistorialAjusteCantidadDopplerMMII.objects.select_for_update().filter(
+        pk__in=evento_ids,
+    ).order_by('pk'))
+    list(RegistroEstudio.objects.select_for_update().filter(
+        pk__in=[evento.registro_estudio_id for item in plan for evento in item['eventos']],
+    ).order_by('registro_id', 'pk'))
+    plan_actual = preparar_reversion_lote_cantidad_doppler_mmii(lote_id=lote_id, usuario=usuario)
+    estado_plan = [
+        (item['registro'].pk, str(item['monto_actual']), str(item['monto_restaurado']), [e.pk for e in item['eventos']])
+        for item in plan
+    ]
+    estado_actual = [
+        (item['registro'].pk, str(item['monto_actual']), str(item['monto_restaurado']), [e.pk for e in item['eventos']])
+        for item in plan_actual
+    ]
+    if estado_actual != estado_plan:
+        raise ValidationError('El lote cambio desde el preview; no se revirtio ningun ajuste.')
+
+    lote_reversion = uuid4()
+    fecha_modificacion = timezone.now()
+    resultados = []
+    for item in plan_actual:
+        registro = item['registro']
+        for evento in item['eventos']:
+            relacion = evento.registro_estudio
+            HistorialAjusteCantidadDopplerMMII.objects.create(
+                registro=registro,
+                registro_estudio=relacion,
+                registro_estudio_id_origen=evento.registro_estudio_id_origen,
+                revision=evento.revision,
+                evento_origen=evento,
+                lote_id=lote_reversion,
+                accion=HistorialAjusteCantidadDopplerMMII.ACCION_REVERTIR,
+                version_regla=evento.version_regla,
+                cantidad_declarada=evento.cantidad_declarada,
+                cantidad_liquidable_anterior=relacion.cantidad_liquidable,
+                cantidad_liquidable_nueva=evento.cantidad_liquidable_anterior,
+                monto_registro_anterior=registro.monto_calculado,
+                monto_registro_nuevo=item['monto_restaurado'],
+                motivo=motivo,
+                realizado_por=usuario,
+            )
+            RegistroEstudio.objects.filter(pk=relacion.pk).update(
+                cantidad_liquidable=evento.cantidad_liquidable_anterior,
+            )
+            estimacion = dict(evento.revision.estimacion_json)
+            estimacion.update({
+                'ajuste_cantidad_aplicado': False,
+                'lote_reversion_cantidad': str(lote_reversion),
+                'monto_registro_tras_revertir': str(item['monto_restaurado']),
+            })
+            evento.revision.estimacion_json = estimacion
+            evento.revision.save(update_fields=['estimacion_json'])
+        registro.monto_calculado = item['monto_restaurado']
+        registro.modificado_por = usuario
+        registro.fecha_modificacion = fecha_modificacion
+        registro.motivo_modificacion = (
+            f'Reversion auditada del ajuste Doppler {lote_id}. '
+            f'Monto ${item["monto_actual"]} -> ${item["monto_restaurado"]}. {motivo}'
+        )
+        registro.save(update_fields=[
+            'monto_calculado', 'modificado_por', 'fecha_modificacion', 'motivo_modificacion',
+        ])
+        resultados.append({
+            'registro_id': registro.pk,
+            'monto_anterior': str(item['monto_actual']),
+            'monto_restaurado': str(item['monto_restaurado']),
+            'eventos_revertidos': [evento.pk for evento in item['eventos']],
+        })
+    return {
+        'lote_id': str(lote_id),
+        'lote_reversion': str(lote_reversion),
+        'registros': resultados,
+        'eventos_revertidos': len(evento_ids),
+    }
+
+
 @transaction.atomic
 def confirmar_lote_auditoria_doppler_mmii(*, caso_ids, fecha_desde, fecha_hasta,
                                          medico_id, evidencias, observacion, usuario):
@@ -587,9 +951,21 @@ def adjuntar_comparacion_doppler_mmii(registros):
         version_regla=RevisionAuditoriaDopplerMMII.VERSION_REGLA_V1,
     ).select_related('revisado_por').order_by('fecha_deteccion', 'pk'):
         casos_por_registro[caso.registro_id].append(caso)
+    ajustes_por_registro = defaultdict(list)
+    for relacion in RegistroEstudio.objects.filter(
+        registro_id__in=[registro.pk for registro in registros],
+        cantidad_liquidable__isnull=False,
+        estudio__tipo='DOP',
+    ).select_related('estudio').order_by('registro_id', 'pk'):
+        ajustes_por_registro[relacion.registro_id].append({
+            'estudio': relacion.estudio.nombre,
+            'cantidad_declarada': relacion.cantidad,
+            'cantidad_liquidable': relacion.cantidad_liquidable,
+        })
     for registro in registros:
         casos = casos_por_registro[registro.pk]
         registro.auditorias_doppler_mmii = casos
+        registro.ajustes_cantidad_doppler_mmii = ajustes_por_registro[registro.pk]
         registro.comparacion_doppler = None
         if not casos:
             continue

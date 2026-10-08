@@ -850,6 +850,12 @@ class RegistroEstudio(models.Model):
         verbose_name='Cantidad',
         help_text='Número de veces que se realizó este estudio (ej: 2 para bilateral)'
     )
+    cantidad_liquidable = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Cantidad liquidable corregida',
+        help_text='Cantidad aplicada por una corrección auditada; vacío conserva la cantidad declarada.',
+    )
     
     CONTEXTO_CHOICES = [
         ('SERVICIO', 'Consultorio / Servicio'),
@@ -1068,7 +1074,10 @@ class RegistroEstudiosPorMedico(models.Model):
         
         for rel in relaciones:
             estudio = rel.estudio
-            cantidad = (cantidades_auditoria or {}).get(rel.pk, rel.cantidad)
+            cantidad = (cantidades_auditoria or {}).get(
+                rel.pk,
+                rel.cantidad_liquidable if rel.cantidad_liquidable is not None else rel.cantidad,
+            )
 
             precio_estudio = estudio.precio_para_os(
                 self.tipo_obra_social,
@@ -1774,6 +1783,69 @@ class HistorialRevisionAuditoriaDopplerMMII(models.Model):
 
     def __str__(self):
         return f'Revision Doppler #{self.revision_id}: {self.estado_nuevo}'
+
+
+class HistorialAjusteCantidadDopplerMMII(models.Model):
+    """Evento append-only al aplicar o revertir la cantidad liquidable Doppler."""
+
+    ACCION_APLICAR = 'APLICAR'
+    ACCION_REVERTIR = 'REVERTIR'
+    ACCION_CHOICES = [
+        (ACCION_APLICAR, 'Aplicar regla de cantidad'),
+        (ACCION_REVERTIR, 'Revertir regla de cantidad'),
+    ]
+
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico', on_delete=models.PROTECT,
+        related_name='historial_ajustes_cantidad_doppler_mmii',
+    )
+    registro_estudio = models.ForeignKey(
+        'RegistroEstudio', on_delete=models.PROTECT,
+        related_name='historial_ajustes_cantidad_doppler_mmii',
+    )
+    registro_estudio_id_origen = models.PositiveIntegerField()
+    revision = models.ForeignKey(
+        RevisionAuditoriaDopplerMMII, on_delete=models.PROTECT,
+        related_name='historial_ajustes_cantidad',
+    )
+    evento_origen = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='reversiones',
+    )
+    lote_id = models.UUIDField(db_index=True)
+    accion = models.CharField(max_length=12, choices=ACCION_CHOICES)
+    version_regla = models.CharField(max_length=40)
+    cantidad_declarada = models.PositiveSmallIntegerField()
+    cantidad_liquidable_anterior = models.PositiveSmallIntegerField(null=True, blank=True)
+    cantidad_liquidable_nueva = models.PositiveSmallIntegerField(null=True, blank=True)
+    monto_registro_anterior = models.DecimalField(max_digits=10, decimal_places=2)
+    monto_registro_nuevo = models.DecimalField(max_digits=10, decimal_places=2)
+    motivo = models.TextField()
+    realizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='historial_ajustes_cantidad_doppler_realizados',
+    )
+    fecha_evento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Historial de ajuste de cantidad Doppler MMII'
+        verbose_name_plural = 'Historiales de ajustes de cantidad Doppler MMII'
+        ordering = ['-fecha_evento', '-pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['evento_origen'],
+                condition=models.Q(accion='REVERTIR'),
+                name='liq_doppler_ajuste_reversion_unica',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['registro', '-fecha_evento']),
+            models.Index(fields=['registro_estudio_id_origen', '-fecha_evento']),
+            models.Index(fields=['lote_id', 'accion']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_accion_display()} Doppler linea #{self.registro_estudio_id_origen}'
 
 
 class RevisionCruceEgesRegistro(models.Model):

@@ -593,7 +593,13 @@ def generar_buffer_excel_mis_registros(*, usuario, mes, año, registros, guardia
         estudios = []
         modalidades = []
         for relacion in relaciones:
-            cantidad = f' x{relacion.cantidad}' if relacion.cantidad > 1 else ''
+            if relacion.cantidad_liquidable is not None:
+                cantidad = (
+                    f' (declarada x{relacion.cantidad}; '
+                    f'liquidable x{relacion.cantidad_liquidable})'
+                )
+            else:
+                cantidad = f' x{relacion.cantidad}' if relacion.cantidad > 1 else ''
             contexto = f' ({relacion.get_contexto_display()})' if relacion.contexto else ''
             estudios.append(f'{relacion.estudio.nombre}{contexto}{cantidad}')
             modalidades.append(relacion.estudio.get_tipo_display())

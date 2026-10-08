@@ -11,8 +11,8 @@
     </div>
 
     <div class="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-        <p class="font-semibold">Revisión sin ajustes económicos</p>
-        <p class="mt-1">No modifica cantidades, regiones ni montos. Las estimaciones de cantidades confirmadas no son débitos aplicados; el monto vigente sigue siendo el registrado.</p>
+        <p class="font-semibold">La revisión de evidencia no aplica ajustes económicos</p>
+        <p class="mt-1">Confirmar o descartar un caso conserva cantidades, regiones y montos. Las estimaciones no son débitos aplicados; sólo la acción independiente “Aplicar cantidad liquidable confirmada” modifica el monto persistido.</p>
         <p class="mt-1">Residentes: informativo, sin propuesta de débito. Jefes, instructores y otros profesionales: impacto potencial pendiente de revisión.</p>
         <p class="mt-1">Un posible duplicado comparte profesional, DNI, fecha y tipo Doppler; es un candidato para revisar contra la orden y VisualMedical, no una confirmación automática.</p>
     </div>
@@ -67,6 +67,55 @@
         </div>
         <button type="submit" class="h-9 shrink-0 rounded-md bg-indigo-700 px-4 text-sm font-semibold text-white hover:bg-indigo-800">Generar casos de revisión</button>
     </form>
+    {% endif %}
+
+    {% if puede_aplicar_ajuste_doppler %}
+    <form id="doppler-aplicar-preview" method="post" action="{% url 'liquidacion:auditoria_doppler_mmii_aplicar_preview' %}" class="mb-4 border-y border-emerald-200 bg-emerald-50/60 py-4">
+        {% csrf_token %}
+        <input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">
+        <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">
+        <input type="hidden" name="profesional" value="{{ profesional_actual }}">
+        <input type="hidden" name="solo_diferencias" value="{% if solo_diferencias %}1{% else %}0{% endif %}">
+        <input type="hidden" name="estado_revision" value="{{ estado_revision_actual }}">
+        <input type="hidden" name="page" value="{{ resultados.number }}">
+        <h2 class="text-base font-semibold text-emerald-950">Aplicar cantidad liquidable confirmada</h2>
+        <p class="mt-1 text-sm text-emerald-900">Acción económica independiente: conserva la cantidad declarada, cambia la liquidable y actualiza el monto persistido. Exige un preview y confirmación final.</p>
+        <label class="mt-3 block text-sm font-semibold text-slate-700">Fundamento económico
+            <textarea name="motivo_aplicacion" required maxlength="2000" rows="2" class="mt-1 w-full rounded-md border border-emerald-300 bg-white p-2 font-normal"></textarea>
+        </label>
+        <button type="submit" class="mt-2 rounded-md bg-emerald-800 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-900">Previsualizar ajuste económico</button>
+    </form>
+    {% endif %}
+
+    {% if lotes_revertibles %}
+    <section class="mb-4 border-y border-rose-200 py-4" aria-labelledby="doppler-reversiones-heading">
+        <h2 id="doppler-reversiones-heading" class="text-base font-semibold text-rose-950">Ajustes económicos activos</h2>
+        <p class="mt-1 text-sm text-slate-600">La reversión restaura los snapshots originales de monto y cantidad liquidable; también requiere preview y confirmación.</p>
+        <div class="mt-3 divide-y divide-rose-100">
+            {% for lote in lotes_revertibles %}
+            <form method="post" action="{% url 'liquidacion:auditoria_doppler_mmii_revertir_preview' %}" class="py-3">
+                {% csrf_token %}
+                <input type="hidden" name="lote_id" value="{{ lote.id }}">
+                <input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">
+                <input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">
+                <input type="hidden" name="profesional" value="{{ profesional_actual }}">
+                <input type="hidden" name="solo_diferencias" value="{% if solo_diferencias %}1{% else %}0{% endif %}">
+                <input type="hidden" name="estado_revision" value="{{ estado_revision_actual }}">
+                <input type="hidden" name="page" value="{{ resultados.number }}">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm">
+                        <p class="font-semibold text-slate-900">Lote {{ lote.id }} · {{ lote.plan|length }} registros</p>
+                        <p class="text-xs text-slate-600">{% for item in lote.plan %}#{{ item.registro.pk }} · ${{ item.monto_actual|floatformat:2 }} → ${{ item.monto_restaurado|floatformat:2 }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+                    </div>
+                    <label class="min-w-64 flex-1 text-xs font-semibold text-slate-700">Motivo de reversión
+                        <input name="motivo_reversion" required maxlength="2000" class="mt-1 h-9 w-full rounded border border-rose-300 bg-white px-2 text-sm font-normal">
+                    </label>
+                    <button type="submit" class="h-9 rounded-md border border-rose-700 px-3 text-sm font-semibold text-rose-800 hover:bg-rose-50">Previsualizar reversión</button>
+                </div>
+            </form>
+            {% endfor %}
+        </div>
+    </section>
     {% endif %}
 
     <form id="doppler-lote" method="post" action="{% url 'liquidacion:auditoria_doppler_mmii_confirmar_lote' %}" class="mb-4 border-y border-slate-200 py-4">
@@ -140,6 +189,7 @@
                                     <div class="text-xs text-slate-500">{{ estudio.codigo_estudio }} · {{ estudio.clasificacion }}</div>
                                     <div class="mt-1 text-xs text-slate-700">
                                         Cantidad declarada: <strong>{{ estudio.cantidad_declarada }}</strong>
+                                        {% if estudio.cantidad_liquidable != None %} · Cantidad liquidable: <strong>{{ estudio.cantidad_liquidable }}</strong>{% endif %}
                                         {% if estudio.requiere_revision_manual %}
                                         · <span class="font-semibold text-amber-800">Regla pendiente de revisión</span>
                                         {% else %}
@@ -159,6 +209,14 @@
                                         <input type="checkbox" name="casos" value="{{ caso.pk }}" form="doppler-lote" data-doppler-caso class="rounded border-indigo-300">
                                         Seleccionar caso #{{ caso.pk }} · 2 → 1
                                     </label>
+                                    {% endif %}
+                                    {% if estudio.permite_aplicar_cantidad %}
+                                    <label class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-emerald-900">
+                                        <input type="checkbox" name="casos_aplicar" value="{{ caso.pk }}" form="doppler-aplicar-preview" class="rounded border-emerald-400">
+                                        Aplicar 2 → 1 a caso #{{ caso.pk }}
+                                    </label>
+                                    {% elif estudio.ajuste_cantidad_activo %}
+                                    <p class="mt-2 text-xs font-semibold text-emerald-800">Ajuste económico aplicado · liquidable {{ estudio.cantidad_liquidable }}.</p>
                                     {% endif %}
                                     <div class="mt-2 rounded-md border border-indigo-200 bg-indigo-50 p-2 text-xs text-indigo-950">
                                         <div class="flex flex-wrap items-center justify-between gap-2">

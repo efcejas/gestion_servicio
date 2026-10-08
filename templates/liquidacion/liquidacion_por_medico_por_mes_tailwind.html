@@ -167,7 +167,11 @@
                                     {% for item in registro.estudios_con_cantidades %}
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-gray-800">{{ item.estudio.nombre }}</span>
-                                        {% if item.cantidad > 1 %}
+                                        {% if item.cantidad_liquidable != None %}
+                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap bg-emerald-100 text-emerald-800">
+                                            Declarada ×{{ item.cantidad }} · Liquidable ×{{ item.cantidad_liquidable }}
+                                        </span>
+                                        {% elif item.cantidad > 1 %}
                                         <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap bg-indigo-100 text-indigo-800">
                                             ×{{ item.cantidad }}
                                         </span>

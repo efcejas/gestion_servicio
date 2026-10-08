@@ -152,7 +152,10 @@
                                     <span class="text-amber-700 font-semibold">Sin grupo</span>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-2 text-sm text-gray-900 text-right">{{ rel.cantidad }}</td>
+                            <td class="px-4 py-2 text-sm text-gray-900 text-right">
+                                <span>Declarada: {{ rel.cantidad }}</span>
+                                {% if rel.cantidad_liquidable != None %}<span class="block font-semibold text-emerald-700">Liquidable: {{ rel.cantidad_liquidable }}</span>{% endif %}
+                            </td>
                             <td class="px-4 py-2 text-sm text-gray-700">{{ rel.get_contexto_display }}</td>
                         </tr>
                         {% empty %}

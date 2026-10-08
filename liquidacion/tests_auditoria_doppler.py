@@ -15,6 +15,7 @@ from .models import (
     Estudios,
     GrupoTarifario,
     GuardiaPasiva,
+    HistorialAjusteCantidadDopplerMMII,
     HistorialRevisionAuditoriaDopplerMMII,
     RegistroEstudio,
     RegistroEstudiosPorMedico,
@@ -24,9 +25,13 @@ from .models import (
 )
 from .services_auditoria import (
     adjuntar_comparacion_doppler_mmii,
+    aplicar_lote_cantidad_doppler_mmii,
     auditar_cantidad_doppler_mmii,
     confirmar_lote_auditoria_doppler_mmii,
     crear_casos_auditoria_doppler_mmii,
+    preparar_aplicacion_cantidad_doppler_mmii,
+    preparar_reversion_lote_cantidad_doppler_mmii,
+    revertir_lote_cantidad_doppler_mmii,
     resolver_caso_auditoria_doppler_mmii,
     resumir_comparacion_doppler_mmii,
     valores_proyeccion_doppler_mmii,
@@ -322,7 +327,7 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         response_jefatura = self.client.get(url)
 
         self.assertEqual(response_jefatura.status_code, 200)
-        self.assertContains(response_jefatura, 'Revisión sin ajustes económicos')
+        self.assertContains(response_jefatura, 'La revisión de evidencia no aplica ajustes económicos')
         self.assertContains(response_jefatura, 'Cantidad declarada')
         self.assertContains(response_jefatura, 'Impacto potencial')
         self.assertContains(response_jefatura, self.medico.get_full_name())
@@ -477,6 +482,295 @@ class AuditoriaCantidadDopplerMMIITest(TestCase):
         registro.refresh_from_db()
         self.assertEqual(relacion.cantidad, 2)
         self.assertEqual(registro.monto_calculado, Decimal('48400.00'))
+
+    def test_calculo_canonico_usa_cantidad_liquidable_sin_pisar_declarada(self):
+        registro = self._crear_registro()
+        relacion = RegistroEstudio.objects.create(
+            registro=registro, estudio=self.arterial, cantidad=2, contexto='SERVICIO',
+        )
+        monto_original = registro.calcular_monto()
+        relacion.cantidad_liquidable = 1
+        relacion.save(update_fields=['cantidad_liquidable'])
+
+        monto_ajustado = registro.calcular_monto()
+        relacion.refresh_from_db()
+
+        self.assertEqual(relacion.cantidad, 2)
+        self.assertEqual(relacion.cantidad_liquidable, 1)
+        self.assertEqual(monto_ajustado, monto_original / 2)
+
+    def test_aplicar_lote_actualiza_monto_una_vez_y_preserva_cantidad_declarada(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(
+            username='jefe_aplica_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral verificada', usuario=jefe,
+            )
+
+        monto_original = registro.monto_calculado
+        plan = preparar_aplicacion_cantidad_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], usuario=jefe,
+        )
+        self.assertEqual(len(plan), 1)
+        self.assertEqual(plan[0]['monto_anterior'], monto_original)
+        self.assertEqual(plan[0]['monto_nuevo'], monto_original / 2)
+        self.assertEqual(registro.registroestudio_set.filter(cantidad_liquidable__isnull=False).count(), 0)
+
+        resultado = aplicar_lote_cantidad_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], usuario=jefe,
+            motivo='Se verifico modalidad bilateral en orden medica.',
+        )
+
+        registro.refresh_from_db()
+        lineas = list(registro.registroestudio_set.order_by('pk'))
+        self.assertEqual(resultado['casos_aplicados'], 2)
+        self.assertEqual(registro.monto_calculado, monto_original / 2)
+        self.assertEqual(registro.calcular_monto(), monto_original / 2)
+        self.assertEqual([linea.cantidad for linea in lineas], [2, 2])
+        self.assertEqual([linea.cantidad_liquidable for linea in lineas], [1, 1])
+        eventos = list(HistorialAjusteCantidadDopplerMMII.objects.order_by('pk'))
+        self.assertEqual(len(eventos), 2)
+        self.assertEqual({evento.accion for evento in eventos}, {HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR})
+        self.assertEqual({evento.lote_id for evento in eventos}, {eventos[0].lote_id})
+
+    def test_aplicacion_mixta_invalida_no_escribe_parcialmente(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(
+            username='jefe_lote_doppler_invalido', rol='jefe_servicio', perfil_completo=True,
+        )
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[0].pk, decision='CONFIRMADO',
+            evidencias={'visualmedical_verificado': True},
+            observacion='Verificado en VisualMedical', usuario=jefe,
+        )
+        monto_original = registro.monto_calculado
+
+        with self.assertRaises(ValidationError):
+            aplicar_lote_cantidad_doppler_mmii(
+                caso_ids=[caso.pk for caso in casos], usuario=jefe,
+                motivo='Intento de lote con un caso pendiente.',
+            )
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertEqual(registro.registroestudio_set.filter(cantidad_liquidable__isnull=False).count(), 0)
+        self.assertFalse(HistorialAjusteCantidadDopplerMMII.objects.exists())
+
+    def test_aplicacion_rechaza_rol_no_autorizado_y_sesion_cerrada(self):
+        registro, casos = self._preparar_casos_economicos()
+        jefe = User.objects.create_user(
+            username='jefe_sesion_cerrada_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        resolver_caso_auditoria_doppler_mmii(
+            caso_id=casos[0].pk, decision='CONFIRMADO',
+            evidencias={'orden_medica_verificada': True},
+            observacion='Orden verificada', usuario=jefe,
+        )
+        with self.assertRaises(ValidationError):
+            preparar_aplicacion_cantidad_doppler_mmii(caso_ids=[casos[0].pk], usuario=jefe)
+
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        administrativo = User.objects.create_user(
+            username='admin_sin_permiso_aplicar_doppler', rol='administrativo', perfil_completo=True,
+        )
+        with self.assertRaises(ValidationError):
+            preparar_aplicacion_cantidad_doppler_mmii(
+                caso_ids=[casos[0].pk], usuario=administrativo,
+            )
+        self.assertEqual(registro.registroestudio_set.filter(cantidad_liquidable__isnull=False).count(), 0)
+        self.assertFalse(HistorialAjusteCantidadDopplerMMII.objects.exists())
+
+    def test_aplicacion_secuencial_de_modalidades_y_reversion_en_orden_inverso(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        monto_original = registro.monto_calculado
+        jefe = User.objects.create_user(
+            username='jefe_secuencial_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral verificada', usuario=jefe,
+            )
+
+        primer_lote = aplicar_lote_cantidad_doppler_mmii(
+            caso_ids=[casos[0].pk], usuario=jefe, motivo='Primera modalidad revisada.',
+        )
+        segundo_lote = aplicar_lote_cantidad_doppler_mmii(
+            caso_ids=[casos[1].pk], usuario=jefe, motivo='Segunda modalidad revisada.',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original / 2)
+        self.assertEqual(list(registro.registroestudio_set.order_by('pk').values_list('cantidad', 'cantidad_liquidable')),
+                         [(2, 1), (2, 1)])
+
+        revertir_lote_cantidad_doppler_mmii(
+            lote_id=segundo_lote['lote_id'], usuario=jefe, motivo='Reversion del segundo lote.',
+        )
+        revertir_lote_cantidad_doppler_mmii(
+            lote_id=primer_lote['lote_id'], usuario=jefe, motivo='Reversion del primer lote.',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertEqual(list(registro.registroestudio_set.order_by('pk').values_list('cantidad', 'cantidad_liquidable')),
+                         [(2, None), (2, None)])
+
+    def test_revertir_lote_restaura_snapshots_exactos_y_bloquea_doble_reversion(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        monto_original = registro.monto_calculado
+        jefe = User.objects.create_user(
+            username='jefe_reversion_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral verificada', usuario=jefe,
+            )
+        aplicado = aplicar_lote_cantidad_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], usuario=jefe,
+            motivo='Aplicacion confirmada de modalidad bilateral.',
+        )
+        preview = preparar_reversion_lote_cantidad_doppler_mmii(
+            lote_id=aplicado['lote_id'], usuario=jefe,
+        )
+        self.assertEqual(preview[0]['monto_actual'], monto_original / 2)
+        self.assertEqual(preview[0]['monto_restaurado'], monto_original)
+
+        revertido = revertir_lote_cantidad_doppler_mmii(
+            lote_id=aplicado['lote_id'], usuario=jefe,
+            motivo='Reversion solicitada tras nueva verificacion.',
+        )
+
+        registro.refresh_from_db()
+        lineas = list(registro.registroestudio_set.order_by('pk'))
+        self.assertEqual(revertido['eventos_revertidos'], 2)
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertEqual(registro.calcular_monto(), monto_original)
+        self.assertEqual([linea.cantidad for linea in lineas], [2, 2])
+        self.assertEqual([linea.cantidad_liquidable for linea in lineas], [None, None])
+        eventos = list(HistorialAjusteCantidadDopplerMMII.objects.order_by('pk'))
+        aplicaciones = [e for e in eventos if e.accion == HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR]
+        reversiones = [e for e in eventos if e.accion == HistorialAjusteCantidadDopplerMMII.ACCION_REVERTIR]
+        self.assertEqual(len(aplicaciones), 2)
+        self.assertEqual(len(reversiones), 2)
+        self.assertEqual({e.evento_origen_id for e in reversiones}, {e.pk for e in aplicaciones})
+
+        with self.assertRaises(ValidationError):
+            revertir_lote_cantidad_doppler_mmii(
+                lote_id=aplicado['lote_id'], usuario=jefe,
+                motivo='Intento de segunda reversion.',
+            )
+        self.assertEqual(HistorialAjusteCantidadDopplerMMII.objects.count(), 4)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_preview_y_aplicacion_economica_requieren_doble_confirmacion(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        monto_original = registro.monto_calculado
+        jefe = User.objects.create_user(
+            username='jefe_endpoint_aplica_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral verificada', usuario=jefe,
+            )
+        self.client.force_login(jefe)
+        filtros = {
+            'fecha_desde': '2026-06-01', 'fecha_hasta': '2026-06-30',
+            'profesional': '', 'solo_diferencias': '1', 'estado_revision': 'CONFIRMADO',
+        }
+        preview = self.client.post(
+            reverse('liquidacion:auditoria_doppler_mmii_aplicar_preview'),
+            {
+                **filtros,
+                'casos_aplicar': [str(caso.pk) for caso in casos],
+                'motivo_aplicacion': 'Aplicacion confirmada contra orden.',
+            },
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, 'Preview de ajuste económico Doppler')
+        self.assertTrue(preview.context['token'])
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertFalse(HistorialAjusteCantidadDopplerMMII.objects.exists())
+
+        aplicada = self.client.post(
+            reverse('liquidacion:auditoria_doppler_mmii_aplicar'),
+            {'token': preview.context['token']},
+        )
+
+        self.assertEqual(aplicada.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original / 2)
+        self.assertEqual(list(registro.registroestudio_set.order_by('pk').values_list('cantidad', 'cantidad_liquidable')),
+                         [(2, 1), (2, 1)])
+        self.assertEqual(HistorialAjusteCantidadDopplerMMII.objects.count(), 2)
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_preview_y_confirmacion_http_revierten_lote_aplicado(self):
+        self.sesion.estado = 'REVISION'
+        self.sesion.save(update_fields=['estado'])
+        registro, casos = self._preparar_casos_economicos()
+        monto_original = registro.monto_calculado
+        jefe = User.objects.create_user(
+            username='jefe_endpoint_reversion_doppler', rol='jefe_servicio', perfil_completo=True,
+        )
+        for caso in casos:
+            resolver_caso_auditoria_doppler_mmii(
+                caso_id=caso.pk, decision='CONFIRMADO',
+                evidencias={'orden_medica_verificada': True},
+                observacion='Orden bilateral verificada', usuario=jefe,
+            )
+        aplicado = aplicar_lote_cantidad_doppler_mmii(
+            caso_ids=[caso.pk for caso in casos], usuario=jefe,
+            motivo='Aplicacion confirmada de modalidad bilateral.',
+        )
+        self.client.force_login(jefe)
+
+        auditoria = self.client.get(reverse('liquidacion:auditoria_doppler_mmii'), {
+            'fecha_desde': '2026-06-01', 'fecha_hasta': '2026-06-30',
+        })
+        self.assertContains(auditoria, 'Ajustes económicos activos')
+        preview = self.client.post(
+            reverse('liquidacion:auditoria_doppler_mmii_revertir_preview'),
+            {
+                'lote_id': aplicado['lote_id'],
+                'motivo_reversion': 'Reversion validada por jefatura.',
+                'fecha_desde': '2026-06-01', 'fecha_hasta': '2026-06-30',
+            },
+        )
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, 'Preview de reversión económica')
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original / 2)
+
+        response = self.client.post(
+            reverse('liquidacion:auditoria_doppler_mmii_revertir'),
+            {'token': preview.context['token']},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, monto_original)
+        self.assertEqual(registro.registroestudio_set.filter(cantidad_liquidable__isnull=False).count(), 0)
+        self.assertEqual(HistorialAjusteCantidadDopplerMMII.objects.count(), 4)
 
     def _preparar_casos_economicos(self):
         registro = self._crear_registro()

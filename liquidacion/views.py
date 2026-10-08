@@ -40,6 +40,7 @@ from .models import (
     PreparacionLiquidacionRRHH,
     RevisionAuditoriaEcoRegistro,
     RevisionAuditoriaDopplerMMII,
+    HistorialAjusteCantidadDopplerMMII,
     RevisionCruceEgesRegistro,
     CorreccionPacsRegistro,
     GuardiaPasiva,
@@ -55,6 +56,7 @@ from .grupo_tarifario_mapping import (
 from .permisos import puede_ver_desglose_administrativo
 from .services_auditoria import (
     adjuntar_comparacion_doppler_mmii,
+    aplicar_lote_cantidad_doppler_mmii,
     confirmar_lote_auditoria_doppler_mmii,
     resumir_comparacion_doppler_mmii,
     adjuntar_revisiones_auditoria_doppler_mmii,
@@ -62,6 +64,9 @@ from .services_auditoria import (
     auditar_cantidad_doppler_mmii,
     auditar_residentes_eco_por_sesion,
     crear_casos_auditoria_doppler_mmii,
+    preparar_aplicacion_cantidad_doppler_mmii,
+    preparar_reversion_lote_cantidad_doppler_mmii,
+    revertir_lote_cantidad_doppler_mmii,
     resolver_caso_auditoria_doppler_mmii,
     resumir_pendientes_auditoria_eco,
 )
@@ -1501,8 +1506,62 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
             ).select_related('medico').prefetch_related('registroestudio_set'),
         )
         comparaciones = {registro.pk: registro.comparacion_doppler for registro in registros_comparados}
+        puede_aplicar = _puede_accion_masiva_revision_horaria(self.request.user)
+        ids_registros_pagina = [item['registro_id'] for item in pagina]
+        registros_pagina = {
+            registro.pk: registro
+            for registro in RegistroEstudiosPorMedico.objects.filter(
+                pk__in=ids_registros_pagina,
+            ).select_related('medico', 'sesion_contable')
+        }
+        ids_lineas_pagina = [
+            estudio['registro_estudio_id']
+            for item in pagina for estudio in item['estudios']
+        ]
+        liquidables_por_linea = dict(RegistroEstudio.objects.filter(
+            pk__in=ids_lineas_pagina,
+        ).values_list('pk', 'cantidad_liquidable'))
+        ultimos_eventos_por_linea = {}
+        for evento in HistorialAjusteCantidadDopplerMMII.objects.filter(
+            registro_estudio_id_origen__in=ids_lineas_pagina,
+        ).order_by('registro_estudio_id_origen', '-fecha_evento', '-pk'):
+            ultimos_eventos_por_linea.setdefault(evento.registro_estudio_id_origen, evento)
+        lotes_revertibles = {}
         for item in pagina:
             item['comparacion_doppler'] = comparaciones.get(item['registro_id'])
+            registro_actual = registros_pagina.get(item['registro_id'])
+            for estudio in item['estudios']:
+                caso = estudio['revision_auditoria']
+                evidencia_confirmada = bool(
+                    caso and caso.estado == RevisionAuditoriaDopplerMMII.ESTADO_CONFIRMADO
+                    and (caso.orden_medica_verificada or caso.visualmedical_verificado)
+                )
+                linea_id = estudio['registro_estudio_id']
+                ultimo_evento = ultimos_eventos_por_linea.get(linea_id)
+                ajuste_activo = bool(
+                    ultimo_evento
+                    and ultimo_evento.accion == HistorialAjusteCantidadDopplerMMII.ACCION_APLICAR
+                )
+                estudio['cantidad_liquidable'] = liquidables_por_linea.get(linea_id)
+                estudio['ajuste_cantidad_activo'] = ajuste_activo
+                estudio['permite_aplicar_cantidad'] = bool(
+                    puede_aplicar and evidencia_confirmada and not ajuste_activo
+                    and registro_actual and not registro_actual.anulado
+                    and registro_actual.medico.rol != 'medico_residente'
+                    and registro_actual.sesion_contable.estado in {'ABIERTA', 'REVISION'}
+                    and estudio['cantidad_declarada'] == 2
+                    and estudio['cantidad_esperada'] == 1
+                    and not estudio['posible_duplicado']
+                )
+                if puede_aplicar and ajuste_activo:
+                    lotes_revertibles.setdefault(str(ultimo_evento.lote_id), None)
+        for lote_id in lotes_revertibles:
+            try:
+                lotes_revertibles[lote_id] = preparar_reversion_lote_cantidad_doppler_mmii(
+                    lote_id=lote_id, usuario=self.request.user,
+                )
+            except ValidationError:
+                lotes_revertibles[lote_id] = None
         context.update({
             'auditoria': auditoria,
             'resultados': pagina,
@@ -1526,6 +1585,11 @@ class AuditoriaDopplerMMIIView(LoginRequiredMixin, UserPassesTestMixin, Template
             'error_fechas': error_fechas,
             'total_filtrado': len(resultados),
             'puede_generar_casos': _puede_acceder_panel_administrativo(self.request.user),
+            'puede_aplicar_ajuste_doppler': _puede_accion_masiva_revision_horaria(self.request.user),
+            'lotes_revertibles': [
+                {'id': lote_id, 'plan': plan}
+                for lote_id, plan in lotes_revertibles.items() if plan
+            ],
         })
         return context
 
@@ -1664,6 +1728,203 @@ class AuditoriaDopplerMMIILoteView(AuditoriaDopplerMMIIRevisionView):
             return redirect(redirect_url)
         messages.success(request, f'{total} casos confirmados con historial. No se aplicaron debitos ni cambios de monto.')
         return redirect(redirect_url)
+
+
+def _firma_plan_aplicacion_cantidad_doppler(plan):
+    return [
+        [
+            item['registro'].pk,
+            str(item['monto_anterior']),
+            str(item['monto_nuevo']),
+            sorted([[linea_id, cantidad] for linea_id, cantidad in item['cantidades'].items()]),
+            sorted(caso.pk for caso in item['casos']),
+        ]
+        for item in plan
+    ]
+
+
+class AuditoriaDopplerMMIIAplicarPreviewView(LoginRequiredMixin, UserPassesTestMixin, View):
+    template_name = 'liquidacion/auditoria_doppler_mmii_aplicar_preview.html'
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede aplicar ajustes economicos Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        redirect_url = _url_auditoria_doppler_con_filtros(request.POST)
+        valores = request.POST.getlist('casos_aplicar')
+        if not valores or len(valores) > 200 or any(not valor.isdigit() for valor in valores):
+            messages.error(request, 'Selecciona entre 1 y 200 casos economicos validos.')
+            return redirect(redirect_url)
+        if len(set(valores)) != len(valores):
+            messages.error(request, 'La seleccion contiene casos repetidos.')
+            return redirect(redirect_url)
+        motivo = (request.POST.get('motivo_aplicacion') or '').strip()
+        if not motivo or len(motivo) > 2000:
+            messages.error(request, 'Indica un fundamento de hasta 2000 caracteres.')
+            return redirect(redirect_url)
+        try:
+            plan = preparar_aplicacion_cantidad_doppler_mmii(
+                caso_ids=[int(valor) for valor in valores], usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+            return redirect(redirect_url)
+        payload = {
+            'user_id': request.user.pk,
+            'caso_ids': [int(valor) for valor in valores],
+            'motivo': motivo,
+            'plan': _firma_plan_aplicacion_cantidad_doppler(plan),
+            'filtros': {
+                clave: (request.POST.get(clave) or '').strip()
+                for clave in ('fecha_desde', 'fecha_hasta', 'profesional', 'solo_diferencias', 'estado_revision', 'page')
+            },
+        }
+        token = signing.dumps(payload, salt='liquidacion.doppler.cantidad.aplicar')
+        return render(request, self.template_name, {
+            'plan': plan,
+            'token': token,
+            'motivo': motivo,
+            'fecha_expiracion_minutos': 15,
+            'volver_url': _url_auditoria_doppler_con_filtros(payload['filtros']),
+        })
+
+
+class AuditoriaDopplerMMIIAplicarView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede aplicar ajustes economicos Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        token = request.POST.get('token') or ''
+        try:
+            payload = signing.loads(
+                token, salt='liquidacion.doppler.cantidad.aplicar', max_age=900,
+            )
+            if payload.get('user_id') != request.user.pk:
+                raise signing.BadSignature('usuario distinto')
+            plan = preparar_aplicacion_cantidad_doppler_mmii(
+                caso_ids=payload['caso_ids'], usuario=request.user,
+            )
+            if _firma_plan_aplicacion_cantidad_doppler(plan) != payload.get('plan'):
+                raise ValidationError('El preview ya no coincide con los datos actuales; vuelve a prepararlo.')
+            resultado = aplicar_lote_cantidad_doppler_mmii(
+                caso_ids=payload['caso_ids'], usuario=request.user, motivo=payload['motivo'],
+            )
+        except signing.BadSignature:
+            messages.error(request, 'El preview vencio o no es valido. Vuelve a seleccionar los casos.')
+            return redirect('liquidacion:auditoria_doppler_mmii')
+        except (KeyError, TypeError, ValidationError) as error:
+            mensajes = error.messages if isinstance(error, ValidationError) else ['El preview no es valido.']
+            messages.error(request, '; '.join(mensajes))
+            return redirect('liquidacion:auditoria_doppler_mmii')
+        messages.success(
+            request,
+            f"Ajuste Doppler aplicado al lote {resultado['lote_id']}: "
+            f"{resultado['casos_aplicados']} lineas; la cantidad declarada se preservo.",
+        )
+        return redirect(_url_auditoria_doppler_con_filtros(payload.get('filtros', {})))
+
+
+def _firma_plan_reversion_cantidad_doppler(plan):
+    return [
+        [
+            item['registro'].pk,
+            str(item['monto_actual']),
+            str(item['monto_restaurado']),
+            [evento.pk for evento in item['eventos']],
+        ]
+        for item in plan
+    ]
+
+
+class AuditoriaDopplerMMIIRevertirPreviewView(LoginRequiredMixin, UserPassesTestMixin, View):
+    template_name = 'liquidacion/auditoria_doppler_mmii_revertir_preview.html'
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede revertir ajustes economicos Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        redirect_url = _url_auditoria_doppler_con_filtros(request.POST)
+        lote_id = (request.POST.get('lote_id') or '').strip()
+        motivo = (request.POST.get('motivo_reversion') or '').strip()
+        if not motivo or len(motivo) > 2000:
+            messages.error(request, 'Indica un fundamento de hasta 2000 caracteres.')
+            return redirect(redirect_url)
+        try:
+            plan = preparar_reversion_lote_cantidad_doppler_mmii(
+                lote_id=lote_id, usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+            return redirect(redirect_url)
+        payload = {
+            'user_id': request.user.pk,
+            'lote_id': lote_id,
+            'motivo': motivo,
+            'plan': _firma_plan_reversion_cantidad_doppler(plan),
+            'filtros': {
+                clave: (request.POST.get(clave) or '').strip()
+                for clave in ('fecha_desde', 'fecha_hasta', 'profesional', 'solo_diferencias', 'estado_revision', 'page')
+            },
+        }
+        token = signing.dumps(payload, salt='liquidacion.doppler.cantidad.revertir')
+        return render(request, self.template_name, {
+            'plan': plan,
+            'token': token,
+            'motivo': motivo,
+            'lote_id': lote_id,
+            'volver_url': _url_auditoria_doppler_con_filtros(payload['filtros']),
+        })
+
+
+class AuditoriaDopplerMMIIRevertirView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede revertir ajustes economicos Doppler.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        try:
+            payload = signing.loads(
+                request.POST.get('token') or '',
+                salt='liquidacion.doppler.cantidad.revertir', max_age=900,
+            )
+            if payload.get('user_id') != request.user.pk:
+                raise signing.BadSignature('usuario distinto')
+            plan = preparar_reversion_lote_cantidad_doppler_mmii(
+                lote_id=payload['lote_id'], usuario=request.user,
+            )
+            if _firma_plan_reversion_cantidad_doppler(plan) != payload.get('plan'):
+                raise ValidationError('El preview ya no coincide con los datos actuales; vuelve a prepararlo.')
+            resultado = revertir_lote_cantidad_doppler_mmii(
+                lote_id=payload['lote_id'], usuario=request.user, motivo=payload['motivo'],
+            )
+        except signing.BadSignature:
+            messages.error(request, 'El preview vencio o no es valido. Vuelve a preparar la reversion.')
+            return redirect('liquidacion:auditoria_doppler_mmii')
+        except (KeyError, TypeError, ValidationError) as error:
+            mensajes = error.messages if isinstance(error, ValidationError) else ['El preview no es valido.']
+            messages.error(request, '; '.join(mensajes))
+            return redirect('liquidacion:auditoria_doppler_mmii')
+        messages.success(
+            request,
+            f"Lote Doppler {resultado['lote_id']} revertido: "
+            f"{resultado['eventos_revertidos']} lineas restauradas desde snapshots.",
+        )
+        return redirect(_url_auditoria_doppler_con_filtros(payload.get('filtros', {})))
 
 
 class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -4694,6 +4955,7 @@ class LiquidacionPorMedicoPorMesListView(LoginRequiredMixin, UserPassesTestMixin
                     estudios_con_cantidades.append({
                         'estudio': rel.estudio,
                         'cantidad': rel.cantidad,
+                        'cantidad_liquidable': rel.cantidad_liquidable,
                         'tipo': rel.estudio.tipo,
                         'contexto': rel.contexto,
                     })
