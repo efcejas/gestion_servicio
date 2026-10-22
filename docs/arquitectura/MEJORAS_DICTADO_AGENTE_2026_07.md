@@ -2,9 +2,40 @@
 
 Fecha inicial: 2026-07-09
 
-Ultima actualizacion: 2026-08-27
+Ultima actualizacion: 2026-10-22
 
-## Estado operativo (2026-09-03)
+## Estado por rama (2026-10-22)
+
+La base estable descrita abajo se mantiene separada de las mejoras incrementales
+de la rama `mejoras-dictado-ia`; no asumir que estas ultimas estan integradas o
+desplegadas.
+
+En esa rama se incorporaron protecciones para el endpoint de firma y el cambio
+de diccionario, manejo de errores del proveedor LLM, reintento sin repetir STT,
+supresion de contenido clinico en logs, limite configurable de audio y claves de
+caché separadas por contexto. La revision de caché tambien cambia al guardar una
+plantilla o una correccion de aprendizaje.
+
+El commit `3114df99` contiene el límite de audio y la invalidación final de
+caché. La rama `mejoras-dictado-ia` está sincronizada con su remoto y el
+directorio de trabajo está limpio; todavía no está integrada en la base estable
+ni desplegada.
+
+Las cuatro suites focales de API, piloto, guardrails y aprendizaje pasaron sobre
+`3114df99`: **105 pruebas en 149,6 s**. El reintento se comprobó manualmente en
+navegador; quedan por hacer las comprobaciones manuales del límite de audio,
+permisos y privacidad descritas en la guía operativa.
+
+El detalle técnico, los gates de validación y los próximos pasos antes de
+integrar están en
+[`OPTIMIZACIONES_DICTADO_RAPIDO.md`](OPTIMIZACIONES_DICTADO_RAPIDO.md).
+El orden recomendado es: repetir pruebas focales, hacer las comprobaciones
+manuales, verificar el backend de caché compartido en producción y luego decidir
+la integración. La plantilla institucional, el modo agente y la conversación
+clínica continua permanecen como roadmap posterior, no como bloqueantes de estas
+correcciones. No integrar ni desplegar esta rama sin aprobación explícita.
+
+## Estado de la base estable (referencia 2026-09-03)
 
 El modulo se restauro funcionalmente a la version estable `5d1baf4e`
 (`Agrega correccion por voz y confirmacion de plantilla`). Las capacidades

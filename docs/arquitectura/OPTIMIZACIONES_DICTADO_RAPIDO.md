@@ -1,5 +1,73 @@
 # 🚀 Optimizaciones del Sistema de Dictado Rápido
 
+## Actualización operativa — 2026-10-22
+
+Esta sección registra mejoras incrementales de seguridad y confiabilidad en la
+rama `mejoras-dictado-ia`. El commit `3114df99` contiene el límite de audio y la
+invalidación de caché; la rama está sincronizada con `origin/mejoras-dictado-ia`.
+Las mejoras todavía no están integradas en la rama estable ni desplegadas. Los
+porcentajes y costos de las secciones históricas inferiores son estimaciones
+previas, no mediciones de esta tanda.
+
+### Cambios implementados
+
+- **Reintento del LLM:** ante un error de mejora, se conserva la transcripción y
+    el texto editable; reintentar no vuelve a ejecutar STT.
+- **Errores explícitos:** la API devuelve error HTTP cuando falla el proveedor
+    LLM, en vez de presentar el texto sin mejorar como una mejora exitosa.
+- **Privacidad:** se retiraron fragmentos de informes y transcripciones de los
+    logs del servidor y de la consola del navegador; se conservan metadatos
+    operativos no clínicos.
+- **Tamaño de audio:** límite configurable mediante
+    `DICTADO_MAX_AUDIO_SIZE_BYTES` (por defecto `1_800_000` bytes), validado en el
+    navegador y en el backend antes de procesar el audio. El backend también
+    comprueba el tamaño de la petición y del contenido decodificado.
+- **Permisos y método HTTP:** el cambio de diccionario requiere superusuario y
+    el endpoint de firma acepta solo `POST`, además de conservar su control de
+    permisos.
+- **Caché de mejora:** la clave incluye un contexto JSON determinista. En modo
+    estructurado incorpora la fecha de modificación de la plantilla visible y
+    activa; al guardar una corrección de aprendizaje se renueva la revisión de
+    caché del usuario. Una solicitud sin cambios conserva el hit de caché.
+
+### Validación registrada
+
+- En `3114df99`, las cuatro suites focales de API, piloto, guardrails y
+    aprendizaje pasaron: **105 pruebas en 149,6 s**.
+- Los archivos modificados no reportaron errores estáticos y `git diff --check`
+    terminó sin problemas.
+- El reintento también fue probado manualmente en el navegador. No se hicieron
+    llamadas a proveedores reales en las pruebas automatizadas.
+
+### Próximos pasos antes de integrar
+
+1. Probar en navegador el rechazo de audio sobre el límite y el flujo de
+    reintento, confirmando que no se repite STT y que se conserva la edición.
+2. Revisar permisos de firma/diccionario y verificar en una prueba controlada
+    que no se registren textos clínicos en logs.
+3. Confirmar que el backend de caché en producción es compartido entre procesos
+    si la aplicación usa más de un worker.
+4. Integrar la rama solo con aprobación explícita y desplegar mediante el
+    procedimiento habitual, con posibilidad de rollback.
+5. Medir tiempos y costos reales antes de actualizar las cifras históricas de
+    rendimiento de este documento.
+
+### Roadmap posterior a la integración
+
+- Reintroducir plantilla institucional y modo agente primero en entorno de
+  prueba, con confirmación humana y una matriz de casos clínicos revisada.
+- Evaluar aprendizaje por usuario con opt-in, criterios de retención y métricas
+  de calidad; no habilitar ejemplos que no superen los filtros existentes.
+- Considerar conversación clínica continua y más regiones anatómicas solo tras
+  validar guardrails, permisos, corrección por voz y recuperación ante errores.
+- Habilitar cada fase mediante una configuración reversible y pruebas de
+  regresión focales. Este roadmap no es requisito para integrar las correcciones
+  de seguridad y caché ya implementadas.
+
+Nota: la revisión de plantilla usa `fecha_modificacion`, actualizada por el
+guardado normal del modelo. Las modificaciones directas con `QuerySet.update()`
+no ejecutan `auto_now` y no actualizan por sí solas esa revisión.
+
 ## 📊 Resumen Ejecutivo
 
 Se implementaron **6 optimizaciones críticas** que mejoran significativamente el rendimiento del sistema de dictado rápido con IA:
