@@ -3,11 +3,11 @@
 ## Actualización operativa — 2026-10-22
 
 Esta sección registra mejoras incrementales de seguridad y confiabilidad en la
-rama `mejoras-dictado-ia`. El commit `3114df99` contiene el límite de audio y la
-invalidación de caché; la rama está sincronizada con `origin/mejoras-dictado-ia`.
-Las mejoras todavía no están integradas en la rama estable ni desplegadas. Los
-porcentajes y costos de las secciones históricas inferiores son estimaciones
-previas, no mediciones de esta tanda.
+rama `feature/liquidacion-copilot-specialization`. El bloque original se integró
+con `bd9595d1` y fue publicado en GitHub; todavía no está desplegado. La
+ampliación del límite a 2 MB descrita abajo está en el árbol local y aún no está
+commiteada ni publicada. Los porcentajes y costos de las secciones históricas
+inferiores son estimaciones previas, no mediciones de esta tanda.
 
 ### Cambios implementados
 
@@ -19,9 +19,9 @@ previas, no mediciones de esta tanda.
     logs del servidor y de la consola del navegador; se conservan metadatos
     operativos no clínicos.
 - **Tamaño de audio:** límite configurable mediante
-    `DICTADO_MAX_AUDIO_SIZE_BYTES` (por defecto `1_800_000` bytes), validado en el
-    navegador y en el backend antes de procesar el audio. El backend también
-    comprueba el tamaño de la petición y del contenido decodificado.
+    `DICTADO_MAX_AUDIO_SIZE_BYTES` (por defecto local actual: `2_000_000` bytes),
+    validado en el navegador y en el backend antes de procesar el audio. El límite
+    de petición Django se calcula para aceptar el JSON/base64 con margen.
 - **Permisos y método HTTP:** el cambio de diccionario requiere superusuario y
     el endpoint de firma acepta solo `POST`, además de conservar su control de
     permisos.
@@ -34,12 +34,14 @@ previas, no mediciones de esta tanda.
 
 - En `3114df99`, las cuatro suites focales de API, piloto, guardrails y
     aprendizaje pasaron: **105 pruebas en 149,6 s**.
+- Tras ampliar el límite local a 2 MB, pasaron `test_apis` (48 pruebas) y
+    `test_piloto_dictado` (14 pruebas). No se han repetido aún las otras suites.
 - Los archivos modificados no reportaron errores estáticos y `git diff --check`
     terminó sin problemas.
 - El reintento también fue probado manualmente en el navegador. No se hicieron
     llamadas a proveedores reales en las pruebas automatizadas.
 
-### Próximos pasos antes de integrar
+### Próximos pasos antes de publicar o desplegar
 
 1. Probar en navegador el rechazo de audio sobre el límite y el flujo de
     reintento, confirmando que no se repite STT y que se conserva la edición.
@@ -47,8 +49,8 @@ previas, no mediciones de esta tanda.
     que no se registren textos clínicos en logs.
 3. Confirmar que el backend de caché en producción es compartido entre procesos
     si la aplicación usa más de un worker.
-4. Integrar la rama solo con aprobación explícita y desplegar mediante el
-    procedimiento habitual, con posibilidad de rollback.
+4. Revisar y publicar el cambio local de 2 MB solo con aprobación explícita;
+    desplegar mediante el procedimiento habitual y con posibilidad de rollback.
 5. Medir tiempos y costos reales antes de actualizar las cifras históricas de
     rendimiento de este documento.
 

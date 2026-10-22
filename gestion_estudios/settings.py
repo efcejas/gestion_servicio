@@ -582,8 +582,14 @@ SESSION_INACTIVITY_TIMEOUT = int(config('SESSION_INACTIVITY_TIMEOUT', default=5 
 DICTADO_AGENTE_HABILITADO = config('DICTADO_AGENTE_HABILITADO', default=True, cast=bool)
 DICTADO_MAX_AUDIO_SIZE_BYTES = config(
     'DICTADO_MAX_AUDIO_SIZE_BYTES',
-    default=1_800_000,
+    default=2_000_000,
     cast=int,
+)
+# El audio viaja como base64 dentro de JSON; conservar el valor configurado si
+# es mayor y asegurar espacio para el payload y metadatos de la solicitud.
+DATA_UPLOAD_MAX_MEMORY_SIZE = max(
+    config('DATA_UPLOAD_MAX_MEMORY_SIZE', default=2_621_440, cast=int),
+    4 * ((DICTADO_MAX_AUDIO_SIZE_BYTES + 2) // 3) + 128 * 1024,
 )
 # Calcula una recomendacion alternativa para medir el selector hibrido sin usarla.
 DICTADO_SELECTOR_HIBRIDO_SOMBRA = config(

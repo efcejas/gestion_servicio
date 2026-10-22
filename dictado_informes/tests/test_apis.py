@@ -7,6 +7,7 @@ Fecha: 2026-03-08
 Cobertura esperada: ~70% de las APIs
 """
 
+from django.conf import settings
 from django.test import TestCase, Client, override_settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -254,6 +255,28 @@ class TestAPIsTranscripcion(TestCase):
         self.assertEqual(response.status_code, 413)
         self.assertFalse(response.json()['success'])
         mock_transcribe.assert_not_called()
+
+    def test_limite_de_peticion_cubre_audio_base64(self):
+        max_audio_size = settings.DICTADO_MAX_AUDIO_SIZE_BYTES
+        max_audio_request = 4 * ((max_audio_size + 2) // 3) + 64 * 1024
+
+        self.assertGreaterEqual(settings.DATA_UPLOAD_MAX_MEMORY_SIZE, max_audio_request)
+
+    @override_settings(DICTADO_MAX_AUDIO_SIZE_BYTES=2_000_000)
+    @patch('dictado_informes.ai_services.AIService.transcribe_audio')
+    def test_transcribir_acepta_audio_hasta_limite_ampliado(self, mock_transcribe):
+        mock_transcribe.return_value = {'text': 'Transcripción de prueba'}
+        audio_ampliado = base64.b64encode(b'x' * 2_000_000).decode()
+
+        response = self.client.post(
+            '/dictado_informes/api/transcribir-whisper/',
+            data=json.dumps({'audio': f'data:audio/webm;base64,{audio_ampliado}'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['success'])
+        mock_transcribe.assert_called_once()
 
     @override_settings(DICTADO_MAX_AUDIO_SIZE_BYTES=1000)
     @patch('dictado_informes.ai_services.AIService.transcribe_audio')
