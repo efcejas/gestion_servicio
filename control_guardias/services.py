@@ -945,6 +945,44 @@ def mover_guardia_borrador(
                 "En noviembre de 2026 no se permiten intercambios de guardias."
             )
 
+        tipo_origen = guardia.tipo_guardia
+        if movimiento_sin_intercambio:
+            if AsignacionGuardia.objects.filter(
+                residente=guardia.residente,
+                fecha=nueva_fecha,
+                estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+            ).exists():
+                raise MovimientoBorradorError(
+                    "El residente ya tiene una guardia ese día; no se puede duplicar."
+                )
+
+            tipos_equivalentes = list(
+                ConfiguracionTipoGuardia.objects.select_for_update().filter(
+                    activo=True,
+                    hora_inicio=tipo_origen.hora_inicio,
+                    hora_fin=tipo_origen.hora_fin,
+                    aplica_feriados=tipo_origen.aplica_feriados,
+                ).order_by('pk')
+            )
+            tipos_ocupados = set(
+                AsignacionGuardia.objects.filter(
+                    fecha=nueva_fecha,
+                    estado__in=['BORRADOR', 'PUBLICADA', 'CUMPLIDA'],
+                ).values_list('tipo_guardia_id', flat=True)
+            )
+            if tipo_origen.pk in tipos_ocupados:
+                dias_origen = set(tipo_origen.dias_semana.split(','))
+                tipo_libre = next(
+                    (
+                        tipo for tipo in tipos_equivalentes
+                        if tipo.pk not in tipos_ocupados
+                        and set(tipo.dias_semana.split(',')) == dias_origen
+                    ),
+                    None,
+                )
+                if tipo_libre:
+                    guardia.tipo_guardia = tipo_libre
+
         ocupante = (
             AsignacionGuardia.objects
             .select_for_update()
@@ -1037,7 +1075,11 @@ def mover_guardia_borrador(
                 "Confirmá el movimiento manual antes de aplicarlo.",
                 codigo='REQUIERE_CONFIRMACION',
                 permite_confirmacion=True,
-                detalles={'violaciones': violaciones},
+                detalles={
+                    'violaciones': violaciones,
+                    'tipo_origen': tipo_origen.nombre,
+                    'tipo_destino': guardia.tipo_guardia.nombre,
+                },
             )
 
         if violaciones and not forzar:
@@ -1058,7 +1100,13 @@ def mover_guardia_borrador(
         guardia.notas = (
             f"{guardia.notas}\n" if guardia.notas else ""
         ) + f"{marca} por {actor}: {fecha_origen:%d/%m/%Y} → {nueva_fecha:%d/%m/%Y}."
-        guardia.save(update_fields=['fecha', 'es_feriado', 'notas', 'fecha_actualizacion'])
+        if tipo_origen.pk != guardia.tipo_guardia_id:
+            guardia.notas += (
+                f" Slot equivalente: {tipo_origen.nombre} → {guardia.tipo_guardia.nombre}."
+            )
+        guardia.save(update_fields=[
+            'fecha', 'tipo_guardia', 'es_feriado', 'notas', 'fecha_actualizacion',
+        ])
 
         if ocupante:
             ocupante.fecha = fecha_origen

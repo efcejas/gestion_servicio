@@ -40,6 +40,17 @@ resolver ausencias, cambios y excepciones.
 Antes de modificar el módulo, leer las
 [instrucciones específicas](../.github/instructions/control_guardias.instructions.md).
 
+## Ajuste manual de noviembre de 2026
+
+Al arrastrar una guardia del borrador, si su tipo está ocupado en el destino,
+se busca un slot activo libre con los mismos horarios, días y aplicación a
+feriados. La confirmación muestra el cambio de slot y las advertencias
+operativas (incluidos días consecutivos); no mueve al residente que ya cubre
+el destino. Sin slot equivalente libre, se rechaza el movimiento.
+No se admite duplicar al mismo residente en una fecha, aun como excepción.
+El movimiento conserva la cuota y registra fecha y cambio de slot en las notas.
+Otros meses mantienen el comportamiento anterior.
+
 ## Verificación
 
 Desde la raíz del repositorio:

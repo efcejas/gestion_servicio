@@ -445,9 +445,12 @@
           const detalle = violaciones.length
             ? `\n\nAdvertencias:\n${violaciones.map((item) => `• ${item}`).join('\n')}`
             : '';
+          const cambioSlot = data.detalles.tipo_origen !== data.detalles.tipo_destino
+            ? `\nSlot equivalente libre: ${data.detalles.tipo_destino}. Los demás residentes no se mueven.`
+            : '';
           const acepta = window.confirm(
             `Mover la guardia del ${fechaLocalIso(info.oldEvent.start)} ` +
-            `al ${fechaLocalIso(info.event.start)}?${detalle}`
+            `al ${fechaLocalIso(info.event.start)}?${cambioSlot}${detalle}`
           );
           if (!acepta) {
             info.revert();

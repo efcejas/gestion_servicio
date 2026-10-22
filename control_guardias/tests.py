@@ -1149,6 +1149,140 @@ class CalendarioViewTests(TestCase):
         self.assertEqual(guardia.fecha, datetime.date(2026, 11, 5))
         self.assertEqual(ocupante.fecha, datetime.date(2026, 11, 18))
 
+    def test_noviembre_mueve_r1_junto_r2_usando_slot_equivalente_libre(self):
+        r1 = crear_residente('r1_movimiento', 'R1')
+        refuerzo = ConfiguracionTipoGuardia.objects.create(
+            nombre='Noche (2)',
+            hora_inicio=self.tipo.hora_inicio,
+            hora_fin=self.tipo.hora_fin,
+            dias_semana='V,J,X,M,L',
+            aplica_feriados=self.tipo.aplica_feriados,
+        )
+        origen = datetime.date(2026, 11, 11)
+        destino = datetime.date(2026, 11, 19)
+        guardia = AsignacionGuardia.objects.create(
+            residente=r1, tipo_guardia=self.tipo, fecha=origen,
+            creada_por=self.jefe,
+        )
+        for indice, tipo in enumerate([refuerzo, self.tipo]):
+            AsignacionGuardia.objects.create(
+                residente=crear_residente(f'cobertura_origen_{indice}', 'R3'),
+                tipo_guardia=tipo, fecha=origen, creada_por=self.jefe,
+            )
+        ocupante = AsignacionGuardia.objects.create(
+            residente=self.residente, tipo_guardia=self.tipo, fecha=destino,
+            creada_por=self.jefe,
+        )
+        AsignacionGuardia.objects.create(
+            residente=r1, tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 20), creada_por=self.jefe,
+        )
+        total = AsignacionGuardia.objects.count()
+        self.client.force_login(self.jefe)
+        url = reverse(
+            'control_guardias:guardia_borrador_mover', kwargs={'pk': guardia.pk},
+        )
+        previa = self.client.post(url, {'fecha': destino.isoformat()})
+        self.assertEqual(previa.status_code, 409)
+        self.assertTrue(previa.json()['permite_confirmacion'])
+        self.assertFalse(previa.json()['permite_intercambio'])
+        self.assertEqual(previa.json()['detalles']['tipo_destino'], refuerzo.nombre)
+        self.assertTrue(any(
+            'consecutivos' in advertencia
+            for advertencia in previa.json()['detalles']['violaciones']
+        ))
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.fecha, origen)
+        self.assertEqual(guardia.tipo_guardia, self.tipo)
+
+        respuesta = self.client.post(url, {
+            'fecha': destino.isoformat(), 'confirmar': '1', 'forzar': '1',
+        })
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIsNone(respuesta.json()['intercambiada_id'])
+        guardia.refresh_from_db()
+        ocupante.refresh_from_db()
+        self.assertEqual(guardia.fecha, destino)
+        self.assertEqual(guardia.tipo_guardia, refuerzo)
+        self.assertEqual(ocupante.fecha, destino)
+        self.assertEqual(ocupante.tipo_guardia, self.tipo)
+        self.assertEqual(AsignacionGuardia.objects.filter(fecha=origen).count(), 2)
+        self.assertEqual(AsignacionGuardia.objects.filter(fecha=destino).count(), 2)
+        self.assertEqual(AsignacionGuardia.objects.count(), total)
+        self.assertEqual(AsignacionGuardia.objects.filter(residente=r1).count(), 2)
+        self.assertIn('Slot equivalente', guardia.notas)
+
+    def test_noviembre_no_usa_slot_incompatible_inactivo_u_ocupado(self):
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente, tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 11), creada_por=self.jefe,
+        )
+        destino = datetime.date(2026, 11, 19)
+        otro = crear_residente('ocupante_slot_principal', 'R3')
+        AsignacionGuardia.objects.create(
+            residente=otro, tipo_guardia=self.tipo,
+            fecha=destino, creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+        for cambios in [
+            {'activo': False},
+            {'hora_inicio': datetime.time(18, 0)},
+            {'hora_fin': datetime.time(10, 0)},
+            {'dias_semana': 'S,D'},
+            {'aplica_feriados': True},
+            {'ocupado': True},
+        ]:
+            with self.subTest(cambios=cambios):
+                configuracion = {
+                    'nombre': 'Slot no disponible',
+                    'hora_inicio': self.tipo.hora_inicio,
+                    'hora_fin': self.tipo.hora_fin,
+                    'dias_semana': self.tipo.dias_semana,
+                }
+                configuracion.update({
+                    clave: valor for clave, valor in cambios.items()
+                    if clave != 'ocupado'
+                })
+                tipo = ConfiguracionTipoGuardia.objects.create(**configuracion)
+                if cambios.get('ocupado'):
+                    AsignacionGuardia.objects.create(
+                        residente=otro, tipo_guardia=tipo,
+                        fecha=destino, creada_por=self.jefe,
+                    )
+                respuesta = self.client.post(
+                    reverse(
+                        'control_guardias:guardia_borrador_mover',
+                        kwargs={'pk': guardia.pk},
+                    ),
+                    {'fecha': destino.isoformat(), 'confirmar': '1', 'forzar': '1'},
+                )
+                self.assertEqual(respuesta.status_code, 400)
+                self.assertEqual(respuesta.json()['codigo'], 'SLOT_OCUPADO')
+                guardia.refresh_from_db()
+                self.assertEqual(guardia.fecha, datetime.date(2026, 11, 11))
+                AsignacionGuardia.objects.filter(tipo_guardia=tipo).delete()
+                tipo.delete()
+
+    def test_noviembre_no_duplica_residente_aun_con_excepcion(self):
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente, tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 11), creada_por=self.jefe,
+        )
+        AsignacionGuardia.objects.create(
+            residente=self.residente, tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 19), creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+        respuesta = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': guardia.pk},
+            ),
+            {'fecha': '2026-11-19', 'confirmar': '1', 'forzar': '1'},
+        )
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertIn('no se puede duplicar', respuesta.json()['error'])
+
     def test_residente_no_puede_mover_guardia_borrador(self):
         self.client.force_login(self.residente)
         response = self.client.post(
