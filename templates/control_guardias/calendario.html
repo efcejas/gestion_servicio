@@ -295,6 +295,9 @@
   async function moverBorrador(info) {
     hideTooltip();
     const url = moverBorradorBaseUrl.replace('999999', String(info.event.id));
+    const movimientoNoviembre2026 =
+      info.oldEvent.start.getFullYear() === 2026 &&
+      info.oldEvent.start.getMonth() === 10;
     const opciones = {};
     try {
       while (true) {
@@ -302,6 +305,7 @@
           fecha: fechaLocalIso(info.event.start),
           intercambiar: opciones.intercambiar ? '1' : '0',
           forzar: opciones.forzar ? '1' : '0',
+          confirmar: opciones.confirmar ? '1' : '0',
           ocupante_id: opciones.ocupanteId || '',
         });
         const response = await fetch(url, {
@@ -318,7 +322,28 @@
           return;
         }
 
+        if (data.permite_confirmacion) {
+          const violaciones = (data.detalles && data.detalles.violaciones) || [];
+          const detalle = violaciones.length
+            ? `\n\nAdvertencias:\n${violaciones.map((item) => `• ${item}`).join('\n')}`
+            : '';
+          const acepta = window.confirm(
+            `Mover la guardia del ${fechaLocalIso(info.oldEvent.start)} ` +
+            `al ${fechaLocalIso(info.event.start)}?${detalle}`
+          );
+          if (!acepta) {
+            info.revert();
+            return;
+          }
+          opciones.confirmar = true;
+          opciones.forzar = violaciones.length > 0;
+          continue;
+        }
+
         if (data.permite_intercambio) {
+          if (movimientoNoviembre2026) {
+            throw new Error(data.error || 'En noviembre no se permiten intercambios.');
+          }
           const detalle = data.detalles || {};
           const acepta = window.confirm(
             `${data.error}\n\n` +

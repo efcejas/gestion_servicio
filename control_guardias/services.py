@@ -46,12 +46,14 @@ class MovimientoBorradorError(DistribucionError):
         codigo='MOVIMIENTO_INVALIDO',
         permite_excepcion=False,
         permite_intercambio=False,
+        permite_confirmacion=False,
         detalles=None,
     ):
         super().__init__(mensaje)
         self.codigo = codigo
         self.permite_excepcion = permite_excepcion
         self.permite_intercambio = permite_intercambio
+        self.permite_confirmacion = permite_confirmacion
         self.detalles = detalles or {}
 
 
@@ -912,6 +914,7 @@ def mover_guardia_borrador(
     usuario,
     forzar=False,
     intercambiar=False,
+    confirmar=False,
     ocupante_esperado_id=None,
 ):
     """Mueve o intercambia guardias BORRADOR con validación y trazabilidad."""
@@ -933,6 +936,15 @@ def mover_guardia_borrador(
         if nueva_fecha == guardia.fecha:
             return {'guardia': guardia, 'intercambiada': None, 'excepcional': False}
 
+        movimiento_sin_intercambio = (
+            guardia.fecha.year == 2026
+            and guardia.fecha.month == 11
+        )
+        if movimiento_sin_intercambio and intercambiar:
+            raise MovimientoBorradorError(
+                "En noviembre de 2026 no se permiten intercambios de guardias."
+            )
+
         ocupante = (
             AsignacionGuardia.objects
             .select_for_update()
@@ -953,7 +965,10 @@ def mover_guardia_borrador(
                 f"({ocupante.residente.anio_residencia or 'sin año'}), "
                 f"{ocupante.tipo_guardia.nombre}.",
                 codigo='SLOT_OCUPADO',
-                permite_intercambio=ocupante.estado == 'BORRADOR',
+                permite_intercambio=(
+                    ocupante.estado == 'BORRADOR'
+                    and not movimiento_sin_intercambio
+                ),
                 detalles={
                     'ocupante_id': ocupante.pk,
                     'ocupante_nombre': nombre,
@@ -1016,6 +1031,14 @@ def mover_guardia_borrador(
             _violaciones_acompanamiento_r1(propuestas, excluir_ids=excluir_ids)
         )
         violaciones = list(dict.fromkeys(violaciones))
+
+        if movimiento_sin_intercambio and not confirmar:
+            raise MovimientoBorradorError(
+                "Confirmá el movimiento manual antes de aplicarlo.",
+                codigo='REQUIERE_CONFIRMACION',
+                permite_confirmacion=True,
+                detalles={'violaciones': violaciones},
+            )
 
         if violaciones and not forzar:
             raise MovimientoBorradorError(

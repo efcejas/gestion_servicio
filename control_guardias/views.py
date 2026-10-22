@@ -412,6 +412,7 @@ class MoverGuardiaBorradorView(JefeInstructorMixin, TemplateView):
                 usuario=request.user,
                 forzar=request.POST.get('forzar') == '1',
                 intercambiar=request.POST.get('intercambiar') == '1',
+                confirmar=request.POST.get('confirmar') == '1',
                 ocupante_esperado_id=(
                     int(ocupante_esperado) if ocupante_esperado else None
                 ),
@@ -422,13 +423,22 @@ class MoverGuardiaBorradorView(JefeInstructorMixin, TemplateView):
                 status=400,
             )
         except MovimientoBorradorError as exc:
-            status = 409 if exc.permite_excepcion or exc.permite_intercambio else 400
+            status = (
+                409
+                if (
+                    exc.permite_excepcion
+                    or exc.permite_intercambio
+                    or exc.permite_confirmacion
+                )
+                else 400
+            )
             return JsonResponse({
                 'ok': False,
                 'error': str(exc),
                 'codigo': exc.codigo,
                 'permite_excepcion': exc.permite_excepcion,
                 'permite_intercambio': exc.permite_intercambio,
+                'permite_confirmacion': exc.permite_confirmacion,
                 'detalles': exc.detalles,
             }, status=status)
 
@@ -1654,4 +1664,3 @@ class RevisarSlotVacanteView(JefeInstructorMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         return redirect('control_guardias:solicitudes_slot_vacante')
-

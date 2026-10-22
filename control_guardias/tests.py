@@ -1050,6 +1050,105 @@ class CalendarioViewTests(TestCase):
         self.assertEqual(self.guardia_bor.fecha, datetime.date(2026, 5, 18))
         self.assertIn('Edición manual', self.guardia_bor.notas)
 
+    def test_noviembre_requiere_confirmacion_antes_de_mover_borrador(self):
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 5),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+        url = reverse(
+            'control_guardias:guardia_borrador_mover',
+            kwargs={'pk': guardia.pk},
+        )
+
+        respuesta_previa = self.client.post(url, {'fecha': '2026-11-06'})
+
+        self.assertEqual(respuesta_previa.status_code, 409)
+        self.assertTrue(respuesta_previa.json()['permite_confirmacion'])
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.fecha, datetime.date(2026, 11, 5))
+
+        respuesta_confirmada = self.client.post(
+            url,
+            {'fecha': '2026-11-06', 'confirmar': '1'},
+        )
+
+        self.assertEqual(respuesta_confirmada.status_code, 200)
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.fecha, datetime.date(2026, 11, 6))
+
+    def test_noviembre_permite_confirmar_excepcion_operativa(self):
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 5),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 10),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+        url = reverse(
+            'control_guardias:guardia_borrador_mover',
+            kwargs={'pk': guardia.pk},
+        )
+
+        respuesta_previa = self.client.post(url, {'fecha': '2026-11-09'})
+
+        self.assertEqual(respuesta_previa.status_code, 409)
+        self.assertTrue(respuesta_previa.json()['permite_confirmacion'])
+        self.assertTrue(respuesta_previa.json()['detalles']['violaciones'])
+
+        respuesta_confirmada = self.client.post(
+            url,
+            {'fecha': '2026-11-09', 'confirmar': '1', 'forzar': '1'},
+        )
+
+        self.assertEqual(respuesta_confirmada.status_code, 200)
+        self.assertTrue(respuesta_confirmada.json()['excepcional'])
+        guardia.refresh_from_db()
+        self.assertEqual(guardia.fecha, datetime.date(2026, 11, 9))
+
+    def test_noviembre_no_ofrece_intercambio_si_destino_esta_ocupado(self):
+        guardia = AsignacionGuardia.objects.create(
+            residente=self.residente,
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 5),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        ocupante = AsignacionGuardia.objects.create(
+            residente=crear_residente('ocupante_noviembre', 'R3'),
+            tipo_guardia=self.tipo,
+            fecha=datetime.date(2026, 11, 18),
+            estado='BORRADOR',
+            creada_por=self.jefe,
+        )
+        self.client.force_login(self.jefe)
+
+        response = self.client.post(
+            reverse(
+                'control_guardias:guardia_borrador_mover',
+                kwargs={'pk': guardia.pk},
+            ),
+            {'fecha': '2026-11-18'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()['permite_intercambio'])
+        guardia.refresh_from_db()
+        ocupante.refresh_from_db()
+        self.assertEqual(guardia.fecha, datetime.date(2026, 11, 5))
+        self.assertEqual(ocupante.fecha, datetime.date(2026, 11, 18))
+
     def test_residente_no_puede_mover_guardia_borrador(self):
         self.client.force_login(self.residente)
         response = self.client.post(
