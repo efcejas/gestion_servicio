@@ -1,11 +1,13 @@
 # 🚀 Optimizaciones del Sistema de Dictado Rápido
 
-## Actualización operativa — 2026-10-02
+## Actualización operativa — 2026-10-22
 
 Esta sección registra mejoras incrementales de seguridad y confiabilidad en la
-rama `mejoras-dictado-ia`. No implica que estén integradas en la rama estable ni
-desplegadas. Los porcentajes y costos de las secciones históricas inferiores son
-estimaciones previas, no mediciones de esta tanda.
+rama `mejoras-dictado-ia`. El commit `3114df99` contiene el límite de audio y la
+invalidación de caché; la rama está sincronizada con `origin/mejoras-dictado-ia`.
+Las mejoras todavía no están integradas en la rama estable ni desplegadas. Los
+porcentajes y costos de las secciones históricas inferiores son estimaciones
+previas, no mediciones de esta tanda.
 
 ### Cambios implementados
 
@@ -30,10 +32,8 @@ estimaciones previas, no mediciones de esta tanda.
 
 ### Validación registrada
 
-- Tras implementar el límite de audio, pasaron 105 pruebas focales del módulo.
-- Después de añadir las revisiones de plantilla y aprendizaje, pasaron
-    `dictado_informes.tests.test_ai_guardrails` (30 pruebas) y
-    `dictado_informes.tests.test_aprendizaje` (15 pruebas).
+- En `3114df99`, las cuatro suites focales de API, piloto, guardrails y
+    aprendizaje pasaron: **105 pruebas en 149,6 s**.
 - Los archivos modificados no reportaron errores estáticos y `git diff --check`
     terminó sin problemas.
 - El reintento también fue probado manualmente en el navegador. No se hicieron
@@ -42,19 +42,27 @@ estimaciones previas, no mediciones de esta tanda.
 ### Próximos pasos antes de integrar
 
 1. Probar en navegador el rechazo de audio sobre el límite y el flujo de
-     reintento, confirmando que no se repite STT y que se conserva la edición.
-2. Confirmar que el backend de caché desplegado es compartido entre procesos si
-     la aplicación sirve peticiones desde más de un worker; los tokens de revisión
-     y las entradas de resultados deben observarse desde todos ellos.
-3. Repetir las pruebas focales de API, piloto, guardrails y aprendizaje después
-     de la última tanda de cambios; la suite de 105 precede a la invalidación más
-     reciente.
-4. Revisar manualmente permisos de firma/diccionario y ausencia de texto clínico
-     en logs durante una prueba controlada.
-5. Medir tiempos y costos reales antes de actualizar las cifras de rendimiento
-     históricas de este documento.
-6. Revisar e integrar la rama solo con aprobación explícita; no desplegar como
-     parte de esta actualización documental.
+    reintento, confirmando que no se repite STT y que se conserva la edición.
+2. Revisar permisos de firma/diccionario y verificar en una prueba controlada
+    que no se registren textos clínicos en logs.
+3. Confirmar que el backend de caché en producción es compartido entre procesos
+    si la aplicación usa más de un worker.
+4. Integrar la rama solo con aprobación explícita y desplegar mediante el
+    procedimiento habitual, con posibilidad de rollback.
+5. Medir tiempos y costos reales antes de actualizar las cifras históricas de
+    rendimiento de este documento.
+
+### Roadmap posterior a la integración
+
+- Reintroducir plantilla institucional y modo agente primero en entorno de
+  prueba, con confirmación humana y una matriz de casos clínicos revisada.
+- Evaluar aprendizaje por usuario con opt-in, criterios de retención y métricas
+  de calidad; no habilitar ejemplos que no superen los filtros existentes.
+- Considerar conversación clínica continua y más regiones anatómicas solo tras
+  validar guardrails, permisos, corrección por voz y recuperación ante errores.
+- Habilitar cada fase mediante una configuración reversible y pruebas de
+  regresión focales. Este roadmap no es requisito para integrar las correcciones
+  de seguridad y caché ya implementadas.
 
 Nota: la revisión de plantilla usa `fecha_modificacion`, actualizada por el
 guardado normal del modelo. Las modificaciones directas con `QuerySet.update()`
