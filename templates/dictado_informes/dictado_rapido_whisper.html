@@ -375,7 +375,7 @@
             <!-- Preview en tiempo real (mientras graba) -->
             <div id="contenedorPreview" class="hidden mb-6">
                 <div class="bg-gradient-to-r from-blue-900/50 to-purple-900/50 border-2 border-blue-500 rounded-lg p-4 animate-pulse-slow">
-                    <label class="text-sm font-semibold text-blue-300 mb-2 block flex items-center">
+                    <label class="text-sm font-semibold text-blue-300 mb-2 flex items-center">
                         <i class="fas fa-waveform-lines text-blue-400 mr-2 animate-pulse"></i>
                         ⚡ Preview en Tiempo Real (provisional)
                         <span class="ml-auto text-xs bg-blue-600 px-2 py-1 rounded-full">Grabando...</span>
@@ -491,16 +491,16 @@
                         <span>Copiar con formato</span>
                         <span class="text-xs opacity-70">Ctrl+Enter</span>
                     </button>
-                    <button id="btnCopiarPlano"
-                            class="copy-action bg-teal-600 text-white rounded-lg font-semibold hover:bg-teal-700 transition-colors shadow group">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Copiar texto plano</span>
-                    </button>
                     <button id="btnCopiarNetterm"
                             class="copy-action bg-cyan-700 text-white rounded-lg font-semibold hover:bg-cyan-600 transition-colors shadow group"
                             title="Copia texto plano compatible con NetTerm, sin tildes ni caracteres especiales">
                         <i class="fas fa-terminal"></i>
                         <span>Copiar para NetTerm</span>
+                    </button>
+                    <button id="btnCopiarPlano"
+                            class="copy-action border border-gray-600 bg-gray-800 text-gray-300 rounded-lg font-medium hover:border-gray-500 hover:bg-gray-700 hover:text-white transition-colors group">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Copiar texto plano</span>
                     </button>
                 </div>
 
@@ -1356,15 +1356,23 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dictadoOpcionesAvanzadasAbierto', abrir ? 'true' : 'false');
     });
 
-    modoRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.value === 'ESTRUCTURADO' && radio.checked) {
-                selectorPlantilla.classList.remove('hidden');
-            } else {
-                selectorPlantilla.classList.add('hidden');
-            }
+    const actualizarModoSeleccionado = () => {
+        const modoSeleccionado = document.querySelector('input[name="modoIA"]:checked')?.value;
+
+        modoRadios.forEach(radio => {
+            const tarjeta = radio.closest('label');
+            if (!tarjeta) return;
+            tarjeta.classList.toggle('border-purple-500', radio.checked);
+            tarjeta.classList.toggle('border-gray-700', !radio.checked);
         });
+
+        selectorPlantilla?.classList.toggle('hidden', modoSeleccionado !== 'ESTRUCTURADO');
+    };
+
+    modoRadios.forEach(radio => {
+        radio.addEventListener('change', actualizarModoSeleccionado);
     });
+    actualizarModoSeleccionado();
 });
 
 async function cargarInfoAprendizaje() {
@@ -1697,7 +1705,7 @@ async function procesarAudio() {
             // 🚀 PASO 2: Mejorar con IA según modo seleccionado
             const t3 = Date.now();
             const modoIA = document.querySelector('input[name="modoIA"]:checked').value;
-            const tipoPlantilla = document.getElementById('tipoPlantilla').value;
+            const tipoPlantilla = document.getElementById('tipoPlantilla')?.value || '';
             const payloadMejora = {
                 texto_original: textoTranscrito,
                 modo: modoIA,
@@ -1762,17 +1770,16 @@ async function procesarAudio() {
             if (dataMejora.correcciones_aplicadas && dataMejora.correcciones_aplicadas.length > 0) {
                 const listaCorrecciones = document.getElementById('listaCorrecciones');
                 listaCorrecciones.innerHTML = dataMejora.correcciones_aplicadas.map(c => 
-                    `<li><span class="text-red-400">"${c.de}"</span> → <span class="text-green-400">"${c.a}"</span></li>`
+                    `<li><span class="text-red-400">"${escapeHtml(c.de || '')}"</span> → <span class="text-green-400">"${escapeHtml(c.a || '')}"</span></li>`
                 ).join('');
                 document.getElementById('correcciones').classList.remove('hidden');
             }
             
             // Mostrar resultado
             const tiempoTotal = Math.round((t4 - t1) / 1000 * 10) / 10; // Redondear a 1 decimal
-            estadoGrabacion.textContent = `✅ Listo en ${tiempoTotal}s! ${fromCache ? '⚡ (caché)' : ''}`
             document.getElementById('contenedorResultado').classList.remove('hidden');
-            
-            estadoGrabacion.textContent = '✅ Listo! Puedes grabar de nuevo';
+            const mensajeCache = fromCache ? ' ⚡ Whisper en caché.' : '';
+            estadoGrabacion.textContent = `✅ Listo en ${tiempoTotal}s.${mensajeCache} Podés grabar de nuevo.`;
             estadoGrabacion.classList.add('text-green-400');
             
             // COPIADO AUTOMÁTICO si está activado
@@ -2096,8 +2103,20 @@ document.addEventListener('keydown', (e) => {
 // 4. HISTORIAL DE DICTADOS (LocalStorage)
 const HISTORIAL_MAX = 5;
 
+function obtenerHistorialLocal() {
+    try {
+        const historial = JSON.parse(localStorage.getItem('historialDictados') || '[]');
+        return Array.isArray(historial)
+            ? historial.filter(item => item && typeof item === 'object')
+            : [];
+    } catch (error) {
+        console.warn('No se pudo leer el historial local de dictados:', error);
+        return [];
+    }
+}
+
 function guardarEnHistorial(textoOriginal, textoMejorado) {
-    let historial = JSON.parse(localStorage.getItem('historialDictados') || '[]');
+    const historial = obtenerHistorialLocal();
     
     historial.unshift({
         fecha: new Date().toISOString(),
@@ -2107,13 +2126,15 @@ function guardarEnHistorial(textoOriginal, textoMejorado) {
     });
 
     // Limitar a últimos 5
-    historial = historial.slice(0, HISTORIAL_MAX);
-    
-    localStorage.setItem('historialDictados', JSON.stringify(historial));
+    try {
+        localStorage.setItem('historialDictados', JSON.stringify(historial.slice(0, HISTORIAL_MAX)));
+    } catch (error) {
+        console.warn('No se pudo guardar el historial local de dictados:', error);
+    }
 }
 
 function cargarHistorial() {
-    const historial = JSON.parse(localStorage.getItem('historialDictados') || '[]');
+    const historial = obtenerHistorialLocal();
     console.log(`📜 Historial: ${historial.length} dictados guardados`);
     
     // Actualizar contador en el badge
@@ -2160,7 +2181,7 @@ function mostrarHistorial() {
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
-                    <p class="text-sm text-gray-300 line-clamp-2">${item.mejorado}</p>
+                    <p class="text-sm text-gray-300 line-clamp-2">${escapeHtml(item.mejorado || '')}</p>
                     <div class="mt-2 text-xs text-purple-400">
                         <i class="fas fa-mouse-pointer mr-1"></i>
                         Click para recuperar
