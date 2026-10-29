@@ -470,6 +470,21 @@
                             <span id="guardrailsTexto"></span>
                         </p>
                     </div>
+
+                    <div id="panelPlantillaAgente" class="hidden mt-3 flex-wrap items-center gap-2 rounded-lg border border-purple-700 bg-purple-950/30 p-3">
+                        <span id="plantillaAgenteActual" class="mr-auto text-sm text-purple-100"></span>
+                        <button id="btnCambiarPlantillaAgente" type="button"
+                                class="rounded-lg border border-purple-500 px-3 py-2 text-sm font-semibold text-purple-100 transition-colors hover:bg-purple-900/60">
+                            <i class="fas fa-shuffle mr-1" aria-hidden="true"></i>
+                            Cambiar plantilla
+                        </button>
+                        <button id="btnDeshacerCambioPlantilla" type="button"
+                                class="hidden rounded-lg bg-gray-700 px-3 py-2 text-sm text-white transition-colors hover:bg-gray-600">
+                            <i class="fas fa-undo mr-1" aria-hidden="true"></i>
+                            Restaurar informe anterior
+                        </button>
+                        <span id="estadoCambioPlantilla" class="w-full text-xs text-purple-200" aria-live="polite"></span>
+                    </div>
                 </div>
 
                 <!-- Opciones de copiado -->
@@ -533,7 +548,7 @@
                     <div class="px-4 py-3 border-b border-gray-700">
                         <h3 id="tituloSeleccionPlantilla" class="text-lg font-bold text-white">
                             <i class="fas fa-file-medical mr-2 text-purple-400"></i>
-                            Elegí la plantilla
+                            <span id="textoTituloSeleccionPlantilla">Confirmar plantilla</span>
                         </h3>
                         <p id="motivoSeleccionPlantilla" class="text-xs text-gray-300 mt-1"></p>
                     </div>
@@ -653,6 +668,9 @@ let descartarAudioCorreccion = false;
 let resolverSeleccionPlantillaPendiente = null;
 let payloadMejoraPendiente = null;
 let reintentoMejoraEnCurso = false;
+let estadoAgenteActual = null;
+let informeAntesCambioPlantilla = null;
+let cambioPlantillaEnCurso = false;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -822,6 +840,183 @@ async function solicitarMejoraConConfirmacionPlantilla(payload, actualizarEstado
     payload.plantilla_confirmada_codigo = codigoElegido;
     actualizarEstado('Generando informe con la plantilla elegida...');
     return solicitarMejoraIA(payload);
+}
+
+function actualizarResumenMejora(data) {
+    const guardrails = data.guardrails_aplicados || [];
+    const guardrailsResumen = document.getElementById('guardrailsResumen');
+    const guardrailsTexto = document.getElementById('guardrailsTexto');
+    const plantillaSugerida = data.plantilla_sugerida;
+
+    if ((guardrails.length > 0 || plantillaSugerida) && guardrailsResumen && guardrailsTexto) {
+        const partesResumen = [];
+        if (plantillaSugerida) {
+            partesResumen.push(`Agente: plantilla seleccionada "${plantillaSugerida.nombre}".`);
+        }
+        if (guardrails.length > 0) {
+            partesResumen.push(`Guardrails: se restauraron ${guardrails.length} lineas de plantilla no mencionadas.`);
+        }
+        guardrailsTexto.textContent = partesResumen.join(' ');
+        guardrailsResumen.classList.remove('hidden');
+    } else if (guardrailsResumen) {
+        guardrailsResumen.classList.add('hidden');
+        if (guardrailsTexto) guardrailsTexto.textContent = '';
+    }
+
+    const listaCorrecciones = document.getElementById('listaCorrecciones');
+    const panelCorrecciones = document.getElementById('correcciones');
+    const correcciones = data.correcciones_aplicadas || [];
+    if (listaCorrecciones && panelCorrecciones) {
+        listaCorrecciones.innerHTML = correcciones.map(c =>
+            `<li><span class="text-red-400">"${escapeHtml(c.de || '')}"</span> → <span class="text-green-400">"${escapeHtml(c.a || '')}"</span></li>`
+        ).join('');
+        panelCorrecciones.classList.toggle('hidden', correcciones.length === 0);
+    }
+}
+
+function actualizarConfirmacionResultado(data) {
+    requiereConfirmacionIA = !!data.requiere_confirmacion;
+    motivoConfirmacionIA = data.motivo_confianza || '';
+    terminosSospechososIA = data.terminos_sospechosos || [];
+}
+
+function guardarEstadoAgente(payload, data) {
+    const sugerida = data.plantilla_sugerida || {};
+    estadoAgenteActual = {
+        payload: {...payload},
+        codigo: data.tipo_plantilla_usada || sugerida.codigo || payload.tipo_plantilla || '',
+        nombre: sugerida.nombre || data.tipo_plantilla_usada || payload.tipo_plantilla || 'Plantilla no especificada',
+        candidatos: Array.isArray(sugerida.candidatos) ? sugerida.candidatos : [],
+        contexto: data.contexto_clinico || sugerida.contexto_clinico || {},
+        confianza: sugerida.confianza_selector || 'baja',
+        respuesta: data,
+    };
+
+    document.getElementById('plantillaAgenteActual').textContent = `Plantilla aplicada: ${estadoAgenteActual.nombre}`;
+    const panel = document.getElementById('panelPlantillaAgente');
+    panel.classList.remove('hidden');
+    panel.classList.add('flex');
+}
+
+function limpiarEstadoAgente() {
+    estadoAgenteActual = null;
+    informeAntesCambioPlantilla = null;
+    const panel = document.getElementById('panelPlantillaAgente');
+    panel?.classList.add('hidden');
+    panel?.classList.remove('flex');
+    document.getElementById('btnDeshacerCambioPlantilla')?.classList.add('hidden');
+    const estado = document.getElementById('estadoCambioPlantilla');
+    if (estado) estado.textContent = '';
+}
+
+async function cambiarPlantillaAgente() {
+    if (!estadoAgenteActual || cambioPlantillaEnCurso) return;
+
+    const boton = document.getElementById('btnCambiarPlantillaAgente');
+    const estado = document.getElementById('estadoCambioPlantilla');
+    boton.disabled = true;
+    boton.classList.add('opacity-60');
+    cambioPlantillaEnCurso = true;
+
+    try {
+        const estadoAnterior = estadoAgenteActual;
+        const alternativas = estadoAnterior.candidatos.filter(c => c.codigo !== estadoAnterior.codigo);
+        const codigoElegido = await solicitarSeleccionPlantilla(
+            alternativas,
+            estadoAnterior.contexto,
+            estadoAnterior.confianza,
+            'cambiar',
+        );
+        if (!codigoElegido || codigoElegido === estadoAnterior.codigo) return;
+
+        const confirmar = window.confirm(
+            'Se regenerará el informe desde la transcripción original con la nueva plantilla. '
+            + 'El borrador actual se conservará para poder restaurarlo. ¿Continuar?'
+        );
+        if (!confirmar) return;
+
+        const textoAntes = getTextoMejoradoTextoPlano();
+        const htmlAntes = getTextoMejoradoHtml();
+        const payload = {
+            ...estadoAnterior.payload,
+            texto_original: estadoAnterior.payload.texto_original || textoOriginalGlobal,
+            plantilla_confirmada_codigo: codigoElegido,
+        };
+        estado.textContent = 'Regenerando desde la transcripción original…';
+        const resultado = await solicitarMejoraIA(payload);
+        if (
+            getTextoMejoradoTextoPlano() !== textoAntes
+            || getTextoMejoradoHtml() !== htmlAntes
+        ) {
+            estado.textContent = 'El borrador cambió durante la generación; no se aplicó el resultado nuevo.';
+            return;
+        }
+
+        informeAntesCambioPlantilla = {
+            html: htmlAntes,
+            textoIA: textoIAGlobal,
+            estadoAgente: estadoAnterior,
+            requiereConfirmacionIA,
+            motivoConfirmacionIA,
+            terminosSospechososIA: [...terminosSospechososIA],
+            feedbackCalidadEnviado,
+            panelFeedbackOculto: document.getElementById('panelFeedbackCalidad').classList.contains('hidden'),
+            feedbackTexto: document.getElementById('feedbackCalidadEstado').textContent,
+            feedbackOculto: document.getElementById('feedbackCalidadEstado').classList.contains('hidden'),
+        };
+        setTextoMejoradoContenido(resultado.texto_mejorado);
+        textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(resultado.texto_mejorado));
+        actualizarConfirmacionResultado(resultado);
+        guardarEstadoAgente(payload, resultado);
+        actualizarResumenMejora(resultado);
+        reiniciarEstadoCorreccion();
+
+        const btnDeshacer = document.getElementById('btnDeshacerCambioPlantilla');
+        btnDeshacer.classList.remove('hidden');
+        estado.textContent = `Informe regenerado con ${estadoAgenteActual.nombre}.`;
+        feedbackCalidadEnviado = false;
+        document.getElementById('panelFeedbackCalidad')?.classList.remove('hidden');
+        const feedbackEstado = document.getElementById('feedbackCalidadEstado');
+        feedbackEstado?.classList.add('hidden');
+        if (feedbackEstado) feedbackEstado.textContent = '';
+        guardarEnHistorial(textoOriginalGlobal, getTextoMejoradoTextoPlano());
+        mostrarToast('Informe regenerado con la nueva plantilla', 'success');
+    } catch (error) {
+        estado.textContent = error.seleccionPlantillaCancelada
+            ? ''
+            : (error.message || 'No se pudo regenerar el informe.');
+    } finally {
+        cambioPlantillaEnCurso = false;
+        boton.disabled = false;
+        boton.classList.remove('opacity-60');
+    }
+}
+
+function deshacerCambioPlantilla() {
+    if (!informeAntesCambioPlantilla) return;
+
+    setTextoMejoradoContenido(informeAntesCambioPlantilla.html);
+    textoIAGlobal = informeAntesCambioPlantilla.textoIA;
+    estadoAgenteActual = informeAntesCambioPlantilla.estadoAgente;
+    requiereConfirmacionIA = informeAntesCambioPlantilla.requiereConfirmacionIA;
+    motivoConfirmacionIA = informeAntesCambioPlantilla.motivoConfirmacionIA;
+    terminosSospechososIA = informeAntesCambioPlantilla.terminosSospechososIA;
+    feedbackCalidadEnviado = informeAntesCambioPlantilla.feedbackCalidadEnviado;
+    document.getElementById('plantillaAgenteActual').textContent = `Plantilla aplicada: ${estadoAgenteActual.nombre}`;
+    actualizarResumenMejora(estadoAgenteActual.respuesta);
+    document.getElementById('panelFeedbackCalidad')?.classList.toggle(
+        'hidden', informeAntesCambioPlantilla.panelFeedbackOculto,
+    );
+    const feedbackEstado = document.getElementById('feedbackCalidadEstado');
+    if (feedbackEstado) {
+        feedbackEstado.textContent = informeAntesCambioPlantilla.feedbackTexto;
+        feedbackEstado.classList.toggle('hidden', informeAntesCambioPlantilla.feedbackOculto);
+    }
+    document.getElementById('btnDeshacerCambioPlantilla').classList.add('hidden');
+    informeAntesCambioPlantilla = null;
+    const estado = document.getElementById('estadoCambioPlantilla');
+    if (estado) estado.textContent = 'Se restauró el borrador anterior.';
+    mostrarToast('Borrador anterior restaurado', 'info');
 }
 
 async function reintentarMejoraPendiente() {
@@ -1209,15 +1404,35 @@ function finalizarSeleccionPlantilla(codigo = null) {
     }
 }
 
-function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
+function construirPreguntaPlantilla(candidatos, contexto, confianza) {
+    if (contexto?.conflicto_region) {
+        return 'El dictado parece mencionar más de una región. ¿Qué región corresponde a este estudio?';
+    }
+    if (contexto?.conflicto_modalidad) {
+        return 'El dictado parece mencionar más de una modalidad. ¿Qué modalidad corresponde a este estudio?';
+    }
+    if (candidatos?.length > 1) {
+        return `Hay dudas entre ${candidatos[0].nombre} y ${candidatos[1].nombre}. ¿Cuál describe este estudio?`;
+    }
+    if (candidatos?.length === 1) {
+        return `La confianza de selección es ${confianza || 'baja'}. ¿La plantilla ${candidatos[0].nombre} corresponde a este estudio?`;
+    }
+    return 'No se encontró una coincidencia segura. ¿Qué plantilla corresponde a este estudio?';
+}
+
+function solicitarSeleccionPlantilla(candidatos, contexto, confianza, proposito = 'generar') {
     const modal = document.getElementById('modalSeleccionPlantilla');
     const lista = document.getElementById('candidatosSeleccionPlantilla');
     const motivo = document.getElementById('motivoSeleccionPlantilla');
     const selectorManual = document.getElementById('plantillaManualAgente');
+    const titulo = document.getElementById('textoTituloSeleccionPlantilla');
     lista.innerHTML = '';
 
-    const region = contexto?.region ? ` para ${contexto.region.toLowerCase()}` : '';
-    motivo.textContent = `La selección automática tiene confianza ${confianza || 'baja'}${region}. Confirmá antes de generar el informe.`;
+    const esCambio = proposito === 'cambiar';
+    if (titulo) titulo.textContent = esCambio ? 'Cambiar plantilla del informe' : 'Confirmar plantilla';
+    motivo.textContent = esCambio
+        ? 'Se volverá a generar desde la transcripción original; el borrador actual se conservará para poder restaurarlo.'
+        : construirPreguntaPlantilla(candidatos, contexto, confianza);
 
     if (!candidatos || candidatos.length === 0) {
         const vacio = document.createElement('p');
@@ -1619,6 +1834,7 @@ async function procesarAudio() {
         return;
     }
 
+    limpiarEstadoAgente();
     payloadMejoraPendiente = null;
     document.getElementById('avisoReintentoMejora')?.classList.add('hidden');
     document.getElementById('estadoReintentoMejora').textContent = '';
@@ -1735,28 +1951,9 @@ async function procesarAudio() {
             console.log(`⏱️ Mejora IA completada en ${t4-t3}ms`);
             console.log(`⏱️ TIEMPO TOTAL: ${t4-t1}ms (Whisper: ${t2-t1}ms, IA: ${t4-t3}ms)`);
             
-            requiereConfirmacionIA = !!dataMejora.requiere_confirmacion;
-            motivoConfirmacionIA = dataMejora.motivo_confianza || '';
-            terminosSospechososIA = dataMejora.terminos_sospechosos || [];
+            actualizarConfirmacionResultado(dataMejora);
 
-            // Mostrar resumen de guardrails / agente si aplica
-            const guardrails = dataMejora.guardrails_aplicados || [];
-            const guardrailsResumen = document.getElementById('guardrailsResumen');
-            const guardrailsTexto = document.getElementById('guardrailsTexto');
-            const plantillaSugerida = dataMejora.plantilla_sugerida;
-            if ((guardrails.length > 0 || plantillaSugerida) && guardrailsResumen && guardrailsTexto) {
-                const partesResumen = [];
-                if (plantillaSugerida) {
-                    partesResumen.push(`Agente: plantilla seleccionada "${plantillaSugerida.nombre}".`);
-                }
-                if (guardrails.length > 0) {
-                    partesResumen.push(`Guardrails: se restauraron ${guardrails.length} lineas de plantilla no mencionadas.`);
-                }
-                guardrailsTexto.textContent = partesResumen.join(' ');
-                guardrailsResumen.classList.remove('hidden');
-            } else if (guardrailsResumen) {
-                guardrailsResumen.classList.add('hidden');
-            }
+            actualizarResumenMejora(dataMejora);
             setTextoMejoradoContenido(dataMejora.texto_mejorado);
             document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
             payloadMejoraPendiente = null;
@@ -1765,14 +1962,11 @@ async function procesarAudio() {
             
             // Guardar texto IA para aprendizaje
             textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(dataMejora.texto_mejorado));
-            
-            // Mostrar correcciones si hay
-            if (dataMejora.correcciones_aplicadas && dataMejora.correcciones_aplicadas.length > 0) {
-                const listaCorrecciones = document.getElementById('listaCorrecciones');
-                listaCorrecciones.innerHTML = dataMejora.correcciones_aplicadas.map(c => 
-                    `<li><span class="text-red-400">"${escapeHtml(c.de || '')}"</span> → <span class="text-green-400">"${escapeHtml(c.a || '')}"</span></li>`
-                ).join('');
-                document.getElementById('correcciones').classList.remove('hidden');
+
+            if (modoIA === 'AGENTE') {
+                guardarEstadoAgente(payloadMejora, dataMejora);
+            } else {
+                limpiarEstadoAgente();
             }
             
             // Mostrar resultado
@@ -1866,7 +2060,9 @@ async function registrarFeedbackCalidad(estadoFeedback) {
 
     const textoFinal = getTextoMejoradoTextoPlano();
     const modoIA = document.querySelector('input[name="modoIA"]:checked')?.value || 'FIEL';
-    const tipoPlantilla = document.getElementById('tipoPlantilla')?.value || '';
+    const tipoPlantilla = modoIA === 'AGENTE'
+        ? (estadoAgenteActual?.codigo || '')
+        : (document.getElementById('tipoPlantilla')?.value || '');
 
     try {
         const response = await fetch('{% url "dictado_informes:feedback_calidad" %}', {
@@ -1881,7 +2077,7 @@ async function registrarFeedbackCalidad(estadoFeedback) {
                 texto_final: textoFinal,
                 modo_dictado: modoIA,
                 tipo_estudio: '',
-                tipo_plantilla: modoIA === 'ESTRUCTURADO' ? tipoPlantilla : ''
+                tipo_plantilla: ['AGENTE', 'ESTRUCTURADO'].includes(modoIA) ? tipoPlantilla : ''
             })
         });
 
@@ -2056,6 +2252,8 @@ async function copiarTexto(modoCopia = 'rich') {
 document.getElementById('btnCopiar')?.addEventListener('click', () => copiarTexto('rich'));
 document.getElementById('btnCopiarPlano')?.addEventListener('click', () => copiarTexto('plain'));
 document.getElementById('btnCopiarNetterm')?.addEventListener('click', () => copiarTexto('netterm'));
+document.getElementById('btnCambiarPlantillaAgente')?.addEventListener('click', cambiarPlantillaAgente);
+document.getElementById('btnDeshacerCambioPlantilla')?.addEventListener('click', deshacerCambioPlantilla);
 document.getElementById('btnReintentarMejora')?.addEventListener('click', reintentarMejoraPendiente);
 document.getElementById('btnCorregirVoz')?.addEventListener('click', () => {
     if (grabandoCorreccion) {

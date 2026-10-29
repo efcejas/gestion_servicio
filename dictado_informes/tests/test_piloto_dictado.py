@@ -118,6 +118,10 @@ class DictadoPilotoAccessTests(TestCase):
         self.assertContains(response, 'id="modalSeleccionPlantilla"')
         self.assertContains(response, 'id="candidatosSeleccionPlantilla"')
         self.assertContains(response, 'id="plantillaManualAgente"')
+        self.assertContains(response, 'id="btnCambiarPlantillaAgente"')
+        self.assertContains(response, 'id="btnDeshacerCambioPlantilla"')
+        self.assertContains(response, 'function construirPreguntaPlantilla')
+        self.assertContains(response, 'Hay dudas entre')
         self.assertContains(response, 'requiere_seleccion_plantilla')
 
     @override_settings(DICTADO_AGENTE_HABILITADO=False)
