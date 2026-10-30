@@ -2,13 +2,14 @@
 
 Fecha inicial: 2026-07-09
 
-Ultima actualizacion: 2026-10-22
+Ultima actualizacion: 2026-10-30
 
-## Estado por rama (2026-10-22)
+## Estado por rama (2026-10-30)
 
 El bloque incremental de Dictado se integró en
 `feature/liquidacion-copilot-specialization` mediante el merge `bd9595d1` y se
-publicó en GitHub; todavía no está desplegado.
+publicó en GitHub. El usuario confirmó que el flujo actualizado fue probado en
+el entorno de despliegue y funciona.
 
 En esa rama se incorporaron protecciones para el endpoint de firma y el cambio
 de diccionario, manejo de errores del proveedor LLM, reintento sin repetir STT,
@@ -16,28 +17,42 @@ supresion de contenido clinico en logs, limite configurable de audio y claves de
 caché separadas por contexto. La revision de caché tambien cambia al guardar una
 plantilla o una correccion de aprendizaje.
 
-El commit `3114df99` contiene el límite configurable original de audio y la
-invalidación final de caché. Está en la rama principal indicada arriba. Se está
-probando localmente un aumento del límite predeterminado a 2 MB y el margen
-correspondiente para peticiones JSON/base64; esos cambios todavía no están
-commiteados ni publicados.
+El límite de audio de 2 MB y el margen de petición están publicados en
+`12e04c6d`. La corrección de la interfaz y el estado de selección de modos están
+en `22ee66f8`. El cambio post-generación de plantilla está en `ed6736da`.
 
-Las cuatro suites focales de API, piloto, guardrails y aprendizaje pasaron sobre
-`3114df99`: **105 pruebas en 149,6 s**. Para la ampliación local a 2 MB pasaron
-48 pruebas de API y 14 de piloto. El reintento se comprobó manualmente en
-navegador; quedan por hacer las comprobaciones manuales del límite de audio,
-permisos y privacidad descritas en la guía operativa.
+El cambio de plantilla reutiliza la transcripción original, exige confirmación
+antes de regenerar y permite restaurar el borrador anterior, incluyendo el
+estado de confianza y feedback. Si el usuario edita el informe mientras espera,
+la respuesta nueva no sobrescribe el contenido. Las trazas distinguen una
+confirmación inicial (`usuario_confirmada`) de un cambio posterior
+(`usuario_cambio_post`), sin añadir texto clínico ni migración.
 
-El detalle técnico, los gates de validación y los próximos pasos antes de
-integrar están en
+Validación registrada: las cuatro suites focales de API, piloto, guardrails y
+aprendizaje pasaron sobre `3114df99`, después del límite de audio y la
+invalidación de caché: **105 pruebas en 149,6 s**. Para el cambio del límite
+pasaron `test_apis` (48) y `test_piloto_dictado` (14). El cambio post-generación
+volvió a pasar `test_piloto_dictado` (14), y el contrato backend de confirmación
+se verificó con `test_apis` (48), incluyendo la nueva distinción de origen. El
+flujo completo se probó en
+navegador con una respuesta de API simulada, sin llamadas a proveedores reales.
+El usuario también confirmó la prueba funcional en despliegue; no se registraron
+resultados por escenario ni mediciones de latencia.
+
+El detalle técnico, los gates de validación y los próximos pasos antes del
+despliegue están en
 [`OPTIMIZACIONES_DICTADO_RAPIDO.md`](OPTIMIZACIONES_DICTADO_RAPIDO.md).
-El orden recomendado es: comprobar manualmente el flujo y el tamaño límite,
-revisar permisos y privacidad, publicar el cambio local de 2 MB con aprobación y
-después planificar el despliegue verificando el backend de caché compartido. La
-plantilla institucional, el modo agente y la conversación clínica continua
-permanecen como roadmap posterior, no como bloqueantes de estas correcciones.
+El despliegue ya no es un pendiente de este bloque. Queda confirmar que el backend
+de caché sea compartido entre workers si corresponde y comparar confirmaciones
+iniciales con cambios posteriores de plantilla usando las trazas agregadas para
+calibrar el selector. La plantilla institucional y la
+conversación clínica multi-turn permanecen como roadmap posterior, no como
+bloqueantes del flujo actual.
 
-## Estado de la base estable (referencia 2026-09-03)
+## Registro histórico de la base estable (referencia 2026-09-03)
+
+La siguiente descripción refleja el estado de esa fecha; el estado operativo
+vigente es el de la sección anterior.
 
 El modulo se restauro funcionalmente a la version estable `5d1baf4e`
 (`Agrega correccion por voz y confirmacion de plantilla`). Las capacidades
@@ -870,9 +885,14 @@ Guardrails del servidor:
 
 El aprendizaje conserva el comportamiento previo: si la correccion por voz cambia el informe, al copiar se puede confirmar el guardado usando el texto clinico normal del editor.
 
-### Sesion clinica continua
+### Diseño futuro: sesión clínica continua (no implementado)
 
-La correccion del borrador ahora mantiene una sesion temporal en el navegador:
+Este apartado conserva una propuesta de evolución; no describe el flujo activo.
+En la versión actual, la corrección por voz es puntual y ofrece un único nivel de
+deshacer. No existe historial conversacional multi-turn ni se envían acciones
+anteriores al LLM.
+
+El diseño propuesto podría mantener una sesión temporal en el navegador:
 
 - conserva las acciones aplicadas y deshechas mientras se trabaja sobre el informe;
 - permite multiples niveles de deshacer y rehacer;
@@ -881,26 +901,24 @@ La correccion del borrador ahora mantiene una sesion temporal en el navegador:
   `eso`, `esa linea` o `el hallazgo anterior`;
 - reinicia la sesion cuando se genera o recupera otro informe.
 
-Cada accion conserva en memoria del navegador el texto anterior y posterior. El
-contenido clinico de esas versiones no se persiste en la base de datos. La
-bitacora del servidor mantiene solo metadatos no clinicos y registra por separado
-aplicar, deshacer y rehacer.
+Cada acción conservaría en memoria del navegador el texto anterior y posterior.
+El contenido clínico de esas versiones no debería persistirse en la base de
+datos. La bitácora del servidor mantendría solo metadatos no clínicos.
 
-Cuando la IA no puede localizar un objetivo unico, devuelve una pregunta de
-aclaracion y no modifica el editor. La respuesta del usuario puede aprovechar la
-pregunta y las acciones recientes como contexto de la siguiente orden.
+Si la IA no pudiera localizar un objetivo único, devolvería una pregunta de
+aclaración y no modificaría el editor. Una respuesta podría usar esa pregunta y
+las acciones recientes como contexto, con límites explícitos de turnos y tokens.
 
-Cuando una propuesta contiene cuatro o mas operaciones, modifica una proporcion
-relevante del informe o el modelo la clasifica como amplia, se muestra una vista
-de confirmacion. La propuesta:
+Para propuestas amplias, el diseño mostraría una vista de confirmación. La
+propuesta:
 
 - se aplica primero contra los guardrails exactos del servidor;
 - no modifica el editor ni genera aprendizaje hasta ser confirmada;
 - al confirmarse vuelve a validarse sin una segunda llamada al LLM;
 - se descarta si el borrador cambio mientras estaba pendiente.
 
-La confirmacion no habilita reescrituras completas: cada operacion debe seguir
-apuntando a fragmentos exactos y unicos del borrador.
+La confirmación no habilitaría reescrituras completas: cada operación debería
+seguir apuntando a fragmentos exactos y únicos del borrador.
 
 Migracion asociada:
 
@@ -913,6 +931,10 @@ Agrega el evento no clinico `correccion_voz_rehecha`.
 ## Commits relevantes
 
 ```text
+ed6736da Permitir cambiar plantilla tras generar
+22ee66f8 Corregir estados y endurecer interfaz
+12e04c6d Aumentar límite de audio a 2 MB
+bd9595d1 Integrar mejoras de Dictado IA
 65292d12 Mejora dictado inteligente y plantillas flexibles
 6be1e56b Refuerza agente dictado y aprendizaje de estilo
 1cdd6430 Evita mezclar regiones en agente dictado

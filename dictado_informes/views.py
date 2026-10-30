@@ -1540,7 +1540,11 @@ def mejorar_texto_ia(request):
                     'candidatos': candidatos_confirmacion,
                     'contexto_clinico': contexto_seleccion,
                 }
-                origen_seleccion = 'usuario_confirmada'
+                origen_seleccion = (
+                    'usuario_cambio_post'
+                    if data.get('cambio_plantilla_posterior') is True
+                    else 'usuario_confirmada'
+                )
             elif debe_confirmar_plantilla_agente(
                 plantilla_sugerida,
                 origen_seleccion,

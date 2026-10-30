@@ -1,13 +1,13 @@
 # 🚀 Optimizaciones del Sistema de Dictado Rápido
 
-## Actualización operativa — 2026-10-22
+## Actualización operativa — 2026-10-30
 
 Esta sección registra mejoras incrementales de seguridad y confiabilidad en la
-rama `feature/liquidacion-copilot-specialization`. El bloque original se integró
-con `bd9595d1` y fue publicado en GitHub; todavía no está desplegado. La
-ampliación del límite a 2 MB descrita abajo está en el árbol local y aún no está
-commiteada ni publicada. Los porcentajes y costos de las secciones históricas
-inferiores son estimaciones previas, no mediciones de esta tanda.
+rama `feature/liquidacion-copilot-specialization`, publicada en
+`origin/feature/liquidacion-copilot-specialization`. El usuario confirmó que el
+flujo actualizado fue probado en el entorno de despliegue y funciona. Los
+porcentajes y costos de las secciones históricas inferiores son estimaciones
+previas, no mediciones de esta tanda.
 
 ### Cambios implementados
 
@@ -19,7 +19,7 @@ inferiores son estimaciones previas, no mediciones de esta tanda.
     logs del servidor y de la consola del navegador; se conservan metadatos
     operativos no clínicos.
 - **Tamaño de audio:** límite configurable mediante
-    `DICTADO_MAX_AUDIO_SIZE_BYTES` (por defecto local actual: `2_000_000` bytes),
+    `DICTADO_MAX_AUDIO_SIZE_BYTES` (por defecto `2_000_000` bytes),
     validado en el navegador y en el backend antes de procesar el audio. El límite
     de petición Django se calcula para aceptar el JSON/base64 con margen.
 - **Permisos y método HTTP:** el cambio de diccionario requiere superusuario y
@@ -29,30 +29,53 @@ inferiores son estimaciones previas, no mediciones de esta tanda.
     estructurado incorpora la fecha de modificación de la plantilla visible y
     activa; al guardar una corrección de aprendizaje se renueva la revisión de
     caché del usuario. Una solicitud sin cambios conserva el hit de caché.
+- **Selección de plantilla:** modo agente combina los selectores legacy e
+    híbrido; ante baja confianza, conflictos o desacuerdo, solicita confirmación
+    con candidatas y una pregunta contextual.
+- **Cambio posterior de plantilla:** después de generar en modo agente se puede
+    elegir otra plantilla y regenerar usando la transcripción original, sin
+    repetir Whisper. El borrador anterior y sus estados de confianza/feedback se
+    conservan para restaurarlos; si el editor cambia mientras se espera respuesta,
+    el resultado nuevo no reemplaza esos cambios.
+- **Trazabilidad del selector:** `origen_seleccion` distingue una confirmación
+    inicial (`usuario_confirmada`) de un cambio posterior (`usuario_cambio_post`),
+    sin almacenar texto clínico ni añadir una migración.
+- **Interfaz:** el borde de las tarjetas de modo refleja la selección; Copiar con
+    formato y NetTerm son las opciones prioritarias, con texto plano como alternativa.
 
 ### Validación registrada
 
-- En `3114df99`, las cuatro suites focales de API, piloto, guardrails y
-    aprendizaje pasaron: **105 pruebas en 149,6 s**.
-- Tras ampliar el límite local a 2 MB, pasaron `test_apis` (48 pruebas) y
-    `test_piloto_dictado` (14 pruebas). No se han repetido aún las otras suites.
-- Los archivos modificados no reportaron errores estáticos y `git diff --check`
-    terminó sin problemas.
-- El reintento también fue probado manualmente en el navegador. No se hicieron
-    llamadas a proveedores reales en las pruebas automatizadas.
+- En `3114df99`, después del límite de audio y la invalidación de caché, las
+    cuatro suites focales de API, piloto, guardrails y aprendizaje pasaron:
+    **105 pruebas en 149,6 s**.
+- Para el límite de 2 MB pasaron `test_apis` (48 pruebas) y
+    `test_piloto_dictado` (14 pruebas).
+- Tras el cambio post-generación de plantilla, `test_piloto_dictado` pasó
+    nuevamente (14 pruebas); el contrato de confirmación de plantilla pasó en
+    `test_apis` (48 pruebas).
+- La distinción entre confirmación inicial y cambio posterior quedó cubierta por
+    `test_apis` (48 pruebas).
+- Una prueba de navegador con respuesta de API simulada confirmó que se envía la
+    transcripción original y el código elegido, se actualiza el informe y se puede
+    restaurar el borrador anterior junto con confianza y feedback. No se llamaron
+    servicios de IA reales.
+- `git diff --check` terminó sin problemas. El editor aún informa solapamientos
+    Tailwind `hidden`/`flex` en los dos modales y el loader; son estados dinámicos
+    existentes y no corresponden al cambio de plantilla.
+- El reintento se comprobó manualmente en el navegador. Las pruebas automatizadas
+    usan mocks y no llaman proveedores reales.
+- El usuario confirmó la prueba funcional en el entorno desplegado. No se
+    detallaron escenarios individuales ni resultados de medición de latencia.
 
-### Próximos pasos antes de publicar o desplegar
+### Próximos pasos
 
-1. Probar en navegador el rechazo de audio sobre el límite y el flujo de
-    reintento, confirmando que no se repite STT y que se conserva la edición.
-2. Revisar permisos de firma/diccionario y verificar en una prueba controlada
-    que no se registren textos clínicos en logs.
-3. Confirmar que el backend de caché en producción es compartido entre procesos
-    si la aplicación usa más de un worker.
-4. Revisar y publicar el cambio local de 2 MB solo con aprobación explícita;
-    desplegar mediante el procedimiento habitual y con posibilidad de rollback.
-5. Medir tiempos y costos reales antes de actualizar las cifras históricas de
-    rendimiento de este documento.
+1. Confirmar que el backend de caché desplegado es compartido entre procesos si
+   la aplicación utiliza más de un worker.
+2. Recolectar tiempos y costos reales del flujo Whisper → mejora LLM antes de
+   actualizar las cifras históricas de rendimiento.
+3. Comparar por separado confirmaciones iniciales y cambios posteriores usando
+    `origen_seleccion`; calibrar el selector solo con métricas agregadas y sin
+    almacenar texto clínico.
 
 ### Roadmap posterior a la integración
 

@@ -941,6 +941,7 @@ async function cambiarPlantillaAgente() {
             ...estadoAnterior.payload,
             texto_original: estadoAnterior.payload.texto_original || textoOriginalGlobal,
             plantilla_confirmada_codigo: codigoElegido,
+            cambio_plantilla_posterior: true,
         };
         estado.textContent = 'Regenerando desde la transcripción original…';
         const resultado = await solicitarMejoraIA(payload);
