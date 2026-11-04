@@ -1,10 +1,11 @@
 from datetime import date, time
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import connection
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
@@ -14,6 +15,7 @@ from control_guardias.models import Feriado
 from .models import (
     ControlEgesSesion,
     CorreccionPacsRegistro,
+    HistorialHorarioEgesResidente,
     HistorialRecalculoTarifaRegistro,
     Estudios,
     RegistroEstudio,
@@ -25,8 +27,13 @@ from .models import (
 )
 from .services_auditoria import resumir_pendientes_auditoria_eco
 from .services_eges import (
+    aplicar_horario_eges_residentes,
+    construir_plan_horario_eges_residentes,
     construir_preview_cruce_liquidacion_eges,
+    horario_residente_por_hora_inicio_eges,
     procesar_control_eges_sesion,
+    preparar_reversion_horario_eges_residentes,
+    revertir_lote_horario_eges_residentes,
     resumir_control_eges_sesion,
 )
 
@@ -95,6 +102,533 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             activo=True,
         )
 
+    def test_horario_residente_usa_hora_turno_desde_en_las_tres_atenciones(self):
+        casos = (
+            ('Guardia', 'Espontaneo', 'Espontaneo'),
+            ('Ambulatorio', 'Normal', 'Citado'),
+            ('Ambulatorio', 'Espontaneo', 'Espontaneo'),
+        )
+        for tipo_atencion, tipo_turno, categoria in casos:
+            with self.subTest(tipo_atencion=tipo_atencion, tipo_turno=tipo_turno):
+                fila = SimpleNamespace(
+                    fecha_turno=date(2026, 10, 5),
+                    hora_turno=time(16, 55),
+                    hora_hasta=time(17, 10),
+                    tipo_atencion=tipo_atencion,
+                    tipo_turno=tipo_turno,
+                )
+                horario, motivo = horario_residente_por_hora_inicio_eges(
+                    fila, fechas_feriado=set(),
+                )
+                self.assertEqual(horario, 'INTRA')
+                self.assertIn('Hora Turno/Desde', motivo)
+                self.assertIn(categoria, motivo)
+
+    def test_horario_residente_marca_manual_sin_hora_o_tipo_reconocido(self):
+        fila = SimpleNamespace(
+            fecha_turno=date(2026, 10, 5), hora_turno=None,
+            hora_hasta=None, tipo_atencion='Guardia',
+        )
+        self.assertEqual(
+            horario_residente_por_hora_inicio_eges(fila, fechas_feriado=set())[0],
+            'MANUAL',
+        )
+        fila.hora_turno = time(10, 0)
+        fila.tipo_atencion = 'Turno desconocido'
+        self.assertEqual(
+            horario_residente_por_hora_inicio_eges(fila, fechas_feriado=set())[0],
+            'MANUAL',
+        )
+        fila.tipo_atencion = 'Ambulatorio'
+        fila.tipo_turno = 'Extraordinario'
+        self.assertEqual(
+            horario_residente_por_hora_inicio_eges(fila, fechas_feriado=set())[0],
+            'MANUAL',
+        )
+
+    def test_horario_residente_no_aplica_intra_en_fin_de_semana_ni_feriado(self):
+        fila = SimpleNamespace(
+            fecha_turno=date(2026, 10, 10), hora_turno=time(10, 0),
+            hora_hasta=time(10, 15), tipo_atencion='Espontáneo',
+        )
+        self.assertEqual(
+            horario_residente_por_hora_inicio_eges(fila, fechas_feriado=set())[0],
+            'EXTRA',
+        )
+        fila.fecha_turno = date(2026, 10, 5)
+        self.assertEqual(
+            horario_residente_por_hora_inicio_eges(
+                fila, fechas_feriado={date(2026, 10, 5)},
+            )[0],
+            'EXTRA',
+        )
+
+    def test_preview_horario_residente_octubre_usa_hora_eges_sin_escribir(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987654')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Ambulatorio', tipo_turno='Normal',
+            dni='10987654', fecha=date(2026, 10, 5),
+        )
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+
+        self.assertEqual(len(plan['candidatos']), 1)
+        candidato = plan['candidatos'][0]
+        self.assertEqual(candidato['horario_anterior'], 'EXTRA')
+        self.assertEqual(candidato['horario_nuevo'], 'INTRA')
+        self.assertEqual(candidato['monto_anterior'], Decimal('1000.00'))
+        self.assertEqual(candidato['monto_nuevo'], Decimal('500.00'))
+        self.assertEqual(candidato['tipo_atencion'], 'Citado')
+        self.assertEqual(candidato['hora_eges'], time(10, 0))
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def test_preview_reproduce_monto_proxy_octubre_y_lo_corrige_desde_eges(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='INTRA', fecha=date(2026, 10, 5), dni='10987667')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('500.00'),
+        )
+        self._eges_row(
+            time(18, 0), time(18, 15), tipo_atencion='Guardia',
+            dni='10987667', fecha=date(2026, 10, 5),
+        )
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+
+        self.assertEqual(len(plan['candidatos']), 1)
+        candidato = plan['candidatos'][0]
+        self.assertEqual(candidato['monto_anterior'], Decimal('500.00'))
+        self.assertEqual(candidato['horario_nuevo'], 'EXTRA')
+        self.assertEqual(candidato['monto_nuevo'], Decimal('1000.00'))
+        self.assertEqual(candidato['snapshot']['origen_monto_validado'], 'PROXY_PRE_EGES_REPRODUCIBLE')
+        aplicar_horario_eges_residentes(
+            sesion_id=sesion_octubre.pk, batch_id=self.batch.pk,
+            registro_ids=[registro.pk], snapshots=plan['snapshots'],
+            usuario=self.jefe, motivo='Corrección del proxy de octubre contra hora EGES.',
+        )
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+
+    def test_aplicar_horario_eges_guarda_monto_y_origen_por_linea(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987655')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        fila = self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia', tipo_turno='Espontaneo',
+            dni='10987655', fecha=date(2026, 10, 5),
+        )
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+
+        resultado = aplicar_horario_eges_residentes(
+            sesion_id=sesion_octubre.pk,
+            batch_id=self.batch.pk,
+            registro_ids=[registro.pk],
+            snapshots=plan['snapshots'],
+            usuario=self.jefe,
+            motivo='Aplicación explícita de la regla desde hora EGES.',
+        )
+
+        registro.refresh_from_db()
+        evento = HistorialHorarioEgesResidente.objects.get()
+        self.assertEqual(resultado['registros_aplicados'], 1)
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(registro.calcular_monto(), Decimal('500.00'))
+        self.assertEqual(evento.registro_estudio_id, registro.registroestudio_set.get().pk)
+        self.assertEqual(evento.fila_eges_id, fila.pk)
+        self.assertEqual(evento.tipo_atencion_eges, 'Espontaneo')
+        self.assertEqual(evento.hora_turno_eges, time(10, 0))
+
+    def test_cambio_posterior_de_hora_eges_invalida_descuento_y_bloquea_reversion(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987669')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        fila = self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987669', fecha=date(2026, 10, 5),
+        )
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+        aplicado = aplicar_horario_eges_residentes(
+            sesion_id=sesion_octubre.pk, batch_id=self.batch.pk,
+            registro_ids=[registro.pk], snapshots=plan['snapshots'],
+            usuario=self.jefe, motivo='Aplicación previa para probar cambios de fuente.',
+        )
+        EgesRow.objects.filter(pk=fila.pk).update(hora_turno=time(18, 0))
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.calcular_monto(), Decimal('1000.00'))
+        with self.assertRaises(ValidationError):
+            preparar_reversion_horario_eges_residentes(
+                lote_id=aplicado['lote_id'], usuario=self.jefe,
+            )
+
+    def test_horario_eges_mixto_solo_descuenta_linea_elegible(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987664')
+        ecocar = Estudios.objects.create(
+            nombre='Ecocardiograma sin descuento EGES test',
+            tipo='ECOCAR',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        RegistroEstudio.objects.create(registro=registro, estudio=ecocar, cantidad=1)
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('2000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987664', fecha=date(2026, 10, 5),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987664', fecha=date(2026, 10, 5),
+            practica='ECOCARDIOGRAMA', codigo_practica='ECOCAR-1',
+            sub_modalidad='ECOCARDIO', servicio='Ecocardiograma',
+        )
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+        self.assertEqual(len(plan['candidatos']), 1)
+        self.assertEqual(plan['candidatos'][0]['monto_nuevo'], Decimal('1500.00'))
+        aplicar_horario_eges_residentes(
+            sesion_id=sesion_octubre.pk, batch_id=self.batch.pk,
+            registro_ids=[registro.pk], snapshots=plan['snapshots'],
+            usuario=self.jefe, motivo='Turno mixto verificado contra EGES.',
+        )
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('1500.00'))
+        self.assertEqual(registro.calcular_monto(), Decimal('1500.00'))
+        eventos = list(HistorialHorarioEgesResidente.objects.order_by('registro_estudio_id'))
+        self.assertEqual(len(eventos), 1)
+        self.assertEqual(eventos[0].registro_estudio.estudio.tipo, 'ECO')
+        self.assertTrue(eventos[0].snapshot_json['linea']['aplica_descuento'])
+        self.assertNotIn(ecocar.pk, {
+            match['estudio_id'] for match in eventos[0].snapshot_json['estudios']
+        })
+
+    def test_ecocar_only_no_es_elegible_para_horario_eges_residente(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        ecocar = Estudios.objects.create(
+            nombre='Ecocardiograma sin descuento EGES solo',
+            tipo='ECOCAR',
+            conteo_regiones=1,
+            conteo_regiones_default=1,
+            precio_cober=Decimal('1000.00'),
+            precio_otras_os=Decimal('1000.00'),
+            activo=True,
+        )
+        registro = self._registro(
+            horario='NA', fecha=date(2026, 10, 5), dni='10987668', estudios=[ecocar],
+        )
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(sesion_contable=sesion_octubre)
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+
+        self.assertFalse(plan['candidatos'])
+        self.assertIn('No contiene ECO general o Doppler', plan['excluidos'][0]['motivo'])
+        self.client.force_login(self.jefe)
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion_octubre.pk}),
+            {'batch': self.batch.pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="registros_horario_eges"')
+
+    def test_vigencia_de_horario_eges_excluye_registros_anteriores_a_octubre(self):
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 9, 30), dni='10987656')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987656', fecha=date(2026, 9, 30),
+        )
+
+        plan = construir_plan_horario_eges_residentes(self.sesion, self.batch, [registro.pk])
+
+        self.assertFalse(plan['candidatos'])
+        self.assertIn('anterior al 01/10/2026', plan['excluidos'][0]['motivo'])
+
+    def test_sin_match_o_con_turnos_ambiguos_queda_manual_sin_escrituras(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        sin_match = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987661')
+        ambiguo = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987662')
+        RegistroEstudiosPorMedico.objects.filter(pk__in=[sin_match.pk, ambiguo.pk]).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987662', fecha=date(2026, 10, 5),
+        )
+        self._eges_row(
+            time(11, 0), time(11, 15), tipo_atencion='Guardia',
+            dni='10987662', fecha=date(2026, 10, 5),
+        )
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [sin_match.pk, ambiguo.pk],
+        )
+
+        self.assertFalse(plan['candidatos'])
+        motivos = {item['registro_id']: item['motivo'] for item in plan['excluidos']}
+        self.assertIn('No hay una coincidencia EGES verificable', motivos[sin_match.pk])
+        self.assertIn('más de un turno EGES posible', motivos[ambiguo.pk])
+        for registro in (sin_match, ambiguo):
+            registro.refresh_from_db()
+            self.assertEqual(registro.horario, 'EXTRA')
+            self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertFalse(HistorialHorarioEgesResidente.objects.exists())
+
+    def test_fila_eges_no_informada_queda_manual(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987665')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(sesion_contable=sesion_octubre)
+        fila = self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987665', fecha=date(2026, 10, 5),
+        )
+        EgesRow.objects.filter(pk=fila.pk).update(estado_turno='Cancelado')
+
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+
+        self.assertFalse(plan['candidatos'])
+        self.assertIn('no está finalizada/Informada', plan['excluidos'][0]['motivo'])
+
+    def test_cambio_de_fila_eges_entre_preview_y_aplicacion_aborta_todo(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987666')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(sesion_contable=sesion_octubre)
+        fila = self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987666', fecha=date(2026, 10, 5),
+        )
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+        EgesRow.objects.filter(pk=fila.pk).update(tipo_atencion='Tipo no reconocido')
+
+        with self.assertRaises(ValidationError):
+            aplicar_horario_eges_residentes(
+                sesion_id=sesion_octubre.pk,
+                batch_id=self.batch.pk,
+                registro_ids=[registro.pk],
+                snapshots=plan['snapshots'],
+                usuario=self.jefe,
+                motivo='El match cambió después del preview.',
+            )
+
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertFalse(HistorialHorarioEgesResidente.objects.exists())
+
+    def test_revertir_horario_eges_restaurar_snapshot_y_bloquear_segunda_vez(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987657')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987657', fecha=date(2026, 10, 5),
+        )
+        plan = construir_plan_horario_eges_residentes(
+            sesion_octubre, self.batch, [registro.pk],
+        )
+        aplicado = aplicar_horario_eges_residentes(
+            sesion_id=sesion_octubre.pk, batch_id=self.batch.pk,
+            registro_ids=[registro.pk], snapshots=plan['snapshots'],
+            usuario=self.jefe, motivo='Aplicación de QA.',
+        )
+        plan_reversion = preparar_reversion_horario_eges_residentes(
+            lote_id=aplicado['lote_id'], usuario=self.jefe,
+        )
+        item = plan_reversion[0]
+        snapshots = [[
+            item['registro'].pk, item['horario_actual'], item['horario_restaurado'],
+            str(item['monto_actual']), str(item['monto_restaurado']),
+            sorted(evento.pk for evento in item['eventos']),
+        ]]
+
+        resultado = revertir_lote_horario_eges_residentes(
+            lote_id=aplicado['lote_id'], snapshots=snapshots,
+            usuario=self.jefe, motivo='Reversión de QA.',
+        )
+
+        registro.refresh_from_db()
+        self.assertEqual(resultado['registros_revertidos'], 1)
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertEqual(HistorialHorarioEgesResidente.objects.count(), 2)
+        registro.horario = 'INTRA'
+        registro.save(update_fields=['horario'])
+        self.assertEqual(registro.calcular_monto(), Decimal('1000.00'))
+        with self.assertRaises(ValidationError):
+            preparar_reversion_horario_eges_residentes(
+                lote_id=aplicado['lote_id'], usuario=self.jefe,
+            )
+
+    def test_http_preview_aplica_y_revierte_horario_eges_con_tokens_firmados(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987658')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987658', fecha=date(2026, 10, 5),
+        )
+        self.client.force_login(self.jefe)
+        url_aplicar = reverse(
+            'liquidacion:cruce_eges_aplicar_horario_residente',
+            kwargs={'pk': sesion_octubre.pk},
+        )
+        next_url = reverse(
+            'liquidacion:cruce_eges_liquidacion_preview',
+            kwargs={'pk': sesion_octubre.pk},
+        ) + f'?batch={self.batch.pk}'
+        datos = {
+            'batch': self.batch.pk,
+            'next': next_url,
+            'motivo': 'Hora de guardia verificada en EGES.',
+            'registros_horario_eges': [str(registro.pk)],
+        }
+
+        preview = self.client.post(url_aplicar, datos)
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, 'Preview de horario EGES residente')
+        self.assertTrue(preview.context['token'])
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertFalse(HistorialHorarioEgesResidente.objects.exists())
+
+        aplicado = self.client.post(url_aplicar, {
+            'accion': 'aplicar', 'confirmar': '1', 'batch': self.batch.pk,
+            'next': next_url, 'motivo': datos['motivo'],
+            'preview_token': preview.context['token'],
+        })
+        self.assertEqual(aplicado.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+        self.assertEqual(HistorialHorarioEgesResidente.objects.filter(accion='APLICAR').count(), 1)
+
+        url_revertir = reverse(
+            'liquidacion:cruce_eges_revertir_horario_residente',
+            kwargs={'pk': sesion_octubre.pk},
+        )
+        lote = HistorialHorarioEgesResidente.objects.get(accion='APLICAR').lote_id
+        preview_reversion = self.client.post(url_revertir, {
+            'lote_id': str(lote), 'next': next_url, 'motivo': 'Restauración solicitada.',
+        })
+        self.assertEqual(preview_reversion.status_code, 200)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+
+        revertido = self.client.post(url_revertir, {
+            'accion': 'revertir', 'confirmar': '1', 'next': next_url,
+            'motivo': 'Restauración solicitada.',
+            'preview_token': preview_reversion.context['token'],
+        })
+        self.assertEqual(revertido.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertEqual(HistorialHorarioEgesResidente.objects.filter(accion='REVERTIR').count(), 1)
+
+    def test_http_horario_eges_preview_no_escribe_y_solo_jefatura_aplica(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987659')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Ambulatorio', tipo_turno='Normal',
+            dni='10987659', fecha=date(2026, 10, 5),
+        )
+        url = reverse(
+            'liquidacion:cruce_eges_aplicar_horario_residente',
+            kwargs={'pk': sesion_octubre.pk},
+        )
+        datos = {
+            'batch': self.batch.pk,
+            'next': reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion_octubre.pk}),
+            'motivo': 'Citado verificado en EGES.',
+            'registros_horario_eges': [str(registro.pk)],
+        }
+
+        self.client.force_login(self.jefe)
+        preview = self.client.post(url, datos)
+        self.assertEqual(preview.status_code, 200)
+        self.assertContains(preview, 'Preview de horario EGES residente')
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'EXTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertFalse(HistorialHorarioEgesResidente.objects.exists())
+
+        response = self.client.post(url, {
+            'accion': 'aplicar', 'confirmar': '1', 'batch': self.batch.pk,
+            'next': datos['next'], 'motivo': datos['motivo'],
+            'preview_token': preview.context['token'],
+        })
+        self.assertEqual(response.status_code, 302)
+        registro.refresh_from_db()
+        self.assertEqual(registro.horario, 'INTRA')
+        self.assertEqual(registro.monto_calculado, Decimal('500.00'))
+
+        otro_registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 6), dni='10987660')
+        RegistroEstudiosPorMedico.objects.filter(pk=otro_registro.pk).update(sesion_contable=sesion_octubre)
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987660', fecha=date(2026, 10, 6),
+        )
+        self.client.force_login(self.admin)
+        denegado = self.client.post(url, {
+            **datos, 'registros_horario_eges': [str(otro_registro.pk)],
+        })
+        self.assertEqual(denegado.status_code, 302)
+        otro_registro.refresh_from_db()
+        self.assertEqual(otro_registro.horario, 'EXTRA')
+
     def _registro(self, horario='INTRA', fecha=date(2026, 5, 12), dni='12345678', estudios=None):
         registro = RegistroEstudiosPorMedico.objects.create(
             sesion_contable=self.sesion,
@@ -122,6 +656,8 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         practica='ECOGRAFIA COMPLETA DE ABDOMEN',
         codigo_practica='180112/0',
         modalidad='ECO',
+        tipo_turno='Normal',
+        sub_modalidad='ECO_ABDOMINAL',
         servicio='Ecografia',
         medico_informante='Médico No Especificado',
         medico_actuante='PUENTE CARLOS',
@@ -135,6 +671,7 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             hora_turno=hora_turno,
             hora_hasta=hora_hasta,
             tipo_atencion=tipo_atencion,
+            tipo_turno=tipo_turno,
             medico_informante=medico_informante,
             medico_actuante=medico_actuante,
             practica=practica,
@@ -143,7 +680,7 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
             servicio=servicio,
             estado_turno='Informado',
             modalidad=modalidad,
-            sub_modalidad='ECO_ABDOMINAL',
+            sub_modalidad=sub_modalidad,
             es_insumo=False,
         )
 
@@ -194,6 +731,41 @@ class CruceEgesLiquidacionPreviewTest(TestCase):
         self.assertEqual(response.context['preview']['doppler_correccion_elegibles_pagina'], 0)
         self.assertContains(response, 'No hay Doppler elegibles en esta página.')
         self.assertNotContains(response, 'name="registros_doppler"')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_ui_muestra_accion_horario_eges_solo_para_octubre_elegible(self):
+        sesion_octubre = SesionContable.objects.create(mes=10, año=2026, estado='REVISION')
+        registro = self._registro(horario='EXTRA', fecha=date(2026, 10, 5), dni='10987663')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(
+            sesion_contable=sesion_octubre,
+            monto_calculado=Decimal('1000.00'),
+        )
+        self._eges_row(
+            time(10, 0), time(10, 15), tipo_atencion='Guardia',
+            dni='10987663', fecha=date(2026, 10, 5),
+        )
+        self.client.force_login(self.jefe)
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion_octubre.pk}),
+            {'batch': self.batch.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Hora Turno/Desde para Guardia, Citado y Espontáneo')
+        self.assertContains(response, 'Liquidar INTRA desde EGES')
+        self.assertContains(response, 'name="registros_horario_eges"')
+
+    @override_settings(SECURE_SSL_REDIRECT=False)
+    def test_ui_no_muestra_accion_horario_eges_para_registro_historico(self):
+        self._registro(horario='EXTRA', fecha=date(2026, 9, 30))
+        self.client.force_login(self.jefe)
+        response = self.client.get(
+            reverse('liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': self.sesion.pk}),
+            {'batch': self.batch.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="registros_horario_eges"')
 
     def test_medico_coincide_con_nombre_en_distinto_orden_y_apellido_extra(self):
         self.residente.first_name = 'Juan David'

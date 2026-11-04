@@ -47,6 +47,8 @@ from .views import (
     CruceEgesBulkValidarOkView,
     CruceEgesBulkValidarSeleccionView,
     CruceEgesBulkCorregirDopplerView,
+    CruceEgesAplicarHorarioResidenteView,
+    CruceEgesRevertirHorarioResidenteView,
     CruceEgesRegistroResolverView,
     GruposTarifariosListView,
     GrupoTarifarioDetalleView,
@@ -209,6 +211,16 @@ urlpatterns = [
         'sesiones/<int:pk>/cruce-eges/corregir-doppler/',
         CruceEgesBulkCorregirDopplerView.as_view(),
         name='cruce_eges_corregir_doppler',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/aplicar-horario-residente/',
+        CruceEgesAplicarHorarioResidenteView.as_view(),
+        name='cruce_eges_aplicar_horario_residente',
+    ),
+    path(
+        'sesiones/<int:pk>/cruce-eges/revertir-horario-residente/',
+        CruceEgesRevertirHorarioResidenteView.as_view(),
+        name='cruce_eges_revertir_horario_residente',
     ),
     path(
         'grupos-tarifarios/<int:grupo_pk>/tarifas/nueva/',

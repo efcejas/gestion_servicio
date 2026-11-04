@@ -1,25 +1,38 @@
-from datetime import time
+from datetime import date, time
 from decimal import Decimal
 import re
 import unicodedata
 from collections import OrderedDict, defaultdict
+from uuid import UUID, uuid4
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Max, Q
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from control_guardias.models import Feriado
-from eges_import.models import EgesRow
+from eges_import.models import EgesRow, ImportBatch
 
+from .grupo_tarifario_mapping import es_eco_general_real_estudio
 from .models import (
     ControlEgesSesion,
     CorreccionPacsRegistro,
+    HistorialHorarioEgesResidente,
     JornadaContractual,
     ROLES_LIQUIDAR_COMO_EXTRA_RESIDENCIA,
+    RegistroEstudio,
+    RegistroEstudiosPorMedico,
     ResultadoControlEgesRegistro,
     RevisionCruceEgesRegistro,
+    SesionContable,
 )
-from .services import ROLES_RESIDENCIA, es_fecha_feriado_liquidacion
+from .services import (
+    FECHA_INICIO_HORARIO_EGES_RESIDENTES,
+    ROLES_RESIDENCIA,
+    es_fecha_feriado_liquidacion,
+    estudio_aplica_descuento_residencia,
+)
 from .services_jornadas import (
     ESTADO_DENTRO_JORNADA,
     ESTADO_FUERA_JORNADA,
@@ -100,11 +113,17 @@ def _medico_coincide(fila, medico):
     return False, None
 
 
-def _practicas_liquidacion(registro):
+def _practicas_liquidacion(registro, solo_eco_general_doppler=False):
     relaciones = registro.registroestudio_set.all()
     practicas = []
     for rel in relaciones:
-        if rel.estudio.tipo not in TIPOS_LIQUIDACION_ECO:
+        en_alcance_eges = (
+            rel.estudio.tipo == 'DOP'
+            or es_eco_general_real_estudio(rel.estudio)
+        )
+        if solo_eco_general_doppler and not en_alcance_eges:
+            continue
+        if not solo_eco_general_doppler and rel.estudio.tipo not in TIPOS_LIQUIDACION_ECO:
             continue
         nombre = rel.estudio.nombre
         tokens = _tokens(nombre)
@@ -219,6 +238,45 @@ def horario_esperado_por_eges(fila_eges, fechas_feriado=None):
     return 'EXTRA', 'Horario EGES fuera de 08:00 a 17:00.'
 
 
+def horario_residente_por_hora_inicio_eges(fila_eges, fechas_feriado=None):
+    """Clasifica liquidacion residente usando solo la fecha y Hora Turno/Desde de EGES."""
+    if not fila_eges or not fila_eges.fecha_turno or not fila_eges.hora_turno:
+        return 'MANUAL', 'La fila EGES no tiene fecha y Hora Turno/Desde confiables.'
+    categoria = tipo_atencion_residente_por_eges(fila_eges)
+    if not categoria:
+        return 'MANUAL', 'El tipo de atencion EGES no es Guardia, Citado o Espontaneo.'
+
+    fecha_turno = fila_eges.fecha_turno
+    es_feriado = (
+        fecha_turno in fechas_feriado
+        if fechas_feriado is not None
+        else es_fecha_feriado_liquidacion(fecha_turno)
+    )
+    if fecha_turno.weekday() >= 5 or es_feriado:
+        return 'EXTRA', f'{categoria}: fin de semana o feriado, no aplica INTRA.'
+    if HORA_INTRA_DESDE <= fila_eges.hora_turno < HORA_INTRA_HASTA:
+        return 'INTRA', f'{categoria}: Hora Turno/Desde EGES entre 08:00 y antes de 17:00.'
+    return 'EXTRA', f'{categoria}: Hora Turno/Desde EGES fuera de 08:00 a 17:00.'
+
+
+def tipo_atencion_residente_por_eges(fila_eges):
+    atencion = _normalizar_texto(fila_eges.tipo_atencion)
+    turno = _normalizar_texto(getattr(fila_eges, 'tipo_turno', None))
+    if turno in {'espontaneo', 'espontanea'} and atencion in {'guardia', 'guardias', 'ambulatorio', 'ambulatoria'}:
+        return 'Espontaneo'
+    if atencion in {'guardia', 'guardias'}:
+        return 'Guardia'
+    if atencion in {'citado', 'citados'}:
+        return 'Citado'
+    if atencion in {'espontaneo', 'espontaneos', 'espontanea', 'espontaneas'}:
+        return 'Espontaneo'
+    if atencion in {'ambulatorio', 'ambulatoria'} and turno in {'normal', 'citado', 'citada'}:
+        return 'Citado'
+    if atencion in {'ambulatorio', 'ambulatoria'} and turno in {'espontaneo', 'espontanea'}:
+        return 'Espontaneo'
+    return None
+
+
 def _buscar_candidatos_eges(registro, batch, indice_candidatos=None):
     if indice_candidatos is not None:
         clave = (registro.fecha_del_informe, str(registro.dni_paciente or '').strip())
@@ -301,18 +359,27 @@ def _resolver_horario_grupo(registro, representante, matches_practicas, usar_jor
 
 
 def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=False, jornada=None,
-                      fechas_feriado=None):
-    practicas = _practicas_liquidacion(registro)
+                      fechas_feriado=None, usar_hora_inicio_residente=False):
+    practicas = _practicas_liquidacion(
+        registro,
+        solo_eco_general_doppler=usar_hora_inicio_residente,
+    )
     candidatos = _buscar_candidatos_eges(registro, batch, indice_candidatos=indice_candidatos)
     evaluados = []
 
     for fila in candidatos:
         medico_ok, rol_medico_eges = _medico_coincide(fila, registro.medico)
-        horario_esperado, motivo_horario = horario_esperado_por_eges(
-            fila,
-            fechas_feriado=fechas_feriado,
-        )
-        horario_ok = horario_esperado == registro.horario
+        if usar_hora_inicio_residente:
+            horario_esperado, motivo_horario = horario_residente_por_hora_inicio_eges(
+                fila, fechas_feriado=fechas_feriado,
+            )
+            horario_ok = horario_esperado in {'INTRA', 'EXTRA'}
+        else:
+            horario_esperado, motivo_horario = horario_esperado_por_eges(
+                fila,
+                fechas_feriado=fechas_feriado,
+            )
+            horario_ok = horario_esperado == registro.horario
 
         puntaje = 0
         puntaje += 4 if medico_ok else 0
@@ -352,6 +419,11 @@ def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=Fal
             filas_grupo,
             evaluados_por_pk=evaluados_por_pk,
         )
+        if usar_hora_inicio_residente:
+            eges_sin_liquidacion_grupo = [
+                fila for fila in eges_sin_liquidacion_grupo
+                if _fila_eges_es_doppler_o_eco_general(fila)
+            ]
         practicas_otro_profesional = [
             match for match in matches_grupo
             if not match['medico_ok']
@@ -446,6 +518,20 @@ def _evaluar_registro(registro, batch, indice_candidatos=None, usar_jornadas=Fal
         'motor_horario': MOTOR_HORARIO_JORNADA if usar_jornadas else MOTOR_HORARIO_GENERAL,
         'evaluacion_jornada': mejor.get('evaluacion_jornada') if mejor else None,
     }
+
+
+def _fila_eges_es_doppler_o_eco_general(fila):
+    if fila.sub_modalidad == 'DOPPLER':
+        return True
+    if fila.sub_modalidad == 'ECOCARDIO':
+        return False
+    estudio_eges = type('EstudioEges', (), {
+        'tipo': 'ECO',
+        'nombre': fila.practica or fila.servicio,
+        'codigo': fila.codigo_practica,
+        'grupo_tarifario': None,
+    })()
+    return es_eco_general_real_estudio(estudio_eges)
 
 
 def _parse_fecha_filtro(valor):
@@ -563,7 +649,8 @@ def _queryset_registros_cruce_eges(sesion):
 
 
 def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, registro_ids=None,
-                                              usar_jornadas=False):
+                                              usar_jornadas=False,
+                                              usar_hora_inicio_residente=False):
     registros = _queryset_registros_cruce_eges(sesion)
     registros = _aplicar_filtros_base_registros(registros, filtros=filtros, registro_ids=registro_ids)
     registros = list(registros)
@@ -589,6 +676,7 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
             usar_jornadas=usar_jornadas,
             jornada=jornadas_vigentes.get(registro.pk),
             fechas_feriado=fechas_feriado,
+            usar_hora_inicio_residente=usar_hora_inicio_residente,
         )
         for registro in registros
     ]
@@ -634,6 +722,539 @@ def construir_preview_cruce_liquidacion_eges(sesion, batch, filtros=None, regist
         'batch': batch,
         'resumen': resumen,
         'resultados': resultados,
+    }
+
+
+def _fingerprint_fila_horario_eges(fila):
+    return [
+        fila.pk,
+        fila.batch_id,
+        fila.fecha_turno.isoformat() if fila.fecha_turno else None,
+        fila.hora_turno.isoformat() if fila.hora_turno else None,
+        fila.hora_hasta.isoformat() if fila.hora_hasta else None,
+        fila.tipo_atencion,
+        fila.tipo_turno,
+        fila.tipo_paciente,
+        fila.dni_paciente,
+        fila.historia_clinica,
+        fila.modalidad,
+        fila.sub_modalidad,
+        fila.practica,
+        fila.codigo_practica,
+        fila.medico_informante,
+        fila.medico_actuante,
+        str(fila.cantidad),
+        fila.estado_turno,
+        fila.es_insumo,
+    ]
+
+
+def construir_plan_horario_eges_residentes(sesion, batch, registro_ids):
+    """Arma un plan read-only; sólo filas EGES inequívocas pueden cambiar el monto."""
+    ids = list(dict.fromkeys(int(registro_id) for registro_id in registro_ids))
+    if not ids or len(ids) > 100 or len(ids) != len(registro_ids):
+        raise ValidationError('Selecciona entre 1 y 100 registros distintos.')
+    if sesion.estado not in {'ABIERTA', 'REVISION'}:
+        raise ValidationError('La sesion debe estar ABIERTA o REVISION.')
+
+    queryset = _queryset_registros_cruce_eges(sesion).filter(
+        pk__in=ids,
+        fecha_del_informe__year=sesion.año,
+        fecha_del_informe__month=sesion.mes,
+        fecha_del_informe__gte=FECHA_INICIO_HORARIO_EGES_RESIDENTES,
+    )
+    registros = list(queryset)
+    por_id = {registro.pk: registro for registro in registros}
+    excluidos = []
+    candidatos = []
+    ids_reversiones = HistorialHorarioEgesResidente.objects.filter(
+        accion=HistorialHorarioEgesResidente.ACCION_REVERTIR,
+        evento_origen__isnull=False,
+    ).values_list('evento_origen_id', flat=True)
+    ajustes_activos = set(HistorialHorarioEgesResidente.objects.filter(
+        registro_id__in=ids,
+        accion=HistorialHorarioEgesResidente.ACCION_APLICAR,
+    ).exclude(pk__in=ids_reversiones).values_list('registro_id', flat=True))
+
+    faltantes = set(ids) - set(por_id)
+    for registro_id in sorted(faltantes):
+        excluidos.append({
+            'registro_id': registro_id,
+            'motivo': 'No pertenece a la sesion, no es residente activo o es anterior al 01/10/2026.',
+        })
+
+    preview = construir_preview_cruce_liquidacion_eges(
+        sesion,
+        batch,
+        registro_ids=ids,
+        usar_hora_inicio_residente=True,
+    )
+    resultados = {item['registro'].pk: item for item in preview['resultados']}
+    filas_batch = EgesRow.objects.filter(
+        batch=batch,
+        fecha_turno__in={
+            fila.fecha_turno
+            for item in preview['resultados']
+            for grupo in [item.get('mejor_match') or {}]
+            for fila in grupo.get('filas_eges', [])
+            if fila.fecha_turno
+        },
+        modalidad='ECO',
+        es_insumo=False,
+    )
+    fechas_feriado = set(Feriado.objects.filter(
+        fecha__in=filas_batch.values_list('fecha_turno', flat=True),
+    ).values_list('fecha', flat=True))
+    for registro_id in ids:
+        registro = por_id.get(registro_id)
+        item = resultados.get(registro_id)
+        if not registro or not item:
+            continue
+        if registro.medico.rol != 'medico_residente':
+            excluidos.append({'registro_id': registro_id, 'motivo': 'La regla EGES de horario económico aplica solo a medico_residente.'})
+            continue
+        if registro.pk in ajustes_activos:
+            excluidos.append({'registro_id': registro_id, 'motivo': 'Ya existe un ajuste horario EGES activo; debe revertirse primero.'})
+            continue
+
+        relaciones = list(registro.registroestudio_set.select_related('estudio').all())
+        relaciones_elegibles = [
+            relacion for relacion in relaciones
+            if relacion.estudio.tipo == 'DOP' or es_eco_general_real_estudio(relacion.estudio)
+        ]
+        relaciones_con_descuento = [
+            relacion for relacion in relaciones
+            if estudio_aplica_descuento_residencia(
+                relacion.estudio,
+                registro.medico.rol,
+                registro.fecha_del_informe,
+            )['aplica']
+        ]
+        if not relaciones_con_descuento:
+            excluidos.append({
+                'registro_id': registro_id,
+                'motivo': 'No contiene ECO general o Doppler con descuento residente vigente.',
+            })
+            continue
+        if any(relacion not in relaciones_elegibles for relacion in relaciones_con_descuento):
+            excluidos.append({
+                'registro_id': registro_id,
+                'motivo': 'Hay prácticas descontables fuera del alcance ECO general/Doppler.',
+            })
+            continue
+
+        mejor = item.get('mejor_match') or {}
+        if not mejor:
+            excluidos.append({'registro_id': registro_id, 'motivo': 'No hay una coincidencia EGES verificable.'})
+            continue
+        motivos = []
+        if 'Hay múltiples coincidencias EGES posibles.' in item['motivos']:
+            motivos.append('Hay más de un turno EGES posible.')
+        if not mejor.get('medico_ok'):
+            motivos.append('El médico no coincide claramente con informante o actuante EGES.')
+        if mejor.get('liquidacion_sin_match'):
+            motivos.append('Hay prácticas del registro sin coincidencia EGES.')
+        if mejor.get('eges_sin_liquidacion'):
+            motivos.append('El turno EGES contiene prácticas no asociadas a este registro.')
+        if mejor.get('practicas_otro_profesional'):
+            motivos.append('El turno contiene prácticas de otro profesional.')
+        if mejor.get('horario_esperado') not in {'INTRA', 'EXTRA'}:
+            motivos.append(mejor.get('motivo_horario') or 'EGES no determina un horario confiable.')
+
+        matches_por_linea = {
+            match['liquidacion']['relacion'].pk: match
+            for match in mejor.get('matches_practicas', [])
+        }
+        if not relaciones_elegibles or set(matches_por_linea) != {
+            relacion.pk for relacion in relaciones_elegibles
+        }:
+            motivos.append('No todas las prácticas ECO/DOP/ECOCAR tienen una fila EGES vinculada.')
+
+        matches_serializados = []
+        fila_ids = []
+        for relacion in relaciones_elegibles:
+            match = matches_por_linea.get(relacion.pk)
+            if not match:
+                continue
+            fila = match['fila_eges']
+            if _normalizar_texto(fila.estado_turno) != 'informado':
+                motivos.append(f'La fila EGES de {relacion.estudio.nombre} no está finalizada/Informada.')
+            if not match['medico_ok']:
+                motivos.append(f'El médico no coincide en EGES para {relacion.estudio.nombre}.')
+            if not match['cantidad_ok'] or Decimal(str(relacion.cantidad)) != Decimal(str(fila.cantidad or 0)):
+                motivos.append(f'La cantidad no coincide para {relacion.estudio.nombre}.')
+            horario_fila, _motivo_horario = horario_residente_por_hora_inicio_eges(
+                fila, fechas_feriado=fechas_feriado,
+            )
+            if horario_fila != mejor.get('horario_esperado'):
+                motivos.append('Las filas vinculadas no comparten un horario EGES único.')
+            fila_ids.append(fila.pk)
+            matches_serializados.append({
+                'registro_estudio_id': relacion.pk,
+                'estudio_id': relacion.estudio_id,
+                'estudio': relacion.estudio.nombre,
+                'cantidad': relacion.cantidad,
+                'contexto': relacion.contexto,
+                'aplica_descuento': relacion in relaciones_con_descuento,
+                'fila_eges_id': fila.pk,
+                'fingerprint': _fingerprint_fila_horario_eges(fila),
+            })
+
+        if len(fila_ids) != len(set(fila_ids)):
+            motivos.append('Una fila EGES no puede justificar más de una práctica del registro.')
+        if motivos:
+            excluidos.append({'registro_id': registro_id, 'motivo': ' '.join(dict.fromkeys(motivos))})
+            continue
+
+        horario_nuevo = mejor['horario_esperado']
+        monto_anterior = registro.monto_calculado or Decimal('0.00')
+        monto_canonico = registro.calcular_monto().quantize(Decimal('0.01'))
+        origen_monto = 'CANONICO'
+        if monto_anterior.quantize(Decimal('0.01')) != monto_canonico:
+            monto_proxy_anterior = registro.calcular_monto(
+                horario_eges_residente_validado=True,
+            ).quantize(Decimal('0.01'))
+            if monto_anterior.quantize(Decimal('0.01')) != monto_proxy_anterior:
+                excluidos.append({
+                    'registro_id': registro_id,
+                    'motivo': 'El monto no coincide ni con el cálculo actual ni con el proxy previo; requiere revisión manual.',
+                })
+                continue
+            origen_monto = 'PROXY_PRE_EGES_REPRODUCIBLE'
+        horario_anterior = registro.horario
+        registro.horario = horario_nuevo
+        try:
+            monto_nuevo = registro.calcular_monto(
+                horario_eges_residente_validado=horario_nuevo == 'INTRA',
+            ).quantize(Decimal('0.01'))
+        finally:
+            registro.horario = horario_anterior
+        if (
+            horario_anterior == horario_nuevo
+            and monto_anterior == monto_nuevo
+            and origen_monto == 'CANONICO'
+        ):
+            excluidos.append({'registro_id': registro_id, 'motivo': 'El horario EGES y el monto ya coinciden.'})
+            continue
+
+        snapshot = {
+            'registro_id': registro.pk,
+            'sesion_id': sesion.pk,
+            'batch_id': batch.pk,
+            'medico_id': registro.medico_id,
+            'fecha_estudio': registro.fecha_del_informe.isoformat(),
+            'dni': registro.dni_paciente,
+            'horario_anterior': horario_anterior,
+            'horario_nuevo': horario_nuevo,
+            'monto_anterior': str(monto_anterior),
+            'monto_nuevo': str(monto_nuevo),
+            'origen_monto_validado': origen_monto,
+            'fecha_modificacion': registro.fecha_modificacion.isoformat() if registro.fecha_modificacion else None,
+            'modificado_por_id': registro.modificado_por_id,
+            'estudios': matches_serializados,
+        }
+        candidato = {
+            'registro': registro,
+            'fila_eges': mejor['fila_eges'],
+            'matches': matches_serializados,
+            'tipo_atencion': tipo_atencion_residente_por_eges(mejor['fila_eges']),
+            'hora_eges': mejor['fila_eges'].hora_turno,
+            'horario_anterior': horario_anterior,
+            'horario_nuevo': horario_nuevo,
+            'monto_anterior': monto_anterior,
+            'monto_nuevo': monto_nuevo,
+            'diferencia': monto_nuevo - monto_anterior,
+            'snapshot': snapshot,
+        }
+        candidatos.append(candidato)
+
+    filas_a_registros = defaultdict(set)
+    for candidato in candidatos:
+        for match in candidato['matches']:
+            filas_a_registros[match['fila_eges_id']].add(candidato['registro'].pk)
+    colisionados = {
+        registro_id
+        for registro_ids_fila in filas_a_registros.values() if len(registro_ids_fila) > 1
+        for registro_id in registro_ids_fila
+    }
+    if colisionados:
+        excluidos.extend({
+            'registro_id': registro_id,
+            'motivo': 'La misma fila EGES coincide con más de un registro de liquidación.',
+        } for registro_id in sorted(colisionados))
+        candidatos = [candidato for candidato in candidatos if candidato['registro'].pk not in colisionados]
+
+    return {
+        'candidatos': candidatos,
+        'excluidos': excluidos,
+        'snapshots': [candidato['snapshot'] for candidato in candidatos],
+        'seleccionados': ids,
+    }
+
+
+@transaction.atomic
+def aplicar_horario_eges_residentes(*, sesion_id, batch_id, registro_ids, snapshots,
+                                    usuario, motivo):
+    if not usuario.is_authenticated or not (usuario.is_superuser or usuario.rol == 'jefe_servicio'):
+        raise ValidationError('Solo jefatura o superusuario puede aplicar horarios EGES.')
+    motivo = (motivo or '').strip()
+    if not motivo or len(motivo) > 2000:
+        raise ValidationError('Indica un fundamento de hasta 2000 caracteres.')
+    ids = list(dict.fromkeys(int(registro_id) for registro_id in registro_ids))
+    if not ids or len(ids) > 100 or len(ids) != len(registro_ids):
+        raise ValidationError('El preview no contiene entre 1 y 100 registros distintos.')
+
+    sesion = SesionContable.objects.select_for_update().get(pk=sesion_id)
+    if sesion.estado not in {'ABIERTA', 'REVISION'}:
+        raise ValidationError('La sesion debe seguir ABIERTA o REVISION.')
+    batch = ImportBatch.objects.get(pk=batch_id)
+    plan = construir_plan_horario_eges_residentes(sesion, batch, ids)
+    if plan['excluidos'] or plan['snapshots'] != snapshots:
+        raise ValidationError('El preview cambió o contiene casos pendientes; no se aplicó ningún registro.')
+
+    registro_ids_ordenados = sorted(ids)
+    registros_bloqueados = list(RegistroEstudiosPorMedico.objects.select_for_update().filter(
+        pk__in=registro_ids_ordenados,
+        sesion_contable=sesion,
+        anulado=False,
+    ).order_by('pk'))
+    if len(registros_bloqueados) != len(ids):
+        raise ValidationError('Uno o mas registros cambiaron o no pertenecen a la sesion.')
+    linea_ids = sorted({
+        match['registro_estudio_id']
+        for candidato in plan['candidatos'] for match in candidato['matches']
+    })
+    lineas_bloqueadas = list(RegistroEstudio.objects.select_for_update().filter(
+        pk__in=linea_ids,
+        registro_id__in=ids,
+    ).order_by('registro_id', 'pk'))
+    if len(lineas_bloqueadas) != len(linea_ids):
+        raise ValidationError('Una practica cambió desde el preview.')
+    fila_ids = sorted({
+        match['fila_eges_id']
+        for candidato in plan['candidatos'] for match in candidato['matches']
+    })
+    filas_bloqueadas = list(EgesRow.objects.select_for_update().filter(
+        pk__in=fila_ids,
+        batch=batch,
+    ).order_by('pk'))
+    if len(filas_bloqueadas) != len(fila_ids):
+        raise ValidationError('Una fila EGES ya no pertenece al batch seleccionado.')
+
+    plan_actual = construir_plan_horario_eges_residentes(sesion, batch, ids)
+    if plan_actual['excluidos'] or plan_actual['snapshots'] != snapshots:
+        raise ValidationError('El cruce o el cálculo cambiaron al confirmar; no se aplicó ningún registro.')
+
+    lote_id = uuid4()
+    ahora = timezone.now()
+    registros_por_id = {registro.pk: registro for registro in registros_bloqueados}
+    eventos_creados = []
+    for candidato in plan_actual['candidatos']:
+        registro = registros_por_id[candidato['registro'].pk]
+        snapshot_por_linea = {
+            match['registro_estudio_id']: match
+            for match in candidato['matches']
+        }
+        for match in candidato['matches']:
+            linea = next(linea for linea in lineas_bloqueadas if linea.pk == match['registro_estudio_id'])
+            fila = next(fila for fila in filas_bloqueadas if fila.pk == match['fila_eges_id'])
+            HistorialHorarioEgesResidente.objects.create(
+                sesion_contable=sesion,
+                registro=registro,
+                registro_estudio=linea,
+                batch_eges=batch,
+                fila_eges=fila,
+                lote_id=lote_id,
+                accion=HistorialHorarioEgesResidente.ACCION_APLICAR,
+                fecha_estudio=registro.fecha_del_informe,
+                tipo_atencion_eges=candidato['tipo_atencion'] or '',
+                hora_turno_eges=fila.hora_turno,
+                horario_anterior=candidato['horario_anterior'],
+                horario_nuevo=candidato['horario_nuevo'],
+                monto_anterior=candidato['monto_anterior'],
+                monto_nuevo=candidato['monto_nuevo'],
+                snapshot_json={**candidato['snapshot'], 'linea': snapshot_por_linea[linea.pk]},
+                motivo=motivo,
+                realizado_por=usuario,
+            )
+            eventos_creados.append(linea.pk)
+        registro.horario = candidato['horario_nuevo']
+        registro.monto_calculado = candidato['monto_nuevo']
+        registro.modificado_por = usuario
+        registro.fecha_modificacion = ahora
+        registro.motivo_modificacion = (
+            f'Horario residente tomado de EGES, Hora Turno/Desde '
+            f'{candidato["hora_eges"]:%H:%M} ({candidato["tipo_atencion"]}). '
+            f'{candidato["horario_anterior"]} -> {candidato["horario_nuevo"]}; '
+            f'monto ${candidato["monto_anterior"]} -> ${candidato["monto_nuevo"]}. {motivo}'
+        )
+        registro.save(update_fields=[
+            'horario', 'monto_calculado', 'modificado_por', 'fecha_modificacion', 'motivo_modificacion',
+        ])
+    return {
+        'lote_id': str(lote_id),
+        'registros_aplicados': len(plan_actual['candidatos']),
+        'lineas_aplicadas': len(eventos_creados),
+        'registros': [candidato['registro'].pk for candidato in plan_actual['candidatos']],
+    }
+
+
+def preparar_reversion_horario_eges_residentes(*, lote_id, usuario):
+    if not usuario.is_authenticated or not (usuario.is_superuser or usuario.rol == 'jefe_servicio'):
+        raise ValidationError('Solo jefatura o superusuario puede revertir horarios EGES.')
+    try:
+        lote_id = UUID(str(lote_id))
+    except (TypeError, ValueError, AttributeError):
+        raise ValidationError('El identificador del lote no es valido.')
+    eventos = list(HistorialHorarioEgesResidente.objects.filter(
+        lote_id=lote_id,
+        accion=HistorialHorarioEgesResidente.ACCION_APLICAR,
+    ).select_related(
+        'registro__sesion_contable', 'registro__medico', 'registro_estudio', 'batch_eges', 'fila_eges',
+    ).order_by('registro_id', 'pk'))
+    if not eventos:
+        raise ValidationError('No hay aplicaciones de horario EGES para ese lote.')
+
+    errores = []
+    eventos_por_registro = defaultdict(list)
+    for evento in eventos:
+        registro = evento.registro
+        if HistorialHorarioEgesResidente.objects.filter(evento_origen=evento).exists():
+            errores.append(f'El evento #{evento.pk} ya fue revertido.')
+        ultimo = HistorialHorarioEgesResidente.objects.filter(
+            registro_id=registro.pk,
+        ).order_by('-fecha_evento', '-pk').first()
+        if ultimo and ultimo.lote_id != lote_id:
+            errores.append(f'El registro #{registro.pk} tiene un evento EGES posterior de otro lote.')
+        if (
+            registro.anulado
+            or registro.sesion_contable.estado not in {'ABIERTA', 'REVISION'}
+            or registro.horario != evento.horario_nuevo
+            or registro.monto_calculado != evento.monto_nuevo
+            or (registro.fecha_modificacion and registro.fecha_modificacion > evento.fecha_evento)
+        ):
+            errores.append(f'El registro #{registro.pk} ya no coincide con el snapshot aplicado o su sesion esta cerrada.')
+        if (
+            evento.registro_estudio.registro_id != registro.pk
+            or evento.fila_eges.batch_id != evento.batch_eges_id
+            or evento.fecha_estudio != registro.fecha_del_informe
+        ):
+            errores.append(f'La trazabilidad del evento #{evento.pk} ya no es consistente.')
+        linea_snapshot = evento.snapshot_json.get('linea') or {}
+        if (
+            _fingerprint_fila_horario_eges(evento.fila_eges) != linea_snapshot.get('fingerprint')
+            or _normalizar_texto(evento.fila_eges.estado_turno) != 'informado'
+            or horario_residente_por_hora_inicio_eges(evento.fila_eges)[0] != evento.horario_nuevo
+        ):
+            errores.append(f'La fila EGES del evento #{evento.pk} cambió; requiere revisión manual.')
+        eventos_por_registro[registro.pk].append(evento)
+    if errores:
+        raise ValidationError('No se puede revertir el lote: ' + ' '.join(errores))
+
+    plan = []
+    for registro_id, eventos_registro in eventos_por_registro.items():
+        montos_anteriores = {evento.monto_anterior for evento in eventos_registro}
+        montos_nuevos = {evento.monto_nuevo for evento in eventos_registro}
+        horarios_anteriores = {evento.horario_anterior for evento in eventos_registro}
+        horarios_nuevos = {evento.horario_nuevo for evento in eventos_registro}
+        if any(len(valores) != 1 for valores in (
+            montos_anteriores, montos_nuevos, horarios_anteriores, horarios_nuevos,
+        )):
+            raise ValidationError(f'El historial del registro #{registro_id} no tiene snapshots coherentes.')
+        registro = eventos_registro[0].registro
+        plan.append({
+            'registro': registro,
+            'eventos': eventos_registro,
+            'horario_actual': registro.horario,
+            'horario_restaurado': eventos_registro[0].horario_anterior,
+            'monto_actual': registro.monto_calculado,
+            'monto_restaurado': eventos_registro[0].monto_anterior,
+        })
+    return plan
+
+
+@transaction.atomic
+def revertir_lote_horario_eges_residentes(*, lote_id, snapshots, usuario, motivo):
+    motivo = (motivo or '').strip()
+    if not motivo or len(motivo) > 2000:
+        raise ValidationError('Indica un fundamento de hasta 2000 caracteres.')
+    plan = preparar_reversion_horario_eges_residentes(lote_id=lote_id, usuario=usuario)
+    evento_ids = [evento.pk for item in plan for evento in item['eventos']]
+    sesion_ids = sorted({item['registro'].sesion_contable_id for item in plan})
+    list(SesionContable.objects.select_for_update().filter(pk__in=sesion_ids).order_by('pk'))
+    registro_ids = sorted(item['registro'].pk for item in plan)
+    list(RegistroEstudiosPorMedico.objects.select_for_update().filter(
+        pk__in=registro_ids,
+    ).order_by('pk'))
+    eventos_bloqueados = list(HistorialHorarioEgesResidente.objects.select_for_update().filter(
+        pk__in=evento_ids,
+    ).order_by('pk'))
+    list(RegistroEstudio.objects.select_for_update().filter(
+        pk__in=[evento.registro_estudio_id for evento in eventos_bloqueados],
+    ).order_by('registro_id', 'pk'))
+    list(EgesRow.objects.select_for_update().filter(
+        pk__in=[evento.fila_eges_id for evento in eventos_bloqueados],
+    ).order_by('pk'))
+    plan_actual = preparar_reversion_horario_eges_residentes(lote_id=lote_id, usuario=usuario)
+    estado = [
+        [item['registro'].pk, item['horario_actual'], item['horario_restaurado'],
+         str(item['monto_actual']), str(item['monto_restaurado']),
+         sorted(evento.pk for evento in item['eventos'])]
+        for item in plan
+    ]
+    estado_actual = [
+        [item['registro'].pk, item['horario_actual'], item['horario_restaurado'],
+         str(item['monto_actual']), str(item['monto_restaurado']),
+         sorted(evento.pk for evento in item['eventos'])]
+        for item in plan_actual
+    ]
+    if estado != estado_actual or estado != snapshots:
+        raise ValidationError('El lote cambio desde el preview; no se revirtio ningun registro.')
+
+    lote_reversion = uuid4()
+    ahora = timezone.now()
+    eventos_revertidos = 0
+    for item in plan_actual:
+        registro = item['registro']
+        for evento in item['eventos']:
+            HistorialHorarioEgesResidente.objects.create(
+                sesion_contable_id=evento.sesion_contable_id,
+                registro=registro,
+                registro_estudio_id=evento.registro_estudio_id,
+                batch_eges_id=evento.batch_eges_id,
+                fila_eges_id=evento.fila_eges_id,
+                evento_origen=evento,
+                lote_id=lote_reversion,
+                accion=HistorialHorarioEgesResidente.ACCION_REVERTIR,
+                fecha_estudio=evento.fecha_estudio,
+                tipo_atencion_eges=evento.tipo_atencion_eges,
+                hora_turno_eges=evento.hora_turno_eges,
+                horario_anterior=evento.horario_nuevo,
+                horario_nuevo=evento.horario_anterior,
+                monto_anterior=evento.monto_nuevo,
+                monto_nuevo=evento.monto_anterior,
+                snapshot_json={'evento_origen_id': evento.pk, 'snapshot_origen': evento.snapshot_json},
+                motivo=motivo,
+                realizado_por=usuario,
+            )
+            eventos_revertidos += 1
+        registro.horario = item['horario_restaurado']
+        registro.monto_calculado = item['monto_restaurado']
+        registro.modificado_por = usuario
+        registro.fecha_modificacion = ahora
+        registro.motivo_modificacion = (
+            f'Reversion de horario EGES lote {lote_id}. '
+            f'{item["horario_actual"]} -> {item["horario_restaurado"]}; '
+            f'monto ${item["monto_actual"]} -> ${item["monto_restaurado"]}. {motivo}'
+        )
+        registro.save(update_fields=[
+            'horario', 'monto_calculado', 'modificado_por', 'fecha_modificacion', 'motivo_modificacion',
+        ])
+    return {
+        'lote_id': str(lote_id),
+        'lote_reversion': str(lote_reversion),
+        'registros_revertidos': len(plan_actual),
+        'eventos_revertidos': eventos_revertidos,
     }
 
 

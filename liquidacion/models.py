@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
@@ -1033,7 +1035,7 @@ class RegistroEstudiosPorMedico(models.Model):
     def __str__(self):
         return f'{self.medico} - {self.fecha_registro}'
     
-    def calcular_monto(self, *, cantidades_auditoria=None):
+    def calcular_monto(self, *, cantidades_auditoria=None, horario_eges_residente_validado=False):
         """
         Calcula el monto a facturar por esta práctica.
         v3.2 - Mayo 2026: Factor INTRA diferenciado por rol y tipo de estudio.
@@ -1049,6 +1051,7 @@ class RegistroEstudiosPorMedico(models.Model):
           - staff / otros roles: sin descuento horario, siempre 100%.
         """
         from .services import (
+            FECHA_INICIO_HORARIO_EGES_RESIDENTES,
             ROLES_RESIDENCIA,
             es_fecha_feriado_liquidacion,
             estudio_aplica_descuento_residencia,
@@ -1061,10 +1064,18 @@ class RegistroEstudiosPorMedico(models.Model):
 
         fecha_referencia = self.fecha_del_informe or timezone.now().date()
         es_feriado = es_fecha_feriado_liquidacion(fecha_referencia)
+        if (
+            self.medico.rol == 'medico_residente'
+            and fecha_referencia >= FECHA_INICIO_HORARIO_EGES_RESIDENTES
+        ):
+            horario_eges_valido = horario_eges_residente_validado or self._tiene_horario_eges_residente_activo()
+        else:
+            horario_eges_valido = True
         rol_residencia_intra = (
             self.horario == 'INTRA'
             and self.medico.rol in ROLES_RESIDENCIA
             and not es_feriado
+            and horario_eges_valido
         )
         
         # 1. Sumar (precio × cantidad) separando elegibles para descuento residencia.
@@ -1112,6 +1123,67 @@ class RegistroEstudiosPorMedico(models.Model):
         monto_final = subtotal * (Decimal('1.0') + bonus_urgencia)
         
         return monto_final
+
+    def _tiene_horario_eges_residente_activo(self):
+        evento = self.historial_horario_eges_residente.order_by('-fecha_evento', '-pk').first()
+        if not (
+            evento
+            and self.medico.rol == 'medico_residente'
+            and evento.accion == HistorialHorarioEgesResidente.ACCION_APLICAR
+            and evento.horario_nuevo == 'INTRA'
+            and self.horario == evento.horario_nuevo
+            and evento.fecha_estudio == self.fecha_del_informe
+        ):
+            return False
+        if self.fecha_modificacion and self.fecha_modificacion > evento.fecha_evento:
+            return False
+        from .services import FECHA_INICIO_HORARIO_EGES_RESIDENTES, estudio_aplica_descuento_residencia
+        if evento.fecha_estudio < FECHA_INICIO_HORARIO_EGES_RESIDENTES:
+            return False
+        from .services_eges import _fingerprint_fila_horario_eges, horario_residente_por_hora_inicio_eges
+        from eges_import.models import EgesRow
+        expected = {
+            (
+                linea['registro_estudio_id'], linea['estudio_id'],
+                linea['cantidad'], linea['contexto'],
+            )
+            for linea in evento.snapshot_json.get('estudios', [])
+            if linea.get('aplica_descuento')
+        }
+        filas_eges = {
+            fila.pk: fila
+            for fila in EgesRow.objects.filter(
+                pk__in=[linea['fila_eges_id'] for linea in evento.snapshot_json.get('estudios', [])
+                        if linea.get('aplica_descuento')],
+                batch_id=evento.batch_eges_id,
+            )
+        }
+        for linea in evento.snapshot_json.get('estudios', []):
+            if not linea.get('aplica_descuento'):
+                continue
+            fila = filas_eges.get(linea['fila_eges_id'])
+            if (
+                not fila
+                or fila.batch_id != evento.batch_eges_id
+                or _fingerprint_fila_horario_eges(fila) != linea.get('fingerprint')
+                or (fila.estado_turno or '').strip().casefold() != 'informado'
+                or horario_residente_por_hora_inicio_eges(fila)[0] != evento.horario_nuevo
+            ):
+                return False
+        actual = set()
+        for relacion in self.registroestudio_set.select_related('estudio__grupo_tarifario').all():
+            if estudio_aplica_descuento_residencia(
+                relacion.estudio, 'medico_residente', evento.fecha_estudio,
+            )['aplica']:
+                linea_snapshot = next((
+                    linea for linea in evento.snapshot_json.get('estudios', [])
+                    if linea.get('registro_estudio_id') == relacion.pk
+                ), {})
+                actual.add((
+                    relacion.pk, relacion.estudio_id, relacion.cantidad,
+                    linea_snapshot.get('contexto'),
+                ))
+        return bool(expected) and actual == expected
     
     def calcular_bonus_urgencia(self):
         """
@@ -1351,20 +1423,15 @@ class RegistroEstudiosPorMedico(models.Model):
             if self.medico.rol in ['medico_staff', 'jefe_servicio', 'cardiologo']:
                 # Staff no tiene horario INTRA/EXTRA
                 self.horario = 'NA'
+            elif self.medico.rol == 'medico_residente':
+                from .services import FECHA_INICIO_HORARIO_EGES_RESIDENTES
+                if self.fecha_del_informe >= FECHA_INICIO_HORARIO_EGES_RESIDENTES:
+                    self.horario = 'NA'
+                else:
+                    self._asignar_horario_proxy_residencia()
             else:
                 # Sin M2M aún no inferimos ECO/no ECO; usamos proxy por fecha_registro.
-                from .services import es_fecha_feriado_liquidacion
-                from django.utils import timezone
-                referencia = self.fecha_registro or timezone.now()
-                hora_actual = timezone.localtime(referencia).hour
-                
-                # 8:00 a 16:59 → INTRA (17:00 ya es EXTRA)
-                if es_fecha_feriado_liquidacion(self.fecha_del_informe):
-                    self.horario = 'EXTRA'
-                elif 8 <= hora_actual < 17:
-                    self.horario = 'INTRA'
-                else:
-                    self.horario = 'EXTRA'
+                self._asignar_horario_proxy_residencia()
         
         # NOTA v3.1: No se puede calcular monto aquí porque usa tabla intermedia RegistroEstudio
         # Los RegistroEstudio se crean DESPUÉS del save() principal (necesita ID)
@@ -1372,6 +1439,19 @@ class RegistroEstudiosPorMedico(models.Model):
         # Secuencia: save() → crear RegistroEstudio → calcular_monto() → save(update_fields)
         
         super().save(*args, **kwargs)
+
+    def _asignar_horario_proxy_residencia(self):
+        from .services import es_fecha_feriado_liquidacion
+        from django.utils import timezone
+        referencia = self.fecha_registro or timezone.now()
+        hora_actual = timezone.localtime(referencia).hour
+
+        if es_fecha_feriado_liquidacion(self.fecha_del_informe):
+            self.horario = 'EXTRA'
+        elif 8 <= hora_actual < 17:
+            self.horario = 'INTRA'
+        else:
+            self.horario = 'EXTRA'
 
 
 class SolicitudRevisionHorarioRegistro(models.Model):
@@ -2068,6 +2148,78 @@ class CorreccionPacsRegistro(models.Model):
 
     def __str__(self):
         return f"Correccion PACS registro #{self.registro_id}: ${self.monto_anterior} -> ${self.monto_nuevo}"
+
+
+class HistorialHorarioEgesResidente(models.Model):
+    """Evento auditable al aplicar o revertir el horario EGES de un residente."""
+
+    ACCION_APLICAR = 'APLICAR'
+    ACCION_REVERTIR = 'REVERTIR'
+    ACCION_CHOICES = [
+        (ACCION_APLICAR, 'Aplicar horario EGES'),
+        (ACCION_REVERTIR, 'Revertir horario EGES'),
+    ]
+
+    sesion_contable = models.ForeignKey(
+        'SesionContable', on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residentes',
+    )
+    registro = models.ForeignKey(
+        'RegistroEstudiosPorMedico', on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residente',
+    )
+    registro_estudio = models.ForeignKey(
+        'RegistroEstudio', on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residente',
+    )
+    batch_eges = models.ForeignKey(
+        'eges_import.ImportBatch', on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residentes',
+    )
+    fila_eges = models.ForeignKey(
+        'eges_import.EgesRow', on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residentes',
+    )
+    evento_origen = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='reversiones',
+    )
+    lote_id = models.UUIDField(db_index=True)
+    accion = models.CharField(max_length=12, choices=ACCION_CHOICES)
+    fecha_estudio = models.DateField()
+    tipo_atencion_eges = models.CharField(max_length=50)
+    hora_turno_eges = models.TimeField()
+    horario_anterior = models.CharField(max_length=6, choices=RegistroEstudiosPorMedico.HORARIO_CHOICES)
+    horario_nuevo = models.CharField(max_length=6, choices=RegistroEstudiosPorMedico.HORARIO_CHOICES)
+    monto_anterior = models.DecimalField(max_digits=10, decimal_places=2)
+    monto_nuevo = models.DecimalField(max_digits=10, decimal_places=2)
+    snapshot_json = models.JSONField(default=dict, blank=True)
+    motivo = models.TextField()
+    realizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='historial_horario_eges_residente_realizado',
+    )
+    fecha_evento = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Historial de horario EGES de residente'
+        verbose_name_plural = 'Historiales de horario EGES de residentes'
+        ordering = ['-fecha_evento', '-pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['evento_origen'],
+                condition=models.Q(accion='REVERTIR'),
+                name='liq_horario_eges_reversion_unica',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['registro', '-fecha_evento']),
+            models.Index(fields=['sesion_contable', '-fecha_evento']),
+            models.Index(fields=['lote_id', 'accion']),
+        ]
+
+    def __str__(self):
+        return f'Horario EGES registro #{self.registro_id}: {self.horario_anterior} -> {self.horario_nuevo}'
 
 
 class HistorialRecalculoTarifaRegistro(models.Model):

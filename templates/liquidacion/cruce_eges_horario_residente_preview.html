@@ -1,0 +1,73 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+
+{% block title %}Preview horario EGES residentes{% endblock %}
+
+{% block content %}
+    <div class="max-w-6xl mx-auto px-4 py-6 space-y-5">
+        <a href="{{ next }}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Volver al cruce EGES</a>
+        <div>
+            <p class="text-xs font-semibold uppercase text-cyan-800">Sesión {{ sesion.mes }}/{{ sesion.año }} · Batch #{{ batch.pk }}</p>
+            <h1 class="mt-1 text-2xl font-bold text-slate-900">Preview de horario EGES residente</h1>
+            <p class="mt-1 text-sm text-slate-600">Desde el 01/10/2026, el cálculo usa Hora Turno/Desde de EGES para Guardia, Citado y Espontáneo. Ningún cambio se guardó.</p>
+        </div>
+
+        <div class="overflow-x-auto border-y border-slate-200 bg-white">
+            <table class="w-full min-w-[980px] text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <tr><th class="px-3 py-2">Registro / práctica</th><th class="px-3 py-2">Atención EGES</th><th class="px-3 py-2">Hora Turno/Desde</th><th class="px-3 py-2">Horario</th><th class="px-3 py-2">Monto actual</th><th class="px-3 py-2">Monto nuevo</th><th class="px-3 py-2">Diferencia</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in candidatos %}
+                        <tr>
+                            <td class="px-3 py-3 align-top">
+                                <p class="font-semibold">#{{ item.registro.pk }} · {{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</p>
+                                {% for match in item.matches %}<p class="text-xs text-slate-600">{{ match.estudio }} · x{{ match.cantidad }} · fila EGES #{{ match.fila_eges_id }}</p>{% endfor %}
+                            </td>
+                            <td class="px-3 py-3 align-top">{{ item.tipo_atencion }}</td>
+                            <td class="px-3 py-3 align-top">{{ item.hora_eges|time:"H:i" }}</td>
+                            <td class="px-3 py-3 align-top">{{ item.horario_anterior }} → <strong>{{ item.horario_nuevo }}</strong></td>
+                            <td class="px-3 py-3 align-top">${{ item.monto_anterior|floatformat:2 }}</td>
+                            <td class="px-3 py-3 align-top font-semibold">${{ item.monto_nuevo|floatformat:2 }}</td>
+                            <td class="px-3 py-3 align-top">{% if item.diferencia < 0 %}-{% endif %}${{ item.diferencia|floatformat:2|cut:"-" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="px-3 py-6 text-center text-slate-500">No hay registros listos para aplicar.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if excluidos %}
+            <section class="border-y border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                <h2 class="font-semibold">Pendientes manuales · no se aplicará ningún registro de esta selección</h2>
+                <ul class="mt-2 space-y-1">
+                    {% for item in excluidos %}<li>Registro #{{ item.registro_id }}: {{ item.motivo }}</li>{% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+
+        <div class="border-l-4 border-cyan-600 bg-cyan-50 p-4 text-sm text-cyan-950">
+            <p class="font-semibold">Fundamento</p>
+            <p class="mt-1 whitespace-pre-line">{{ motivo }}</p>
+            <p class="mt-2 text-xs">La confirmación cambia el horario y recalcula sólo estos registros. Se conserva cantidad y se registra batch/fila EGES por práctica. El token vence en 15 minutos.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            {% if puede_confirmar %}
+                <form method="post" action="{% url 'liquidacion:cruce_eges_aplicar_horario_residente' sesion.pk %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="accion" value="aplicar">
+                    <input type="hidden" name="confirmar" value="1">
+                    <input type="hidden" name="batch" value="{{ batch.pk }}">
+                    <input type="hidden" name="next" value="{{ next }}">
+                    <input type="hidden" name="motivo" value="{{ motivo }}">
+                    <input type="hidden" name="preview_token" value="{{ token }}">
+                    <button type="submit" class="rounded-lg bg-cyan-800 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-900">Confirmar y aplicar</button>
+                </form>
+            {% else %}
+                <button type="button" disabled class="rounded-lg bg-slate-300 px-4 py-2 text-sm font-semibold text-slate-600">Aplicación bloqueada por pendientes manuales</button>
+            {% endif %}
+            <a href="{{ next }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
+        </div>
+    </div>
+{% endblock %}

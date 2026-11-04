@@ -5,7 +5,7 @@ Encapsula la lógica de construcción de PDF y Excel, separada del ciclo HTTP.
 Las funciones retornan buffers (BytesIO) listos para ser enviados como descarga.
 """
 import io
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.utils import timezone
@@ -30,6 +30,8 @@ ROLES_RESIDENCIA = {
 ROLES_DESCUENTO_INTRA_RESIDENCIA = {
     'medico_residente',
 }
+
+FECHA_INICIO_HORARIO_EGES_RESIDENTES = date(2026, 10, 1)
 
 CAMPO_REGLA_DESCUENTO_POR_ROL = {
     'medico_residente': 'aplica_medico_residente',
@@ -206,6 +208,9 @@ def clasificar_horario_residencia_por_proxy(
     fecha_calendario = fecha_practica or fecha_local.date()
     if hasattr(fecha_calendario, 'date'):
         fecha_calendario = fecha_calendario.date()
+
+    if rol == 'medico_residente' and fecha_calendario >= FECHA_INICIO_HORARIO_EGES_RESIDENTES:
+        return None
 
     # Feriados institucionales centralizados en control_guardias.
     if fecha_calendario.weekday() >= 5:

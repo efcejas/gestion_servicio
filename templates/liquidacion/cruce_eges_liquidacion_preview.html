@@ -291,11 +291,66 @@
             {% endif %}
         </form>
         {% endif %}
+        {% if puede_aplicar_horario_eges_residente %}
+        <form id="horario-eges-residente-form"
+              method="post"
+              action="{% url 'liquidacion:cruce_eges_aplicar_horario_residente' sesion.pk %}"
+              class="border-b border-cyan-200 bg-cyan-50 px-4 py-3">
+            {% csrf_token %}
+            <input type="hidden" name="accion" value="previsualizar">
+            <input type="hidden" name="batch" value="{{ batch_seleccionado.pk }}">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-[auto_minmax(18rem,1fr)_auto] lg:items-end">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="seleccionar-horario-eges-visibles" type="button" disabled
+                            class="h-9 rounded-lg border border-cyan-300 bg-white px-3 text-sm font-semibold text-cyan-900 hover:bg-cyan-100 disabled:opacity-50">
+                        Seleccionar elegibles visibles
+                    </button>
+                    <span id="cantidad-horario-eges-seleccionada" role="status" aria-live="polite" class="text-sm font-semibold text-cyan-950">0 seleccionados</span>
+                </div>
+                <label>
+                    <span class="mb-1 block text-xs font-semibold uppercase text-cyan-900">Fundamento económico</span>
+                    <input type="text" name="motivo" maxlength="2000" required
+                           placeholder="Motivo de aplicar hora de inicio EGES"
+                           class="h-9 w-full rounded-lg border border-cyan-300 bg-white px-3 text-sm">
+                </label>
+                <button id="previsualizar-horario-eges" type="submit" disabled class="h-9 rounded-lg bg-cyan-800 px-4 text-sm font-semibold text-white hover:bg-cyan-900 disabled:opacity-50">
+                    Previsualizar horario y monto
+                </button>
+            </div>
+            <p class="mt-2 text-xs text-cyan-950">
+                Para residentes y registros desde 01/10/2026. Usa Hora Turno/Desde para Guardia, Citado y Espontáneo. Los casos sin match único quedan pendientes; validar EGES no aplica cambios.
+            </p>
+            <p class="mt-1 text-xs font-semibold text-cyan-950">
+                Elegibles visibles para preview: {{ preview.horario_eges_residente_candidatos_pagina }}. Selecciona las casillas independientes de la tabla.
+            </p>
+        </form>
+        {% endif %}
+        {% if puede_aplicar_horario_eges_residente and preview.horario_lotes_revertibles %}
+        <section class="border-b border-rose-200 bg-rose-50 px-4 py-3">
+            <h3 class="text-sm font-semibold text-rose-950">Revertir aplicación de horario EGES</h3>
+            {% for lote in preview.horario_lotes_revertibles %}
+            <form method="post" action="{% url 'liquidacion:cruce_eges_revertir_horario_residente' sesion.pk %}" class="mt-2 flex flex-col gap-2 lg:flex-row lg:items-end">
+                {% csrf_token %}
+                <input type="hidden" name="lote_id" value="{{ lote.lote_id }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <div class="min-w-0 flex-1 text-xs text-rose-900">
+                    <p class="font-semibold">Lote {{ lote.lote_id }} · {{ lote.plan|length }} registro(s)</p>
+                    <p>{% for item in lote.plan %}#{{ item.registro.pk }} · {{ item.horario_actual }} → {{ item.horario_restaurado }} · ${{ item.monto_actual|floatformat:2 }} → ${{ item.monto_restaurado|floatformat:2 }}{% if not forloop.last %} · {% endif %}{% endfor %}</p>
+                </div>
+                <label class="min-w-64 flex-1 text-xs font-semibold text-rose-900">Motivo de reversión
+                    <input name="motivo" maxlength="2000" required class="mt-1 h-9 w-full rounded border border-rose-300 bg-white px-3 text-sm font-normal">
+                </label>
+                <button type="submit" class="h-9 rounded-lg border border-rose-700 bg-white px-4 text-sm font-semibold text-rose-800 hover:bg-rose-100">Previsualizar reversión</button>
+            </form>
+            {% endfor %}
+        </section>
+        {% endif %}
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50">
                     <tr>
-                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado %}
+                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado or puede_aplicar_horario_eges_residente %}
                         <th class="w-32 px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Seleccionar</th>
                         {% endif %}
                         <th class="px-3 py-2 text-left text-xs font-semibold uppercase text-slate-500">Estado</th>
@@ -309,7 +364,7 @@
                 <tbody class="divide-y divide-slate-100">
                     {% for item in preview.resultados %}
                     <tr class="{% if item.estado == 'ok' %}bg-emerald-50/40{% elif item.estado == 'advertencia' %}bg-amber-50/40{% else %}bg-red-50/40{% endif %}">
-                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado %}
+                        {% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado or puede_aplicar_horario_eges_residente %}
                         <td class="px-3 py-3 align-top">
                             <div class="flex flex-col gap-2">
                             {% if puede_validacion_masiva_eges %}
@@ -332,6 +387,16 @@
                                     aria-label="Seleccionar Doppler de {{ item.registro.medico.get_full_name }}">
                                 <span>Doppler<br><span class="text-slate-600">{{ item.registro.horario }} → {{ item.mejor_match.horario_esperado }}</span></span>
                             </label>
+                            {% endif %}
+                            {% if puede_aplicar_horario_eges_residente and item.horario_eges_residente_seleccionable %}
+                            <label class="inline-flex items-start gap-2 text-xs font-medium text-cyan-950">
+                                <input type="checkbox" name="registros_horario_eges" value="{{ item.registro.pk }}"
+                                    form="horario-eges-residente-form" class="checkbox-horario-eges mt-0.5 h-4 w-4 rounded border-cyan-400 text-cyan-800"
+                                    aria-label="Seleccionar horario EGES de {{ item.registro.medico.get_full_name }}">
+                                <span>Liquidar {{ item.horario_eges_residente_objetivo }} desde EGES</span>
+                            </label>
+                            {% elif puede_aplicar_horario_eges_residente and item.horario_eges_residente_visible and item.horario_eges_residente_motivo %}
+                            <p class="max-w-56 text-xs text-amber-900">Pendiente manual: {{ item.horario_eges_residente_motivo }}</p>
                             {% endif %}
                             </div>
                         </td>
@@ -578,7 +643,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="{% if puede_validacion_masiva_eges %}7{% else %}6{% endif %}" class="px-3 py-6 text-center text-slate-500">La sesión no tiene registros de residencia para cruzar.</td>
+                        <td colspan="{% if puede_validacion_masiva_eges or puede_corregir_doppler_seleccionado or puede_aplicar_horario_eges_residente %}7{% else %}6{% endif %}" class="px-3 py-6 text-center text-slate-500">La sesión no tiene registros de residencia para cruzar.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -646,6 +711,39 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('corregir-doppler-form').addEventListener('submit', (event) => {
         const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
         if (!selected || !window.confirm(`Previsualizar la corrección de ${selected} registros Doppler seleccionados?`)) {
+            event.preventDefault();
+        }
+    });
+    updateCount();
+});
+</script>
+{% endif %}
+{% if puede_aplicar_horario_eges_residente %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = Array.from(document.querySelectorAll('.checkbox-horario-eges'));
+    const count = document.getElementById('cantidad-horario-eges-seleccionada');
+    const toggle = document.getElementById('seleccionar-horario-eges-visibles');
+    const submit = document.getElementById('previsualizar-horario-eges');
+    const form = document.getElementById('horario-eges-residente-form');
+    const updateCount = () => {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+        count.textContent = `${selected} seleccionados`;
+        submit.disabled = selected === 0;
+        toggle.disabled = checkboxes.length === 0;
+        toggle.textContent = checkboxes.length && selected === checkboxes.length
+            ? 'Quitar selección'
+            : 'Seleccionar elegibles visibles';
+    };
+    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateCount));
+    toggle.addEventListener('click', () => {
+        const selectAll = checkboxes.some((checkbox) => !checkbox.checked);
+        checkboxes.forEach((checkbox) => { checkbox.checked = selectAll; });
+        updateCount();
+    });
+    form.addEventListener('submit', (event) => {
+        const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
+        if (!selected || !window.confirm(`Previsualizar horario y monto de ${selected} registros seleccionados?`)) {
             event.preventDefault();
         }
     });

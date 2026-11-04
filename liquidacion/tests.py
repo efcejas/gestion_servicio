@@ -1408,6 +1408,40 @@ class ClasificacionHorarioResidenciaProxyTest(TestCase):
         registro.refresh_from_db()
         self.assertEqual(registro.horario, 'INTRA')
 
+    def test_residente_octubre_no_usa_hora_de_carga_hasta_validar_eges(self):
+        fecha_registro = self._aware(2026, 10, 5, 10, 30)
+        registro = RegistroEstudiosPorMedico.objects.create(
+            medico=self.residente,
+            nombre_paciente='Ana',
+            apellido_paciente='OctubreEges',
+            dni_paciente='90000021',
+            fecha_del_informe=date(2026, 10, 5),
+            fecha_registro=fecha_registro,
+            tipo_obra_social='COBER',
+            horario='',
+        )
+        self.RegistroEstudio.objects.create(
+            registro=registro,
+            estudio=self.estudio_eco,
+            cantidad=1,
+        )
+
+        registro.refresh_from_db()
+        registro.monto_calculado = registro.calcular_monto()
+        registro.save(update_fields=['monto_calculado'])
+
+        self.assertEqual(registro.horario, 'NA')
+        self.assertEqual(registro.monto_calculado, Decimal('1000.00'))
+        self.assertIsNone(clasificar_horario_residencia_por_proxy(
+            rol='medico_residente',
+            fecha_registro=fecha_registro,
+            tiene_eco_general=True,
+            fecha_practica=date(2026, 10, 5),
+        ))
+        registro.horario = 'INTRA'
+        registro.save(update_fields=['horario'])
+        self.assertEqual(registro.calcular_monto(), Decimal('1000.00'))
+
     def test_integracion_update_post_m2m_aplica_clasificacion(self):
         registro = RegistroEstudiosPorMedico.objects.create(
             medico=self.residente,

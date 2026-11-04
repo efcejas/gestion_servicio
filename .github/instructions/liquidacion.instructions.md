@@ -42,6 +42,8 @@ applyTo: "liquidacion/**/*.py"
 - Una regla activa por estudio o grupo puede denegar explicitamente el descuento Doppler.
 - `jefe_residentes` e `instructor_residentes` no aplican descuento INTRA, aunque existan flags historicos en reglas.
 - `EXTRA` y `NA` liquidan al 100%.
+- Desde `2026-10-01`, el descuento INTRA de `medico_residente` en ECO general/Doppler requiere historial EGES activo; ECOCAR queda fuera y `horario='INTRA'` manual no basta. La hora fuente es `EgesRow.hora_turno` (Hora Turno/Desde) para Guardia, Citado y Espontaneo, con fecha de turno habil no feriado entre 08:00 y antes de 17:00.
+- Sin match EGES unico, fila finalizada/Informada, profesional, practica, cantidad y tipo de atencion confiables, el caso queda pendiente manual y no se cambia monto. La aplicacion requiere preview y confirmacion de jefatura/superusuario; no modificar periodos anteriores a octubre de 2026.
 - Bonus urgencia RM: respetar regla existente de remoto + paciente internado + ventana temporal definida.
 
 ## ReglaDescuentoResidencia C1/C2

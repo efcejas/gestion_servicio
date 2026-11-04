@@ -1,0 +1,53 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+
+{% block title %}Preview reversión horario EGES{% endblock %}
+
+{% block content %}
+    <div class="max-w-5xl mx-auto px-4 py-6 space-y-5">
+        <a href="{{ next }}" class="text-sm font-semibold text-slate-600 hover:text-slate-900">Volver al cruce EGES</a>
+        <div>
+            <p class="text-xs font-semibold uppercase text-rose-800">Sesión {{ sesion.mes }}/{{ sesion.año }}</p>
+            <h1 class="mt-1 text-2xl font-bold text-slate-900">Preview de reversión EGES</h1>
+            <p class="mt-1 text-sm text-slate-600">Se restaurarán los snapshots de horario y monto del lote. No se recalculan tarifas ni se borra historial.</p>
+            <p class="mt-1 text-xs text-slate-500">Lote aplicado: {{ lote_id }}</p>
+        </div>
+
+        <div class="overflow-x-auto border-y border-slate-200 bg-white">
+            <table class="w-full min-w-[700px] text-sm">
+                <thead class="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <tr><th class="px-3 py-2">Registro</th><th class="px-3 py-2">Horario</th><th class="px-3 py-2">Monto vigente</th><th class="px-3 py-2">Monto a restaurar</th><th class="px-3 py-2">Prácticas</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for item in plan %}
+                        <tr>
+                            <td class="px-3 py-3 font-semibold">#{{ item.registro.pk }}</td>
+                            <td class="px-3 py-3">{{ item.horario_actual }} → {{ item.horario_restaurado }}</td>
+                            <td class="px-3 py-3">${{ item.monto_actual|floatformat:2 }}</td>
+                            <td class="px-3 py-3 font-semibold">${{ item.monto_restaurado|floatformat:2 }}</td>
+                            <td class="px-3 py-3">{% for evento in item.eventos %}{{ evento.registro_estudio.estudio.nombre }} · EGES #{{ evento.fila_eges_id }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="border-l-4 border-rose-600 bg-rose-50 p-4 text-sm text-rose-950">
+            <p class="font-semibold">Fundamento de reversión</p>
+            <p class="mt-1 whitespace-pre-line">{{ motivo }}</p>
+            <p class="mt-2 text-xs">Si hay cambios posteriores en el registro o un lote más reciente, la reversión se bloquea.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+            <form method="post" action="{% url 'liquidacion:cruce_eges_revertir_horario_residente' sesion.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="accion" value="revertir">
+                <input type="hidden" name="confirmar" value="1">
+                <input type="hidden" name="motivo" value="{{ motivo }}">
+                <input type="hidden" name="preview_token" value="{{ token }}">
+                <input type="hidden" name="next" value="{{ next }}">
+                <button type="submit" class="rounded-lg bg-rose-800 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-900">Confirmar reversión</button>
+            </form>
+            <a href="{{ next }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancelar</a>
+        </div>
+    </div>
+{% endblock %}

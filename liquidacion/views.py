@@ -41,6 +41,7 @@ from .models import (
     RevisionAuditoriaEcoRegistro,
     RevisionAuditoriaDopplerMMII,
     HistorialAjusteCantidadDopplerMMII,
+    HistorialHorarioEgesResidente,
     RevisionCruceEgesRegistro,
     CorreccionPacsRegistro,
     GuardiaPasiva,
@@ -114,8 +115,13 @@ from .services_eges import (
     adjuntar_comparacion_reanalisis_jornadas,
     construir_preview_cruce_liquidacion_eges,
     construir_plan_correccion_doppler_eges,
+    construir_plan_horario_eges_residentes,
+    FECHA_INICIO_HORARIO_EGES_RESIDENTES,
     motivo_no_seleccionable_correccion_doppler,
     ultimo_control_usa_jornadas,
+    aplicar_horario_eges_residentes,
+    preparar_reversion_horario_eges_residentes,
+    revertir_lote_horario_eges_residentes,
     procesar_control_eges_sesion,
     resumir_control_eges_sesion,
     serializar_resultado_control_eges,
@@ -1984,6 +1990,68 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
                 item['doppler_correccion_seleccionable']
                 for item in preview['resultados']
             )
+            puede_aplicar_horario_eges = (
+                _puede_accion_masiva_revision_horaria(self.request.user)
+                and self.sesion.estado in {'ABIERTA', 'REVISION'}
+            )
+            horario_lotes_revertibles = []
+            if puede_aplicar_horario_eges:
+                ids_pagina = [item['registro'].pk for item in preview['resultados']]
+                plan_horario = construir_plan_horario_eges_residentes(
+                    self.sesion, batch, ids_pagina,
+                ) if ids_pagina else {'candidatos': [], 'excluidos': []}
+                candidatos_horario = {
+                    candidato['registro'].pk: candidato
+                    for candidato in plan_horario['candidatos']
+                }
+                excluidos_horario = {
+                    item['registro_id']: item['motivo']
+                    for item in plan_horario['excluidos']
+                }
+                for item in preview['resultados']:
+                    candidato = candidatos_horario.get(item['registro'].pk)
+                    item['horario_eges_residente_seleccionable'] = bool(candidato)
+                    item['horario_eges_residente_objetivo'] = candidato['horario_nuevo'] if candidato else None
+                    item['horario_eges_residente_motivo'] = excluidos_horario.get(item['registro'].pk, '')
+                    item['horario_eges_residente_visible'] = bool(
+                        item['registro'].medico.rol == 'medico_residente'
+                        and item['registro'].fecha_del_informe >= FECHA_INICIO_HORARIO_EGES_RESIDENTES
+                        and any(
+                            relacion.estudio.tipo == 'DOP'
+                            or es_eco_general_real_estudio(relacion.estudio)
+                            for relacion in item['registro'].registroestudio_set.all()
+                        )
+                    )
+                reversos = HistorialHorarioEgesResidente.objects.filter(
+                    accion=HistorialHorarioEgesResidente.ACCION_REVERTIR,
+                    evento_origen__isnull=False,
+                ).values_list('evento_origen_id', flat=True)
+                lotes = HistorialHorarioEgesResidente.objects.filter(
+                    sesion_contable=self.sesion,
+                    batch_eges=batch,
+                    fecha_estudio__gte=FECHA_INICIO_HORARIO_EGES_RESIDENTES,
+                    accion=HistorialHorarioEgesResidente.ACCION_APLICAR,
+                ).exclude(pk__in=reversos).values_list('lote_id', flat=True).distinct()
+                for lote_id in lotes:
+                    try:
+                        plan_reversion = preparar_reversion_horario_eges_residentes(
+                            lote_id=lote_id, usuario=self.request.user,
+                        )
+                    except ValidationError:
+                        continue
+                    horario_lotes_revertibles.append({
+                        'lote_id': lote_id,
+                        'plan': plan_reversion,
+                    })
+                preview['horario_eges_residente_candidatos_pagina'] = len(candidatos_horario)
+            else:
+                for item in preview['resultados']:
+                    item['horario_eges_residente_seleccionable'] = False
+                    item['horario_eges_residente_objetivo'] = None
+                    item['horario_eges_residente_motivo'] = ''
+                    item['horario_eges_residente_visible'] = False
+                preview['horario_eges_residente_candidatos_pagina'] = 0
+            preview['horario_lotes_revertibles'] = horario_lotes_revertibles
 
         context.update({
             'sesion': self.sesion,
@@ -1998,6 +2066,10 @@ class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, T
                 and self.sesion.estado not in {'FACTURADA', 'PAGADA'}
             ),
             'puede_corregir_doppler_seleccionado': (
+                _puede_accion_masiva_revision_horaria(self.request.user)
+                and self.sesion.estado in {'ABIERTA', 'REVISION'}
+            ),
+            'puede_aplicar_horario_eges_residente': (
                 _puede_accion_masiva_revision_horaria(self.request.user)
                 and self.sesion.estado in {'ABIERTA', 'REVISION'}
             ),
@@ -2559,6 +2631,210 @@ class CruceEgesBulkCorregirDopplerView(LoginRequiredMixin, UserPassesTestMixin, 
 
         messages.success(request, f'Se corrigieron {len(ids)} Doppler seleccionados y previsualizados.')
         return redirect(redirect_url)
+
+
+def _snapshot_plan_reversion_horario_eges(plan):
+    return [
+        [
+            item['registro'].pk,
+            item['horario_actual'],
+            item['horario_restaurado'],
+            str(item['monto_actual']),
+            str(item['monto_restaurado']),
+            sorted(evento.pk for evento in item['eventos']),
+        ]
+        for item in plan
+    ]
+
+
+class CruceEgesAplicarHorarioResidenteView(LoginRequiredMixin, UserPassesTestMixin, View):
+    TOKEN_SALT = 'liquidacion.cruce_eges.horario_residente_preview.v1'
+    TOKEN_MAX_AGE_SECONDS = 900
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede aplicar horarios EGES de residentes.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        next_url = request.POST.get('next') or reverse(
+            'liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk},
+        )
+        if request.POST.get('accion') == 'aplicar':
+            return self._aplicar(request, sesion, next_url)
+        if sesion.estado not in {'ABIERTA', 'REVISION'}:
+            messages.error(request, 'La sesion debe estar ABIERTA o REVISION.')
+            return redirect(next_url)
+        motivo = (request.POST.get('motivo') or '').strip()
+        valores = request.POST.getlist('registros_horario_eges')
+        if not motivo or len(motivo) > 2000:
+            messages.error(request, 'Indica un fundamento de hasta 2000 caracteres.')
+            return redirect(next_url)
+        if not valores or len(valores) > 100 or any(not valor.isdigit() for valor in valores):
+            messages.error(request, 'Selecciona entre 1 y 100 registros residentes elegibles.')
+            return redirect(next_url)
+        ids = [int(valor) for valor in valores]
+        if len(set(ids)) != len(ids):
+            messages.error(request, 'La seleccion contiene registros repetidos.')
+            return redirect(next_url)
+        batch = get_object_or_404(ImportBatch, pk=request.POST.get('batch'))
+        try:
+            plan = construir_plan_horario_eges_residentes(sesion, batch, ids)
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+            return redirect(next_url)
+        puede_confirmar = bool(plan['candidatos']) and not plan['excluidos']
+        payload = {
+            'usuario_id': request.user.pk,
+            'sesion_id': sesion.pk,
+            'batch_id': batch.pk,
+            'motivo': motivo,
+            'registro_ids': ids,
+            'snapshots': plan['snapshots'],
+        }
+        token = signing.dumps(payload, salt=self.TOKEN_SALT, compress=True) if puede_confirmar else None
+        return render(request, 'liquidacion/cruce_eges_horario_residente_preview.html', {
+            'sesion': sesion,
+            'batch': batch,
+            'next': next_url,
+            'motivo': motivo,
+            'candidatos': plan['candidatos'],
+            'excluidos': plan['excluidos'],
+            'token': token,
+            'puede_confirmar': puede_confirmar,
+        })
+
+    def _aplicar(self, request, sesion, next_url):
+        if request.POST.get('confirmar') != '1':
+            messages.error(request, 'Confirma expresamente el preview EGES.')
+            return redirect(next_url)
+        try:
+            payload = signing.loads(
+                request.POST.get('preview_token', ''),
+                salt=self.TOKEN_SALT,
+                max_age=self.TOKEN_MAX_AGE_SECONDS,
+            )
+        except signing.BadSignature:
+            messages.error(request, 'El preview vencio o fue alterado; genera uno nuevo.')
+            return redirect(next_url)
+        if payload.get('usuario_id') != request.user.pk or payload.get('sesion_id') != sesion.pk:
+            messages.error(request, 'El preview no corresponde a tu usuario o sesion.')
+            return redirect(next_url)
+        if str(request.POST.get('batch')) != str(payload.get('batch_id')):
+            messages.error(request, 'El batch no coincide con el preview.')
+            return redirect(next_url)
+        motivo = (request.POST.get('motivo') or '').strip()
+        if motivo != payload.get('motivo'):
+            messages.error(request, 'El fundamento cambio respecto del preview; vuelve a prepararlo.')
+            return redirect(next_url)
+        try:
+            resultado = aplicar_horario_eges_residentes(
+                sesion_id=sesion.pk,
+                batch_id=payload['batch_id'],
+                registro_ids=payload['registro_ids'],
+                snapshots=payload['snapshots'],
+                usuario=request.user,
+                motivo=motivo,
+            )
+        except (KeyError, TypeError, ValidationError, ImportBatch.DoesNotExist) as error:
+            mensajes = error.messages if isinstance(error, ValidationError) else ['El preview ya no es válido.']
+            messages.error(request, '; '.join(mensajes))
+            return redirect(next_url)
+        messages.success(
+            request,
+            f"Horario EGES aplicado a {resultado['registros_aplicados']} registro(s), "
+            f"{resultado['lineas_aplicadas']} práctica(s); lote {resultado['lote_id']}.",
+        )
+        return redirect(next_url)
+
+
+class CruceEgesRevertirHorarioResidenteView(LoginRequiredMixin, UserPassesTestMixin, View):
+    TOKEN_SALT = 'liquidacion.cruce_eges.revertir_horario_residente.v1'
+    TOKEN_MAX_AGE_SECONDS = 900
+
+    def test_func(self):
+        return _puede_accion_masiva_revision_horaria(self.request.user)
+
+    def handle_no_permission(self):
+        messages.error(self.request, 'Solo jefatura o superusuario puede revertir horarios EGES.')
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        next_url = request.POST.get('next') or reverse(
+            'liquidacion:cruce_eges_liquidacion_preview', kwargs={'pk': sesion.pk},
+        )
+        lote_id = (request.POST.get('lote_id') or '').strip()
+        motivo = (request.POST.get('motivo') or '').strip()
+        if request.POST.get('accion') == 'revertir':
+            return self._revertir(request, sesion, next_url)
+        if not motivo or len(motivo) > 2000:
+            messages.error(request, 'Indica un fundamento de hasta 2000 caracteres.')
+            return redirect(next_url)
+        try:
+            plan = preparar_reversion_horario_eges_residentes(
+                lote_id=lote_id, usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+            return redirect(next_url)
+        snapshots = _snapshot_plan_reversion_horario_eges(plan)
+        payload = {
+            'usuario_id': request.user.pk,
+            'sesion_id': sesion.pk,
+            'lote_id': lote_id,
+            'motivo': motivo,
+            'snapshots': snapshots,
+        }
+        token = signing.dumps(payload, salt=self.TOKEN_SALT, compress=True)
+        return render(request, 'liquidacion/cruce_eges_horario_residente_reversion_preview.html', {
+            'sesion': sesion,
+            'next': next_url,
+            'lote_id': lote_id,
+            'plan': plan,
+            'motivo': motivo,
+            'token': token,
+        })
+
+    def _revertir(self, request, sesion, next_url):
+        if request.POST.get('confirmar') != '1':
+            messages.error(request, 'Confirma expresamente la reversión del lote.')
+            return redirect(next_url)
+        try:
+            payload = signing.loads(
+                request.POST.get('preview_token', ''),
+                salt=self.TOKEN_SALT,
+                max_age=self.TOKEN_MAX_AGE_SECONDS,
+            )
+        except signing.BadSignature:
+            messages.error(request, 'El preview de reversión vencio o fue alterado.')
+            return redirect(next_url)
+        if payload.get('usuario_id') != request.user.pk or payload.get('sesion_id') != sesion.pk:
+            messages.error(request, 'El preview de reversión pertenece a otro usuario o sesion.')
+            return redirect(next_url)
+        if (request.POST.get('motivo') or '').strip() != payload.get('motivo'):
+            messages.error(request, 'El fundamento cambio respecto del preview.')
+            return redirect(next_url)
+        try:
+            resultado = revertir_lote_horario_eges_residentes(
+                lote_id=payload['lote_id'],
+                snapshots=payload['snapshots'],
+                usuario=request.user,
+                motivo=payload['motivo'],
+            )
+        except (KeyError, TypeError, ValidationError) as error:
+            mensajes = error.messages if isinstance(error, ValidationError) else ['El preview no es válido.']
+            messages.error(request, '; '.join(mensajes))
+            return redirect(next_url)
+        messages.success(
+            request,
+            f"Se revirtieron {resultado['registros_revertidos']} registro(s) del lote EGES "
+            f"{resultado['lote_id']} usando snapshots.",
+        )
+        return redirect(next_url)
 
 
 class CruceEgesRegistroResolverView(LoginRequiredMixin, UserPassesTestMixin, View):

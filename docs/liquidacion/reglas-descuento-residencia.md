@@ -93,6 +93,14 @@ La accion economica es separada y requiere jefatura o superusuario, sesion `ABIE
 
 Cada linea aplicada deja historial append-only con lote, actor, motivo, montos y cantidades anterior/nueva. La reversión también requiere preview y confirmación, y restaura exactamente los snapshots anteriores sin recalcular ni borrar eventos. Se bloquea si el lote ya fue revertido, si una línea/monto cambió después o si la sesión ya no admite correcciones económicas.
 
+### Horario INTRA residente basado en EGES
+
+Desde el `2026-10-01` inclusive, el descuento INTRA de `medico_residente` en ECO general y Doppler ya no se infiere de la hora de carga (`fecha_registro`). ECOCAR queda fuera de esta regla. La fuente es `EgesRow.fecha_turno + EgesRow.hora_turno` (Hora Turno/Desde) para atenciones `Guardia`, `Citado` y `Espontaneo`: día hábil entre 08:00 y antes de 17:00 = `INTRA`; fuera de esa franja, fines de semana o feriados = `EXTRA`. `hora_hasta` no cambia la clasificación; se conserva como dato de auditoría.
+
+La regla se limita al mes/año de la sesión y a fecha de estudio desde octubre de 2026. No corrige registros anteriores. Los registros nuevos de octubre quedan sin descuento hasta que un jefe de servicio o superusuario seleccione casos y confirme un preview económico. La selección exige un turno EGES único que coincida por paciente/DNI, profesional, práctica y cantidad; todas las prácticas ECO general/Doppler del registro que admiten descuento deben estar verificadas en ese turno. ECOCAR y otras prácticas no son parte del alcance. La fila debe estar finalizada (`Informado`), con hora y tipo de atención reconocidos. Sin coincidencia, empate, otra práctica/profesional, diferencia de cantidad o fila no finalizada, el caso queda pendiente manual y no se modifica.
+
+La aplicación sólo opera en sesiones `ABIERTA`/`REVISION`, deja historial por práctica con batch/fila EGES, tipo de atención, hora de inicio, horario y monto anterior/nuevo. El preview es read-only, firmado por usuario/sesión/batch/snapshots por 15 minutos. La confirmación revalida el turno y aborta el lote completo si una fuente cambió. La reversión usa los snapshots y requiere una segunda confirmación; no elimina eventos. El cálculo canónico no aplica el 50% desde octubre por el solo hecho de que `horario='INTRA'`: exige un evento EGES activo para el registro y las prácticas descontables verificadas.
+
 ### Regularizacion masiva desde EGES
 
 En el cruce EGES, la accion **Corregir Doppler y recalcular** requiere seleccionar registros concretos elegibles de la pagina actual. Las casillas `Validar EGES` y `Doppler` son independientes: validar el cruce no autoriza una correccion economica. Solo permite registros activos exclusivamente Doppler de `medico_residente`, con coincidencia EGES confiable de medico y practica, horario INTRA/EXTRA determinado y diferencia de horario o monto. Los registros mixtos y las filas de otras paginas no se seleccionan.
