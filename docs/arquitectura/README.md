@@ -4,6 +4,7 @@ Documentos tecnicos, relevamientos y roadmap de evolucion del sistema.
 
 ## Incluye
 
+- [IMPORTACION_CONCILIACION_EGES_NETTERM.md](IMPORTACION_CONCILIACION_EGES_NETTERM.md) - Mapa de dependencias, contrato de datos y fases para incorporar Netterm sin alterar EGES ni Liquidacion.
 - [CONFIGURACION_APIS_IA.md](CONFIGURACION_APIS_IA.md)
 - [ARQUITECTURA_SISTEMA_DICTADO_IA.md](ARQUITECTURA_SISTEMA_DICTADO_IA.md)
 - [RELEVAMIENTO_SISTEMA_DICTADO_IA.md](RELEVAMIENTO_SISTEMA_DICTADO_IA.md)

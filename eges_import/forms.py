@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 import openpyxl
 
 from .services import leer_encabezados_eges
+from .services_netterm import MAX_BYTES_NETTERM, preparar_preview_netterm
 
 
 class ImportarEGESForm(forms.Form):
@@ -77,4 +78,45 @@ class ImportarEGESForm(forms.Form):
                 raise ValidationError('El archivo no tiene el formato correcto. Debe ser un archivo .xls o .xlsx exportado desde EGES.')
             raise ValidationError(f'Error al leer el archivo: {exc}')
 
+        return archivo
+
+
+class PreviewNettermForm(forms.Form):
+    archivo = forms.FileField(
+        label='Libro Netterm',
+        widget=forms.FileInput(attrs={
+            'accept': '.xlsx',
+            'class': 'block w-full text-sm text-gray-700 dark:text-gray-200',
+        }),
+    )
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data['archivo']
+        if archivo.size > MAX_BYTES_NETTERM:
+            raise ValidationError('El archivo Netterm supera el limite de 10 MB.')
+        try:
+            self.resultado_preview = preparar_preview_netterm(archivo)
+        except ValidationError:
+            raise
+        except Exception:
+            raise ValidationError('No se pudo interpretar el libro Netterm; revisa el formato de la exportacion.') from None
+        return archivo
+
+
+class GuardarNettermForm(forms.Form):
+    archivo = forms.FileField(
+        label='Mismo libro Netterm del preview',
+        widget=forms.FileInput(attrs={'accept': '.xlsx', 'class': 'block w-full text-sm text-gray-700 dark:text-gray-200'}),
+    )
+    preview_token = forms.CharField(widget=forms.HiddenInput())
+    motivo = forms.CharField(
+        max_length=2000, strip=True, label='Motivo de carga',
+        widget=forms.Textarea(attrs={'rows': 2, 'class': 'w-full rounded-md border border-gray-500 bg-gray-800 p-2 text-white'}),
+    )
+    confirmar = forms.BooleanField(label='Confirmo guardar estas filas de origen, sin consolidar ni liquidar')
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data['archivo']
+        if not archivo.name.lower().endswith('.xlsx') or archivo.size > MAX_BYTES_NETTERM:
+            raise ValidationError('Selecciona el XLSX Netterm del preview, hasta 10 MB.')
         return archivo

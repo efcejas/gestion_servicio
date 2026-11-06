@@ -7,6 +7,9 @@ urlpatterns = [
     # ── Vistas principales (superuser) ──────────────────────────────────────
     path('', views.lista_batches, name='lista_batches'),
     path('importar/', views.importar_eges, name='importar'),
+    path('netterm/preview/', views.preview_netterm, name='preview_netterm'),
+    path('netterm/guardar/', views.guardar_netterm, name='guardar_netterm'),
+    path('netterm/lotes/', views.lista_lotes_netterm, name='lista_lotes_netterm'),
     path('batch/<int:batch_id>/', views.detalle_batch, name='detalle_batch'),
 
     # ── Estadísticas globales (superuser) ───────────────────────────────────

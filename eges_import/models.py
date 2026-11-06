@@ -1,6 +1,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
@@ -386,3 +387,82 @@ class NombreObraSocial(models.Model):
 
     def __str__(self):
         return f"{self.codigo} – {self.nombre}"
+
+
+class NettermLote(models.Model):
+    archivo_nombre = models.CharField(max_length=255)
+    archivo_sha256 = models.CharField(max_length=64, unique=True)
+    version_parser = models.CharField(max_length=40)
+    importado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='lotes_netterm',
+    )
+    fecha_importacion = models.DateTimeField(auto_now_add=True)
+    motivo = models.TextField()
+    resumen_json = models.JSONField(default=dict)
+    advertencias_json = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ['-fecha_importacion', '-pk']
+        verbose_name = 'Lote Netterm de origen'
+        verbose_name_plural = 'Lotes Netterm de origen'
+
+    def __str__(self):
+        return f'Lote Netterm #{self.pk}'
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Los lotes Netterm de origen no se sobrescriben.')
+        return super().save(*args, **kwargs)
+
+
+class NettermFila(models.Model):
+    CLASE_NUEVA = 'NUEVA'
+    CLASE_REITERADA = 'REITERADA'
+    CLASE_ACTUALIZADA = 'ACTUALIZADA'
+    CLASE_AMBIGUA = 'AMBIGUA'
+    CLASE_CHOICES = [
+        (CLASE_NUEVA, 'Nueva observacion'),
+        (CLASE_REITERADA, 'Contenido reiterado'),
+        (CLASE_ACTUALIZADA, 'Nueva version de contenido'),
+        (CLASE_AMBIGUA, 'Referencia ambigua'),
+    ]
+
+    lote = models.ForeignKey(NettermLote, on_delete=models.PROTECT, related_name='filas')
+    hoja = models.CharField(max_length=255)
+    numero_fila = models.PositiveIntegerField()
+    clave_candidata_sha256 = models.CharField(max_length=64, db_index=True)
+    contenido_sha256 = models.CharField(max_length=64)
+    clase_observacion = models.CharField(max_length=16, choices=CLASE_CHOICES)
+    referencia_previa = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.PROTECT, related_name='observaciones_posteriores',
+    )
+    originales_json = models.JSONField(default=list)
+    normalizados_json = models.JSONField(default=dict)
+    fecha_pedido = models.DateField(null=True, blank=True)
+    fecha_realizacion = models.DateField(null=True, blank=True)
+    fecha_informe = models.DateField(null=True, blank=True)
+    modalidad = models.CharField(max_length=24)
+    estado_informe = models.CharField(max_length=24)
+    anulado = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['lote_id', 'numero_fila', 'pk']
+        verbose_name = 'Fila Netterm de origen'
+        verbose_name_plural = 'Filas Netterm de origen'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['lote', 'hoja', 'numero_fila'], name='netterm_fila_origen_unica',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['lote', 'clase_observacion']),
+            models.Index(fields=['clave_candidata_sha256', '-lote']),
+        ]
+
+    def __str__(self):
+        return f'Fila Netterm #{self.pk}, lote #{self.lote_id}, fila {self.numero_fila}'
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Las observaciones Netterm no se sobrescriben; importa una nueva version.')
+        return super().save(*args, **kwargs)

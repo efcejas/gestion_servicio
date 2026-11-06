@@ -1,0 +1,40 @@
+{% extends "layouts/base_with_sidebar.html" %}
+
+{% block title %}Netterm - Lotes de origen{% endblock %}
+
+{% block content %}
+    <div class="max-w-full space-y-5 px-4 py-4 sm:px-6 lg:px-10">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h1 class="text-2xl font-bold text-white">Netterm - Lotes de origen</h1>
+            <a href="{% url 'eges_import:preview_netterm' %}" class="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"><i class="fas fa-file-excel" aria-hidden="true"></i> Previsualizar otro libro</a>
+        </div>
+        <a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white">Lotes EGES</a>
+        {% for message in messages %}<p role="status" class="border-l-4 border-teal-500 bg-gray-800 p-3 text-sm text-gray-100">{{ message }}</p>{% endfor %}
+        <p class="text-sm text-gray-300">Archivo de origen separado. Estos lotes no forman parte de las estadísticas EGES ni de las liquidaciones. Las referencias de versión no son estudios consolidados.</p>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[850px] text-left text-sm text-gray-200">
+                <thead class="border-b border-gray-600"><tr><th class="p-2">Lote / archivo</th><th class="p-2">Guardado</th><th class="p-2">Filas</th><th class="p-2">Advertencias</th><th class="p-2">Observaciones de origen</th><th class="p-2">Parser</th></tr></thead>
+                <tbody>
+                    {% for lote in lotes %}
+                        <tr class="border-b border-gray-700 align-top">
+                            <td class="max-w-xs break-words p-2"><p class="font-semibold text-white">#{{ lote.pk }}</p><p>{{ lote.archivo_nombre }}</p><details class="mt-2"><summary class="cursor-pointer text-xs">Huella de archivo</summary><p class="mt-1 break-all text-xs">{{ lote.archivo_sha256 }}</p></details></td>
+                            <td class="p-2"><p>{{ lote.fecha_importacion|date:"d/m/Y H:i" }}</p><p>{{ lote.importado_por.username }}</p></td>
+                            <td class="p-2">{{ lote.resumen_json.filas_validas }}</td>
+                            <td class="p-2">{{ lote.resumen_json.advertencias_total }}</td>
+                            <td class="p-2">{% for item in lote.resumen_json.observaciones_por_clase %}<p>{{ item.valor }}: {{ item.cantidad }}</p>{% endfor %}</td>
+                            <td class="p-2">{{ lote.version_parser }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6" class="px-3 py-6 text-gray-300">Todavía no hay lotes Netterm guardados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if lotes.paginator.num_pages > 1 %}
+            <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-300">
+                <span>Página {{ lotes.number }} de {{ lotes.paginator.num_pages }}</span>
+                <div class="flex gap-3">{% if lotes.has_previous %}<a href="?page={{ lotes.previous_page_number }}" class="underline">Anterior</a>{% endif %}{% if lotes.has_next %}<a href="?page={{ lotes.next_page_number }}" class="underline">Siguiente</a>{% endif %}</div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

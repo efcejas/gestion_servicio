@@ -2,6 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.http import JsonResponse, HttpResponseForbidden
+from django.core import signing
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db.models import Count, Q, Avg, Max, Min
 from django.db.models.functions import ExtractWeekDay
 from django.db.models.functions import Coalesce
@@ -9,9 +12,11 @@ from datetime import date as date_type
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 import openpyxl
+from django.views.decorators.http import require_POST
 
-from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial
-from .forms import ImportarEGESForm
+from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermLote
+from .forms import ImportarEGESForm, PreviewNettermForm, GuardarNettermForm
+from .services_netterm import guardar_lote_netterm
 from .services import (
     get_base_estudios_finalizados as _base_estudios_finalizados,
     get_base_rx_sin_informe as _base_rx_sin_informe,
@@ -39,6 +44,87 @@ COLORES_MODALIDAD = {
 def es_superuser(user):
     """Verifica que el usuario sea superusuario."""
     return user.is_superuser
+
+
+NETTERM_TOKEN_SALT = 'eges_import.netterm.guardar.v1'
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def preview_netterm(request):
+    form = PreviewNettermForm(
+        request.POST if request.method == 'POST' else None,
+        request.FILES if request.method == 'POST' else None,
+    )
+    preview = None
+    guardar_form = None
+    if request.method == 'POST' and form.is_valid():
+        resultado = form.resultado_preview
+        preview = {
+            'resumen': resultado['resumen'],
+            'advertencias': resultado['advertencias'],
+            'hojas': resultado['hojas'],
+            'version_parser': resultado['version_parser'],
+            'sha256': resultado['sha256'],
+        }
+        if resultado['filas']:
+            guardar_form = GuardarNettermForm(prefix='guardar', initial={
+                'preview_token': signing.dumps({
+                    'usuario_id': request.user.pk,
+                    'sha256': resultado['sha256'],
+                    'version_parser': resultado['version_parser'],
+                }, salt=NETTERM_TOKEN_SALT),
+            })
+        del form.resultado_preview
+    return render(request, 'eges_import/preview_netterm.html', {
+        'form': form, 'preview': preview, 'guardar_form': guardar_form,
+        'titulo_pagina': 'Netterm - Vista previa',
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_POST
+def guardar_netterm(request):
+    form = GuardarNettermForm(request.POST, request.FILES, prefix='guardar')
+    if form.is_valid():
+        try:
+            payload = signing.loads(form.cleaned_data['preview_token'], salt=NETTERM_TOKEN_SALT, max_age=900)
+            if payload.get('usuario_id') != request.user.pk:
+                raise ValidationError('El preview pertenece a otro usuario.')
+            resultado = guardar_lote_netterm(
+                archivo=form.cleaned_data['archivo'], usuario=request.user,
+                motivo=form.cleaned_data['motivo'], sha256_esperado=payload['sha256'],
+                version_parser_esperada=payload['version_parser'],
+            )
+        except signing.BadSignature:
+            form.add_error(None, 'El preview vencio o fue alterado; vuelve a previsualizar el libro.')
+        except ValidationError as error:
+            form.add_error(None, error)
+        except (KeyError, TypeError, ValueError):
+            form.add_error(None, 'El archivo o el preview no es valido; vuelve a generar el preview.')
+        except Exception:
+            form.add_error(None, 'No se pudo completar el guardado Netterm. No se guardo un lote parcial.')
+        else:
+            if resultado['creado']:
+                messages.success(request, f'Lote Netterm #{resultado["lote"].pk} guardado como origen. EGES y Liquidacion no se modificaron.')
+            else:
+                messages.info(request, f'El libro ya estaba guardado como lote Netterm #{resultado["lote"].pk}; no se duplicaron filas.')
+            return redirect('eges_import:lista_lotes_netterm')
+    return render(request, 'eges_import/preview_netterm.html', {
+        'form': PreviewNettermForm(), 'preview': None, 'guardar_form': form,
+        'titulo_pagina': 'Netterm - Guardado pendiente',
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def lista_lotes_netterm(request):
+    lotes = NettermLote.objects.select_related('importado_por').all()
+    return render(request, 'eges_import/lotes_netterm.html', {
+        'lotes': Paginator(lotes, 25).get_page(request.GET.get('page')),
+        'titulo_pagina': 'Netterm - Lotes de origen',
+    })
 
 
 @login_required

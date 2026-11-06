@@ -1,14 +1,412 @@
 from io import BytesIO
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 from openpyxl import Workbook
 
 from .forms import ImportarEGESForm
-from .models import DirectorToken, EgesRow, ImportBatch
+from .models import DirectorToken, EgesRow, ImportBatch, NettermFila, NettermLote
 from .services import calcular_sha256_archivo, procesar_excel_eges
+from .services_netterm import ENCABEZADOS_NETTERM, guardar_lote_netterm, preparar_preview_netterm
+
+
+def _fila_netterm(**cambios):
+    fila = [None] * 37
+    valores = {
+        0: 'ECOGRAFIA', 1: '000123', 2: 'ECOGRAFIA COMPLETA DE ABDOMEN',
+        3: 'A', 4: '000987', 5: 'PACIENTE FICTICIO', 6: 'DNI', 7: '00123456',
+        9: datetime(2026, 10, 31), 10: time(7, 52),
+        11: datetime(2026, 11, 1), 12: time(8, 12),
+        15: 'SOLICITANTE FICTICIO', 18: 'GUARDIA', 22: 'INFORME DEFINITIVO',
+        23: 'TECNICO FICTICIO', 24: 'OPERADOR FICTICIO', 28: 'INFORMANTE FICTICIO',
+        29: datetime(2026, 11, 2), 30: time(9, 15), 35: 1, 36: '180112',
+    }
+    valores.update({int(indice): valor for indice, valor in cambios.items()})
+    for indice, valor in valores.items():
+        fila[indice] = valor
+    return fila
+
+
+def _archivo_netterm(filas=None, encabezados=None, nombre_hoja='Netterm'):
+    libro = Workbook()
+    hoja = libro.active
+    hoja.title = nombre_hoja
+    hoja.append(list(ENCABEZADOS_NETTERM) if encabezados is None else encabezados)
+    for fila in filas if filas is not None else [_fila_netterm()]:
+        hoja.append(fila)
+    libro.create_sheet('Hoja vacia')
+    buffer = BytesIO()
+    libro.save(buffer)
+    libro.close()
+    return SimpleUploadedFile('netterm.xlsx', buffer.getvalue())
+
+
+class PreviewNettermParserTest(SimpleTestCase):
+    def test_preserva_fechas_horas_roles_y_ceros_sin_inventar_cantidad(self):
+        archivo = _archivo_netterm()
+        resultado = preparar_preview_netterm(archivo)
+        fila = resultado['filas'][0]
+        self.assertEqual(fila['pedido'], '000123')
+        self.assertEqual(fila['documento'], '00123456')
+        self.assertEqual(fila['historia_clinica'], '000987')
+        self.assertEqual(fila['fecha_pedido'], date(2026, 10, 31))
+        self.assertEqual(fila['fecha_realizacion'], date(2026, 11, 1))
+        self.assertEqual(fila['fecha_informe'], date(2026, 11, 2))
+        self.assertEqual([fila[campo] for campo in ('hora_pedido', 'hora_realizacion', 'hora_informe')],
+                         [time(7, 52), time(8, 12), time(9, 15)])
+        self.assertEqual(fila['informante'], 'INFORMANTE FICTICIO')
+        self.assertNotEqual(fila['solicitante'], fila['informante'])
+        self.assertIsNone(fila['cantidad'])
+        self.assertEqual(len(fila['originales']), 37)
+        self.assertEqual(resultado['hojas'], ['Netterm'])
+        self.assertEqual(len(resultado['sha256']), 64)
+        self.assertEqual(archivo.tell(), 0)
+
+    def test_clasifica_por_practica_no_por_archivo(self):
+        filas = [
+            _fila_netterm(),
+            _fila_netterm(**{'1': '2', '2': 'ECODOPPLER VENOSO MM INF', '36': '900048'}),
+            _fila_netterm(**{'1': '3', '2': 'ECODOPPLER CARDIACO', '36': '900009'}),
+        ]
+        resultado = preparar_preview_netterm(_archivo_netterm(filas))
+        self.assertEqual([fila['modalidad'] for fila in resultado['filas']], ['ECO_GENERAL', 'DOP', 'ECOCAR'])
+
+    def test_repetidos_se_marcan_pero_no_se_borran(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([_fila_netterm(), _fila_netterm()]))
+        self.assertEqual(resultado['resumen']['filas_validas'], 2)
+        self.assertEqual(resultado['resumen']['claves_repetidas'], 1)
+        self.assertTrue(all(fila['clave_repetida'] for fila in resultado['filas']))
+
+    def test_mismo_paciente_con_pedidos_distintos_no_es_duplicado(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([_fila_netterm(), _fila_netterm(**{'1': 'otro'})]))
+        self.assertEqual(resultado['resumen']['claves_repetidas'], 0)
+
+    def test_rechaza_columnas_movidas_aunque_los_nombres_sean_validos(self):
+        encabezados = list(ENCABEZADOS_NETTERM)
+        encabezados[9], encabezados[11] = encabezados[11], encabezados[9]
+        with self.assertRaises(ValidationError):
+            preparar_preview_netterm(_archivo_netterm(encabezados=encabezados))
+
+    def test_no_evalua_formulas_y_omite_filas_no_identificables(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            list(ENCABEZADOS_NETTERM), [None] * 37,
+            _fila_netterm(**{'2': '=1+1'}), _fila_netterm(**{'1': None}), _fila_netterm(),
+        ]))
+        self.assertEqual(resultado['resumen']['filas_validas'], 1)
+        self.assertEqual(resultado['resumen']['filas_ignoradas'], 4)
+        self.assertEqual({aviso['codigo'] for aviso in resultado['advertencias']},
+                         {'FORMULA_NO_ADMITIDA', 'FILA_NO_IDENTIFICABLE'})
+
+    def test_datos_invalidos_no_se_sustituyen_y_avisos_no_contienen_phi(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'9': 'fecha secreta invalida', '10': '99:99', '7': None, '28': None}),
+        ]))
+        fila = resultado['filas'][0]
+        self.assertIsNone(fila['fecha_pedido'])
+        self.assertIsNone(fila['hora_pedido'])
+        self.assertEqual(fila['originales'][9], 'fecha secreta invalida')
+        self.assertEqual(resultado['resumen']['advertencias_total'], 4)
+        self.assertNotIn('secreta', str(resultado['advertencias']))
+        self.assertNotIn('PACIENTE FICTICIO', str(resultado['resumen']))
+
+    def test_rechaza_extension_eges_y_archivo_corrupto(self):
+        for archivo in (SimpleUploadedFile('netterm.xls', b'no'), SimpleUploadedFile('netterm.xlsx', b'no')):
+            with self.subTest(nombre=archivo.name), self.assertRaises(ValidationError):
+                preparar_preview_netterm(archivo)
+
+    def test_estados_clinicos_separados_y_anulacion_sin_activar_cobro(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'22': 'ANULADO'}),
+            _fila_netterm(**{'1': '2', '22': 'PENDIENTE REALIZAR', '11': None}),
+        ]))
+        self.assertTrue(resultado['filas'][0]['anulado'])
+        self.assertEqual(resultado['filas'][1]['estado_realizacion'], 'PENDIENTE')
+        self.assertEqual(resultado['filas'][1]['estado_informe'], 'DESCONOCIDO')
+
+    def test_limites_de_archivo_y_filas_rechazan_no_recortan(self):
+        archivo = _archivo_netterm()
+        with patch('eges_import.services_netterm.MAX_BYTES_NETTERM', 10):
+            with self.assertRaises(ValidationError):
+                preparar_preview_netterm(archivo)
+        with patch('eges_import.services_netterm.MAX_FILAS_NETTERM', 1):
+            with self.assertRaises(ValidationError):
+                preparar_preview_netterm(_archivo_netterm([_fila_netterm(), _fila_netterm(**{'1': '2'})]))
+
+    def test_limita_detalle_de_advertencias_sin_perder_el_total(self):
+        filas = [_fila_netterm(**{'1': str(indice), '28': None}) for indice in range(120)]
+        resultado = preparar_preview_netterm(_archivo_netterm(filas))
+        self.assertEqual(len(resultado['advertencias']), 100)
+        self.assertEqual(resultado['resumen']['advertencias_total'], 120)
+        self.assertEqual(resultado['resumen']['filas_validas'], 120)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class PreviewNettermViewTest(TestCase):
+    def setUp(self):
+        self.superuser = get_user_model().objects.create_user(
+            username='netterm_admin', is_superuser=True, is_staff=True, perfil_completo=True,
+        )
+        self.url = reverse('eges_import:preview_netterm')
+
+    def test_preview_anonimo_no_persiste_ni_expone_filas(self):
+        from liquidacion.models import RegistroEstudiosPorMedico, SesionContable
+
+        self.client.force_login(self.superuser)
+        self.assertEqual(self.client.get(self.url).status_code, 200)
+        modelos = (ImportBatch, EgesRow, RegistroEstudiosPorMedico, SesionContable)
+        antes = [modelo.objects.count() for modelo in modelos]
+        response = self.client.post(self.url, {'archivo': _archivo_netterm()})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['preview']['resumen']['filas_validas'], 1)
+        self.assertNotIn('filas', response.context['preview'])
+        self.assertFalse(hasattr(response.context['form'], 'resultado_preview'))
+        self.assertNotContains(response, 'PACIENTE FICTICIO')
+        self.assertNotContains(response, '00123456')
+        self.assertNotContains(response, 'INFORMANTE FICTICIO')
+        self.assertContains(response, '31/10/2026')
+        self.assertContains(response, '02/11/2026')
+        self.assertEqual([modelo.objects.count() for modelo in modelos], antes)
+
+    def test_requiere_autenticacion_y_superusuario(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        for rol in ('administrativo', 'jefe_servicio', 'medico_residente'):
+            usuario = get_user_model().objects.create_user(
+                username=f'netterm_{rol}', rol=rol, perfil_completo=True,
+            )
+            with self.subTest(rol=rol):
+                self.client.force_login(usuario)
+                response = self.client.post(self.url, {'archivo': _archivo_netterm()})
+                self.assertEqual(response.status_code, 302)
+        self.assertFalse(ImportBatch.objects.exists())
+        self.assertFalse(EgesRow.objects.exists())
+
+    def test_archivo_eges_se_rechaza_sin_filtrar_contenido_o_crear_lote(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(self.url, {
+            'archivo': SimpleUploadedFile('eges.xlsx', _archivo_eges_xlsx()),
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context['preview'])
+        self.assertTrue(response.context['form'].errors)
+        self.assertFalse(ImportBatch.objects.exists())
+        self.assertNotContains(response, 'NIZ MICAELA')
+
+    def test_libro_sin_datos_muestra_estado_vacio(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(self.url, {'archivo': _archivo_netterm([])})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No se encontraron estudios identificables')
+
+    def test_acceso_separado_desde_importacion_eges(self):
+        self.client.force_login(self.superuser)
+        response = self.client.get(reverse('eges_import:importar'))
+        self.assertContains(response, self.url)
+
+    def test_post_vacio_exige_archivo(self):
+        self.client.force_login(self.superuser)
+        response = self.client.post(self.url, {})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('archivo', response.context['form'].errors)
+        self.assertIsNone(response.context['preview'])
+
+
+class AlmacenamientoNettermTest(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user(
+            username='netterm_storage_admin', is_superuser=True, is_staff=True, perfil_completo=True,
+        )
+
+    def _guardar(self, archivo):
+        preview = preparar_preview_netterm(archivo)
+        return guardar_lote_netterm(
+            archivo=archivo, usuario=self.usuario, motivo='Carga de origen verificada.',
+            sha256_esperado=preview['sha256'], version_parser_esperada=preview['version_parser'],
+        )
+
+    def test_archiva_originales_tipados_y_fechas_sin_crear_datos_eges(self):
+        resultado = self._guardar(_archivo_netterm())
+        self.assertTrue(resultado['creado'])
+        fila = NettermFila.objects.get()
+        self.assertEqual(fila.originales_json[7], {'tipo': 'str', 'valor': '00123456'})
+        self.assertEqual(fila.originales_json[9]['tipo'], 'datetime')
+        self.assertEqual(fila.normalizados_json['fecha_pedido'], '2026-10-31')
+        self.assertIsNone(fila.normalizados_json['cantidad'])
+        self.assertEqual(fila.fecha_realizacion, date(2026, 11, 1))
+        self.assertEqual(fila.clase_observacion, 'NUEVA')
+        self.assertFalse(ImportBatch.objects.exists())
+        self.assertFalse(EgesRow.objects.exists())
+
+    def test_reimportacion_exacta_devuelve_el_lote_sin_duplicar_filas(self):
+        archivo = _archivo_netterm()
+        primer_lote = self._guardar(archivo)
+        segundo_lote = self._guardar(archivo)
+        self.assertFalse(segundo_lote['creado'])
+        self.assertEqual(primer_lote['lote'].pk, segundo_lote['lote'].pk)
+        self.assertEqual(NettermLote.objects.count(), 1)
+        self.assertEqual(NettermFila.objects.count(), 1)
+
+    def test_exportacion_posterior_con_estado_nuevo_conserva_version_anterior(self):
+        self._guardar(_archivo_netterm([_fila_netterm(**{'22': 'PENDIENTE INFORMAR', '29': None, '30': None})]))
+        anterior = NettermFila.objects.get()
+        self._guardar(_archivo_netterm())
+        nueva = NettermFila.objects.order_by('-pk').first()
+        anterior.refresh_from_db()
+        self.assertEqual(nueva.clase_observacion, 'ACTUALIZADA')
+        self.assertEqual(nueva.referencia_previa_id, anterior.pk)
+        self.assertEqual(anterior.estado_informe, 'PENDIENTE')
+        self.assertEqual(nueva.estado_informe, 'DEFINITIVO')
+        self.assertEqual(NettermLote.objects.count(), 2)
+
+    def test_mismo_contenido_en_otro_libro_archiva_evidencia_reiterada(self):
+        self._guardar(_archivo_netterm())
+        self._guardar(_archivo_netterm(nombre_hoja='Exportacion posterior'))
+        nueva = NettermFila.objects.order_by('-pk').first()
+        self.assertEqual(nueva.clase_observacion, 'REITERADA')
+        self.assertIsNotNone(nueva.referencia_previa_id)
+        self.assertEqual(NettermFila.objects.count(), 2)
+
+    def test_clave_repetida_se_archiva_ambigua_sin_fusion(self):
+        self._guardar(_archivo_netterm([_fila_netterm(), _fila_netterm(**{'22': 'PENDIENTE INFORMAR'})]))
+        self.assertEqual(NettermFila.objects.filter(clase_observacion='AMBIGUA').count(), 2)
+        self.assertFalse(NettermFila.objects.exclude(referencia_previa=None).exists())
+
+    def test_misma_clave_con_otro_documento_no_se_asume_actualizacion(self):
+        self._guardar(_archivo_netterm())
+        self._guardar(_archivo_netterm([_fila_netterm(**{'7': '99999999'})]))
+        nueva = NettermFila.objects.order_by('-pk').first()
+        self.assertEqual(nueva.clase_observacion, 'AMBIGUA')
+        self.assertIsNone(nueva.referencia_previa_id)
+
+    def test_ambiguedad_no_se_resuelve_al_reimportar_otra_exportacion(self):
+        self._guardar(_archivo_netterm([_fila_netterm(), _fila_netterm(**{'22': 'PENDIENTE INFORMAR'})]))
+        self._guardar(_archivo_netterm(nombre_hoja='Nueva exportacion'))
+        nueva = NettermFila.objects.order_by('-pk').first()
+        self.assertEqual(nueva.clase_observacion, 'AMBIGUA')
+        self.assertIsNone(nueva.referencia_previa_id)
+
+    def test_fallo_al_insertar_filas_revierte_el_lote_completo(self):
+        with patch.object(NettermFila.objects, 'bulk_create', side_effect=RuntimeError('fallo sintetico')):
+            with self.assertRaises(RuntimeError):
+                self._guardar(_archivo_netterm())
+        self.assertFalse(NettermLote.objects.exists())
+        self.assertFalse(NettermFila.objects.exists())
+
+    def test_permisos_huella_y_motivo_rechazados_sin_escrituras(self):
+        archivo = _archivo_netterm()
+        preview = preparar_preview_netterm(archivo)
+        administrativo = get_user_model().objects.create_user(username='netterm_storage_denied', rol='administrativo')
+        parametros = {
+            'archivo': archivo, 'usuario': self.usuario, 'motivo': 'Carga verificada.',
+            'sha256_esperado': preview['sha256'], 'version_parser_esperada': preview['version_parser'],
+        }
+        for cambios in ({'usuario': administrativo}, {'motivo': ''}, {'sha256_esperado': '0' * 64}):
+            with self.subTest(cambios=list(cambios)), self.assertRaises(ValidationError):
+                guardar_lote_netterm(**{**parametros, **cambios})
+        self.assertFalse(NettermLote.objects.exists())
+
+    def test_modelos_no_permiten_sobrescribir_snapshots_por_save(self):
+        lote = self._guardar(_archivo_netterm())['lote']
+        fila = NettermFila.objects.get()
+        with self.assertRaises(ValidationError):
+            lote.save()
+        with self.assertRaises(ValidationError):
+            fila.save()
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class GuardadoNettermViewTest(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user(
+            username='netterm_http_admin', is_superuser=True, is_staff=True, perfil_completo=True,
+        )
+        self.client.force_login(self.usuario)
+        self.preview_url = reverse('eges_import:preview_netterm')
+        self.guardar_url = reverse('eges_import:guardar_netterm')
+        self.lotes_url = reverse('eges_import:lista_lotes_netterm')
+        self.contenido = _archivo_netterm().read()
+
+    def _preview(self):
+        response = self.client.post(self.preview_url, {
+            'archivo': SimpleUploadedFile('netterm.xlsx', self.contenido),
+        })
+        self.assertEqual(response.status_code, 200)
+        return response.context['guardar_form'].initial['preview_token']
+
+    def _datos(self, token, contenido=None):
+        return {
+            'guardar-archivo': SimpleUploadedFile('netterm.xlsx', self.contenido if contenido is None else contenido),
+            'guardar-preview_token': token,
+            'guardar-motivo': 'Carga Netterm de origen confirmada.',
+            'guardar-confirmar': 'on',
+        }
+
+    def test_preview_confirmacion_guardado_y_reenvio_sin_duplicados(self):
+        token = self._preview()
+        self.assertFalse(NettermLote.objects.exists())
+        response = self.client.post(self.guardar_url, self._datos(token))
+        self.assertRedirects(response, self.lotes_url)
+        self.assertEqual(NettermLote.objects.count(), 1)
+        self.assertEqual(NettermFila.objects.count(), 1)
+        lista = self.client.get(self.lotes_url)
+        self.assertContains(lista, 'Lotes de origen')
+        self.assertNotContains(lista, 'PACIENTE FICTICIO')
+        self.assertNotContains(lista, '00123456')
+        response = self.client.post(self.guardar_url, self._datos(token))
+        self.assertRedirects(response, self.lotes_url)
+        self.assertEqual(NettermLote.objects.count(), 1)
+        self.assertEqual(NettermFila.objects.count(), 1)
+        self.assertFalse(ImportBatch.objects.exists())
+        self.assertFalse(EgesRow.objects.exists())
+
+    def test_sin_confirmacion_o_archivo_distinto_no_guarda(self):
+        token = self._preview()
+        sin_confirmar = self._datos(token)
+        del sin_confirmar['guardar-confirmar']
+        response = self.client.post(self.guardar_url, sin_confirmar)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['guardar_form'].errors)
+        otro_contenido = _archivo_netterm([_fila_netterm(**{'1': 'distinto'})]).read()
+        response = self.client.post(self.guardar_url, self._datos(token, otro_contenido))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'no coincide con el preview')
+        self.assertFalse(NettermLote.objects.exists())
+
+    def test_token_alterado_vencido_o_de_otro_usuario_no_guarda(self):
+        import time as reloj
+
+        token = self._preview()
+        response = self.client.post(self.guardar_url, self._datos(token + 'alterado'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'vencio o fue alterado')
+        vencimiento = reloj.time() + 901
+        with patch('django.core.signing.time.time', return_value=vencimiento):
+            response = self.client.post(self.guardar_url, self._datos(token))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'vencio o fue alterado')
+        otro_usuario = get_user_model().objects.create_user(
+            username='netterm_http_otro', is_superuser=True, is_staff=True, perfil_completo=True,
+        )
+        self.client.force_login(otro_usuario)
+        response = self.client.post(self.guardar_url, self._datos(token))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'pertenece a otro usuario')
+        self.assertFalse(NettermLote.objects.exists())
+
+    def test_guardado_solo_post_y_listado_restringido(self):
+        self.assertEqual(self.client.get(self.guardar_url).status_code, 405)
+        self.assertContains(self.client.get(self.lotes_url), 'Todavía no hay lotes Netterm guardados')
+        administrativo = get_user_model().objects.create_user(
+            username='netterm_http_admin_denegado', rol='administrativo', perfil_completo=True,
+        )
+        self.client.force_login(administrativo)
+        self.assertEqual(self.client.get(self.lotes_url).status_code, 302)
+        self.assertEqual(self.client.post(self.guardar_url, {}).status_code, 302)
+        self.assertFalse(NettermLote.objects.exists())
 
 
 def _archivo_eges_xlsx():
