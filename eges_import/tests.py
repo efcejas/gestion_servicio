@@ -5,14 +5,19 @@ from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from openpyxl import Workbook
 
 from .forms import ImportarEGESForm
-from .models import DirectorToken, EgesRow, ImportBatch, NettermFila, NettermLote
+from .models import ConciliacionRevision, DirectorToken, EgesRow, ImportBatch, NettermFila, NettermLote
 from .services import calcular_sha256_archivo, procesar_excel_eges
 from .services_netterm import ENCABEZADOS_NETTERM, guardar_lote_netterm, preparar_preview_netterm
+from .services_conciliacion import (
+    construir_preview_conciliacion, construir_preview_conteo_consolidado, registrar_revision_conciliacion,
+)
 
 
 def _fila_netterm(**cambios):
@@ -82,9 +87,66 @@ class PreviewNettermParserTest(SimpleTestCase):
         self.assertEqual(resultado['resumen']['claves_repetidas'], 1)
         self.assertTrue(all(fila['clave_repetida'] for fila in resultado['filas']))
 
+    def test_modalidades_generales_y_densitometria(self):
+        nombres = ['TOMOGRAFIA DE TORAX CON CONTRASTE', 'RESONANCIA CEREBRAL',
+                   'RADIOGRAFIA DE TORAX', 'MAMOGRAFIA BILATERAL',
+                   'DENSITOMETRIA OSEA', 'SERIOGRAFIA', 'PRACTICA DESCONOCIDA']
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'0': '', '1': str(indice), '2': nombre})
+            for indice, nombre in enumerate(nombres)
+        ]))
+        self.assertEqual([fila['modalidad'] for fila in resultado['filas']],
+                         ['TC', 'RM', 'RX', 'MAM', 'DX', 'SERIE', 'SIN_CLASIFICAR'])
+        self.assertFalse(any(fila['es_insumo'] for fila in resultado['filas']))
+
+    def test_angioresonancia_sin_contraste_es_practica_rm(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'2': 'ANGIORESON.DEL ENDOCRANEO S/CONTRASTE', '36': '901'}),
+        ]))
+        fila = resultado['filas'][0]
+        self.assertEqual(fila['modalidad'], 'RM')
+        self.assertFalse(fila['es_insumo'])
+        self.assertEqual(resultado['resumen']['filas_practicas'], 1)
+
+    def test_materiales_se_conservan_pero_no_se_suman_a_modalidades(self):
+        filas = [
+            _fila_netterm(**{'1': '1', '2': 'TOMOGRAFIA DE TORAX CON CONTRASTE'}),
+            _fila_netterm(**{'1': '1', '2': 'CONTRASTE OMNIPAQUE', '36': '99'}),
+            _fila_netterm(**{'1': '1', '2': 'JERINGA DESCARTABLE', '36': '98'}),
+            _fila_netterm(**{'1': '1', '2': 'DENSITOMETRIA OSEA', '36': '97'}),
+            _fila_netterm(**{'1': '1', '2': 'MATERIAL RADIOGRAFICO', '36': '96'}),
+        ]
+        resultado = preparar_preview_netterm(_archivo_netterm(filas))
+        self.assertEqual(resultado['resumen']['filas_validas'], 5)
+        self.assertEqual(resultado['resumen']['filas_practicas'], 2)
+        self.assertEqual(resultado['resumen']['filas_insumos'], 3)
+        self.assertEqual(resultado['filas'][1]['originales'], tuple(filas[1]))
+        self.assertEqual(sum(item['cantidad'] for item in resultado['resumen']['modalidades']), 2)
+        self.assertEqual(resultado['resumen']['claves_repetidas'], 0)
+
+    def test_practica_con_sedacion_no_es_fila_de_medicacion(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'2': 'ECODOPPLER CARDIACO CON SEDACION', '36': '900009'}),
+            _fila_netterm(**{'1': 'otro', '2': 'SEDACION PARA ECOCARDIOGRAMA', '36': '99'}),
+            _fila_netterm(**{'1': 'tercero', '2': 'MIDAZOLAM', '36': '98'}),
+        ]))
+        self.assertEqual([fila['es_insumo'] for fila in resultado['filas']], [False, True, True])
+        self.assertEqual(resultado['filas'][0]['modalidad'], 'ECOCAR')
+        self.assertEqual(resultado['resumen']['filas_practicas'], 1)
+
     def test_mismo_paciente_con_pedidos_distintos_no_es_duplicado(self):
         resultado = preparar_preview_netterm(_archivo_netterm([_fila_netterm(), _fila_netterm(**{'1': 'otro'})]))
         self.assertEqual(resultado['resumen']['claves_repetidas'], 0)
+
+    def test_pedido_con_practica_principal_y_subsiguiente_conserva_ambas_filas(self):
+        principal = _fila_netterm(**{'2': 'RADIOGRAFIA DE TORAX', '36': '120001'})
+        siguiente = _fila_netterm(**{'2': 'RADIOGRAFIA DE TORAX SUBSIGUIENTE', '36': '120002'})
+        resultado = preparar_preview_netterm(_archivo_netterm([principal, siguiente]))
+        self.assertEqual(resultado['resumen']['filas_validas'], 2)
+        self.assertEqual(resultado['resumen']['claves_repetidas'], 0)
+        self.assertEqual([fila['pedido'] for fila in resultado['filas']], ['000123', '000123'])
+        self.assertEqual([fila['codigo_nomenclador'] for fila in resultado['filas']], ['120001', '120002'])
+        self.assertEqual([fila['practica'] for fila in resultado['filas']], [principal[2], siguiente[2]])
 
     def test_rechaza_columnas_movidas_aunque_los_nombres_sean_validos(self):
         encabezados = list(ENCABEZADOS_NETTERM)
@@ -316,6 +378,800 @@ class AlmacenamientoNettermTest(TestCase):
             lote.save()
         with self.assertRaises(ValidationError):
             fila.save()
+
+
+class PreviewConciliacionTest(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user(username='cruce_origen_admin', is_superuser=True)
+        self.batch = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='eges_sintetico.xlsx')
+
+    def _netterm(self, filas=None, hoja='Netterm'):
+        archivo = _archivo_netterm(filas, nombre_hoja=hoja)
+        preview = preparar_preview_netterm(archivo)
+        return guardar_lote_netterm(
+            archivo=archivo, usuario=self.usuario, motivo='Origen sintetico para conciliacion.',
+            sha256_esperado=preview['sha256'], version_parser_esperada=preview['version_parser'],
+        )['lote']
+
+    def _eges(self, **campos):
+        valores = {
+            'batch': self.batch, 'dni_paciente': '00123456', 'historia_clinica': '000987',
+            'fecha_turno': date(2026, 10, 31), 'hora_turno': time(7, 52),
+            'codigo_practica': '180112/0', 'practica': 'ECOGRAFIA COMPLETA DE ABDOMEN',
+            'medico_informante': 'INFORMANTE FICTICIO', 'estado_turno': 'Informado',
+            'modalidad': 'ECO', 'es_insumo': False,
+        }
+        return EgesRow.objects.create(**{**valores, **campos})
+
+    def _cruzar(self, *lotes):
+        return construir_preview_conciliacion(batch_eges_id=self.batch.pk, lote_netterm_ids=[lote.pk for lote in lotes])
+
+    def test_dni_codigo_y_fecha_pedido_generan_candidata_sin_escribir(self):
+        lote = self._netterm()
+        eges = self._eges()
+        antes = [modelo.objects.count() for modelo in (ImportBatch, EgesRow, NettermLote, NettermFila)]
+        resultado = self._cruzar(lote)
+        self.assertEqual([item['estado'] for item in resultado['resultados']], ['COINCIDENTE'])
+        candidata = resultado['resultados'][0]
+        self.assertEqual(candidata['eges'][0]['id'], eges.pk)
+        self.assertEqual(candidata['netterm']['fecha_realizacion'], date(2026, 11, 1))
+        self.assertIn('desconocida', candidata['advertencias'][0])
+        self.assertEqual([modelo.objects.count() for modelo in (ImportBatch, EgesRow, NettermLote, NettermFila)], antes)
+
+    def test_solo_fuentes_separadas_sin_usar_fecha_realizacion_por_defecto(self):
+        lote = self._netterm()
+        self._eges(fecha_turno=date(2026, 11, 1))
+        self.assertCountEqual([item['estado'] for item in self._cruzar(lote)['resultados']], ['SOLO_NETTERM', 'SOLO_EGES'])
+
+    def test_varios_lotes_y_periodo_conservan_practicas_del_paciente(self):
+        otro_batch = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='dx.xlsx')
+        eges_eco = self._eges()
+        eges_dx = self._eges(batch=otro_batch, practica='DENSITOMETRIA OSEA', codigo_practica='97')
+        self._eges(batch=otro_batch, practica='RADIOGRAFIA DE TORAX', codigo_practica='98', fecha_turno=date(2026, 11, 2))
+        lote = self._netterm([
+            _fila_netterm(), _fila_netterm(**{'2': 'DENSITOMETRIA OSEA', '36': '97'}),
+            _fila_netterm(**{'2': 'RADIOGRAFIA DE TORAX', '36': '98', '9': datetime(2026, 11, 2)}),
+        ])
+        with patch('eges_import.services_conciliacion.MAX_FILAS_CRUCE', 5):
+            resultado = construir_preview_conciliacion(
+                batch_eges_ids=[otro_batch.pk, self.batch.pk], lote_netterm_ids=[lote.pk],
+                fecha_desde='2026-10-01', fecha_hasta='2026-10-31',
+            )
+        self.assertEqual(resultado['resumen']['filas_eges'], 2)
+        self.assertEqual(resultado['resumen']['observaciones_netterm'], 2)
+        self.assertTrue(all(item['estado'] == 'COINCIDENTE' for item in resultado['resultados']))
+        self.assertCountEqual([item['eges'][0]['id'] for item in resultado['resultados']], [eges_eco.pk, eges_dx.pk])
+        self.assertEqual(resultado['batch_eges_ids'], [self.batch.pk, otro_batch.pk])
+        self.assertFalse(resultado['permite_revision'])
+
+    def test_periodo_no_resucita_version_anterior_con_fecha_distinta(self):
+        anterior = self._netterm()
+        posterior = self._netterm([_fila_netterm(**{'9': datetime(2026, 11, 2)})])
+        self._eges()
+        resultado = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[anterior.pk, posterior.pk],
+            fecha_desde='2026-10-01', fecha_hasta='2026-10-31',
+        )
+        self.assertEqual(resultado['resumen']['observaciones_netterm'], 2)
+        self.assertEqual(resultado['resultados'][0]['estado'], 'AMBIGUO')
+        self.assertTrue(resultado['resultados'][0]['netterm']['vigencia_incierta'])
+
+    def test_correspondencia_ambigua_entre_lotes_no_se_fusiona(self):
+        otro = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='otra_exportacion.xlsx')
+        self._eges()
+        self._eges(batch=otro, hora_turno=time(10))
+        lote = self._netterm()
+        resultado = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk, otro.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(resultado['resultados'][0]['estado'], 'AMBIGUO')
+        self.assertEqual(len(resultado['resultados'][0]['eges']), 2)
+
+    def test_comparacion_modalidad_no_arrastra_otras_filas_del_libro(self):
+        lote = self._netterm([
+            _fila_netterm(**{'1': '1', '2': 'MAMOGRAFIA BILATERAL', '36': '55'}),
+            _fila_netterm(**{'1': '2', '2': 'RADIOGRAFIA DE TORAX', '36': '66'}),
+        ])
+        eges = self._eges(practica='MAMOGRAFIA BILATERAL', codigo_practica='55', modalidad='MAM')
+        resultado = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk], modalidades_netterm=['MAM'],
+        )
+        self.assertEqual(resultado['resumen']['observaciones_netterm'], 2)
+        self.assertEqual(resultado['resumen']['observaciones_netterm_modalidad'], 1)
+        self.assertEqual(resultado['resumen']['grupos_netterm'], 1)
+        self.assertEqual(resultado['resultados'][0]['eges'][0]['id'], eges.pk)
+        self.assertEqual(resultado['resultados'][0]['estado'], 'COINCIDENTE')
+        self.assertFalse(resultado['permite_revision'])
+
+    def test_comparacion_serie_filtra_lote_eges_mixto_rx(self):
+        lote = self._netterm([_fila_netterm(**{'2': 'SERIOGRAFIA', '36': '77'})])
+        self._eges(practica='SERIOGRAFIA', codigo_practica='77', modalidad='SERIE')
+        self._eges(practica='RADIOGRAFIA DE TORAX', codigo_practica='78', modalidad='RX')
+        resultado = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+            modalidades_eges=['SERIE'], modalidades_netterm=['SERIE'],
+        )
+        self.assertEqual(resultado['resumen']['filas_eges'], 1)
+        self.assertEqual(resultado['resultados'][0]['estado'], 'COINCIDENTE')
+
+    def test_modalidad_cruzada_no_cuenta_como_compartida(self):
+        lote = self._netterm([_fila_netterm(**{'2': 'RESONANCIA CEREBRAL', '36': '180112'})])
+        self._eges(codigo_practica='180112', modalidad='TC')
+        resultado = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk], modalidades_netterm=['RM'],
+        )
+        self.assertEqual(resultado['resultados'][0]['estado'], 'CONFLICTO')
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertEqual(conteo['pendientes']['netterm_correspondencia_no_resuelta'], 1)
+
+    def test_rechaza_filtro_de_modalidad_desconocida(self):
+        lote = self._netterm()
+        with self.assertRaises(ValidationError):
+            construir_preview_conciliacion(
+                batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk], modalidades_netterm=['PET'],
+            )
+
+    def test_insumo_archivado_no_es_practica_exclusiva_ni_duplicado(self):
+        lote = self._netterm([
+            _fila_netterm(),
+            _fila_netterm(**{'2': 'JERINGA DESCARTABLE', '36': '99'}),
+            _fila_netterm(**{'2': 'DENSITOMETRIA OSEA', '36': '97'}),
+        ])
+        self._eges()
+        self._eges(practica='DENSITOMETRIA OSEA', codigo_practica='97')
+        insumo = NettermFila.objects.get(lote=lote, modalidad='INSUMO')
+        datos_antiguos = dict(insumo.normalizados_json)
+        datos_antiguos.pop('es_insumo')
+        NettermFila.objects.filter(pk=insumo.pk).update(normalizados_json=datos_antiguos)
+        resultado = self._cruzar(lote)
+        self.assertEqual(resultado['resumen']['observaciones_netterm'], 3)
+        self.assertEqual(resultado['resumen']['insumos_netterm_excluidos'], 1)
+        self.assertEqual(resultado['resumen']['observaciones_adicionales'], 0)
+        self.assertEqual(len(resultado['resultados']), 2)
+        self.assertTrue(all(item['estado'] == 'COINCIDENTE' for item in resultado['resultados']))
+        self.assertEqual(NettermFila.objects.filter(lote=lote).count(), 3)
+
+    def test_dos_pedidos_para_misma_fila_eges_son_ambiguos(self):
+        lote = self._netterm([_fila_netterm(), _fila_netterm(**{'1': 'segundo_pedido'})])
+        self._eges()
+        resultado = self._cruzar(lote)
+        self.assertEqual([item['estado'] for item in resultado['resultados']], ['AMBIGUO', 'AMBIGUO'])
+        self.assertEqual(resultado['resumen']['filas_eges_con_candidata'], 1)
+
+    def test_dos_turnos_eges_no_se_resuelven_por_la_primera_hora(self):
+        lote = self._netterm()
+        self._eges()
+        self._eges(hora_turno=time(8, 30))
+        resultado = self._cruzar(lote)['resultados']
+        self.assertEqual(len(resultado), 1)
+        self.assertEqual(resultado[0]['estado'], 'AMBIGUO')
+        self.assertEqual(len(resultado[0]['eges']), 2)
+
+    def test_informante_es_alerta_pero_estado_incompatible_es_conflicto(self):
+        lote = self._netterm()
+        fila = self._eges(medico_informante='OTRO INFORMANTE')
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(caso['estado'], 'COINCIDENTE')
+        self.assertFalse(caso['requiere_revision_produccion'])
+        self.assertTrue(any('Informantes distintos' in aviso for aviso in caso['advertencias']))
+        EgesRow.objects.filter(pk=fila.pk).update(medico_informante='INFORMANTE FICTICIO', estado_turno='Cancelado')
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(caso['estado'], 'CONFLICTO')
+        self.assertTrue(caso['requiere_revision_produccion'])
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(caso['comparacion_estados'], 'ANULACION_CONTRADICTORIA')
+        self.assertFalse(caso['alerta_estado_no_bloqueante'])
+
+    def test_informantes_ausentes_no_exigen_revision_de_produccion(self):
+        lote = self._netterm([_fila_netterm(**{'28': None})])
+        self._eges(medico_informante=None)
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(caso['estado'], 'COINCIDENTE')
+        self.assertFalse(caso['requiere_revision_produccion'])
+        self.assertEqual(caso['motivos'], [])
+        self.assertTrue(any('Informantes incompletos' in aviso for aviso in caso['advertencias']))
+        self.assertEqual(ConciliacionRevision.objects.count(), 0)
+
+    def test_estados_rx_no_anulados_no_exigen_vincular_cada_practica(self):
+        lote = self._netterm([_fila_netterm(**{
+            '0': 'RADIOLOGIA', '2': 'RX. TORAX', '36': '340301',
+        })])
+        eges = self._eges(practica='RX. TORAX', codigo_practica='340301', modalidad='RX')
+        for estado in ('Fin Practica', 'Entregado Sin Informe', 'Recepcionado', '', 'ESTADO NUEVO'):
+            with self.subTest(estado=estado):
+                EgesRow.objects.filter(pk=eges.pk).update(estado_turno=estado)
+                with CaptureQueriesContext(connection) as consultas:
+                    resultado = self._cruzar(lote)
+                caso = resultado['resultados'][0]
+                self.assertEqual(caso['estado'], 'CONFLICTO')  # Contrato de conteo conservado.
+                self.assertTrue(caso['identidad_coincidente'])
+                self.assertEqual(caso['comparacion_estados'], 'NO_COMPARABLES')
+                self.assertTrue(caso['alerta_estado_no_bloqueante'])
+                self.assertFalse(caso['requiere_revision_identidad'])
+                self.assertFalse(caso['requiere_revision_estado'])
+                self.assertFalse(caso['requiere_revision_produccion'])
+                self.assertEqual(resultado['resumen']['correspondencias_identidad_unica'], 1)
+                self.assertEqual(resultado['resumen']['alertas_estado_no_bloqueantes'], 1)
+                self.assertEqual(resultado['resumen']['excepciones_produccion'], 0)
+                self.assertEqual([q['sql'] for q in consultas.captured_queries
+                                  if q['sql'].lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE '))], [])
+                conteo = construir_preview_conteo_consolidado(
+                    batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+                )
+                self.assertEqual(conteo['total_provisional'], 0)
+                self.assertEqual(conteo['aporte_netterm'], 0)
+                self.assertEqual(conteo['pendientes']['netterm_correspondencia_no_resuelta'], 1)
+
+    def test_eges_informado_con_netterm_pendiente_conserva_su_aporte(self):
+        lote = self._netterm([_fila_netterm(**{'22': 'PENDIENTE INFORMAR'})])
+        self._eges()
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(caso['comparacion_estados'], 'DIFERENTES')
+        self.assertTrue(caso['alerta_estado_no_bloqueante'])
+        self.assertFalse(caso['requiere_revision_produccion'])
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['base_eges'], 1)
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertEqual(conteo['total_provisional'], 1)
+        self.assertEqual(conteo['pendientes']['netterm_estado_no_definitivo'], 1)
+
+    def test_anulacion_contradictoria_no_se_oculta_como_alerta_de_estado(self):
+        lote = self._netterm([_fila_netterm(**{'22': 'ANULADO'})])
+        self._eges()
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(caso['comparacion_estados'], 'ANULACION_CONTRADICTORIA')
+        self.assertFalse(caso['alerta_estado_no_bloqueante'])
+        self.assertTrue(caso['requiere_revision_estado'])
+        self.assertTrue(caso['requiere_revision_produccion'])
+        self.assertFalse(caso['requiere_revision_identidad'])
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['total_provisional'], 1)
+        self.assertEqual(conteo['excluidos']['netterm_anulado'], 1)
+
+    def test_ambiguedad_no_se_convierte_en_alerta_de_estado(self):
+        lote = self._netterm()
+        self._eges(estado_turno='Fin Practica')
+        self._eges(estado_turno='Entregado Sin Informe', hora_turno=time(10))
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(caso['estado'], 'AMBIGUO')
+        self.assertFalse(caso['identidad_coincidente'])
+        self.assertFalse(caso['alerta_estado_no_bloqueante'])
+        self.assertEqual(caso['comparacion_estados'], 'NO_COMPARADOS')
+        self.assertTrue(caso['requiere_revision_identidad'])
+        self.assertTrue(caso['requiere_revision_produccion'])
+
+    def test_conflicto_de_modalidad_no_se_oculta_como_alerta_de_estado(self):
+        lote = self._netterm()
+        self._eges(practica='TOMOGRAFIA DE TORAX', modalidad='TC', estado_turno='Fin Practica')
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(caso['estado'], 'CONFLICTO')
+        self.assertFalse(caso['identidad_coincidente'])
+        self.assertFalse(caso['alerta_estado_no_bloqueante'])
+        self.assertTrue(caso['requiere_revision_identidad'])
+        self.assertTrue(caso['requiere_revision_produccion'])
+
+    def test_coincidencias_y_anulaciones_equivalentes_no_requieren_revision(self):
+        lote = self._netterm()
+        self._eges()
+        caso = self._cruzar(lote)['resultados'][0]
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(caso['comparacion_estados'], 'EQUIVALENTES')
+        self.assertFalse(caso['alerta_estado_no_bloqueante'])
+        self.assertFalse(caso['requiere_revision_produccion'])
+        anulado = self._netterm([_fila_netterm(**{'1': 'otra', '36': '97', '22': 'ANULADO'})])
+        self._eges(codigo_practica='97', practica='ECOGRAFIA RENAL', estado_turno='Cancelado')
+        caso = next(item for item in self._cruzar(anulado)['resultados'] if item['netterm'])
+        self.assertTrue(caso['identidad_coincidente'])
+        self.assertEqual(caso['comparacion_estados'], 'EQUIVALENTES')
+        self.assertFalse(caso['requiere_revision_produccion'])
+
+    def test_modalidades_distintas_no_se_marcan_compartidas(self):
+        lote = self._netterm([_fila_netterm(**{'2': 'RESONANCIA CEREBRAL', '36': '180112'})])
+        self._eges(codigo_practica='180112', modalidad='TC', medico_informante='INFORMANTE FICTICIO')
+        resultado = self._cruzar(lote)['resultados'][0]
+        self.assertEqual(resultado['estado'], 'CONFLICTO')
+        self.assertTrue(resultado['requiere_revision_produccion'])
+        self.assertTrue(any('modalidades' in motivo for motivo in resultado['motivos']))
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['base_eges'], 1)
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertEqual(conteo['pendientes']['netterm_correspondencia_no_resuelta'], 1)
+
+    def test_correspondencia_no_restringida_a_modalidades_liquidables(self):
+        practicas = ['RADIOGRAFIA DE TORAX', 'RESONANCIA DE CEREBRO', 'MAMOGRAFIA BILATERAL']
+        filas = [
+            _fila_netterm(**{'1': str(100 + indice), '2': practica, '36': str(500 + indice)})
+            for indice, practica in enumerate(practicas)
+        ]
+        lote = self._netterm(filas)
+        for indice, practica in enumerate(practicas):
+            self._eges(practica=practica, codigo_practica=str(500 + indice), medico_informante='OTRO INFORMANTE')
+        resultado = self._cruzar(lote)
+        self.assertEqual(len(resultado['resultados']), 3)
+        self.assertTrue(all(item['estado'] == 'COINCIDENTE' for item in resultado['resultados']))
+        self.assertTrue(all(not item['requiere_revision_produccion'] for item in resultado['resultados']))
+
+    def test_hc_no_se_confunde_con_documento_y_no_se_usan_nombres(self):
+        lote = self._netterm()
+        self._eges(dni_paciente='99999999', historia_clinica='00123456', apellido_nombre='PACIENTE FICTICIO')
+        self.assertCountEqual([item['estado'] for item in self._cruzar(lote)['resultados']], ['SOLO_NETTERM', 'SOLO_EGES'])
+
+    def test_documento_no_dni_permanece_en_conflicto_no_exclusivo(self):
+        lote = self._netterm([_fila_netterm(**{'6': 'PASAPORTE'})])
+        self._eges()
+        estados = [item['estado'] for item in self._cruzar(lote)['resultados']]
+        self.assertCountEqual(estados, ['CONFLICTO', 'SOLO_EGES'])
+
+    def test_versiones_distintas_no_definen_vigencia_por_orden_de_importacion(self):
+        pendiente = self._netterm([_fila_netterm(**{'22': 'PENDIENTE INFORMAR'})])
+        definitivo = self._netterm()
+        self._eges()
+        resultado = self._cruzar(pendiente, definitivo)
+        self.assertEqual(len(resultado['resultados']), 1)
+        self.assertEqual(resultado['resumen']['observaciones_netterm'], 2)
+        self.assertEqual(resultado['resultados'][0]['estado'], 'AMBIGUO')
+        self.assertTrue(resultado['resultados'][0]['netterm']['vigencia_incierta'])
+        self.assertEqual(len(resultado['resultados'][0]['netterm']['observaciones_ids']), 2)
+        solo_anterior = self._cruzar(pendiente)
+        self.assertEqual(solo_anterior['resultados'][0]['estado'], 'CONFLICTO')
+
+    def test_sufijo_distinto_de_cero_no_se_elimina(self):
+        lote = self._netterm()
+        self._eges(codigo_practica='180112/1')
+        self.assertCountEqual([item['estado'] for item in self._cruzar(lote)['resultados']], ['SOLO_NETTERM', 'SOLO_EGES'])
+
+    def test_resumen_no_contiene_nombres_ni_documentos(self):
+        lote = self._netterm()
+        self._eges()
+        resultado = self._cruzar(lote)
+        self.assertNotIn('PACIENTE FICTICIO', str(resultado))
+        self.assertNotIn('00123456', str(resultado))
+        self.assertNotIn('INFORMANTE FICTICIO', str(resultado))
+
+    def test_lotes_invalidos_repetidos_y_limite_se_rechazan(self):
+        lote = self._netterm()
+        for ids in ([], [lote.pk, lote.pk], [999999]):
+            with self.subTest(ids=ids), self.assertRaises(ValidationError):
+                construir_preview_conciliacion(batch_eges_id=self.batch.pk, lote_netterm_ids=ids)
+        with patch('eges_import.services_conciliacion.MAX_FILAS_CRUCE', 0), self.assertRaises(ValidationError):
+            self._cruzar(lote)
+
+    def _registrar(self, lote, eges, preview, decision=ConciliacionRevision.DECISION_VINCULAR, motivo='Revision de origen confirmada.'):
+        return registrar_revision_conciliacion(
+            batch_eges_id=self.batch.pk, lote_netterm_ids=[lote.pk],
+            fila_netterm_id=preview['resultados'][0]['netterm']['id'], fila_eges_id=eges.pk,
+            firma_esperada=preview['firma_snapshot'], decision=decision,
+            motivo=motivo, usuario=self.usuario,
+        )
+
+    def test_conteo_compartido_exclusivo_material_y_clasificacion_pendiente(self):
+        lote = self._netterm([
+            _fila_netterm(),
+            _fila_netterm(**{'2': 'DENSITOMETRIA OSEA', '36': '97'}),
+            _fila_netterm(**{'2': 'JERINGA DESCARTABLE', '36': '98'}),
+            _fila_netterm(**{'0': '', '2': 'PRACTICA DESCONOCIDA', '36': '99'}),
+        ])
+        self._eges(cantidad=3)
+        with CaptureQueriesContext(connection) as consultas:
+            conteo = construir_preview_conteo_consolidado(
+                batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+            )
+        self.assertEqual(conteo['base_eges'], 1)
+        self.assertEqual(conteo['aporte_netterm'], 1)
+        self.assertEqual(conteo['total_provisional'], 2)
+        self.assertEqual(conteo['pendientes']['netterm_clasificacion'], 1)
+        self.assertEqual(conteo['insumos_netterm_excluidos'], 1)
+        self.assertEqual([item['sql'] for item in consultas.captured_queries
+                          if item['sql'].lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE '))], [])
+        self.assertNotIn('PACIENTE FICTICIO', str(conteo))
+        self.assertNotIn('00123456', str(conteo))
+
+    def test_conteo_preserva_repeticiones_eges_y_no_suma_multiples_netterm(self):
+        lote = self._netterm([_fila_netterm(), _fila_netterm(**{'1': 'segundo_pedido'})])
+        self._eges()
+        self._eges(hora_turno=time(10))
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['base_eges'], 2)
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertEqual(conteo['pendientes']['netterm_correspondencia_no_resuelta'], 2)
+        self.assertEqual(NettermFila.objects.filter(lote=lote).count(), 2)
+
+    def test_conteo_estado_y_fecha_no_se_inventan(self):
+        lote = self._netterm([
+            _fila_netterm(**{'36': '90', '22': 'ANULADO'}),
+            _fila_netterm(**{'36': '91', '22': 'PENDIENTE INFORMAR'}),
+            _fila_netterm(**{'36': '92', '9': None}),
+        ])
+        self._eges(estado_turno='Informe Entregado')
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['total_provisional'], 0)
+        self.assertEqual(conteo['excluidos']['netterm_anulado'], 1)
+        self.assertEqual(conteo['pendientes']['eges_estado_no_informado'], 1)
+        self.assertEqual(conteo['pendientes']['netterm_estado_no_definitivo'], 1)
+        self.assertEqual(conteo['pendientes']['netterm_sin_fecha'], 1)
+
+    def test_conteo_usa_turno_pedido_no_fecha_de_informe(self):
+        lote = self._netterm()
+        self._eges()
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+            fecha_desde='2026-10-01', fecha_hasta='2026-10-31',
+        )
+        self.assertEqual(conteo['total_provisional'], 1)
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertTrue(conteo['provisional'])
+
+    def test_conteo_deja_versiones_divergentes_pendientes_sin_elegir_ultima_importacion(self):
+        antigua = self._netterm()
+        nueva = self._netterm([_fila_netterm(**{'22': 'PENDIENTE INFORMAR'})])
+        self._eges()
+        lote_ids = [antigua.pk, nueva.pk]
+        resultados = []
+        for seleccion in (lote_ids, list(reversed(lote_ids))):
+            resultados.append(construir_preview_conteo_consolidado(
+                batch_eges_ids=[self.batch.pk], lote_netterm_ids=seleccion,
+            ))
+        for conteo in resultados:
+            self.assertEqual(conteo['base_eges'], 1)
+            self.assertEqual(conteo['aporte_netterm'], 0)
+            self.assertEqual(conteo['pendientes']['netterm_vigencia_no_verificada'], 1)
+            motivo = next(item for item in conteo['desglose'] if item['motivo'] == 'netterm_vigencia_no_verificada')
+            self.assertTrue(motivo['puede_modificar_total'])
+        self.assertEqual(resultados[0]['total_provisional'], resultados[1]['total_provisional'])
+
+    def test_pacientes_se_deduplican_entre_fuentes_sin_confundir_practicas(self):
+        lote = self._netterm([
+            _fila_netterm(**{'2': 'DENSITOMETRIA OSEA', '36': '97', '7': '123456'}),
+            _fila_netterm(**{'2': 'RADIOGRAFIA DE TORAX', '36': '98', '7': '87654321'}),
+        ])
+        self._eges(dni_paciente='00.123.456')
+        self._eges(practica='MAMOGRAFIA BILATERAL', codigo_practica='99', dni_paciente=None, historia_clinica='SIN_DNI')
+        conteo = construir_preview_conteo_consolidado(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+        )
+        self.assertEqual(conteo['total_provisional'], 4)
+        self.assertEqual(conteo['pacientes_unicos_identificables'], 2)
+        self.assertEqual(conteo['pacientes_compartidos_entre_aportes'], 1)
+        self.assertEqual(conteo['no_identificables']['practicas_eges_incluidas'], 1)
+        self.assertNotIn('87654321', str(conteo))
+        self.assertNotIn('00.123.456', str(conteo))
+
+    def test_desglose_separa_exclusiones_de_pendientes_que_pueden_cambiar_total(self):
+        lote = self._netterm([
+            _fila_netterm(**{'22': 'ANULADO'}),
+            _fila_netterm(**{'36': '97', '22': 'PENDIENTE INFORMAR'}),
+            _fila_netterm(**{'36': '98', '2': 'JERINGA DESCARTABLE'}),
+        ])
+        self._eges()
+        conteo = construir_preview_conteo_consolidado(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk])
+        pendientes = [item for item in conteo['desglose'] if item['tipo'] == 'pendiente']
+        exclusiones = [item for item in conteo['desglose'] if item['tipo'] == 'exclusion']
+        self.assertTrue(all(item['puede_modificar_total'] for item in pendientes))
+        self.assertTrue(all(not item['puede_modificar_total'] for item in exclusiones))
+        self.assertEqual(conteo['total_provisional'], 1)
+
+    def test_importar_exportacion_antigua_despues_no_le_da_vigencia(self):
+        actual = self._netterm()
+        antigua = self._netterm([_fila_netterm(**{'22': 'PENDIENTE INFORMAR'})], hoja='Exportacion antigua')
+        self._eges()
+        seleccion = {'batch_eges_ids': [self.batch.pk], 'lote_netterm_ids': [actual.pk, antigua.pk]}
+        conteo = construir_preview_conteo_consolidado(**seleccion)
+        self.assertEqual(conteo['base_eges'], 1)
+        self.assertEqual(conteo['aporte_netterm'], 0)
+        self.assertEqual(conteo['pendientes']['netterm_vigencia_no_verificada'], 1)
+        invertido = construir_preview_conteo_consolidado(**{**seleccion, 'lote_netterm_ids': [antigua.pk, actual.pk]})
+        self.assertEqual(invertido['total_provisional'], conteo['total_provisional'])
+        self.assertEqual(invertido['pendientes'], conteo['pendientes'])
+
+    def test_periodo_pequeno_no_evade_limite_de_observaciones_seleccionadas(self):
+        lote = self._netterm([
+            _fila_netterm(),
+            _fila_netterm(**{'1': 'noviembre', '9': datetime(2026, 11, 2)}),
+        ])
+        self._eges()
+        with patch('eges_import.services_conciliacion.MAX_FILAS_CRUCE', 2), self.assertRaises(ValidationError):
+            construir_preview_conteo_consolidado(
+                batch_eges_ids=[self.batch.pk], lote_netterm_ids=[lote.pk],
+                fecha_desde='2026-10-31', fecha_hasta='2026-10-31',
+            )
+
+    def test_revision_es_append_only_y_reemplazo_conserva_historial(self):
+        lote = self._netterm()
+        eges = self._eges()
+        preview = self._cruzar(lote)
+        revision = self._registrar(lote, eges, preview)
+        self.assertEqual(revision.estado_preview, 'COINCIDENTE')
+        self.assertEqual(revision.version_motor, preview['version_motor'])
+        self.assertEqual(revision.observaciones_netterm_ids, [preview['resultados'][0]['netterm']['id']])
+        self.assertEqual(ConciliacionRevision.objects.count(), 1)
+        with self.assertRaises(ValidationError):
+            ConciliacionRevision.objects.filter(pk=revision.pk).update(motivo='sobrescritura')
+        with self.assertRaises(ValidationError):
+            ConciliacionRevision.objects.filter(pk=revision.pk).delete()
+        revision.motivo = 'sobrescritura'
+        with self.assertRaises(ValidationError):
+            revision.save()
+
+        reemplazo = self._registrar(
+            lote, eges, preview, decision=ConciliacionRevision.DECISION_NO_VINCULAR,
+            motivo='Correccion tras revisar evidencia.',
+        )
+        self.assertEqual(reemplazo.reemplaza_revision_id, revision.pk)
+        self.assertEqual(ConciliacionRevision.objects.count(), 2)
+        self.assertIsNotNone(ConciliacionRevision.objects.get(pk=revision.pk).revision_siguiente)
+        self.assertEqual(self._cruzar(lote)['resultados'][0]['estado'], 'COINCIDENTE')
+
+    def test_revision_rechaza_snapshot_obsoleto_y_actor_sin_permiso(self):
+        lote = self._netterm()
+        eges = self._eges()
+        preview = self._cruzar(lote)
+        EgesRow.objects.filter(pk=eges.pk).update(medico_informante='CAMBIO POSTERIOR')
+        with self.assertRaises(ValidationError):
+            self._registrar(lote, eges, preview)
+        self.assertEqual(ConciliacionRevision.objects.count(), 0)
+        operador = get_user_model().objects.create_user(username='revisor_sin_permiso')
+        with self.assertRaises(ValidationError):
+            registrar_revision_conciliacion(
+                batch_eges_id=self.batch.pk, lote_netterm_ids=[lote.pk],
+                fila_netterm_id=NettermFila.objects.get(lote=lote).pk, fila_eges_id=eges.pk,
+                firma_esperada=preview['firma_snapshot'],
+                decision=ConciliacionRevision.DECISION_NO_VINCULAR,
+                motivo='No autorizado.', usuario=operador,
+            )
+        self.assertEqual(ConciliacionRevision.objects.count(), 0)
+
+    def test_vinculo_vigente_impide_reutilizar_fila_en_ambiguo(self):
+        lote = self._netterm()
+        primera = self._eges()
+        segunda = self._eges(hora_turno=time(8, 30))
+        preview = self._cruzar(lote)
+        self.assertEqual(preview['resultados'][0]['estado'], 'AMBIGUO')
+        revision = self._registrar(lote, primera, preview)
+        with self.assertRaises(ValidationError):
+            self._registrar(lote, segunda, preview)
+        with self.assertRaises(ValidationError):
+            registrar_revision_conciliacion(
+                batch_eges_id=self.batch.pk, lote_netterm_ids=[lote.pk],
+                fila_netterm_id=revision.fila_netterm_id, fila_eges_id=999999,
+                firma_esperada=preview['firma_snapshot'],
+                decision=ConciliacionRevision.DECISION_NO_VINCULAR,
+                motivo='No es candidato.', usuario=self.usuario,
+            )
+        self.assertEqual(ConciliacionRevision.objects.count(), 1)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+class ConciliacionViewTest(TestCase):
+    def setUp(self):
+        self.usuario = get_user_model().objects.create_user(
+            username='conciliacion_superuser', is_superuser=True, is_staff=True, perfil_completo=True,
+        )
+        self.url = reverse('eges_import:preview_conciliacion')
+        self.batch = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='eges_preview.xlsx')
+        archivo = _archivo_netterm()
+        preview = preparar_preview_netterm(archivo)
+        self.lote = guardar_lote_netterm(
+            archivo=archivo, usuario=self.usuario, motivo='Libro sintetico.',
+            sha256_esperado=preview['sha256'], version_parser_esperada=preview['version_parser'],
+        )['lote']
+        self.eges = EgesRow.objects.create(
+            batch=self.batch, dni_paciente='00123456', fecha_turno=date(2026, 10, 31),
+            hora_turno=time(7, 52), practica='ECOGRAFIA COMPLETA DE ABDOMEN',
+            codigo_practica='180112/0', estado_turno='Informado', medico_informante='INFORMANTE FICTICIO',
+        )
+        self.parametros = {'batch_eges': self.batch.pk, 'lotes_netterm': [self.lote.pk]}
+
+    def test_preview_sin_writes_sin_phi_y_con_fechas_separadas(self):
+        self.client.force_login(self.usuario)
+        with CaptureQueriesContext(connection) as consultas:
+            response = self.client.get(self.url, self.parametros)
+        self.assertEqual(response.status_code, 200)
+        escrituras = [item['sql'] for item in consultas.captured_queries
+                      if item['sql'].lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE '))]
+        self.assertEqual(escrituras, [])
+        self.assertContains(response, 'Coincidencia candidata')
+        self.assertContains(response, 'Fecha Turno EGES y Fecha Pedido Netterm')
+        self.assertNotContains(response, '00123456')
+        self.assertNotContains(response, 'PACIENTE FICTICIO')
+        self.assertNotContains(response, 'INFORMANTE FICTICIO')
+        self.assertContains(response, '01/11/2026')
+        self.assertEqual(len(response.context['resultados']), 1)
+
+    def test_filtro_no_altera_resumen_global_y_estado_vacio(self):
+        self.client.force_login(self.usuario)
+        response = self.client.get(self.url, {**self.parametros, 'estado': 'SOLO_NETTERM'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_filtrado'], 0)
+        self.assertContains(response, 'No hay casos para los lotes y filtro seleccionados')
+        conteos = {item['estado']: item['cantidad'] for item in response.context['preview']['resumen']['estados']}
+        self.assertEqual(conteos['COINCIDENTE'], 1)
+
+    def test_paginacion_preserva_lotes_y_no_guarda_resultados(self):
+        self.client.force_login(self.usuario)
+        EgesRow.objects.bulk_create([
+            EgesRow(batch=self.batch, dni_paciente=str(30000000 + numero),
+                    fecha_turno=date(2026, 10, 31), hora_turno=time(10),
+                    codigo_practica='180112/0', practica='ECOGRAFIA', historia_clinica=str(numero))
+            for numero in range(51)
+        ])
+        response = self.client.get(self.url, {**self.parametros, 'page': 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['resultados'].number, 2)
+        self.assertIn('lotes_netterm=', response.context['filtros_query'])
+        self.assertEqual(NettermFila.objects.count(), 1)
+
+    def test_lote_invalido_muestra_error_y_no_cruza(self):
+        self.client.force_login(self.usuario)
+        response = self.client.get(self.url, {**self.parametros, 'lotes_netterm': [999999]})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].errors)
+        self.assertIsNone(response.context['preview'])
+
+    def test_restringe_superusuario_y_muestra_seleccion_inicial(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        usuario = get_user_model().objects.create_user(username='conciliacion_denegado', rol='jefe_servicio', perfil_completo=True)
+        self.client.force_login(usuario)
+        self.assertEqual(self.client.get(self.url, self.parametros).status_code, 302)
+        self.client.force_login(self.usuario)
+        inicial = self.client.get(self.url)
+        self.assertEqual(inicial.status_code, 200)
+        self.assertIsNone(inicial.context['preview'])
+        self.assertEqual(self.client.post(self.url, self.parametros).status_code, 405)
+
+    def test_filtro_excepciones_no_incluye_alertas_de_informante(self):
+        self.client.force_login(self.usuario)
+        EgesRow.objects.filter(pk=self.eges.pk).update(medico_informante='OTRO INFORMANTE')
+        parametros = {**self.parametros, 'estado': 'EXCEPCIONES'}
+        response = self.client.get(self.url, parametros)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_filtrado'], 0)
+        self.assertEqual(response.context['preview']['resumen']['estados'][0]['cantidad'], 1)
+        self.assertContains(self.client.get(self.url, self.parametros), 'Sin revisión individual requerida')
+        EgesRow.objects.filter(pk=self.eges.pk).update(estado_turno='Cancelado')
+        response = self.client.get(self.url, parametros)
+        self.assertEqual(response.context['total_filtrado'], 1)
+        self.assertEqual(response.context['resultados'][0]['estado'], 'CONFLICTO')
+        self.assertIn('estado=EXCEPCIONES', response.context['filtros_query'])
+
+    def test_alertas_de_estado_se_consultan_sin_pedir_revision_individual(self):
+        self.client.force_login(self.usuario)
+        EgesRow.objects.filter(pk=self.eges.pk).update(estado_turno='Entregado Sin Informe')
+        respuesta = self.client.get(self.url, {**self.parametros, 'estado': 'ALERTAS_ESTADO'})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(respuesta.context['form'].errors)
+        self.assertEqual(respuesta.context['total_filtrado'], 1)
+        self.assertContains(respuesta, 'Correspondencia única con alerta de estado')
+        self.assertContains(respuesta, 'Sin revisión individual requerida')
+        self.assertNotContains(respuesta, 'Excepción de producción sin decisión vigente')
+        self.assertContains(respuesta, 'No confirma realización, informe ni derecho a cobro')
+        self.assertIn('estado=ALERTAS_ESTADO', respuesta.context['filtros_query'])
+        excepciones = self.client.get(self.url, {**self.parametros, 'estado': 'EXCEPCIONES'})
+        self.assertEqual(excepciones.context['total_filtrado'], 0)
+        self.assertEqual(excepciones.context['preview']['resumen']['alertas_estado_no_bloqueantes'], 1)
+        self.assertEqual(ConciliacionRevision.objects.count(), 0)
+        self.eges.refresh_from_db()
+        self.assertEqual(self.eges.estado_turno, 'Entregado Sin Informe')
+        # Una anulacion pasa a excepciones y deja de ser una alerta no bloqueante.
+        EgesRow.objects.filter(pk=self.eges.pk).update(estado_turno='Cancelado')
+        alertas = self.client.get(self.url, {**self.parametros, 'estado': 'ALERTAS_ESTADO'})
+        self.assertEqual(alertas.context['total_filtrado'], 0)
+        excepciones = self.client.get(self.url, {**self.parametros, 'estado': 'EXCEPCIONES'})
+        self.assertEqual(excepciones.context['total_filtrado'], 1)
+        self.assertContains(excepciones, 'Anulación contradictoria: requiere revisión')
+
+    def test_seleccion_multiple_y_periodo_son_read_only(self):
+        self.client.force_login(self.usuario)
+        otro = ImportBatch.objects.create(usuario=self.usuario, archivo_nombre='dx.xlsx')
+        EgesRow.objects.create(
+            batch=otro, dni_paciente='00123456', historia_clinica='OTRO',
+            fecha_turno=date(2026, 10, 31), hora_turno=time(10),
+            practica='DENSITOMETRIA OSEA', codigo_practica='97', estado_turno='Informado',
+        )
+        seleccion = {
+            'lotes_eges': [self.batch.pk, otro.pk], 'lotes_netterm': [self.lote.pk],
+            'fecha_desde': '2026-10-01', 'fecha_hasta': '2026-10-31',
+        }
+        with CaptureQueriesContext(connection) as consultas:
+            response = self.client.get(self.url, seleccion)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['preview']['resumen']['filas_eges'], 2)
+        self.assertFalse(response.context['preview']['permite_revision'])
+        self.assertNotContains(response, 'action="/eges/conciliacion/revisar/"')
+        self.assertContains(response, 'DENSITOMETRIA OSEA')
+        self.assertEqual([item['sql'] for item in consultas.captured_queries
+                          if item['sql'].lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE '))], [])
+        filtros = response.context['filtros_query']
+        self.assertIn(f'lotes_eges={self.batch.pk}', filtros)
+        self.assertIn(f'lotes_eges={otro.pk}', filtros)
+        self.assertIn('fecha_desde=2026-10-01', filtros)
+        invalido = self.client.get(self.url, {**seleccion, 'fecha_hasta': '2026-09-01'})
+        self.assertTrue(invalido.context['form'].errors)
+        self.assertIsNone(invalido.context['preview'])
+
+    def test_analisis_admite_mas_de_diez_lotes_netterm(self):
+        self.client.force_login(self.usuario)
+        extras = [NettermLote.objects.create(
+            archivo_nombre=f'parte-{numero}.xlsx', archivo_sha256=f'{numero:064x}',
+            version_parser='NETTERM_37_V2', importado_por=self.usuario, motivo='Origen sintetico.',
+        ) for numero in range(10)]
+        response = self.client.get(self.url, {
+            'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk] + [lote.pk for lote in extras],
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['form'].errors)
+        self.assertEqual(len(response.context['preview']['lote_netterm_ids']), 11)
+        self.assertFalse(response.context['preview']['permite_revision'])
+
+    def test_post_guarda_decision_y_muestra_historial_sin_cambiar_cruce(self):
+        self.client.force_login(self.usuario)
+        preview = self.client.get(self.url, self.parametros).context['preview']
+        fila_netterm = NettermFila.objects.get(lote=self.lote)
+        datos_revision = {
+            'batch_eges_id': self.batch.pk,
+            'lote_netterm_ids': str(self.lote.pk),
+            'fila_netterm_id': fila_netterm.pk,
+            'fila_eges_id': self.eges.pk,
+            'firma_snapshot': preview['firma_snapshot'],
+            'decision': ConciliacionRevision.DECISION_NO_VINCULAR,
+            'motivo': 'No coincide la evidencia.',
+            'estado': '',
+        }
+        response = self.client.post(reverse('eges_import:guardar_revision_conciliacion'), datos_revision)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(f'batch_eges={self.batch.pk}', response.url)
+        revision = ConciliacionRevision.objects.get()
+        self.assertEqual(revision.revisado_por, self.usuario)
+        resultado = self.client.get(self.url, self.parametros)
+        self.assertContains(resultado, 'Decision vigente: No vincular')
+        self.assertContains(resultado, 'Historial (1)')
+        self.assertContains(resultado, 'No coincide la evidencia.')
+        self.assertEqual(resultado.context['preview']['resumen']['estados'][0]['estado'], 'COINCIDENTE')
+        datos_revision['decision'] = ConciliacionRevision.DECISION_VINCULAR
+        datos_revision['motivo'] = 'Vinculo confirmado en revision.'
+        response = self.client.post(reverse('eges_import:guardar_revision_conciliacion'), datos_revision)
+        self.assertEqual(response.status_code, 302)
+        reemplazo = ConciliacionRevision.objects.latest('pk')
+        self.assertEqual(reemplazo.reemplaza_revision_id, revision.pk)
+        resultado = self.client.get(self.url, self.parametros)
+        self.assertContains(resultado, 'Decision vigente: Vincular tras revision humana')
+        self.assertContains(resultado, 'Historial (2)')
+
+    def test_post_obsoleto_o_no_autorizado_no_crea_revision(self):
+        url_revision = reverse('eges_import:guardar_revision_conciliacion')
+        self.assertEqual(self.client.post(url_revision).status_code, 302)
+        usuario = get_user_model().objects.create_user(username='conciliacion_post_denegado')
+        self.client.force_login(usuario)
+        self.assertEqual(self.client.post(url_revision).status_code, 302)
+        self.client.force_login(self.usuario)
+        fila_netterm = NettermFila.objects.get(lote=self.lote)
+        response = self.client.post(url_revision, {
+            'batch_eges_id': self.batch.pk,
+            'lote_netterm_ids': str(self.lote.pk),
+            'fila_netterm_id': fila_netterm.pk,
+            'fila_eges_id': self.eges.pk,
+            'firma_snapshot': '0' * 64,
+            'decision': ConciliacionRevision.DECISION_VINCULAR,
+            'motivo': 'Cruce verificado.',
+            'estado': '',
+        }, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Las fuentes cambiaron desde el preview')
+        self.assertEqual(ConciliacionRevision.objects.count(), 0)
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -578,6 +1434,75 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         fila = EgesRow(practica='AGUJA DE BIOPSIA', servicio='Ecografia')
 
         self.assertTrue(fila.clasificar_insumo())
+
+    def test_practicas_con_sin_contraste_no_son_insumos(self):
+        for nombre in (
+            'TOMOGRAFIA DE TORAX CON CONTRASTE',
+            'TC DE ABDOMEN SIN CONTRASTE',
+            'RESONANCIA CEREBRAL CON CONTRASTE',
+            'ANGIORESONANCIA DEL ENDOCRANEO S/CONTRASTE',
+            'TOMOGRAFIA DE TORAX CON   CONTRASTE',
+        ):
+            with self.subTest(nombre=nombre):
+                self.assertFalse(EgesRow(practica=nombre).clasificar_insumo())
+
+    def test_contraste_material_y_codigos_de_insumo_se_siguen_excluyendo(self):
+        for nombre in ('CONTRASTE OMNIPAQUE', 'JERINGA DESCARTABLE',
+                       'MATERIAL RADIOGRAFICO', 'CONTRASTE PARA TOMOGRAFIA',
+                       'MATERIAL CON CONTRASTE PARA TOMOGRAFIA'):
+            with self.subTest(nombre=nombre):
+                self.assertTrue(EgesRow(practica=nombre).clasificar_insumo())
+        self.assertTrue(EgesRow(
+            practica='TOMOGRAFIA DE TORAX CON CONTRASTE', codigo_practica='3005554/0',
+        ).clasificar_insumo())
+
+    def test_importacion_conserva_tc_con_contraste_y_excluye_materiales(self):
+        batch_historico = ImportBatch.objects.create(usuario=self.user, archivo_nombre='historico_sintetico.xlsx')
+        historica = EgesRow(
+            batch=batch_historico, historia_clinica='HISTORICO',
+            practica='TOMOGRAFIA DE TORAX CON CONTRASTE', es_insumo=True,
+        )
+        EgesRow.objects.bulk_create([historica])
+        practicas = ['TOMOGRAFIA DE TORAX CON CONTRASTE', 'TC DE ABDOMEN SIN CONTRASTE',
+                     'CONTRASTE OMNIPAQUE', 'JERINGA DESCARTABLE']
+        archivo = SimpleUploadedFile('tc_sintetico.xlsx', _archivo_practicas_mismo_protocolo_xlsx(practicas))
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre=archivo.name)
+        resultado = procesar_excel_eges(archivo, batch)
+        self.assertEqual(resultado['creadas'], 2)
+        self.assertEqual(resultado['errores'], 0)
+        self.assertCountEqual(list(batch.filas.values_list('practica', flat=True)), practicas[:2])
+        self.assertFalse(batch.filas.filter(es_insumo=True).exists())
+        batch.calcular_metricas()
+        self.assertEqual(batch.total_tc, 2)
+        self.assertEqual(batch.total_estudios_finalizados, 2)
+        historica.refresh_from_db()
+        self.assertTrue(historica.es_insumo)
+
+    def test_rx_subsiguiente_con_cantidad_dos_se_conserva_en_una_fila(self):
+        libro = Workbook()
+        hoja = libro.active
+        hoja.append([
+            'Dni', 'Numero Afiliado', 'Centro', 'Fecha Turno', 'Hora Desde',
+            'Hora Hasta', 'Tipo Atencion', 'Medico Informante', 'Historia Clinica',
+            'Práctica', 'Código Practica', 'Estado Turno', 'Cantidad',
+        ])
+        practica = 'RADIOGRAFIA DE TORAX + SUBSIGUIENTE'
+        hoja.append([
+            '12345678', 'AF-1', 'CENTRO', '31/10/2026', '10:00', '10:15',
+            'Ambulatorio', 'INFORMANTE FICTICIO', 'HC-1', practica, '500100',
+            'Informado', 2,
+        ])
+        contenido = BytesIO()
+        libro.save(contenido)
+        libro.close()
+        archivo = SimpleUploadedFile('rx_subsiguiente.xlsx', contenido.getvalue())
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre=archivo.name)
+        resultado = procesar_excel_eges(archivo, batch)
+        filas = list(batch.filas.all())
+        self.assertEqual(resultado['creadas'], 1)
+        self.assertEqual(len(filas), 1)
+        self.assertEqual(filas[0].practica, practica)
+        self.assertEqual(filas[0].cantidad, 2)
 
     def test_puncion_biopsia_guiada_se_conserva_como_practica(self):
         fila = EgesRow(

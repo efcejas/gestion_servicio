@@ -4,6 +4,7 @@ from decimal import Decimal
 import hashlib
 from io import BytesIO
 import json
+import re
 import unicodedata
 from zipfile import BadZipFile, ZipFile
 
@@ -16,7 +17,7 @@ from openpyxl import load_workbook
 from liquidacion.grupo_tarifario_mapping import es_eco_general_real, es_estudio_cardiologico
 
 
-VERSION_PARSER_NETTERM = 'NETTERM_37_V1'
+VERSION_PARSER_NETTERM = 'NETTERM_37_V3'
 MAX_BYTES_NETTERM = 10 * 1024 * 1024
 MAX_FILAS_NETTERM = 20000
 ENCABEZADOS_NETTERM = (
@@ -70,7 +71,31 @@ def _hora(valor):
     raise ValueError('hora invalida')
 
 
-def _modalidad(nombre, codigo):
+def clasificar_fila_netterm(nombre, codigo, servicio=''):
+    from .models import EgesRow
+
+    nombre_normalizado = _normalizado(nombre)
+    practica = EgesRow(practica=_normalizado(nombre))
+    modalidad = practica.clasificar_modalidad()
+    if modalidad == 'OTROS' and any(alias in nombre_normalizado for alias in ('ANGIORESON', 'ANGIO RESON')):
+        modalidad = 'RM'
+    descripcion_insumo = practica.practica
+    if modalidad != 'OTROS':
+        descripcion_insumo = re.sub(
+            r'\b(?:CON|SIN) (?:CONTRASTE|SEDACION)\b|\b[CS]/\s*CONTRASTE\b',
+            '', descripcion_insumo,
+        )
+    es_insumo = EgesRow(practica=descripcion_insumo).clasificar_insumo()
+    if es_insumo:
+        return {'modalidad': 'INSUMO', 'es_insumo': True}
+    if modalidad == 'OTROS':
+        modalidad = EgesRow(servicio=_normalizado(servicio)).clasificar_modalidad()
+    if modalidad != 'ECO':
+        return {'modalidad': modalidad if modalidad != 'OTROS' else 'SIN_CLASIFICAR', 'es_insumo': False}
+    return {'modalidad': _modalidad_eco(nombre, codigo), 'es_insumo': False}
+
+
+def _modalidad_eco(nombre, codigo):
     if es_estudio_cardiologico('ECO', nombre, codigo):
         return 'ECOCAR'
     nombre_normalizado = _normalizado(nombre)
@@ -182,6 +207,7 @@ def preparar_preview_netterm(archivo):
                     advertir(hoja.title, numero, 'ESTADO_DESCONOCIDO', 'estado')
                 filas.append({
                     'hoja': hoja.title, 'numero_fila': numero, 'originales': valores,
+                    'servicio': _texto(valores[0]),
                     'pedido': pedido, 'practica': practica,
                     'tipo_nomenclador': _texto(valores[35]), 'codigo_nomenclador': codigo,
                     'historia_clinica': _texto(valores[4]), 'tipo_documento': _texto(valores[6]),
@@ -196,7 +222,8 @@ def preparar_preview_netterm(archivo):
                         'CON_FECHA' if fechas['fecha_realizacion'] else 'DESCONOCIDO'
                     ),
                     'anulado': estado == 'ANULADO',
-                    'modalidad': _modalidad(practica, codigo), 'cantidad': None,
+                    **clasificar_fila_netterm(practica, codigo, _texto(valores[0])),
+                    'cantidad': None,
                     **fechas,
                 })
     finally:
@@ -207,9 +234,10 @@ def preparar_preview_netterm(archivo):
     for fila in filas:
         fila['clave_repetida'] = claves[(fila['pedido'], fila['tipo_nomenclador'], fila['codigo_nomenclador'])] > 1
 
-    def distribucion(campo):
+    def distribucion(campo, excluir_insumos=False):
         return [{'valor': valor, 'cantidad': cantidad} for valor, cantidad in sorted(Counter(
             fila[campo] or 'DESCONOCIDO' for fila in filas
+            if not excluir_insumos or not fila['es_insumo']
         ).items())]
 
     periodos = {}
@@ -226,11 +254,13 @@ def preparar_preview_netterm(archivo):
         'hojas': hojas_leidas, 'filas': filas,
         'resumen': {
             'filas_validas': len(filas), 'filas_ignoradas': ignoradas,
+            'filas_practicas': sum(not fila['es_insumo'] for fila in filas),
+            'filas_insumos': sum(fila['es_insumo'] for fila in filas),
             'claves_repetidas': sum(cantidad > 1 for cantidad in claves.values()),
             'filas_en_claves_repetidas': sum(cantidad for cantidad in claves.values() if cantidad > 1),
             'advertencias_total': sum(motivos.values()),
             'advertencias_por_codigo': [{'valor': valor, 'cantidad': cantidad} for valor, cantidad in sorted(motivos.items())],
-            'modalidades': distribucion('modalidad'), 'estados': distribucion('estado_informe'),
+            'modalidades': distribucion('modalidad', excluir_insumos=True), 'estados': distribucion('estado_informe'),
             'realizacion': distribucion('estado_realizacion'), 'periodos': periodos,
             'anulados': sum(fila['anulado'] for fila in filas),
         },

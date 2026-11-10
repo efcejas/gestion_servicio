@@ -1,0 +1,173 @@
+"""Respaldo de existencia/autoria: solo lectura, sin recalculo ni validacion economica."""
+from collections import Counter, defaultdict
+from calendar import monthrange
+from datetime import date
+
+from django.core.exceptions import ValidationError
+
+from eges_import.models import EgesRow, NettermFila
+from eges_import.services_conciliacion import (
+    construir_preview_conciliacion, _codigo, _paciente_clave, _texto_normalizado,
+)
+from eges_import.services_produccion import realizada_eges, realizada_netterm
+from .services_eges import _tokens_nombre_medico
+
+
+MAX_REGISTROS_RESPALDO = 10000
+MODALIDADES = {'ECO': 'ECO', 'DOP': 'ECO', 'ECOCAR': 'ECO', 'TOM': 'TC',
+               'RES': 'RM', 'RAD': 'RX', 'MAM': 'MAM'}
+ALIAS_NOMBRE = {
+    'ECO ABDOMINAL': 'ECOGRAFIA COMPLETA DE ABDOMEN',
+    'ECOGRAFIA ABDOMINAL': 'ECOGRAFIA COMPLETA DE ABDOMEN',
+}
+
+
+def _nombre(valor):
+    normalizado = _texto_normalizado(valor)
+    return ALIAS_NOMBRE.get(normalizado, normalizado)
+
+
+def _compatible(relacion, fila):
+    if MODALIDADES.get(relacion.estudio.tipo) != fila['modalidad']:
+        return None
+    codigo = _codigo(relacion.estudio.codigo)
+    if codigo and codigo.isascii() and codigo.isdigit():
+        # Un codigo numerico diferente nunca se tapa con similitud de palabras.
+        return 'CODIGO' if codigo == _codigo(fila['codigo']) else None
+    esperado, observado = _nombre(relacion.estudio.nombre), _nombre(fila['practica'])
+    return 'NOMBRE_EQUIVALENTE' if esperado and esperado == observado else None
+
+
+def _medico_coincide(medico, nombres):
+    esperado = _tokens_nombre_medico(f'{medico.last_name} {medico.first_name}')
+    # No atribuir una practica por un nombre solo, solicitante, tecnico u operador.
+    return len(esperado) >= 2 and all((medico.last_name, medico.first_name)) and any(
+        esperado.issubset(_tokens_nombre_medico(nombre)) for nombre in nombres
+    )
+
+
+def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_ids, filtros=None):
+    desde = date(sesion.año, sesion.mes, 1)
+    hasta = date(sesion.año, sesion.mes, monthrange(sesion.año, sesion.mes)[1])
+    registros_qs = sesion.practicas.filter(anulado=False).select_related('medico').prefetch_related(
+        'registroestudio_set__estudio',
+    ).order_by('fecha_del_informe', 'pk')
+    if registros_qs.count() > MAX_REGISTROS_RESPALDO:
+        raise ValidationError('La sesión supera el límite de 10000 registros para este respaldo.')
+    # Se evalua toda la sesion antes de filtrar/paginar: un filtro no puede ocultar
+    # otro registro que pretenda reutilizar la misma evidencia.
+    registros = list(registros_qs)
+    preview = construir_preview_conciliacion(
+        batch_eges_ids=batch_eges_ids, lote_netterm_ids=lote_netterm_ids,
+        fecha_desde=desde, fecha_hasta=hasta,
+    )
+    eg_datos = {f['id']: f for caso in preview['resultados'] for f in caso['eges']}
+    nt_casos = {c['netterm']['id']: c for c in preview['resultados'] if c['netterm']}
+    eg_medicos = {f.pk: (f.medico_informante, f.medico_actuante)
+                  for f in EgesRow.objects.filter(pk__in=eg_datos).only('pk', 'medico_informante', 'medico_actuante')}
+    nt_medicos = {f.pk: (f.normalizados_json.get('informante'),)
+                  for f in NettermFila.objects.filter(pk__in=nt_casos).only('pk', 'normalizados_json')}
+    indice = defaultdict(list)
+    for fila in eg_datos.values():
+        indice[(fila['paciente_clave'], fila['fecha_turno'])].append({
+            **fila, 'origen': 'EGES', 'nombres': eg_medicos[fila['id']],
+            'realizada': realizada_eges(fila),
+            'bloqueada': _texto_normalizado(fila['estado']) in {'ANULADO', 'CANCELADO'},
+            'eges_vinculado': fila['id'],
+        })
+    for caso in nt_casos.values():
+        fila = caso['netterm']
+        modalidad = 'ECO' if fila['modalidad'] in {'ECO_GENERAL', 'DOP', 'ECOCAR'} else fila['modalidad']
+        indice[(fila['paciente_clave'], fila['fecha_pedido'])].append({
+            **fila, 'modalidad': modalidad, 'origen': 'NETTERM', 'nombres': nt_medicos[fila['id']],
+            'realizada': realizada_netterm(fila),
+            'bloqueada': (fila['vigencia_incierta'] or fila['anulado'] or caso['contradiccion_anulacion']
+                          or caso['estado'] == 'AMBIGUO'
+                          or (caso['estado'] == 'CONFLICTO' and not caso['identidad_coincidente'])),
+            'eges_vinculado': caso['eges'][0]['id'] if caso['identidad_coincidente'] else None,
+        })
+    candidatos, usuarios_evidencia = {}, defaultdict(set)
+    for registro in registros:
+        clave = _paciente_clave(registro.dni_paciente)
+        for relacion in registro.registroestudio_set.all():
+            posibles = []
+            if clave:
+                for fila in indice.get((clave, registro.fecha_del_informe), []):
+                    metodo = _compatible(relacion, fila)
+                    if metodo:
+                        posibles.append((fila, metodo))
+                        usuarios_evidencia[(fila['origen'], fila['id'])].add(relacion.pk)
+            candidatos[relacion.pk] = posibles
+    resultados = []
+    for registro in registros:
+        lineas = []
+        for relacion in registro.registroestudio_set.all():
+            posibles = candidatos[relacion.pk]
+            eges = [(f, m) for f, m in posibles if f['origen'] == 'EGES']
+            netterm = [(f, m) for f, m in posibles if f['origen'] == 'NETTERM']
+            # EGES conserva prioridad. Netterm no levanta una contradiccion EGES
+            # de identidad/autoria; complementa su ausencia o falta de realizacion.
+            preferidos = eges or netterm
+            if len(eges) == 1:
+                principal = eges[0][0]
+                if (not principal['bloqueada'] and not principal['realizada']
+                        and _medico_coincide(registro.medico, principal['nombres'])
+                        and len(usuarios_evidencia[('EGES', principal['id'])]) == 1):
+                    complemento = [(f, m) for f, m in netterm if f['eges_vinculado'] == principal['id']]
+                    if complemento:
+                        preferidos = complemento
+            estado, fuente, motivos, evidencia = 'SIN_RESPALDO', None, [], []
+            reafirmado = False
+            if preferidos:
+                estado = 'REVISAR'
+                if len(preferidos) != 1:
+                    motivos.append('Hay varias prácticas posibles; no se elige una repetición arbitrariamente.')
+                else:
+                    fila, metodo = preferidos[0]
+                    medico_ok = _medico_coincide(registro.medico, fila['nombres'])
+                    libre = len(usuarios_evidencia[(fila['origen'], fila['id'])]) == 1
+                    if not libre:
+                        motivos.append('La misma evidencia es candidata para más de una línea profesional.')
+                    if fila['bloqueada']:
+                        motivos.append('El origen tiene anulación, ambigüedad, vigencia incierta o identidad contradictoria.')
+                    if not medico_ok:
+                        motivos.append('El informante/actuante no acredita inequívocamente al profesional.')
+                    if not fila['realizada']:
+                        motivos.append('La realización no está confirmada por el origen.')
+                    if libre and not fila['bloqueada'] and medico_ok and fila['realizada']:
+                        fuente = fila['origen']
+                        estado = f'OK_{fuente}'
+                        evidencia = [{'origen': fuente, 'fila_id': fila['id'], 'metodo': metodo}]
+                        if fuente == 'EGES':
+                            complementos = [f for f, _ in netterm if f['eges_vinculado'] == fila['id']
+                                            and not f['bloqueada'] and f['realizada']]
+                            reafirmado = len(complementos) == 1
+                            if reafirmado:
+                                evidencia.append({'origen': 'NETTERM', 'fila_id': complementos[0]['id'], 'metodo': 'CORRESPONDENCIA_ORIGEN'})
+                                if not _medico_coincide(registro.medico, complementos[0]['nombres']):
+                                    motivos.append('Netterm difiere en informante; conserva el respaldo EGES.')
+            else:
+                motivos.append('Sin correspondencia inequívoca por DNI, fecha y código o nombre equivalente.')
+            lineas.append({
+                'relacion_id': relacion.pk, 'practica': relacion.estudio.nombre,
+                'cantidad_declarada': relacion.cantidad, 'estado': estado, 'fuente': fuente,
+                'reafirmado_netterm': reafirmado, 'motivos': motivos, 'evidencia': evidencia,
+                'cantidad_economica_validada': False, 'horario_economico_validado': False,
+            })
+        ok = sum(l['estado'].startswith('OK_') for l in lineas)
+        estado = ('OK_RESPALDO' if lineas and ok == len(lineas) else 'PARCIAL' if ok
+                  else 'REVISAR' if any(l['estado'] == 'REVISAR' for l in lineas) else 'SIN_RESPALDO')
+        resultados.append({'registro': registro, 'estado_respaldo': estado, 'lineas': lineas})
+    filtros = filtros or {}
+    # Estos filtros afectan solo la presentacion, nunca la unicidad de la evidencia.
+    if filtros.get('profesional'):
+        resultados = [r for r in resultados if str(r['registro'].medico_id) == str(filtros['profesional'])]
+    if filtros.get('estado_respaldo'):
+        resultados = [r for r in resultados if r['estado_respaldo'] == filtros['estado_respaldo']]
+    resumen = Counter(r['estado_respaldo'] for r in resultados)
+    return {
+        'version_reglas': 'RESPALDO_ORIGEN_V1', 'sesion': sesion, 'resultados': resultados,
+        'resumen': dict(resumen), 'total': len(resultados), 'modifica_valores_economicos': False,
+        'firma_fuentes': preview['firma_snapshot'],
+        'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],
+    }

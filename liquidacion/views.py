@@ -18,6 +18,8 @@ from django.contrib.auth import get_user_model
 from decimal import Decimal, InvalidOperation
 import io, json
 import pandas as pd
+from eges_import.forms import PreviewConciliacionForm
+from .services_respaldo_fuentes import construir_preview_respaldo_fuentes
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
@@ -1931,6 +1933,39 @@ class AuditoriaDopplerMMIIRevertirView(LoginRequiredMixin, UserPassesTestMixin, 
             f"{resultado['eventos_revertidos']} lineas restauradas desde snapshots.",
         )
         return redirect(_url_auditoria_doppler_con_filtros(payload.get('filtros', {})))
+
+
+class RespaldoFuentesPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = 'liquidacion/respaldo_fuentes_preview.html'
+
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        return redirect('home')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sesion = get_object_or_404(SesionContable, pk=self.kwargs['pk'])
+        form = PreviewConciliacionForm(self.request.GET if self.request.GET else None)
+        preview, pagina = None, None
+        if form.is_bound and form.is_valid():
+            try:
+                preview = construir_preview_respaldo_fuentes(
+                    sesion=sesion,
+                    batch_eges_ids=[l.pk for l in form.cleaned_data['lotes_eges']],
+                    lote_netterm_ids=[l.pk for l in form.cleaned_data['lotes_netterm']],
+                    filtros=self.request.GET,
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            else:
+                pagina = Paginator(preview.pop('resultados'), 50).get_page(self.request.GET.get('page'))
+        filtros = self.request.GET.copy()
+        filtros.pop('page', None)
+        context.update(sesion=sesion, form=form, preview=preview, pagina=pagina,
+                       filtros_query=filtros.urlencode(), estado_respaldo=self.request.GET.get('estado_respaldo', ''))
+        return context
 
 
 class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

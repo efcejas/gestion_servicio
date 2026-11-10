@@ -1,10 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, QueryDict
 from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
+from django.urls import reverse
 from django.db.models import Count, Q, Avg, Max, Min
 from django.db.models.functions import ExtractWeekDay
 from django.db.models.functions import Coalesce
@@ -12,11 +13,20 @@ from datetime import date as date_type
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 import openpyxl
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
-from .models import ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermLote
-from .forms import ImportarEGESForm, PreviewNettermForm, GuardarNettermForm
+from .models import (
+    ConciliacionRevision, ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermLote,
+)
+from .forms import (
+    ImportarEGESForm, PreviewNettermForm, GuardarNettermForm,
+    PreviewConciliacionForm, RevisionConciliacionForm,
+)
+from .services_conciliacion import (
+    ESTADOS_CRUCE, construir_preview_conciliacion, registrar_revision_conciliacion,
+)
 from .services_netterm import guardar_lote_netterm
+from .services_produccion import construir_preview_produccion
 from .services import (
     get_base_estudios_finalizados as _base_estudios_finalizados,
     get_base_rx_sin_informe as _base_rx_sin_informe,
@@ -125,6 +135,141 @@ def lista_lotes_netterm(request):
         'lotes': Paginator(lotes, 25).get_page(request.GET.get('page')),
         'titulo_pagina': 'Netterm - Lotes de origen',
     })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_GET
+def preview_conciliacion(request):
+    form = PreviewConciliacionForm(request.GET if request.GET else None)
+    preview = None
+    pagina = None
+    total_filtrado = 0
+    if form.is_bound and form.is_valid():
+        try:
+            preview = construir_preview_conciliacion(
+                batch_eges_ids=[lote.pk for lote in form.cleaned_data['lotes_eges']],
+                lote_netterm_ids=[lote.pk for lote in form.cleaned_data['lotes_netterm']],
+                fecha_desde=form.cleaned_data['fecha_desde'],
+                fecha_hasta=form.cleaned_data['fecha_hasta'],
+            )
+        except ValidationError as error:
+            form.add_error(None, error)
+        else:
+            resultados = preview.pop('resultados')
+            estado = form.cleaned_data['estado']
+            pares = [
+                (item['netterm']['id'], fila['id'])
+                for item in resultados if item['netterm']
+                for fila in item['eges']
+            ]
+            netterm_ids = {par[0] for par in pares}
+            eges_ids = {par[1] for par in pares}
+            revisiones = ConciliacionRevision.objects.filter(
+                batch_eges_id__in=preview['batch_eges_ids'],
+                fila_netterm_id__in=netterm_ids,
+                fila_eges_id__in=eges_ids,
+            ).select_related('revisado_por').order_by('fecha_revision', 'pk')
+            revisiones_vigentes = ConciliacionRevision.objects.filter(
+                firma_snapshot=preview['firma_snapshot'],
+                fila_netterm_id__in=netterm_ids,
+                fila_eges_id__in=eges_ids,
+                revision_siguiente__isnull=True,
+            )
+            historial_por_par = {}
+            revision_actual_por_par = {
+                (revision.fila_netterm_id, revision.fila_eges_id): revision
+                for revision in revisiones_vigentes
+            }
+            for revision in revisiones:
+                clave = (revision.fila_netterm_id, revision.fila_eges_id)
+                historial_por_par.setdefault(clave, []).append(revision)
+            for item in resultados:
+                item['pares_revision'] = []
+                if not item['netterm']:
+                    continue
+                for fila in item['eges']:
+                    clave = (item['netterm']['id'], fila['id'])
+                    item['pares_revision'].append({
+                        'eges': fila,
+                        'revision_actual': revision_actual_por_par.get(clave),
+                        'historial': historial_por_par.get(clave, []),
+                    })
+            if estado == 'EXCEPCIONES':
+                filtrados = [item for item in resultados if item['requiere_revision_produccion']]
+            elif estado == 'ALERTAS_ESTADO':
+                filtrados = [item for item in resultados if item['alerta_estado_no_bloqueante']]
+            else:
+                filtrados = [item for item in resultados if not estado or item['estado'] == estado]
+            total_filtrado = len(filtrados)
+            pagina = Paginator(filtrados, 50).get_page(request.GET.get('page'))
+    filtros = request.GET.copy()
+    filtros.pop('page', None)
+    return render(request, 'eges_import/preview_conciliacion.html', {
+        'form': form, 'preview': preview, 'resultados': pagina,
+        'total_filtrado': total_filtrado, 'filtros_query': filtros.urlencode(),
+        'estado_seleccionado': request.GET.get('estado', ''),
+        'titulo_pagina': 'Conciliacion EGES - Netterm',
+    })
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_GET
+def produccion_consolidada(request):
+    form = PreviewConciliacionForm(request.GET if request.GET else None)
+    resultado = None
+    if form.is_bound and form.is_valid():
+        try:
+            resultado = construir_preview_produccion(
+                batch_eges_ids=[lote.pk for lote in form.cleaned_data['lotes_eges']],
+                lote_netterm_ids=[lote.pk for lote in form.cleaned_data['lotes_netterm']],
+                fecha_desde=form.cleaned_data['fecha_desde'], fecha_hasta=form.cleaned_data['fecha_hasta'],
+            )
+        except ValidationError as error:
+            form.add_error(None, error)
+    return render(request, 'eges_import/produccion_consolidada.html', {'form': form, 'resultado': resultado})
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_POST
+def guardar_revision_conciliacion(request):
+    form = RevisionConciliacionForm(request.POST)
+    query = QueryDict('', mutable=True)
+    if form.is_valid():
+        datos = form.cleaned_data
+        query['batch_eges'] = str(datos['batch_eges_id'])
+        query.setlist('lotes_netterm', [str(valor) for valor in datos['lote_netterm_ids']])
+        if datos['estado']:
+            query['estado'] = datos['estado']
+        try:
+            revision = registrar_revision_conciliacion(
+                batch_eges_id=datos['batch_eges_id'],
+                lote_netterm_ids=datos['lote_netterm_ids'],
+                fila_netterm_id=datos['fila_netterm_id'],
+                fila_eges_id=datos['fila_eges_id'],
+                firma_esperada=datos['firma_snapshot'],
+                decision=datos['decision'], motivo=datos['motivo'], usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            messages.success(request, f'Revision #{revision.pk} guardada como evento inmutable.')
+    else:
+        messages.error(request, 'No se pudo registrar la revision; vuelve a cargar el preview.')
+        batch_id = request.POST.get('batch_eges_id')
+        lote_ids = request.POST.get('lote_netterm_ids', '').split(',')
+        if batch_id and batch_id.isdigit() and all(valor.isdigit() for valor in lote_ids if valor):
+            query['batch_eges'] = batch_id
+            query.setlist('lotes_netterm', [valor for valor in lote_ids if valor])
+            estado = request.POST.get('estado', '')
+            if estado in (*ESTADOS_CRUCE, 'EXCEPCIONES'):
+                query['estado'] = estado
+    destino = reverse('eges_import:preview_conciliacion')
+    if query:
+        destino = f'{destino}?{query.urlencode()}'
+    return redirect(destino)
 
 
 @login_required

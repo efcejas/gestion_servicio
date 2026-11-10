@@ -297,6 +297,9 @@ class EgesRow(models.Model):
 
         texto = f"{self.practica or ''} {self.servicio or ''}".upper()
 
+        if self.clasificar_modalidad() != 'OTROS':
+            texto = re.sub(r'\b(?:CON|SIN)\s+CONTRASTE\b|\b[CS]/\s*CONTRASTE\b', '', texto)
+
         keywords_insumo = [
             # Contrastes
             'CONTRASTE', 'GADOLINIO', 'IODO', 'XENETIX', 'OMNIPAQUE',
@@ -466,3 +469,73 @@ class NettermFila(models.Model):
         if not self._state.adding:
             raise ValidationError('Las observaciones Netterm no se sobrescriben; importa una nueva version.')
         return super().save(*args, **kwargs)
+
+
+class ConciliacionRevisionQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError('Las revisiones de conciliacion son inmutables.')
+
+    def delete(self):
+        raise ValidationError('Las revisiones de conciliacion no se eliminan.')
+
+
+class ConciliacionRevision(models.Model):
+    DECISION_VINCULAR = 'VINCULAR'
+    DECISION_NO_VINCULAR = 'NO_VINCULAR'
+    DECISION_CHOICES = [
+        (DECISION_VINCULAR, 'Vincular tras revision humana'),
+        (DECISION_NO_VINCULAR, 'No vincular'),
+    ]
+    ESTADO_PREVIEW_CHOICES = [
+        ('COINCIDENTE', 'Coincidencia candidata'),
+        ('SOLO_EGES', 'Solo EGES'),
+        ('SOLO_NETTERM', 'Solo Netterm'),
+        ('AMBIGUO', 'Ambiguo'),
+        ('CONFLICTO', 'Conflicto'),
+    ]
+
+    firma_snapshot = models.CharField(max_length=64, db_index=True)
+    batch_eges = models.ForeignKey(
+        ImportBatch, on_delete=models.PROTECT, related_name='revisiones_conciliacion',
+    )
+    fila_netterm = models.ForeignKey(
+        NettermFila, on_delete=models.PROTECT, related_name='revisiones_conciliacion',
+    )
+    fila_eges = models.ForeignKey(
+        EgesRow, on_delete=models.PROTECT, related_name='revisiones_conciliacion',
+    )
+    lotes_netterm_ids = models.JSONField(default=list)
+    observaciones_netterm_ids = models.JSONField(default=list)
+    candidatas_eges_ids = models.JSONField(default=list)
+    version_motor = models.CharField(max_length=60)
+    estado_preview = models.CharField(max_length=16, choices=ESTADO_PREVIEW_CHOICES)
+    decision = models.CharField(max_length=16, choices=DECISION_CHOICES)
+    motivos_cruce_json = models.JSONField(default=list)
+    motivo = models.TextField()
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='revisiones_eges_netterm',
+    )
+    fecha_revision = models.DateTimeField(default=timezone.now)
+    reemplaza_revision = models.OneToOneField(
+        'self', null=True, blank=True, on_delete=models.PROTECT, related_name='revision_siguiente',
+    )
+    objects = ConciliacionRevisionQuerySet.as_manager()
+
+    class Meta:
+        ordering = ['-fecha_revision', '-pk']
+        verbose_name = 'Revision de conciliacion EGES-Netterm'
+        verbose_name_plural = 'Revisiones de conciliacion EGES-Netterm'
+        indexes = [
+            models.Index(fields=['batch_eges', 'fila_netterm'], name='eges_rev_batch_netterm_idx'),
+        ]
+
+    def __str__(self):
+        return f'Revision de conciliacion #{self.pk}'
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Las revisiones de conciliacion son inmutables.')
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Las revisiones de conciliacion no se eliminan.')

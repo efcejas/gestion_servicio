@@ -10,6 +10,7 @@
                 ← Volver a sesiones
             </a>
             <h1 class="mt-2 text-2xl font-bold text-slate-900">Cruce EGES vs Liquidación</h1>
+            <a href="{% url 'liquidacion:respaldo_fuentes_preview' sesion.pk %}" class="text-sm font-semibold text-indigo-700 underline">Consultar respaldo EGES + Netterm (incluye TC)</a>
             <p class="text-sm text-slate-600">Sesión {{ sesion.mes }}/{{ sesion.año }} · Preview sin impacto económico</p>
         </div>
     </div>
@@ -663,6 +664,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const count = document.getElementById('cantidad-eges-seleccionada');
     const toggle = document.getElementById('seleccionar-eges-visibles');
     const form = document.getElementById('bulk-eges-form');
+    if (!count) return;
     const updateCount = () => {
         count.textContent = checkboxes.filter((checkbox) => checkbox.checked).length;
     };
@@ -702,13 +704,15 @@ document.addEventListener('DOMContentLoaded', function () {
             ? 'Quitar selección Doppler'
             : 'Seleccionar Doppler elegibles visibles';
     };
+    const form = document.getElementById('corregir-doppler-form');
+    if (!count || !toggle || !submit || !form) return;
     checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateCount));
     toggle.addEventListener('click', () => {
         const selectAll = checkboxes.some((checkbox) => !checkbox.checked);
         checkboxes.forEach((checkbox) => { checkbox.checked = selectAll; });
         updateCount();
     });
-    document.getElementById('corregir-doppler-form').addEventListener('submit', (event) => {
+    form.addEventListener('submit', (event) => {
         const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
         if (!selected || !window.confirm(`Previsualizar la corrección de ${selected} registros Doppler seleccionados?`)) {
             event.preventDefault();
@@ -726,6 +730,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggle = document.getElementById('seleccionar-horario-eges-visibles');
     const submit = document.getElementById('previsualizar-horario-eges');
     const form = document.getElementById('horario-eges-residente-form');
+    if (!count || !toggle || !submit || !form) return;
     const updateCount = () => {
         const selected = checkboxes.filter((checkbox) => checkbox.checked).length;
         count.textContent = `${selected} seleccionados`;

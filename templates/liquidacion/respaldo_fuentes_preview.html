@@ -1,0 +1,31 @@
+{% extends "layouts/base_portal_liquidacion.html" %}
+{% block title %}Respaldo EGES + Netterm{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 text-slate-800">
+    <div class="flex flex-wrap justify-between gap-3"><h1 class="text-2xl font-bold">Respaldo EGES + Netterm</h1><a class="text-indigo-700 underline" href="{% url 'liquidacion:cruce_eges_liquidacion_preview' sesion.pk %}">Control EGES actual</a></div>
+    <p>Sesión {{ sesion.mes }}/{{ sesion.año }}. Respaldo de la práctica y del profesional, incluyendo ecografía y tomografía.</p>
+    <p class="rounded border border-indigo-200 bg-indigo-50 p-3">El OK de respaldo confirma evidencia de origen. No certifica cantidades u horarios económicos, no modifica montos y no reemplaza las validaciones del control EGES actual.</p>
+    <form method="get" class="space-y-4 rounded border border-slate-200 bg-white p-4">
+        {% for error in form.non_field_errors %}<p role="alert" class="text-red-700">{{ error }}</p>{% endfor %}
+        <div class="grid gap-4 lg:grid-cols-2">
+            <fieldset><legend class="font-semibold">Lotes EGES</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_eges }}</div>{{ form.lotes_eges.errors }}</fieldset>
+            <fieldset><legend class="font-semibold">Lotes Netterm</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_netterm }}</div>{{ form.lotes_netterm.errors }}</fieldset>
+        </div>
+        <div><label for="estado-respaldo" class="font-semibold">Respaldo</label><select id="estado-respaldo" name="estado_respaldo" class="rounded border border-slate-300 p-2">
+            <option value="">Todos</option><option value="OK_RESPALDO" {% if estado_respaldo == 'OK_RESPALDO' %}selected{% endif %}>OK de respaldo</option><option value="PARCIAL" {% if estado_respaldo == 'PARCIAL' %}selected{% endif %}>Parcial</option><option value="REVISAR" {% if estado_respaldo == 'REVISAR' %}selected{% endif %}>Revisar</option><option value="SIN_RESPALDO" {% if estado_respaldo == 'SIN_RESPALDO' %}selected{% endif %}>Sin respaldo</option>
+        </select></div>
+        <button class="rounded bg-indigo-700 px-4 py-2 font-semibold text-white" type="submit">Consultar respaldo</button>
+    </form>
+    {% if preview %}
+    <p class="font-semibold">{{ preview.total }} registros en esta consulta</p>
+    <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-3">Registro profesional</th><th class="p-3">Prácticas y respaldo</th></tr></thead><tbody>
+    {% for item in pagina %}<tr class="border-t border-slate-200 align-top">
+        <td class="p-3"><p class="font-semibold">Registro #{{ item.registro.pk }}</p><p>{{ item.registro.medico.get_full_name }}</p><p>{{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</p><p>{{ item.registro.fecha_del_informe|date:"d/m/Y" }}</p><p class="mt-2 font-semibold">{% if item.estado_respaldo == 'OK_RESPALDO' %}OK de respaldo{% elif item.estado_respaldo == 'PARCIAL' %}Respaldo parcial{% elif item.estado_respaldo == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}</p></td>
+        <td class="p-3">{% for linea in item.lineas %}<div class="mb-4 space-y-1"><p class="font-semibold">{{ linea.practica }}</p><p>Cantidad declarada: {{ linea.cantidad_declarada }} · Cantidad y horario económicos sin certificar por esta consulta.</p><p>{% if linea.estado == 'OK_EGES' %}OK de respaldo EGES{% elif linea.estado == 'OK_NETTERM' %}OK de respaldo Netterm{% elif linea.estado == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}{% if linea.reafirmado_netterm %} · Netterm reafirma la práctica{% endif %}</p>{% for motivo in linea.motivos %}<p>{{ motivo }}</p>{% endfor %}{% for evidencia in linea.evidencia %}<p class="text-xs text-slate-500">{{ evidencia.origen }} · fila #{{ evidencia.fila_id }}</p>{% endfor %}</div>{% empty %}<p>Sin líneas de prácticas.</p>{% endfor %}</td>
+    </tr>{% empty %}<tr><td colspan="2" class="p-3">Sin registros para esta selección.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="flex flex-wrap justify-between gap-3"><p>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p><div class="flex gap-4">{% if pagina.has_previous %}<a class="text-indigo-700 underline" href="?{{ filtros_query }}&page={{ pagina.previous_page_number }}">Anterior</a>{% endif %}{% if pagina.has_next %}<a class="text-indigo-700 underline" href="?{{ filtros_query }}&page={{ pagina.next_page_number }}">Siguiente</a>{% endif %}</div></div>
+    <p class="break-all text-xs text-slate-500">{{ preview.version_reglas }} · EGES {{ preview.batch_eges_ids|join:", " }} · Netterm {{ preview.lote_netterm_ids|join:", " }} · {{ preview.firma_fuentes }}</p>
+    {% endif %}
+</div>
+{% endblock %}

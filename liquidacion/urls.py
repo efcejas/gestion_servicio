@@ -42,6 +42,7 @@ from .views import (
     AuditoriaEcoRegistroCorregirView,
     AuditoriaEcoCorreccionPacsBulkView,
     CruceEgesLiquidacionPreviewView,
+    RespaldoFuentesPreviewView,
     CruceEgesProcesarControlView,
     CruceEgesReanalizarJornadasView,
     CruceEgesBulkValidarOkView,
@@ -176,6 +177,11 @@ urlpatterns = [
         'sesiones/<int:pk>/auditoria-eco/corregir-ajustes-masivo/',
         AuditoriaEcoCorreccionPacsBulkView.as_view(),
         name='auditoria_eco_correccion_pacs_masiva',
+    ),
+    path(
+        'sesiones/<int:pk>/respaldo-fuentes/',
+        RespaldoFuentesPreviewView.as_view(),
+        name='respaldo_fuentes_preview',
     ),
     path(
         'sesiones/<int:pk>/cruce-eges/',

@@ -9,6 +9,7 @@
             <a href="{% url 'eges_import:preview_netterm' %}" class="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"><i class="fas fa-file-excel" aria-hidden="true"></i> Previsualizar otro libro</a>
         </div>
         <a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white">Lotes EGES</a>
+        <a href="{% url 'eges_import:preview_conciliacion' %}" class="ml-4 text-sm text-gray-300 hover:text-white">Previsualizar conciliación</a>
         {% for message in messages %}<p role="status" class="border-l-4 border-teal-500 bg-gray-800 p-3 text-sm text-gray-100">{{ message }}</p>{% endfor %}
         <p class="text-sm text-gray-300">Archivo de origen separado. Estos lotes no forman parte de las estadísticas EGES ni de las liquidaciones. Las referencias de versión no son estudios consolidados.</p>
         <div class="overflow-x-auto">

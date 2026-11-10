@@ -10,10 +10,13 @@ urlpatterns = [
     path('netterm/preview/', views.preview_netterm, name='preview_netterm'),
     path('netterm/guardar/', views.guardar_netterm, name='guardar_netterm'),
     path('netterm/lotes/', views.lista_lotes_netterm, name='lista_lotes_netterm'),
+    path('conciliacion/preview/', views.preview_conciliacion, name='preview_conciliacion'),
+    path('conciliacion/revisar/', views.guardar_revision_conciliacion, name='guardar_revision_conciliacion'),
     path('batch/<int:batch_id>/', views.detalle_batch, name='detalle_batch'),
 
     # ── Estadísticas globales (superuser) ───────────────────────────────────
     path('estadisticas/', views.dashboard_global, name='estadisticas'),
+    path('estadisticas/produccion/', views.produccion_consolidada, name='produccion_consolidada'),
     path('estadisticas/grafico-data/', views.dashboard_global_grafico_data, name='dashboard_global_grafico_data'),
     path('estadisticas/grafico-dia-semana/', views.dashboard_global_dia_semana_data, name='dashboard_global_dia_semana_data'),
     path('estadisticas/grafico-franja-horaria/', views.dashboard_global_franja_horaria_data, name='dashboard_global_franja_horaria_data'),

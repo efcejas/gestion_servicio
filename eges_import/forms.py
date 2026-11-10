@@ -4,6 +4,8 @@ import openpyxl
 
 from .services import leer_encabezados_eges
 from .services_netterm import MAX_BYTES_NETTERM, preparar_preview_netterm
+from .models import ConciliacionRevision, ImportBatch, NettermLote
+from .services_conciliacion import MAX_LOTES_NETTERM_CRUCE, ESTADOS_CRUCE
 
 
 class ImportarEGESForm(forms.Form):
@@ -120,3 +122,90 @@ class GuardarNettermForm(forms.Form):
         if not archivo.name.lower().endswith('.xlsx') or archivo.size > MAX_BYTES_NETTERM:
             raise ValidationError('Selecciona el XLSX Netterm del preview, hasta 10 MB.')
         return archivo
+
+
+class PreviewConciliacionForm(forms.Form):
+    batch_eges = forms.ModelChoiceField(queryset=ImportBatch.objects.none(), label='Lote EGES', required=False)
+    lotes_eges = forms.ModelMultipleChoiceField(
+        queryset=ImportBatch.objects.none(), label='Lotes EGES', widget=forms.CheckboxSelectMultiple(),
+    )
+    fecha_desde = forms.DateField(required=False, label='Desde', widget=forms.DateInput(attrs={'type': 'date'}))
+    fecha_hasta = forms.DateField(required=False, label='Hasta', widget=forms.DateInput(attrs={'type': 'date'}))
+    lotes_netterm = forms.ModelMultipleChoiceField(
+        queryset=NettermLote.objects.none(), label='Lotes Netterm',
+        widget=forms.CheckboxSelectMultiple(),
+    )
+    estado = forms.ChoiceField(
+        choices=[('', 'Todas las categorías'), ('EXCEPCIONES', 'Sólo excepciones de producción'),
+                 ('ALERTAS_ESTADO', 'Correspondencia única con alerta de estado')] + [(estado, estado) for estado in ESTADOS_CRUCE],
+        required=False, label='Resultado del cruce',
+    )
+
+    def __init__(self, *args, **kwargs):
+        data = args[0] if args else kwargs.get('data')
+        if data and data.get('batch_eges') and not data.get('lotes_eges'):
+            data = data.copy()
+            if hasattr(data, 'setlist'):
+                data.setlist('lotes_eges', [data['batch_eges']])
+            else:
+                data['lotes_eges'] = [data['batch_eges']]
+            data.pop('batch_eges', None)
+            if args:
+                args = (data, *args[1:])
+            else:
+                kwargs['data'] = data
+        super().__init__(*args, **kwargs)
+        self.fields['batch_eges'].queryset = ImportBatch.objects.order_by('-fecha_importacion', '-pk')
+        self.fields['batch_eges'].label_from_instance = lambda lote: f'EGES #{lote.pk} - {lote.archivo_nombre}'
+        self.fields['batch_eges'].widget.attrs['class'] = 'w-full rounded-md border border-gray-500 bg-gray-800 p-2 text-white'
+        self.fields['lotes_eges'].queryset = ImportBatch.objects.order_by('-fecha_importacion', '-pk')
+        self.fields['lotes_eges'].label_from_instance = lambda lote: f'EGES #{lote.pk} - {lote.archivo_nombre}'
+        self.fields['lotes_netterm'].queryset = NettermLote.objects.order_by('-fecha_importacion', '-pk')
+        self.fields['lotes_netterm'].label_from_instance = lambda lote: f'Netterm #{lote.pk} - {lote.archivo_nombre}'
+        self.fields['estado'].widget.attrs['class'] = 'w-full rounded-md border border-gray-500 bg-gray-800 p-2 text-white'
+        for campo in ('fecha_desde', 'fecha_hasta'):
+            self.fields[campo].widget.attrs['class'] = 'w-full rounded-md border border-gray-500 bg-gray-800 p-2 text-white'
+
+    def clean(self):
+        datos = super().clean()
+        desde, hasta = datos.get('fecha_desde'), datos.get('fecha_hasta')
+        if desde and hasta and desde > hasta:
+            self.add_error('fecha_hasta', 'La fecha final debe ser igual o posterior a la inicial.')
+        if datos.get('batch_eges'):
+            self.add_error(None, 'Usa una sola seleccion de lotes EGES.')
+        return datos
+
+
+class RevisionConciliacionForm(forms.Form):
+    batch_eges_id = forms.IntegerField(widget=forms.HiddenInput())
+    lote_netterm_ids = forms.CharField(widget=forms.HiddenInput())
+    fila_netterm_id = forms.IntegerField(widget=forms.HiddenInput())
+    fila_eges_id = forms.IntegerField(widget=forms.HiddenInput())
+    firma_snapshot = forms.CharField(min_length=64, max_length=64, widget=forms.HiddenInput())
+    decision = forms.ChoiceField(
+        choices=ConciliacionRevision.DECISION_CHOICES,
+        label='Decision humana',
+        widget=forms.Select(attrs={'class': 'rounded-md border border-gray-500 bg-gray-800 p-2 text-white'}),
+    )
+    motivo = forms.CharField(
+        min_length=8, max_length=2000, label='Motivo de revision',
+        widget=forms.Textarea(attrs={
+            'rows': 2,
+            'class': 'w-full rounded-md border border-gray-500 bg-gray-800 p-2 text-white',
+            'required': True,
+        }),
+    )
+    estado = forms.ChoiceField(
+        choices=[('', 'Todas las categorias'), ('EXCEPCIONES', 'Solo excepciones de produccion'),
+                 ('ALERTAS_ESTADO', 'Correspondencia unica con alerta de estado')] + [(estado, estado) for estado in ESTADOS_CRUCE],
+        required=False, widget=forms.HiddenInput(),
+    )
+
+    def clean_lote_netterm_ids(self):
+        try:
+            ids = [int(valor) for valor in self.cleaned_data['lote_netterm_ids'].split(',')]
+        except ValueError:
+            raise ValidationError('La seleccion Netterm no es valida.') from None
+        if not ids or len(ids) > MAX_LOTES_NETTERM_CRUCE or len(ids) != len(set(ids)):
+            raise ValidationError('La seleccion debe incluir entre 1 y 10 lotes Netterm distintos.')
+        return ids

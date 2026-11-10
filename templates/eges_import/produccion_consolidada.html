@@ -1,0 +1,42 @@
+{% extends "layouts/base_with_sidebar.html" %}
+{% block title %}Producción EGES + Netterm{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 text-gray-200">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-2xl font-bold text-white">Producción EGES + Netterm</h1>
+        <a class="underline" href="{% url 'eges_import:estadisticas' %}">Estadísticas EGES</a>
+    </div>
+    <p>Producción respaldada por los registros seleccionados, separada del estado del informe. Período por fecha de turno EGES y pedido Netterm.</p>
+    <p class="border-l-4 border-amber-500 bg-gray-800 p-3 text-sm">Resultado provisional: cuenta registros de práctica identificados, no suma cantidades económicas ni determina proyecciones RX. Los casos ambiguos quedan pendientes; el total puede estar incompleto.</p>
+    <form method="get" class="space-y-4 border-y border-gray-700 py-4">
+        {% for error in form.non_field_errors %}<p role="alert" class="text-red-300">{{ error }}</p>{% endfor %}
+        <div class="flex flex-wrap gap-4">
+            <div><label for="{{ form.fecha_desde.id_for_label }}">Desde</label> {{ form.fecha_desde }}{{ form.fecha_desde.errors }}</div>
+            <div><label for="{{ form.fecha_hasta.id_for_label }}">Hasta</label> {{ form.fecha_hasta }}{{ form.fecha_hasta.errors }}</div>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-2">
+            <fieldset><legend class="mb-2 font-semibold">Lotes EGES</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_eges }}</div>{{ form.lotes_eges.errors }}</fieldset>
+            <fieldset><legend class="mb-2 font-semibold">Lotes Netterm</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_netterm }}</div>{{ form.lotes_netterm.errors }}</fieldset>
+        </div>
+        <button class="rounded bg-teal-700 px-4 py-2 font-semibold text-white" type="submit">Consultar producción</button>
+    </form>
+    {% if resultado %}
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="rounded border border-gray-700 p-4"><p>Producción respaldada</p><strong class="text-3xl text-white">{{ resultado.total_produccion }}</strong><p class="text-sm">EGES {{ resultado.base_eges }} + aporte Netterm {{ resultado.aporte_netterm }}</p></div>
+        <div class="rounded border border-gray-700 p-4"><p>Pacientes identificables</p><strong class="text-3xl text-white">{{ resultado.pacientes_unicos_identificables }}</strong><p class="text-sm">Prácticas incluidas sin identidad: {{ resultado.practicas_sin_identidad }}</p></div>
+        <div class="rounded border border-gray-700 p-4"><p>Informes confirmados</p><strong class="text-3xl text-white">{{ resultado.informadas_confirmadas }}</strong><p class="text-sm">Sin informe confirmado: {{ resultado.sin_informe_confirmado }}</p></div>
+        <div class="rounded border border-gray-700 p-4"><p>Tasa de finalización documentada</p><strong class="text-3xl text-white">{% if resultado.tasa_finalizacion != None %}{{ resultado.tasa_finalizacion }}%{% else %}Sin población{% endif %}</strong></div>
+    </div>
+    <p class="text-sm">Un informe se confirma si EGES indica Informado o una correspondencia Netterm inequívoca indica Definitivo. No se exige igualdad entre estados; “impreso” no se interpreta como informe definitivo. Una anulación contradictoria impide usar ese respaldo Netterm.</p>
+    <div class="overflow-x-auto"><table class="w-full text-left"><thead><tr><th class="p-2">Modalidad</th><th class="p-2">EGES</th><th class="p-2">Aporte Netterm</th><th class="p-2">Producción</th><th class="p-2">Informadas</th></tr></thead><tbody>
+        {% for fila in resultado.por_modalidad %}<tr class="border-t border-gray-700"><td class="p-2">{{ fila.modalidad }}</td><td class="p-2">{{ fila.eges }}</td><td class="p-2">{{ fila.netterm }}</td><td class="p-2">{{ fila.total }}</td><td class="p-2">{{ fila.informadas }}</td></tr>{% empty %}<tr><td colspan="5" class="p-2">No hay producción respaldada para esta selección.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <div class="grid gap-4 lg:grid-cols-2">
+        <section><h2 class="font-semibold text-white">Pendientes de evidencia</h2><p class="text-sm">Filas EGES y grupos Netterm; no se suman como prácticas adicionales.</p><ul>{% for fila in resultado.pendientes_detalle %}<li>{{ fila.motivo }}: {{ fila.cantidad }}</li>{% empty %}<li>Sin pendientes.</li>{% endfor %}</ul></section>
+        <section><h2 class="font-semibold text-white">Exclusiones</h2><ul>{% for fila in resultado.excluidos_detalle %}<li>{{ fila.motivo }}: {{ fila.cantidad }}</li>{% endfor %}<li>Insumos Netterm: {{ resultado.insumos_netterm_excluidos }}</li></ul></section>
+    </div>
+    <details><summary class="cursor-pointer">Estados observados por fuente</summary><div class="grid gap-4 sm:grid-cols-2"><ul>{% for estado, cantidad in resultado.estados_eges.items %}<li>EGES {{ estado }}: {{ cantidad }}</li>{% endfor %}</ul><ul>{% for estado, cantidad in resultado.estados_netterm.items %}<li>Netterm {{ estado }}: {{ cantidad }}</li>{% endfor %}</ul></div></details>
+    <p class="break-all text-xs text-gray-400">{{ resultado.version_reglas }} · EGES {{ resultado.batch_eges_ids|join:", " }} · Netterm {{ resultado.lote_netterm_ids|join:", " }} · {{ resultado.firma_snapshot }}</p>
+    {% endif %}
+</div>
+{% endblock %}

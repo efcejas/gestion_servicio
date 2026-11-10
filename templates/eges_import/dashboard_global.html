@@ -6,16 +6,16 @@
 {% block page_title %}📊 Estadísticas de Productividad EGES{% endblock %}
 {% block page_description %}Análisis consolidado de todos los lotes importados{% if fecha_min and fecha_max %} · Período: {{ fecha_min|date:"d/m/Y" }} - {{ fecha_max|date:"d/m/Y" }}{% endif %}{% endblock %}
 
-{% block page_actions %}
-<a href="{% url 'eges_import:lista_batches' %}" class="text-sm text-gray-300 hover:text-white flex items-center gap-2" title="Volver al listado de lotes">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-    </svg>
-    Volver
-</a>
-{% endblock %}
-
 {% block content %}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <a href="{% url 'eges_import:produccion_consolidada' %}" class="text-sm text-gray-300 hover:text-white">Producción EGES + Netterm</a>
+        <a href="{% url 'eges_import:lista_batches' %}" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white" title="Volver al listado de lotes">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Volver
+        </a>
+    </div>
 
     <section class="mb-6 rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 md:p-7 text-white shadow-lg">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -192,7 +192,7 @@
         </div>
     </div>
     <!-- RX sin informe: se muestra solo si > 0 -->
-    <div id="kpi-rx-sin-informe-card" class="hidden mb-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3 flex items-center gap-3">
+    <div id="kpi-rx-sin-informe-card" role="status" aria-live="polite" class="hidden mb-4 flex-wrap items-center gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg px-4 py-3">
         <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
         </svg>
@@ -591,12 +591,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 const rxSI = d.rx_sin_informe || 0;
                 document.getElementById('kpi-rx-sin-informe').textContent = Number(rxSI).toLocaleString('es-AR');
                 document.getElementById('kpi-rx-sin-informe-resumen').textContent = Number(rxSI).toLocaleString('es-AR');
-                document.getElementById('kpi-rx-sin-informe-card').classList.toggle('hidden', rxSI === 0);
+                const rxCard = document.getElementById('kpi-rx-sin-informe-card');
+                rxCard.classList.toggle('hidden', rxSI === 0);
+                rxCard.classList.toggle('flex', rxSI > 0);
             })
             .catch(() => {
                 if (requestId !== dashboardRequestId) return;
                 ['kpi-pacientes-atendidos', 'kpi-practicas-realizadas', 'kpi-practicas-por-paciente', 'kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
                     .forEach(id => document.getElementById(id).textContent = 'Error');
+                const rxCard = document.getElementById('kpi-rx-sin-informe-card');
+                rxCard.classList.add('hidden');
+                rxCard.classList.remove('flex');
             });
     }
 
@@ -937,7 +942,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('fecha-hasta').value = '';
         document.querySelectorAll('.modalidad-check').forEach(cb => cb.checked = true);
         actualizarEstilosModalidad();
-        document.getElementById('kpi-rx-sin-informe-card').classList.add('hidden');
+        const rxCard = document.getElementById('kpi-rx-sin-informe-card');
+        rxCard.classList.add('hidden');
+        rxCard.classList.remove('flex');
         cargarTodo();
     });
 

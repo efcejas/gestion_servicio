@@ -417,6 +417,7 @@
                                     <div class="flex flex-col gap-2 text-xs">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
                                             <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Control EGES</span>
+                                            <a href="{% url 'liquidacion:respaldo_fuentes_preview' dato.sesion.pk %}" class="text-xs font-semibold text-indigo-700 underline">Respaldo EGES + Netterm</a>
                                             <a href="{% url 'liquidacion:cruce_eges_liquidacion_preview' dato.sesion.pk %}"
                                                class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800 hover:bg-sky-200">
                                                 Abrir control
