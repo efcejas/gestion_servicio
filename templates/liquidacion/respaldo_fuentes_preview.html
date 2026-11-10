@@ -1,31 +1,145 @@
 {% extends "layouts/base_portal_liquidacion.html" %}
 {% block title %}Respaldo EGES + Netterm{% endblock %}
 {% block content %}
-<div class="mx-auto max-w-7xl space-y-6 p-4 sm:p-6 text-slate-800">
-    <div class="flex flex-wrap justify-between gap-3"><h1 class="text-2xl font-bold">Respaldo EGES + Netterm</h1><a class="text-indigo-700 underline" href="{% url 'liquidacion:cruce_eges_liquidacion_preview' sesion.pk %}">Control EGES actual</a></div>
-    <p>Sesión {{ sesion.mes }}/{{ sesion.año }}. Respaldo de la práctica y del profesional, incluyendo ecografía y tomografía.</p>
-    <p class="rounded border border-indigo-200 bg-indigo-50 p-3">El OK de respaldo confirma evidencia de origen. No certifica cantidades u horarios económicos, no modifica montos y no reemplaza las validaciones del control EGES actual.</p>
-    <form method="get" class="space-y-4 rounded border border-slate-200 bg-white p-4">
-        {% for error in form.non_field_errors %}<p role="alert" class="text-red-700">{{ error }}</p>{% endfor %}
-        <div class="grid gap-4 lg:grid-cols-2">
-            <fieldset><legend class="font-semibold">Lotes EGES</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_eges }}</div>{{ form.lotes_eges.errors }}</fieldset>
-            <fieldset><legend class="font-semibold">Lotes Netterm</legend><div class="max-h-64 overflow-y-auto">{{ form.lotes_netterm }}</div>{{ form.lotes_netterm.errors }}</fieldset>
+<div class="mx-auto max-w-7xl space-y-5 p-4 text-slate-800 sm:p-6">
+    <header class="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+            <p class="text-xs font-semibold uppercase text-indigo-700">Liquidación · Sesión {{ sesion.mes }}/{{ sesion.año }}</p>
+            <h1 class="mt-1 text-2xl font-bold text-slate-950">Respaldo EGES + Netterm</h1>
+            <p class="mt-1 text-sm text-slate-600">Evidencia de práctica y profesional; incluye ecografía y tomografía.</p>
         </div>
-        <div><label for="estado-respaldo" class="font-semibold">Respaldo</label><select id="estado-respaldo" name="estado_respaldo" class="rounded border border-slate-300 p-2">
-            <option value="">Todos</option><option value="OK_RESPALDO" {% if estado_respaldo == 'OK_RESPALDO' %}selected{% endif %}>OK de respaldo</option><option value="PARCIAL" {% if estado_respaldo == 'PARCIAL' %}selected{% endif %}>Parcial</option><option value="REVISAR" {% if estado_respaldo == 'REVISAR' %}selected{% endif %}>Revisar</option><option value="SIN_RESPALDO" {% if estado_respaldo == 'SIN_RESPALDO' %}selected{% endif %}>Sin respaldo</option>
-        </select></div>
-        <button class="rounded bg-indigo-700 px-4 py-2 font-semibold text-white" type="submit">Consultar respaldo</button>
+        <a class="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="{% url 'liquidacion:cruce_eges_liquidacion_preview' sesion.pk %}">Control EGES actual</a>
+    </header>
+
+    <div role="note" class="flex gap-3 border-l-4 border-indigo-600 bg-indigo-50 p-4 text-sm text-indigo-950">
+        <span class="font-bold" aria-hidden="true">i</span>
+        <p>El OK confirma evidencia de origen. No certifica cantidades ni horarios económicos, no modifica montos y no reemplaza las validaciones del control EGES.</p>
+    </div>
+
+    <form method="get" class="space-y-4 border-y border-slate-200 py-4">
+        {% for error in form.non_field_errors %}<p role="alert" class="text-sm font-medium text-red-700">{{ error }}</p>{% endfor %}
+        <div class="grid gap-4 lg:grid-cols-2">
+            <fieldset data-lote-picker="eges" class="min-w-0 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <legend class="px-1 text-sm font-bold text-slate-900">Lotes EGES</legend>
+                <label for="buscar-lote-eges" class="sr-only">Buscar lote EGES</label>
+                <input id="buscar-lote-eges" type="search" autocomplete="off" data-lote-search placeholder="Buscar por archivo, número o período" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm placeholder:text-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                <div class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-slate-200 bg-white p-2" data-lote-options>
+                    {% for opcion in form.lotes_eges %}
+                    <label data-lote-option class="flex cursor-pointer items-start gap-2 rounded px-2 py-2 text-sm text-slate-700 hover:bg-indigo-50">
+                        {{ opcion.tag }}<span class="min-w-0 break-words">{{ opcion.choice_label }}</span>
+                    </label>
+                    {% empty %}<p class="px-2 py-3 text-sm text-slate-500">No hay lotes EGES disponibles.</p>{% endfor %}
+                    <p data-lote-empty hidden class="px-2 py-3 text-sm text-slate-500">No hay lotes que coincidan con la búsqueda.</p>
+                </div>
+                {{ form.lotes_eges.errors }}
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
+                    <span data-lote-count role="status" aria-live="polite" class="text-xs font-semibold text-slate-600">0 seleccionados</span>
+                    <div class="flex gap-2">
+                        <button type="button" data-lote-select-visible class="min-h-9 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Seleccionar visibles</button>
+                        <button type="button" data-lote-clear class="min-h-9 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Limpiar</button>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset data-lote-picker="netterm" class="min-w-0 space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <legend class="px-1 text-sm font-bold text-slate-900">Lotes Netterm</legend>
+                <label for="buscar-lote-netterm" class="sr-only">Buscar lote Netterm</label>
+                <input id="buscar-lote-netterm" type="search" autocomplete="off" data-lote-search placeholder="Buscar por archivo, número o período" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm placeholder:text-slate-400 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                <div class="max-h-48 space-y-1 overflow-y-auto rounded-md border border-slate-200 bg-white p-2" data-lote-options>
+                    {% for opcion in form.lotes_netterm %}
+                    <label data-lote-option class="flex cursor-pointer items-start gap-2 rounded px-2 py-2 text-sm text-slate-700 hover:bg-indigo-50">
+                        {{ opcion.tag }}<span class="min-w-0 break-words">{{ opcion.choice_label }}</span>
+                    </label>
+                    {% empty %}<p class="px-2 py-3 text-sm text-slate-500">No hay lotes Netterm disponibles.</p>{% endfor %}
+                    <p data-lote-empty hidden class="px-2 py-3 text-sm text-slate-500">No hay lotes que coincidan con la búsqueda.</p>
+                </div>
+                {{ form.lotes_netterm.errors }}
+                <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-2">
+                    <span data-lote-count role="status" aria-live="polite" class="text-xs font-semibold text-slate-600">0 seleccionados</span>
+                    <div class="flex gap-2">
+                        <button type="button" data-lote-select-visible class="min-h-9 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Seleccionar visibles</button>
+                        <button type="button" data-lote-clear class="min-h-9 rounded border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50">Limpiar</button>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+        <div class="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200 pt-4">
+            <div class="w-full max-w-xs">
+                <label for="estado-respaldo" class="mb-1 block text-xs font-semibold uppercase text-slate-600">Filtrar por estado</label>
+                <select id="estado-respaldo" name="estado_respaldo" class="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                    <option value="">Todos</option><option value="OK_RESPALDO" {% if estado_respaldo == 'OK_RESPALDO' %}selected{% endif %}>OK de respaldo</option><option value="PARCIAL" {% if estado_respaldo == 'PARCIAL' %}selected{% endif %}>Parcial</option><option value="REVISAR" {% if estado_respaldo == 'REVISAR' %}selected{% endif %}>Revisar</option><option value="SIN_RESPALDO" {% if estado_respaldo == 'SIN_RESPALDO' %}selected{% endif %}>Sin respaldo</option>
+                </select>
+            </div>
+            <button class="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-indigo-700 px-5 text-sm font-semibold text-white hover:bg-indigo-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 sm:w-auto" type="submit">Consultar respaldo</button>
+        </div>
     </form>
     {% if preview %}
-    <p class="font-semibold">{{ preview.total }} registros en esta consulta</p>
-    <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-3">Registro profesional</th><th class="p-3">Prácticas y respaldo</th></tr></thead><tbody>
-    {% for item in pagina %}<tr class="border-t border-slate-200 align-top">
-        <td class="p-3"><p class="font-semibold">Registro #{{ item.registro.pk }}</p><p>{{ item.registro.medico.get_full_name }}</p><p>{{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</p><p>{{ item.registro.fecha_del_informe|date:"d/m/Y" }}</p><p class="mt-2 font-semibold">{% if item.estado_respaldo == 'OK_RESPALDO' %}OK de respaldo{% elif item.estado_respaldo == 'PARCIAL' %}Respaldo parcial{% elif item.estado_respaldo == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}</p></td>
-        <td class="p-3">{% for linea in item.lineas %}<div class="mb-4 space-y-1"><p class="font-semibold">{{ linea.practica }}</p><p>Cantidad declarada: {{ linea.cantidad_declarada }} · Cantidad y horario económicos sin certificar por esta consulta.</p><p>{% if linea.estado == 'OK_EGES' %}OK de respaldo EGES{% elif linea.estado == 'OK_NETTERM' %}OK de respaldo Netterm{% elif linea.estado == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}{% if linea.reafirmado_netterm %} · Netterm reafirma la práctica{% endif %}</p>{% for motivo in linea.motivos %}<p>{{ motivo }}</p>{% endfor %}{% for evidencia in linea.evidencia %}<p class="text-xs text-slate-500">{{ evidencia.origen }} · fila #{{ evidencia.fila_id }}</p>{% endfor %}</div>{% empty %}<p>Sin líneas de prácticas.</p>{% endfor %}</td>
-    </tr>{% empty %}<tr><td colspan="2" class="p-3">Sin registros para esta selección.</td></tr>{% endfor %}
-    </tbody></table></div>
-    <div class="flex flex-wrap justify-between gap-3"><p>Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p><div class="flex gap-4">{% if pagina.has_previous %}<a class="text-indigo-700 underline" href="?{{ filtros_query }}&page={{ pagina.previous_page_number }}">Anterior</a>{% endif %}{% if pagina.has_next %}<a class="text-indigo-700 underline" href="?{{ filtros_query }}&page={{ pagina.next_page_number }}">Siguiente</a>{% endif %}</div></div>
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div><h2 class="text-lg font-bold text-slate-950">Resultados del respaldo</h2><p class="text-sm text-slate-600">{{ preview.total }} registros en esta consulta</p></div>
+        <p class="text-xs text-slate-500">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p>
+    </div>
+    <div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <table class="w-full min-w-[42rem] text-left text-sm">
+            <caption class="sr-only">Registros profesionales y evidencia encontrada en los lotes seleccionados</caption>
+            <thead class="bg-slate-50 text-xs uppercase text-slate-600"><tr><th scope="col" class="p-3">Registro profesional</th><th scope="col" class="p-3">Prácticas y respaldo</th></tr></thead>
+            <tbody class="divide-y divide-slate-200">
+            {% for item in pagina %}<tr class="align-top hover:bg-slate-50/70">
+                <td class="w-64 p-3"><p class="font-semibold text-slate-950">Registro #{{ item.registro.pk }}</p><p class="mt-1 font-medium text-slate-800">{{ item.registro.medico.get_full_name }}</p><p class="text-slate-600">{{ item.registro.apellido_paciente }}, {{ item.registro.nombre_paciente }}</p><p class="text-xs text-slate-500">{{ item.registro.fecha_del_informe|date:"d/m/Y" }}</p><p class="mt-2 inline-flex rounded px-2 py-1 text-xs font-semibold {% if item.estado_respaldo == 'OK_RESPALDO' %}bg-emerald-100 text-emerald-800{% elif item.estado_respaldo == 'PARCIAL' %}bg-amber-100 text-amber-800{% elif item.estado_respaldo == 'REVISAR' %}bg-orange-100 text-orange-800{% else %}bg-slate-100 text-slate-700{% endif %}">{% if item.estado_respaldo == 'OK_RESPALDO' %}OK de respaldo{% elif item.estado_respaldo == 'PARCIAL' %}Respaldo parcial{% elif item.estado_respaldo == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}</p></td>
+                <td class="space-y-3 p-3">{% for linea in item.lineas %}<div class="border-l-2 border-slate-200 pl-3"><p class="font-semibold text-slate-950">{{ linea.practica }}</p><p class="mt-1 text-sm text-slate-600">Cantidad declarada: {{ linea.cantidad_declarada }} · Sin validación económica de cantidad u horario.</p><p class="mt-1 text-sm font-medium text-slate-700">{% if linea.estado == 'OK_EGES' %}OK de respaldo EGES{% elif linea.estado == 'OK_NETTERM' %}OK de respaldo Netterm{% elif linea.estado == 'REVISAR' %}Revisar evidencia{% else %}Sin respaldo{% endif %}{% if linea.reafirmado_netterm %} · Netterm reafirma la práctica{% endif %}</p>{% for motivo in linea.motivos %}<p class="text-sm text-amber-800">{{ motivo }}</p>{% endfor %}<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1">{% for evidencia in linea.evidencia %}<span class="text-xs text-slate-500">{{ evidencia.origen }} · fila #{{ evidencia.fila_id }}</span>{% endfor %}</div></div>{% empty %}<p class="text-slate-500">Sin líneas de prácticas.</p>{% endfor %}</td>
+            </tr>{% empty %}<tr><td colspan="2" class="p-8 text-center text-sm text-slate-500">Sin registros para esta selección.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <nav aria-label="Paginación del respaldo" class="flex flex-wrap items-center justify-between gap-3">
+        <p class="text-sm text-slate-600">Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}</p>
+        <div class="flex gap-2">{% if pagina.has_previous %}<a class="inline-flex min-h-9 items-center rounded border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="?{{ filtros_query }}&page={{ pagina.previous_page_number }}">Anterior</a>{% endif %}{% if pagina.has_next %}<a class="inline-flex min-h-9 items-center rounded border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="?{{ filtros_query }}&page={{ pagina.next_page_number }}">Siguiente</a>{% endif %}</div>
+    </nav>
     <p class="break-all text-xs text-slate-500">{{ preview.version_reglas }} · EGES {{ preview.batch_eges_ids|join:", " }} · Netterm {{ preview.lote_netterm_ids|join:", " }} · {{ preview.firma_fuentes }}</p>
     {% endif %}
 </div>
+<script>
+document.querySelectorAll('[data-lote-picker]').forEach((picker) => {
+    const search = picker.querySelector('[data-lote-search]');
+    const options = Array.from(picker.querySelectorAll('[data-lote-option]'));
+    const count = picker.querySelector('[data-lote-count]');
+    const empty = picker.querySelector('[data-lote-empty]');
+    const selectVisible = picker.querySelector('[data-lote-select-visible]');
+    const clear = picker.querySelector('[data-lote-clear]');
+    const normalizar = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+    const actualizar = () => {
+        const termino = normalizar(search.value.trim());
+        let visibles = 0;
+        let seleccionadosVisibles = 0;
+        let seleccionados = 0;
+        options.forEach((opcion) => {
+            const checkbox = opcion.querySelector('input[type="checkbox"]');
+            const coincide = normalizar(opcion.textContent).includes(termino);
+            opcion.hidden = !coincide;
+            if (coincide) {
+                visibles += 1;
+                if (checkbox.checked) seleccionadosVisibles += 1;
+            }
+            if (checkbox.checked) seleccionados += 1;
+        });
+        count.textContent = `${seleccionados} seleccionados`;
+        selectVisible.disabled = visibles === 0;
+        selectVisible.textContent = visibles > 0 && seleccionadosVisibles === visibles ? 'Quitar selección visible' : 'Seleccionar visibles';
+        clear.disabled = seleccionados === 0;
+        empty.hidden = visibles !== 0;
+    };
+    search.addEventListener('input', actualizar);
+    options.forEach((opcion) => opcion.querySelector('input[type="checkbox"]').addEventListener('change', actualizar));
+    selectVisible.addEventListener('click', () => {
+        const visibles = options.filter((opcion) => !opcion.hidden);
+        const marcar = visibles.some((opcion) => !opcion.querySelector('input[type="checkbox"]').checked);
+        visibles.forEach((opcion) => { opcion.querySelector('input[type="checkbox"]').checked = marcar; });
+        actualizar();
+    });
+    clear.addEventListener('click', () => {
+        options.forEach((opcion) => { opcion.querySelector('input[type="checkbox"]').checked = false; });
+        actualizar();
+    });
+    actualizar();
+});
+</script>
 {% endblock %}

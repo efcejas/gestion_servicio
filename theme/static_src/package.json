@@ -5,11 +5,9 @@
   "main": "index.js",
   "scripts": {
     "dev": "npm run tailwind-watch",
-    "tailwind-watch": "tailwindcss -i ./src/styles.css -o ../../static/css/tailwind.css --watch",
-    "copy-watch": "chokidar \"../static/css/tailwind.css\" -c \"npm run copy-styles\"",
-    "build": "tailwindcss -i ./src/styles.css -o ../../static/css/tailwind.css --watch",
-    "build-prod": "tailwindcss -i ./src/styles.css -o ../../static/css/tailwind.css --minify",
-    "copy-styles": "copy \"..\\static\\css\\tailwind.css\" \"..\\..\\static\\css\\tailwind.css\""
+    "tailwind-watch": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch",
+    "build": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css --watch",
+    "build-prod": "tailwindcss -i ./src/styles.css -o ../static/css/tailwind.css"
   },
   "keywords": [
     "tailwind",
