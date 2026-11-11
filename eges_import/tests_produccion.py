@@ -7,9 +7,12 @@ from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
-from .models import EgesRow, ImportBatch, NettermFila, NettermLote
+from .models import ConciliacionRevision, EgesRow, ImportBatch, NettermFila, NettermLote
 from .services_produccion import construir_preview_produccion
-from .services_conciliacion import construir_preview_conteo_consolidado
+from .services_conciliacion import (
+    construir_preview_conciliacion, construir_preview_conteo_consolidado,
+    registrar_revision_conciliacion,
+)
 
 
 class FuentesSinteticasMixin:
@@ -45,6 +48,21 @@ class FuentesSinteticasMixin:
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
     def produccion(self):
         return construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
+
+    def registrar_revision(self, eges, decision):
+        preview = construir_preview_conciliacion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk],
+        )
+        caso = next(
+            caso for caso in preview['resultados']
+            if caso['netterm'] and any(fila['id'] == eges.pk for fila in caso['eges'])
+        )
+        return registrar_revision_conciliacion(
+            batch_eges_id=self.batch.pk, lote_netterm_ids=[self.lote.pk],
+            fila_netterm_id=caso['netterm']['id'], fila_eges_id=eges.pk,
+            firma_esperada=preview['firma_snapshot'], decision=decision,
+            motivo='Decision de origen para prueba sintetica.', usuario=self.usuario,
+        )
 
     def test_produccion_no_exige_informe_y_no_suma_cantidades(self):
         self.eges(estado_turno='Fin Practica', cantidad=3)
@@ -115,6 +133,35 @@ class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
         self.assertEqual(resultado['total_produccion'], 2)
         self.assertEqual(resultado['aporte_netterm'], 0)
         self.assertEqual(resultado['pendientes']['netterm_correspondencia'], 2)
+
+    def test_vincular_vigente_resuelve_ambiguedad_y_no_duplica(self):
+        primera = self.eges(estado_turno='Recepcionado')
+        segunda = self.eges(estado_turno='Recepcionado', hora_turno=time(11))
+        self.netterm()
+        self.registrar_revision(segunda, ConciliacionRevision.DECISION_VINCULAR)
+
+        resultado = self.produccion()
+
+        self.assertEqual(resultado['total_produccion'], 1)
+        self.assertEqual(resultado['base_eges'], 0)
+        self.assertEqual(resultado['aporte_netterm'], 1)
+        self.assertEqual(resultado['informadas_confirmadas'], 1)
+        self.assertEqual(resultado['vinculaciones_humanas_consumidas'], 1)
+        self.assertEqual(resultado['vinculaciones_rechazadas_consumidas'], 0)
+
+    def test_no_vincular_bloquea_match_automatico_sin_sumar_netterm(self):
+        eges = self.eges()
+        self.netterm()
+        self.registrar_revision(eges, ConciliacionRevision.DECISION_NO_VINCULAR)
+
+        resultado = self.produccion()
+
+        self.assertEqual(resultado['total_produccion'], 1)
+        self.assertEqual(resultado['base_eges'], 1)
+        self.assertEqual(resultado['aporte_netterm'], 0)
+        self.assertEqual(resultado['vinculaciones_humanas_consumidas'], 0)
+        self.assertEqual(resultado['vinculaciones_rechazadas_consumidas'], 1)
+        self.assertEqual(resultado['pendientes']['netterm_correspondencia'], 1)
 
     def test_informe_y_paciente_se_cuentan_una_vez_y_conteo_anterior_se_conserva(self):
         self.eges(estado_turno='Fin Practica')

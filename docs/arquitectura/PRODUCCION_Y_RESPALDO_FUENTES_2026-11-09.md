@@ -1,8 +1,18 @@
 # Produccion combinada y respaldo profesional de origen
 
+**Verificacion operativa posterior, 09/11/2026:** los archivos de esta entrega ya
+coinciden con los publicados en Heroku y sus migraciones estan aplicadas. La rama
+remota de GitHub todavia no contiene los dos commits y la etiqueta de release es inconsistente con
+los archivos. Ver el [informe de publicacion](../operativa/REVISION_PRE_DESPLIEGUE_NETTERM_2026-11-09.md).
+El estado local/sin despliegue indicado abajo corresponde a la entrega inicial;
+esta comprobacion no realizo un despliegue nuevo.
+
 Fecha: 09/11/2026. Implementado por Codex por indicacion explicita del usuario.
-Estado: implementacion local, sin commit/push/despliegue. No se modificaron modelos,
-migraciones, precios, importes, cantidades economicas o reglas de cierre.
+Entrega inicial: produccion y preview de respaldo sin decisiones persistidas ni
+cambios de modelos/economia. Ampliacion local del 10/11/2026: consumo estadistico de
+`VINCULAR` vigente y OK de respaldo persistido por linea en una tabla propia; incluye
+migracion `liquidacion.0060`. No modifica precios, importes, cantidades economicas ni
+reglas de cierre. Esta ampliacion no esta desplegada.
 
 ## Intencion del usuario
 
@@ -20,9 +30,11 @@ informes se muestran por separado. Netterm nunca recalcula valores economicos.
    jefe de servicio, como el panel actual). Elegir lotes de ambas fuentes; el
    periodo de fuentes corresponde al mes de la sesion. Consulta paginada por 50.
 
-Ambas vistas son GET/solo lectura. No se agrega confirmacion por pareja ni guardado
-de decisiones. No sustituyen ni alteran los endpoints historicos de estadisticas,
-el portal del director, los controles economicos o las revisiones persistidas.
+La consulta de produccion y el preview de respaldo son GET. La conciliacion mantiene
+su POST separado para registrar decisiones humanas. El respaldo agrega un POST
+explicito por linea inequívoca para persistir su OK de origen; no sustituye ni altera
+los endpoints historicos de estadisticas, el portal del director, los controles
+economicos o las revisiones EGES existentes.
 
 ## Produccion: reglas PRODUCCION_RESPALDADA_V1
 
@@ -124,8 +136,10 @@ se hayan realizado todas las unidades de la cantidad declarada. Los resultados
 expresan `cantidad_economica_validada=False` y `horario_economico_validado=False`.
 La cantidad declarada se muestra tal como esta guardada, sin correccion.
 
-No se llama `save`, `calcular_monto`, procesos de control o acciones de correccion
-economica. No se crean `ResultadoControlEgesRegistro` ni `RevisionCruceEgesRegistro`.
+El preview no llama `save`, `calcular_monto`, procesos de control ni acciones de
+correccion economica. El POST explicito de confirmacion solo crea
+`ValidacionRespaldoFuenteRegistro`; no crea `ResultadoControlEgesRegistro` ni
+`RevisionCruceEgesRegistro`.
 El **OK actual de Liquidacion y sus pendientes de cierre siguen con sus reglas**:
 un OK de respaldo no los convierte silenciosamente en OK economico. Integrar este
 respaldo en un checklist persistido exige distinguir esos alcances; no reutilizar
@@ -254,3 +268,23 @@ Estado: el objetivo funcional local de produccion/respaldo y la comprobacion de 
 estan logrados. Los cambios se preparan en la rama local, sin push, despliegue ni
 validacion en datos de produccion. Siguen pendientes la calibracion de
 equivalencias/nombres truncados con casos profesionales reales.
+
+## Consumo de conciliacion y respaldo persistido (10/11/2026)
+
+- Un `VINCULAR` vigente de `ConciliacionRevision`, para el mismo `firma_snapshot`,
+  basta para que produccion use ese par. Netterm confirma la misma practica, no
+  suma otra. Las reglas de realizacion, anulacion y exclusiones siguen vigentes;
+  `NO_VINCULAR` bloquea la fusion y deja el aporte Netterm como pendiente. El
+  resumen indica cuantas decisiones vigentes se consumieron.
+- En Liquidacion, una linea con `OK_EGES` o `OK_NETTERM` ofrece una confirmacion
+  explicita. El POST revalida el snapshot y persiste un
+  `ValidacionRespaldoFuenteRegistro` inmutable con linea, firma, lotes, evidencia,
+  actor y fecha. Cambios en la linea o las fuentes requieren una nueva validacion.
+- Este OK es respaldo de origen, no `RevisionCruceEgesRegistro.ESTADO_VALIDADO`:
+  no resuelve pendientes del cierre, no cambia montos/horarios/cantidades y no
+  llama al calculo economico. La identidad paciente del snapshot se guarda como
+  hash, no DNI en claro.
+- Verificacion local del 10/11: 217 tests OK, `makemigrations --check --dry-run`
+  sin cambios adicionales, `git diff --check` limpio y POST probado en SQLite
+  sintetica. Se comprobo monto/cantidad preservados y cero resultados/revisiones
+  EGES creados. La migracion `0060` y esta ampliacion siguen sin desplegar.

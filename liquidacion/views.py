@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import ListView, CreateView, TemplateView, UpdateView, DeleteView, DetailView
 from django.views.generic.edit import FormView
@@ -13,13 +13,16 @@ from django.core import signing
 from django.db.models import Sum, Count, Q, Prefetch, Case, When, IntegerField, prefetch_related_objects
 from django.utils.dateparse import parse_date
 from django.db import transaction
-from django.http import FileResponse, HttpResponse, HttpResponseRedirect
+from django.http import FileResponse, HttpResponse, HttpResponseRedirect, QueryDict
 from django.contrib.auth import get_user_model
 from decimal import Decimal, InvalidOperation
 import io, json
 import pandas as pd
 from eges_import.forms import PreviewConciliacionForm
-from .services_respaldo_fuentes import construir_preview_respaldo_fuentes
+from .services_respaldo_fuentes import (
+    construir_preview_respaldo_fuentes,
+    registrar_validacion_respaldo_fuente,
+)
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 from reportlab.lib.pagesizes import letter
@@ -1949,12 +1952,15 @@ class RespaldoFuentesPreviewView(LoginRequiredMixin, UserPassesTestMixin, Templa
         sesion = get_object_or_404(SesionContable, pk=self.kwargs['pk'])
         form = PreviewConciliacionForm(self.request.GET if self.request.GET else None)
         preview, pagina = None, None
+        lotes_eges_seleccionados, lotes_netterm_seleccionados = [], []
         if form.is_bound and form.is_valid():
+            lotes_eges_seleccionados = [l.pk for l in form.cleaned_data['lotes_eges']]
+            lotes_netterm_seleccionados = [l.pk for l in form.cleaned_data['lotes_netterm']]
             try:
                 preview = construir_preview_respaldo_fuentes(
                     sesion=sesion,
-                    batch_eges_ids=[l.pk for l in form.cleaned_data['lotes_eges']],
-                    lote_netterm_ids=[l.pk for l in form.cleaned_data['lotes_netterm']],
+                    batch_eges_ids=lotes_eges_seleccionados,
+                    lote_netterm_ids=lotes_netterm_seleccionados,
                     filtros=self.request.GET,
                 )
             except ValidationError as error:
@@ -1964,8 +1970,51 @@ class RespaldoFuentesPreviewView(LoginRequiredMixin, UserPassesTestMixin, Templa
         filtros = self.request.GET.copy()
         filtros.pop('page', None)
         context.update(sesion=sesion, form=form, preview=preview, pagina=pagina,
-                       filtros_query=filtros.urlencode(), estado_respaldo=self.request.GET.get('estado_respaldo', ''))
+                       filtros_query=filtros.urlencode(), estado_respaldo=self.request.GET.get('estado_respaldo', ''),
+                       lotes_eges_seleccionados=lotes_eges_seleccionados,
+                       lotes_netterm_seleccionados=lotes_netterm_seleccionados)
         return context
+
+
+class ValidarRespaldoFuentesView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        form = PreviewConciliacionForm(request.POST)
+        destino = reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': sesion.pk})
+        query = QueryDict('', mutable=True)
+        query.setlist('lotes_eges', request.POST.getlist('lotes_eges'))
+        query.setlist('lotes_netterm', request.POST.getlist('lotes_netterm'))
+        estado = request.POST.get('estado_respaldo', '')
+        if estado in {'', 'OK_RESPALDO', 'PARCIAL', 'REVISAR', 'SIN_RESPALDO'}:
+            query['estado_respaldo'] = estado
+        if query:
+            destino = f'{destino}?{query.urlencode()}'
+        if not form.is_valid():
+            messages.error(request, 'No se pudo validar la selección de lotes; vuelve a cargar la consulta.')
+            return redirect(destino)
+        try:
+            validacion, creada = registrar_validacion_respaldo_fuente(
+                sesion=sesion,
+                linea_id=request.POST.get('relacion_id'),
+                batch_eges_ids=[l.pk for l in form.cleaned_data['lotes_eges']],
+                lote_netterm_ids=[l.pk for l in form.cleaned_data['lotes_netterm']],
+                firma_esperada=request.POST.get('firma_validacion'),
+                usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            if creada:
+                messages.success(request, 'OK definitivo de respaldo guardado. No modifica montos ni horarios.')
+            else:
+                messages.info(request, f'El OK definitivo de respaldo #{validacion.pk} ya estaba guardado para esta versión.')
+        return redirect(destino)
 
 
 class CruceEgesLiquidacionPreviewView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

@@ -80,6 +80,7 @@
         <div class="rounded-md border border-gray-700 bg-gray-800 p-4"><p class="text-xs font-semibold uppercase text-gray-400">Tasa de finalización documentada</p><strong class="mt-2 block text-3xl font-bold text-white">{% if resultado.tasa_finalizacion != None %}{{ resultado.tasa_finalizacion }}%{% else %}Sin población{% endif %}</strong><p class="mt-1 text-sm text-gray-400">Informes / producción respaldada</p></div>
     </section>
     <p class="border-l-2 border-gray-600 pl-3 text-sm text-gray-400">Un informe se confirma si EGES indica Informado o una correspondencia Netterm inequívoca indica Definitivo. “Impreso” no se interpreta como definitivo; una anulación contradictoria impide usar ese respaldo Netterm.</p>
+    <p class="text-xs text-gray-400">Decisiones humanas vigentes aplicadas a este snapshot: {{ resultado.vinculaciones_humanas_consumidas }} vínculos · {{ resultado.vinculaciones_rechazadas_consumidas }} rechazos. No son validaciones económicas.</p>
     <section aria-labelledby="produccion-modalidad" class="space-y-3">
         <h2 id="produccion-modalidad" class="text-lg font-bold text-white">Producción por modalidad</h2>
         <div class="overflow-x-auto rounded-md border border-gray-700 bg-gray-800">

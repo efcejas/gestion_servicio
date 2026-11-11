@@ -2,8 +2,11 @@
 from collections import Counter, defaultdict
 from calendar import monthrange
 from datetime import date
+import hashlib
+import json
 
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 
 from eges_import.models import EgesRow, NettermFila
 from eges_import.services_conciliacion import (
@@ -11,6 +14,7 @@ from eges_import.services_conciliacion import (
 )
 from eges_import.services_produccion import realizada_eges, realizada_netterm
 from .services_eges import _tokens_nombre_medico
+from .models import RegistroEstudio, ValidacionRespaldoFuenteRegistro
 
 
 MAX_REGISTROS_RESPALDO = 10000
@@ -44,6 +48,34 @@ def _medico_coincide(medico, nombres):
     return len(esperado) >= 2 and all((medico.last_name, medico.first_name)) and any(
         esperado.issubset(_tokens_nombre_medico(nombre)) for nombre in nombres
     )
+
+
+def _snapshot_linea_respaldo(sesion, registro, relacion, linea, firma_fuentes):
+    estudio = relacion.estudio
+    snapshot = {
+        'version_reglas': 'RESPALDO_ORIGEN_V1',
+        'firma_fuentes': firma_fuentes,
+        'sesion_id': sesion.pk,
+        'registro_id': registro.pk,
+        'linea_id': relacion.pk,
+        'profesional_id': registro.medico_id,
+        'paciente_clave': _paciente_clave(registro.dni_paciente),
+        'fecha_del_informe': registro.fecha_del_informe,
+        'estudio': {
+            'id': estudio.pk,
+            'tipo': estudio.tipo,
+            'codigo': estudio.codigo,
+            'nombre': estudio.nombre,
+            'cantidad_declarada': relacion.cantidad,
+            'cantidad_liquidable': relacion.cantidad_liquidable,
+        },
+        'estado_respaldo': linea['estado'],
+        'evidencia': linea['evidencia'],
+    }
+    serializado = json.dumps(
+        snapshot, ensure_ascii=False, sort_keys=True, separators=(',', ':'), default=str,
+    )
+    return hashlib.sha256(serializado.encode('utf-8')).hexdigest(), json.loads(serializado)
 
 
 def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_ids, filtros=None):
@@ -154,10 +186,30 @@ def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_i
                 'reafirmado_netterm': reafirmado, 'motivos': motivos, 'evidencia': evidencia,
                 'cantidad_economica_validada': False, 'horario_economico_validado': False,
             })
+            firma_validacion, snapshot_validacion = _snapshot_linea_respaldo(
+                sesion, registro, relacion, lineas[-1], preview['firma_snapshot'],
+            )
+            lineas[-1]['firma_validacion'] = firma_validacion
+            lineas[-1]['snapshot_validacion'] = snapshot_validacion
         ok = sum(l['estado'].startswith('OK_') for l in lineas)
         estado = ('OK_RESPALDO' if lineas and ok == len(lineas) else 'PARCIAL' if ok
                   else 'REVISAR' if any(l['estado'] == 'REVISAR' for l in lineas) else 'SIN_RESPALDO')
         resultados.append({'registro': registro, 'estado_respaldo': estado, 'lineas': lineas})
+    lineas_por_clave = {
+        (linea['relacion_id'], linea['firma_validacion']): linea
+        for resultado in resultados for linea in resultado['lineas']
+    }
+    if lineas_por_clave:
+        validaciones = ValidacionRespaldoFuenteRegistro.objects.filter(
+            linea_estudio_id__in={linea_id for linea_id, _ in lineas_por_clave},
+            firma_fuentes=preview['firma_snapshot'],
+        ).select_related('validado_por')
+        for validacion in validaciones:
+            linea = lineas_por_clave.get((validacion.linea_estudio_id, validacion.firma_snapshot))
+            if linea:
+                linea['validacion_persistida'] = validacion
+    for linea in lineas_por_clave.values():
+        linea.setdefault('validacion_persistida', None)
     filtros = filtros or {}
     # Estos filtros afectan solo la presentacion, nunca la unicidad de la evidencia.
     if filtros.get('profesional'):
@@ -171,3 +223,61 @@ def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_i
         'firma_fuentes': preview['firma_snapshot'],
         'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],
     }
+
+
+def registrar_validacion_respaldo_fuente(
+    *, sesion, linea_id, batch_eges_ids, lote_netterm_ids, firma_esperada, usuario,
+):
+    try:
+        linea_id = int(linea_id)
+    except (TypeError, ValueError):
+        raise ValidationError('La línea profesional indicada no es válida.') from None
+    if not isinstance(firma_esperada, str) or len(firma_esperada) != 64:
+        raise ValidationError('La firma del respaldo no es válida; vuelve a cargar la consulta.')
+
+    try:
+        with transaction.atomic():
+            relacion = RegistroEstudio.objects.select_for_update().filter(
+                pk=linea_id,
+                registro__sesion_contable=sesion,
+                registro__anulado=False,
+            ).select_related('registro', 'estudio').first()
+            if relacion is None:
+                raise ValidationError('La línea profesional ya no pertenece a esta sesión.')
+            preview = construir_preview_respaldo_fuentes(
+                sesion=sesion,
+                batch_eges_ids=batch_eges_ids,
+                lote_netterm_ids=lote_netterm_ids,
+            )
+            linea = next((
+                linea
+                for resultado in preview['resultados']
+                for linea in resultado['lineas']
+                if linea['relacion_id'] == relacion.pk
+            ), None)
+            if linea is None or linea['estado'] not in {'OK_EGES', 'OK_NETTERM'}:
+                raise ValidationError('La línea ya no tiene respaldo inequívoco para validar.')
+            if linea['firma_validacion'] != firma_esperada:
+                raise ValidationError('Las fuentes o el registro cambiaron; vuelve a cargar el preview.')
+            validacion, creada = ValidacionRespaldoFuenteRegistro.objects.get_or_create(
+                linea_estudio=relacion,
+                firma_snapshot=linea['firma_validacion'],
+                defaults={
+                    'firma_fuentes': preview['firma_fuentes'],
+                    'version_reglas': preview['version_reglas'],
+                    'lotes_eges_ids': preview['batch_eges_ids'],
+                    'lotes_netterm_ids': preview['lote_netterm_ids'],
+                    'evidencia_json': linea['evidencia'],
+                    'snapshot_json': linea['snapshot_validacion'],
+                    'validado_por': usuario,
+                },
+            )
+            return validacion, creada
+    except IntegrityError:
+        validacion = ValidacionRespaldoFuenteRegistro.objects.filter(
+            linea_estudio_id=linea_id,
+            firma_snapshot=firma_esperada,
+        ).first()
+        if validacion:
+            return validacion, False
+        raise ValidationError('La validación cambió en paralelo; vuelve a cargar el preview.') from None

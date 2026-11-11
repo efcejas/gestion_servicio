@@ -5,6 +5,12 @@ Estado: importacion y conciliacion implementadas localmente. Consultas paralelas
 produccion y respaldo de origen disponibles; sin despliegue ni cambios economicos.
 Los dashboards EGES anteriores conservan sus reglas.
 
+Verificacion operativa posterior del 09/11/2026: el codigo de estas funciones ya
+esta presente en Heroku y 0010/0011/0012 figuran aplicadas, aunque la etiqueta de
+release reporta un commit anterior. Ver el
+[informe de publicacion y manifiesto de hashes](../operativa/REVISION_PRE_DESPLIEGUE_NETTERM_2026-11-09.md).
+Las menciones historicas a trabajo solo local describen las entregas previas.
+
 Entrega Codex del 09/11/2026:
 [produccion combinada y respaldo profesional](PRODUCCION_Y_RESPALDO_FUENTES_2026-11-09.md).
 
@@ -791,3 +797,24 @@ de identidad de importaciones simultaneas pertenecen a la fase de conciliacion.
 Siguiente fase: conciliacion y revision versionada contra EGES, con preview de
 coincidencias, exclusivos, ambiguos y conflictos. Dashboards y Liquidacion siguen
 sin consumir filas Netterm.
+
+## Seguimiento: consumo de decisiones y respaldo en Liquidacion (10/11/2026)
+
+La ampliacion local consume decisiones `VINCULAR` vigentes por `firma_snapshot` en
+`construir_preview_produccion`: el enlace humano basta para resolver el par y
+Netterm no suma una segunda practica. `NO_VINCULAR` bloquea la fusion y deja el
+aporte Netterm pendiente. Las reglas de realizacion, anulacion, insumos y modalidad
+siguen aplicandose. Doppler se agrupa en ECO; no se publica como una modalidad
+separada.
+
+Liquidacion persiste un OK de origen independiente en
+`ValidacionRespaldoFuenteRegistro`, por linea profesional y firma de snapshot,
+despues de una accion POST explicita. El OK no equivale a
+`RevisionCruceEgesRegistro.VALIDADO`, no resuelve gates del cierre y no toca montos,
+horarios o cantidades. El snapshot no conserva DNI en claro.
+
+La migracion `liquidacion.0060_validacionrespaldofuenteregistro` crea la auditoria
+separada. Al 10/11/2026, codigo y migracion son cambios locales: no se han aplicado
+ni desplegado en Heroku. Verificacion local: 217 tests OK, chequeo de migraciones
+sin cambios pendientes y POST validado en SQLite sintetica, con monto/cantidad
+preservados y sin registros de control EGES creados.

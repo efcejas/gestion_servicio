@@ -1,6 +1,7 @@
 """Produccion respaldada por origen, separada de informes y de cantidades economicas."""
 from collections import Counter
 
+from .models import ConciliacionRevision
 from .services_conciliacion import construir_preview_conciliacion, _texto_normalizado
 
 
@@ -29,11 +30,39 @@ def realizada_netterm(fila):
     return bool(fila['fecha_realizacion']) or fila['estado'] in {'DEFINITIVO', 'NO_DEFINITIVO', 'ESCRITO'}
 
 
+def _decisiones_vigentes(preview):
+    if not preview['permite_revision']:
+        return {}, set()
+    decisiones = ConciliacionRevision.objects.filter(
+        firma_snapshot=preview['firma_snapshot'],
+        batch_eges_id__in=preview['batch_eges_ids'],
+        fila_netterm_id__in={
+            caso['netterm']['id'] for caso in preview['resultados'] if caso['netterm']
+        },
+        revision_siguiente__isnull=True,
+    ).values_list('fila_netterm_id', 'fila_eges_id', 'decision')
+    vinculos, rechazos = {}, set()
+    for netterm_id, eges_id, decision in decisiones:
+        if decision == ConciliacionRevision.DECISION_VINCULAR:
+            vinculos.setdefault(netterm_id, set()).add(eges_id)
+        else:
+            rechazos.add((netterm_id, eges_id))
+    vinculos_unicos = {
+        netterm_id: next(iter(eges_ids))
+        for netterm_id, eges_ids in vinculos.items()
+        if len(eges_ids) == 1
+    }
+    return vinculos_unicos, rechazos
+
+
 def construir_preview_produccion(**seleccion):
     preview = construir_preview_conciliacion(**seleccion)
+    vinculos_validados, vinculos_rechazados = _decisiones_vigentes(preview)
     practicas = {}
     pendientes, excluidos = Counter(), Counter()
     estados_eges, estados_netterm = Counter(), Counter()
+    revisiones_vincular_consumidas = 0
+    revisiones_no_vincular_consumidas = 0
     for caso in preview['resultados']:
         for fila in caso['eges']:
             clave = ('EGES', fila['id'])
@@ -72,21 +101,40 @@ def construir_preview_produccion(**seleccion):
             pendientes['netterm_sin_fecha'] += 1
         elif not realizada_netterm(fila):
             pendientes['netterm_realizacion_sin_confirmar'] += 1
-        elif caso['identidad_coincidente']:
-            item = practicas[('EGES', caso['eges'][0]['id'])]
-            if not item['incluida']:
-                # Netterm puede confirmar actividad aun cuando EGES no la confirma.
-                item.update(incluida=True, fuente='NETTERM', informada=False)
-                pendientes['eges_realizacion_sin_confirmar'] -= 1
-            item['informada'] = item['informada'] or fila['estado'] == 'DEFINITIVO'
-        elif caso['estado'] == 'SOLO_NETTERM':
-            modalidad = 'ECO' if fila['modalidad'] in {'ECO_GENERAL', 'DOP', 'ECOCAR'} else fila['modalidad']
-            practicas[('NETTERM', fila['id'])] = {
-                'fila': {**fila, 'modalidad': modalidad}, 'incluida': True,
-                'fuente': 'NETTERM', 'informada': fila['estado'] == 'DEFINITIVO',
-            }
         else:
-            pendientes['netterm_correspondencia'] += 1
+            netterm_id = fila['id']
+            eges_id_validado = vinculos_validados.get(netterm_id)
+            eges_vinculado = next(
+                (eges for eges in caso['eges'] if eges['id'] == eges_id_validado), None,
+            ) if eges_id_validado else None
+            rechazado_unico = (
+                len(caso['eges']) == 1
+                and (netterm_id, caso['eges'][0]['id']) in vinculos_rechazados
+            )
+            vinculo_automatico = (
+                caso['identidad_coincidente']
+                and not (caso['eges'] and (netterm_id, caso['eges'][0]['id']) in vinculos_rechazados)
+            )
+            if eges_vinculado or vinculo_automatico:
+                eges_vinculado = eges_vinculado or caso['eges'][0]
+                item = practicas[('EGES', eges_vinculado['id'])]
+                if eges_id_validado:
+                    revisiones_vincular_consumidas += 1
+                if not item['incluida']:
+                    # Netterm confirms a performed practice but never adds a second copy.
+                    item.update(incluida=True, fuente='NETTERM', informada=False)
+                    pendientes['eges_realizacion_sin_confirmar'] -= 1
+                item['informada'] = item['informada'] or fila['estado'] == 'DEFINITIVO'
+            elif caso['estado'] == 'SOLO_NETTERM':
+                modalidad = 'ECO' if fila['modalidad'] in {'ECO_GENERAL', 'DOP', 'ECOCAR'} else fila['modalidad']
+                practicas[('NETTERM', netterm_id)] = {
+                    'fila': {**fila, 'modalidad': modalidad}, 'incluida': True,
+                    'fuente': 'NETTERM', 'informada': fila['estado'] == 'DEFINITIVO',
+                }
+            else:
+                if rechazado_unico:
+                    revisiones_no_vincular_consumidas += 1
+                pendientes['netterm_correspondencia'] += 1
     incluidos = [p for p in practicas.values() if p['incluida']]
     produccion, informadas = Counter(), Counter()
     pacientes = set()
@@ -103,6 +151,8 @@ def construir_preview_produccion(**seleccion):
     modalidades = sorted({m for m, _ in produccion})
     return {
         'version_reglas': 'PRODUCCION_RESPALDADA_V1', 'provisional': True,
+        'vinculaciones_humanas_consumidas': revisiones_vincular_consumidas,
+        'vinculaciones_rechazadas_consumidas': revisiones_no_vincular_consumidas,
         'total_produccion': total,
         'base_eges': sum(n for (m, f), n in produccion.items() if f == 'EGES'),
         'aporte_netterm': sum(n for (m, f), n in produccion.items() if f == 'NETTERM'),

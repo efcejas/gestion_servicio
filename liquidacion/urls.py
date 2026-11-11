@@ -43,6 +43,7 @@ from .views import (
     AuditoriaEcoCorreccionPacsBulkView,
     CruceEgesLiquidacionPreviewView,
     RespaldoFuentesPreviewView,
+    ValidarRespaldoFuentesView,
     CruceEgesProcesarControlView,
     CruceEgesReanalizarJornadasView,
     CruceEgesBulkValidarOkView,
@@ -182,6 +183,11 @@ urlpatterns = [
         'sesiones/<int:pk>/respaldo-fuentes/',
         RespaldoFuentesPreviewView.as_view(),
         name='respaldo_fuentes_preview',
+    ),
+    path(
+        'sesiones/<int:pk>/respaldo-fuentes/validar/',
+        ValidarRespaldoFuentesView.as_view(),
+        name='respaldo_fuentes_validar',
     ),
     path(
         'sesiones/<int:pk>/cruce-eges/',

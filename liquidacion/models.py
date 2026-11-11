@@ -1984,6 +1984,65 @@ class RevisionCruceEgesRegistro(models.Model):
         return f"Revision EGES registro #{self.registro_id} - {self.estado}"
 
 
+class ValidacionRespaldoFuenteQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        raise ValidationError('Las validaciones de respaldo son inmutables.')
+
+    def delete(self):
+        raise ValidationError('Las validaciones de respaldo no se eliminan.')
+
+
+class ValidacionRespaldoFuenteRegistro(models.Model):
+    """OK de origen persistido; no resuelve el control EGES ni altera importes."""
+
+    linea_estudio = models.ForeignKey(
+        'RegistroEstudio',
+        on_delete=models.PROTECT,
+        related_name='validaciones_respaldo_fuentes',
+    )
+    estado = models.CharField(max_length=20, default='OK_RESPALDO', editable=False)
+    firma_snapshot = models.CharField(max_length=64)
+    firma_fuentes = models.CharField(max_length=64)
+    version_reglas = models.CharField(max_length=60)
+    lotes_eges_ids = models.JSONField(default=list)
+    lotes_netterm_ids = models.JSONField(default=list)
+    evidencia_json = models.JSONField(default=list)
+    snapshot_json = models.JSONField(default=dict)
+    validado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='validaciones_respaldo_fuentes',
+    )
+    fecha_validacion = models.DateTimeField(default=timezone.now)
+    objects = ValidacionRespaldoFuenteQuerySet.as_manager()
+
+    class Meta:
+        verbose_name = 'Validacion de respaldo de fuente'
+        verbose_name_plural = 'Validaciones de respaldo de fuentes'
+        ordering = ['-fecha_validacion', '-pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['linea_estudio', 'firma_snapshot'],
+                name='liq_respaldo_linea_snapshot_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['linea_estudio', '-fecha_validacion']),
+            models.Index(fields=['firma_fuentes']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Las validaciones de respaldo son inmutables.')
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise ValidationError('Las validaciones de respaldo no se eliminan.')
+
+    def __str__(self):
+        return f"OK de respaldo linea #{self.linea_estudio_id}"
+
+
 class ControlEgesSesion(models.Model):
     """Ejecucion persistida del cruce EGES de una sesion contable."""
 

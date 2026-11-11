@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -9,7 +10,8 @@ from django.urls import reverse
 
 from eges_import.tests_produccion import FuentesSinteticasMixin
 from .models import (Estudios, RegistroEstudio, RegistroEstudiosPorMedico, SesionContable,
-                     ResultadoControlEgesRegistro, RevisionCruceEgesRegistro)
+                     ResultadoControlEgesRegistro, RevisionCruceEgesRegistro,
+                     ValidacionRespaldoFuenteRegistro)
 from .services_respaldo_fuentes import construir_preview_respaldo_fuentes
 
 
@@ -34,6 +36,21 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
     def respaldo(self, **filtros):
         return construir_preview_respaldo_fuentes(sesion=self.sesion, batch_eges_ids=[self.batch.pk],
                                                   lote_netterm_ids=[self.lote.pk], filtros=filtros)
+
+    def parametros_preview(self):
+        return {'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk]}
+
+    def validar_linea(self, linea):
+        return self.client.post(
+            reverse('liquidacion:respaldo_fuentes_validar', kwargs={'pk': self.sesion.pk}),
+            {
+                'relacion_id': linea['relacion_id'],
+                'firma_validacion': linea['firma_validacion'],
+                'lotes_eges': [self.batch.pk],
+                'lotes_netterm': [self.lote.pk],
+                'estado_respaldo': '',
+            },
+        )
 
     def test_faltante_eges_tiene_respaldo_netterm_sin_certificar_cantidad_o_monto(self):
         registro = self.registro(cantidad=3)
@@ -135,6 +152,94 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
         resultado = self.respaldo()['resultados'][0]
         self.assertEqual(resultado['estado_respaldo'], 'OK_RESPALDO')
         self.assertCountEqual([l['estado'] for l in resultado['lineas']], ['OK_EGES', 'OK_NETTERM'])
+
+    def test_persistir_ok_eges_netterm_no_modifica_datos_ni_control_economico(self):
+        registro = self.registro(cantidad=2)
+        self.eges(estado_turno='Fin Practica')
+        self.netterm()
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('1234.56'))
+        self.client.force_login(self.usuario)
+        url = reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': self.sesion.pk})
+        response = self.client.get(url, self.parametros_preview())
+        linea = response.context['pagina'][0]['lineas'][0]
+        monto_antes = RegistroEstudiosPorMedico.objects.get(pk=registro.pk).monto_calculado
+        cantidad_antes = RegistroEstudio.objects.get(registro=registro).cantidad
+
+        guardado = self.validar_linea(linea)
+
+        self.assertEqual(guardado.status_code, 302)
+        validacion = ValidacionRespaldoFuenteRegistro.objects.get(linea_estudio_id=linea['relacion_id'])
+        self.assertEqual(validacion.estado, 'OK_RESPALDO')
+        self.assertEqual(validacion.evidencia_json, linea['evidencia'])
+        self.assertEqual(validacion.validado_por, self.usuario)
+        self.assertNotIn('12345678', str(validacion.snapshot_json))
+        self.assertEqual(RegistroEstudiosPorMedico.objects.get(pk=registro.pk).monto_calculado, monto_antes)
+        self.assertEqual(RegistroEstudio.objects.get(registro=registro).cantidad, cantidad_antes)
+        self.assertFalse(ResultadoControlEgesRegistro.objects.exists())
+        self.assertFalse(RevisionCruceEgesRegistro.objects.exists())
+
+        actualizado = self.client.get(url, self.parametros_preview())
+        linea_actualizada = actualizado.context['pagina'][0]['lineas'][0]
+        self.assertEqual(linea_actualizada['validacion_persistida'].pk, validacion.pk)
+        self.assertContains(actualizado, 'OK definitivo de respaldo')
+        self.assertNotContains(actualizado, 'Confirmar OK definitivo')
+        self.assertRaises(ValidationError, validacion.delete)
+        self.assertRaises(
+            ValidationError,
+            lambda: ValidacionRespaldoFuenteRegistro.objects.filter(pk=validacion.pk).update(estado='ANULADO'),
+        )
+
+    def test_persistir_ok_netterm_solo_si_coincide_con_linea_y_profesional(self):
+        registro = self.registro(cantidad=1)
+        self.netterm()
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('1234.56'))
+        self.client.force_login(self.usuario)
+        url = reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': self.sesion.pk})
+        response = self.client.get(url, self.parametros_preview())
+        linea = response.context['pagina'][0]['lineas'][0]
+        self.assertEqual(linea['estado'], 'OK_NETTERM')
+
+        guardado = self.validar_linea(linea)
+
+        self.assertEqual(guardado.status_code, 302)
+        validacion = ValidacionRespaldoFuenteRegistro.objects.get(linea_estudio_id=linea['relacion_id'])
+        self.assertEqual([e['origen'] for e in validacion.evidencia_json], ['NETTERM'])
+        self.assertEqual(RegistroEstudiosPorMedico.objects.get(pk=registro.pk).monto_calculado, Decimal('1234.56'))
+        self.assertFalse(ResultadoControlEgesRegistro.objects.exists())
+        self.assertFalse(RevisionCruceEgesRegistro.objects.exists())
+
+    def test_post_respaldo_rechaza_linea_ambigua_y_usuario_sin_permiso(self):
+        registro = self.registro()
+        otro_medico = get_user_model().objects.create_user(
+            username='otro_respaldo', first_name='Otro', last_name='Profesional',
+        )
+        self.registro(medico=otro_medico)
+        self.netterm()
+        self.client.force_login(self.usuario)
+        url = reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': self.sesion.pk})
+        response = self.client.get(url, self.parametros_preview())
+        linea = response.context['pagina'][0]['lineas'][0]
+        self.assertEqual(linea['estado'], 'REVISAR')
+        self.assertEqual(self.validar_linea(linea).status_code, 302)
+        self.assertFalse(ValidacionRespaldoFuenteRegistro.objects.exists())
+        self.client.force_login(self.medico)
+        self.assertEqual(self.validar_linea(linea).status_code, 302)
+        self.assertFalse(ValidacionRespaldoFuenteRegistro.objects.exists())
+
+    def test_post_respaldo_rechaza_snapshot_obsoleto(self):
+        registro = self.registro(cantidad=1)
+        self.eges()
+        self.netterm()
+        self.client.force_login(self.usuario)
+        response = self.client.get(
+            reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': self.sesion.pk}),
+            self.parametros_preview(),
+        )
+        linea = response.context['pagina'][0]['lineas'][0]
+        RegistroEstudio.objects.filter(registro=registro).update(cantidad=2)
+
+        self.assertEqual(self.validar_linea(linea).status_code, 302)
+        self.assertFalse(ValidacionRespaldoFuenteRegistro.objects.exists())
 
     @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
     def test_vista_restringida_renderiza_respaldo_y_no_admite_escrituras(self):
