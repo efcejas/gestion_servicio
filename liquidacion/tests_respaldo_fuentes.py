@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -48,6 +48,19 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
                 'firma_validacion': linea['firma_validacion'],
                 'lotes_eges': [self.batch.pk],
                 'lotes_netterm': [self.lote.pk],
+                'estado_respaldo': '',
+            },
+        )
+
+    def validar_lineas_masivo(self, preview, linea_ids):
+        return self.client.post(
+            reverse('liquidacion:respaldo_fuentes_validar_masivo', kwargs={'pk': self.sesion.pk}),
+            {
+                'relacion_ids': linea_ids,
+                'firma_fuentes': preview['firma_fuentes'],
+                'lotes_eges': [self.batch.pk],
+                'lotes_netterm': [self.lote.pk],
+                'page': '1',
                 'estado_respaldo': '',
             },
         )
@@ -240,6 +253,51 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
 
         self.assertEqual(self.validar_linea(linea).status_code, 302)
         self.assertFalse(ValidacionRespaldoFuenteRegistro.objects.exists())
+
+    def test_confirmar_multiples_ok_visibles_es_idempotente_y_no_economico(self):
+        registro = self.registro(cantidad=2)
+        renal = Estudios.objects.create(nombre='ECOGRAFIA RENAL', codigo='180113', tipo='ECO', conteo_regiones=1)
+        renal_linea = RegistroEstudio.objects.create(registro=registro, estudio=renal, cantidad=1)
+        self.eges()
+        self.eges(codigo_practica='180113', practica='ECOGRAFIA RENAL', hora_turno=time(11))
+        self.netterm()
+        self.netterm(pedido='2', codigo='180113', practica='ECOGRAFIA RENAL')
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('1234.56'))
+        self.client.force_login(self.usuario)
+        preview = self.respaldo()
+        lineas = preview['resultados'][0]['lineas']
+        self.assertCountEqual([linea['estado'] for linea in lineas], ['OK_EGES', 'OK_EGES'])
+        ids = [linea['relacion_id'] for linea in lineas]
+        monto_antes = RegistroEstudiosPorMedico.objects.get(pk=registro.pk).monto_calculado
+        cantidades_antes = list(RegistroEstudio.objects.filter(registro=registro).order_by('pk').values_list('cantidad', flat=True))
+
+        primera = self.validar_lineas_masivo(preview, ids)
+        segunda = self.validar_lineas_masivo(preview, ids)
+
+        self.assertEqual(primera.status_code, 302)
+        self.assertEqual(segunda.status_code, 302)
+        self.assertEqual(ValidacionRespaldoFuenteRegistro.objects.count(), 2)
+        self.assertEqual(RegistroEstudiosPorMedico.objects.get(pk=registro.pk).monto_calculado, monto_antes)
+        self.assertEqual(list(RegistroEstudio.objects.filter(registro=registro).order_by('pk').values_list('cantidad', flat=True)), cantidades_antes)
+        self.assertEqual(renal_linea.cantidad, 1)
+        self.assertFalse(ResultadoControlEgesRegistro.objects.exists())
+        self.assertFalse(RevisionCruceEgesRegistro.objects.exists())
+
+    def test_confirmacion_masiva_rechaza_seleccion_invalida_sin_escrituras_parciales(self):
+        registro = self.registro()
+        self.eges()
+        self.netterm()
+        RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('1234.56'))
+        self.client.force_login(self.usuario)
+        preview = self.respaldo()
+        linea_id = preview['resultados'][0]['lineas'][0]['relacion_id']
+
+        response = self.validar_lineas_masivo(preview, [linea_id, 999999])
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ValidacionRespaldoFuenteRegistro.objects.exists())
+        registro.refresh_from_db()
+        self.assertEqual(registro.monto_calculado, Decimal('1234.56'))
 
     @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
     def test_vista_restringida_renderiza_respaldo_y_no_admite_escrituras(self):

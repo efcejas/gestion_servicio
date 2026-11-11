@@ -6,6 +6,7 @@ import hashlib
 import json
 
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 
 from eges_import.models import EgesRow, NettermFila
@@ -259,19 +260,7 @@ def registrar_validacion_respaldo_fuente(
                 raise ValidationError('La línea ya no tiene respaldo inequívoco para validar.')
             if linea['firma_validacion'] != firma_esperada:
                 raise ValidationError('Las fuentes o el registro cambiaron; vuelve a cargar el preview.')
-            validacion, creada = ValidacionRespaldoFuenteRegistro.objects.get_or_create(
-                linea_estudio=relacion,
-                firma_snapshot=linea['firma_validacion'],
-                defaults={
-                    'firma_fuentes': preview['firma_fuentes'],
-                    'version_reglas': preview['version_reglas'],
-                    'lotes_eges_ids': preview['batch_eges_ids'],
-                    'lotes_netterm_ids': preview['lote_netterm_ids'],
-                    'evidencia_json': linea['evidencia'],
-                    'snapshot_json': linea['snapshot_validacion'],
-                    'validado_por': usuario,
-                },
-            )
+            validacion, creada = _persistir_validacion_respaldo(relacion, linea, preview, usuario)
             return validacion, creada
     except IntegrityError:
         validacion = ValidacionRespaldoFuenteRegistro.objects.filter(
@@ -281,3 +270,79 @@ def registrar_validacion_respaldo_fuente(
         if validacion:
             return validacion, False
         raise ValidationError('La validación cambió en paralelo; vuelve a cargar el preview.') from None
+
+
+def _persistir_validacion_respaldo(relacion, linea, preview, usuario):
+    return ValidacionRespaldoFuenteRegistro.objects.get_or_create(
+        linea_estudio=relacion,
+        firma_snapshot=linea['firma_validacion'],
+        defaults={
+            'firma_fuentes': preview['firma_fuentes'],
+            'version_reglas': preview['version_reglas'],
+            'lotes_eges_ids': preview['batch_eges_ids'],
+            'lotes_netterm_ids': preview['lote_netterm_ids'],
+            'evidencia_json': linea['evidencia'],
+            'snapshot_json': linea['snapshot_validacion'],
+            'validado_por': usuario,
+        },
+    )
+
+
+def registrar_validaciones_respaldo_fuentes(
+    *, sesion, linea_ids, batch_eges_ids, lote_netterm_ids, firma_fuentes_esperada,
+    pagina, filtros=None, usuario,
+):
+    try:
+        ids = [int(value) for value in linea_ids]
+        pagina = int(pagina)
+    except (TypeError, ValueError):
+        raise ValidationError('La selección de líneas no es válida.') from None
+    if not ids or len(ids) > 50 or len(ids) != len(set(ids)):
+        raise ValidationError('Selecciona entre 1 y 50 líneas distintas de esta página.')
+    if pagina < 1:
+        raise ValidationError('La página seleccionada no es válida.')
+
+    creadas = 0
+    existentes = 0
+    try:
+        with transaction.atomic():
+            relaciones_bloqueadas = list(RegistroEstudio.objects.select_for_update().filter(
+                pk__in=ids,
+                registro__sesion_contable=sesion,
+                registro__anulado=False,
+            ).values_list('pk', flat=True))
+            if len(relaciones_bloqueadas) != len(ids):
+                raise ValidationError('Una o más líneas ya no pertenecen a esta sesión.')
+            relaciones_por_id = {
+                relacion.pk: relacion
+                for relacion in RegistroEstudio.objects.filter(pk__in=relaciones_bloqueadas).select_related(
+                    'registro', 'estudio',
+                )
+            }
+            preview = construir_preview_respaldo_fuentes(
+                sesion=sesion,
+                batch_eges_ids=batch_eges_ids,
+                lote_netterm_ids=lote_netterm_ids,
+                filtros=filtros,
+            )
+            if preview['firma_fuentes'] != firma_fuentes_esperada:
+                raise ValidationError('Las fuentes cambiaron; vuelve a cargar el preview antes de confirmar.')
+            pagina_actual = Paginator(preview['resultados'], 50).get_page(pagina)
+            lineas_visibles = {
+                linea['relacion_id']: linea
+                for resultado in pagina_actual.object_list
+                for linea in resultado['lineas']
+            }
+            if any(linea_id not in lineas_visibles for linea_id in ids):
+                raise ValidationError('La selección contiene líneas que no están visibles en esta página.')
+            if any(lineas_visibles[linea_id]['estado'] not in {'OK_EGES', 'OK_NETTERM'} for linea_id in ids):
+                raise ValidationError('Solo se pueden confirmar líneas con OK inequívoco de respaldo.')
+            for linea_id in ids:
+                _, creada = _persistir_validacion_respaldo(
+                    relaciones_por_id[linea_id], lineas_visibles[linea_id], preview, usuario,
+                )
+                creadas += int(creada)
+                existentes += int(not creada)
+    except IntegrityError:
+        raise ValidationError('Una o más líneas se confirmaron en paralelo; vuelve a cargar la página.') from None
+    return {'creadas': creadas, 'existentes': existentes, 'total': len(ids)}

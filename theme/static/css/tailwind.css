@@ -3464,10 +3464,6 @@ input:checked + .toggle-bg {
   max-height: 15rem;
 }
 
-.max-h-64 {
-  max-height: 16rem;
-}
-
 .max-h-72 {
   max-height: 18rem;
 }
@@ -292213,6 +292209,16 @@ input:checked + .toggle-bg {
   .xl\:text-5xl {
     font-size: 3rem;
     line-height: 1;
+  }
+}
+
+@media (min-width: 1536px) {
+  .\32xl\:block {
+    display: block;
+  }
+
+  .\32xl\:hidden {
+    display: none;
   }
 }
 

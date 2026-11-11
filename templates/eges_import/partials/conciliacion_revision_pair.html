@@ -1,0 +1,36 @@
+{% for par in item.pares_revision %}
+<div class="space-y-2 border-t border-gray-700 pt-2">
+    {% if par.revision_actual %}
+    <p class="text-xs font-semibold text-teal-300">Decision vigente: {{ par.revision_actual.get_decision_display }} · revision #{{ par.revision_actual.pk }}</p>
+    {% elif item.requiere_revision_produccion %}
+    <p class="text-xs font-semibold text-amber-300">Excepción sin decisión vigente</p>
+    {% else %}
+    <p class="text-xs text-gray-400">Sin revisión individual requerida para producción.</p>
+    {% endif %}
+    {% if par.historial %}
+    <details><summary class="cursor-pointer text-xs text-gray-300">Historial ({{ par.historial|length }})</summary>
+        {% for revision in par.historial %}<div class="mt-2 border-l border-gray-600 pl-2 text-xs text-gray-400"><p>#{{ revision.pk }} · {{ revision.get_decision_display }} · {{ revision.fecha_revision|date:"d/m/Y H:i" }} · {{ revision.revisado_por.get_username }}</p><p>{{ revision.motivo }}</p>{% if revision.reemplaza_revision_id %}<p>Reemplaza revisión #{{ revision.reemplaza_revision_id }}</p>{% endif %}</div>{% endfor %}
+    </details>
+    {% endif %}
+    {% if preview.permite_revision and item.requiere_revision_produccion %}
+    <details open><summary class="cursor-pointer text-xs font-semibold text-amber-200">Revisar pareja candidata</summary>
+        <form method="post" action="{% url 'eges_import:guardar_revision_conciliacion' %}" class="mt-2 space-y-2">
+            {% csrf_token %}
+            <input type="hidden" name="batch_eges_id" value="{{ preview.batch_eges_id }}">
+            <input type="hidden" name="lote_netterm_ids" value="{{ preview.lote_netterm_ids|join:"," }}">
+            <input type="hidden" name="fila_netterm_id" value="{{ item.netterm.id }}">
+            <input type="hidden" name="fila_eges_id" value="{{ par.eges.id }}">
+            <input type="hidden" name="firma_snapshot" value="{{ preview.firma_snapshot }}">
+            <input type="hidden" name="estado" value="{{ estado_seleccionado }}">
+            <label class="block text-xs text-gray-200" for="decision-{{ control_prefix }}-{{ item.netterm.id }}-{{ par.eges.id }}">Decisión</label>
+            <select id="decision-{{ control_prefix }}-{{ item.netterm.id }}-{{ par.eges.id }}" name="decision" required class="w-full rounded-md border border-gray-500 bg-gray-900 p-2 text-sm text-white">
+                <option value="">Seleccionar decisión</option><option value="VINCULAR">Vincular tras revisión humana</option><option value="NO_VINCULAR">No vincular</option>
+            </select>
+            <label class="block text-xs text-gray-200" for="motivo-{{ control_prefix }}-{{ item.netterm.id }}-{{ par.eges.id }}">Motivo obligatorio; no incluyas datos personales</label>
+            <textarea id="motivo-{{ control_prefix }}-{{ item.netterm.id }}-{{ par.eges.id }}" name="motivo" required minlength="8" maxlength="2000" rows="2" class="w-full rounded-md border border-gray-500 bg-gray-900 p-2 text-sm text-white"></textarea>
+            <button type="submit" class="inline-flex min-h-9 items-center rounded-md bg-teal-700 px-3 text-sm font-semibold text-white hover:bg-teal-800">Guardar revisión</button>
+        </form>
+    </details>
+    {% endif %}
+</div>
+{% endfor %}

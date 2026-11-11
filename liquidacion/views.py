@@ -22,6 +22,7 @@ from eges_import.forms import PreviewConciliacionForm
 from .services_respaldo_fuentes import (
     construir_preview_respaldo_fuentes,
     registrar_validacion_respaldo_fuente,
+    registrar_validaciones_respaldo_fuentes,
 )
 from datetime import datetime, date, timedelta
 from collections import defaultdict
@@ -2014,6 +2015,53 @@ class ValidarRespaldoFuentesView(LoginRequiredMixin, UserPassesTestMixin, View):
                 messages.success(request, 'OK definitivo de respaldo guardado. No modifica montos ni horarios.')
             else:
                 messages.info(request, f'El OK definitivo de respaldo #{validacion.pk} ya estaba guardado para esta versión.')
+        return redirect(destino)
+
+
+class ValidarRespaldoFuentesMasivoView(LoginRequiredMixin, UserPassesTestMixin, View):
+    def test_func(self):
+        return _puede_acceder_panel_administrativo(self.request.user)
+
+    def handle_no_permission(self):
+        return redirect('home')
+
+    def post(self, request, *args, **kwargs):
+        sesion = get_object_or_404(SesionContable, pk=kwargs['pk'])
+        form = PreviewConciliacionForm(request.POST)
+        query = QueryDict('', mutable=True)
+        query.setlist('lotes_eges', request.POST.getlist('lotes_eges'))
+        query.setlist('lotes_netterm', request.POST.getlist('lotes_netterm'))
+        estado = request.POST.get('estado_respaldo', '')
+        if estado in {'', 'OK_RESPALDO', 'PARCIAL', 'REVISAR', 'SIN_RESPALDO'}:
+            query['estado_respaldo'] = estado
+        pagina = request.POST.get('page', '1')
+        if pagina.isdigit() and int(pagina) > 1:
+            query['page'] = pagina
+        destino = reverse('liquidacion:respaldo_fuentes_preview', kwargs={'pk': sesion.pk})
+        if query:
+            destino = f'{destino}?{query.urlencode()}'
+        if not form.is_valid():
+            messages.error(request, 'No se pudo validar la selección de lotes; vuelve a cargar la consulta.')
+            return redirect(destino)
+        try:
+            resultado = registrar_validaciones_respaldo_fuentes(
+                sesion=sesion,
+                linea_ids=request.POST.getlist('relacion_ids'),
+                batch_eges_ids=[l.pk for l in form.cleaned_data['lotes_eges']],
+                lote_netterm_ids=[l.pk for l in form.cleaned_data['lotes_netterm']],
+                firma_fuentes_esperada=request.POST.get('firma_fuentes'),
+                pagina=pagina,
+                filtros={'estado_respaldo': estado},
+                usuario=request.user,
+            )
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            messages.success(
+                request,
+                f"OK definitivos guardados: {resultado['creadas']}; ya existentes: "
+                f"{resultado['existentes']}. No se modificaron montos ni horarios.",
+            )
         return redirect(destino)
 
 

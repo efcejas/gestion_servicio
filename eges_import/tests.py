@@ -992,6 +992,33 @@ class ConciliacionViewTest(TestCase):
         self.assertContains(response, '01/11/2026')
         self.assertEqual(len(response.context['resultados']), 1)
 
+    def test_preview_busca_lotes_y_no_invita_a_revisar_coincidencia_verde(self):
+        self.client.force_login(self.usuario)
+        response = self.client.get(self.url, self.parametros)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Buscar lote EGES')
+        self.assertContains(response, 'Buscar lote Netterm')
+        self.assertContains(response, 'Seleccionar visibles')
+        self.assertContains(response, 'Coincidencia candidata')
+        self.assertNotContains(response, 'Registrar revisión opcional')
+
+    def test_preview_muestra_revision_manual_para_ambiguedad(self):
+        self.client.force_login(self.usuario)
+        EgesRow.objects.create(
+            batch=self.batch, dni_paciente='00123456', fecha_turno=date(2026, 10, 31),
+            hora_turno=time(11), practica='ECOGRAFIA COMPLETA DE ABDOMEN',
+            codigo_practica='180112/0', estado_turno='Informado', medico_informante='INFORMANTE FICTICIO',
+        )
+
+        response = self.client.get(self.url, self.parametros)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ambiguo')
+        self.assertContains(response, 'Revisar pareja candidata')
+        self.assertContains(response, 'class="block text-xs text-gray-200"')
+        self.assertNotContains(response, 'Registrar revisión opcional')
+
     def test_filtro_no_altera_resumen_global_y_estado_vacio(self):
         self.client.force_login(self.usuario)
         response = self.client.get(self.url, {**self.parametros, 'estado': 'SOLO_NETTERM'})
