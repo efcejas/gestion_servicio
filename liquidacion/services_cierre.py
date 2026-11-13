@@ -88,7 +88,7 @@ def construir_checklist_cierre_sesion(
     if control_eges['estado'] == 'NO_REALIZADO':
         estado_control_eges = 'pendiente'
         detalle_control_eges = 'Control no realizado'
-        pendientes_control_eges = 0
+        pendientes_control_eges = control_eges['pendientes']
     elif control_eges['desactualizado']:
         estado_control_eges = 'advertencia'
         detalle_control_eges = 'Hay registros posteriores al control'
@@ -99,7 +99,9 @@ def construir_checklist_cierre_sesion(
         detalle_control_eges = f'{pendientes_control_eges} caso(s) pendiente(s)'
     else:
         estado_control_eges = 'ok'
-        detalle_control_eges = 'Control completo'
+        detalle_control_eges = 'Respaldo TC completo' if not control_eges.get('control') and control_eges.get('total_tomografia') else 'Control completo'
+        if control_eges.get('resueltos_respaldo'):
+            detalle_control_eges += f"; {control_eges['resueltos_respaldo']} respaldado(s) por fuentes complementarias"
         pendientes_control_eges = 0
 
     if requisito_rrhh is None:
@@ -161,7 +163,7 @@ def construir_checklist_cierre_sesion(
         ),
         _item(
             'control_eges',
-            'Control EGES',
+            'Control EGES + respaldo de fuentes',
             estado_control_eges,
             detalle_control_eges,
             pendientes_control_eges,

@@ -8,12 +8,12 @@
             <h1 class="mt-1 text-2xl font-bold text-slate-950">Respaldo EGES + Netterm</h1>
             <p class="mt-1 text-sm text-slate-600">Evidencia de práctica y profesional; incluye ecografía y tomografía.</p>
         </div>
-        <a class="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="{% url 'liquidacion:cruce_eges_liquidacion_preview' sesion.pk %}">Control EGES actual</a>
+        <a class="inline-flex min-h-10 items-center rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" href="{% url 'liquidacion:sesiones_list' %}">Volver a sesiones</a>
     </header>
 
     <div role="note" class="flex gap-3 border-l-4 border-indigo-600 bg-indigo-50 p-4 text-sm text-indigo-950">
         <span class="font-bold" aria-hidden="true">i</span>
-        <p>El OK confirma evidencia de origen. No certifica cantidades ni horarios económicos, no modifica montos y no reemplaza las validaciones del control EGES.</p>
+        <p>El OK confirmado resuelve el respaldo de tomografía y la ausencia de EGES en el control ECO de cierre cuando todas las prácticas del registro tienen respaldo vigente. No certifica cantidades ni horarios económicos, no modifica montos y conserva las diferencias que requieren revisión.</p>
     </div>
 
     <form method="get" class="space-y-4 border-y border-slate-200 py-4">

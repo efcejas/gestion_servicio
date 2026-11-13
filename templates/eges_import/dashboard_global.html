@@ -7,6 +7,11 @@
 {% block page_description %}Análisis consolidado de todos los lotes importados{% if fecha_min and fecha_max %} · Período: {{ fecha_min|date:"d/m/Y" }} - {{ fecha_max|date:"d/m/Y" }}{% endif %}{% endblock %}
 
 {% block content %}
+<section aria-label="Producción del servicio EGES y Netterm">
+{% include "eges_import/partials/produccion_fuentes.html" with form=form_produccion resultado=produccion %}
+</section>
+<h2 class="mt-8 text-xl font-semibold">Análisis histórico EGES</h2>
+<p class="mb-4 text-sm">Los gráficos siguientes corresponden exclusivamente a EGES y a sus propios filtros.</p>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="{% url 'eges_import:produccion_consolidada' %}" class="text-sm text-gray-300 hover:text-white">Producción EGES + Netterm</a>
         <a href="{% url 'eges_import:lista_batches' %}" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white" title="Volver al listado de lotes">

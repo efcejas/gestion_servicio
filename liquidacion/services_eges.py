@@ -1564,7 +1564,9 @@ def adjuntar_comparacion_reanalisis_jornadas(preview, sesion, batch, control_act
 
 
 def resumir_control_eges_sesion(sesion):
-    """Resumen liviano del ultimo control persistido para panel y checklist."""
+    """Combina el control ECO persistido con el respaldo vigente de tomografia."""
+    from .services_respaldo_fuentes import registros_con_respaldo_vigente
+
     control = (
         ControlEgesSesion.objects
         .filter(sesion_contable=sesion)
@@ -1572,49 +1574,66 @@ def resumir_control_eges_sesion(sesion):
         .order_by('-version')
         .first()
     )
-    if not control:
-        return {
-            'estado': 'NO_REALIZADO',
-            'control': None,
-            'total': 0,
-            'ok': 0,
-            'advertencias': 0,
-            'manuales': 0,
-            'pendientes': 0,
-            'requieren_correccion': 0,
-            'resueltos': 0,
-            'desactualizado': False,
-        }
-
+    tomografia_ids = set(
+        sesion.practicas.filter(
+            anulado=False, registroestudio__estudio__tipo='TOM',
+        ).values_list('pk', flat=True)
+    )
+    respaldados = registros_con_respaldo_vigente(sesion) if control or tomografia_ids else set()
     resultados = list(
         control.resultados
         .filter(registro__anulado=False)
-        .only('registro_id', 'estado')
-    )
+        .only('registro_id', 'estado', 'motivos_json')
+    ) if control else []
     registro_ids = [resultado.registro_id for resultado in resultados]
     revisiones_por_registro = {}
     revisiones = (
         RevisionCruceEgesRegistro.objects
-        .filter(batch_eges=control.batch_eges, registro_id__in=registro_ids)
+        .filter(registro_id__in=set(registro_ids) | tomografia_ids)
+        .filter(Q(batch_eges=control.batch_eges) | Q(registro_id__in=tomografia_ids)
+                if control else Q(registro_id__in=tomografia_ids))
         .order_by('registro_id', '-fecha_revision')
     )
     for revision in revisiones:
         revisiones_por_registro.setdefault(revision.registro_id, revision)
 
+    tomografia_correccion = {
+        registro_id for registro_id in tomografia_ids
+        if registro_id in revisiones_por_registro
+        and revisiones_por_registro[registro_id].estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION
+    }
+    tomografia_pendiente = (tomografia_ids - respaldados) | tomografia_correccion
+    tomografia_adicional = tomografia_ids - set(registro_ids)
     registros_corregidos = set(
         CorreccionPacsRegistro.objects
         .filter(sesion_contable=sesion, registro_id__in=registro_ids)
         .values_list('registro_id', flat=True)
     )
-    pendientes = 0
+    pendientes = len(tomografia_adicional & tomografia_pendiente)
     ok_vigentes = 0
-    requieren_correccion = 0
+    requieren_correccion = len(tomografia_adicional & tomografia_correccion)
     resueltos_excepcion = 0
+    resueltos_respaldo = len(tomografia_adicional - tomografia_pendiente)
     for resultado in resultados:
+        if resultado.registro_id in tomografia_pendiente:
+            pendientes += 1
+            requieren_correccion += resultado.registro_id in tomografia_correccion
+            continue
         if resultado.estado == ResultadoControlEgesRegistro.ESTADO_OK:
             ok_vigentes += 1
             continue
         revision = revisiones_por_registro.get(resultado.registro_id)
+        # Sólo sustituye la ausencia completa de EGES. No absorbe diferencias
+        # de cantidad/horario, autoría, repeticiones ni correcciones solicitadas.
+        if (
+            resultado.registro_id in respaldados
+            and resultado.motivos_json == [
+                'No se encontró práctica EGES ECO para el DNI y fecha del registro.'
+            ]
+            and not (revision and revision.estado == RevisionCruceEgesRegistro.ESTADO_REQUIERE_CORRECCION)
+        ):
+            resueltos_respaldo += 1
+            continue
         resuelto = bool(
             resultado.registro_id in registros_corregidos
             or (
@@ -1634,9 +1653,9 @@ def resumir_control_eges_sesion(sesion):
 
     total_actual = _queryset_registros_cruce_eges(sesion).count()
     return {
-        'estado': 'COMPLETADO',
+        'estado': 'COMPLETADO' if control or (tomografia_ids and not total_actual) else 'NO_REALIZADO',
         'control': control,
-        'total': len(resultados),
+        'total': len(resultados) + len(tomografia_adicional),
         'ok': ok_vigentes,
         'advertencias': sum(
             1 for resultado in resultados
@@ -1648,6 +1667,10 @@ def resumir_control_eges_sesion(sesion):
         ),
         'pendientes': pendientes,
         'requieren_correccion': requieren_correccion,
-        'resueltos': ok_vigentes + resueltos_excepcion,
-        'desactualizado': total_actual != len(resultados),
+        'resueltos': ok_vigentes + resueltos_excepcion + resueltos_respaldo,
+        'resueltos_respaldo': resueltos_respaldo,
+        'total_tomografia': len(tomografia_ids),
+        'pendientes_tomografia': len(tomografia_pendiente),
+        'resueltos_tomografia': len(tomografia_ids - tomografia_pendiente),
+        'desactualizado': bool(control and total_actual != len(resultados)),
     }

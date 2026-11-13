@@ -46,6 +46,20 @@ class FuentesSinteticasMixin:
 
 
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
+    @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+    def test_tablero_habitual_consulta_la_misma_produccion(self):
+        self.eges()
+        self.netterm()
+        self.netterm(pedido='2', documento='87654321')
+        self.client.force_login(self.usuario)
+        response = self.client.get(reverse('eges_import:estadisticas'), {
+            'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['produccion']['total_produccion'], 2)
+        self.assertEqual(response.context['produccion']['aporte_netterm'], 1)
+        self.assertContains(response, 'Análisis histórico EGES')
+
     def produccion(self):
         return construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
 

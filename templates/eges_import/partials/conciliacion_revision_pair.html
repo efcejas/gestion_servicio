@@ -1,5 +1,8 @@
 {% for par in item.pares_revision %}
 <div class="space-y-2 border-t border-gray-700 pt-2">
+    {% if item.requiere_revision_produccion %}
+    <p class="text-xs font-semibold text-gray-200">Candidata EGES: lote #{{ par.eges.lote_id }} · fila #{{ par.eges.id }} · {{ par.eges.fecha_turno|date:"d/m/Y"|default:"Sin fecha" }} · {{ par.eges.hora_turno|time:"H:i"|default:"Sin hora" }}</p>
+    {% endif %}
     {% if par.revision_actual %}
     <p class="text-xs font-semibold text-teal-300">Decision vigente: {{ par.revision_actual.get_decision_display }} · revision #{{ par.revision_actual.pk }}</p>
     {% elif item.requiere_revision_produccion %}

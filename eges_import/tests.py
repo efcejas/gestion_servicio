@@ -991,6 +991,11 @@ class ConciliacionViewTest(TestCase):
         self.assertNotContains(response, 'INFORMANTE FICTICIO')
         self.assertContains(response, '01/11/2026')
         self.assertEqual(len(response.context['resultados']), 1)
+        self.assertContains(response, '<article ', count=1)
+        self.assertNotContains(response, '<table')
+        self.assertContains(response, f'Lote #{self.batch.pk} · fila #{self.eges.pk}')
+        self.assertContains(response, 'Turno 31/10/2026 · 07:52')
+        self.assertContains(response, 'Observaciones de los lotes seleccionados')
 
     def test_preview_busca_lotes_y_no_invita_a_revisar_coincidencia_verde(self):
         self.client.force_login(self.usuario)
@@ -1005,7 +1010,7 @@ class ConciliacionViewTest(TestCase):
 
     def test_preview_muestra_revision_manual_para_ambiguedad(self):
         self.client.force_login(self.usuario)
-        EgesRow.objects.create(
+        segunda_eges = EgesRow.objects.create(
             batch=self.batch, dni_paciente='00123456', fecha_turno=date(2026, 10, 31),
             hora_turno=time(11), practica='ECOGRAFIA COMPLETA DE ABDOMEN',
             codigo_practica='180112/0', estado_turno='Informado', medico_informante='INFORMANTE FICTICIO',
@@ -1017,6 +1022,8 @@ class ConciliacionViewTest(TestCase):
         self.assertContains(response, 'Ambiguo')
         self.assertContains(response, 'Revisar pareja candidata')
         self.assertContains(response, 'class="block text-xs text-gray-200"')
+        self.assertContains(response, f'Candidata EGES: lote #{self.batch.pk} · fila #{self.eges.pk}')
+        self.assertContains(response, f'Candidata EGES: lote #{self.batch.pk} · fila #{segunda_eges.pk} · 31/10/2026 · 11:00')
         self.assertNotContains(response, 'Registrar revisión opcional')
 
     def test_filtro_no_altera_resumen_global_y_estado_vacio(self):
@@ -1084,6 +1091,7 @@ class ConciliacionViewTest(TestCase):
         self.assertEqual(respuesta.context['total_filtrado'], 1)
         self.assertContains(respuesta, 'Correspondencia única con alerta de estado')
         self.assertContains(respuesta, 'Sin revisión individual requerida')
+        self.assertContains(respuesta, 'Revisar la regla de estados; no se requiere una decisión individual de vinculación.')
         self.assertNotContains(respuesta, 'Excepción de producción sin decisión vigente')
         self.assertContains(respuesta, 'No confirma realización, informe ni derecho a cobro')
         self.assertIn('estado=ALERTAS_ESTADO', respuesta.context['filtros_query'])

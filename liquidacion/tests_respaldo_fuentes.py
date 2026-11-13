@@ -37,6 +37,40 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
         return construir_preview_respaldo_fuentes(sesion=self.sesion, batch_eges_ids=[self.batch.pk],
                                                   lote_netterm_ids=[self.lote.pk], filtros=filtros)
 
+    def test_cierre_consume_respaldo_confirmado_solo_para_ausencia_eges(self):
+        from .models import ControlEgesSesion
+        from .services_eges import resumir_control_eges_sesion
+        from .services_respaldo_fuentes import registrar_validacion_respaldo_fuente
+
+        registro = self.registro()
+        self.netterm()
+        control = ControlEgesSesion.objects.create(
+            sesion_contable=self.sesion, batch_eges=self.batch, version=1, procesado_por=self.usuario,
+        )
+        resultado = ResultadoControlEgesRegistro.objects.create(
+            control=control, registro=registro, estado='MANUAL',
+            motivos_json=['No se encontró práctica EGES ECO para el DNI y fecha del registro.'],
+        )
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes'], 1)
+        linea = self.respaldo()['resultados'][0]['lineas'][0]
+        antes = list(RegistroEstudiosPorMedico.objects.values())
+        registrar_validacion_respaldo_fuente(
+            sesion=self.sesion, linea_id=linea['relacion_id'], batch_eges_ids=[self.batch.pk],
+            lote_netterm_ids=[self.lote.pk], firma_esperada=linea['firma_validacion'], usuario=self.usuario,
+        )
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['pendientes'], 0)
+        self.assertEqual(resumen['resueltos_respaldo'], 1)
+        self.assertFalse(resumen['desactualizado'])
+        self.assertEqual(antes, list(RegistroEstudiosPorMedico.objects.values()))
+        resultado.motivos_json = ['Hay prácticas con cantidad distinta entre liquidación y EGES.']
+        resultado.save()
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes'], 1)
+        resultado.motivos_json = ['No se encontró práctica EGES ECO para el DNI y fecha del registro.']
+        resultado.save()
+        RegistroEstudio.objects.filter(registro=registro).update(cantidad=2)
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes'], 1)
+
     def parametros_preview(self):
         return {'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk]}
 
@@ -101,6 +135,158 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
         self.registro(estudio)
         self.netterm(codigo='340101', practica='TOMOGRAFIA DE TORAX', estado='NO_DEFINITIVO')
         self.assertEqual(self.respaldo()['resultados'][0]['lineas'][0]['estado'], 'OK_NETTERM')
+
+    def test_cierre_tomografia_staff_exige_respaldo_confirmado_vigente(self):
+        from .services_eges import resumir_control_eges_sesion
+        from .services_respaldo_fuentes import registrar_validacion_respaldo_fuente
+
+        self.medico.rol = 'medico_staff'
+        self.medico.save(update_fields=['rol'])
+        estudio = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        registro = self.registro(estudio)
+        self.netterm(codigo='340101', practica='TOMOGRAFIA DE TORAX')
+        antes = (list(RegistroEstudiosPorMedico.objects.values()), list(RegistroEstudio.objects.values()))
+
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['pendientes'], 1)
+        linea = self.respaldo()['resultados'][0]['lineas'][0]
+        registrar_validacion_respaldo_fuente(
+            sesion=self.sesion, linea_id=linea['relacion_id'], batch_eges_ids=[self.batch.pk],
+            lote_netterm_ids=[self.lote.pk], firma_esperada=linea['firma_validacion'], usuario=self.usuario,
+        )
+
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['estado'], 'COMPLETADO')
+        self.assertEqual(resumen['pendientes'], 0)
+        self.assertEqual(resumen['resueltos_respaldo'], 1)
+        self.assertFalse(resumen['desactualizado'])
+        self.assertEqual(antes, (list(RegistroEstudiosPorMedico.objects.values()), list(RegistroEstudio.objects.values())))
+        self.assertFalse(ResultadoControlEgesRegistro.objects.exists())
+        RegistroEstudio.objects.filter(registro=registro).update(cantidad=2)
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes'], 1)
+
+    def test_cierre_tomografia_acepta_eges_confirmado_sin_control_eco(self):
+        from .services_eges import resumir_control_eges_sesion
+
+        estudio = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        self.registro(estudio)
+        self.eges(practica='TOMOGRAFIA DE TORAX', codigo_practica='340101', modalidad='TC')
+        preview = self.respaldo()
+        linea = preview['resultados'][0]['lineas'][0]
+        self.assertEqual(linea['estado'], 'OK_EGES')
+        self.client.force_login(self.usuario)
+        self.assertEqual(self.validar_lineas_masivo(preview, [linea['relacion_id']]).status_code, 302)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['pendientes'], 0)
+        self.assertEqual(resumen['resueltos_tomografia'], 1)
+
+    def test_cierre_tomografia_parcial_exige_todas_las_lineas(self):
+        from .services_eges import resumir_control_eges_sesion
+
+        torax = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        abdomen = Estudios.objects.create(nombre='TOMOGRAFIA DE ABDOMEN', codigo='340102', tipo='TOM', conteo_regiones=1)
+        registro = self.registro(torax)
+        RegistroEstudio.objects.create(registro=registro, estudio=abdomen, cantidad=1)
+        self.netterm(codigo='340101', practica=torax.nombre)
+        self.netterm(pedido='2', codigo='340102', practica=abdomen.nombre)
+        self.client.force_login(self.usuario)
+        preview = self.respaldo()
+        lineas = preview['resultados'][0]['lineas']
+        self.assertEqual(self.validar_lineas_masivo(preview, [lineas[0]['relacion_id']]).status_code, 302)
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes_tomografia'], 1)
+        self.assertEqual(self.validar_lineas_masivo(preview, [lineas[1]['relacion_id']]).status_code, 302)
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes_tomografia'], 0)
+
+    def test_cierre_tomografia_no_sustituye_control_eco_no_realizado(self):
+        from .services_eges import resumir_control_eges_sesion
+
+        self.registro()
+        torax = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        tomografia = self.registro(torax)
+        self.netterm(codigo='340101', practica=torax.nombre)
+        preview = self.respaldo()
+        linea = next(item['lineas'][0] for item in preview['resultados'] if item['registro'].pk == tomografia.pk)
+        self.client.force_login(self.usuario)
+        self.assertEqual(self.validar_lineas_masivo(preview, [linea['relacion_id']]).status_code, 302)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['estado'], 'NO_REALIZADO')
+        self.assertEqual(resumen['resueltos_tomografia'], 1)
+
+    def test_cierre_mixto_conserva_pendientes_eco_y_correccion_tc(self):
+        from .models import ControlEgesSesion
+        from .services_eges import resumir_control_eges_sesion
+
+        eco = self.registro()
+        torax = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        tomografia = self.registro(torax)
+        self.netterm(codigo='340101', practica=torax.nombre)
+        control = ControlEgesSesion.objects.create(
+            sesion_contable=self.sesion, batch_eges=self.batch, version=1, procesado_por=self.usuario,
+        )
+        ResultadoControlEgesRegistro.objects.create(
+            control=control, registro=eco, estado='MANUAL',
+            motivos_json=['Hay prácticas con cantidad distinta entre liquidación y EGES.'],
+        )
+        self.client.force_login(self.usuario)
+        preview = self.respaldo()
+        linea = next(item['lineas'][0] for item in preview['resultados'] if item['registro'].pk == tomografia.pk)
+        self.assertEqual(self.validar_lineas_masivo(preview, [linea['relacion_id']]).status_code, 302)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['total'], 2)
+        self.assertEqual(resumen['pendientes'], 1)
+        self.assertEqual(resumen['resueltos_tomografia'], 1)
+        self.assertFalse(resumen['desactualizado'])
+        RevisionCruceEgesRegistro.objects.create(
+            sesion_contable=self.sesion, registro=tomografia, batch_eges=self.batch,
+            estado='REQUIERE_CORRECCION', observacion='Correccion pendiente de QA.', revisado_por=self.usuario,
+        )
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['pendientes'], 2)
+        self.assertEqual(resumen['requieren_correccion'], 1)
+
+    def test_cierre_no_cuenta_tomografia_anulada(self):
+        from .services_eges import resumir_control_eges_sesion
+
+        torax = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        tomografia = self.registro(torax)
+        self.assertEqual(resumir_control_eges_sesion(self.sesion)['pendientes_tomografia'], 1)
+        RegistroEstudiosPorMedico.objects.filter(pk=tomografia.pk).update(anulado=True)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['total_tomografia'], 0)
+        self.assertEqual(resumen['pendientes'], 0)
+
+    def test_cierre_registro_mixto_cuenta_una_vez_y_exige_todas_las_lineas(self):
+        from .models import ControlEgesSesion
+        from .services_cierre import construir_checklist_cierre_sesion
+        from .services_eges import resumir_control_eges_sesion
+
+        registro = self.registro()
+        torax = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
+        RegistroEstudio.objects.create(registro=registro, estudio=torax, cantidad=1)
+        self.netterm()
+        self.netterm(pedido='2', codigo='340101', practica=torax.nombre)
+        control = ControlEgesSesion.objects.create(
+            sesion_contable=self.sesion, batch_eges=self.batch, version=1, procesado_por=self.usuario,
+        )
+        ResultadoControlEgesRegistro.objects.create(
+            control=control, registro=registro, estado='MANUAL',
+            motivos_json=['No se encontró práctica EGES ECO para el DNI y fecha del registro.'],
+        )
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['total'], 1)
+        self.assertEqual(resumen['pendientes'], 1)
+        self.client.force_login(self.usuario)
+        preview = self.respaldo()
+        self.assertEqual(self.validar_lineas_masivo(
+            preview, [linea['relacion_id'] for linea in preview['resultados'][0]['lineas']],
+        ).status_code, 302)
+        resumen = resumir_control_eges_sesion(self.sesion)
+        self.assertEqual(resumen['total'], 1)
+        self.assertEqual(resumen['resueltos'], 1)
+        self.assertEqual(resumen['pendientes'], 0)
+        checklist = construir_checklist_cierre_sesion(self.sesion)
+        control_item = next(item for item in checklist['items'] if item['key'] == 'control_eges')
+        self.assertEqual(control_item['estado'], 'ok')
 
     def test_informante_netterm_distinto_sin_eges_queda_para_revisar(self):
         self.registro()

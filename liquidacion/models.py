@@ -1993,7 +1993,7 @@ class ValidacionRespaldoFuenteQuerySet(models.QuerySet):
 
 
 class ValidacionRespaldoFuenteRegistro(models.Model):
-    """OK de origen persistido; no resuelve el control EGES ni altera importes."""
+    """OK de origen; puede suplir ausencia EGES, sin certificar economía ni alterar importes."""
 
     linea_estudio = models.ForeignKey(
         'RegistroEstudio',

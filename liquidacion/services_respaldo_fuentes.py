@@ -27,6 +27,37 @@ ALIAS_NOMBRE = {
 }
 
 
+def registros_con_respaldo_vigente(sesion):
+    """Revalida firmas actuales; un OK guardado no es evidencia perpetua.
+
+    Toda la línea del registro debe estar respaldada en una misma selección.
+    No escribe ni certifica cantidades u horarios.
+    """
+    selecciones = set()
+    for validacion in ValidacionRespaldoFuenteRegistro.objects.filter(
+        linea_estudio__registro__sesion_contable=sesion,
+        linea_estudio__registro__anulado=False,
+    ).only('lotes_eges_ids', 'lotes_netterm_ids'):
+        selecciones.add((tuple(sorted(validacion.lotes_eges_ids)),
+                         tuple(sorted(validacion.lotes_netterm_ids))))
+    respaldados = set()
+    for eges_ids, netterm_ids in selecciones:
+        try:
+            preview = construir_preview_respaldo_fuentes(
+                sesion=sesion, batch_eges_ids=list(eges_ids), lote_netterm_ids=list(netterm_ids),
+            )
+        except ValidationError:
+            # Una selección borrada, inválida o demasiado grande nunca libera el cierre.
+            continue
+        for resultado in preview['resultados']:
+            if resultado['lineas'] and all(
+                linea['estado'] in {'OK_EGES', 'OK_NETTERM'} and linea['validacion_persistida']
+                for linea in resultado['lineas']
+            ):
+                respaldados.add(resultado['registro'].pk)
+    return respaldados
+
+
 def _nombre(valor):
     normalizado = _texto_normalizado(valor)
     return ALIAS_NOMBRE.get(normalizado, normalizado)

@@ -42,7 +42,7 @@
                 <p class="mt-1 text-xs text-indigo-800">
                     Ejecutalo cuando los profesionales hayan terminado de cargar el mes. Solo entonces los casos sin coincidencia se mostraran como pendientes administrativos.
                 </p>
-                {% if control_eges.estado == 'COMPLETADO' %}
+                {% if control_eges.control %}
                 <p class="mt-1 text-xs font-semibold text-indigo-900">
                     Ultimo control: v{{ control_eges.control.version }} · {{ control_eges.control.fecha_procesamiento|date:"d/m/Y H:i" }} · {{ control_eges.pendientes }} pendiente(s)
                 </p>

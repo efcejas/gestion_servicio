@@ -19,6 +19,7 @@
                 </div>
                 <div><label for="{{ form.estado.id_for_label }}" class="mb-2 block text-sm font-semibold text-gray-100">{{ form.estado.label }}</label>{{ form.estado }}</div>
             </div>
+            <div class="grid gap-4 lg:grid-cols-2">
             <fieldset data-lote-picker="eges" class="min-w-0 space-y-3 rounded-md border border-gray-700 bg-gray-800/60 p-3">
                 <legend class="px-1 text-sm font-semibold text-gray-100">Lotes EGES</legend>
                 <label for="buscar-lote-eges-cruce" class="sr-only">Buscar lote EGES</label>
@@ -47,6 +48,7 @@
                     <div class="flex gap-2"><button type="button" data-lote-select-visible class="min-h-9 rounded border border-gray-600 bg-gray-900 px-2.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">Seleccionar visibles</button><button type="button" data-lote-clear class="min-h-9 rounded border border-gray-600 bg-gray-900 px-2.5 text-xs font-semibold text-gray-200 hover:bg-gray-700 disabled:opacity-50">Limpiar</button></div>
                 </div>
             </fieldset>
+            </div>
             <button type="submit" class="inline-flex items-center gap-2 rounded-md bg-teal-700 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-800"><i class="fas fa-search" aria-hidden="true"></i> Previsualizar cruce</button>
         </form>
         {% if preview %}
@@ -63,7 +65,7 @@
                 </dl>
                 <p class="text-xs text-gray-400">{{ preview.resumen.filas_eges_con_candidata }} filas EGES con alguna candidata. Una fila puede aparecer en varios casos ambiguos; no sumar esas referencias como estudios diferentes.</p>
             </section>
-            <div class="space-y-3 2xl:hidden">
+            <div class="space-y-3">
                 {% for item in resultados %}
                 <article class="space-y-3 rounded-md border border-gray-700 bg-gray-800 p-3">
                     <header class="flex flex-wrap items-start justify-between gap-2">
@@ -71,34 +73,17 @@
                             <h3 class="font-semibold text-white">{% if item.alerta_estado_no_bloqueante %}Coincidencia única · alerta de estado{% elif item.estado == 'COINCIDENTE' %}Coincidencia candidata{% elif item.estado == 'SOLO_EGES' %}Solo EGES{% elif item.estado == 'SOLO_NETTERM' %}Solo Netterm{% elif item.estado == 'AMBIGUO' %}Ambiguo{% else %}Conflicto{% endif %}</h3>
                             {% if item.identidad_coincidente %}<p class="mt-1 text-xs text-teal-300">Identidad coincidente por documento, código, fecha y modalidad</p>{% endif %}
                         </div>
-                        {% if item.requiere_revision_produccion %}<span class="rounded bg-amber-900/50 px-2 py-1 text-xs font-semibold text-amber-200">Requiere revisión</span>{% else %}<span class="rounded bg-emerald-900/40 px-2 py-1 text-xs font-semibold text-emerald-200">No requiere decisión individual</span>{% endif %}
+                        {% if item.requiere_revision_produccion %}<span class="rounded bg-amber-900/50 px-2 py-1 text-xs font-semibold text-amber-200">Requiere revisión</span>{% elif item.identidad_coincidente %}<span class="rounded bg-emerald-900/40 px-2 py-1 text-xs font-semibold text-emerald-200">No requiere decisión individual</span>{% else %}<span class="rounded bg-gray-700 px-2 py-1 text-xs font-semibold text-gray-200">Sin correspondencia entre fuentes</span>{% endif %}
                     </header>
                     <div class="grid gap-3 text-sm sm:grid-cols-2">
-                        <div class="min-w-0"><p class="text-xs font-semibold uppercase text-gray-400">Netterm</p>{% if item.netterm %}<p class="mt-1 break-words text-gray-100">{{ item.netterm.practica }}</p><p class="text-xs text-gray-400">Lote #{{ item.netterm.lote_id }} · código {{ item.netterm.codigo }} · {{ item.netterm.estado }}</p>{% else %}<p class="mt-1 text-gray-400">Sin candidata Netterm</p>{% endif %}</div>
-                        <div class="min-w-0"><p class="text-xs font-semibold uppercase text-gray-400">Candidatas EGES</p>{% for fila in item.eges %}<div class="mt-1 break-words text-gray-100">{{ fila.practica }} <span class="text-xs text-gray-400">· {{ fila.codigo }} · {{ fila.estado }} · {{ fila.fecha_turno|date:"d/m/Y"|default:"Sin fecha" }}</span></div>{% empty %}<p class="mt-1 text-gray-400">Sin candidata EGES</p>{% endfor %}</div>
+                        <div class="min-w-0"><p class="text-xs font-semibold uppercase text-gray-400">Netterm</p>{% if item.netterm %}<p class="mt-1 break-words text-gray-100">{{ item.netterm.practica }}</p><p class="text-xs text-gray-400">Lote #{{ item.netterm.lote_id }} · fila #{{ item.netterm.id }} · código {{ item.netterm.codigo }} · {{ item.netterm.estado }}</p><details class="mt-1 text-xs text-gray-300"><summary class="cursor-pointer">Observaciones de los lotes seleccionados</summary><p class="break-all">{{ item.netterm.observaciones_ids|join:", " }}</p></details>{% else %}<p class="mt-1 text-gray-400">Sin candidata Netterm</p>{% endif %}</div>
+                        <div class="min-w-0"><p class="text-xs font-semibold uppercase text-gray-400">Candidatas EGES</p>{% for fila in item.eges %}<div class="mt-1 break-words text-gray-100"><p>{{ fila.practica }}</p><p class="text-xs text-gray-400">Lote #{{ fila.lote_id }} · fila #{{ fila.id }} · código {{ fila.codigo }} · {{ fila.estado }}</p><p class="text-xs text-gray-400">Turno {{ fila.fecha_turno|date:"d/m/Y"|default:"Sin fecha" }} · {{ fila.hora_turno|time:"H:i"|default:"Sin hora" }}</p></div>{% empty %}<p class="mt-1 text-gray-400">Sin candidata EGES</p>{% endfor %}</div>
                     </div>
                     {% if item.netterm %}<p class="text-xs text-gray-400">Pedido {{ item.netterm.fecha_pedido|date:"d/m/Y"|default:"Sin fecha" }} · realización {{ item.netterm.fecha_realizacion|date:"d/m/Y"|default:"Sin fecha" }} · informe {{ item.netterm.fecha_informe|date:"d/m/Y"|default:"Sin fecha" }}</p>{% endif %}
-                    {% if item.motivos or item.advertencias or item.requiere_revision_estado %}<details class="border-t border-gray-700 pt-2"><summary class="cursor-pointer text-xs font-semibold text-gray-300">Discrepancias y límites</summary><div class="mt-2 space-y-1 text-sm">{% if item.requiere_revision_estado %}<p class="text-amber-300">Anulación contradictoria: requiere revisión.</p>{% endif %}{% for motivo in item.motivos %}<p class="text-gray-300">{{ motivo }}</p>{% endfor %}{% for aviso in item.advertencias %}<p class="text-xs text-gray-400">{{ aviso }}</p>{% endfor %}</div></details>{% endif %}
+                    {% if item.motivos or item.advertencias or item.requiere_revision_estado or item.alerta_estado_no_bloqueante %}<details class="border-t border-gray-700 pt-2"><summary class="cursor-pointer text-xs font-semibold text-gray-300">Discrepancias y límites</summary><div class="mt-2 space-y-1 text-sm">{% if item.alerta_estado_no_bloqueante %}<p class="text-gray-300">Revisar la regla de estados; no se requiere una decisión individual de vinculación. Los criterios del conteo provisional se mantienen.</p>{% endif %}{% if item.requiere_revision_estado %}<p class="text-amber-300">Anulación contradictoria: requiere revisión.</p>{% endif %}{% for motivo in item.motivos %}<p class="text-gray-300">{{ motivo }}</p>{% endfor %}{% for aviso in item.advertencias %}<p class="text-xs text-gray-400">{{ aviso }}</p>{% endfor %}</div></details>{% endif %}
                     {% include 'eges_import/partials/conciliacion_revision_pair.html' with item=item preview=preview estado_seleccionado=estado_seleccionado control_prefix='mobile' %}
                 </article>
-                {% empty %}<p class="rounded-md border border-gray-700 p-6 text-center text-sm text-gray-400">No hay casos para los lotes y el filtro seleccionados.</p>{% endfor %}
-            </div>
-            <div class="hidden overflow-x-auto 2xl:block">
-                <table class="w-full text-left text-sm text-gray-200" style="min-width: 1240px">
-                    <thead class="border-b border-gray-600"><tr><th class="p-2">Resultado</th><th class="p-2">Origen Netterm</th><th class="p-2">Candidatas EGES</th><th class="p-2">Fechas Netterm</th><th class="p-2">Discrepancias / límites</th><th class="p-2">Revision humana</th></tr></thead>
-                    <tbody>
-                        {% for item in resultados %}
-                            <tr class="border-b border-gray-700 align-top">
-                                <td class="p-2 font-semibold">{% if item.alerta_estado_no_bloqueante %}Correspondencia única con alerta de estado{% elif item.estado == 'COINCIDENTE' %}Coincidencia candidata{% elif item.estado == 'SOLO_EGES' %}Sólo EGES{% elif item.estado == 'SOLO_NETTERM' %}Sólo Netterm{% elif item.estado == 'AMBIGUO' %}Ambiguo{% else %}Conflicto{% endif %}{% if item.identidad_coincidente %}<p class="mt-2 text-xs font-normal text-teal-300">DNI, código, fecha y modalidad: correspondencia única.</p>{% endif %}{% if item.requiere_revision_estado %}<p class="mt-2 text-xs font-normal text-amber-300">Anulación contradictoria: requiere revisión.</p>{% endif %}</td>
-                                <td class="max-w-xs break-words p-2">{% if item.netterm %}<p>Lote #{{ item.netterm.lote_id }} · fila #{{ item.netterm.id }}</p><p>{{ item.netterm.practica }}</p><p>Código {{ item.netterm.codigo }} · {{ item.netterm.estado }}</p><details class="mt-2"><summary class="cursor-pointer text-xs">Observaciones de los lotes seleccionados</summary><p class="break-all text-xs">{{ item.netterm.observaciones_ids|join:", " }}</p></details>{% else %}<p>Sin candidata Netterm.</p>{% endif %}</td>
-                                <td class="max-w-xs break-words p-2">{% for fila in item.eges %}<div class="mb-3"><p>Lote #{{ fila.lote_id }} · fila #{{ fila.id }}</p><p>{{ fila.practica }}</p><p>Codigo {{ fila.codigo }} · {{ fila.estado }}</p><p>Turno {{ fila.fecha_turno|date:"d/m/Y"|default:"Sin fecha" }} · {{ fila.hora_turno|time:"H:i"|default:"Sin hora" }}</p></div>{% empty %}<p>Sin candidata EGES.</p>{% endfor %}</td>
-                                <td class="p-2">{% if item.netterm %}<p>Pedido: {{ item.netterm.fecha_pedido|date:"d/m/Y"|default:"Sin fecha" }}</p><p>Realización: {{ item.netterm.fecha_realizacion|date:"d/m/Y"|default:"Sin fecha" }}</p><p>Informe: {{ item.netterm.fecha_informe|date:"d/m/Y"|default:"Sin fecha" }}</p>{% else %}—{% endif %}</td>
-                                <td class="max-w-sm break-words p-2">{% if item.alerta_estado_no_bloqueante %}<p class="mb-2">Revisar la regla de estados; no se requiere una decisión individual de vinculación. Los criterios del conteo provisional se mantienen.</p>{% endif %}{% for motivo in item.motivos %}<p class="mb-2">{{ motivo }}</p>{% empty %}<p class="mb-2">Correspondencia única por las claves comparadas.</p>{% endfor %}{% for aviso in item.advertencias %}<p class="text-xs text-gray-400">{{ aviso }}</p>{% endfor %}</td>
-                                <td class="max-w-sm break-words p-2">{% include 'eges_import/partials/conciliacion_revision_pair.html' with item=item preview=preview estado_seleccionado=estado_seleccionado control_prefix='desktop' %}</td>
-                            </tr>
-                        {% empty %}<tr><td colspan="6" class="p-4 text-gray-300">No hay casos para los lotes y filtro seleccionados.</td></tr>{% endfor %}
-                    </tbody>
-                </table>
+                {% empty %}<p class="rounded-md border border-gray-700 p-6 text-center text-sm text-gray-400">No hay casos para los lotes y filtro seleccionados.</p>{% endfor %}
             </div>
             <div class="flex flex-wrap items-center justify-between gap-3 text-sm text-gray-300">
                 <span>{{ total_filtrado }} casos · página {{ resultados.number }} de {{ resultados.paginator.num_pages }}</span>

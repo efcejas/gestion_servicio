@@ -306,6 +306,20 @@ def dashboard_global(request):
     Dashboard global que consolida TODOS los batches importados.
     Vista ejecutiva para el director.
     """
+    # El tablero habitual permite consultar la misma producción conciliada,
+    # con selección explícita de fuentes; los indicadores históricos siguen EGES.
+    form_produccion = PreviewConciliacionForm(request.GET if request.GET else None)
+    produccion = None
+    if form_produccion.is_bound and form_produccion.is_valid():
+        try:
+            produccion = construir_preview_produccion(
+                batch_eges_ids=[lote.pk for lote in form_produccion.cleaned_data['lotes_eges']],
+                lote_netterm_ids=[lote.pk for lote in form_produccion.cleaned_data['lotes_netterm']],
+                fecha_desde=form_produccion.cleaned_data['fecha_desde'],
+                fecha_hasta=form_produccion.cleaned_data['fecha_hasta'],
+            )
+        except ValidationError as error:
+            form_produccion.add_error(None, error)
     # Obtener todos los batches
     batches = ImportBatch.objects.all()
     
@@ -330,6 +344,8 @@ def dashboard_global(request):
     
     context = {
         'titulo_pagina': 'Dashboard Global EGES',
+        'form_produccion': form_produccion,
+        'produccion': produccion,
         'total_batches': total_batches,
         'lotes_posible_tope': lotes_posible_tope,
         'ultimo_batch': ultimo_batch,

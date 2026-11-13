@@ -416,9 +416,9 @@
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-3">
                                     <div class="flex flex-col gap-2 text-xs">
                                         <div class="flex flex-wrap items-center justify-between gap-2">
-                                            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Control EGES</span>
+                                            <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Control EGES + Netterm</span>
                                             <a href="{% url 'liquidacion:respaldo_fuentes_preview' dato.sesion.pk %}" class="text-xs font-semibold text-indigo-700 underline">Respaldo EGES + Netterm</a>
-                                            <a href="{% url 'liquidacion:cruce_eges_liquidacion_preview' dato.sesion.pk %}"
+                                            <a href="{% if not dato.control_eges.control and dato.control_eges.total_tomografia and dato.control_eges.estado != 'NO_REALIZADO' %}{% url 'liquidacion:respaldo_fuentes_preview' dato.sesion.pk %}{% else %}{% url 'liquidacion:cruce_eges_liquidacion_preview' dato.sesion.pk %}{% endif %}"
                                                class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800 hover:bg-sky-200">
                                                 Abrir control
                                             </a>
@@ -428,7 +428,7 @@
                                         {% else %}
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 font-semibold text-emerald-800">
-                                                Coincidencias: {{ dato.control_eges.ok }}
+                                                Resueltos: {{ dato.control_eges.resueltos }}
                                             </span>
                                             <span class="rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-800">
                                                 Pendientes: {{ dato.control_eges.pendientes }}
@@ -439,12 +439,15 @@
                                             </span>
                                             {% endif %}
                                         </div>
-                                        <p class="text-slate-500">
+                                        {% if dato.control_eges.control %}<p class="text-slate-500">
                                             Version {{ dato.control_eges.control.version }} · {{ dato.control_eges.control.batch_eges.archivo_nombre }} · {{ dato.control_eges.control.fecha_procesamiento|date:"d/m/Y H:i" }}
-                                        </p>
+                                        </p>{% endif %}
                                         {% if dato.control_eges.desactualizado %}
                                         <p class="font-semibold text-amber-700">Hay registros posteriores al control. Debe consolidarse nuevamente.</p>
                                         {% endif %}
+                                        {% endif %}
+                                        {% if dato.control_eges.total_tomografia %}
+                                        <p class="font-semibold {% if dato.control_eges.pendientes_tomografia %}text-amber-700{% else %}text-emerald-700{% endif %}">Tomografía: {{ dato.control_eges.resueltos_tomografia }} confirmado(s) · {{ dato.control_eges.pendientes_tomografia }} pendiente(s) de respaldo</p>
                                         {% endif %}
                                         <a href="{% url 'liquidacion:auditoria_eco_sesion' dato.sesion.pk %}"
                                            class="text-[11px] font-semibold text-slate-500 hover:text-slate-700">
