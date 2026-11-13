@@ -32,6 +32,12 @@ sin secciones nuevas. Se valida nuevamente lo editado al confirmar. El título d
 conservar región/modalidad; se rechazan técnica, datos clínicos evidentes, duplicados,
 afirmaciones patológicas y líneas sin expresión explícita de normalidad. Se aceptan
 descripciones negativas claras, por ejemplo “sin lesiones” o “ausencia de lesiones”.
+También se reconocen negaciones como “No se identifican adenopatías” y
+“No se observa líquido libre”. Si el filtro no reconoce una expresión de normalidad,
+la generación muestra el borrador con advertencias numeradas, en vez de descartarlo.
+El médico puede reformular o eliminar esas líneas; el guardado conserva la validación
+estricta. Técnica, datos clínicos evidentes y posibles afirmaciones patológicas siguen
+bloqueando la generación y el guardado. Los filtros no certifican normalidad clínica.
 
 No es una validación semántica médica exhaustiva: la IA puede proponer anatomía
 inadecuada o normalidades no evaluables. El médico debe revisar **cada línea**.

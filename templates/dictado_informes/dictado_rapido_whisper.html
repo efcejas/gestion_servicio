@@ -1371,6 +1371,9 @@ document.getElementById('btnGenerarPlantilla')?.addEventListener('click', async 
         document.getElementById('lineasNuevaPlantilla').value = data.borrador.comentarios_base.join('\n');
         document.getElementById('previewNuevaPlantilla').classList.remove('hidden');
         estado.textContent = `${data.criterio_referencias} Referencias: ${data.referencias.map(p => p.nombre).join(', ')}. Revisá y editá antes de confirmar.`;
+        if (data.advertencias?.length) {
+            estado.textContent += ` Revisión necesaria: ${data.advertencias.join(' ')}`;
+        }
     } catch (error) {
         if (solicitud === solicitudNuevaPlantilla) estado.textContent = error.message;
     } finally {
@@ -1503,15 +1506,22 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('dictadoOpcionesAvanzadasAbierto', abrir ? 'true' : 'false');
     });
 
-    modoRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.value === 'ESTRUCTURADO' && radio.checked) {
-                selectorPlantilla.classList.remove('hidden');
-            } else {
-                selectorPlantilla.classList.add('hidden');
-            }
+    const actualizarModoIA = () => {
+        modoRadios.forEach(radio => {
+            const tarjeta = radio.closest('label');
+            tarjeta.classList.toggle('border-purple-500', radio.checked);
+            tarjeta.classList.toggle('border-gray-700', !radio.checked);
         });
+        const modoEstructurado = Array.from(modoRadios).some(
+            radio => radio.value === 'ESTRUCTURADO' && radio.checked
+        );
+        selectorPlantilla.classList.toggle('hidden', !modoEstructurado);
+    };
+
+    modoRadios.forEach(radio => {
+        radio.addEventListener('change', actualizarModoIA);
     });
+    actualizarModoIA();
 });
 
 async function cargarInfoAprendizaje() {

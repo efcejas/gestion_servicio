@@ -133,6 +133,53 @@ class PlantillaInexistenteTests(TestCase):
         data['borrador'] = {**self.borrador, 'conclusion': 'Normal.'}
         self.assertEqual(self.post(data).status_code, 400)
 
+    def test_reconoce_normalidad_negativa_sin_ocultar_patologia_afirmativa(self):
+        for linea in (
+            'No se identifican adenopatías.',
+            'No se observa líquido libre.',
+            'Sin colecciones ni edema.',
+            'Ausencia de lesiones óseas.',
+        ):
+            with self.subTest(linea=linea):
+                resultado = validar_borrador(
+                    {**self.borrador, 'comentarios_base': [linea]}, 'RODILLA', 'RES',
+                )
+                self.assertEqual(resultado['comentarios_base'], [linea])
+        for linea in (
+            'No se identifican lesiones, pero hay edema.',
+            'Sin lesiones con edema.',
+            'Estructuras conservadas. Adenopatías presentes.',
+        ):
+            with self.subTest(linea=linea):
+                with self.assertRaises(ValidationError):
+                    validar_borrador(
+                        {**self.borrador, 'comentarios_base': [linea]}, 'RODILLA', 'RES',
+                    )
+
+    def test_normalidad_no_reconocida_se_muestra_para_editar_antes_de_guardar(self):
+        self.borrador['comentarios_base'] = ['Contornos lisos y señal homogénea.']
+        cantidad = PlantillaEstructurada.objects.count()
+        propuesta = self.generar()
+        self.assertEqual(propuesta['borrador']['comentarios_base'], self.borrador['comentarios_base'])
+        self.assertIn('Línea 1', propuesta['advertencias'][0])
+        self.assertEqual(PlantillaEstructurada.objects.count(), cantidad)
+        rechazo = self.post(self.confirmacion(propuesta))
+        self.assertEqual(rechazo.status_code, 400)
+        self.assertIn('Línea 1', rechazo.json()['error'])
+        self.assertEqual(PlantillaEstructurada.objects.count(), cantidad)
+        propuesta['borrador']['comentarios_base'] = ['Estructuras de señal habitual.']
+        self.assertEqual(self.post(self.confirmacion(propuesta)).status_code, 200)
+
+    def test_preview_no_relaja_bloqueo_de_patologia_o_tecnica(self):
+        for linea in ('Edema muscular.', 'Secuencias T1 normales.'):
+            with self.subTest(linea=linea):
+                self.borrador['comentarios_base'] = [linea]
+                with patch.object(ai_service, 'generar_plantilla_normal', return_value=self.borrador):
+                    response = self.post({
+                        'accion': 'generar', 'region': 'RODILLA', 'modalidad': 'RES',
+                    })
+                self.assertEqual(response.status_code, 400)
+
     def test_confirmacion_explicita_token_permisos_y_vencimiento(self):
         propuesta = self.generar()
         cantidad = PlantillaEstructurada.objects.count()

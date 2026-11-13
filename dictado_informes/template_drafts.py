@@ -32,15 +32,21 @@ CRITERIO_REFERENCIAS = (
 SALT = 'dictado.plantilla-normal.v1'
 PATOLOGIA_BORRADOR_RE = re.compile(
     r'\b(rotura|desgarro|lesion\w*|tumor\w*|masa|nodulo\w*|edema|'
-    r'fractura\w*|luxacion\w*|derrame|patologic\w*)\b'
+    r'fractura\w*|luxacion\w*|derrame|patologic\w*|adenopatia\w*|'
+    r'coleccion\w*|quiste\w*|alteracion\w*|liquido libre)\b'
 )
-NORMALIDAD_BORRADOR_RE = re.compile(
-    r'\b(normal\w*|conservad\w*|habitual\w*|sin\s+'
-    r'(?:(?:evidencia|signos?)\s+de\s+)?(?:lesion\w*|alteracion\w*|'
-    r'hallazg\w*|fractura\w*|edema|tumor\w*|masa|nodulo\w*|'
-    r'luxacion\w*|derrame)|ausencia\s+de\s+'
+NEGACION_BORRADOR = (
+    r'\b(?:sin|ni|ausencia\s+de|no(?:\s+se)?\s+'
+    r'(?:identifica\w*|observa\w*|evidencia\w*|detecta\w*|'
+    r'visualiza\w*|aprecia\w*))\s+'
+    r'(?:(?:evidencia|signos?)\s+de\s+)?'
     r'(?:lesion\w*|alteracion\w*|hallazg\w*|fractura\w*|edema|'
-    r'tumor\w*|masa|nodulo\w*|luxacion\w*|derrame))\b'
+    r'tumor\w*|masa|nodulo\w*|luxacion\w*|derrame|rotura\w*|'
+    r'desgarro\w*|adenopatia\w*|coleccion\w*|quiste\w*|liquido libre)\b'
+)
+NEGACION_BORRADOR_RE = re.compile(NEGACION_BORRADOR)
+NORMALIDAD_BORRADOR_RE = re.compile(
+    r'\b(?:normal\w*|conservad\w*|habitual\w*)\b|' + NEGACION_BORRADOR
 )
 
 
@@ -81,7 +87,7 @@ def seleccionar_referencias(usuario, region, modalidad, limite=3):
     return [item[2] for item in candidatas[:limite]]
 
 
-def validar_borrador(data, region, modalidad):
+def validar_borrador(data, region, modalidad, *, advertencias=None):
     """Contrato pequeño y estricto; revisión clínica humana sigue siendo obligatoria."""
     if not isinstance(data, dict):
         raise ValidationError('El borrador debe ser un objeto.')
@@ -111,7 +117,7 @@ def validar_borrador(data, region, modalidad):
     lineas = data.get('comentarios_base')
     if not isinstance(lineas, list) or not 1 <= len(lineas) <= 30:
         raise ValidationError('Se requieren entre 1 y 30 líneas de anatomía normal.')
-    for linea in lineas:
+    for numero, linea in enumerate(lineas, 1):
         if (not isinstance(linea, str) or not linea.strip() or len(linea) > 500
                 or '\n' in linea or '\r' in linea):
             raise ValidationError('Cada línea debe tener entre 1 y 500 caracteres.')
@@ -121,15 +127,24 @@ def validar_borrador(data, region, modalidad):
             r'dosis|proyecciones|adquisicion|paciente|dni|historia clinica)\b', texto
         ):
             raise ValidationError('No incluir técnica ni datos de paciente en las líneas base.')
-        if not NORMALIDAD_BORRADOR_RE.search(texto):
-            raise ValidationError('Las líneas base deben describir anatomía normal, no patología.')
         segmentos = re.split(r'[,.;]|\b(?:y|pero|aunque)\b', texto)
         if any(
-            PATOLOGIA_BORRADOR_RE.search(segmento)
-            and not re.search(r'\b(?:sin|no|ni|ausencia de)\b', segmento)
+            PATOLOGIA_BORRADOR_RE.search(NEGACION_BORRADOR_RE.sub('', segmento))
             for segmento in segmentos
         ):
-            raise ValidationError('No incluir hallazgos patológicos afirmativos en una plantilla normal.')
+            raise ValidationError(
+                f'Línea {numero}: se detectó una posible afirmación patológica. '
+                'La plantilla debe describir anatomía normal.'
+            )
+        if not NORMALIDAD_BORRADOR_RE.search(texto):
+            mensaje = (
+                f'Línea {numero}: no se reconoció una expresión de normalidad. '
+                'Revisá esa línea y reformulala o eliminala antes de guardar. '
+                'Esto no significa que se haya detectado patología.'
+            )
+            if advertencias is None:
+                raise ValidationError(mensaje)
+            advertencias.append(mensaje)
     if len({normalizar(linea) for linea in lineas}) != len(lineas):
         raise ValidationError('El borrador contiene líneas repetidas.')
     return {
@@ -161,13 +176,15 @@ def generar_borrador(usuario, data):
             ],
         } for p in referencias],
     )
-    borrador = validar_borrador(borrador, region, modalidad)
+    advertencias = []
+    borrador = validar_borrador(borrador, region, modalidad, advertencias=advertencias)
     token = signing.dumps({
         'usuario': usuario.pk, 'region': region, 'modalidad': modalidad,
         'codigo': f'IA_{uuid.uuid4().hex.upper()}',
     }, salt=SALT)
     return {
         'borrador': borrador, 'token': token,
+        'advertencias': advertencias,
         'referencias': [{'codigo': p.codigo, 'nombre': p.nombre} for p in referencias],
         'criterio_referencias': CRITERIO_REFERENCIAS,
     }
