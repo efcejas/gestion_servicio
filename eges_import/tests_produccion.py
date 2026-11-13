@@ -49,6 +49,30 @@ class FuentesSinteticasMixin:
 
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
     @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+    def test_tablero_inicia_con_historico_eges_y_netterm_opcional(self):
+        self.client.force_login(self.usuario)
+        response = self.client.get(reverse('eges_import:estadisticas'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['form_fuentes']['lotes_eges'].value(), [self.batch.pk])
+        self.assertEqual(response.context['form_fuentes']['lotes_netterm'].value(), None)
+
+    @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+    def test_seleccionar_netterm_infiere_periodo_para_comparar_historico_eges(self):
+        self.eges()
+        self.netterm()
+        self.client.force_login(self.usuario)
+        with patch('eges_import.views.construir_estadisticas_fuentes',
+                   wraps=construir_estadisticas_fuentes) as construir:
+            response = self.client.get(reverse('eges_import:estadisticas_fuentes_data'), {
+                'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['metadatos']['fecha_desde'], '2026-10-10')
+        self.assertEqual(response.json()['metadatos']['fecha_hasta'], '2026-10-10')
+        self.assertEqual(construir.call_args.kwargs['fecha_desde'], date(2026, 10, 10))
+        self.assertEqual(construir.call_args.kwargs['fecha_hasta'], date(2026, 10, 10))
+
+    @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
     def test_tablero_no_duplica_panel_y_conserva_acceso_a_produccion(self):
         self.eges()
         self.netterm()

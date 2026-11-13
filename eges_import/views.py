@@ -16,7 +16,7 @@ import openpyxl
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import (
-    ConciliacionRevision, ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermLote,
+    ConciliacionRevision, ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermFila, NettermLote,
 )
 from .forms import (
     ImportarEGESForm, PreviewNettermForm, GuardarNettermForm,
@@ -329,9 +329,13 @@ def dashboard_global(request):
     fecha_min = todas_filas.order_by('fecha_turno').first()
     fecha_max = todas_filas.order_by('-fecha_turno').first()
     
+    form_fuentes = _form_estadisticas_fuentes(request.GET if request.GET else None)
+    if not request.GET.getlist('lotes_eges') and not request.GET.getlist('lotes_netterm'):
+        form_fuentes.initial['lotes_eges'] = list(ImportBatch.objects.values_list('pk', flat=True))
+
     context = {
         'titulo_pagina': 'Dashboard Global EGES',
-        'form_fuentes': _form_estadisticas_fuentes(request.GET if request.GET else None),
+        'form_fuentes': form_fuentes,
         'total_batches': total_batches,
         'lotes_posible_tope': lotes_posible_tope,
         'ultimo_batch': ultimo_batch,
@@ -1056,12 +1060,24 @@ def _datos_estadisticas_fuentes(request):
     modalidades = request.GET.getlist('modalidades[]') or None
     if request.GET.get('sin_modalidades') == '1':
         modalidades = []
-    return construir_estadisticas_fuentes(
-        batch_eges_ids=[lote.pk for lote in form.cleaned_data['lotes_eges']],
-        lote_netterm_ids=[lote.pk for lote in form.cleaned_data['lotes_netterm']],
-        fecha_desde=form.cleaned_data['fecha_desde'], fecha_hasta=form.cleaned_data['fecha_hasta'],
+    lote_eges_ids = [lote.pk for lote in form.cleaned_data['lotes_eges']]
+    lote_netterm_ids = [lote.pk for lote in form.cleaned_data['lotes_netterm']]
+    fecha_desde = form.cleaned_data['fecha_desde']
+    fecha_hasta = form.cleaned_data['fecha_hasta']
+    periodo_inferido = bool(lote_netterm_ids and not fecha_desde and not fecha_hasta)
+    if periodo_inferido:
+        periodo_netterm = NettermFila.objects.filter(lote_id__in=lote_netterm_ids).aggregate(
+            desde=Min('fecha_pedido'), hasta=Max('fecha_pedido'),
+        )
+        fecha_desde, fecha_hasta = periodo_netterm['desde'], periodo_netterm['hasta']
+    resultado = construir_estadisticas_fuentes(
+        batch_eges_ids=lote_eges_ids,
+        lote_netterm_ids=lote_netterm_ids,
+        fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
         modalidades=modalidades, agrupacion=request.GET.get('agrupacion', 'mes'),
     )
+    resultado['metadatos']['periodo_inferido_netterm'] = periodo_inferido
+    return resultado
 
 
 @login_required
