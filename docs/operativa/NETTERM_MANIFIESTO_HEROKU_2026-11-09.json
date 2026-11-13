@@ -1,0 +1,163 @@
+{
+  "fecha_local": "2026-11-09",
+  "timezone": "America/Buenos_Aires",
+  "app": "gestion-colegiales",
+  "release": "v511",
+  "release_description": "Deploy 818a324f",
+  "commit_local": "5c83248e56b6bca43aa608585298c520291a3b44",
+  "base": "818a324f113ca8b2a311eb53537fd1b9a0e0f416",
+  "scope": "Archivos de eges_import, liquidacion y templates cambiados en los dos commits Netterm; no es un manifiesto de toda la aplicacion.",
+  "files": [
+    {
+      "path": "eges_import/forms.py",
+      "sha256_heroku": "fab4c2935e305594315552c3da044ffcb39cf50ee68fc47e6fd2add545783b3a",
+      "sha256_git_blob": "fab4c2935e305594315552c3da044ffcb39cf50ee68fc47e6fd2add545783b3a",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/migrations/0010_nettermlote_nettermfila.py",
+      "sha256_heroku": "8096729bbe770cf5b55e4e7d768ebf4b7269fdb23c1093b3691a7a85f58716f2",
+      "sha256_git_blob": "8096729bbe770cf5b55e4e7d768ebf4b7269fdb23c1093b3691a7a85f58716f2",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/migrations/0011_conciliacionrevision.py",
+      "sha256_heroku": "f6f648dfb8c7ac100cb9f2ab7ed539ef98c0cbbd14102e6f0fa7a266d368dce8",
+      "sha256_git_blob": "f6f648dfb8c7ac100cb9f2ab7ed539ef98c0cbbd14102e6f0fa7a266d368dce8",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/migrations/0012_conciliacionrevision_reemplaza_revision.py",
+      "sha256_heroku": "7634b2fbccc112e48a431e1501b0588ac38d8cda19bf3853a666d335aec8d7ec",
+      "sha256_git_blob": "7634b2fbccc112e48a431e1501b0588ac38d8cda19bf3853a666d335aec8d7ec",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/models.py",
+      "sha256_heroku": "55804bcdc86a190a5854e2277adbf6d5fce2c490aa291436501e83bf220d0253",
+      "sha256_git_blob": "55804bcdc86a190a5854e2277adbf6d5fce2c490aa291436501e83bf220d0253",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/services_conciliacion.py",
+      "sha256_heroku": "0a679e495233801c33ba3f36b1f7f064140874335c2cca18582126e3aed512e7",
+      "sha256_git_blob": "0a679e495233801c33ba3f36b1f7f064140874335c2cca18582126e3aed512e7",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/services_netterm.py",
+      "sha256_heroku": "8e68cc532f4d1413b67d0a39f403a49ed8988a1139690c383813c9ed44a9241c",
+      "sha256_git_blob": "8e68cc532f4d1413b67d0a39f403a49ed8988a1139690c383813c9ed44a9241c",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/services_produccion.py",
+      "sha256_heroku": "5c7a8bf6ebe0787f6ba372b19789b969dc2d7a195843ac263cdbabe0cfb5fa93",
+      "sha256_git_blob": "5c7a8bf6ebe0787f6ba372b19789b969dc2d7a195843ac263cdbabe0cfb5fa93",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/tests.py",
+      "sha256_heroku": "5df9bf89a10007af4a99ce377d92dcbc3641a4d46b1953f7cc26490f63ff1609",
+      "sha256_git_blob": "5df9bf89a10007af4a99ce377d92dcbc3641a4d46b1953f7cc26490f63ff1609",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/tests_produccion.py",
+      "sha256_heroku": "a5f9d8e02c940b5b626e0b9c24633248108fcefec820299a551fd6a8659483de",
+      "sha256_git_blob": "a5f9d8e02c940b5b626e0b9c24633248108fcefec820299a551fd6a8659483de",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/urls.py",
+      "sha256_heroku": "d79a95c45bf25e87f7a63e82880107bd6d44f4e5ab47fd79b09b295f54dd146b",
+      "sha256_git_blob": "d79a95c45bf25e87f7a63e82880107bd6d44f4e5ab47fd79b09b295f54dd146b",
+      "coincide": true
+    },
+    {
+      "path": "eges_import/views.py",
+      "sha256_heroku": "6bec8af84313bd77d349402cd0f09a735e01fd71b18c0e311f0da63947459f8e",
+      "sha256_git_blob": "6bec8af84313bd77d349402cd0f09a735e01fd71b18c0e311f0da63947459f8e",
+      "coincide": true
+    },
+    {
+      "path": "liquidacion/services_respaldo_fuentes.py",
+      "sha256_heroku": "c6996e5284e97e027af7d008fe8ccdff694a57c385f1a70ec55ec184aea0d2e2",
+      "sha256_git_blob": "c6996e5284e97e027af7d008fe8ccdff694a57c385f1a70ec55ec184aea0d2e2",
+      "coincide": true
+    },
+    {
+      "path": "liquidacion/tests_respaldo_fuentes.py",
+      "sha256_heroku": "b63c34ccfea3fd64c38faf195948f0e9e2e5df877dbc2925271698742c9dbec1",
+      "sha256_git_blob": "b63c34ccfea3fd64c38faf195948f0e9e2e5df877dbc2925271698742c9dbec1",
+      "coincide": true
+    },
+    {
+      "path": "liquidacion/urls.py",
+      "sha256_heroku": "8fa1f30f7dc1d2a82337396732a3fee8ef28cc1727a6bd4251d3d62fbbcd4d41",
+      "sha256_git_blob": "8fa1f30f7dc1d2a82337396732a3fee8ef28cc1727a6bd4251d3d62fbbcd4d41",
+      "coincide": true
+    },
+    {
+      "path": "liquidacion/views.py",
+      "sha256_heroku": "4e173025711e7fa03d9e44c274080586c5a2c3becf09e3d3404a7ad7474fab27",
+      "sha256_git_blob": "4e173025711e7fa03d9e44c274080586c5a2c3becf09e3d3404a7ad7474fab27",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/dashboard_global.html",
+      "sha256_heroku": "3dcbcf7f65fdf24c497289f284b30f844d1ef9dfac0419ca9032d18cad68461f",
+      "sha256_git_blob": "3dcbcf7f65fdf24c497289f284b30f844d1ef9dfac0419ca9032d18cad68461f",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/importar.html",
+      "sha256_heroku": "684c9d19b8bf510094748cbed051e0129b8ce3d3922de64617aa04eb242b09f0",
+      "sha256_git_blob": "684c9d19b8bf510094748cbed051e0129b8ce3d3922de64617aa04eb242b09f0",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/lotes_netterm.html",
+      "sha256_heroku": "1305c62f5014debb94dd82aae97e13db1e0812d8dc6f47efa6b852f3bcfdbdb9",
+      "sha256_git_blob": "1305c62f5014debb94dd82aae97e13db1e0812d8dc6f47efa6b852f3bcfdbdb9",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/preview_conciliacion.html",
+      "sha256_heroku": "1fe942654667f27f1a6d1e41b3a7e8bde7ba3051df5e702f57b3fbc0e601bcf6",
+      "sha256_git_blob": "1fe942654667f27f1a6d1e41b3a7e8bde7ba3051df5e702f57b3fbc0e601bcf6",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/preview_netterm.html",
+      "sha256_heroku": "aff10afefcb16aff207fee2c808ae0ddf7733d131946223c7aa47c1a338e3172",
+      "sha256_git_blob": "aff10afefcb16aff207fee2c808ae0ddf7733d131946223c7aa47c1a338e3172",
+      "coincide": true
+    },
+    {
+      "path": "templates/eges_import/produccion_consolidada.html",
+      "sha256_heroku": "ed5d888a98e6ef67d86dc2689d3103365c96aca029b275e2213b632fd6986d31",
+      "sha256_git_blob": "ed5d888a98e6ef67d86dc2689d3103365c96aca029b275e2213b632fd6986d31",
+      "coincide": true
+    },
+    {
+      "path": "templates/liquidacion/cruce_eges_liquidacion_preview.html",
+      "sha256_heroku": "2999841d886e615fc9c59964717fd4d45b3e7488ca1d0237146673f56645c58e",
+      "sha256_git_blob": "2999841d886e615fc9c59964717fd4d45b3e7488ca1d0237146673f56645c58e",
+      "coincide": true
+    },
+    {
+      "path": "templates/liquidacion/respaldo_fuentes_preview.html",
+      "sha256_heroku": "a5ddd995da1bc90dd2b7b82a2adc3e4ce5cfa05e69a1d5e41fbbb0d946ed846d",
+      "sha256_git_blob": "a5ddd995da1bc90dd2b7b82a2adc3e4ce5cfa05e69a1d5e41fbbb0d946ed846d",
+      "coincide": true
+    },
+    {
+      "path": "templates/liquidacion/sesion_contable_list.html",
+      "sha256_heroku": "6ef9cabc69651b4865956c5c243795314cc024f2b1483486e0789e722d00a94d",
+      "sha256_git_blob": "6ef9cabc69651b4865956c5c243795314cc024f2b1483486e0789e722d00a94d",
+      "coincide": true
+    }
+  ],
+  "all_match": true
+}
