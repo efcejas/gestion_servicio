@@ -367,6 +367,7 @@ class TestAPIsMejora(TestCase):
             data=json.dumps({
                 'texto_transcrito': 'texto desde transcripcion',
                 'modo': 'AGENTE',
+                'plantilla_confirmada_codigo': 'RODILLA',
                 'tipo_estudio': 'RES'
             }),
             content_type='application/json'
@@ -611,6 +612,15 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(contexto['region'], 'MANO')
         self.assertEqual(contexto['lateralidad'], 'IZQUIERDA')
         self.assertEqual(contexto['lado_tecnica'], 'izquierda')
+
+    def test_extrae_contexto_para_crear_plantillas_de_brazo_y_dedo(self):
+        brazo = extraer_contexto_clinico_dictado('Es una RM de brazo.')
+        dedo = extraer_contexto_clinico_dictado('Es una RM de dedo.')
+
+        self.assertEqual(brazo['region'], 'BRAZO')
+        self.assertEqual(brazo['modalidad'], 'RES')
+        self.assertEqual(dedo['region'], 'DEDO')
+        self.assertEqual(dedo['modalidad'], 'RES')
 
     def test_extrae_contexto_clinico_gonalgia_derecha(self):
         contexto = extraer_contexto_clinico_dictado('Paciente con gonalgia derecha.')

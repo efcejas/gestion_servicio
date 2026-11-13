@@ -286,7 +286,7 @@
                             }
 
                             // Empty states
-                            const tienePropias = {{ plantillas_propias|length }} > 0;
+                            const tienePropias = Array.from(options).some(opt => opt.dataset.grupo === 'mias');
                             document.getElementById('emptyMias').classList.toggle(
                                 'hidden', !(filtroActivo === 'mias' && !tienePropias)
                             );
@@ -528,7 +528,7 @@
             </div>
 
             <div id="modalSeleccionPlantilla" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div class="bg-gray-800 border border-purple-600 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden"
+                <div class="bg-gray-800 border border-purple-600 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                      role="dialog" aria-modal="true" aria-labelledby="tituloSeleccionPlantilla">
                     <div class="px-4 py-3 border-b border-gray-700">
                         <h3 id="tituloSeleccionPlantilla" class="text-lg font-bold text-white">
@@ -546,11 +546,49 @@
                             </label>
                             <select id="plantillaManualAgente"
                                     class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white">
+                                <option value="" selected disabled>Elegí una plantilla...</option>
                                 {% for p in plantillas_estructuradas %}
                                     <option value="{{ p.codigo }}">{{ p.nombre }}</option>
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <details id="opcionesCrearPlantilla" class="mt-4 border-t border-gray-700 pt-3">
+                            <summary class="text-sm text-purple-300 cursor-pointer">Ninguna sirve: Crear plantilla inexistente</summary>
+                            <p class="text-xs text-amber-300 mt-2">
+                                Borrador de anatomía normal, no un informe. No se envía el dictado ni datos del paciente.
+                                Verificá región, modalidad y cada línea: la normalidad aprobada puede preservarse en informes futuros.
+                                Sin técnica ni conclusión automática. Popularidad: criterio futuro, sin frecuencia clínica fiable.
+                            </p>
+                            <label class="block text-xs text-gray-300 mt-2" for="regionNuevaPlantilla">Región anatómica objetivo</label>
+                            <select id="regionNuevaPlantilla" class="w-full bg-gray-900 text-white rounded p-2">
+                                <option value="">Elegí región (obligatorio)</option>
+                                {% for codigo, nombre in regiones_borrador %}
+                                <option value="{{ codigo }}">{{ nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <label class="block text-xs text-gray-300 mt-2" for="modalidadNuevaPlantilla">Modalidad</label>
+                            <select id="modalidadNuevaPlantilla" class="w-full bg-gray-900 text-white rounded p-2">
+                                <option value="">Elegí modalidad (obligatorio)</option>
+                                {% for codigo, nombre in modalidades_borrador %}
+                                <option value="{{ codigo }}">{{ nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <button id="btnGenerarPlantilla" type="button" class="mt-2 bg-purple-700 text-white rounded px-3 py-2 text-sm">Proponer borrador normal</button>
+                            <p id="estadoNuevaPlantilla" role="status" aria-live="polite" class="text-xs text-amber-300 mt-2"></p>
+                            <div id="previewNuevaPlantilla" class="hidden space-y-2 mt-3">
+                                <label class="block text-xs text-gray-300" for="nombreNuevaPlantilla">Nombre</label>
+                                <input id="nombreNuevaPlantilla" maxlength="200" class="w-full bg-gray-900 text-white rounded p-2">
+                                <label class="block text-xs text-gray-300" for="tituloNuevaPlantilla">Título</label>
+                                <input id="tituloNuevaPlantilla" maxlength="500" class="w-full bg-gray-900 text-white rounded p-2">
+                                <label class="block text-xs text-gray-300" for="lineasNuevaPlantilla">COMENTARIO — una línea normal por anatomía</label>
+                                <textarea id="lineasNuevaPlantilla" rows="8" spellcheck="false" class="w-full bg-gray-900 text-white rounded p-2"></textarea>
+                                <p class="text-xs text-gray-400">CONCLUSIÓN: vacía, se redactará a partir del dictado. Técnica: omitida.</p>
+                                <label class="block text-xs text-gray-300"><input id="compartirNuevaPlantilla" type="checkbox"> Compartir con otros usuarios de Dictado IA (por defecto privada)</label>
+                                <label class="block text-xs text-amber-300"><input id="confirmarNuevaPlantilla" type="checkbox"> Revisé región/modalidad y cada línea; confirmo que es una plantilla normal genérica, sin datos de paciente, y autorizo guardarla y usarla.</label>
+                                <button id="btnGuardarNuevaPlantilla" type="button" class="bg-green-700 text-white rounded px-3 py-2 text-sm">Confirmar, guardar y usar en este informe</button>
+                            </div>
+                        </details>
 
                         <div class="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                             <button id="btnCancelarSeleccionPlantilla" type="button"
@@ -1201,6 +1239,7 @@ function reiniciarEstadoCorreccion() {
 }
 
 function finalizarSeleccionPlantilla(codigo = null) {
+    solicitudNuevaPlantilla += 1;
     document.getElementById('modalSeleccionPlantilla')?.classList.add('hidden');
     if (resolverSeleccionPlantillaPendiente) {
         const resolver = resolverSeleccionPlantillaPendiente;
@@ -1209,12 +1248,25 @@ function finalizarSeleccionPlantilla(codigo = null) {
     }
 }
 
+let tokenNuevaPlantilla = null;
+let solicitudNuevaPlantilla = 0;
+let guardandoNuevaPlantilla = false;
+
 function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
     const modal = document.getElementById('modalSeleccionPlantilla');
     const lista = document.getElementById('candidatosSeleccionPlantilla');
     const motivo = document.getElementById('motivoSeleccionPlantilla');
     const selectorManual = document.getElementById('plantillaManualAgente');
     lista.innerHTML = '';
+    solicitudNuevaPlantilla += 1;
+    tokenNuevaPlantilla = null;
+    document.getElementById('previewNuevaPlantilla').classList.add('hidden');
+    document.getElementById('opcionesCrearPlantilla').open = false;
+    document.getElementById('estadoNuevaPlantilla').textContent = '';
+    document.getElementById('regionNuevaPlantilla').value = contexto.region || '';
+    document.getElementById('modalidadNuevaPlantilla').value = contexto.modalidad || '';
+    document.getElementById('confirmarNuevaPlantilla').checked = false;
+    document.getElementById('compartirNuevaPlantilla').checked = false;
 
     const region = contexto?.region ? ` para ${contexto.region.toLowerCase()}` : '';
     motivo.textContent = `La selección automática tiene confianza ${confianza || 'baja'}${region}. Confirmá antes de generar el informe.`;
@@ -1222,7 +1274,7 @@ function solicitarSeleccionPlantilla(candidatos, contexto, confianza) {
     if (!candidatos || candidatos.length === 0) {
         const vacio = document.createElement('p');
         vacio.className = 'text-sm text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg p-3';
-        vacio.textContent = 'No hubo una coincidencia clara. Elegí una plantilla de la lista completa.';
+        vacio.textContent = 'No hubo una coincidencia clara. Elegí una plantilla o abrí “Crear plantilla inexistente”.';
         lista.appendChild(vacio);
     } else {
         candidatos.forEach(candidato => {
@@ -1268,7 +1320,102 @@ document.getElementById('btnUsarPlantillaManual')?.addEventListener('click', () 
     if (codigo) finalizarSeleccionPlantilla(codigo);
 });
 document.getElementById('btnCancelarSeleccionPlantilla')?.addEventListener('click', () => {
+    if (guardandoNuevaPlantilla) return;
+    solicitudNuevaPlantilla += 1;
     finalizarSeleccionPlantilla(null);
+});
+
+async function enviarPlantillaInexistente(payload) {
+    const response = await fetch('{% url "dictado_informes:plantilla_inexistente" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Error creando plantilla');
+    return data;
+}
+
+function invalidarBorradorNuevaPlantilla() {
+    solicitudNuevaPlantilla += 1;
+    tokenNuevaPlantilla = null;
+    document.getElementById('previewNuevaPlantilla').classList.add('hidden');
+    document.getElementById('confirmarNuevaPlantilla').checked = false;
+}
+['regionNuevaPlantilla', 'modalidadNuevaPlantilla'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', invalidarBorradorNuevaPlantilla);
+});
+['nombreNuevaPlantilla', 'tituloNuevaPlantilla', 'lineasNuevaPlantilla', 'compartirNuevaPlantilla'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+        document.getElementById('confirmarNuevaPlantilla').checked = false;
+    });
+});
+
+document.getElementById('btnGenerarPlantilla')?.addEventListener('click', async () => {
+    const boton = document.getElementById('btnGenerarPlantilla');
+    const estado = document.getElementById('estadoNuevaPlantilla');
+    invalidarBorradorNuevaPlantilla();
+    const solicitud = solicitudNuevaPlantilla;
+    boton.disabled = true;
+    estado.textContent = 'Generando con referencias de plantillas, sin dictado...';
+    try {
+        const data = await enviarPlantillaInexistente({
+            accion: 'generar',
+            region: document.getElementById('regionNuevaPlantilla').value,
+            modalidad: document.getElementById('modalidadNuevaPlantilla').value,
+        });
+        if (solicitud !== solicitudNuevaPlantilla) return;
+        tokenNuevaPlantilla = data.token;
+        document.getElementById('nombreNuevaPlantilla').value = data.borrador.nombre;
+        document.getElementById('tituloNuevaPlantilla').value = data.borrador.titulo;
+        document.getElementById('lineasNuevaPlantilla').value = data.borrador.comentarios_base.join('\n');
+        document.getElementById('previewNuevaPlantilla').classList.remove('hidden');
+        estado.textContent = `${data.criterio_referencias} Referencias: ${data.referencias.map(p => p.nombre).join(', ')}. Revisá y editá antes de confirmar.`;
+    } catch (error) {
+        if (solicitud === solicitudNuevaPlantilla) estado.textContent = error.message;
+    } finally {
+        boton.disabled = false;
+    }
+});
+
+document.getElementById('btnGuardarNuevaPlantilla')?.addEventListener('click', async () => {
+    const estado = document.getElementById('estadoNuevaPlantilla');
+    if (!tokenNuevaPlantilla || !document.getElementById('confirmarNuevaPlantilla').checked) {
+        estado.textContent = 'Generá un borrador y confirmá explícitamente la revisión médica.';
+        return;
+    }
+    if (guardandoNuevaPlantilla) return;
+    guardandoNuevaPlantilla = true;
+    const controles = Array.from(document.querySelectorAll('#modalSeleccionPlantilla button, #modalSeleccionPlantilla input, #modalSeleccionPlantilla textarea, #modalSeleccionPlantilla select'));
+    controles.forEach(control => control.disabled = true);
+    try {
+        const data = await enviarPlantillaInexistente({
+            accion: 'confirmar', token: tokenNuevaPlantilla, confirmar: true,
+            compartida: document.getElementById('compartirNuevaPlantilla').checked,
+            borrador: {
+                nombre: document.getElementById('nombreNuevaPlantilla').value,
+                titulo: document.getElementById('tituloNuevaPlantilla').value,
+                comentarios_base: document.getElementById('lineasNuevaPlantilla').value.split('\n').map(s => s.trim()).filter(Boolean),
+                seccion_tecnica: '', conclusion: '',
+            },
+        });
+        // Disponible inmediatamente en selección manual y modo estructurado, sin recargar.
+        ['plantillaManualAgente', 'tipoPlantilla'].forEach(id => {
+            const selector = document.getElementById(id);
+            if (selector && !Array.from(selector.options).some(o => o.value === data.plantilla.codigo)) {
+                const opcion = new Option(data.plantilla.nombre, data.plantilla.codigo);
+                opcion.dataset.grupo = 'mias';
+                opcion.dataset.nombre = data.plantilla.nombre.toLowerCase();
+                selector.add(opcion);
+            }
+        });
+        finalizarSeleccionPlantilla(data.plantilla.codigo);
+    } catch (error) {
+        estado.textContent = error.message;
+    } finally {
+        guardandoNuevaPlantilla = false;
+        controles.forEach(control => control.disabled = false);
+    }
 });
 
 // 🚀 WEB SPEECH API para preview en tiempo real
