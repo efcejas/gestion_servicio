@@ -27,6 +27,7 @@ from .services_conciliacion import (
 )
 from .services_netterm import guardar_lote_netterm
 from .services_produccion import construir_preview_produccion
+from .services_estadisticas import construir_estadisticas_fuentes
 from .services import (
     get_base_estudios_finalizados as _base_estudios_finalizados,
     get_base_rx_sin_informe as _base_rx_sin_informe,
@@ -306,20 +307,6 @@ def dashboard_global(request):
     Dashboard global que consolida TODOS los batches importados.
     Vista ejecutiva para el director.
     """
-    # El tablero habitual permite consultar la misma producción conciliada,
-    # con selección explícita de fuentes; los indicadores históricos siguen EGES.
-    form_produccion = PreviewConciliacionForm(request.GET if request.GET else None)
-    produccion = None
-    if form_produccion.is_bound and form_produccion.is_valid():
-        try:
-            produccion = construir_preview_produccion(
-                batch_eges_ids=[lote.pk for lote in form_produccion.cleaned_data['lotes_eges']],
-                lote_netterm_ids=[lote.pk for lote in form_produccion.cleaned_data['lotes_netterm']],
-                fecha_desde=form_produccion.cleaned_data['fecha_desde'],
-                fecha_hasta=form_produccion.cleaned_data['fecha_hasta'],
-            )
-        except ValidationError as error:
-            form_produccion.add_error(None, error)
     # Obtener todos los batches
     batches = ImportBatch.objects.all()
     
@@ -344,8 +331,7 @@ def dashboard_global(request):
     
     context = {
         'titulo_pagina': 'Dashboard Global EGES',
-        'form_produccion': form_produccion,
-        'produccion': produccion,
+        'form_fuentes': _form_estadisticas_fuentes(request.GET if request.GET else None),
         'total_batches': total_batches,
         'lotes_posible_tope': lotes_posible_tope,
         'ultimo_batch': ultimo_batch,
@@ -1055,6 +1041,220 @@ def dashboard_global_franja_horaria_data(request):
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoint: KPIs
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _form_estadisticas_fuentes(data):
+    form = PreviewConciliacionForm(data)
+    form.fields['lotes_eges'].required = False
+    form.fields['lotes_netterm'].required = False
+    return form
+
+
+def _datos_estadisticas_fuentes(request):
+    form = _form_estadisticas_fuentes(request.GET)
+    if not form.is_valid():
+        raise ValidationError([str(error) for errores in form.errors.values() for error in errores])
+    modalidades = request.GET.getlist('modalidades[]') or None
+    if request.GET.get('sin_modalidades') == '1':
+        modalidades = []
+    return construir_estadisticas_fuentes(
+        batch_eges_ids=[lote.pk for lote in form.cleaned_data['lotes_eges']],
+        lote_netterm_ids=[lote.pk for lote in form.cleaned_data['lotes_netterm']],
+        fecha_desde=form.cleaned_data['fecha_desde'], fecha_hasta=form.cleaned_data['fecha_hasta'],
+        modalidades=modalidades, agrupacion=request.GET.get('agrupacion', 'mes'),
+    )
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_GET
+def estadisticas_fuentes_data(request):
+    try:
+        return JsonResponse(_datos_estadisticas_fuentes(request))
+    except ValidationError as error:
+        return JsonResponse({'error': '; '.join(error.messages)}, status=400)
+
+
+def _imagen_grafico_estadistico(labels, datasets, *, tipo='bar', horizontal=False):
+    import io
+
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from reportlab.platypus import Image
+
+    buffer = io.BytesIO()
+    figure, axis = plt.subplots(figsize=(10, 3.2))
+    if tipo == 'donut':
+        valores = datasets[0]['data'] if datasets else []
+        if valores and sum(valores):
+            axis.pie(valores, labels=labels, autopct='%1.1f%%', startangle=90,
+                     wedgeprops={'width': 0.48, 'edgecolor': 'white'})
+        else:
+            axis.text(0.5, 0.5, 'Sin datos', ha='center', va='center', transform=axis.transAxes)
+            axis.axis('off')
+    elif horizontal:
+        datos = datasets[0]['data'] if datasets else []
+        posiciones = np.arange(len(labels))
+        axis.barh(posiciones, datos, color=(datasets[0].get('backgroundColor') if datasets else '#64748b'))
+        axis.set_yticks(posiciones, labels=labels, fontsize=7)
+        axis.invert_yaxis()
+    elif tipo == 'line':
+        for dataset in datasets:
+            axis.plot(labels, dataset['data'], marker='o', markersize=2,
+                      label=dataset['label'], color=dataset.get('borderColor'))
+    else:
+        posiciones = np.arange(len(labels))
+        ancho = 0.8 / max(len(datasets), 1)
+        for indice, dataset in enumerate(datasets):
+            desplazamiento = (indice - (len(datasets) - 1) / 2) * ancho
+            axis.bar(posiciones + desplazamiento, dataset['data'], ancho,
+                     label=dataset['label'], color=dataset.get('backgroundColor'))
+        axis.set_xticks(posiciones, labels=labels)
+    if tipo != 'donut':
+        if not horizontal:
+            axis.tick_params(axis='x', labelrotation=35 if len(labels) > 8 else 0, labelsize=7)
+        axis.tick_params(axis='y', labelsize=7)
+        axis.grid(axis='x' if horizontal else 'y', color='#e5e7eb', linewidth=0.5)
+        axis.set_axisbelow(True)
+        axis.spines[['top', 'right']].set_visible(False)
+        handles, _ = axis.get_legend_handles_labels()
+        if handles and len(datasets) > 1:
+            axis.legend(fontsize=7, loc='best')
+    figure.tight_layout()
+    figure.savefig(buffer, format='png', dpi=140, bbox_inches='tight', facecolor='white')
+    plt.close(figure)
+    buffer.seek(0)
+    return Image(buffer, width=24 * 28.35, height=7.5 * 28.35, kind='proportional')
+
+
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+@require_GET
+def exportar_pdf_fuentes(request):
+    """Exporta los mismos agregados y filtros del tablero EGES + Netterm."""
+    import io
+    from html import escape
+
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    try:
+        datos = _datos_estadisticas_fuentes(request)
+    except ValidationError as error:
+        return HttpResponse('; '.join(error.messages), status=400, content_type='text/plain; charset=utf-8')
+
+    metadata = datos['metadatos']
+    estado_resultado = 'Resultado incompleto' if metadata['incompleto'] else 'Resultado provisional'
+    buffer = io.BytesIO()
+    document = SimpleDocTemplate(buffer, pagesize=landscape(A4),
+                                 leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+                                 topMargin=1.2 * cm, bottomMargin=1.2 * cm)
+    styles = getSampleStyleSheet()
+    title = ParagraphStyle('FuenteTitle', parent=styles['Title'], textColor=colors.HexColor('#1e40af'))
+    heading = ParagraphStyle('FuenteHeading', parent=styles['Heading2'], textColor=colors.HexColor('#1e40af'))
+    note = ParagraphStyle('FuenteNote', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor('#475569'))
+
+    def tabla(filas, anchos=None):
+        table = Table(filas, colWidths=anchos, repeatRows=1, hAlign='LEFT')
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e293b')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+            ('GRID', (0, 0), (-1, -1), 0.35, colors.HexColor('#cbd5e1')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+        return table
+
+    kpis = datos['kpis']
+    fecha_desde = metadata['fecha_desde']
+    fecha_hasta = metadata['fecha_hasta']
+    modalidades = request.GET.getlist('modalidades[]')
+    modalidad_texto = ('Ninguna' if request.GET.get('sin_modalidades') == '1'
+                       else ', '.join(modalidades) if modalidades else 'Todas')
+    agrupaciones = {'dia': 'Día', 'semana': 'Semana', 'mes': 'Mes'}
+    agrupacion_texto = agrupaciones[request.GET.get('agrupacion', 'mes')]
+    desde_texto = fecha_desde.strftime('%d/%m/%Y') if fecha_desde else 'Sin dato'
+    hasta_texto = fecha_hasta.strftime('%d/%m/%Y') if fecha_hasta else 'Sin dato'
+    pendientes_texto = '; '.join(
+        f"{item['motivo']}: {item['cantidad']}" for item in metadata['pendientes']
+    ) or 'Ninguno'
+    excluidos_texto = '; '.join(
+        f"{item['motivo']}: {item['cantidad']}" for item in metadata['excluidos']
+    ) or 'Ninguna'
+    historia = [
+        Paragraph('Estadísticas de producción respaldada', title),
+        Paragraph(f"Fuentes: {escape(metadata['fuente'])} · Modalidades: {escape(modalidad_texto)} · "
+              f"Período: {desde_texto} – {hasta_texto} · Agrupación: {agrupacion_texto} · "
+              f"{estado_resultado} · Generado: {timezone.localdate():%d/%m/%Y}", note),
+        Spacer(1, 10),
+        Paragraph('Indicadores', heading),
+        tabla([
+            ['Prácticas', 'Pacientes identificables', 'Prácticas / paciente', 'Informes confirmados', 'Sin informe', 'Finalización documentada'],
+            [str(kpis['practicas_realizadas']), str(kpis['pacientes_atendidos']),
+             str(kpis['practicas_por_paciente']) if kpis['practicas_por_paciente'] is not None else 'Sin dato',
+             str(kpis['total_finalizados']), str(kpis['total_pendientes']),
+             f"{kpis['tasa_conversion']}%" if kpis['tasa_conversion'] is not None else 'Sin dato'],
+        ]),
+        Spacer(1, 8),
+        Paragraph('Este conteo es provisional y no certifica cantidades económicas. '
+                  'Las observaciones ambiguas quedan pendientes y no se agregan como prácticas. '
+                  'Las fechas usan Turno EGES y Pedido Netterm. La franja horaria muestra la hora de turno EGES; '
+                  'Netterm no aporta hora de realización comparable. La cobertura de las fuentes no está confirmada.', note),
+        Paragraph(f"Pendientes: {escape(pendientes_texto)}. "
+              f"Exclusiones: {escape(excluidos_texto)}. "
+                  f"Sin identidad: {kpis['sin_identidad']}. Lotes EGES: {escape(', '.join(map(str, metadata['lotes_eges'])) or 'Ninguno')}; "
+                  f"Netterm: {escape(', '.join(map(str, metadata['lotes_netterm'])) or 'Ninguno')}.", note),
+        Spacer(1, 10),
+        Paragraph('Evolución y distribución por modalidad', heading),
+        _imagen_grafico_estadistico(datos['temporal']['labels'], datos['temporal']['datasets'], tipo='line'),
+        tabla([['Modalidad', 'Prácticas'], *[[label, str(value)] for label, value in
+              zip(datos['modalidad']['labels'], datos['modalidad']['datasets'][0]['data'])]]),
+        PageBreak(),
+        Paragraph('Distribución operativa', heading),
+    ]
+    historia.extend([
+        tabla([['Día de semana', 'Prácticas'], *[[label, str(value)] for label, value in
+              zip(datos['dia_semana']['labels'], datos['dia_semana']['datasets'][0]['data'])]]),
+        Spacer(1, 10),
+        tabla([['Franja horaria', 'Prácticas'], *[[label, str(value)] for label, value in
+              zip(datos['franja']['labels'], datos['franja']['datasets'][0]['data'])]]),
+        Spacer(1, 10),
+        Paragraph('Sub-modalidades ECO', heading),
+        tabla([['Sub-modalidad', 'Prácticas'], *[[label, str(value)] for label, value in
+              zip(datos['sub_eco']['labels'], datos['sub_eco']['datasets'][0]['data'])]]),
+        PageBreak(),
+        Paragraph('Productividad y cobertura registrada', heading),
+        _imagen_grafico_estadistico(datos['medicos']['labels'], datos['medicos']['datasets'], horizontal=True),
+        tabla([['Profesional', 'Prácticas'], *[[label, str(sum(dataset['data'][index] for dataset in datos['medicos']['datasets']))]
+              for index, label in enumerate(datos['medicos']['labels'])]]),
+        Spacer(1, 10),
+        tabla([['Cobertura registrada', 'Prácticas'], *[[label, str(value)] for label, value in
+              zip(datos['obras_sociales']['labels'], datos['obras_sociales']['datasets'][0]['data'])]]),
+        Spacer(1, 10),
+        Paragraph('Comparativa con período anterior', heading),
+        tabla([['Indicador', 'Actual', 'Anterior', 'Variación'], *[
+            [nombre, str(item['actual']) if item['actual'] is not None else 'Sin dato',
+             str(item['anterior']) if item['anterior'] is not None else 'Sin dato',
+             str(item['absoluta']) if item['absoluta'] is not None else 'Sin dato']
+            for nombre, item in [('Prácticas', datos['comparativa']['comparativa']['practicas']),
+                                 ('Pacientes', datos['comparativa']['comparativa']['pacientes']),
+                                 ('Prácticas / paciente', datos['comparativa']['comparativa']['practicas_por_paciente'])]
+        ]]),
+    ])
+    document.build(historia)
+    response = HttpResponse(buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = 'attachment; filename="estadisticas_fuentes.pdf"'
+    return response
+
 
 def _vista_kpis_data(request):
     """Lógica interna de KPIs, reutilizable desde superuser y director."""
@@ -2010,7 +2210,7 @@ def portal_director_franja_horaria(request, token):
 # Exportar PDF
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _exportar_pdf(request):
+def _exportar_pdf(request, datos_fuentes=None):
     """
     Genera un informe PDF ejecutivo.
     Usa matplotlib para gráficos (alta calidad) + ReportLab Platypus para layout.

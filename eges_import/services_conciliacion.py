@@ -127,6 +127,7 @@ def _firma_snapshot(
 def construir_preview_conciliacion(
     *, lote_netterm_ids, batch_eges_id=None, batch_eges_ids=None,
     fecha_desde=None, fecha_hasta=None, modalidades_eges=None, modalidades_netterm=None,
+    permitir_fuente_unica=False,
 ):
     """Compara origenes seleccionados sin fusionar, validar o persistir decisiones."""
     try:
@@ -134,7 +135,9 @@ def construir_preview_conciliacion(
         batch_ids = [int(valor) for valor in batch_eges_ids] if batch_eges_ids is not None else [int(batch_eges_id)]
     except (TypeError, ValueError):
         raise ValidationError('Selecciona identificadores de lotes validos.') from None
-    if not ids or len(ids) != len(set(ids)) or not batch_ids or len(batch_ids) != len(set(batch_ids)):
+    seleccion_incompleta = not ids or not batch_ids
+    if (len(ids) != len(set(ids)) or len(batch_ids) != len(set(batch_ids))
+            or (seleccion_incompleta and not permitir_fuente_unica) or (not ids and not batch_ids)):
         raise ValidationError('Selecciona lotes EGES y Netterm distintos, al menos uno de cada fuente.')
     if batch_eges_ids is not None and batch_eges_id is not None:
         raise ValidationError('Usa una sola seleccion de lotes EGES.')

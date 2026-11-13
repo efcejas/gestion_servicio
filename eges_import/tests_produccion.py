@@ -1,5 +1,6 @@
 import hashlib
 from datetime import date, time
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import connection
@@ -9,6 +10,7 @@ from django.urls import reverse
 
 from .models import ConciliacionRevision, EgesRow, ImportBatch, NettermFila, NettermLote
 from .services_produccion import construir_preview_produccion
+from .services_estadisticas import construir_estadisticas_fuentes
 from .services_conciliacion import (
     construir_preview_conciliacion, construir_preview_conteo_consolidado,
     registrar_revision_conciliacion,
@@ -47,7 +49,7 @@ class FuentesSinteticasMixin:
 
 class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
     @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
-    def test_tablero_habitual_consulta_la_misma_produccion(self):
+    def test_tablero_no_duplica_panel_y_conserva_acceso_a_produccion(self):
         self.eges()
         self.netterm()
         self.netterm(pedido='2', documento='87654321')
@@ -56,12 +58,101 @@ class ProduccionFuentesTest(FuentesSinteticasMixin, TestCase):
             'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
         })
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['produccion']['total_produccion'], 2)
-        self.assertEqual(response.context['produccion']['aporte_netterm'], 1)
-        self.assertContains(response, 'Análisis histórico EGES')
+        self.assertContains(response, 'id="fecha-desde"', count=1)
+        self.assertNotContains(response, 'data-lote-picker')
+        self.assertNotContains(response, 'Análisis histórico EGES')
+        self.assertContains(response, reverse('eges_import:produccion_consolidada'))
+        self.assertNotIn('produccion', response.context)
+        produccion = self.client.get(reverse('eges_import:produccion_consolidada'), {
+            'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
+        })
+        self.assertEqual(produccion.status_code, 200)
+        self.assertEqual(produccion.context['resultado']['total_produccion'], 2)
+        self.assertEqual(produccion.context['resultado']['aporte_netterm'], 1)
 
     def produccion(self):
         return construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
+
+    def test_practicas_internas_comparten_el_conteo_sin_duplicar(self):
+        self.eges()
+        self.netterm()
+        self.netterm(pedido='2', documento='87654321')
+        resultado = construir_preview_produccion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk], incluir_practicas=True,
+        )
+        self.assertEqual(len(resultado['practicas']), resultado['total_produccion'])
+        self.assertEqual(resultado['total_produccion'], 2)
+        self.assertEqual(sum(item['fuente'] == 'NETTERM' for item in resultado['practicas']), 1)
+        self.assertNotIn('practicas', self.produccion())
+
+    def test_fuente_unica_estadistica_no_relaja_conciliacion_habitual(self):
+        self.eges()
+        resultado = construir_preview_produccion(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[], permitir_fuente_unica=True,
+        )
+        self.assertEqual(resultado['total_produccion'], 1)
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            construir_preview_produccion(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[])
+
+    def test_estadisticas_comparten_poblacion_y_conservan_sin_dato(self):
+        from .services_estadisticas import construir_estadisticas_fuentes
+
+        self.eges()
+        self.netterm()
+        self.netterm(pedido='2', codigo='180113', practica='ECOGRAFIA RENAL', documento='', estado='PENDIENTE')
+        self.eges(dni_paciente='', codigo_practica='180113', practica='ECOGRAFIA RENAL', estado_turno='Fin Practica')
+        self.netterm(pedido='3', codigo='180114', practica='ECOGRAFIA PELVICA',
+                 documento='87654321', estado='PENDIENTE')
+        datos = construir_estadisticas_fuentes(batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk])
+        self.assertEqual(datos['kpis']['practicas_realizadas'], 3)
+        self.assertEqual(datos['kpis']['total_finalizados'], 1)
+        self.assertIsNone(datos['kpis']['practicas_por_paciente'])
+        self.assertTrue(datos['metadatos']['incompleto'])
+        for grafico in ('temporal', 'dia_semana', 'franja', 'modalidad', 'medicos', 'obras_sociales'):
+            self.assertEqual(sum(sum(dataset['data']) for dataset in datos[grafico]['datasets']), 3, grafico)
+        self.assertIn('Sin dato', datos['franja']['labels'])
+        self.assertEqual(datos['franja']['datasets'][0]['data'][-1], 1)
+        self.assertIsNone(datos['comparativa']['comparativa']['practicas']['anterior'])
+
+    @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+    def test_endpoint_estadistico_no_escribe_ni_expone_documentos(self):
+        self.eges()
+        self.netterm()
+        self.client.force_login(self.usuario)
+        with CaptureQueriesContext(connection) as consultas:
+            response = self.client.get(reverse('eges_import:estadisticas_fuentes_data'), {
+                'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
+            })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['kpis']['practicas_realizadas'], 1)
+        self.assertNotContains(response, '12345678')
+        self.assertFalse(any(q['sql'].lstrip().upper().startswith(('INSERT ', 'UPDATE ', 'DELETE ')) for q in consultas))
+        self.assertEqual(self.client.get(reverse('eges_import:estadisticas_fuentes_data')).status_code, 400)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse('eges_import:estadisticas_fuentes_data')).status_code, 302)
+
+    @override_settings(SECURE_SSL_REDIRECT=False, SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies')
+    def test_pdf_estadistico_usa_la_misma_seleccion_del_tablero(self):
+        self.eges()
+        self.netterm()
+        self.client.force_login(self.usuario)
+        parametros = {'lotes_eges': [self.batch.pk], 'lotes_netterm': [self.lote.pk],
+                      'fecha_desde': '2026-10-01', 'fecha_hasta': '2026-10-31',
+                      'modalidades[]': ['ECO'], 'agrupacion': 'semana'}
+        with patch('eges_import.views.construir_estadisticas_fuentes',
+                 wraps=construir_estadisticas_fuentes) as construir:
+            response = self.client.get(reverse('eges_import:exportar_pdf_fuentes'), parametros)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF-'))
+        self.assertIn('attachment; filename="estadisticas_fuentes.pdf"', response['Content-Disposition'])
+        construir.assert_called_once_with(
+            batch_eges_ids=[self.batch.pk], lote_netterm_ids=[self.lote.pk],
+            fecha_desde=date(2026, 10, 1), fecha_hasta=date(2026, 10, 31),
+            modalidades=['ECO'], agrupacion='semana',
+        )
+        self.assertEqual(self.client.get(reverse('eges_import:exportar_pdf_fuentes')).status_code, 400)
 
     def registrar_revision(self, eges, decision):
         preview = construir_preview_conciliacion(

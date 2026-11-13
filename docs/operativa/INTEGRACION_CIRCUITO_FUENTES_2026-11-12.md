@@ -11,7 +11,7 @@ confirmados se guardaban por línea, pero el resumen del cierre no los consultab
 El control EGES existente alcanza residentes ECO/DOP/ECOCAR y también evalúa
 cantidad y horario: no es un control general de todas las modalidades.
 
-## Cambios locales de esta intervención
+## Cambios iniciales de Codex
 
 - El tablero habitual incluye el formulario y resultado de producción EGES +
   Netterm, reutilizando una plantilla parcial con la pantalla independiente.
@@ -95,3 +95,37 @@ Al agregar una ECO sin respaldo y consolidar el control, permaneció un pendient
 ECO junto a la TC confirmada. Vistas de 390 y 1280 px sin desbordamiento horizontal,
 con capturas del panel sin superposiciones.
 No se accedió a Heroku ni se evaluó rendimiento con volumen productivo.
+
+## Estadísticas conciliadas, 13/11/2026
+
+La primera integración visual incrustó una página completa de producción dentro
+del tablero, duplicando encabezados y filtros. Se retiró y se completó el cambio
+mediante una sola población estadística compartida, sin duplicar esa pantalla.
+
+- El tablero conserva una sola selección de fuentes/lotes, fechas y modalidades.
+  KPI, gráficos, comparación y PDF se derivan de `construir_estadisticas_fuentes`,
+  que parte de las prácticas aceptadas por el conteo conciliado.
+- Las selecciones de fuente única (EGES o Netterm) son válidas para estadísticas;
+  las reglas de la vista de conciliación no se relajan.
+- El PDF conciliado usa la misma selección y agrupación del tablero. Los
+  exportadores históricos del portal del director y del PDF EGES mantienen su
+  contrato previo.
+- Pacientes sin identidad hacen que promedio por paciente sea «Sin dato»;
+  prácticas sin médico/cobertura permanecen en «Sin dato» y los restantes
+  rankings se agrupan en «Otros», conservando los totales.
+- Fechas comparadas: Turno EGES o Pedido Netterm. La distribución por día usa
+  esas fechas; la franja horaria usa Hora Turno EGES. Netterm queda como «Sin
+  dato» de hora, no se sustituye por Hora Pedido.
+- La finalización documentada usa los estados respaldados de cada fuente, no se
+  etiqueta como conversión de turnos. Los pendientes/exclusiones se muestran;
+  cobertura de exportación permanece explícitamente no confirmada.
+- Liquidación y sus reglas económicas no se modificaron en esta integración.
+
+Validación final: las 142 pruebas de `eges_import` pasan; no hay migraciones.
+En navegador con SQLite temporal sintética, una coincidencia EGES/Netterm más
+un aporte Netterm exclusivo dieron dos prácticas sin duplicar, un informe
+confirmado, un pendiente y una finalización documentada del 50%. La franja
+horaria mostró la práctica EGES en 10-12 y la Netterm exclusiva en «Sin dato».
+El PDF devolvió HTTP 200 y `%PDF-`, con la misma selección y agrupación. Se
+revisó escritorio y móvil sin desbordamiento de página. No se accedió a Heroku
+ni se midió rendimiento sobre volumen productivo; estos cambios siguen locales.

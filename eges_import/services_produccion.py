@@ -55,7 +55,7 @@ def _decisiones_vigentes(preview):
     return vinculos_unicos, rechazos
 
 
-def construir_preview_produccion(**seleccion):
+def construir_preview_produccion(*, incluir_practicas=False, **seleccion):
     preview = construir_preview_conciliacion(**seleccion)
     vinculos_validados, vinculos_rechazados = _decisiones_vigentes(preview)
     practicas = {}
@@ -118,6 +118,7 @@ def construir_preview_produccion(**seleccion):
             if eges_vinculado or vinculo_automatico:
                 eges_vinculado = eges_vinculado or caso['eges'][0]
                 item = practicas[('EGES', eges_vinculado['id'])]
+                item['netterm'] = fila
                 if eges_id_validado:
                     revisiones_vincular_consumidas += 1
                 if not item['incluida']:
@@ -149,7 +150,7 @@ def construir_preview_produccion(**seleccion):
     total = len(incluidos)
     finalizadas = sum(informadas.values())
     modalidades = sorted({m for m, _ in produccion})
-    return {
+    resultado = {
         'version_reglas': 'PRODUCCION_RESPALDADA_V1', 'provisional': True,
         'vinculaciones_humanas_consumidas': revisiones_vincular_consumidas,
         'vinculaciones_rechazadas_consumidas': revisiones_no_vincular_consumidas,
@@ -178,3 +179,6 @@ def construir_preview_produccion(**seleccion):
         'firma_snapshot': preview['firma_snapshot'],
         'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],
     }
+    if incluir_practicas:
+        resultado['practicas'] = incluidos
+    return resultado

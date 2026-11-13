@@ -1,17 +1,12 @@
 {% extends "layouts/base_with_sidebar.html" %}
 {% load static %}
 
-{% block title %}Estadísticas EGES - {{ block.super }}{% endblock %}
+{% block title %}Estadísticas del servicio - {{ block.super }}{% endblock %}
 
-{% block page_title %}📊 Estadísticas de Productividad EGES{% endblock %}
-{% block page_description %}Análisis consolidado de todos los lotes importados{% if fecha_min and fecha_max %} · Período: {{ fecha_min|date:"d/m/Y" }} - {{ fecha_max|date:"d/m/Y" }}{% endif %}{% endblock %}
+{% block page_title %}📊 Estadísticas de Producción{% endblock %}
+{% block page_description %}Seleccioná las fuentes y lotes para consultar la producción respaldada.{% endblock %}
 
 {% block content %}
-<section aria-label="Producción del servicio EGES y Netterm">
-{% include "eges_import/partials/produccion_fuentes.html" with form=form_produccion resultado=produccion %}
-</section>
-<h2 class="mt-8 text-xl font-semibold">Análisis histórico EGES</h2>
-<p class="mb-4 text-sm">Los gráficos siguientes corresponden exclusivamente a EGES y a sus propios filtros.</p>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <a href="{% url 'eges_import:produccion_consolidada' %}" class="text-sm text-gray-300 hover:text-white">Producción EGES + Netterm</a>
         <a href="{% url 'eges_import:lista_batches' %}" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white" title="Volver al listado de lotes">
@@ -31,7 +26,7 @@
                 </div>
                 <h1 class="text-2xl font-bold md:text-3xl">Actividad de Diagnóstico por Imágenes</h1>
                 <p class="mt-2 max-w-3xl text-sm text-blue-100">
-                    Producción informada, demanda pendiente y distribución operativa consolidada desde EGES.
+                    Producción respaldada e informes documentados de las fuentes seleccionadas.
                 </p>
             </div>
             <div class="grid grid-cols-2 gap-3 text-sm">
@@ -63,6 +58,21 @@
 
     <!-- Panel de Filtros -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
+        <details class="mb-3 border-b border-gray-200 pb-3 dark:border-gray-700" open>
+            <summary class="cursor-pointer text-sm font-semibold text-gray-800 dark:text-white">Fuentes de datos</summary>
+            <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <fieldset class="min-w-0"><legend class="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-300">EGES</legend>
+                    <div class="max-h-32 space-y-1 overflow-y-auto">
+                    {% for opcion in form_fuentes.lotes_eges %}<label for="{{ opcion.id_for_label }}" class="flex items-start gap-2 break-words py-1 text-xs text-gray-700 dark:text-gray-300">{{ opcion.tag }}<span class="min-w-0">{{ opcion.choice_label }}</span></label>{% empty %}<p class="text-xs text-gray-500">Sin lotes EGES.</p>{% endfor %}
+                    </div>
+                </fieldset>
+                <fieldset class="min-w-0"><legend class="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Netterm</legend>
+                    <div class="max-h-32 space-y-1 overflow-y-auto">
+                    {% for opcion in form_fuentes.lotes_netterm %}<label for="{{ opcion.id_for_label }}" class="flex items-start gap-2 break-words py-1 text-xs text-gray-700 dark:text-gray-300">{{ opcion.tag }}<span class="min-w-0">{{ opcion.choice_label }}</span></label>{% empty %}<p class="text-xs text-gray-500">Sin lotes Netterm.</p>{% endfor %}
+                    </div>
+                </fieldset>
+            </div>
+        </details>
         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Período y modalidades</h2>
@@ -140,7 +150,7 @@
             {# Botón exportar Excel oculto hasta definir los datos a exportar #}
             {# <button id="btn-exportar-excel" ...>Exportar Excel</button> #}
             <a id="btn-exportar-pdf"
-               href="{% url 'eges_import:exportar_pdf' %}"
+                    href="{% url 'eges_import:exportar_pdf_fuentes' %}"
                class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors text-sm no-underline"
                target="_blank">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,6 +163,8 @@
         </div>
     </div>
 
+    <p id="estado-fuentes" role="status" aria-live="polite" class="mb-3 border-l-4 border-amber-500 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">Sin selección de fuentes.</p>
+    <ul id="pendientes-fuentes" class="mb-4 space-y-1 text-xs text-amber-700 dark:text-amber-300"></ul>
     <!-- KPIs dinámicos (actualizados al aplicar filtros) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
@@ -163,7 +175,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas realizadas</p>
             <p class="text-3xl font-bold text-gray-900 dark:text-white mt-2" id="kpi-practicas-realizadas">—</p>
-            <p class="text-xs text-gray-400 mt-1">filas clínicas informadas</p>
+            <p class="text-xs text-gray-400 mt-1">prácticas respaldadas, sin duplicación</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas por paciente</p>
@@ -181,19 +193,19 @@
             <p class="text-xs text-gray-400 mt-1">sobre período filtrado</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Tasa de Conversión</p>
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Finalización documentada</p>
             <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2" id="kpi-tasa-conversion">—</p>
-            <p class="text-xs text-gray-400 mt-1">turnos informados / total registrado</p>
+            <p class="text-xs text-gray-400 mt-1">informes confirmados / prácticas respaldadas</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios Pendientes</p>
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Sin informe confirmado</p>
             <p class="text-2xl font-bold text-amber-500 dark:text-amber-400 mt-2" id="kpi-pendientes">—</p>
             <p class="text-xs text-gray-400 mt-1">sin informe registrado</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">RX sin informe</p>
             <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2" id="kpi-rx-sin-informe-resumen">—</p>
-            <p class="text-xs text-gray-400 mt-1">cerrados sin reporte médico</p>
+            <p class="text-xs text-gray-400 mt-1">prácticas respaldadas sin informe confirmado</p>
         </div>
     </div>
     <!-- RX sin informe: se muestra solo si > 0 -->
@@ -204,81 +216,12 @@
         <p class="text-sm text-amber-700 dark:text-amber-300">RX entregados <strong>sin informe</strong>: <span id="kpi-rx-sin-informe" class="font-bold">0</span> estudio(s) — estudios cerrados sin reporte médico.</p>
     </div>
 
-    <!-- Métricas Globales (estáticas del servidor) -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Total Lotes</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-2">{{ total_batches }}</p>
-                </div>
-                <div class="bg-blue-100 dark:bg-blue-900 rounded-lg p-3">
-                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Total Filas</p>
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white mt-2">{{ total_filas_global|default:0 }}</p>
-                </div>
-                <div class="bg-purple-100 dark:bg-purple-900 rounded-lg p-3">
-                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios Finalizados</p>
-                    <p class="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">{{ total_estudios_finalizados_global|default:0 }}</p>
-                </div>
-                <div class="bg-green-100 dark:bg-green-900 rounded-lg p-3">
-                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Modalidad Principal</p>
-                    <p class="text-xl font-bold text-blue-600 dark:text-blue-400 mt-2">
-                        {% if total_tc_global >= total_rm_global and total_tc_global >= total_rx_global and total_tc_global >= total_eco_global %}
-                            TC ({{ total_tc_global }})
-                        {% elif total_rm_global >= total_rx_global and total_rm_global >= total_eco_global %}
-                            RM ({{ total_rm_global }})
-                        {% elif total_rx_global >= total_eco_global %}
-                            RX ({{ total_rx_global }})
-                        {% else %}
-                            ECO ({{ total_eco_global }})
-                        {% endif %}
-                    </p>
-                </div>
-                <div class="bg-yellow-100 dark:bg-yellow-900 rounded-lg p-3">
-                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                    </svg>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Gráfico Principal -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-200 dark:border-gray-700">
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div>
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Evolución Temporal Consolidada</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Todos los batches importados</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Prácticas respaldadas de la selección aplicada</p>
             </div>
             <div class="flex gap-2 items-center flex-wrap">
                 <div class="flex gap-1 border-r border-gray-200 dark:border-gray-600 pr-2 mr-1">
@@ -306,7 +249,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Distribución por Día de Semana</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Consolidado de todos los datos</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Fecha de turno EGES / pedido Netterm</p>
             </div>
             <div class="p-4">
                 <div class="relative" style="height: 250px;">
@@ -318,7 +261,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Distribución por Franja Horaria</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Consolidado de todos los datos</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Hora de turno EGES; Netterm sin hora de realización</p>
             </div>
             <div class="p-4">
                 <div class="relative" style="height: 250px;">
@@ -360,7 +303,7 @@
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div>
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Productividad por Médico — Top 10</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Estudios finalizados desglosados por modalidad</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Prácticas respaldadas; Otros y Sin dato conservan el total</p>
             </div>
         </div>
         <div class="p-4">
@@ -380,7 +323,7 @@
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" id="comp-subtitulo">Período actual vs anterior de igual duración</p>
             </div>
             <div id="comp-sin-actividad" class="hidden mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                Sin actividad en el período anterior
+                Sin evidencia comparable en el período anterior
             </div>
             <div class="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
@@ -419,8 +362,8 @@
         <!-- Ranking Obras Sociales -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Top Obras Sociales</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Por volumen de estudios finalizados en el período</p>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Cobertura registrada</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Prácticas respaldadas; ausencias agrupadas en Sin dato</p>
             </div>
             <div class="p-4">
                 <div class="relative" style="height: 280px;">
@@ -433,7 +376,7 @@
     <!-- Lista de Lotes -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-base font-semibold text-gray-800 dark:text-white">Lotes Importados</h2>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Importaciones EGES disponibles (sin filtrar)</h2>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -506,8 +449,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const charts = {};
     let tipoGraficoPrincipal = 'line';
     let agrupacion = 'mes';
-    let temporalAbortCtrl = null;  // cancela fetch anterior al cambiar agrupación/tipo
     let dashboardRequestId = 0;
+    let temporalRequestId = 0;
+    let datosCompartidos = null;
+
+    function datosFuente(clave, params) {
+        const query = new URLSearchParams(params);
+        if (!query.has('agrupacion')) query.set('agrupacion', agrupacion);
+        query.sort();
+        const filtro = query.toString();
+        if (!datosCompartidos || datosCompartidos.filtro !== filtro) {
+            const requestId = dashboardRequestId;
+            const promesa = fetch("{% url 'eges_import:estadisticas_fuentes_data' %}?" + filtro)
+                .then(async response => {
+                    const datos = await response.json();
+                    if (!response.ok) throw new Error(datos.error || 'No se pudo cargar la selección.');
+                    if (requestId === dashboardRequestId) {
+                        const meta = datos.metadatos;
+                        document.getElementById('estado-fuentes').textContent = `${meta.fuente} · ${meta.incompleto ? 'Resultado incompleto' : 'Producción provisional'} · Cobertura no confirmada${meta.sin_identidad ? ' · ' + meta.sin_identidad + ' práctica(s) sin identidad' : ''}`;
+                        const lista = document.getElementById('pendientes-fuentes');
+                        lista.replaceChildren();
+                        [...meta.pendientes, ...meta.excluidos].forEach(item => {
+                            const fila = document.createElement('li');
+                            fila.textContent = `${item.motivo}: ${item.cantidad}`;
+                            lista.appendChild(fila);
+                        });
+                        if (meta.advertencia_cobertura) {
+                            const fila = document.createElement('li');
+                            fila.textContent = 'Lotes EGES con 1.000 filas o más: verificar cobertura de exportación.';
+                            lista.appendChild(fila);
+                        }
+                        document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'false');
+                    }
+                    return datos;
+                }).catch(error => {
+                    if (requestId === dashboardRequestId) {
+                        document.getElementById('estado-fuentes').textContent = error.message;
+                        Object.values(charts).forEach(chart => chart.destroy());
+                        Object.keys(charts).forEach(key => delete charts[key]);
+                        document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'true');
+                    }
+                    throw error;
+                });
+            datosCompartidos = {filtro, promesa};
+        }
+        return datosCompartidos.promesa.then(datos => datos[clave]);
+    }
 
     // ── Clases de botones (con dark mode explícito en todos los estados) ────
     const CLS_AGRUP_ACTIVO   = 'agrup-btn px-2 py-1 text-xs rounded font-medium bg-blue-600 text-white transition-colors';
@@ -530,6 +517,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // ── Parámetros de filtro ─────────────────────────────────────────────────
     function obtenerParametrosFiltro() {
         const params = new URLSearchParams();
+        params.set('fuentes', 'conciliadas');
+        document.querySelectorAll('input[name="lotes_eges"]:checked, input[name="lotes_netterm"]:checked').forEach(input => params.append(input.name, input.value));
         const fechaDesde = document.getElementById('fecha-desde').value;
         const fechaHasta = document.getElementById('fecha-hasta').value;
         if (fechaDesde) params.append('fecha_desde', fechaDesde);
@@ -540,6 +529,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // e incluye tambien registros clasificados como OTROS.
         if (seleccionadas.length !== modalidades.length) {
             seleccionadas.forEach(checkbox => params.append('modalidades[]', checkbox.value));
+            if (!seleccionadas.length) params.set('sin_modalidades', '1');
         }
         return params.toString();
     }
@@ -552,6 +542,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const modalidades = seleccionadas.length === controles.length ? ['Todas'] : seleccionadas;
         const periodo = desde || hasta ? `${desde || 'inicio'} a ${hasta || 'hoy'}` : 'Todo el período';
         document.getElementById('filtro-resumen').textContent = `${periodo} · ${modalidades.join(', ')}`;
+    }
+
+    function actualizarEnlacePdf(params = obtenerParametrosFiltro()) {
+        const pdfBase = "{% url 'eges_import:exportar_pdf_fuentes' %}";
+        document.getElementById('btn-exportar-pdf').href = `${pdfBase}?${params}&agrupacion=${agrupacion}`;
     }
 
     const coloresModalidad = {
@@ -581,16 +576,15 @@ document.addEventListener('DOMContentLoaded', function() {
     function cargarKPIs(params, requestId) {
         ['kpi-pacientes-atendidos', 'kpi-practicas-realizadas', 'kpi-practicas-por-paciente', 'kpi-total-finalizados', 'kpi-promedio-dia', 'kpi-tasa-conversion', 'kpi-pendientes', 'kpi-rx-sin-informe-resumen']
             .forEach(id => document.getElementById(id).textContent = '…');
-        fetch("{% url 'eges_import:kpis_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('kpis', params)
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
                 document.getElementById('kpi-pacientes-atendidos').textContent = Number(d.pacientes_atendidos).toLocaleString('es-AR');
                 document.getElementById('kpi-practicas-realizadas').textContent = Number(d.practicas_realizadas).toLocaleString('es-AR');
-                document.getElementById('kpi-practicas-por-paciente').textContent = Number(d.practicas_por_paciente).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                document.getElementById('kpi-practicas-por-paciente').textContent = d.practicas_por_paciente === null ? 'Sin dato' : Number(d.practicas_por_paciente).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
                 document.getElementById('kpi-total-finalizados').textContent = Number(d.total_finalizados).toLocaleString('es-AR');
-                document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia;
-                document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion + '%';
+                document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia === null ? 'Sin dato' : d.promedio_dia;
+                document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion === null ? 'Sin dato' : d.tasa_conversion + '%';
                 document.getElementById('kpi-pendientes').textContent = Number(d.total_pendientes).toLocaleString('es-AR');
                 // Card informativa RX sin informe
                 const rxSI = d.rx_sin_informe || 0;
@@ -611,18 +605,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Solo recarga el gráfico temporal — se llama al cambiar agrupacion o tipo
-    function recargarTemporal(requestId = ++dashboardRequestId) {
-        // Cancelar fetch anterior si sigue en vuelo
-        if (temporalAbortCtrl) temporalAbortCtrl.abort();
-        temporalAbortCtrl = new AbortController();
-        const signal = temporalAbortCtrl.signal;
-
+    function recargarTemporal(requestId = dashboardRequestId) {
+        const temporalId = ++temporalRequestId;
         const params = obtenerParametrosFiltro();
         const agrupacionActual = agrupacion;   // snapshot para el closure
-        fetch("{% url 'eges_import:analisis_temporal_data' %}?" + params + '&agrupacion=' + agrupacionActual, { signal })
-            .then(r => r.json())
+        datosFuente('temporal', params + '&agrupacion=' + agrupacionActual)
             .then(data => {
-                if (requestId !== dashboardRequestId) return;
+                if (requestId !== dashboardRequestId || temporalId !== temporalRequestId) return;
                 if (charts.principal) charts.principal.destroy();
                 charts.principal = new Chart(
                     document.getElementById('grafico-principal').getContext('2d'), {
@@ -636,7 +625,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             },
                             scales: {
                                 y: { beginAtZero: true, ticks: { precision: 0 },
-                                     title: { display: true, text: 'Estudios finalizados' } },
+                                     title: { display: true, text: 'Prácticas respaldadas' } },
                                 x: { title: { display: true, text:
                                     agrupacionActual === 'dia' ? 'Fecha' :
                                     agrupacionActual === 'semana' ? 'Semana' : 'Mes' } }
@@ -649,8 +638,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarDiaSemana(params, requestId) {
-        fetch("{% url 'eges_import:dashboard_global_dia_semana_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('dia_semana', params)
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.diaSemana) charts.diaSemana.destroy();
@@ -676,8 +664,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarFranja(params, requestId) {
-        fetch("{% url 'eges_import:dashboard_global_franja_horaria_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('franja', params)
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.franja) charts.franja.destroy();
@@ -703,8 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarDona(params, requestId) {
-        fetch("{% url 'eges_import:distribucion_modalidad_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('modalidad', params)
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.dona) charts.dona.destroy();
@@ -730,8 +716,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarSubEco(params, requestId) {
-        fetch("{% url 'eges_import:sub_modalidades_eco_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('sub_eco', params)
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.subEco) charts.subEco.destroy();
@@ -755,8 +740,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarComparativa(params, requestId) {
-        fetch("{% url 'eges_import:comparativa_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('comparativa', params)
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
                 const comparativa = d.comparativa;
@@ -773,6 +757,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
 
                 function renderMetrica(metrica, valoresId, deltaId, decimales = 0) {
+                    if (metrica.actual === null || metrica.anterior === null) {
+                        document.getElementById(valoresId).textContent = 'Sin dato';
+                        document.getElementById(deltaId).textContent = 'Sin evidencia comparable en las fuentes seleccionadas';
+                        return;
+                    }
                     document.getElementById(valoresId).textContent =
                         `${formatoNumero(metrica.actual, decimales)} vs ${formatoNumero(metrica.anterior, decimales)}`;
                     const porcentaje = metrica.porcentaje === null
@@ -781,7 +770,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const absoluta = `${metrica.absoluta > 0 ? '+' : ''}${formatoNumero(metrica.absoluta, decimales)}`;
                     document.getElementById(deltaId).textContent = comparativa.hay_datos_anterior
                         ? `${flechaEstado[metrica.estado]} ${absoluta}${porcentaje}`
-                        : 'Sin actividad en el período anterior';
+                        : 'Sin evidencia comparable en el período anterior';
                 }
 
                 renderMetrica(comparativa.pacientes, 'comp-pacientes-valores', 'comp-pacientes-delta');
@@ -797,6 +786,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 function renderPracticas(items, elementId) {
                     const element = document.getElementById(elementId);
+                    if (!comparativa.hay_datos_anterior) {
+                        element.textContent = 'Sin evidencia comparable en el período anterior';
+                        return;
+                    }
                     if (!items.length) {
                         element.innerHTML = '<span class="text-gray-400">— sin cambios</span>';
                         return;
@@ -819,8 +812,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 const bloqueos = comparativa.bloqueos_tc;
                 const bloqueosCard = document.getElementById('comp-bloqueos-tc');
-                bloqueosCard.classList.toggle('hidden', bloqueos === null);
-                if (bloqueos !== null) {
+                if (bloqueos === null) {
+                    bloqueosCard.classList.add('hidden');
+                } else {
+                    bloqueosCard.classList.remove('hidden');
                     document.getElementById('comp-bloqueos-valores').textContent =
                         `${formatoNumero(bloqueos.actual)} vs ${formatoNumero(bloqueos.anterior)}`;
                     document.getElementById('comp-bloqueos-delta').textContent =
@@ -836,8 +831,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarObrasSociales(params, requestId) {
-        fetch("{% url 'eges_import:obras_sociales_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('obras_sociales', params)
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.obrasSociales) charts.obrasSociales.destroy();
@@ -864,8 +858,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function cargarMedicos(params, requestId) {
-        fetch("{% url 'eges_import:productividad_medico_data' %}?" + params)
-            .then(r => r.json())
+        datosFuente('medicos', params)
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.medicos) charts.medicos.destroy();
@@ -893,11 +886,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Recarga todo cuando cambian los filtros (fechas / modalidades)
     function cargarTodo() {
+        datosCompartidos = null;
         const requestId = ++dashboardRequestId;
         const params = obtenerParametrosFiltro();
         actualizarResumenFiltro();
-        const pdfBase = "{% url 'eges_import:exportar_pdf' %}";
-        document.getElementById('btn-exportar-pdf').href = params ? `${pdfBase}?${params}` : pdfBase;
+        actualizarEnlacePdf(params);
+        document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'true');
+        if (!document.querySelector('input[name="lotes_eges"]:checked, input[name="lotes_netterm"]:checked')) {
+            document.getElementById('estado-fuentes').textContent = 'Seleccioná las fuentes y aplicá los filtros.';
+            Object.values(charts).forEach(chart => chart.destroy());
+            Object.keys(charts).forEach(key => delete charts[key]);
+            document.querySelectorAll('p[id^="kpi-"]').forEach(element => element.textContent = 'Sin selección');
+            document.getElementById('pendientes-fuentes').replaceChildren();
+            document.getElementById('comp-sin-actividad').classList.add('hidden');
+            ['comp-pacientes-valores', 'comp-practicas-valores', 'comp-practicas-paciente-valores']
+                .forEach(id => document.getElementById(id).textContent = 'Sin selección');
+            ['comp-pacientes-delta', 'comp-practicas-delta', 'comp-practicas-paciente-delta', 'comp-aumentos', 'comp-disminuciones']
+                .forEach(id => document.getElementById(id).textContent = 'Seleccioná fuentes para comparar.');
+            document.getElementById('comp-bloqueos-tc').classList.add('hidden');
+            return;
+        }
         cargarKPIs(params, requestId);
         recargarTemporal(requestId);      // usa obtenerParametrosFiltro() internamente
         cargarDiaSemana(params, requestId);
@@ -910,19 +918,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ── Botones de agrupación (solo recargan el temporal) ───────────────────
+    document.getElementById('btn-exportar-pdf').addEventListener('click', event => {
+        if (event.currentTarget.getAttribute('aria-disabled') === 'true') event.preventDefault();
+    });
     document.getElementById('agrup-dia').addEventListener('click', function() {
         agrupacion = 'dia';
         actualizarBotonesAgrupacion('agrup-dia');
+        actualizarEnlacePdf();
         recargarTemporal();
     });
     document.getElementById('agrup-semana').addEventListener('click', function() {
         agrupacion = 'semana';
         actualizarBotonesAgrupacion('agrup-semana');
+        actualizarEnlacePdf();
         recargarTemporal();
     });
     document.getElementById('agrup-mes').addEventListener('click', function() {
         agrupacion = 'mes';
         actualizarBotonesAgrupacion('agrup-mes');
+        actualizarEnlacePdf();
         recargarTemporal();
     });
 

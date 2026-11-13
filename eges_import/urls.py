@@ -16,6 +16,8 @@ urlpatterns = [
 
     # ── Estadísticas globales (superuser) ───────────────────────────────────
     path('estadisticas/', views.dashboard_global, name='estadisticas'),
+    path('estadisticas/fuentes-data/', views.estadisticas_fuentes_data, name='estadisticas_fuentes_data'),
+    path('estadisticas/fuentes-pdf/', views.exportar_pdf_fuentes, name='exportar_pdf_fuentes'),
     path('estadisticas/produccion/', views.produccion_consolidada, name='produccion_consolidada'),
     path('estadisticas/grafico-data/', views.dashboard_global_grafico_data, name='dashboard_global_grafico_data'),
     path('estadisticas/grafico-dia-semana/', views.dashboard_global_dia_semana_data, name='dashboard_global_dia_semana_data'),
