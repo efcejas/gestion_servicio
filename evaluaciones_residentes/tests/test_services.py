@@ -123,6 +123,27 @@ class EvaluacionServicesTests(TestCase):
         self.assertEqual(self.examen.estado, Examen.CERRADO)
         self.assertIsNotNone(self.examen.fecha_cierre)
 
+    def test_iniciar_manual_antes_de_apertura_permite_rendir_inmediatamente(self):
+        ahora = timezone.now()
+        self.examen.modo_inicio = Examen.INICIO_MANUAL
+        self.examen.fecha_apertura = ahora + timedelta(minutes=30)
+        self.examen.save(update_fields=['modo_inicio', 'fecha_apertura'])
+        self.examen = publicar_examen(self.examen, self.docente, ahora=ahora)
+
+        iniciar_examen_manual(self.examen, self.docente, ahora=ahora)
+
+        self.examen.refresh_from_db()
+        self.assertTrue(self.examen.esta_disponible_para(self.residente, ahora=ahora))
+        intento = iniciar_intento(self.examen, self.residente, ahora=ahora)
+        self.assertEqual(intento.residente, self.residente)
+
+    def test_iniciar_intento_de_examen_eliminado_informa_no_disponible(self):
+        examen_id = self.examen.pk
+        Examen.objects.filter(pk=examen_id).delete()
+
+        with self.assertRaises(EvaluacionNoDisponibleError):
+            iniciar_intento(self.examen, self.residente)
+
     def test_anular_intento_registra_motivo_usuario_y_fecha_sin_borrar_respuestas(self):
         self.examen = publicar_examen(self.examen, self.docente)
         intento = iniciar_intento(self.examen, self.residente)
