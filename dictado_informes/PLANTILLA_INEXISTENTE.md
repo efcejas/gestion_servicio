@@ -26,6 +26,12 @@ con varias secciones de hallazgos conservan su organización: su contenido se ed
 en el JSON avanzado, no se aplana desde el campo de líneas normales.
 Los cambios afectan futuros informes, no reescriben informes anteriores.
 
+En el banco, **Eliminar** borra definitivamente el registro después de mostrar una
+confirmación irreversible. Solo el propietario o un superusuario puede eliminarlo,
+incluso si está inactivo. No se elimina la auditoría: `TrazaAgenteDictado` conserva el
+código histórico y su vínculo con la plantilla pasa a nulo. Los informes ya generados
+no se modifican. Para retirar temporalmente una plantilla, sigue disponible **Editar → Activa**.
+
 ## Cambiar plantilla después de generar
 
 Después de cada generación exitosa en AGENTE aparece **Cambiar plantilla** junto a

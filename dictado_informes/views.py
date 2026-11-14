@@ -1218,18 +1218,16 @@ class PlantillaEstructuradaUpdateView(LoginRequiredMixin, DictadoModuleAccessMix
 
 
 class PlantillaEstructuradaDeleteView(LoginRequiredMixin, DictadoModuleAccessMixin, DeleteView):
-    """Eliminar una plantilla estructurada (soft delete)"""
+    """Eliminar definitivamente una plantilla sin borrar sus trazas históricas."""
     model = PlantillaEstructurada
     template_name = 'dictado_informes/plantilla_estructurada_confirm_delete.html'
     success_url = reverse_lazy('dictado_informes:plantilla_estructurada_list')
     
-    def delete(self, request, *args, **kwargs):
-        plantilla = self.get_object()
-        # Soft delete - solo desactivar
-        plantilla.activa = False
-        plantilla.save()
-        messages.success(request, f"🗑️ Plantilla '{plantilla.nombre}' desactivada exitosamente")
-        return redirect(self.success_url)
+    def form_valid(self, form):
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"🗑️ Plantilla '{nombre}' eliminada definitivamente")
+        return response
 
     def get_queryset(self):
         if self.request.user.is_superuser:

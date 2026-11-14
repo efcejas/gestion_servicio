@@ -30,6 +30,10 @@
         </div>
     </div>
 
+    {% for message in messages %}
+        {% include 'components/alert_message.html' with type=message.level_tag message=message|force_escape %}
+    {% endfor %}
+
     <!-- Filtros -->
     <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
         <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -174,7 +178,7 @@
                         </a>
                         <a href="{% url 'dictado_informes:plantilla_estructurada_delete' plantilla.pk %}" 
                            class="inline-flex items-center px-3 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors"
-                           title="Desactivar plantilla">
+                           title="Eliminar definitivamente">
                             <i class="fas fa-trash mr-1"></i>
                             Eliminar
                         </a>
