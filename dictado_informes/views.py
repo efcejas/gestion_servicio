@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse_lazy
-from django.core.exceptions import RequestDataTooBig
+from django.core.exceptions import RequestDataTooBig, ValidationError
 from django.http import JsonResponse, HttpResponse
 from django.utils import timezone
 from django.db.models import Q, Count, Avg
@@ -18,8 +18,14 @@ from .models import (
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
     PlantillaEstructurada, FeedbackCalidadDictado, TrazaAgenteDictado
 )
-from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
+from .forms import (
+    TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm,
+    PreferenciasPlantillaForm,
+)
 from .ai_services import ai_service
+from .template_drafts import (
+    REGIONES_BORRADOR, MODALIDADES_BORRADOR, generar_borrador, confirmar_borrador,
+)
 from .template_importer import (
     DocxTemplateImportError,
     extraer_texto_plantilla_archivo,
@@ -112,11 +118,16 @@ REGION_SELECTOR_KEYWORDS = {
         'hombro', 'manguito', 'supraespinoso', 'infraespinoso', 'subescapular',
         'glenohumeral', 'acromioclavicular',
     },
+    'BRAZO': {'brazo', 'brazos'},
     'CODO': {'codo', 'epicondilo', 'epitroclea'},
     'MANO': {
         'mano', 'manos', 'dedo', 'dedos', 'pulgar', 'metacarpiano',
         'metacarpianos', 'metacarpofalangica', 'interfalangica', 'falange',
         'falanges', 'risartrosis', 'trapeciometacarpiana',
+    },
+    'DEDO': {
+        'dedo', 'dedos', 'pulgar', 'falange', 'falanges',
+        'metacarpofalangica', 'interfalangica',
     },
     'MUNECA': {
         'muneca', 'carpo', 'carpiano', 'carpianos', 'escafoides',
@@ -142,8 +153,10 @@ REGION_SELECTOR_KEYWORDS = {
 REGION_EXPLICIT_KEYWORDS = {
     'RODILLA': {'rodilla', 'rodillas'},
     'HOMBRO': {'hombro', 'hombros'},
+    'BRAZO': {'brazo', 'brazos'},
     'CODO': {'codo', 'codos'},
     'MANO': {'mano', 'manos'},
+    'DEDO': {'dedo', 'dedos', 'pulgar'},
     'MUNECA': {'muneca', 'munecas'},
     'TOBILLO': {'tobillo', 'tobillos'},
     'CADERA': {'cadera', 'caderas'},
@@ -773,6 +786,9 @@ class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateVi
         context['plantillas_default_codigo'] = default_codigo
         context['plantillas_total_visibles'] = len(plantillas_visibles)
         context['dictado_agente_habilitado'] = getattr(settings, 'DICTADO_AGENTE_HABILITADO', True)
+        context['regiones_borrador'] = REGIONES_BORRADOR.items()
+        context['modalidades_borrador'] = MODALIDADES_BORRADOR.items()
+        context['preferencias_plantilla_form'] = PreferenciasPlantillaForm()
         context['dictado_max_audio_size_bytes'] = settings.DICTADO_MAX_AUDIO_SIZE_BYTES
         return context
 
@@ -1202,23 +1218,54 @@ class PlantillaEstructuradaUpdateView(LoginRequiredMixin, DictadoModuleAccessMix
 
 
 class PlantillaEstructuradaDeleteView(LoginRequiredMixin, DictadoModuleAccessMixin, DeleteView):
-    """Eliminar una plantilla estructurada (soft delete)"""
+    """Eliminar definitivamente una plantilla sin borrar sus trazas históricas."""
     model = PlantillaEstructurada
     template_name = 'dictado_informes/plantilla_estructurada_confirm_delete.html'
     success_url = reverse_lazy('dictado_informes:plantilla_estructurada_list')
     
-    def delete(self, request, *args, **kwargs):
-        plantilla = self.get_object()
-        # Soft delete - solo desactivar
-        plantilla.activa = False
-        plantilla.save()
-        messages.success(request, f"🗑️ Plantilla '{plantilla.nombre}' desactivada exitosamente")
-        return redirect(self.success_url)
+    def form_valid(self, form):
+        nombre = self.object.nombre
+        response = super().form_valid(form)
+        messages.success(self.request, f"🗑️ Plantilla '{nombre}' eliminada definitivamente")
+        return response
 
     def get_queryset(self):
         if self.request.user.is_superuser:
             return PlantillaEstructurada.objects.all()
         return PlantillaEstructurada.objects.filter(creada_por=self.request.user)
+
+
+# Creación desde el modal del agente.
+@login_required
+@require_POST
+def plantilla_inexistente_api(request):
+    """API del modal AGENTE; permisos también en generación y confirmación."""
+    if not user_can_access_dictado_module(request.user):
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+    if not getattr(settings, 'DICTADO_AGENTE_HABILITADO', True):
+        return JsonResponse({'error': 'Modo agente deshabilitado'}, status=403)
+    if len(request.body) > 24000:
+        return JsonResponse({'error': 'Solicitud demasiado grande'}, status=400)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValidationError('Solicitud inválida.')
+        if data.get('accion') == 'generar':
+            resultado = generar_borrador(request.user, data)
+        elif data.get('accion') == 'confirmar':
+            plantilla = confirmar_borrador(request.user, data)
+            resultado = {'plantilla': {'codigo': plantilla.codigo, 'nombre': plantilla.nombre}}
+        else:
+            raise ValidationError('Acción inválida.')
+        return JsonResponse({'success': True, **resultado})
+    except ValidationError as error:
+        return JsonResponse({'error': ' '.join(error.messages)}, status=400)
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'No se pudo generar o validar el borrador.'}, status=400)
+    except Exception:
+        # No registrar excepciones del proveedor: pueden contener partes de la solicitud.
+        logger.warning('Fallo en creación de plantilla inexistente')
+        return JsonResponse({'error': 'No se pudo crear la plantilla. Intentá nuevamente.'}, status=503)
 
 
 # Vista AJAX para obtener plantilla por ID
@@ -1545,7 +1592,7 @@ def mejorar_texto_ia(request):
                     if data.get('cambio_plantilla_posterior') is True
                     else 'usuario_confirmada'
                 )
-            elif debe_confirmar_plantilla_agente(
+            elif not plantilla_sugerida or debe_confirmar_plantilla_agente(
                 plantilla_sugerida,
                 origen_seleccion,
                 plantilla_legacy,
@@ -1565,6 +1612,7 @@ def mejorar_texto_ia(request):
                     ),
                     'selector_origen': 'pendiente_usuario',
                     'contexto_clinico': contexto_seleccion,
+                    'puede_crear_plantilla': True,
                 })
 
             if plantilla_sugerida:

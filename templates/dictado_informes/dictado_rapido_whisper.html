@@ -286,7 +286,7 @@
                             }
 
                             // Empty states
-                            const tienePropias = {{ plantillas_propias|length }} > 0;
+                            const tienePropias = Array.from(options).some(opt => opt.dataset.grupo === 'mias');
                             document.getElementById('emptyMias').classList.toggle(
                                 'hidden', !(filtroActivo === 'mias' && !tienePropias)
                             );
@@ -543,12 +543,12 @@
             </div>
 
             <div id="modalSeleccionPlantilla" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                <div class="bg-gray-800 border border-purple-600 rounded-lg shadow-2xl w-full max-w-lg overflow-hidden"
+                <div class="bg-gray-800 border border-purple-600 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
                      role="dialog" aria-modal="true" aria-labelledby="tituloSeleccionPlantilla">
                     <div class="px-4 py-3 border-b border-gray-700">
                         <h3 id="tituloSeleccionPlantilla" class="text-lg font-bold text-white">
                             <i class="fas fa-file-medical mr-2 text-purple-400"></i>
-                            <span id="textoTituloSeleccionPlantilla">Confirmar plantilla</span>
+                            <span id="textoTituloSeleccionPlantilla">Elegí la plantilla</span>
                         </h3>
                         <p id="motivoSeleccionPlantilla" class="text-xs text-gray-300 mt-1"></p>
                     </div>
@@ -561,11 +561,63 @@
                             </label>
                             <select id="plantillaManualAgente"
                                     class="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white">
+                                <option value="" selected disabled>Elegí una plantilla...</option>
                                 {% for p in plantillas_estructuradas %}
                                     <option value="{{ p.codigo }}">{{ p.nombre }}</option>
                                 {% endfor %}
                             </select>
                         </div>
+
+                        <details id="opcionesCrearPlantilla" class="mt-4 border-t border-gray-700 pt-3">
+                            <summary class="text-sm text-purple-300 cursor-pointer">Ninguna sirve: Crear plantilla inexistente</summary>
+                            <p class="text-xs text-amber-300 mt-2">
+                                Borrador de anatomía normal, no un informe. No se envía el dictado ni datos del paciente.
+                                Verificá región, modalidad y cada línea: la normalidad aprobada puede preservarse en informes futuros.
+                                Sin técnica ni conclusión automática. Popularidad: criterio futuro, sin frecuencia clínica fiable.
+                            </p>
+                            <label class="block text-xs text-gray-300 mt-2" for="regionNuevaPlantilla">Región anatómica objetivo</label>
+                            <select id="regionNuevaPlantilla" class="w-full bg-gray-900 text-white rounded p-2">
+                                <option value="">Elegí región (obligatorio)</option>
+                                {% for codigo, nombre in regiones_borrador %}
+                                <option value="{{ codigo }}">{{ nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <label class="block text-xs text-gray-300 mt-2" for="modalidadNuevaPlantilla">Modalidad</label>
+                            <select id="modalidadNuevaPlantilla" class="w-full bg-gray-900 text-white rounded p-2">
+                                <option value="">Elegí modalidad (obligatorio)</option>
+                                {% for codigo, nombre in modalidades_borrador %}
+                                <option value="{{ codigo }}">{{ nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <details class="mt-3 rounded border border-gray-700 p-3">
+                                <summary class="cursor-pointer text-sm text-purple-300">Preferencias de esta plantilla</summary>
+                                <div class="mt-2 space-y-2">
+                                    {% for field in preferencias_plantilla_form %}
+                                    <label class="block text-xs text-gray-300" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    {% if field.help_text %}<p class="text-xs text-amber-300">{{ field.help_text }}</p>{% endif %}
+                                    {% endfor %}
+                                    <p class="text-xs text-gray-400">Se guardan en la guía de esta plantilla, no como preferencias globales. Las líneas normales se revisan por separado, aunque prefieras el informe en párrafos.</p>
+                                </div>
+                            </details>
+                            <button id="btnGenerarPlantilla" type="button" class="mt-2 bg-purple-700 text-white rounded px-3 py-2 text-sm">Proponer borrador normal</button>
+                            <p id="estadoNuevaPlantilla" role="status" aria-live="polite" class="text-xs text-amber-300 mt-2"></p>
+                            <div id="previewNuevaPlantilla" class="hidden space-y-2 mt-3">
+                                <label class="block text-xs text-gray-300" for="nombreNuevaPlantilla">Nombre</label>
+                                <input id="nombreNuevaPlantilla" maxlength="200" class="w-full bg-gray-900 text-white rounded p-2">
+                                <label class="block text-xs text-gray-300" for="tituloNuevaPlantilla">Título</label>
+                                <input id="tituloNuevaPlantilla" maxlength="500" class="w-full bg-gray-900 text-white rounded p-2">
+                                <label class="block text-xs text-gray-300" for="lineasNuevaPlantilla">COMENTARIO — una línea normal por anatomía</label>
+                                <textarea id="lineasNuevaPlantilla" rows="8" spellcheck="false" class="w-full bg-gray-900 text-white rounded p-2"></textarea>
+                                <p class="text-xs text-gray-400">CONCLUSIÓN: vacía, se redactará a partir del dictado. Técnica: omitida.</p>
+                                <label class="block text-xs text-gray-300" for="guiaNuevaPlantilla">Guía de estilo para esta plantilla</label>
+                                <textarea id="guiaNuevaPlantilla" rows="4" maxlength="2000" class="w-full bg-gray-900 text-white rounded p-2"></textarea>
+                                <p class="text-xs text-gray-400">Podés ajustarla ahora o luego en <a href="{% url 'dictado_informes:plantilla_estructurada_list' %}?scope=mias" target="_blank" rel="noopener" class="text-purple-300 underline">Mis plantillas → Editar</a>. No incluyas datos ni hallazgos de pacientes.</p>
+                                <label class="block text-xs text-gray-300"><input id="compartirNuevaPlantilla" type="checkbox"> Compartir con otros usuarios de Dictado IA (por defecto privada)</label>
+                                <label class="block text-xs text-amber-300"><input id="confirmarNuevaPlantilla" type="checkbox"> Revisé región/modalidad y cada línea; confirmo que es una plantilla normal genérica, sin datos de paciente, y autorizo guardarla y usarla.</label>
+                                <button id="btnGuardarNuevaPlantilla" type="button" class="bg-green-700 text-white rounded px-3 py-2 text-sm">Confirmar, guardar y usar en este informe</button>
+                            </div>
+                        </details>
 
                         <div class="mt-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                             <button id="btnCancelarSeleccionPlantilla" type="button"
@@ -891,7 +943,6 @@ function guardarEstadoAgente(payload, data) {
         confianza: sugerida.confianza_selector || 'baja',
         respuesta: data,
     };
-
     document.getElementById('plantillaAgenteActual').textContent = `Plantilla aplicada: ${estadoAgenteActual.nombre}`;
     const panel = document.getElementById('panelPlantillaAgente');
     panel.classList.remove('hidden');
@@ -911,55 +962,52 @@ function limpiarEstadoAgente() {
 
 async function cambiarPlantillaAgente() {
     if (!estadoAgenteActual || cambioPlantillaEnCurso) return;
-
+    if (grabandoActivo || grabandoCorreccion || document.getElementById('btnAplicarCorreccion').disabled) {
+        mostrarToast('Finalizá la grabación o corrección antes de cambiar de plantilla.', 'info');
+        return;
+    }
     const boton = document.getElementById('btnCambiarPlantillaAgente');
+    const botonDeshacer = document.getElementById('btnDeshacerCambioPlantilla');
     const estado = document.getElementById('estadoCambioPlantilla');
-    boton.disabled = true;
-    boton.classList.add('opacity-60');
+    const estadoAnterior = estadoAgenteActual;
     cambioPlantillaEnCurso = true;
-
+    boton.disabled = true;
+    botonDeshacer.disabled = true;
     try {
-        const estadoAnterior = estadoAgenteActual;
         const alternativas = estadoAnterior.candidatos.filter(c => c.codigo !== estadoAnterior.codigo);
         const codigoElegido = await solicitarSeleccionPlantilla(
-            alternativas,
-            estadoAnterior.contexto,
-            estadoAnterior.confianza,
-            'cambiar',
+            alternativas, estadoAnterior.contexto, estadoAnterior.confianza, 'cambiar',
         );
-        if (!codigoElegido || codigoElegido === estadoAnterior.codigo) return;
-
-        const confirmar = window.confirm(
-            'Se regenerará el informe desde la transcripción original con la nueva plantilla. '
-            + 'El borrador actual se conservará para poder restaurarlo. ¿Continuar?'
-        );
-        if (!confirmar) return;
+        if (!codigoElegido || codigoElegido === estadoAnterior.codigo
+                || estadoAgenteActual !== estadoAnterior) return;
+        if (!window.confirm(
+            'Se regenerará desde la transcripción original; tus ediciones manuales no se trasladan '
+            + 'al nuevo informe. El borrador actual se conservará para poder restaurarlo. ¿Continuar?'
+        )) return;
 
         const textoAntes = getTextoMejoradoTextoPlano();
         const htmlAntes = getTextoMejoradoHtml();
         const payload = {
             ...estadoAnterior.payload,
-            texto_original: estadoAnterior.payload.texto_original || textoOriginalGlobal,
+            texto_original: estadoAnterior.payload.texto_original,
             plantilla_confirmada_codigo: codigoElegido,
             cambio_plantilla_posterior: true,
         };
-        estado.textContent = 'Regenerando desde la transcripción original…';
+        estado.textContent = 'Regenerando desde la transcripción original...';
         const resultado = await solicitarMejoraIA(payload);
-        if (
-            getTextoMejoradoTextoPlano() !== textoAntes
-            || getTextoMejoradoHtml() !== htmlAntes
-        ) {
+        if (estadoAgenteActual !== estadoAnterior
+                || getTextoMejoradoTextoPlano() !== textoAntes || getTextoMejoradoHtml() !== htmlAntes) {
             estado.textContent = 'El borrador cambió durante la generación; no se aplicó el resultado nuevo.';
             return;
         }
-
+        if (typeof resultado.texto_mejorado !== 'string' || !resultado.texto_mejorado.trim()) {
+            throw new Error('La IA no devolvió un informe válido. Se conserva el borrador anterior.');
+        }
         informeAntesCambioPlantilla = {
-            html: htmlAntes,
-            textoIA: textoIAGlobal,
-            estadoAgente: estadoAnterior,
-            requiereConfirmacionIA,
-            motivoConfirmacionIA,
+            html: htmlAntes, textoIA: textoIAGlobal, estadoAgente: estadoAnterior,
+            requiereConfirmacionIA, motivoConfirmacionIA,
             terminosSospechososIA: [...terminosSospechososIA],
+            htmlAntesUltimaCorreccion,
             feedbackCalidadEnviado,
             panelFeedbackOculto: document.getElementById('panelFeedbackCalidad').classList.contains('hidden'),
             feedbackTexto: document.getElementById('feedbackCalidadEstado').textContent,
@@ -971,52 +1019,45 @@ async function cambiarPlantillaAgente() {
         guardarEstadoAgente(payload, resultado);
         actualizarResumenMejora(resultado);
         reiniciarEstadoCorreccion();
-
-        const btnDeshacer = document.getElementById('btnDeshacerCambioPlantilla');
-        btnDeshacer.classList.remove('hidden');
+        botonDeshacer.classList.remove('hidden');
         estado.textContent = `Informe regenerado con ${estadoAgenteActual.nombre}.`;
         feedbackCalidadEnviado = false;
-        document.getElementById('panelFeedbackCalidad')?.classList.remove('hidden');
-        const feedbackEstado = document.getElementById('feedbackCalidadEstado');
-        feedbackEstado?.classList.add('hidden');
-        if (feedbackEstado) feedbackEstado.textContent = '';
+        document.getElementById('panelFeedbackCalidad').classList.remove('hidden');
+        document.getElementById('feedbackCalidadEstado').classList.add('hidden');
+        document.getElementById('feedbackCalidadEstado').textContent = '';
         guardarEnHistorial(textoOriginalGlobal, getTextoMejoradoTextoPlano());
         mostrarToast('Informe regenerado con la nueva plantilla', 'success');
     } catch (error) {
-        estado.textContent = error.seleccionPlantillaCancelada
-            ? ''
-            : (error.message || 'No se pudo regenerar el informe.');
+        estado.textContent = error.message || 'No se pudo regenerar el informe. El borrador se conserva.';
+        mostrarToast(estado.textContent, 'error');
     } finally {
         cambioPlantillaEnCurso = false;
         boton.disabled = false;
-        boton.classList.remove('opacity-60');
+        botonDeshacer.disabled = false;
     }
 }
 
 function deshacerCambioPlantilla() {
-    if (!informeAntesCambioPlantilla) return;
-
-    setTextoMejoradoContenido(informeAntesCambioPlantilla.html);
-    textoIAGlobal = informeAntesCambioPlantilla.textoIA;
-    estadoAgenteActual = informeAntesCambioPlantilla.estadoAgente;
-    requiereConfirmacionIA = informeAntesCambioPlantilla.requiereConfirmacionIA;
-    motivoConfirmacionIA = informeAntesCambioPlantilla.motivoConfirmacionIA;
-    terminosSospechososIA = informeAntesCambioPlantilla.terminosSospechososIA;
-    feedbackCalidadEnviado = informeAntesCambioPlantilla.feedbackCalidadEnviado;
-    document.getElementById('plantillaAgenteActual').textContent = `Plantilla aplicada: ${estadoAgenteActual.nombre}`;
-    actualizarResumenMejora(estadoAgenteActual.respuesta);
-    document.getElementById('panelFeedbackCalidad')?.classList.toggle(
-        'hidden', informeAntesCambioPlantilla.panelFeedbackOculto,
-    );
-    const feedbackEstado = document.getElementById('feedbackCalidadEstado');
-    if (feedbackEstado) {
-        feedbackEstado.textContent = informeAntesCambioPlantilla.feedbackTexto;
-        feedbackEstado.classList.toggle('hidden', informeAntesCambioPlantilla.feedbackOculto);
-    }
-    document.getElementById('btnDeshacerCambioPlantilla').classList.add('hidden');
+    if (!informeAntesCambioPlantilla || cambioPlantillaEnCurso) return;
+    const anterior = informeAntesCambioPlantilla;
+    setTextoMejoradoContenido(anterior.html);
+    textoIAGlobal = anterior.textoIA;
+    guardarEstadoAgente(anterior.estadoAgente.payload, anterior.estadoAgente.respuesta);
+    requiereConfirmacionIA = anterior.requiereConfirmacionIA;
+    motivoConfirmacionIA = anterior.motivoConfirmacionIA;
+    terminosSospechososIA = anterior.terminosSospechososIA;
+    reiniciarEstadoCorreccion();
+    htmlAntesUltimaCorreccion = anterior.htmlAntesUltimaCorreccion;
+    document.getElementById('btnDeshacerCorreccion').classList.toggle('hidden', !htmlAntesUltimaCorreccion);
+    actualizarResumenMejora(anterior.estadoAgente.respuesta);
+    feedbackCalidadEnviado = anterior.feedbackCalidadEnviado;
+    document.getElementById('panelFeedbackCalidad').classList.toggle('hidden', anterior.panelFeedbackOculto);
+    const feedback = document.getElementById('feedbackCalidadEstado');
+    feedback.textContent = anterior.feedbackTexto;
+    feedback.classList.toggle('hidden', anterior.feedbackOculto);
     informeAntesCambioPlantilla = null;
-    const estado = document.getElementById('estadoCambioPlantilla');
-    if (estado) estado.textContent = 'Se restauró el borrador anterior.';
+    document.getElementById('btnDeshacerCambioPlantilla').classList.add('hidden');
+    document.getElementById('estadoCambioPlantilla').textContent = 'Se restauró el borrador anterior.';
     mostrarToast('Borrador anterior restaurado', 'info');
 }
 
@@ -1050,18 +1091,13 @@ async function reintentarMejoraPendiente() {
         document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
         textoOriginalGlobal = payload.texto_original;
         textoIAGlobal = htmlATextoPlano(textoPlanoAHtml(textoMejorado));
-        requiereConfirmacionIA = !!resultado.requiere_confirmacion;
-        motivoConfirmacionIA = resultado.motivo_confianza || '';
-        terminosSospechososIA = resultado.terminos_sospechosos || [];
-
-        const guardrails = resultado.guardrails_aplicados || [];
-        const resumen = document.getElementById('guardrailsResumen');
-        const resumenTexto = document.getElementById('guardrailsTexto');
-        if (guardrails.length && resumen && resumenTexto) {
-            resumenTexto.textContent = `Guardrails: se aplicaron ${guardrails.length} controles de estructura.`;
-            resumen.classList.remove('hidden');
-        } else if (resumen) {
-            resumen.classList.add('hidden');
+        actualizarConfirmacionResultado(resultado);
+        actualizarResumenMejora(resultado);
+        if (payload.modo === 'AGENTE') {
+            limpiarEstadoAgente();
+            guardarEstadoAgente(payload, resultado);
+        } else {
+            limpiarEstadoAgente();
         }
 
         payloadMejoraPendiente = null;
@@ -1239,6 +1275,10 @@ function blobADataUrl(blob) {
 }
 
 async function iniciarGrabacionCorreccion() {
+    if (cambioPlantillaEnCurso) {
+        mostrarToast('Terminá o cancelá el cambio de plantilla antes de grabar una corrección.', 'info');
+        return;
+    }
     if (!getTextoMejoradoTextoPlano().trim()) {
         mostrarToast('Primero genera un informe para corregir', 'info');
         return;
@@ -1397,6 +1437,7 @@ function reiniciarEstadoCorreccion() {
 }
 
 function finalizarSeleccionPlantilla(codigo = null) {
+    solicitudNuevaPlantilla += 1;
     document.getElementById('modalSeleccionPlantilla')?.classList.add('hidden');
     if (resolverSeleccionPlantillaPendiente) {
         const resolver = resolverSeleccionPlantillaPendiente;
@@ -1421,6 +1462,10 @@ function construirPreguntaPlantilla(candidatos, contexto, confianza) {
     return 'No se encontró una coincidencia segura. ¿Qué plantilla corresponde a este estudio?';
 }
 
+let tokenNuevaPlantilla = null;
+let solicitudNuevaPlantilla = 0;
+let guardandoNuevaPlantilla = false;
+
 function solicitarSeleccionPlantilla(candidatos, contexto, confianza, proposito = 'generar') {
     const modal = document.getElementById('modalSeleccionPlantilla');
     const lista = document.getElementById('candidatosSeleccionPlantilla');
@@ -1428,9 +1473,19 @@ function solicitarSeleccionPlantilla(candidatos, contexto, confianza, proposito 
     const selectorManual = document.getElementById('plantillaManualAgente');
     const titulo = document.getElementById('textoTituloSeleccionPlantilla');
     lista.innerHTML = '';
+    selectorManual.value = '';
+    solicitudNuevaPlantilla += 1;
+    tokenNuevaPlantilla = null;
+    document.getElementById('previewNuevaPlantilla').classList.add('hidden');
+    document.getElementById('opcionesCrearPlantilla').open = false;
+    document.getElementById('estadoNuevaPlantilla').textContent = '';
+    document.getElementById('regionNuevaPlantilla').value = contexto.region || '';
+    document.getElementById('modalidadNuevaPlantilla').value = contexto.modalidad || '';
+    document.getElementById('confirmarNuevaPlantilla').checked = false;
+    document.getElementById('compartirNuevaPlantilla').checked = false;
 
     const esCambio = proposito === 'cambiar';
-    if (titulo) titulo.textContent = esCambio ? 'Cambiar plantilla del informe' : 'Confirmar plantilla';
+    if (titulo) titulo.textContent = esCambio ? 'Cambiar plantilla del informe' : 'Elegí la plantilla';
     motivo.textContent = esCambio
         ? 'Se volverá a generar desde la transcripción original; el borrador actual se conservará para poder restaurarlo.'
         : construirPreguntaPlantilla(candidatos, contexto, confianza);
@@ -1438,7 +1493,7 @@ function solicitarSeleccionPlantilla(candidatos, contexto, confianza, proposito 
     if (!candidatos || candidatos.length === 0) {
         const vacio = document.createElement('p');
         vacio.className = 'text-sm text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg p-3';
-        vacio.textContent = 'No hubo una coincidencia clara. Elegí una plantilla de la lista completa.';
+        vacio.textContent = 'No hubo una coincidencia clara. Elegí una plantilla o abrí “Crear plantilla inexistente”.';
         lista.appendChild(vacio);
     } else {
         candidatos.forEach(candidato => {
@@ -1484,7 +1539,113 @@ document.getElementById('btnUsarPlantillaManual')?.addEventListener('click', () 
     if (codigo) finalizarSeleccionPlantilla(codigo);
 });
 document.getElementById('btnCancelarSeleccionPlantilla')?.addEventListener('click', () => {
+    if (guardandoNuevaPlantilla) return;
+    solicitudNuevaPlantilla += 1;
     finalizarSeleccionPlantilla(null);
+});
+
+async function enviarPlantillaInexistente(payload) {
+    const response = await fetch('{% url "dictado_informes:plantilla_inexistente" %}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Error creando plantilla');
+    return data;
+}
+
+function invalidarBorradorNuevaPlantilla() {
+    solicitudNuevaPlantilla += 1;
+    tokenNuevaPlantilla = null;
+    document.getElementById('previewNuevaPlantilla').classList.add('hidden');
+    document.getElementById('confirmarNuevaPlantilla').checked = false;
+}
+['regionNuevaPlantilla', 'modalidadNuevaPlantilla', 'id_estilo_redaccion', 'id_formato_redaccion'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', invalidarBorradorNuevaPlantilla);
+});
+document.getElementById('id_instrucciones_estilo')?.addEventListener('input', invalidarBorradorNuevaPlantilla);
+['nombreNuevaPlantilla', 'tituloNuevaPlantilla', 'lineasNuevaPlantilla', 'guiaNuevaPlantilla', 'compartirNuevaPlantilla'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => {
+        document.getElementById('confirmarNuevaPlantilla').checked = false;
+    });
+});
+
+document.getElementById('btnGenerarPlantilla')?.addEventListener('click', async () => {
+    const boton = document.getElementById('btnGenerarPlantilla');
+    const estado = document.getElementById('estadoNuevaPlantilla');
+    invalidarBorradorNuevaPlantilla();
+    const solicitud = solicitudNuevaPlantilla;
+    boton.disabled = true;
+    estado.textContent = 'Generando con referencias de plantillas, sin dictado...';
+    try {
+        const data = await enviarPlantillaInexistente({
+            accion: 'generar',
+            region: document.getElementById('regionNuevaPlantilla').value,
+            modalidad: document.getElementById('modalidadNuevaPlantilla').value,
+            preferencias: {
+                estilo_redaccion: document.getElementById('id_estilo_redaccion').value,
+                formato_redaccion: document.getElementById('id_formato_redaccion').value,
+                instrucciones_estilo: document.getElementById('id_instrucciones_estilo').value,
+            },
+        });
+        if (solicitud !== solicitudNuevaPlantilla) return;
+        tokenNuevaPlantilla = data.token;
+        document.getElementById('nombreNuevaPlantilla').value = data.borrador.nombre;
+        document.getElementById('tituloNuevaPlantilla').value = data.borrador.titulo;
+        document.getElementById('lineasNuevaPlantilla').value = data.borrador.comentarios_base.join('\n');
+        document.getElementById('guiaNuevaPlantilla').value = data.guia_estilo || '';
+        document.getElementById('previewNuevaPlantilla').classList.remove('hidden');
+        estado.textContent = `${data.criterio_referencias} Referencias: ${data.referencias.map(p => p.nombre).join(', ')}. Revisá y editá antes de confirmar.`;
+        if (data.advertencias?.length) {
+            estado.textContent += ` Revisión necesaria: ${data.advertencias.join(' ')}`;
+        }
+    } catch (error) {
+        if (solicitud === solicitudNuevaPlantilla) estado.textContent = error.message;
+    } finally {
+        boton.disabled = false;
+    }
+});
+
+document.getElementById('btnGuardarNuevaPlantilla')?.addEventListener('click', async () => {
+    const estado = document.getElementById('estadoNuevaPlantilla');
+    if (!tokenNuevaPlantilla || !document.getElementById('confirmarNuevaPlantilla').checked) {
+        estado.textContent = 'Generá un borrador y confirmá explícitamente la revisión médica.';
+        return;
+    }
+    if (guardandoNuevaPlantilla) return;
+    guardandoNuevaPlantilla = true;
+    const controles = Array.from(document.querySelectorAll('#modalSeleccionPlantilla button, #modalSeleccionPlantilla input, #modalSeleccionPlantilla textarea, #modalSeleccionPlantilla select'));
+    controles.forEach(control => control.disabled = true);
+    try {
+        const data = await enviarPlantillaInexistente({
+            accion: 'confirmar', token: tokenNuevaPlantilla, confirmar: true,
+            compartida: document.getElementById('compartirNuevaPlantilla').checked,
+            guia_estilo: document.getElementById('guiaNuevaPlantilla').value,
+            borrador: {
+                nombre: document.getElementById('nombreNuevaPlantilla').value,
+                titulo: document.getElementById('tituloNuevaPlantilla').value,
+                comentarios_base: document.getElementById('lineasNuevaPlantilla').value.split('\n').map(s => s.trim()).filter(Boolean),
+                seccion_tecnica: '', conclusion: '',
+            },
+        });
+        // Disponible inmediatamente en selección manual y modo estructurado, sin recargar.
+        ['plantillaManualAgente', 'tipoPlantilla'].forEach(id => {
+            const selector = document.getElementById(id);
+            if (selector && !Array.from(selector.options).some(o => o.value === data.plantilla.codigo)) {
+                const opcion = new Option(data.plantilla.nombre, data.plantilla.codigo);
+                opcion.dataset.grupo = 'mias';
+                opcion.dataset.nombre = data.plantilla.nombre.toLowerCase();
+                selector.add(opcion);
+            }
+        });
+        finalizarSeleccionPlantilla(data.plantilla.codigo);
+    } catch (error) {
+        estado.textContent = error.message;
+    } finally {
+        guardandoNuevaPlantilla = false;
+        controles.forEach(control => control.disabled = false);
+    }
 });
 
 // 🚀 WEB SPEECH API para preview en tiempo real
@@ -1626,6 +1787,10 @@ btnGrabar.addEventListener('click', (e) => {
 });
 
 async function iniciarGrabacion() {
+    if (cambioPlantillaEnCurso) {
+        mostrarToast('Terminá o cancelá el cambio de plantilla antes de iniciar otro dictado.', 'info');
+        return;
+    }
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
@@ -1953,7 +2118,6 @@ async function procesarAudio() {
             console.log(`⏱️ TIEMPO TOTAL: ${t4-t1}ms (Whisper: ${t2-t1}ms, IA: ${t4-t3}ms)`);
             
             actualizarConfirmacionResultado(dataMejora);
-
             actualizarResumenMejora(dataMejora);
             setTextoMejoradoContenido(dataMejora.texto_mejorado);
             document.getElementById('labelTextoMejorado').textContent = 'Texto Mejorado por IA:';
