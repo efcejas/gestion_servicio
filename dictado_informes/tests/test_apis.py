@@ -858,6 +858,22 @@ class TestAPIsMejora(TestCase):
         self.assertEqual(traza.codigo_plantilla, 'MENISCAL')
         self.assertEqual(traza.origen_seleccion, 'usuario_confirmada')
 
+        confirmada_post = self.client.post(
+            '/dictado_informes/api/mejorar-texto/',
+            data=json.dumps({
+                'texto_original': 'RM de rodilla con desgarro meniscal',
+                'modo': 'AGENTE',
+                'plantilla_confirmada_codigo': 'MENISCAL',
+                'cambio_plantilla_posterior': True,
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(confirmada_post.status_code, 200)
+        self.assertEqual(confirmada_post.json()['tipo_plantilla_usada'], 'MENISCAL')
+        self.assertEqual(TrazaAgenteDictado.objects.latest('pk').origen_seleccion,
+                         'usuario_cambio_post')
+        self.assertEqual(mock_improve.call_count, 2)
+
     def test_modo_agente_rechaza_plantilla_confirmada_no_visible(self):
         response = self.client.post(
             '/dictado_informes/api/mejorar-texto/',
@@ -865,6 +881,7 @@ class TestAPIsMejora(TestCase):
                 'texto_original': 'RM de rodilla derecha',
                 'modo': 'AGENTE',
                 'plantilla_confirmada_codigo': 'INEXISTENTE',
+                'cambio_plantilla_posterior': True,
             }),
             content_type='application/json',
         )

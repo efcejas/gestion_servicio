@@ -18,7 +18,10 @@ from .models import (
     EstadoInforme, TerminoMedico, CorreccionAprendizaje, MetricaDictado,
     PlantillaEstructurada, FeedbackCalidadDictado, TrazaAgenteDictado
 )
-from .forms import TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm
+from .forms import (
+    TerminoMedicoForm, PlantillaEstructuradaForm, ImportarPlantillaDocxForm,
+    PreferenciasPlantillaForm,
+)
 from .ai_services import ai_service
 from .template_drafts import (
     REGIONES_BORRADOR, MODALIDADES_BORRADOR, generar_borrador, confirmar_borrador,
@@ -785,6 +788,7 @@ class DictadoRapidoView(LoginRequiredMixin, DictadoModuleAccessMixin, TemplateVi
         context['dictado_agente_habilitado'] = getattr(settings, 'DICTADO_AGENTE_HABILITADO', True)
         context['regiones_borrador'] = REGIONES_BORRADOR.items()
         context['modalidades_borrador'] = MODALIDADES_BORRADOR.items()
+        context['preferencias_plantilla_form'] = PreferenciasPlantillaForm()
         context['dictado_max_audio_size_bytes'] = settings.DICTADO_MAX_AUDIO_SIZE_BYTES
         return context
 
@@ -1585,7 +1589,11 @@ def mejorar_texto_ia(request):
                     'candidatos': candidatos_confirmacion,
                     'contexto_clinico': contexto_seleccion,
                 }
-                origen_seleccion = 'usuario_confirmada'
+                origen_seleccion = (
+                    'usuario_cambio_post'
+                    if data.get('cambio_plantilla_posterior') is True
+                    else 'usuario_confirmada'
+                )
             elif not plantilla_sugerida or debe_confirmar_plantilla_agente(
                 plantilla_sugerida,
                 origen_seleccion,

@@ -7,6 +7,7 @@ from django.core import signing
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from .forms import PreferenciasPlantillaForm
 from .models import PlantillaEstructurada
 
 
@@ -158,6 +159,18 @@ def generar_borrador(usuario, data):
     from .ai_services import ai_service
 
     region, modalidad = validar_contexto(data)
+    preferencias = data.get('preferencias', {})
+    if not isinstance(preferencias, dict):
+        raise ValidationError('Las preferencias deben ser un objeto.')
+    if any(not isinstance(valor, str) for valor in preferencias.values()):
+        raise ValidationError('Cada preferencia debe ser texto.')
+    form = PreferenciasPlantillaForm(preferencias)
+    if not form.is_valid():
+        raise ValidationError([
+            f'{form.fields[campo].label}: {error}'
+            for campo, errores in form.errors.items() for error in errores
+        ])
+    guia_estilo = ai_service.construir_guia_estilo_plantilla(form.cleaned_data)
     referencias = seleccionar_referencias(usuario, region, modalidad)
     if not referencias:
         raise ValidationError(
@@ -167,6 +180,7 @@ def generar_borrador(usuario, data):
     borrador = ai_service.generar_plantilla_normal(
         region=REGIONES_BORRADOR[region],
         modalidad=MODALIDADES_BORRADOR[modalidad],
+        guia_estilo=guia_estilo,
         referencias=[{
             'nombre': p.nombre, 'titulo': p.titulo,
             'comentarios_base': (p.comentarios_base or [])[:30],
@@ -181,10 +195,12 @@ def generar_borrador(usuario, data):
     token = signing.dumps({
         'usuario': usuario.pk, 'region': region, 'modalidad': modalidad,
         'codigo': f'IA_{uuid.uuid4().hex.upper()}',
+        'guia_estilo': guia_estilo,
     }, salt=SALT)
     return {
         'borrador': borrador, 'token': token,
         'advertencias': advertencias,
+        'guia_estilo': guia_estilo,
         'referencias': [{'codigo': p.codigo, 'nombre': p.nombre} for p in referencias],
         'criterio_referencias': CRITERIO_REFERENCIAS,
     }
@@ -200,6 +216,9 @@ def confirmar_borrador(usuario, data):
     if contexto['usuario'] != usuario.pk:
         raise ValidationError('El borrador pertenece a otro usuario.')
     borrador = validar_borrador(data.get('borrador'), contexto['region'], contexto['modalidad'])
+    guia_estilo = data.get('guia_estilo', contexto.get('guia_estilo', ''))
+    if not isinstance(guia_estilo, str) or len(guia_estilo) > 2000:
+        raise ValidationError('La guía de estilo debe ser texto, hasta 2000 caracteres.')
     compartida = data.get('compartida', False)
     if not isinstance(compartida, bool):
         raise ValidationError('Compartida debe ser un valor booleano.')
@@ -218,6 +237,7 @@ def confirmar_borrador(usuario, data):
             defaults={
                 'nombre': borrador['nombre'], 'titulo': borrador['titulo'],
                 'seccion_tecnica': '', 'comentarios_base': borrador['comentarios_base'],
+                'guia_estilo': guia_estilo.strip(),
                 'estructura_documento': estructura, 'modo_estructura': 'estricta',
                 'creada_por': usuario, 'origen': 'user', 'activa': True,
                 'compartida': compartida,

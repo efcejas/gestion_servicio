@@ -133,6 +133,57 @@ class PlantillaInexistenteTests(TestCase):
         data['borrador'] = {**self.borrador, 'conclusion': 'Normal.'}
         self.assertEqual(self.post(data).status_code, 400)
 
+    def test_preferencias_generan_guia_editable_privada_para_uso_futuro(self):
+        preferencias = {
+            'estilo_redaccion': 'breve', 'formato_redaccion': 'parrafos',
+            'instrucciones_estilo': 'Usar morfología conservada.',
+        }
+        with patch.object(ai_service, 'generar_plantilla_normal', return_value=self.borrador) as generar:
+            response = self.post({
+                'accion': 'generar', 'region': 'RODILLA', 'modalidad': 'RES',
+                'preferencias': preferencias,
+            })
+        self.assertEqual(response.status_code, 200, response.content)
+        propuesta = response.json()
+        self.assertIn('breve', generar.call_args.kwargs['guia_estilo'])
+        self.assertIn('párrafos', propuesta['guia_estilo'])
+        self.assertIn('Usar morfología conservada.', propuesta['guia_estilo'])
+        self.assertFalse(PlantillaEstructurada.objects.filter(creada_por=self.medico).exists())
+        guia_editada = 'Usar frases separadas. Conclusión breve.'
+        guardada = self.post(self.confirmacion(propuesta, guia_estilo=guia_editada))
+        plantilla = PlantillaEstructurada.objects.get(codigo=guardada.json()['plantilla']['codigo'])
+        self.assertEqual(plantilla.guia_estilo, guia_editada)
+        self.assertFalse(plantilla.compartida)
+        self.assertEqual(ai_service._get_plantilla_estructurada(plantilla.codigo, self.medico)['guia_estilo'],
+                         guia_editada)
+        self.post(self.confirmacion(propuesta, guia_estilo='No sobrescribir en reintento.'))
+        plantilla.refresh_from_db()
+        self.assertEqual(plantilla.guia_estilo, guia_editada)
+        self.referencia.refresh_from_db()
+        self.assertEqual(self.referencia.guia_estilo, '')
+
+    @patch.object(ai_service, 'generar_plantilla_normal')
+    def test_preferencias_invalidas_no_llaman_ia_y_guia_invalida_no_se_guarda(self, generar):
+        for preferencias in (
+            'no es un objeto',
+            {'estilo_redaccion': 'inventado'},
+            {'instrucciones_estilo': 'x' * 1001},
+        ):
+            with self.subTest(preferencias=preferencias):
+                response = self.post({
+                    'accion': 'generar', 'region': 'RODILLA', 'modalidad': 'RES',
+                    'preferencias': preferencias,
+                })
+                self.assertEqual(response.status_code, 400)
+        generar.assert_not_called()
+        generar.return_value = self.borrador
+        propuesta = self.post({
+            'accion': 'generar', 'region': 'RODILLA', 'modalidad': 'RES',
+        }).json()
+        for guia in ({}, 'x' * 2001):
+            self.assertEqual(self.post(self.confirmacion(propuesta, guia_estilo=guia)).status_code, 400)
+        self.assertFalse(PlantillaEstructurada.objects.filter(creada_por=self.medico).exists())
+
     def test_reconoce_normalidad_negativa_sin_ocultar_patologia_afirmativa(self):
         for linea in (
             'No se identifican adenopatías.',
@@ -275,10 +326,12 @@ class PlantillaInexistenteTests(TestCase):
         servicio._crear_chat_completion_openai = Mock(return_value=(respuesta, 'modelo'))
         servicio.groq_fallback = Mock()
         kwargs = {'region': 'Rodilla', 'modalidad': 'RM',
+                  'guia_estilo': 'Presentar hallazgos en párrafos.',
                   'referencias': [{'nombre': 'RM de hombro', 'comentarios_base': ['Normal.']}]}
         self.assertEqual(servicio.generar_plantilla_normal(**kwargs), self.borrador)
         mensajes = servicio._crear_chat_completion_openai.call_args.kwargs['messages']
         self.assertEqual(json.loads(mensajes[1]['content'])['region_objetivo'], 'Rodilla')
+        self.assertEqual(json.loads(mensajes[1]['content'])['preferencias_redaccion'], kwargs['guia_estilo'])
         response_format = servicio._crear_chat_completion_openai.call_args.kwargs['response_format']
         self.assertEqual(response_format['type'], 'json_schema')
         self.assertTrue(response_format['json_schema']['strict'])

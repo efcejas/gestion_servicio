@@ -4,6 +4,30 @@ from django import forms
 from .models import TerminoMedico, CategoriaTerminoMedico, PlantillaEstructurada
 
 
+class PreferenciasPlantillaForm(forms.Form):
+    estilo_redaccion = forms.ChoiceField(
+        label='Estilo de redacción', required=False,
+        choices=[('referencias', 'Como las referencias'), ('breve', 'Breve'),
+                 ('descriptivo', 'Descriptivo')],
+        initial='referencias',
+        widget=forms.Select(attrs={'class': 'w-full bg-gray-900 text-white rounded p-2'}),
+    )
+    formato_redaccion = forms.ChoiceField(
+        label='Presentación del informe', required=False,
+        choices=[('lineas', 'Frases separadas'), ('parrafos', 'Párrafos por región anatómica')],
+        initial='lineas',
+        widget=forms.Select(attrs={'class': 'w-full bg-gray-900 text-white rounded p-2'}),
+    )
+    instrucciones_estilo = forms.CharField(
+        label='Indicaciones personales de estilo', required=False, max_length=1000,
+        help_text='Solo preferencias de redacción. No pegues informes, hallazgos ni datos de pacientes.',
+        widget=forms.Textarea(attrs={
+            'class': 'w-full bg-gray-900 text-white rounded p-2', 'rows': 3,
+            'placeholder': 'Ej.: usar morfología conservada y una conclusión breve.',
+        }),
+    )
+
+
 class PlantillaEstructuradaForm(forms.ModelForm):
     """Formulario para crear/editar plantillas estructuradas con comentarios base"""
     
@@ -93,7 +117,8 @@ class PlantillaEstructuradaForm(forms.ModelForm):
         help_texts = {
             'guia_estilo': (
                 'Instrucciones de redacción para esta plantilla. '
-                'La IA las toma con prioridad en modo ESTRUCTURADO.'
+                'Se usan al generar informes con esta plantilla en modo ESTRUCTURADO o AGENTE. '
+                'Podés indicar extensión, frases separadas o párrafos. No agregues hallazgos de un caso.'
             ),
             'compartida': 'Si la compartes, otros usuarios del módulo podrán usarla en Dictado Rápido. Si no, quedará solo para vos y para superusuarios.'
         }
@@ -101,6 +126,7 @@ class PlantillaEstructuradaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        self.fields['seccion_tecnica'].required = False
         # Si es edición, cargar comentarios_base del JSON a textarea
         if self.instance.pk:
             comentarios = self.instance.comentarios_base or []
@@ -192,13 +218,64 @@ class PlantillaEstructuradaForm(forms.ModelForm):
             lineas_base = seccion.get('lineas_base')
             if lineas_base is not None and not isinstance(lineas_base, list):
                 raise forms.ValidationError(f'La seccion #{idx} tiene "lineas_base" pero no es una lista.')
+            if lineas_base is not None and any(not isinstance(linea, str) for linea in lineas_base):
+                raise forms.ValidationError(f'Las lineas base de la seccion #{idx} deben ser texto.')
+            if not isinstance(seccion.get('contenido', ''), str):
+                raise forms.ValidationError(f'El contenido de la seccion #{idx} debe ser texto.')
+            seccion['tipo'] = tipo
 
-        estructura.setdefault('modo', modo_estructura)
-        estructura.setdefault(
-            'permitir_secciones_nuevas',
-            bool(self.cleaned_data.get('permitir_secciones_nuevas'))
+        estructura['modo'] = modo_estructura
+        estructura['permitir_secciones_nuevas'] = bool(
+            self.cleaned_data.get('permitir_secciones_nuevas')
         )
         return estructura
+
+    def clean(self):
+        cleaned = super().clean()
+        estructura = cleaned.get('estructura_documento_texto')
+        if not self.instance.pk or not estructura:
+            return cleaned
+        anteriores = (self.instance.estructura_documento or {}).get('secciones', [])
+        for tipo, campo, clave, anterior in (
+            ('titulo', 'titulo', 'contenido', self.instance.titulo),
+            ('tecnica', 'seccion_tecnica', 'contenido', self.instance.seccion_tecnica),
+            ('hallazgos', 'comentarios_base_texto', 'lineas_base', self.instance.comentarios_base),
+        ):
+            if campo not in cleaned:
+                continue
+            secciones = [s for s in estructura['secciones'] if s.get('tipo', '').lower() == tipo]
+            cambio_simple = cleaned[campo] != anterior
+            if cambio_simple and len(secciones) != 1:
+                self.add_error(
+                    campo,
+                    'La estructura tiene varias secciones de este tipo o ninguna. '
+                    'Editá su contenido en las opciones avanzadas para conservar la organización.',
+                )
+                continue
+            if len(secciones) == 1:
+                seccion = secciones[0]
+                valor_json = seccion.get(clave, [] if tipo == 'hallazgos' else '')
+                originales = [s for s in anteriores if s.get('tipo', '').lower() == tipo]
+                cambio_json = len(originales) != 1 or valor_json != originales[0].get(
+                    clave, [] if tipo == 'hallazgos' else ''
+                )
+                if cambio_simple:
+                    if cambio_json and valor_json != cleaned[campo]:
+                        self.add_error(
+                            campo, 'El campo y el JSON avanzado tienen cambios distintos. '
+                            'Usá el mismo contenido en ambos o modificá solo uno.',
+                        )
+                    else:
+                        seccion[clave] = cleaned[campo]
+                        if tipo == 'hallazgos':
+                            seccion['contenido'] = ''
+                else:
+                    cleaned[campo] = valor_json
+            elif tipo == 'hallazgos' and secciones:
+                cleaned[campo] = [
+                    linea for seccion in secciones for linea in seccion.get('lineas_base', [])
+                ]
+        return cleaned
     
     def save(self, commit=True):
         """Guardar comentarios_base como lista JSON"""
