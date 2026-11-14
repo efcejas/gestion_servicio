@@ -103,6 +103,14 @@
                                 <i class="fas fa-users text-[0.65rem]" aria-hidden="true"></i>
                                 <span>Ver entregas</span>
                             </a>
+                            {% if request.user.is_superuser or request.user.rol == 'jefe_servicio' %}
+                            {% if examen.estado == 'PUBLICADO' or examen.estado == 'CERRADO' %}
+                            <form method="post" action="{% url 'evaluaciones_residentes:eliminar' examen.pk %}" class="inline">
+                                {% csrf_token %}
+                                <button type="button" class="js-abrir-eliminar ml-2 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50" title="Eliminar evaluación" aria-label="Eliminar evaluación" data-titulo="{{ examen.titulo }}"><i class="fas fa-trash-alt text-xs" aria-hidden="true"></i></button>
+                            </form>
+                            {% endif %}
+                            {% endif %}
                             {% endif %}
                         </td>
                     </tr>
@@ -121,15 +129,15 @@
             <div class="min-w-0">
                 <div class="flex items-center gap-4">
                     <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600" aria-hidden="true"><i class="fas fa-trash-alt"></i></span>
-                    <h2 id="modal-eliminar-titulo" class="text-lg font-bold text-gray-900">Eliminar borrador</h2>
+                    <h2 id="modal-eliminar-titulo" class="text-lg font-bold text-gray-900">Eliminar evaluación</h2>
                 </div>
                 <p class="mt-2 text-sm text-gray-600">Vas a eliminar <strong id="modal-eliminar-nombre" class="text-gray-900"></strong>.</p>
-                <p class="mt-2 text-sm text-red-700">También se eliminarán sus preguntas e imágenes. Esta acción no se puede deshacer.</p>
+                <p class="mt-2 text-sm text-red-700">Se eliminarán sus preguntas, imágenes y asignaciones. No se pueden eliminar evaluaciones con intentos. Esta acción no se puede deshacer.</p>
             </div>
         </div>
         <div class="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row sm:justify-end">
             <button id="cancelar-eliminar-borrador" type="button" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-medical-primary hover:bg-gray-50">Cancelar</button>
-            <button id="confirmar-eliminar-borrador" type="button" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"><i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>Eliminar borrador</button>
+            <button id="confirmar-eliminar-borrador" type="button" class="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"><i class="fas fa-trash-alt text-xs" aria-hidden="true"></i>Eliminar evaluación</button>
         </div>
     </div>
 </div>

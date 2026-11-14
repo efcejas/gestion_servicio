@@ -591,6 +591,74 @@ class EvaluacionViewsTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Examen.objects.filter(pk=self.examen.pk).exists())
 
+    def test_jefatura_y_superusuario_pueden_eliminar_publicados_sin_intentos(self):
+        user_model = get_user_model()
+        usuarios = [
+            user_model.objects.create_user(username='jefe-prueba', rol='jefe_servicio', perfil_completo=True),
+            user_model.objects.create_superuser(username='admin-prueba', password='test-pass'),
+        ]
+        for usuario in usuarios:
+            with self.subTest(usuario=usuario.username):
+                examen = Examen.objects.create(
+                    titulo='Evaluación publicada', creador=self.docente,
+                    fecha_apertura=timezone.now(),
+                    fecha_vencimiento=timezone.now() + timedelta(hours=1),
+                    estado=Examen.PUBLICADO,
+                )
+                self.client.force_login(usuario)
+                listado = self.client.get(reverse('evaluaciones_residentes:lista'))
+                self.assertContains(listado, f'aria-label="Eliminar evaluación"')
+                response = self.client.post(reverse('evaluaciones_residentes:eliminar', args=[examen.pk]))
+                self.assertEqual(response.status_code, 302)
+                self.assertFalse(Examen.objects.filter(pk=examen.pk).exists())
+
+    def test_jefe_servicio_no_puede_eliminar_publicado_con_intentos(self):
+        jefe = get_user_model().objects.create_user(
+            username='jefe-con-intentos', rol='jefe_servicio', perfil_completo=True,
+        )
+        self.examen.estado = Examen.PUBLICADO
+        self.examen.save(update_fields=['estado'])
+        intento = IntentoExamen.objects.create(examen=self.examen, residente=self.residente)
+        self.client.force_login(jefe)
+
+        response = self.client.post(
+            reverse('evaluaciones_residentes:eliminar', args=[self.examen.pk]), follow=True,
+        )
+
+        self.assertContains(response, 'No se puede eliminar una evaluación con intentos registrados.')
+        self.assertTrue(Examen.objects.filter(pk=self.examen.pk).exists())
+        self.assertTrue(IntentoExamen.objects.filter(pk=intento.pk).exists())
+
+    def test_jefe_residentes_no_puede_eliminar_publicado(self):
+        jefe = get_user_model().objects.create_user(
+            username='jefe-residentes', rol='jefe_residentes', perfil_completo=True,
+        )
+        self.examen.estado = Examen.PUBLICADO
+        self.examen.save(update_fields=['estado'])
+        self.client.force_login(jefe)
+
+        listado = self.client.get(reverse('evaluaciones_residentes:lista'))
+        self.assertNotContains(listado, 'aria-label="Eliminar evaluación"')
+        response = self.client.post(
+            reverse('evaluaciones_residentes:eliminar', args=[self.examen.pk]), follow=True,
+        )
+
+        self.assertContains(response, 'Solo el jefe de servicio o un superusuario puede eliminar evaluaciones publicadas.')
+        self.assertTrue(Examen.objects.filter(pk=self.examen.pk).exists())
+
+    def test_eliminar_publicado_requiere_post(self):
+        jefe = get_user_model().objects.create_user(
+            username='jefe-get', rol='jefe_servicio', perfil_completo=True,
+        )
+        self.examen.estado = Examen.PUBLICADO
+        self.examen.save(update_fields=['estado'])
+        self.client.force_login(jefe)
+
+        response = self.client.get(reverse('evaluaciones_residentes:eliminar', args=[self.examen.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Examen.objects.filter(pk=self.examen.pk).exists())
+
     def test_docente_puede_crear_borrador(self):
         self.client.force_login(self.docente)
         datos = {
@@ -670,6 +738,22 @@ class EvaluacionViewsTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.examen.refresh_from_db()
         self.assertIsNotNone(self.examen.iniciado_en)
+
+    def test_iniciar_manual_anticipado_muestra_examen_en_curso(self):
+        self.client.force_login(self.docente)
+        self.examen.estado = Examen.PUBLICADO
+        self.examen.modo_inicio = Examen.INICIO_MANUAL
+        self.examen.fecha_apertura = timezone.now() + timedelta(minutes=30)
+        self.examen.save(update_fields=['estado', 'modo_inicio', 'fecha_apertura'])
+
+        response = self.client.post(
+            reverse('evaluaciones_residentes:iniciar_examen', args=[self.examen.pk]), follow=True,
+        )
+
+        self.assertContains(response, 'Examen iniciado. Los residentes ya pueden rendirlo.')
+        self.assertContains(response, 'En curso')
+        self.examen.refresh_from_db()
+        self.assertEqual(self.examen.estado_operativo, 'En curso')
 
     def test_docente_puede_finalizar_examen_en_curso(self):
         self.client.force_login(self.docente)

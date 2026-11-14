@@ -125,9 +125,8 @@ class Examen(models.Model):
         if not usuario.es_residente_activo():
             return False
         asignado = self.destinatarios_asignados.filter(residente=usuario).exists()
-        if not asignado or not (self.fecha_apertura <= ahora < self.fecha_vencimiento):
-            return False
-        if self.modo_inicio == self.INICIO_MANUAL and self.iniciado_en is None:
+        apertura = self.iniciado_en if self.modo_inicio == self.INICIO_MANUAL else self.fecha_apertura
+        if not asignado or apertura is None or not (apertura <= ahora < self.fecha_vencimiento):
             return False
         return True
 
@@ -140,9 +139,8 @@ class Examen(models.Model):
         if self.estado == self.ARCHIVADO:
             return 'Archivado'
         ahora = timezone.now()
-        if self.fecha_apertura > ahora:
-            return 'Programado'
-        if self.modo_inicio == self.INICIO_MANUAL and self.iniciado_en is None:
+        apertura = self.iniciado_en if self.modo_inicio == self.INICIO_MANUAL else self.fecha_apertura
+        if apertura is None or apertura > ahora:
             return 'Programado'
         if self.estado == self.PUBLICADO and self.fecha_vencimiento > ahora:
             return 'En curso'

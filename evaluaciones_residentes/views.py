@@ -611,5 +611,5 @@ def eliminar(request, examen_id):
     except EvaluacionError as exc:
         messages.error(request, str(exc))
         return redirect('evaluaciones_residentes:lista')
-    messages.success(request, 'Borrador eliminado.')
+    messages.success(request, 'Evaluación eliminada.')
     return redirect('evaluaciones_residentes:lista')

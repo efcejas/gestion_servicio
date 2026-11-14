@@ -236,16 +236,19 @@ def recuperar_intento(intento, usuario, motivo, ahora=None):
 
 
 def eliminar_borrador(examen, usuario):
-    """Elimina un borrador y sus archivos asociados de forma controlada."""
+    """Elimina un borrador o una evaluación sin intentos autorizada por jefatura."""
     if not _puede_gestionar_examen(usuario, examen):
         raise PermisoEvaluacionError('El usuario no puede eliminar este examen.')
-    if examen.estado != Examen.BORRADOR:
-        raise TransicionEvaluacionError('Solo se pueden eliminar evaluaciones en borrador.')
 
     with transaction.atomic():
         examen = Examen.objects.select_for_update().get(pk=examen.pk)
         if examen.estado != Examen.BORRADOR:
-            raise TransicionEvaluacionError('Solo se pueden eliminar evaluaciones en borrador.')
+            if not (usuario.is_superuser or usuario.rol == 'jefe_servicio'):
+                raise PermisoEvaluacionError('Solo el jefe de servicio o un superusuario puede eliminar evaluaciones publicadas.')
+            if examen.estado not in {Examen.PUBLICADO, Examen.CERRADO}:
+                raise TransicionEvaluacionError('No se puede eliminar esta evaluación.')
+            if examen.intentos.exists():
+                raise TransicionEvaluacionError('No se puede eliminar una evaluación con intentos registrados.')
 
         preguntas = list(examen.preguntas.prefetch_related('imagenes').all())
         for pregunta in preguntas:
@@ -258,12 +261,14 @@ def eliminar_borrador(examen, usuario):
 
 def iniciar_intento(examen, residente, ahora=None):
     ahora = ahora or timezone.now()
-    if not examen.esta_disponible_para(residente, ahora=ahora):
-        raise EvaluacionNoDisponibleError('El examen no está disponible para este residente.')
-
     try:
         with transaction.atomic():
+            examen = Examen.objects.select_for_update().get(pk=examen.pk)
+            if not examen.esta_disponible_para(residente, ahora=ahora):
+                raise EvaluacionNoDisponibleError('El examen no está disponible para este residente.')
             return IntentoExamen.objects.create(examen=examen, residente=residente)
+    except Examen.DoesNotExist as exc:
+        raise EvaluacionNoDisponibleError('El examen ya no está disponible.') from exc
     except IntegrityError as exc:
         raise TransicionEvaluacionError('El residente ya tiene un intento para este examen.') from exc
 
