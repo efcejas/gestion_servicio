@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from dictado_informes.models import PlantillaEstructurada
+from dictado_informes.models import PlantillaEstructurada, TrazaAgenteDictado
 
 
 User = get_user_model()
@@ -190,3 +190,48 @@ class DictadoPilotoAccessTests(TestCase):
         response = self.client.get(reverse('dictado_informes:plantilla_estructurada_update', args=[plantilla_privada.pk]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_eliminar_plantilla_borra_registro_y_conserva_traza(self):
+        self.client.force_login(self.piloto)
+        plantilla = PlantillaEstructurada.objects.create(
+            codigo='PROPIA_ELIMINAR', nombre='Plantilla propia <strong>temporal</strong>',
+            titulo='RM DE RODILLA', seccion_tecnica='', comentarios_base=['Ligamentos conservados.'],
+            creada_por=self.piloto, origen='user', compartida=False,
+        )
+        traza = TrazaAgenteDictado.objects.create(
+            usuario=self.piloto, plantilla_seleccionada=plantilla,
+            codigo_plantilla=plantilla.codigo, origen_seleccion='usuario_confirmada',
+        )
+        url = reverse('dictado_informes:plantilla_estructurada_delete', args=[plantilla.pk])
+        confirmacion = self.client.get(url)
+        self.assertEqual(confirmacion.status_code, 200)
+        self.assertTrue(PlantillaEstructurada.objects.filter(pk=plantilla.pk).exists())
+        response = self.client.post(url, follow=True)
+        self.assertRedirects(response, reverse('dictado_informes:plantilla_estructurada_list'))
+        self.assertFalse(PlantillaEstructurada.objects.filter(codigo='PROPIA_ELIMINAR').exists())
+        traza.refresh_from_db()
+        self.assertIsNone(traza.plantilla_seleccionada_id)
+        self.assertEqual(traza.codigo_plantilla, 'PROPIA_ELIMINAR')
+        self.assertEqual(traza.origen_seleccion, 'usuario_confirmada')
+        self.assertContains(response, 'eliminada definitivamente')
+        self.assertContains(response, '&lt;strong&gt;temporal&lt;/strong&gt;')
+        self.assertNotContains(response, '<strong>temporal</strong>')
+        self.assertContains(confirmacion, 'Eliminar definitivamente')
+        self.assertNotContains(confirmacion, 'Sí, desactivar plantilla')
+
+    def test_eliminar_restringido_al_propietario_o_superuser(self):
+        plantilla = PlantillaEstructurada.objects.get(codigo='PRIVADA_OTRO')
+        url = reverse('dictado_informes:plantilla_estructurada_delete', args=[plantilla.pk])
+        self.client.force_login(self.piloto)
+        for compartida in (False, True):
+            plantilla.compartida = compartida
+            plantilla.save()
+            self.assertEqual(self.client.get(url).status_code, 404)
+            self.assertEqual(self.client.post(url).status_code, 404)
+            self.assertTrue(PlantillaEstructurada.objects.filter(pk=plantilla.pk).exists())
+        plantilla.activa = False
+        plantilla.save()
+        self.client.force_login(self.superuser)
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse('dictado_informes:plantilla_estructurada_list'))
+        self.assertFalse(PlantillaEstructurada.objects.filter(codigo='PRIVADA_OTRO').exists())

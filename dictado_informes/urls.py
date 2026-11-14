@@ -48,6 +48,7 @@ urlpatterns = [
     path('metricas/api/anomalias/', views_dashboard.api_anomalias, name='api_anomalias'),
     
     # API
+    path('api/plantilla-inexistente/', views.plantilla_inexistente_api, name='plantilla_inexistente'),
     path('api/plantilla/<int:pk>/', views.obtener_plantilla, name='obtener_plantilla'),
     path('api/transcribir-whisper/', views.transcribir_audio_whisper, name='transcribir_whisper'),
     path('api/mejorar-texto/', views.mejorar_texto_ia, name='mejorar_texto'),

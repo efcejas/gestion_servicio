@@ -529,3 +529,43 @@ class AIServiceStructuredOutputTest(TestCase):
         self.assertEqual(response_format['type'], 'json_schema')
         self.assertTrue(response_format['json_schema']['strict'])
         self.assertEqual(response_format['json_schema']['schema'], schema)
+        self.assertEqual(resultado['model_used'], 'modelo-prueba')
+        self.assertEqual(resultado['provider'], 'openai')
+
+    def test_fallback_groq_se_informa_como_proveedor_usado(self):
+        servicio = AIService.__new__(AIService)
+        servicio.llm_enabled = True
+        servicio.llm_client = MagicMock()
+        servicio.llm_provider = 'openai'
+        servicio.llm_model = 'modelo-principal'
+        servicio.llm_fallback_model = None
+        servicio.llm_reasoning_effort = None
+        servicio._crear_chat_completion_openai = MagicMock(
+            side_effect=RuntimeError('fallo simulado'),
+        )
+        servicio.groq_fallback = MagicMock()
+        servicio.groq_fallback.chat.completions.create.return_value = SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"resultado": "ok"}',
+                        refusal=None,
+                    )
+                )
+            ]
+        )
+
+        resultado = servicio.generate_structured_json(
+            messages=[{'role': 'user', 'content': 'Prueba'}],
+            schema={
+                'type': 'object',
+                'additionalProperties': False,
+                'properties': {'resultado': {'type': 'string'}},
+                'required': ['resultado'],
+            },
+            schema_name='respuesta_prueba',
+        )
+
+        self.assertEqual(resultado['data'], {'resultado': 'ok'})
+        self.assertEqual(resultado['model_used'], 'llama-3.3-70b-versatile')
+        self.assertEqual(resultado['provider'], 'groq')
