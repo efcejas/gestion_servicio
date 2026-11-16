@@ -1,6 +1,7 @@
 """Una poblacion conciliada para indicadores, graficos y PDF del tablero."""
 from collections import Counter, defaultdict
 from datetime import timedelta
+from itertools import chain
 
 from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_time
@@ -100,7 +101,7 @@ def _resto_ranking(conteo):
     return [{'nombre': nombre, 'total': total} for nombre, total in conocidos[10:]]
 
 
-def _poblacion(seleccion, modalidades, produccion_dashboard=None):
+def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anteriores=None):
     seleccion = seleccion.copy()
     validacion_id = seleccion.pop('validacion_id', None)
     dashboard_global = seleccion.pop('dashboard_global', False)
@@ -158,6 +159,13 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None):
     aliases_medicos = _aliases_medicos_por_estudios(practicas, eges, netterm)
     nombres_os = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
     coberturas = construir_equivalencias_coberturas(practicas, eges, netterm, nombres_os)
+    practicas_anteriores = []
+    desde, hasta = seleccion.get('fecha_desde'), seleccion.get('fecha_hasta')
+    if filas_anteriores is not None and desde and hasta:
+        desde_previo = desde - timedelta(days=(hasta - desde).days + 1)
+        practicas_anteriores = [item for item in practicas
+                               if desde_previo <= item['fecha_produccion'] < desde
+                               and (modalidades is None or item['fila']['modalidad'] in modalidades)]
     if validacion_id or dashboard_global:
         desde, hasta = seleccion.get('fecha_desde'), seleccion.get('fecha_hasta')
         practicas = [item for item in practicas
@@ -176,7 +184,7 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None):
     resultado['aporte_netterm_aplicado'] = sum(unidades_practica(item) for item in practicas
                                              if item['fuente'] == 'NETTERM')
     filas = []
-    for item in practicas:
+    for item in chain(practicas, practicas_anteriores):
         fila = item['fila']
         original = eges.get(fila['id']) if 'fecha_turno' in fila else None
         nt_fila = item.get('netterm', fila)
@@ -214,7 +222,9 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None):
             'practica': fila['practica'],
         }
         # Las unidades comparten los mismos datos de lectura para los gráficos.
-        filas.extend([fila_estadistica] * unidades_practica(item))
+        destino = (filas_anteriores if filas_anteriores is not None and desde
+                   and item['fecha_produccion'] < desde else filas)
+        destino.extend([fila_estadistica] * unidades_practica(item))
     return resultado, filas
 
 
@@ -267,7 +277,9 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
     if dashboard_global:
         from .services_dashboard import construir_produccion_dashboard
         produccion_dashboard = construir_produccion_dashboard(incluir_netterm=incluir_netterm)
-    produccion, filas = _poblacion(seleccion, modalidades, produccion_dashboard)
+    anteriores = []
+    produccion, filas = _poblacion(seleccion, modalidades, produccion_dashboard,
+                                 anteriores if dashboard_global else None)
     kpis = _indicadores(filas, fecha_desde, fecha_hasta)
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
     conteo = Counter(fila['modalidad'] for fila in filas)
@@ -305,14 +317,13 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
                                   if tipo == mod and medico == nombre)
                               for nombre, _ in medicos]} for mod in mods]
     previo = None
-    anteriores = []
     periodo_anterior = None
     if fecha_desde and fecha_hasta:
         hasta_previo = fecha_desde - timedelta(days=1)
         desde_previo = fecha_desde - timedelta(days=(fecha_hasta - fecha_desde).days + 1)
         periodo_anterior = {'desde': desde_previo.isoformat(), 'hasta': hasta_previo.isoformat()}
-        _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades,
-                                  produccion_dashboard)
+        if not dashboard_global:
+            _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades)
         if anteriores:
             previo = _indicadores(anteriores, desde_previo, hasta_previo)
     comparativa = {'hay_datos_anterior': previo is not None,

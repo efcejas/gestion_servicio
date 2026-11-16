@@ -1171,6 +1171,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // ── Estado inicial ───────────────────────────────────────────────────────
+    document.querySelectorAll('.modalidad-check').forEach(checkbox => {
+        checkbox.checked = ['TC', 'ECO'].includes(checkbox.value);
+    });
     actualizarBotonesAgrupacion('agrup-mes');
     actualizarBotonesTipo('line');
     actualizarEstilosModalidad();

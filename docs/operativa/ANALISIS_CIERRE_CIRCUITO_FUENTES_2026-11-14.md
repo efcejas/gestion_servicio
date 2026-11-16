@@ -661,3 +661,21 @@ aprobó visualmente el modal de espera con fondo translúcido y reloj de agujas
 animadas. El indicador cubre espera y procesamiento y se cierra al resolver la
 consulta. Respeta movimiento reducido. El usuario solicitó commit y push para
 realizar personalmente el despliegue en Heroku y la comprobación en producción.
+
+## Prueba local de TC y ECO y comparación compartida
+
+La apertura del tablero selecciona TC y ECO en el período inicial de tres meses.
+Las otras modalidades y «Todas» siguen disponibles. Para conservar equivalencias
+históricas, su contexto se sigue consultando una vez. El período actual y el
+anterior comparten las equivalencias de identidad, profesionales y coberturas.
+Las filas para gráficos se preparan sólo para las modalidades seleccionadas y
+los dos intervalos. La vía de selección explícita conserva su comportamiento.
+
+Se comparó la respuesta completa contra el commit desplegado con una copia en
+memoria de la base habitual. Las tres selecciones produjeron respuestas idénticas.
+TC y ECO en agosto-octubre, sólo EGES, pasó de 4,71 a 2,94 segundos. TC y ECO en
+octubre con aporte aprobado pasó de 5,37 a 3,56 segundos. Todas las modalidades
+de octubre con aporte aprobado pasaron de 5,76 a 3,48 segundos. Son mediciones
+locales y el rendimiento en Heroku requiere verificación posterior. Pasaron
+47 pruebas focales, la sintaxis JavaScript y git diff --check. Cambios locales
+pendientes de la prueba visual solicitada por el usuario.
