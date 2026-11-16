@@ -679,3 +679,25 @@ de octubre con aporte aprobado pasaron de 5,76 a 3,48 segundos. Son mediciones
 locales y el rendimiento en Heroku requiere verificación posterior. Pasaron
 47 pruebas focales, la sintaxis JavaScript y git diff --check. Cambios locales
 pendientes de la prueba visual solicitada por el usuario.
+
+## Medición por etapas
+
+Se incorporó rendimiento.py para registrar las etapas inicio, producción,
+lectura_contexto, identidades, medicos, coberturas, filas_graficos e indicadores.
+Cada registro incluye una referencia aleatoria por cálculo, PID, duración de
+etapa y acumulada, memoria residente actual y pico del proceso en MiB. Los campos
+son técnicos y agregados. Se usa el logger django.eges_import.rendimiento que
+hereda la salida de consola configurada para Django.
+
+La lectura utiliza GetProcessMemoryInfo en Windows y /proc/self/status en Linux.
+Si la métrica de memoria no está disponible, registra None y conserva los tiempos.
+El pico corresponde a la vida del proceso y las muestras de memoria reflejan
+el proceso completo. Los tiempos abarcan la preparación de estadísticas hasta
+los indicadores y excluyen transmisión HTTP y serialización de JsonResponse.
+
+En la comprobación local con copia en memoria de la base, el cálculo marcó
+5,31 segundos. La producción llevó 1,97 segundos y la lectura de contexto 1,15.
+En esa lectura la memoria residente pasó aproximadamente de 204 a 296 MiB.
+Es una observación local cuya magnitud requiere contrastar en Heroku. Pasaron
+47 pruebas focales y se verificaron la lectura Linux y su fallo controlado.
+La instrumentación queda local, pendiente de publicación.

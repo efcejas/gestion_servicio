@@ -13,6 +13,7 @@ from .services_unidades import unidades_practica
 from .services_identificacion import _identidades_netterm
 from .services_conciliacion import _profesional
 from .services_coberturas import clave_cobertura, construir_equivalencias_coberturas
+from .rendimiento import MedicionEstadisticas
 
 
 COLORES = {'TC': '#3b82f6', 'RM': '#9333ea', 'RX': '#22c55e', 'DX': '#f97316',
@@ -101,7 +102,7 @@ def _resto_ranking(conteo):
     return [{'nombre': nombre, 'total': total} for nombre, total in conocidos[10:]]
 
 
-def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anteriores=None):
+def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anteriores=None, medicion=None):
     seleccion = seleccion.copy()
     validacion_id = seleccion.pop('validacion_id', None)
     dashboard_global = seleccion.pop('dashboard_global', False)
@@ -138,6 +139,8 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anterior
     else:
         resultado = construir_preview_produccion(**seleccion, permitir_fuente_unica=True, incluir_practicas=True)
     practicas = resultado.pop('practicas')
+    if medicion:
+        medicion.marcar('produccion')
     eges_ids = {item['fila']['id'] for item in practicas if 'fecha_turno' in item['fila']}
     netterm_ids = {item.get('netterm', item['fila'])['id'] for item in practicas
                    if item.get('netterm') or 'fecha_pedido' in item['fila']}
@@ -155,10 +158,18 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anterior
                 cobertura = cobertura.get('valor')
             datos['cobertura'] = str(cobertura or '').strip()
         netterm[origen.pk] = datos
+    if medicion:
+        medicion.marcar('lectura_contexto')
     identidades_netterm = _identidades_netterm(eges, netterm)
+    if medicion:
+        medicion.marcar('identidades')
     aliases_medicos = _aliases_medicos_por_estudios(practicas, eges, netterm)
+    if medicion:
+        medicion.marcar('medicos')
     nombres_os = dict(NombreObraSocial.objects.values_list('codigo', 'nombre'))
     coberturas = construir_equivalencias_coberturas(practicas, eges, netterm, nombres_os)
+    if medicion:
+        medicion.marcar('coberturas')
     practicas_anteriores = []
     desde, hasta = seleccion.get('fecha_desde'), seleccion.get('fecha_hasta')
     if filas_anteriores is not None and desde and hasta:
@@ -225,6 +236,8 @@ def _poblacion(seleccion, modalidades, produccion_dashboard=None, filas_anterior
         destino = (filas_anteriores if filas_anteriores is not None and desde
                    and item['fecha_produccion'] < desde else filas)
         destino.extend([fila_estadistica] * unidades_practica(item))
+    if medicion:
+        medicion.marcar('filas_graficos')
     return resultado, filas
 
 
@@ -273,13 +286,14 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
         seleccion['validacion_id'] = validacion_id
     if dashboard_global:
         seleccion.update(dashboard_global=True, incluir_netterm=incluir_netterm)
+    medicion = MedicionEstadisticas()
     produccion_dashboard = None
     if dashboard_global:
         from .services_dashboard import construir_produccion_dashboard
         produccion_dashboard = construir_produccion_dashboard(incluir_netterm=incluir_netterm)
     anteriores = []
     produccion, filas = _poblacion(seleccion, modalidades, produccion_dashboard,
-                                 anteriores if dashboard_global else None)
+                                 anteriores if dashboard_global else None, medicion=medicion)
     kpis = _indicadores(filas, fecha_desde, fecha_hasta)
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
     conteo = Counter(fila['modalidad'] for fila in filas)
@@ -323,7 +337,8 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
         desde_previo = fecha_desde - timedelta(days=(fecha_hasta - fecha_desde).days + 1)
         periodo_anterior = {'desde': desde_previo.isoformat(), 'hasta': hasta_previo.isoformat()}
         if not dashboard_global:
-            _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades)
+            _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades,
+                                      medicion=medicion)
         if anteriores:
             previo = _indicadores(anteriores, desde_previo, hasta_previo)
     comparativa = {'hay_datos_anterior': previo is not None,
@@ -348,6 +363,7 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
     fuente = 'EGES + Netterm' if batch_eges_ids and lote_netterm_ids else 'EGES' if batch_eges_ids else 'Netterm'
     if dashboard_global:
         fuente = 'EGES + aporte Netterm validado' if incluir_netterm else 'EGES'
+    medicion.marcar('indicadores')
     return {
         'kpis': kpis,
         'temporal': {'labels': [periodo.strftime(formato) for periodo in periodos], 'datasets': datasets},
