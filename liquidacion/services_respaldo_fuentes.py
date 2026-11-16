@@ -85,7 +85,7 @@ def _medico_coincide(medico, nombres):
 def _snapshot_linea_respaldo(sesion, registro, relacion, linea, firma_fuentes):
     estudio = relacion.estudio
     snapshot = {
-        'version_reglas': 'RESPALDO_ORIGEN_V1',
+        'version_reglas': 'RESPALDO_REALIZADO_INFORMADO_V2',
         'firma_fuentes': firma_fuentes,
         'sesion_id': sesion.pk,
         'registro_id': registro.pk,
@@ -123,7 +123,6 @@ def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_i
     registros = list(registros_qs)
     preview = construir_preview_conciliacion(
         batch_eges_ids=batch_eges_ids, lote_netterm_ids=lote_netterm_ids,
-        fecha_desde=desde, fecha_hasta=hasta,
     )
     eg_datos = {f['id']: f for caso in preview['resultados'] for f in caso['eges']}
     nt_casos = {c['netterm']['id']: c for c in preview['resultados'] if c['netterm']}
@@ -132,19 +131,32 @@ def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_i
     nt_medicos = {f.pk: (f.normalizados_json.get('informante'),)
                   for f in NettermFila.objects.filter(pk__in=nt_casos).only('pk', 'normalizados_json')}
     indice = defaultdict(list)
+    fechas_realizacion = {
+        caso['eges'][0]['id']: caso['netterm']['fecha_realizacion']
+        for caso in nt_casos.values()
+        if caso['identidad_coincidente'] and not caso['contradiccion_anulacion']
+        and not caso['netterm']['vigencia_incierta']
+        and realizada_netterm(caso['netterm']) and caso['netterm']['fecha_realizacion']
+    }
     for fila in eg_datos.values():
-        indice[(fila['paciente_clave'], fila['fecha_turno'])].append({
+        fecha = fechas_realizacion.get(fila['id'], fila['fecha_turno'])
+        if not fecha or not desde <= fecha <= hasta:
+            continue
+        indice[(fila['paciente_clave'], fecha)].append({
             **fila, 'origen': 'EGES', 'nombres': eg_medicos[fila['id']],
-            'realizada': realizada_eges(fila),
+            'realizada': realizada_eges(fila) and _texto_normalizado(fila['estado']) == 'INFORMADO',
             'bloqueada': _texto_normalizado(fila['estado']) in {'ANULADO', 'CANCELADO'},
             'eges_vinculado': fila['id'],
         })
     for caso in nt_casos.values():
         fila = caso['netterm']
+        fecha = fila['fecha_realizacion']
+        if not fecha or not desde <= fecha <= hasta:
+            continue
         modalidad = 'ECO' if fila['modalidad'] in {'ECO_GENERAL', 'DOP', 'ECOCAR'} else fila['modalidad']
-        indice[(fila['paciente_clave'], fila['fecha_pedido'])].append({
+        indice[(fila['paciente_clave'], fecha)].append({
             **fila, 'modalidad': modalidad, 'origen': 'NETTERM', 'nombres': nt_medicos[fila['id']],
-            'realizada': realizada_netterm(fila),
+            'realizada': realizada_netterm(fila) and fila['estado'] == 'DEFINITIVO',
             'bloqueada': (fila['vigencia_incierta'] or fila['anulado'] or caso['contradiccion_anulacion']
                           or caso['estado'] == 'AMBIGUO'
                           or (caso['estado'] == 'CONFLICTO' and not caso['identidad_coincidente'])),
@@ -250,7 +262,7 @@ def construir_preview_respaldo_fuentes(*, sesion, batch_eges_ids, lote_netterm_i
         resultados = [r for r in resultados if r['estado_respaldo'] == filtros['estado_respaldo']]
     resumen = Counter(r['estado_respaldo'] for r in resultados)
     return {
-        'version_reglas': 'RESPALDO_ORIGEN_V1', 'sesion': sesion, 'resultados': resultados,
+        'version_reglas': 'RESPALDO_REALIZADO_INFORMADO_V2', 'sesion': sesion, 'resultados': resultados,
         'resumen': dict(resumen), 'total': len(resultados), 'modifica_valores_economicos': False,
         'firma_fuentes': preview['firma_snapshot'],
         'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],

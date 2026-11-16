@@ -7,6 +7,7 @@ desde vistas, management commands y tests sin levantar un servidor.
 """
 from datetime import date as date_type, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 import hashlib
 import os
 import unicodedata
@@ -41,11 +42,18 @@ def _normalizar_header(valor):
     return ' '.join(texto.split())
 
 
+_NO_ESPECIFICADO_NORMALIZADO = frozenset(_normalizar_header(item) for item in NO_ESPECIFICADO)
+
+
 def _valor_valido(valor):
     if not valor:
         return False
-    texto = _normalizar_header(str(valor).strip(' ,;.-'))
-    return texto not in {_normalizar_header(item) for item in NO_ESPECIFICADO}
+    return _texto_valido(str(valor).strip(' ,;.-'))
+
+
+@lru_cache(maxsize=4096)
+def _texto_valido(texto):
+    return _normalizar_header(texto) not in _NO_ESPECIFICADO_NORMALIZADO
 
 
 def _texto(valor):
@@ -137,7 +145,7 @@ def leer_encabezados_eges(archivo):
     return headers
 
 
-def _indice(headers, principal, alternativas=None):
+def _indice(headers, principal, alternativas=None, *, coincidencia_parcial=True):
     alternativas = alternativas or []
     buscados = [_normalizar_header(principal), *[_normalizar_header(a) for a in alternativas]]
     normalizados = [_normalizar_header(h) for h in headers]
@@ -146,6 +154,8 @@ def _indice(headers, principal, alternativas=None):
         for idx, header in enumerate(normalizados):
             if header == buscado:
                 return idx
+    if not coincidencia_parcial:
+        return None
     for buscado in buscados:
         for idx, header in enumerate(normalizados):
             if buscado and buscado in header:
@@ -173,7 +183,11 @@ def procesar_excel_eges(archivo, batch):
     print(f"[EGES] Encabezados encontrados: {len(headers)} columnas")
     print(f"[EGES] Columnas: {headers[:8]}...")
 
-    idx_nro_turno = _indice(headers, 'Nro. Turno', ['Turno', 'Número'])
+    idx_nro_turno = _indice(
+        headers, 'Nro. Turno',
+        ['Nro Turno', 'Numero Turno', 'Numero de Turno', 'Turno', 'Número'],
+        coincidencia_parcial=False,
+    )
     idx_protocolo = _indice(headers, 'Protocolo')
     idx_dni = _indice(headers, 'Dni', ['DNI', 'Documento'])
     idx_numero_afiliado = _indice(headers, 'Numero Afiliado', ['Número Afiliado', 'Nro Afiliado'])

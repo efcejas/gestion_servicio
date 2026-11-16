@@ -11,6 +11,7 @@ urlpatterns = [
     path('netterm/guardar/', views.guardar_netterm, name='guardar_netterm'),
     path('netterm/lotes/', views.lista_lotes_netterm, name='lista_lotes_netterm'),
     path('conciliacion/preview/', views.preview_conciliacion, name='preview_conciliacion'),
+    path('produccion/validar/', views.validar_produccion, name='validar_produccion'),
     path('conciliacion/revisar/', views.guardar_revision_conciliacion, name='guardar_revision_conciliacion'),
     path('batch/<int:batch_id>/', views.detalle_batch, name='detalle_batch'),
 

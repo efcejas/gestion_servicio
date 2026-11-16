@@ -17,7 +17,7 @@ from openpyxl import load_workbook
 from liquidacion.grupo_tarifario_mapping import es_eco_general_real, es_estudio_cardiologico
 
 
-VERSION_PARSER_NETTERM = 'NETTERM_37_V3'
+VERSION_PARSER_NETTERM = 'NETTERM_37_V6'
 MAX_BYTES_NETTERM = 10 * 1024 * 1024
 MAX_FILAS_NETTERM = 20000
 ENCABEZADOS_NETTERM = (
@@ -96,9 +96,9 @@ def clasificar_fila_netterm(nombre, codigo, servicio=''):
 
 
 def _modalidad_eco(nombre, codigo):
-    if es_estudio_cardiologico('ECO', nombre, codigo):
-        return 'ECOCAR'
     nombre_normalizado = _normalizado(nombre)
+    if 'ECOESTRES' in nombre_normalizado.replace(' ', '') or es_estudio_cardiologico('ECO', nombre, codigo):
+        return 'ECOCAR'
     if any(patron in nombre_normalizado for patron in ('DOPPLER', 'DUPLEX')):
         return 'DOP'
     if any(patron in nombre_normalizado for patron in ('ECOGRAF', 'ECO ')) and es_eco_general_real(
@@ -211,6 +211,7 @@ def preparar_preview_netterm(archivo):
                     'pedido': pedido, 'practica': practica,
                     'tipo_nomenclador': _texto(valores[35]), 'codigo_nomenclador': codigo,
                     'historia_clinica': _texto(valores[4]), 'tipo_documento': _texto(valores[6]),
+                    'cobertura': _texto(valores[13]), 'plan': _texto(valores[14]),
                     'documento': _texto(valores[7]), 'paciente': _texto(valores[5]),
                     'marca_atencion_original': _texto(valores[3]), 'sector': _texto(valores[18]),
                     'urgencia_original': _texto(valores[19]), 'numero_visual': _texto(valores[26]),

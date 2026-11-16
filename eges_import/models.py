@@ -5,6 +5,29 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 
+class ProduccionValidada(models.Model):
+    """Resultado aprobado y reproducible de una selección de fuentes."""
+
+    firma = models.CharField(max_length=64, unique=True)
+    firma_fuentes = models.CharField(max_length=64)
+    lotes_eges_ids = models.JSONField(default=list)
+    lotes_netterm_ids = models.JSONField(default=list)
+    fecha_desde = models.DateField()
+    fecha_hasta = models.DateField()
+    decisiones_json = models.JSONField(default=dict)
+    resultado_json = models.JSONField(default=dict)
+    confirmado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    fecha_confirmacion = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-fecha_confirmacion', '-pk']
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValidationError('Las producciones confirmadas son inmutables.')
+        return super().save(*args, **kwargs)
+
+
 class ImportBatch(models.Model):
     """
     Representa un lote de importación de datos EGES.
@@ -295,10 +318,16 @@ class EgesRow(models.Model):
         if re.match(r'^3\d{6}', codigo):
             return True
 
+        descripcion_principal = (self.practica or self.servicio or '').strip().upper()
+        if re.match(r'^(?:MEGLUMINA|DIATRIZOATO|IOPAMIRON|ISOSORBIDA|DILTIAZEM|PROPRANOLOL)\b', descripcion_principal):
+            return True
+
         texto = f"{self.practica or ''} {self.servicio or ''}".upper()
 
         if self.clasificar_modalidad() != 'OTROS':
             texto = re.sub(r'\b(?:CON|SIN)\s+CONTRASTE\b|\b[CS]/\s*CONTRASTE\b', '', texto)
+            if re.match(r'^(?:TAC|TC|TOMOGRAF[IÍ]A|ANGIOTAC|ANGIOTOMOGRAF[IÍ]A|RM|RMN|RESONANCIA|ANGIORESONANCIA)\b', descripcion_principal):
+                texto = re.sub(r'\bCONTRASTE\b', '', texto)
 
         keywords_insumo = [
             # Contrastes

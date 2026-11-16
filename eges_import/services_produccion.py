@@ -1,8 +1,14 @@
 """Produccion respaldada por origen, separada de informes y de cantidades economicas."""
 from collections import Counter
+from datetime import date
+
+from django.core.exceptions import ValidationError
+from django.utils.dateparse import parse_date
 
 from .models import ConciliacionRevision
 from .services_conciliacion import construir_preview_conciliacion, _texto_normalizado
+from .services_procedimientos import MODALIDADES_GUIADAS
+from .services_unidades import aplicar_unidades_rx, unidades_practica
 
 
 ESTADOS_REALIZADOS_EGES = {'INFORMADO', 'FIN PRACTICA', 'ENTREGADO SIN INFORME'}
@@ -13,9 +19,11 @@ ETIQUETAS_PENDIENTES = {
     'netterm_vigencia': 'Netterm: versiones divergentes sin vigencia confirmada',
     'netterm_anulacion_contradictoria': 'Netterm: anulación contradictoria con EGES',
     'netterm_modalidad': 'Netterm: modalidad sin clasificar',
-    'netterm_sin_fecha': 'Netterm: falta fecha de pedido',
+    'netterm_sin_fecha': 'Netterm: falta fecha de realización',
     'netterm_realizacion_sin_confirmar': 'Netterm: realización sin confirmar',
     'netterm_correspondencia': 'Netterm: correspondencia ambigua o incompatible',
+    'eges_informe_sin_confirmar': 'EGES: informe definitivo sin confirmar',
+    'netterm_informe_sin_confirmar': 'Netterm: informe definitivo sin confirmar',
 }
 
 
@@ -55,9 +63,26 @@ def _decisiones_vigentes(preview):
     return vinculos_unicos, rechazos
 
 
-def construir_preview_produccion(*, incluir_practicas=False, **seleccion):
-    preview = construir_preview_conciliacion(**seleccion)
-    vinculos_validados, vinculos_rechazados = _decisiones_vigentes(preview)
+def construir_preview_produccion(*, incluir_practicas=False, preview_conciliado=None, **seleccion):
+    try:
+        desde, hasta = (
+            valor if isinstance(valor, date) else parse_date(str(valor)) if valor else None
+            for valor in (seleccion.get('fecha_desde'), seleccion.get('fecha_hasta'))
+        )
+    except (TypeError, ValueError):
+        raise ValidationError('El período de producción no es válido.') from None
+    if ((seleccion.get('fecha_desde') and not desde)
+            or (seleccion.get('fecha_hasta') and not hasta)
+            or (desde and hasta and desde > hasta)):
+        raise ValidationError('El período de producción no es válido.')
+    # Resolver identidad antes de filtrar permite reconocer un pedido de octubre
+    # realizado en noviembre y evita contarlo en los dos meses.
+    preview = preview_conciliado or construir_preview_conciliacion(**{
+        **seleccion, 'fecha_desde': None, 'fecha_hasta': None,
+    })
+    vinculos_validados, vinculos_rechazados = (
+        _decisiones_vigentes(preview) if preview_conciliado is None else ({}, set())
+    )
     practicas = {}
     pendientes, excluidos = Counter(), Counter()
     estados_eges, estados_netterm = Counter(), Counter()
@@ -97,7 +122,7 @@ def construir_preview_produccion(*, incluir_practicas=False, **seleccion):
             pendientes['netterm_anulacion_contradictoria'] += 1
         elif fila['modalidad'] == 'SIN_CLASIFICAR':
             pendientes['netterm_modalidad'] += 1
-        elif not fila['fecha_pedido']:
+        elif not fila['fecha_realizacion']:
             pendientes['netterm_sin_fecha'] += 1
         elif not realizada_netterm(fila):
             pendientes['netterm_realizacion_sin_confirmar'] += 1
@@ -131,29 +156,77 @@ def construir_preview_produccion(*, incluir_practicas=False, **seleccion):
                 practicas[('NETTERM', netterm_id)] = {
                     'fila': {**fila, 'modalidad': modalidad}, 'incluida': True,
                     'fuente': 'NETTERM', 'informada': fila['estado'] == 'DEFINITIVO',
+                    'sub_modalidad_netterm': fila['modalidad'],
                 }
             else:
                 if rechazado_unico:
                     revisiones_no_vincular_consumidas += 1
                 pendientes['netterm_correspondencia'] += 1
-    incluidos = [p for p in practicas.values() if p['incluida']]
+    incluidos = []
+    for item in practicas.values():
+        if not item['incluida']:
+            continue
+        if not item['informada']:
+            origen = 'eges' if item['fuente'] == 'EGES' else 'netterm'
+            pendientes[f'{origen}_informe_sin_confirmar'] += 1
+            continue
+        fila = item['fila']
+        netterm = item.get('netterm')
+        fecha_produccion = (netterm['fecha_realizacion'] if netterm else
+                            fila.get('fecha_realizacion') or fila.get('fecha_turno'))
+        if not fecha_produccion:
+            pendientes['netterm_sin_fecha'] += 1
+            continue
+        if ((desde and fecha_produccion < desde) or (hasta and fecha_produccion > hasta)):
+            continue
+        if netterm and _texto_normalizado(fila['estado']) != 'INFORMADO':
+            item['fuente'] = 'NETTERM'
+        item['fecha_produccion'] = fecha_produccion
+        modalidad_guiada = MODALIDADES_GUIADAS.get(str(fila['codigo']).removesuffix('/0'))
+        if modalidad_guiada and fila['modalidad'] == modalidad_guiada:
+            item['procedimiento_guiado'] = True
+            item['procedimiento_guiado_modalidad'] = modalidad_guiada
+        incluidos.append(item)
+    incluidos = aplicar_unidades_rx(incluidos)
+    resumen = resumir_practicas_produccion(incluidos)
+    resultado = {
+        'version_reglas': 'PRODUCCION_REALIZADA_INFORMADA_V2', 'provisional': True,
+        'vinculaciones_humanas_consumidas': revisiones_vincular_consumidas,
+        'vinculaciones_rechazadas_consumidas': revisiones_no_vincular_consumidas,
+        **resumen,
+        'pendientes': {k: v for k, v in pendientes.items() if v > 0},
+        'pendientes_detalle': [{'motivo': ETIQUETAS_PENDIENTES[k], 'cantidad': v}
+                              for k, v in pendientes.items() if v > 0],
+        'excluidos': dict(excluidos),
+        'excluidos_detalle': [{'motivo': 'EGES: anuladas' if k == 'eges_anulado' else 'Netterm: anuladas', 'cantidad': v}
+                             for k, v in excluidos.items()],
+        'estados_eges': dict(estados_eges), 'estados_netterm': dict(estados_netterm),
+        'insumos_netterm_excluidos': preview['resumen']['insumos_netterm_excluidos'],
+        'fecha_desde': desde, 'fecha_hasta': hasta,
+        'firma_snapshot': preview['firma_snapshot'],
+        'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],
+    }
+    if incluir_practicas:
+        resultado['practicas'] = incluidos
+    return resultado
+
+
+def resumir_practicas_produccion(incluidos):
     produccion, informadas = Counter(), Counter()
     pacientes = set()
     sin_identidad = 0
     for p in incluidos:
-        produccion[(p['fila']['modalidad'], p['fuente'])] += 1
-        informadas[p['fila']['modalidad']] += p['informada']
+        unidades = unidades_practica(p)
+        produccion[(p['fila']['modalidad'], p['fuente'])] += unidades
+        informadas[p['fila']['modalidad']] += unidades * p['informada']
         if p['fila']['paciente_clave']:
             pacientes.add(p['fila']['paciente_clave'])
         else:
-            sin_identidad += 1
-    total = len(incluidos)
+            sin_identidad += unidades
+    total = sum(unidades_practica(item) for item in incluidos)
     finalizadas = sum(informadas.values())
     modalidades = sorted({m for m, _ in produccion})
-    resultado = {
-        'version_reglas': 'PRODUCCION_RESPALDADA_V1', 'provisional': True,
-        'vinculaciones_humanas_consumidas': revisiones_vincular_consumidas,
-        'vinculaciones_rechazadas_consumidas': revisiones_no_vincular_consumidas,
+    return {
         'total_produccion': total,
         'base_eges': sum(n for (m, f), n in produccion.items() if f == 'EGES'),
         'aporte_netterm': sum(n for (m, f), n in produccion.items() if f == 'NETTERM'),
@@ -167,18 +240,4 @@ def construir_preview_produccion(*, incluir_practicas=False, **seleccion):
              'total': produccion[(m, 'EGES')] + produccion[(m, 'NETTERM')], 'informadas': informadas[m]}
             for m in modalidades
         ],
-        'pendientes': {k: v for k, v in pendientes.items() if v > 0},
-        'pendientes_detalle': [{'motivo': ETIQUETAS_PENDIENTES[k], 'cantidad': v}
-                              for k, v in pendientes.items() if v > 0],
-        'excluidos': dict(excluidos),
-        'excluidos_detalle': [{'motivo': 'EGES: anuladas' if k == 'eges_anulado' else 'Netterm: anuladas', 'cantidad': v}
-                             for k, v in excluidos.items()],
-        'estados_eges': dict(estados_eges), 'estados_netterm': dict(estados_netterm),
-        'insumos_netterm_excluidos': preview['resumen']['insumos_netterm_excluidos'],
-        'fecha_desde': preview['fecha_desde'], 'fecha_hasta': preview['fecha_hasta'],
-        'firma_snapshot': preview['firma_snapshot'],
-        'batch_eges_ids': preview['batch_eges_ids'], 'lote_netterm_ids': preview['lote_netterm_ids'],
     }
-    if incluir_practicas:
-        resultado['practicas'] = incluidos
-    return resultado

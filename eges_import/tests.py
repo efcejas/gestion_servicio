@@ -52,6 +52,34 @@ def _archivo_netterm(filas=None, encabezados=None, nombre_hoja='Netterm'):
 
 
 class PreviewNettermParserTest(SimpleTestCase):
+    def test_tac_con_errata_din_contraste_conserva_la_practica(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'0': 'TOMOGRAFIA', '2': 'TAC CODO DIN CONTRASTE', '36': '901619'}),
+        ]))
+        self.assertFalse(resultado['filas'][0]['es_insumo'])
+        self.assertEqual(resultado['filas'][0]['modalidad'], 'TC')
+
+    def test_meglumina_aislada_se_clasifica_como_insumo(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'0': 'TOMOGRAFIA', '2': 'MEGLUMINA, DIATRIZOATO', '36': '999999'}),
+        ]))
+        self.assertTrue(resultado['filas'][0]['es_insumo'])
+        self.assertEqual(resultado['resumen']['filas_insumos'], 1)
+
+    def test_preserva_cobertura_y_plan_en_campos_normalizados(self):
+        resultado = preparar_preview_netterm(_archivo_netterm([
+            _fila_netterm(**{'13': 'COBERTURA PRUEBA', '14': 'PLAN PRUEBA'}),
+        ]))
+        self.assertEqual(resultado['filas'][0]['cobertura'], 'COBERTURA PRUEBA')
+        self.assertEqual(resultado['filas'][0]['plan'], 'PLAN PRUEBA')
+
+    def test_ecoestrés_pertenece_a_ecocardio(self):
+        for practica in ('ECOESTRESS CON EJERCICIO', 'ECOESTRES CON EJERCICIO', 'ECO ESTRÉS'):
+            with self.subTest(practica=practica):
+                resultado = preparar_preview_netterm(_archivo_netterm([
+                    _fila_netterm(**{'2': practica, '36': '180304'}),
+                ]))
+                self.assertEqual(resultado['filas'][0]['modalidad'], 'ECOCAR')
     def test_preserva_fechas_horas_roles_y_ceros_sin_inventar_cantidad(self):
         archivo = _archivo_netterm()
         resultado = preparar_preview_netterm(archivo)
@@ -214,6 +242,29 @@ class PreviewNettermViewTest(TestCase):
             username='netterm_admin', is_superuser=True, is_staff=True, perfil_completo=True,
         )
         self.url = reverse('eges_import:preview_netterm')
+
+    def test_carga_unica_guarda_muestra_resumen_y_reenvio_es_idempotente(self):
+        self.client.force_login(self.superuser)
+        for intento in range(2):
+            response = self.client.post(self.url, {'archivo': _archivo_netterm(), 'accion': 'cargar'})
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNotNone(response.context['lote_guardado'])
+            self.assertEqual(response.context['lote_creado'], intento == 0)
+            self.assertEqual(NettermLote.objects.count(), 1)
+            self.assertEqual(NettermFila.objects.count(), 1)
+            self.assertContains(response, 'Ir a validar EGES + Netterm')
+            self.assertNotContains(response, 'Selecciona el mismo libro del preview')
+            self.assertNotContains(response, 'name="guardar-archivo"')
+            self.assertIsNone(response.context['guardar_form'])
+        self.assertFalse(EgesRow.objects.exists())
+
+    def test_carga_unica_informa_error_de_guardado(self):
+        self.client.force_login(self.superuser)
+        with patch('eges_import.views.guardar_lote_netterm', side_effect=ValidationError('Guardado rechazado')):
+            response = self.client.post(self.url, {'archivo': _archivo_netterm(), 'accion': 'cargar'})
+        self.assertContains(response, 'Guardado rechazado')
+        self.assertIsNone(response.context['lote_guardado'])
+        self.assertFalse(NettermLote.objects.exists())
 
     def test_preview_anonimo_no_persiste_ni_expone_filas(self):
         from liquidacion.models import RegistroEstudiosPorMedico, SesionContable
@@ -1452,6 +1503,8 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(fila.dni_paciente, '37933118')
         self.assertEqual(fila.historia_clinica, '37933118')
         self.assertEqual(fila.numero_afiliado, '2052113')
+        self.assertEqual(fila.numero_turno, '')
+        self.assertEqual(fila.fecha_turno.isoformat(), '2026-05-01')
         self.assertEqual(fila.apellido_nombre, 'NIZ MICAELA YANINA')
         self.assertEqual(fila.tipo_atencion, 'Ambulatorio')
         self.assertEqual(fila.hora_turno.strftime('%H:%M'), '09:45')
@@ -1464,6 +1517,33 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(fila.tipo_turno, 'Normal')
         self.assertEqual(fila.tipo_paciente, 'Adulto')
         self.assertEqual(fila.region_informe, '-')
+
+    def test_importa_numero_turno_solo_desde_encabezado_explicito(self):
+        for indice, encabezado in enumerate((
+            'Nro. Turno', 'Nro Turno', 'Número Turno', 'Número de Turno', 'Turno', 'Número',
+        )):
+            with self.subTest(encabezado=encabezado):
+                libro = Workbook()
+                hoja = libro.active
+                hoja.append([
+                    'Dni', 'Fecha Turno', 'Numero Afiliado', 'Tipo de turno', encabezado,
+                    'Hora Desde', 'Practica', 'Servicio', 'Estado Turno',
+                ])
+                hoja.append([
+                    str(12000000 + indice), '01/05/2026', 'AF-1', 'Normal', 'T-123',
+                    '09:45', 'ECOGRAFIA COMPLETA DE ABDOMEN', 'Ecografia', 'Informado',
+                ])
+                contenido = BytesIO()
+                libro.save(contenido)
+                libro.close()
+                archivo = SimpleUploadedFile('turno_sintetico.xlsx', contenido.getvalue())
+                batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre=archivo.name)
+                resultado = procesar_excel_eges(archivo, batch)
+                self.assertEqual(resultado['creadas'], 1)
+                fila = batch.filas.get()
+                self.assertEqual(fila.numero_turno, 'T-123')
+                self.assertEqual(fila.numero_afiliado, 'AF-1')
+                self.assertEqual(fila.fecha_turno.isoformat(), '2026-05-01')
 
     def test_aguja_de_biopsia_se_clasifica_como_insumo(self):
         fila = EgesRow(practica='AGUJA DE BIOPSIA', servicio='Ecografia')
@@ -1490,6 +1570,23 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertTrue(EgesRow(
             practica='TOMOGRAFIA DE TORAX CON CONTRASTE', codigo_practica='3005554/0',
         ).clasificar_insumo())
+
+    def test_farmacos_independientes_se_excluyen_aun_sin_codigo(self):
+        for nombre in ('MEGLUMINA,DIATRIZOATO+ASOC. ORAL/RECTAL', 'DIATRIZOATO DE MEGLUMINA',
+                       'IOPAMIRON 370', 'ISOSORBIDA DINITRATO', 'DILTIAZEM', 'PROPRANOLOL CLORHIDRATO INY IV'):
+            with self.subTest(nombre=nombre):
+                self.assertTrue(EgesRow(practica=nombre, servicio='TOMOGRAFIA', equipo='TOMOGRAFO').clasificar_insumo())
+        self.assertFalse(EgesRow(practica='TAC ABDOMEN CON CONTRASTE MEGLUMINA').clasificar_insumo())
+
+    def test_importacion_tc_excluye_meglumina_y_contraste_independientes(self):
+        practicas = ['TAC ABDOMEN CON CONTRASTE', 'TAC CEREBRAL SIN CONTRASTE',
+                     'MEGLUMINA, DIATRIZOATO ORAL', 'CONTRASTE', 'DILTIAZEM']
+        archivo = SimpleUploadedFile('tc_materiales.xlsx', _archivo_practicas_mismo_protocolo_xlsx(practicas))
+        batch = ImportBatch.objects.create(usuario=self.user, archivo_nombre=archivo.name)
+        resultado = procesar_excel_eges(archivo, batch)
+        self.assertEqual(resultado['creadas'], 2)
+        self.assertEqual(resultado['errores'], 0)
+        self.assertCountEqual(batch.filas.values_list('practica', flat=True), practicas[:2])
 
     def test_importacion_conserva_tc_con_contraste_y_excluye_materiales(self):
         batch_historico = ImportBatch.objects.create(usuario=self.user, archivo_nombre='historico_sintetico.xlsx')
@@ -2056,7 +2153,7 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         self.assertEqual(data['datasets'][0]['data'], [0, 1])
         self.assertEqual(data['datasets'][1]['data'], [1, 0])
 
-    def test_dashboard_advierte_lote_con_posible_tope_eges(self):
+    def test_dashboard_no_supone_tope_de_exportacion_por_mil_filas(self):
         self.user.is_superuser = True
         self.user.save(update_fields=['is_superuser'])
         self.client.force_login(self.user)
@@ -2069,5 +2166,5 @@ class ImportacionEgesAuditoriaPacsTest(TestCase):
         response = self.client.get('/eges/estadisticas/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['lotes_posible_tope'], 1)
-        self.assertContains(response, 'podrían haber alcanzado el límite')
+        self.assertNotContains(response, 'podrían haber alcanzado el límite')
+        self.assertNotContains(response, 'Revisar cobertura de')

@@ -104,7 +104,7 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
         # Simula un monto historico ya fijado; crear la relacion dispara el
         # calculo normal del modelo, que no forma parte del servicio de respaldo.
         RegistroEstudiosPorMedico.objects.filter(pk=registro.pk).update(monto_calculado=Decimal('1234.56'))
-        self.netterm(estado='PENDIENTE')
+        self.netterm()
         antes = (list(RegistroEstudiosPorMedico.objects.values()), list(RegistroEstudio.objects.values()))
         with CaptureQueriesContext(connection) as consultas:
             resultado = self.respaldo()
@@ -123,7 +123,7 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
 
     def test_eges_tiene_prioridad_y_otro_informante_netterm_no_lo_quita(self):
         self.registro()
-        self.eges(estado_turno='Fin Practica')
+        self.eges()
         self.netterm(informante='OTRO PROFESIONAL')
         linea = self.respaldo()['resultados'][0]['lineas'][0]
         self.assertEqual(linea['estado'], 'OK_EGES')
@@ -133,7 +133,7 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
     def test_tomografia_sin_eges_puede_respaldarse_con_netterm(self):
         estudio = Estudios.objects.create(nombre='TOMOGRAFIA DE TORAX', codigo='340101', tipo='TOM', conteo_regiones=1)
         self.registro(estudio)
-        self.netterm(codigo='340101', practica='TOMOGRAFIA DE TORAX', estado='NO_DEFINITIVO')
+        self.netterm(codigo='340101', practica='TOMOGRAFIA DE TORAX')
         self.assertEqual(self.respaldo()['resultados'][0]['lineas'][0]['estado'], 'OK_NETTERM')
 
     def test_cierre_tomografia_staff_exige_respaldo_confirmado_vigente(self):
@@ -339,7 +339,18 @@ class RespaldoFuentesTest(FuentesSinteticasMixin, TestCase):
     def test_pendiente_realizacion_no_da_ok(self):
         self.registro()
         self.netterm(estado='PENDIENTE', realizada=False)
+        self.assertEqual(self.respaldo()['resultados'][0]['estado_respaldo'], 'SIN_RESPALDO')
+
+    def test_realizado_sin_definitivo_queda_en_revision(self):
+        self.registro()
+        self.netterm(estado='NO_DEFINITIVO')
         self.assertEqual(self.respaldo()['resultados'][0]['estado_respaldo'], 'REVISAR')
+
+    def test_realizacion_noviembre_no_respalda_sesion_octubre(self):
+        self.registro()
+        self.eges()
+        self.netterm(fecha_realizacion=date(2026, 11, 2))
+        self.assertEqual(self.respaldo()['resultados'][0]['estado_respaldo'], 'SIN_RESPALDO')
 
     def test_varias_practicas_combinan_fuentes_y_muestran_respaldo_parcial(self):
         registro = self.registro()

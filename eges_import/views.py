@@ -13,10 +13,12 @@ from datetime import date as date_type
 from django.utils import timezone
 from datetime import datetime, time, timedelta
 import openpyxl
+import json
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import (
     ConciliacionRevision, ImportBatch, EgesRow, DirectorToken, NombreObraSocial, NettermFila, NettermLote,
+    ProduccionValidada,
 )
 from .forms import (
     ImportarEGESForm, PreviewNettermForm, GuardarNettermForm,
@@ -28,6 +30,9 @@ from .services_conciliacion import (
 from .services_netterm import guardar_lote_netterm
 from .services_produccion import construir_preview_produccion
 from .services_estadisticas import construir_estadisticas_fuentes
+from .services_validacion_produccion import (
+    preparar_validacion_produccion, confirmar_produccion, construir_resultado_validado, MODALIDADES,
+)
 from .services import (
     get_base_estudios_finalizados as _base_estudios_finalizados,
     get_base_rx_sin_informe as _base_rx_sin_informe,
@@ -57,6 +62,61 @@ def es_superuser(user):
     return user.is_superuser
 
 
+@login_required
+@user_passes_test(es_superuser, login_url='/admin/')
+def validar_produccion(request):
+    form = PreviewConciliacionForm(request.POST if request.method == 'POST' else request.GET or None)
+    form.fields['fecha_desde'].required = True
+    form.fields['fecha_hasta'].required = True
+    preparacion = None
+    decisiones = {}
+    if form.is_bound and form.is_valid():
+        seleccion = {
+            'batch_eges_ids': [lote.pk for lote in form.cleaned_data['lotes_eges']],
+            'lote_netterm_ids': [lote.pk for lote in form.cleaned_data['lotes_netterm']],
+            'fecha_desde': form.cleaned_data['fecha_desde'],
+            'fecha_hasta': form.cleaned_data['fecha_hasta'],
+        }
+        try:
+            preparacion = preparar_validacion_produccion(**seleccion)
+            if request.method == 'POST':
+                decisiones = json.loads(request.POST.get('decisiones_json', '{}'))
+                if request.POST.get('accion') == 'resumen':
+                    if preparacion['firma'] != request.POST.get('firma'):
+                        raise ValidationError('Las fuentes o los criterios cambiaron. Volvé a analizar la selección.')
+                    resultado = construir_resultado_validado(preparacion, decisiones)
+                    return JsonResponse({clave: resultado[clave] for clave in (
+                        'total_produccion', 'base_eges', 'aporte_netterm', 'pacientes_unicos_identificables',
+                    )})
+                validacion = confirmar_produccion(
+                    **seleccion, usuario=request.user, decisiones=decisiones,
+                    firma_esperada=request.POST.get('firma', ''),
+                )
+                messages.success(request, 'Producción confirmada. Los gráficos usan este resultado aprobado.')
+                query = QueryDict('', mutable=True)
+                query['validacion'] = str(validacion.pk)
+                query.setlist('lotes_eges', [str(pk) for pk in validacion.lotes_eges_ids])
+                query.setlist('lotes_netterm', [str(pk) for pk in validacion.lotes_netterm_ids])
+                query['fecha_desde'] = str(validacion.fecha_desde)
+                query['fecha_hasta'] = str(validacion.fecha_hasta)
+                return redirect(f"{reverse('eges_import:estadisticas')}?{query.urlencode()}")
+        except (ValidationError, json.JSONDecodeError) as error:
+            if request.method == 'POST' and request.POST.get('accion') == 'resumen':
+                return JsonResponse({'error': error.messages[0] if isinstance(error, ValidationError) else 'Las decisiones no son válidas.'}, status=400)
+            form.add_error(None, error.messages if isinstance(error, ValidationError) else 'Las decisiones no son válidas.')
+        if preparacion:
+            for item in preparacion['excepciones']:
+                decision = decisiones.get(item['id'], {}) if isinstance(decisiones, dict) else {}
+                item['accion_seleccionada'] = decision.get('accion', '') if isinstance(decision, dict) else ''
+                item['modalidad_seleccionada'] = decision.get('modalidad', item['modalidad']) if isinstance(decision, dict) else item['modalidad']
+            for grupo in preparacion.get('grupos_bilaterales', []) + preparacion.get('grupos_procedimientos', []):
+                decision = decisiones.get(grupo['id'], {}) if isinstance(decisiones, dict) else {}
+                grupo['accion_seleccionada'] = decision.get('accion', '') if isinstance(decision, dict) else ''
+    return render(request, 'eges_import/validar_produccion.html', {
+        'form': form, 'preparacion': preparacion, 'modalidades': MODALIDADES,
+    })
+
+
 NETTERM_TOKEN_SALT = 'eges_import.netterm.guardar.v1'
 
 
@@ -69,6 +129,8 @@ def preview_netterm(request):
     )
     preview = None
     guardar_form = None
+    lote_guardado = None
+    lote_creado = False
     if request.method == 'POST' and form.is_valid():
         resultado = form.resultado_preview
         preview = {
@@ -78,7 +140,22 @@ def preview_netterm(request):
             'version_parser': resultado['version_parser'],
             'sha256': resultado['sha256'],
         }
-        if resultado['filas']:
+        if resultado['filas'] and request.POST.get('accion') == 'cargar':
+            try:
+                guardado = guardar_lote_netterm(
+                    archivo=form.cleaned_data['archivo'], usuario=request.user,
+                    motivo='Carga de origen desde la pantalla Netterm.',
+                    sha256_esperado=resultado['sha256'],
+                    version_parser_esperada=resultado['version_parser'],
+                )
+            except ValidationError as error:
+                form.add_error(None, error)
+            except Exception:
+                form.add_error(None, 'No se pudo completar la carga. Volvé a intentarlo.')
+            else:
+                lote_guardado = guardado['lote']
+                lote_creado = guardado['creado']
+        elif resultado['filas']:
             guardar_form = GuardarNettermForm(prefix='guardar', initial={
                 'preview_token': signing.dumps({
                     'usuario_id': request.user.pk,
@@ -89,7 +166,8 @@ def preview_netterm(request):
         del form.resultado_preview
     return render(request, 'eges_import/preview_netterm.html', {
         'form': form, 'preview': preview, 'guardar_form': guardar_form,
-        'titulo_pagina': 'Netterm - Vista previa',
+        'lote_guardado': lote_guardado, 'lote_creado': lote_creado,
+        'titulo_pagina': 'Cargar Netterm',
     })
 
 
@@ -307,12 +385,14 @@ def dashboard_global(request):
     Dashboard global que consolida TODOS los batches importados.
     Vista ejecutiva para el director.
     """
+    validacion = None
+    if request.GET.get('validacion', '').isdigit():
+        validacion = get_object_or_404(ProduccionValidada, pk=request.GET['validacion'])
     # Obtener todos los batches
     batches = ImportBatch.objects.all()
     
     # Métricas globales consolidadas
     total_batches = batches.count()
-    lotes_posible_tope = batches.filter(total_filas__gte=1000).count()
     ultimo_batch = batches.order_by('-fecha_importacion').first()
     total_filas_global = sum(b.total_filas for b in batches)
     total_estudios_finalizados_global = sum(b.total_estudios_finalizados for b in batches)
@@ -336,8 +416,10 @@ def dashboard_global(request):
     context = {
         'titulo_pagina': 'Dashboard Global EGES',
         'form_fuentes': form_fuentes,
+        'validacion_produccion': validacion,
+        'hay_aportes_netterm': ProduccionValidada.objects.exists(),
+        'netterm_activado': request.GET.get('incluir_netterm') == '1' or bool(request.GET.getlist('lotes_netterm')),
         'total_batches': total_batches,
-        'lotes_posible_tope': lotes_posible_tope,
         'ultimo_batch': ultimo_batch,
         'total_filas_global': total_filas_global,
         'total_estudios_finalizados_global': total_estudios_finalizados_global,
@@ -1054,7 +1136,12 @@ def _form_estadisticas_fuentes(data):
 
 
 def _datos_estadisticas_fuentes(request):
-    form = _form_estadisticas_fuentes(request.GET)
+    datos = request.GET.copy()
+    dashboard_completo = datos.get('base_eges') == 'todos'
+    if dashboard_completo:
+        datos.setlist('lotes_eges', [str(pk) for pk in ImportBatch.objects.values_list('pk', flat=True)])
+        datos.setlist('lotes_netterm', [])
+    form = _form_estadisticas_fuentes(datos)
     if not form.is_valid():
         raise ValidationError([str(error) for errores in form.errors.values() for error in errores])
     modalidades = request.GET.getlist('modalidades[]') or None
@@ -1064,17 +1151,35 @@ def _datos_estadisticas_fuentes(request):
     lote_netterm_ids = [lote.pk for lote in form.cleaned_data['lotes_netterm']]
     fecha_desde = form.cleaned_data['fecha_desde']
     fecha_hasta = form.cleaned_data['fecha_hasta']
-    periodo_inferido = bool(lote_netterm_ids and not fecha_desde and not fecha_hasta)
-    if periodo_inferido:
-        periodo_netterm = NettermFila.objects.filter(lote_id__in=lote_netterm_ids).aggregate(
-            desde=Min('fecha_pedido'), hasta=Max('fecha_pedido'),
+    if dashboard_completo:
+        resultado = construir_estadisticas_fuentes(
+            batch_eges_ids=lote_eges_ids, lote_netterm_ids=[],
+            fecha_desde=fecha_desde, fecha_hasta=fecha_hasta, modalidades=modalidades,
+            agrupacion=request.GET.get('agrupacion', 'mes'),
+            dashboard_global=True, incluir_netterm=request.GET.get('incluir_netterm') == '1',
         )
-        fecha_desde, fecha_hasta = periodo_netterm['desde'], periodo_netterm['hasta']
+        resultado['metadatos']['periodo_inferido_netterm'] = False
+        return resultado
+    validacion_id = request.GET.get('validacion')
+    if lote_netterm_ids and not validacion_id:
+        raise ValidationError('Confirmá la conciliación EGES + Netterm antes de actualizar los gráficos.')
+    if validacion_id:
+        if not str(validacion_id).isdigit():
+            raise ValidationError('La producción confirmada no es válida.')
+        validacion = ProduccionValidada.objects.filter(pk=validacion_id).first()
+        if (not validacion or not set(validacion.lotes_eges_ids).issubset(lote_eges_ids)
+                or sorted(lote_netterm_ids) != sorted(validacion.lotes_netterm_ids)):
+            raise ValidationError('La selección cambió. Validá esta combinación de lotes para actualizar los gráficos.')
+    periodo_inferido = bool(lote_netterm_ids and not fecha_desde and not fecha_hasta
+                            and set(lote_eges_ids) == set(validacion.lotes_eges_ids))
+    if periodo_inferido:
+        fecha_desde, fecha_hasta = validacion.fecha_desde, validacion.fecha_hasta
     resultado = construir_estadisticas_fuentes(
         batch_eges_ids=lote_eges_ids,
         lote_netterm_ids=lote_netterm_ids,
         fecha_desde=fecha_desde, fecha_hasta=fecha_hasta,
         modalidades=modalidades, agrupacion=request.GET.get('agrupacion', 'mes'),
+        **({'validacion_id': validacion_id} if validacion_id else {}),
     )
     resultado['metadatos']['periodo_inferido_netterm'] = periodo_inferido
     return resultado
@@ -1110,9 +1215,13 @@ def _imagen_grafico_estadistico(labels, datasets, *, tipo='bar', horizontal=Fals
             axis.text(0.5, 0.5, 'Sin datos', ha='center', va='center', transform=axis.transAxes)
             axis.axis('off')
     elif horizontal:
-        datos = datasets[0]['data'] if datasets else []
         posiciones = np.arange(len(labels))
-        axis.barh(posiciones, datos, color=(datasets[0].get('backgroundColor') if datasets else '#64748b'))
+        acumulados = np.zeros(len(labels))
+        for dataset in datasets:
+            valores = np.array(dataset['data'])
+            axis.barh(posiciones, valores, left=acumulados, label=dataset['label'],
+                      color=dataset.get('backgroundColor', '#64748b'))
+            acumulados = acumulados + valores
         axis.set_yticks(posiciones, labels=labels, fontsize=7)
         axis.invert_yaxis()
     elif tipo == 'line':
@@ -1214,7 +1323,7 @@ def exportar_pdf_fuentes(request):
         Spacer(1, 10),
         Paragraph('Indicadores', heading),
         tabla([
-            ['Prácticas', 'Pacientes identificables', 'Prácticas / paciente', 'Informes confirmados', 'Sin informe', 'Finalización documentada'],
+            ['Prácticas', 'Pacientes identificables', 'Prácticas / paciente identificado', 'Informes confirmados', 'Sin informe', 'Finalización documentada'],
             [str(kpis['practicas_realizadas']), str(kpis['pacientes_atendidos']),
              str(kpis['practicas_por_paciente']) if kpis['practicas_por_paciente'] is not None else 'Sin dato',
              str(kpis['total_finalizados']), str(kpis['total_pendientes']),
@@ -1223,7 +1332,8 @@ def exportar_pdf_fuentes(request):
         Spacer(1, 8),
         Paragraph('Este conteo es provisional y no certifica cantidades económicas. '
                   'Las observaciones ambiguas quedan pendientes y no se agregan como prácticas. '
-                  'Las fechas usan Turno EGES y Pedido Netterm. La franja horaria muestra la hora de turno EGES; '
+                  'Se cuentan estudios realizados con informe definitivo, por fecha de realización Netterm '
+                  'o turno EGES cuando es la única fuente. La franja horaria muestra la hora de turno EGES; '
                   'Netterm no aporta hora de realización comparable. La cobertura de las fuentes no está confirmada.', note),
         Paragraph(f"Pendientes: {escape(pendientes_texto)}. "
               f"Exclusiones: {escape(excluidos_texto)}. "
@@ -1250,10 +1360,14 @@ def exportar_pdf_fuentes(request):
         PageBreak(),
         Paragraph('Productividad y cobertura registrada', heading),
         _imagen_grafico_estadistico(datos['medicos']['labels'], datos['medicos']['datasets'], horizontal=True),
+        Paragraph(f"Diez profesionales con mayor producción. Resto del ranking con {datos['medicos']['total_resto']} prácticas. "
+                  f"Registros sin informante con {datos['medicos']['sin_dato']} prácticas.", note),
         tabla([['Profesional', 'Prácticas'], *[[label, str(sum(dataset['data'][index] for dataset in datos['medicos']['datasets']))]
               for index, label in enumerate(datos['medicos']['labels'])]]),
         Spacer(1, 10),
-        tabla([['Cobertura registrada', 'Prácticas'], *[[label, str(value)] for label, value in
+        Paragraph(f"Diez coberturas con mayor producción. Resto del ranking con {datos['obras_sociales']['total_resto']} prácticas. "
+                  f"Registros sin cobertura con {datos['obras_sociales']['sin_dato']} prácticas.", note),
+        tabla([['Cobertura registrada — Top 10', 'Prácticas'], *[[label, str(value)] for label, value in
               zip(datos['obras_sociales']['labels'], datos['obras_sociales']['datasets'][0]['data'])]]),
         Spacer(1, 10),
         Paragraph('Comparativa con período anterior', heading),

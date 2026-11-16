@@ -7,23 +7,9 @@
 {% block page_description %}Seleccioná las fuentes y lotes para consultar la producción respaldada.{% endblock %}
 
 {% block content %}
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <a href="{% url 'eges_import:produccion_consolidada' %}" class="text-sm text-gray-300 hover:text-white">Producción EGES + Netterm</a>
-        <a href="{% url 'eges_import:lista_batches' %}" class="flex items-center gap-2 text-sm text-gray-300 hover:text-white" title="Volver al listado de lotes">
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-            </svg>
-            Volver
-        </a>
-    </div>
-
     <section class="mb-6 rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 md:p-7 text-white shadow-lg">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <div class="mb-2 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-3 py-1 text-xs font-semibold">
-                    <i class="fa-solid fa-chart-line"></i>
-                    Tablero ejecutivo · Superuser
-                </div>
                 <h1 class="text-2xl font-bold md:text-3xl">Actividad de Diagnóstico por Imágenes</h1>
                 <p class="mt-2 max-w-3xl text-sm text-blue-100">
                     Producción respaldada e informes documentados de las fuentes seleccionadas.
@@ -31,49 +17,42 @@
             </div>
             <div class="grid grid-cols-2 gap-3 text-sm">
                 <div class="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                    <p class="text-xs text-blue-100">Datos disponibles</p>
+                    <p class="text-xs text-blue-100">Histórico EGES disponible</p>
                     <p class="mt-1 font-semibold">
                         {% if fecha_min and fecha_max %}{{ fecha_min|date:"d/m/Y" }} – {{ fecha_max|date:"d/m/Y" }}{% else %}Sin datos{% endif %}
                     </p>
                 </div>
                 <div class="rounded-xl border border-white/20 bg-white/10 px-4 py-3">
-                    <p class="text-xs text-blue-100">Última importación</p>
+                    <p class="text-xs text-blue-100">Última importación EGES</p>
                     <p class="mt-1 font-semibold">
                         {% if ultimo_batch %}{{ ultimo_batch.fecha_importacion|date:"d/m/Y H:i" }}{% else %}Sin importaciones{% endif %}
                     </p>
                 </div>
             </div>
         </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-4">
+            <div class="space-y-2">
+                <a id="validar-produccion-fuentes" class="inline-flex min-h-10 items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-blue-900 hover:bg-blue-50" href="{% url 'eges_import:validar_produccion' %}">Integrar y validar Netterm</a>
+                {% if validacion_produccion %}<p class="text-xs text-blue-100">Validación registrada el {{ validacion_produccion.fecha_confirmacion|date:'d/m/Y H:i' }}. Los aportes aprobados se aplican a sus períodos y modalidades.</p>{% endif %}
+            </div>
+            <div class="flex flex-wrap gap-4 text-sm text-blue-100">
+                <a href="{% url 'eges_import:produccion_consolidada' %}" class="underline hover:text-white">Consultar análisis provisional</a>
+                <a href="{% url 'eges_import:lista_batches' %}" class="underline hover:text-white">Lotes importados</a>
+            </div>
+        </div>
     </section>
 
-    {% if lotes_posible_tope %}
-    <div class="mb-5 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200">
-        <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
-        <div>
-            <p class="text-sm font-semibold">Revisar cobertura de {{ lotes_posible_tope }} lote{{ lotes_posible_tope|pluralize }}</p>
-            <p class="mt-0.5 text-xs">Tienen 1.000 registros o más y podrían haber alcanzado el límite de exportación de EGES. Conviene validar el rango o dividir la descarga.</p>
-        </div>
-    </div>
-    {% endif %}
 
     <!-- Panel de Filtros -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 border border-gray-200 p-3 sm:p-4 dark:border-gray-700">
-        <details class="mb-3 border-b border-gray-200 pb-3 dark:border-gray-700" open>
-            <summary class="cursor-pointer text-sm font-semibold text-gray-800 dark:text-white">Fuentes de datos</summary>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Al abrir se carga todo el histórico EGES. Netterm es opcional; al seleccionarlo sin fechas, el período se ajusta al rango del libro y se compara con EGES.</p>
-            <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                <fieldset class="min-w-0"><legend class="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-300">EGES · histórico completo</legend>
-                    <div class="max-h-32 space-y-1 overflow-y-auto">
-                    {% for opcion in form_fuentes.lotes_eges %}<label for="{{ opcion.id_for_label }}" class="flex items-start gap-2 break-words py-1 text-xs text-gray-700 dark:text-gray-300">{{ opcion.tag }}<span class="min-w-0">{{ opcion.choice_label }}</span></label>{% empty %}<p class="text-xs text-gray-500">Sin lotes EGES.</p>{% endfor %}
-                    </div>
-                </fieldset>
-                <fieldset class="min-w-0"><legend class="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-300">Netterm · opcional</legend>
-                    <div class="max-h-32 space-y-1 overflow-y-auto">
-                    {% for opcion in form_fuentes.lotes_netterm %}<label for="{{ opcion.id_for_label }}" class="flex items-start gap-2 break-words py-1 text-xs text-gray-700 dark:text-gray-300">{{ opcion.tag }}<span class="min-w-0">{{ opcion.choice_label }}</span></label>{% empty %}<p class="text-xs text-gray-500">Sin lotes Netterm.</p>{% endfor %}
-                    </div>
-                </fieldset>
-            </div>
-        </details>
+        <div class="mb-3 space-y-2 border-b border-gray-200 pb-3 text-sm text-gray-800 dark:border-gray-700 dark:text-gray-200">
+            <p class="font-semibold">Base EGES completa · {{ total_batches }} lotes cargados</p>
+            <label class="inline-flex cursor-pointer items-center gap-2"><input type="checkbox" id="incluir-netterm-dashboard" {% if netterm_activado %}checked{% endif %} {% if not hay_aportes_netterm %}disabled{% endif %}> Añadir aporte Netterm validado</label>
+            <p id="aporte-netterm-resumen" class="text-xs text-gray-600 dark:text-gray-300" role="status"></p>
+            <ul id="avisos-aporte-netterm" class="space-y-1 text-xs text-amber-700 dark:text-amber-300"></ul>
+            {% if not hay_aportes_netterm %}<p class="text-xs">Importá y validá Netterm para habilitar su aporte.</p>{% endif %}
+            <details><summary class="cursor-pointer text-xs">Ver lotes EGES incluidos</summary><ul class="mt-2 max-h-32 overflow-y-auto text-xs">{% for batch in batches %}<li>{{ batch.archivo_nombre }}</li>{% empty %}<li>Sin lotes EGES.</li>{% endfor %}</ul></details>
+        </div>
         <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Período y modalidades</h2>
@@ -165,7 +144,14 @@
     </div>
 
     <p id="estado-fuentes" role="status" aria-live="polite" class="mb-3 border-l-4 border-amber-500 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">Sin selección de fuentes.</p>
-    <ul id="pendientes-fuentes" class="mb-4 space-y-1 text-xs text-amber-700 dark:text-amber-300"></ul>
+    <details class="mb-4 text-xs text-gray-600 dark:text-gray-300">
+        <summary class="cursor-pointer">Ver observaciones de origen y exclusiones</summary>
+        <p class="mt-2">Este detalle abarca los lotes completos e incluye observaciones resueltas en la validación. Las prácticas anuladas están excluidas del total de producción.</p>
+        <h3 class="mt-2 font-semibold">Observaciones de lectura</h3>
+        <ul id="pendientes-fuentes" class="space-y-1"></ul>
+        <h3 class="mt-2 font-semibold">Excluidas del total</h3>
+        <ul id="excluidos-fuentes" class="space-y-1"></ul>
+    </details>
     <!-- KPIs dinámicos (actualizados al aplicar filtros) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
@@ -179,9 +165,9 @@
             <p class="text-xs text-gray-400 mt-1">prácticas respaldadas, sin duplicación</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
-            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas por paciente</p>
+            <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Prácticas por paciente identificado</p>
             <p class="text-3xl font-bold text-blue-600 dark:text-blue-400 mt-2" id="kpi-practicas-por-paciente">—</p>
-            <p class="text-xs text-gray-400 mt-1">promedio del período</p>
+            <p class="text-xs text-gray-400 mt-1" id="detalle-practicas-por-paciente">promedio del período</p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4 border border-gray-200 dark:border-gray-700">
             <p class="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">Estudios informados</p>
@@ -250,7 +236,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Distribución por Día de Semana</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Fecha de turno EGES / pedido Netterm</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Fecha de realización Netterm / turno EGES. Estudios con informe definitivo.</p>
             </div>
             <div class="p-4">
                 <div class="relative" style="height: 250px;">
@@ -262,6 +248,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Distribución por Franja Horaria</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Hora de realización Netterm o turno EGES. Sin dato reúne las prácticas sin horario disponible.</p>
                 <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Hora de turno EGES; Netterm sin hora de realización</p>
             </div>
             <div class="p-4">
@@ -304,13 +291,16 @@
         <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <div>
                 <h2 class="text-base font-semibold text-gray-800 dark:text-white">Productividad por Médico — Top 10</h2>
-                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Prácticas respaldadas; Otros y Sin dato conservan el total</p>
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Diez profesionales con mayor cantidad de prácticas.</p>
             </div>
         </div>
         <div class="p-4">
             <div class="relative" style="height: 380px;">
                 <canvas id="grafico-medicos-top"></canvas>
             </div>
+            <details id="nombres-medicos-unificados" class="mt-3 text-sm text-gray-800 dark:text-gray-200" hidden><summary class="cursor-pointer">Ver nombres unificados</summary><ul id="lista-nombres-medicos-unificados" class="mt-2 max-h-60 overflow-auto space-y-1"></ul></details>
+            <p id="resumen-ranking-medicos" class="mt-3 text-sm text-gray-600 dark:text-gray-300"></p>
+            <details id="resto-medicos" class="mt-3 text-sm text-gray-800 dark:text-gray-200" hidden><summary class="cursor-pointer">Ver médicos incluidos en el resto</summary><ul id="lista-resto-medicos" class="mt-2 max-h-60 overflow-auto space-y-1"></ul></details>
         </div>
     </div>
 
@@ -338,7 +328,7 @@
                     <p class="text-xs mt-1 text-gray-400" id="comp-practicas-delta">cargando…</p>
                 </div>
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas / paciente</p>
+                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Prácticas / paciente identificado</p>
                     <p class="text-2xl font-bold text-gray-900 dark:text-white" id="comp-practicas-paciente-valores">—</p>
                     <p class="text-xs mt-1 text-gray-400" id="comp-practicas-paciente-delta">cargando…</p>
                 </div>
@@ -363,13 +353,17 @@
         <!-- Ranking Obras Sociales -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
             <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Cobertura registrada</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Prácticas respaldadas; ausencias agrupadas en Sin dato</p>
+                <h2 class="text-base font-semibold text-gray-800 dark:text-white">Cobertura registrada — Top 10</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Diez coberturas con mayor cantidad de prácticas.</p>
             </div>
             <div class="p-4">
                 <div class="relative" style="height: 280px;">
                     <canvas id="grafico-obras-sociales"></canvas>
                 </div>
+                <p id="resumen-ranking-coberturas" class="mt-3 text-sm text-gray-600 dark:text-gray-300"></p>
+                <details id="nombres-coberturas-unificadas" class="mt-3 text-sm text-gray-800 dark:text-gray-200" hidden><summary class="cursor-pointer">Ver coberturas unificadas</summary><ul id="lista-nombres-coberturas-unificadas" class="mt-2 max-h-60 overflow-auto space-y-1"></ul></details>
+                <details id="coberturas-por-revisar" class="mt-3 text-sm text-gray-800 dark:text-gray-200" hidden><summary class="cursor-pointer">Ver correspondencias de cobertura por revisar</summary><ul id="lista-coberturas-por-revisar" class="mt-2 max-h-60 overflow-auto space-y-1"></ul></details>
+                <details id="resto-coberturas" class="mt-3 text-sm text-gray-800 dark:text-gray-200" hidden><summary class="cursor-pointer">Ver coberturas incluidas en el resto</summary><ul id="lista-resto-coberturas" class="mt-2 max-h-60 overflow-auto space-y-1"></ul></details>
             </div>
         </div>
     </div>
@@ -467,19 +461,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (!response.ok) throw new Error(datos.error || 'No se pudo cargar la selección.');
                     if (requestId === dashboardRequestId) {
                         const meta = datos.metadatos;
-                        document.getElementById('estado-fuentes').textContent = `${meta.fuente} · ${meta.incompleto ? 'Resultado incompleto' : 'Producción provisional'} · Cobertura no confirmada${meta.sin_identidad ? ' · ' + meta.sin_identidad + ' práctica(s) sin identidad' : ''}`;
-                        const lista = document.getElementById('pendientes-fuentes');
-                        lista.replaceChildren();
-                        [...meta.pendientes, ...meta.excluidos].forEach(item => {
-                            const fila = document.createElement('li');
-                            fila.textContent = `${item.motivo}: ${item.cantidad}`;
-                            lista.appendChild(fila);
+                        const estado = meta.base_eges_completa ? 'Base EGES completa' : (meta.historico_eges ? 'Período confirmado + histórico EGES' : (meta.confirmada ? 'Producción confirmada' : 'Producción provisional'));
+                        document.getElementById('estado-fuentes').textContent = `${meta.fuente} · ${estado}${meta.sin_identidad ? ' · ' + meta.sin_identidad + ' práctica(s) pendientes de identificación' : ''}`;
+                        document.getElementById('aporte-netterm-resumen').textContent = meta.aporte_netterm_activo
+                            ? `Aporte Netterm aplicado · ${Number(meta.aporte_netterm_aplicado).toLocaleString('es-AR')} prácticas`
+                            : `Aporte Netterm validado disponible · ${Number(meta.aporte_netterm_disponible).toLocaleString('es-AR')} prácticas`;
+                        const avisos = document.getElementById('avisos-aporte-netterm');
+                        avisos.replaceChildren();
+                        (meta.advertencias_dashboard || []).forEach(texto => {
+                            const item = document.createElement('li');
+                            item.textContent = texto;
+                            avisos.appendChild(item);
                         });
-                        if (meta.advertencia_cobertura) {
-                            const fila = document.createElement('li');
-                            fila.textContent = 'Lotes EGES con 1.000 filas o más: verificar cobertura de exportación.';
-                            lista.appendChild(fila);
-                        }
+                        [['pendientes-fuentes', meta.pendientes], ['excluidos-fuentes', meta.excluidos]].forEach(([id, items]) => {
+                            const lista = document.getElementById(id);
+                            lista.replaceChildren();
+                            items.forEach(item => {
+                                const fila = document.createElement('li');
+                                fila.textContent = `${item.motivo} · ${item.cantidad}`;
+                                lista.appendChild(fila);
+                            });
+                        });
                         document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'false');
                     }
                     return datos;
@@ -519,7 +521,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function obtenerParametrosFiltro() {
         const params = new URLSearchParams();
         params.set('fuentes', 'conciliadas');
-        document.querySelectorAll('input[name="lotes_eges"]:checked, input[name="lotes_netterm"]:checked').forEach(input => params.append(input.name, input.value));
+        params.set('base_eges', 'todos');
+        params.set('incluir_netterm', document.getElementById('incluir-netterm-dashboard').checked ? '1' : '0');
         const fechaDesde = document.getElementById('fecha-desde').value;
         const fechaHasta = document.getElementById('fecha-hasta').value;
         if (fechaDesde) params.append('fecha_desde', fechaDesde);
@@ -548,6 +551,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function actualizarEnlacePdf(params = obtenerParametrosFiltro()) {
         const pdfBase = "{% url 'eges_import:exportar_pdf_fuentes' %}";
         document.getElementById('btn-exportar-pdf').href = `${pdfBase}?${params}&agrupacion=${agrupacion}`;
+        document.getElementById('validar-produccion-fuentes').href = "{% url 'eges_import:validar_produccion' %}?" + params;
     }
 
     const coloresModalidad = {
@@ -582,7 +586,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (requestId !== dashboardRequestId) return;
                 document.getElementById('kpi-pacientes-atendidos').textContent = Number(d.pacientes_atendidos).toLocaleString('es-AR');
                 document.getElementById('kpi-practicas-realizadas').textContent = Number(d.practicas_realizadas).toLocaleString('es-AR');
-                document.getElementById('kpi-practicas-por-paciente').textContent = d.practicas_por_paciente === null ? 'Sin dato' : Number(d.practicas_por_paciente).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                const promedioPaciente = document.getElementById('kpi-practicas-por-paciente');
+                promedioPaciente.textContent = d.practicas_por_paciente === null ? 'No calculable' : Number(d.practicas_por_paciente).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                promedioPaciente.title = 'Prácticas de pacientes identificados divididas por la cantidad de pacientes identificados.';
+                document.getElementById('detalle-practicas-por-paciente').textContent = d.sin_identidad ? `Promedio entre identificados. ${d.sin_identidad} prácticas pendientes de identificación.` : 'promedio del período';
                 document.getElementById('kpi-total-finalizados').textContent = Number(d.total_finalizados).toLocaleString('es-AR');
                 document.getElementById('kpi-promedio-dia').textContent = d.promedio_dia === null ? 'Sin dato' : d.promedio_dia;
                 document.getElementById('kpi-tasa-conversion').textContent = d.tasa_conversion === null ? 'Sin dato' : d.tasa_conversion + '%';
@@ -745,6 +752,10 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
                 const comparativa = d.comparativa;
+                const fechaCorta = valor => valor.split('-').reverse().join('/');
+                document.getElementById('comp-subtitulo').textContent = d.periodo_actual && d.periodo_anterior
+                    ? `${fechaCorta(d.periodo_actual.desde)} al ${fechaCorta(d.periodo_actual.hasta)} comparado con ${fechaCorta(d.periodo_anterior.desde)} al ${fechaCorta(d.periodo_anterior.hasta)}`
+                    : 'Seleccioná fechas desde y hasta para definir el período a comparar';
                 const formatoNumero = (valor, decimales = 0) => Number(valor || 0).toLocaleString('es-AR', {
                     minimumFractionDigits: decimales,
                     maximumFractionDigits: decimales,
@@ -759,8 +770,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 function renderMetrica(metrica, valoresId, deltaId, decimales = 0) {
                     if (metrica.actual === null || metrica.anterior === null) {
-                        document.getElementById(valoresId).textContent = 'Sin dato';
-                        document.getElementById(deltaId).textContent = 'Sin evidencia comparable en las fuentes seleccionadas';
+                        document.getElementById(valoresId).textContent = d.periodo_anterior
+                            ? 'Sin período comparable'
+                            : 'Elegí un período';
+                        document.getElementById(deltaId).textContent = comparativa.motivo_sin_comparativa
+                            || 'Sin evidencia comparable en las fuentes seleccionadas';
                         return;
                     }
                     document.getElementById(valoresId).textContent =
@@ -778,6 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderMetrica(comparativa.practicas, 'comp-practicas-valores', 'comp-practicas-delta');
                 renderMetrica(comparativa.practicas_por_paciente, 'comp-practicas-paciente-valores', 'comp-practicas-paciente-delta', 2);
                 document.getElementById('comp-sin-actividad').classList.toggle('hidden', comparativa.hay_datos_anterior);
+                document.getElementById('comp-sin-actividad').textContent = comparativa.motivo_sin_comparativa || 'Sin evidencia comparable en el período anterior';
 
                 function escapeHtml(valor) {
                     return String(valor).replace(/[&<>'"]/g, caracter => ({
@@ -831,11 +846,50 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {});
     }
 
+    function mostrarRestoRanking(datos, tipo) {
+        const items = datos.resto || [];
+        const detalle = document.getElementById(`resto-${tipo}`);
+        const lista = document.getElementById(`lista-resto-${tipo}`);
+        lista.replaceChildren();
+        detalle.hidden = !items.length;
+        const textos = [];
+        if (items.length) textos.push(`Resto del ranking · ${Number(datos.total_resto).toLocaleString('es-AR')} prácticas en ${items.length} ${tipo === 'medicos' ? 'profesionales' : 'coberturas'}`);
+        if (datos.sin_dato) textos.push(`Sin dato · ${Number(datos.sin_dato).toLocaleString('es-AR')} prácticas`);
+        document.getElementById(`resumen-ranking-${tipo}`).textContent = textos.join('. ');
+        items.forEach(item => {
+            const fila = document.createElement('li');
+            fila.textContent = `${item.nombre} · ${Number(item.total).toLocaleString('es-AR')} prácticas`;
+            lista.appendChild(fila);
+        });
+    }
+
+    function mostrarEquivalencias(items, detalleId, listaId) {
+        const lista = document.getElementById(listaId);
+        lista.replaceChildren();
+        document.getElementById(detalleId).hidden = !items.length;
+        items.forEach(item => {
+            const fila = document.createElement('li');
+            fila.textContent = `${item.nombre} ← ${item.variantes.join(' / ')}`;
+            lista.appendChild(fila);
+        });
+    }
+
     function cargarObrasSociales(params, requestId) {
         datosFuente('obras_sociales', params)
             .then(d => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.obrasSociales) charts.obrasSociales.destroy();
+                mostrarRestoRanking(d, 'coberturas');
+                mostrarEquivalencias(d.equivalencias || [], 'nombres-coberturas-unificadas', 'lista-nombres-coberturas-unificadas');
+                const revisiones = d.revisiones || [];
+                const listaRevisiones = document.getElementById('lista-coberturas-por-revisar');
+                listaRevisiones.replaceChildren();
+                document.getElementById('coberturas-por-revisar').hidden = !revisiones.length;
+                revisiones.forEach(item => {
+                    const fila = document.createElement('li');
+                    fila.textContent = `Netterm ${item.netterm} · EGES ${item.candidatas.join(' / ')}`;
+                    listaRevisiones.appendChild(fila);
+                });
                 charts.obrasSociales = new Chart(
                     document.getElementById('grafico-obras-sociales').getContext('2d'), {
                         type: 'bar',
@@ -863,6 +917,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (requestId !== dashboardRequestId) return;
                 if (charts.medicos) charts.medicos.destroy();
+                mostrarRestoRanking(data, 'medicos');
+                mostrarEquivalencias(data.equivalencias || [], 'nombres-medicos-unificados', 'lista-nombres-medicos-unificados');
                 charts.medicos = new Chart(
                     document.getElementById('grafico-medicos-top').getContext('2d'), {
                         type: 'bar',
@@ -893,12 +949,13 @@ document.addEventListener('DOMContentLoaded', function() {
         actualizarResumenFiltro();
         actualizarEnlacePdf(params);
         document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'true');
-        if (!document.querySelector('input[name="lotes_eges"]:checked, input[name="lotes_netterm"]:checked')) {
-            document.getElementById('estado-fuentes').textContent = 'Seleccioná las fuentes y aplicá los filtros.';
+        if ({{ total_batches }} === 0) {
+            document.getElementById('estado-fuentes').textContent = 'Cargá un lote EGES para ver la producción.';
             Object.values(charts).forEach(chart => chart.destroy());
             Object.keys(charts).forEach(key => delete charts[key]);
             document.querySelectorAll('p[id^="kpi-"]').forEach(element => element.textContent = 'Sin selección');
             document.getElementById('pendientes-fuentes').replaceChildren();
+            document.getElementById('excluidos-fuentes').replaceChildren();
             document.getElementById('comp-sin-actividad').classList.add('hidden');
             ['comp-pacientes-valores', 'comp-practicas-valores', 'comp-practicas-paciente-valores']
                 .forEach(id => document.getElementById(id).textContent = 'Sin selección');
@@ -957,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Botón exportar temporalmente deshabilitado
     // document.getElementById('btn-exportar-excel').addEventListener(...);\n
     document.getElementById('btn-aplicar-filtros').addEventListener('click', cargarTodo);
+    document.getElementById('incluir-netterm-dashboard').addEventListener('change', cargarTodo);
     document.getElementById('btn-limpiar-filtros').addEventListener('click', function() {
         document.getElementById('fecha-desde').value = '';
         document.getElementById('fecha-hasta').value = '';

@@ -14,7 +14,7 @@ from .models import ConciliacionRevision, EgesRow, ImportBatch, NettermFila, Net
 from .services_netterm import clasificar_fila_netterm
 
 
-VERSION_CRUCE_NETTERM_EGES = 'DNI_CODIGO_FECHA_PEDIDO_V8'
+VERSION_CRUCE_NETTERM_EGES = 'DOCUMENTO_NOMBRE_CODIGO_FECHA_PEDIDO_V10'
 MAX_LOTES_NETTERM_CRUCE = 10
 MAX_FILAS_CRUCE = 50000
 ESTADOS_CRUCE = ('COINCIDENTE', 'SOLO_EGES', 'SOLO_NETTERM', 'AMBIGUO', 'CONFLICTO')
@@ -60,15 +60,17 @@ def _datos_eges(fila):
         'codigo': fila.codigo_practica, 'fecha_turno': fila.fecha_turno,
         'hora_turno': fila.hora_turno, 'estado': fila.estado_turno,
         'estado_informe': fila.estado_informe,
+        'cantidad': str(fila.cantidad) if fila.cantidad is not None else None,
         'modalidad': fila.modalidad,
         'paciente_clave': _paciente_clave(fila.dni_paciente),
     }
 
 
-def _datos_netterm(grupo):
+def _datos_netterm(grupo, *, paciente_clave=None):
     fila = grupo[0]
     return {
         'id': fila.pk, 'lote_id': fila.lote_id,
+        'pedido': fila.normalizados_json.get('pedido', ''),
         'observaciones_ids': [observacion.pk for observacion in grupo],
         'practica': fila.normalizados_json.get('practica', ''),
         'codigo': fila.normalizados_json.get('codigo_nomenclador', ''),
@@ -77,7 +79,7 @@ def _datos_netterm(grupo):
         'anulado': fila.anulado,
         'estado_realizacion': fila.normalizados_json.get('estado_realizacion', 'DESCONOCIDO'),
         'vigencia_incierta': len({observacion.contenido_sha256 for observacion in grupo}) > 1,
-        'paciente_clave': _paciente_clave(
+        'paciente_clave': paciente_clave or _paciente_clave(
             fila.normalizados_json.get('documento'), fila.normalizados_json.get('tipo_documento'),
         ),
         'modalidad': clasificar_fila_netterm(
@@ -106,7 +108,8 @@ def _firma_snapshot(
         'lotes_netterm': sorted(lote_ids),
         'eges': [
             [fila.pk, fila.dni_paciente, fila.codigo_practica, fila.fecha_turno,
-             fila.hora_turno, fila.medico_informante, fila.estado_turno, fila.practica]
+             fila.hora_turno, fila.medico_informante, fila.estado_turno, fila.practica, fila.apellido_nombre,
+             fila.cantidad]
             for fila in eges
         ],
         'netterm': sorted(
@@ -169,6 +172,7 @@ def construir_preview_conciliacion(
         'pk', 'batch_id', 'dni_paciente', 'codigo_practica', 'fecha_turno',
         'hora_turno', 'medico_informante', 'estado_turno', 'practica',
         'modalidad', 'estado_informe',
+        'apellido_nombre', 'cantidad',
     ).order_by('pk')
     netterm_qs = NettermFila.objects.filter(lote_id__in=ids).only(
         'pk', 'lote_id', 'clave_candidata_sha256', 'contenido_sha256', 'clase_observacion', 'normalizados_json',
@@ -191,6 +195,7 @@ def construir_preview_conciliacion(
     cantidad_insumos = 0
     cantidad_netterm = 0
     cantidad_netterm_modalidad = 0
+    modalidades_por_grupo = {}
     for clave_grupo, grupo in grupos.items():
         grupo.sort(key=lambda observacion: observacion.pk)
         fila = grupo[0]
@@ -215,23 +220,46 @@ def construir_preview_conciliacion(
             continue
         cantidad_netterm_modalidad += len(grupo)
         grupos_periodo[clave_grupo] = grupo
+        modalidades_por_grupo[clave_grupo] = modalidad
     grupos = grupos_periodo
     indice_eges = defaultdict(list)
+    nombres_por_documento = defaultdict(set)
     for fila in eges:
+        numero = _dni(fila.dni_paciente)
+        nombre = _profesional(fila.apellido_nombre)
+        if numero and nombre:
+            nombres_por_documento[numero].add(nombre)
         clave = (_dni(fila.dni_paciente), _codigo(fila.codigo_practica), fila.fecha_turno)
         if all(clave):
             indice_eges[clave].append(fila)
     candidatos_por_grupo = {}
     motivos_por_grupo = {}
     grupos_por_eges = defaultdict(set)
+    documentos_alternativos_verificados = {}
     for clave_grupo, grupo in grupos.items():
         fila = grupo[0]
         normalizados = fila.normalizados_json
         motivos = []
         tipo_documento = re.sub(r'[^A-Z]', '', _texto_normalizado(normalizados.get('tipo_documento')))
-        clave = (_dni(normalizados.get('documento')), _codigo(normalizados.get('codigo_nomenclador')), fila.fecha_pedido)
-        if tipo_documento != 'DNI' or not all(clave):
-            motivos.append('Documento DNI, codigo o fecha de pedido insuficientes para comparar.')
+        numero = _dni(normalizados.get('documento'))
+        nombre = _profesional(normalizados.get('paciente'))
+        alternativo_verificado = (
+            tipo_documento in {'LC', 'LE', 'CI', 'PASAP', 'PASAPORTE'} and numero and nombre
+            and nombres_por_documento.get(numero) == {nombre}
+        )
+        if alternativo_verificado:
+            documentos_alternativos_verificados[clave_grupo] = _paciente_clave(numero)
+        clave = (numero, _codigo(normalizados.get('codigo_nomenclador')), fila.fecha_pedido)
+        if not numero:
+            motivos.append('El número de documento está ausente o requiere revisión de formato.')
+        if not clave[1]:
+            motivos.append('Falta el código de la práctica para comparar.')
+        if not fila.fecha_pedido:
+            motivos.append('Falta la fecha del pedido Netterm para comparar.')
+        if tipo_documento != 'DNI' and not alternativo_verificado:
+            motivos.append(f'Documento {normalizados.get("tipo_documento") or "sin tipo"}. '
+                           'Revisá la identidad: no se corroboró un número y nombre únicos en EGES.')
+        if (tipo_documento != 'DNI' and not alternativo_verificado) or not all(clave):
             candidatos = []
         else:
             candidatos = indice_eges.get(clave, [])
@@ -245,6 +273,8 @@ def construir_preview_conciliacion(
         candidatas = candidatos_por_grupo[clave_grupo]
         motivos = list(motivos_por_grupo[clave_grupo])
         advertencias = ['Cantidad Netterm desconocida; no se valido cantidad ni horario economico.']
+        if clave_grupo in documentos_alternativos_verificados:
+            advertencias.append('Documento alternativo corroborado por número y nombre de paciente en EGES.')
         estado = 'SOLO_NETTERM'
         identidad_coincidente = False
         comparacion_estados = 'NO_COMPARADOS'
@@ -265,7 +295,7 @@ def construir_preview_conciliacion(
         elif candidatas:
             candidata = candidatas[0]
             estado = 'COINCIDENTE'
-            modalidad_netterm = _modalidad_consolidada(fila.normalizados_json.get('modalidad'))
+            modalidad_netterm = modalidades_por_grupo[clave_grupo]
             if modalidad_netterm != candidata.modalidad:
                 motivos.append('Las modalidades de ambas fuentes difieren; verificar nomenclador antes de contar.')
             else:
@@ -293,7 +323,7 @@ def construir_preview_conciliacion(
             if motivos:
                 estado = 'CONFLICTO'
         else:
-            motivos.append('Sin candidata EGES por DNI, codigo y fecha de pedido dentro de los lotes EGES seleccionados.')
+            motivos.append('Sin candidata EGES por documento, código y fecha de pedido dentro de los lotes EGES seleccionados.')
         # La categoria historica conserva sus reglas para no cambiar el conteo.
         # Una diferencia de estado sin anulacion no invalida la identidad ni exige
         # decidir manualmente VINCULAR/NO_VINCULAR para cada pareja.
@@ -302,7 +332,7 @@ def construir_preview_conciliacion(
         revision_estado = identidad_coincidente and contradiccion_anulacion
         resultados.append({
             'estado': estado, 'motivos': motivos,
-            'netterm': _datos_netterm(grupo),
+            'netterm': _datos_netterm(grupo, paciente_clave=documentos_alternativos_verificados.get(clave_grupo)),
             'eges': [_datos_eges(candidata) for candidata in candidatas],
             'advertencias': advertencias,
             'identidad_coincidente': identidad_coincidente,
