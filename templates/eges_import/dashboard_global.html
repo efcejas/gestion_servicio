@@ -7,6 +7,52 @@
 {% block page_description %}Seleccioná las fuentes y lotes para consultar la producción respaldada.{% endblock %}
 
 {% block content %}
+    <style>
+        .dashboard-clock {
+            position: relative;
+            width: 76px;
+            height: 76px;
+            margin: 0 auto 24px;
+            border: 4px solid #93c5fd;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.08);
+        }
+        .dashboard-clock::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #2563eb;
+            transform: translate(-50%, -50%);
+        }
+        .dashboard-clock-hand {
+            position: absolute;
+            bottom: 50%;
+            left: calc(50% - 2px);
+            width: 4px;
+            height: 26px;
+            border-radius: 4px;
+            background: #2563eb;
+            transform-origin: center bottom;
+            animation: dashboard-clock-turn 2s linear infinite;
+        }
+        .dashboard-clock-hand-hour {
+            height: 18px;
+            background: #60a5fa;
+            animation-duration: 12s;
+            animation-delay: -3s;
+        }
+        @keyframes dashboard-clock-turn {
+            to { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .dashboard-clock-hand { animation: none; }
+            .dashboard-clock-hand-hour { transform: rotate(90deg); }
+        }
+    </style>
     <section class="mb-6 rounded-2xl bg-gradient-to-r from-medical-primary to-medical-secondary p-5 md:p-7 text-white shadow-lg">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -59,6 +105,8 @@
                 <p class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400">Todos los indicadores y gráficos responden a esta selección.</p>
             </div>
             <div class="flex flex-wrap gap-1.5 sm:gap-2" aria-label="Períodos rápidos">
+                <button type="button" data-periodo="ultimo-cargado" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-600 dark:text-gray-200">Último mes cargado</button>
+                <button type="button" data-periodo="tres-meses" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 dark:border-gray-600 dark:text-gray-200">Últimos tres meses cargados</button>
                 <button type="button" data-periodo="mes-actual" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes actual</button>
                 <button type="button" data-periodo="mes-anterior" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Mes anterior</button>
                 <button type="button" data-periodo="90-dias" class="periodo-rapido rounded-lg border border-gray-300 px-2.5 py-1.5 text-[11px] font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700">Últimos 90 días</button>
@@ -143,6 +191,18 @@
         </div>
     </div>
 
+    <div id="carga-dashboard" role="dialog" aria-modal="true" aria-labelledby="titulo-carga-dashboard" hidden
+         class="fixed inset-0" style="z-index: 10000; background: rgba(15, 23, 42, 0.48); backdrop-filter: blur(4px);">
+        <div class="absolute inset-0 flex items-center justify-center p-6">
+            <div class="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-2xl dark:border-gray-700 dark:bg-gray-800">
+                <div aria-hidden="true" class="dashboard-clock">
+                    <span class="dashboard-clock-hand dashboard-clock-hand-hour"></span>
+                    <span class="dashboard-clock-hand"></span>
+                </div>
+                <p id="titulo-carga-dashboard" role="status" aria-live="polite" class="text-base font-semibold text-gray-900 dark:text-white">Actualizando datos…</p>
+            </div>
+        </div>
+    </div>
     <p id="estado-fuentes" role="status" aria-live="polite" class="mb-3 border-l-4 border-amber-500 px-3 py-2 text-sm text-gray-700 dark:text-gray-200">Sin selección de fuentes.</p>
     <details class="mb-4 text-xs text-gray-600 dark:text-gray-300">
         <summary class="cursor-pointer">Ver observaciones de origen y exclusiones</summary>
@@ -447,6 +507,14 @@ document.addEventListener('DOMContentLoaded', function() {
     let dashboardRequestId = 0;
     let temporalRequestId = 0;
     let datosCompartidos = null;
+    let colaConsultas = Promise.resolve();
+    let esperaFiltros;
+    let solicitudCarga = 0;
+
+    function programarFiltros() {
+        clearTimeout(esperaFiltros);
+        esperaFiltros = setTimeout(cargarTodo, 300);
+    }
 
     function datosFuente(clave, params) {
         const query = new URLSearchParams(params);
@@ -454,9 +522,26 @@ document.addEventListener('DOMContentLoaded', function() {
         query.sort();
         const filtro = query.toString();
         if (!datosCompartidos || datosCompartidos.filtro !== filtro) {
+            const cargaId = ++solicitudCarga;
+            document.getElementById('carga-dashboard').hidden = false;
+            document.getElementById('estado-fuentes').setAttribute('aria-busy', 'true');
             const requestId = dashboardRequestId;
-            const promesa = fetch("{% url 'eges_import:estadisticas_fuentes_data' %}?" + filtro)
+            const consulta = colaConsultas.catch(() => {}).then(() => {
+                if (requestId !== dashboardRequestId) {
+                    const error = new Error('La selección fue reemplazada.');
+                    error.name = 'AbortError';
+                    throw error;
+                }
+                return fetch("{% url 'eges_import:estadisticas_fuentes_data' %}?" + filtro);
+            });
+            colaConsultas = consulta;
+            const promesa = consulta
                 .then(async response => {
+                    if (!response.headers.get('content-type')?.includes('application/json')) {
+                        throw new Error(response.status === 503 || response.status === 504
+                            ? 'El servidor no pudo completar la consulta. Esperá un momento y volvé a aplicar los filtros.'
+                            : `La consulta recibió una respuesta inesperada del servidor (${response.status}).`);
+                    }
                     const datos = await response.json();
                     if (!response.ok) throw new Error(datos.error || 'No se pudo cargar la selección.');
                     if (requestId === dashboardRequestId) {
@@ -487,12 +572,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     return datos;
                 }).catch(error => {
                     if (requestId === dashboardRequestId) {
-                        document.getElementById('estado-fuentes').textContent = error.message;
-                        Object.values(charts).forEach(chart => chart.destroy());
-                        Object.keys(charts).forEach(key => delete charts[key]);
+                        document.getElementById('estado-fuentes').textContent = error.message
+                            + (Object.keys(charts).length ? ' Los gráficos corresponden a la última consulta completada.' : '');
+                        datosCompartidos = null;
                         document.getElementById('btn-exportar-pdf').setAttribute('aria-disabled', 'true');
                     }
                     throw error;
+                }).finally(() => {
+                    if (cargaId === solicitudCarga) {
+                        document.getElementById('carga-dashboard').hidden = true;
+                        document.getElementById('estado-fuentes').setAttribute('aria-busy', 'false');
+                    }
                 });
             datosCompartidos = {filtro, promesa};
         }
@@ -943,6 +1033,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Recarga todo cuando cambian los filtros (fechas / modalidades)
     function cargarTodo() {
+        clearTimeout(esperaFiltros);
         datosCompartidos = null;
         const requestId = ++dashboardRequestId;
         const params = obtenerParametrosFiltro();
@@ -1036,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', function() {
         checkbox.addEventListener('change', function() {
             if (!document.querySelector('.modalidad-check:checked')) this.checked = true;
             actualizarEstilosModalidad();
-            cargarTodo();
+            programarFiltros();
         });
     });
 
@@ -1052,7 +1143,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const hoy = new Date();
             let desde = null;
             let hasta = null;
-            if (this.dataset.periodo === 'mes-actual') {
+            if (this.dataset.periodo === 'tres-meses' || this.dataset.periodo === 'ultimo-cargado') {
+                const ultimaFecha = '{{ fecha_referencia_filtros|date:"Y-m-d" }}';
+                if (!ultimaFecha) return;
+                const [anio, mes] = ultimaFecha.split('-').map(Number);
+                desde = new Date(anio, mes - (this.dataset.periodo === 'tres-meses' ? 3 : 1), 1);
+                hasta = new Date(anio, mes, 0);
+            } else if (this.dataset.periodo === 'mes-actual') {
                 desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
                 hasta = hoy;
             } else if (this.dataset.periodo === 'mes-anterior') {
@@ -1077,7 +1174,11 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarBotonesAgrupacion('agrup-mes');
     actualizarBotonesTipo('line');
     actualizarEstilosModalidad();
-    cargarTodo();
+    if ('{{ fecha_referencia_filtros|date:"Y-m-d" }}') {
+        document.querySelector('[data-periodo="tres-meses"]').click();
+    } else {
+        cargarTodo();
+    }
 });
 </script>
 {% endblock %}

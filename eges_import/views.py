@@ -408,6 +408,10 @@ def dashboard_global(request):
     todas_filas = EgesRow.objects.filter(fecha_turno__isnull=False)
     fecha_min = todas_filas.order_by('fecha_turno').first()
     fecha_max = todas_filas.order_by('-fecha_turno').first()
+    fecha_aprobada = ProduccionValidada.objects.aggregate(ultima=Max('fecha_hasta'))['ultima']
+    fechas_referencia = [fecha for fecha in (
+        fecha_max.fecha_turno if fecha_max else None, fecha_aprobada,
+    ) if fecha]
     
     form_fuentes = _form_estadisticas_fuentes(request.GET if request.GET else None)
     if not request.GET.getlist('lotes_eges') and not request.GET.getlist('lotes_netterm'):
@@ -430,6 +434,7 @@ def dashboard_global(request):
         'total_otros_global': total_otros_global,
         'fecha_min': fecha_min.fecha_turno if fecha_min else None,
         'fecha_max': fecha_max.fecha_turno if fecha_max else None,
+        'fecha_referencia_filtros': max(fechas_referencia) if fechas_referencia else None,
         'batches': batches,
     }
     return render(request, 'eges_import/dashboard_global.html', context)

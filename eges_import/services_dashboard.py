@@ -6,9 +6,11 @@ import json
 from django.core.exceptions import ValidationError
 
 from .models import EgesRow, ImportBatch, NettermFila, NettermLote, ProduccionValidada
-from .services_conciliacion import _dni, _modalidad_consolidada, _texto_normalizado
+from .services_conciliacion import _datos_eges, _dni, _modalidad_consolidada, _texto_normalizado
 from .services_identificacion import _hc_netterm
-from .services_produccion import ETIQUETAS_PENDIENTES, construir_preview_produccion, resumir_practicas_produccion
+from .services_produccion import ETIQUETAS_PENDIENTES, realizada_eges, resumir_practicas_produccion
+from .services_procedimientos import MODALIDADES_GUIADAS
+from .services_unidades import aplicar_unidades_rx
 from .services_validacion_produccion import leer_produccion_validada
 
 
@@ -34,43 +36,77 @@ def _clave_estudio_netterm(fila):
     return fila.clave_candidata_sha256, paciente
 
 
-def _base_eges_dashboard(batches):
-    resultado = None
-    firmas = []
-    for batch_id in sorted(batches):
-        parcial = construir_preview_produccion(
-            batch_eges_ids=[batch_id], lote_netterm_ids=[],
-            permitir_fuente_unica=True, incluir_practicas=True,
-        )
-        firmas.append(parcial['firma_snapshot'])
-        if resultado is None:
-            resultado = parcial
-            continue
-        resultado['practicas'].extend(parcial['practicas'])
-        for clave in ('pendientes', 'excluidos', 'estados_eges'):
-            resultado[clave] = dict(Counter(resultado[clave]) + Counter(parcial[clave]))
-    if resultado is None:
+def _base_eges_dashboard(batches, validaciones, cubiertos):
+    if not batches:
         raise ValidationError('Cargá un lote EGES para ver la producción.')
+    practicas, afectados = [], set()
+    pendientes, excluidos, estados = Counter(), Counter(), Counter()
+    firma = hashlib.sha256()
+    filas = EgesRow.objects.filter(batch_id__in=batches, es_insumo=False).only(
+        'pk', 'batch_id', 'dni_paciente', 'codigo_practica', 'fecha_turno',
+        'hora_turno', 'estado_turno', 'practica', 'estado_informe', 'modalidad', 'cantidad',
+    ).order_by('pk')
+    for origen in filas.iterator(chunk_size=500):
+        fila = _datos_eges(origen)
+        firma.update(json.dumps(fila, sort_keys=True, default=str).encode())
+        estado = _texto_normalizado(fila['estado'])
+        estados[estado or 'SIN ESTADO'] += 1
+        if estado in {'ANULADO', 'CANCELADO'}:
+            excluidos['eges_anulado'] += 1
+            continue
+        motivo = None
+        if not fila['fecha_turno']:
+            motivo = 'eges_sin_fecha'
+        elif fila['modalidad'] in {'OTROS', 'SIN_CLASIFICAR', ''}:
+            motivo = 'eges_modalidad'
+        elif not realizada_eges(fila):
+            motivo = 'eges_realizacion_sin_confirmar'
+        elif estado != 'INFORMADO':
+            motivo = 'eges_informe_sin_confirmar'
+        if motivo:
+            pendientes[motivo] += 1
+            continue
+        if fila['id'] in cubiertos:
+            continue
+        info = _validacion_del_estudio(validaciones, fila['fecha_turno'], fila['modalidad'])
+        if info and fila['lote_id'] in info['validacion'].lotes_eges_ids:
+            continue
+        if info:
+            afectados.add((info['validacion'].pk, fila['modalidad']))
+        item = {'fila': fila, 'incluida': True, 'fuente': 'EGES', 'informada': True,
+                'fecha_produccion': fila['fecha_turno']}
+        modalidad_guiada = MODALIDADES_GUIADAS.get(str(fila['codigo']).removesuffix('/0'))
+        if modalidad_guiada and modalidad_guiada == fila['modalidad']:
+            item.update(procedimiento_guiado=True, procedimiento_guiado_modalidad=modalidad_guiada)
+        practicas.append(item)
+    resultado = {
+        'practicas': aplicar_unidades_rx(practicas), 'pendientes': dict(pendientes),
+        'excluidos': dict(excluidos), 'estados_eges': dict(estados), 'estados_netterm': {},
+        'provisional': True, 'version_reglas': 'BASE_EGES_DASHBOARD_V2',
+        'insumos_netterm_excluidos': 0, 'fecha_desde': None, 'fecha_hasta': None,
+        'vinculaciones_humanas_consumidas': 0, 'vinculaciones_rechazadas_consumidas': 0,
+    }
     resultado['pendientes_detalle'] = [{'motivo': ETIQUETAS_PENDIENTES[motivo], 'cantidad': cantidad}
                                       for motivo, cantidad in resultado['pendientes'].items()]
     anuladas = sum(resultado['excluidos'].values())
     resultado['excluidos_detalle'] = [{'motivo': 'EGES: anuladas', 'cantidad': anuladas}] if anuladas else []
     resultado['batch_eges_ids'] = sorted(batches)
-    resultado['firma_snapshot'] = hashlib.sha256(json.dumps(firmas).encode()).hexdigest()
-    return resultado
+    resultado['firma_snapshot'] = firma.hexdigest()
+    return resultado, afectados
 
 
 def construir_produccion_dashboard(*, incluir_netterm=False):
     batches = set(ImportBatch.objects.values_list('pk', flat=True))
-    resultado = _base_eges_dashboard(batches)
     lotes_netterm = set(NettermLote.objects.values_list('pk', flat=True))
     validaciones = []
     advertencias = []
-    for validacion in ProduccionValidada.objects.all():
+    for validacion in ProduccionValidada.objects.defer('decisiones_json').iterator(chunk_size=1):
         if (not set(validacion.lotes_eges_ids).issubset(batches)
                 or not set(validacion.lotes_netterm_ids).issubset(lotes_netterm)):
             continue
-        snapshot = leer_produccion_validada(validacion.pk)
+        snapshot = leer_produccion_validada(validacion)
+        # El objeto de metadatos deja de retener el JSON completo ya leído.
+        del validacion.resultado_json
         modalidades = set(EgesRow.objects.filter(batch_id__in=validacion.lotes_eges_ids).order_by()
                           .values_list('modalidad', flat=True).distinct())
         modalidades.update(_modalidad_consolidada(modalidad) for modalidad in
@@ -88,18 +124,8 @@ def construir_produccion_dashboard(*, incluir_netterm=False):
     cubiertos = {item['fila']['id'] for info in validaciones for item in info['snapshot']['practicas']
                  if 'fecha_turno' in item['fila']
                  and _validacion_del_estudio(validaciones, item['fecha_produccion'], item['fila']['modalidad']) is info}
-    base = {}
-    afectados = set()
-    for item in resultado['practicas']:
-        fila = item['fila']
-        if fila['id'] in cubiertos:
-            continue
-        info = _validacion_del_estudio(validaciones, item['fecha_produccion'], fila['modalidad'])
-        if info and fila['lote_id'] in info['validacion'].lotes_eges_ids:
-            continue
-        base[fila['id']] = item
-        if info:
-            afectados.add((info['validacion'].pk, fila['modalidad']))
+    resultado, afectados = _base_eges_dashboard(batches, validaciones, cubiertos)
+    base = {item['fila']['id']: item for item in resultado.pop('practicas')}
     nt_ids = {item.get('netterm', item['fila'])['id']
               for info in validaciones for item in info['snapshot']['practicas']
               if item.get('netterm') or 'fecha_pedido' in item['fila']}

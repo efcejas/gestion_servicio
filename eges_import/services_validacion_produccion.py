@@ -195,10 +195,12 @@ def confirmar_produccion(*, usuario, firma_esperada, decisiones, **seleccion):
 
 
 def leer_produccion_validada(validacion_id):
-    validacion = ProduccionValidada.objects.filter(pk=validacion_id).first()
+    validacion = (validacion_id if isinstance(validacion_id, ProduccionValidada)
+                  else ProduccionValidada.objects.filter(pk=validacion_id).first())
     if not validacion:
         raise ValidationError('La producción confirmada no existe.')
-    resultado = deepcopy(validacion.resultado_json)
+    resultado = (validacion.resultado_json if isinstance(validacion_id, ProduccionValidada)
+                 else deepcopy(validacion.resultado_json))
     for item in resultado['practicas']:
         item['fecha_produccion'] = parse_date(item['fecha_produccion'])
         hora = item['fila'].get('hora_turno')

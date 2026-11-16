@@ -616,3 +616,48 @@ memoria. Se cubren cantidades de RX, capacidad de absorción por pedido, estudio
 independientes, cantidades cero, mamografía bilateral, densitometría y lectura de
 validaciones antiguas de RX. `git diff --check` pasó. Los cambios permanecen
 locales en feature/eges-netterm, pendientes de commit y publicación.
+
+## Optimización del tablero, 16 de noviembre
+
+Los logs de Heroku registraron timeouts H12 de 30 segundos en fuentes-data,
+exceso de memoria R14/R15 e interrupciones de otras solicitudes. Ocurrió también
+con el aporte Netterm desactivado.
+
+El tablero lee las producciones aprobadas y recorre la base EGES mediante un
+iterador. Los registros cubiertos por la confirmación se omiten antes de crear
+sus objetos de producción. La base restante conserva los controles de estado,
+modalidad y cantidades. La consulta de estadísticas reutiliza esa producción
+para el período anterior. Se eliminó la segunda consulta de cada validación,
+la retención del JSON en el objeto de metadatos y su copia completa en esa lectura.
+Las unidades de un mismo registro comparten datos de lectura para los gráficos.
+
+Se compararon las respuestas completas con el código del commit previo usando
+una copia en memoria de la base local. Los gráficos e indicadores coinciden.
+La diferencia de metadatos es la firma interna del nuevo recorrido. En una
+medición con fechas y aporte Netterm, el tiempo pasó de 7,98 a 6,24 segundos.
+El pico de asignaciones Python al construir producción pasó de 72,58 a 55,32 MiB
+según tracemalloc. Esa medición corresponde al cálculo local y no representa
+la memoria total del proceso en Heroku.
+
+El navegador reconoce respuestas HTML de error y muestra un aviso para volver
+a aplicar filtros. Conserva los gráficos anteriores con una aclaración visible.
+Pasaron 327 pruebas y la comprobación JavaScript de respuesta HTML 503.
+Los cambios están locales y requieren publicación y medición posterior en Heroku.
+El control de consultas superpuestas y la reducción de versiones reemplazadas
+siguen como optimizaciones posteriores.
+
+Se incorporaron después controles de período y solicitudes. El inicio utiliza
+tres meses calendario hasta el mes más reciente de EGES o del período aprobado.
+Hay accesos al último mes cargado y a toda la historia. La selección de modalidades
+mantiene el filtro global de tarjetas y gráficos y agrupa cambios durante 300 ms.
+Las solicitudes de datos se serializan en el navegador y descartan selecciones
+reemplazadas antes de enviarlas. Se conserva Chart.js y los controles existentes.
+La leyenda de cada gráfico mantiene su función visual propia.
+Pasaron 47 pruebas focales y la comprobación JavaScript de los rangos calendario
+antes del ajuste final del contexto de fecha de referencia.
+
+La comprobación posterior del contexto pasó las 9 pruebas del tablero. El usuario
+aprobó visualmente el modal de espera con fondo translúcido y reloj de agujas
+animadas. El indicador cubre espera y procesamiento y se cierra al resolver la
+consulta. Respeta movimiento reducido. El usuario solicitó commit y push para
+realizar personalmente el despliegue en Heroku y la comprobación en producción.

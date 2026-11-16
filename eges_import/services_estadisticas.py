@@ -100,14 +100,14 @@ def _resto_ranking(conteo):
     return [{'nombre': nombre, 'total': total} for nombre, total in conocidos[10:]]
 
 
-def _poblacion(seleccion, modalidades):
+def _poblacion(seleccion, modalidades, produccion_dashboard=None):
     seleccion = seleccion.copy()
     validacion_id = seleccion.pop('validacion_id', None)
     dashboard_global = seleccion.pop('dashboard_global', False)
     incluir_netterm = seleccion.pop('incluir_netterm', False)
     if dashboard_global:
         from .services_dashboard import construir_produccion_dashboard
-        resultado = construir_produccion_dashboard(incluir_netterm=incluir_netterm)
+        resultado = dict(produccion_dashboard) if produccion_dashboard is not None else construir_produccion_dashboard(incluir_netterm=incluir_netterm)
     elif validacion_id:
         from .services_validacion_produccion import leer_produccion_validada
         resultado = leer_produccion_validada(validacion_id)
@@ -213,7 +213,8 @@ def _poblacion(seleccion, modalidades):
             'revision_cobertura': coberturas['pendientes'].get(clave_nt) if not original else None,
             'practica': fila['practica'],
         }
-        filas.extend(dict(fila_estadistica) for _ in range(unidades_practica(item)))
+        # Las unidades comparten los mismos datos de lectura para los gráficos.
+        filas.extend([fila_estadistica] * unidades_practica(item))
     return resultado, filas
 
 
@@ -262,7 +263,11 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
         seleccion['validacion_id'] = validacion_id
     if dashboard_global:
         seleccion.update(dashboard_global=True, incluir_netterm=incluir_netterm)
-    produccion, filas = _poblacion(seleccion, modalidades)
+    produccion_dashboard = None
+    if dashboard_global:
+        from .services_dashboard import construir_produccion_dashboard
+        produccion_dashboard = construir_produccion_dashboard(incluir_netterm=incluir_netterm)
+    produccion, filas = _poblacion(seleccion, modalidades, produccion_dashboard)
     kpis = _indicadores(filas, fecha_desde, fecha_hasta)
     nombres = dict(EgesRow.MODALIDAD_CHOICES)
     conteo = Counter(fila['modalidad'] for fila in filas)
@@ -306,7 +311,8 @@ def construir_estadisticas_fuentes(*, batch_eges_ids, lote_netterm_ids, fecha_de
         hasta_previo = fecha_desde - timedelta(days=1)
         desde_previo = fecha_desde - timedelta(days=(fecha_hasta - fecha_desde).days + 1)
         periodo_anterior = {'desde': desde_previo.isoformat(), 'hasta': hasta_previo.isoformat()}
-        _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades)
+        _, anteriores = _poblacion({**seleccion, 'fecha_desde': desde_previo, 'fecha_hasta': hasta_previo}, modalidades,
+                                  produccion_dashboard)
         if anteriores:
             previo = _indicadores(anteriores, desde_previo, hasta_previo)
     comparativa = {'hay_datos_anterior': previo is not None,
